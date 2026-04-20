@@ -1403,10 +1403,14 @@ const QP_TYPES = [
 ]
 
 const QP_SIZES = [
-    { id: '1:1',  label: '1:1',   desc: 'Instagram / Facebook', icon: 'crop_square' },
-    { id: '9:16', label: '9:16',  desc: 'Story / Reel / Status', icon: 'crop_portrait' },
-    { id: '16:9', label: '16:9',  desc: 'YouTube / Banner',      icon: 'crop_landscape' },
-    { id: '4:5',  label: '4:5',   desc: 'Feed Optimal',          icon: 'crop_5_4' },
+    { id: '1:1',       label: '1:1',     desc: 'Instagram / Facebook',   icon: 'crop_square',   w: 1024, h: 1024 },
+    { id: '4:5',       label: '4:5',     desc: 'Feed Optimal',           icon: 'crop_5_4',      w: 896,  h: 1120 },
+    { id: '9:16',      label: '9:16',    desc: 'Story / Reel / Status',  icon: 'crop_portrait', w: 832,  h: 1216 },
+    { id: '16:9',      label: '16:9',    desc: 'YouTube / Banner',       icon: 'crop_landscape',w: 1344, h: 768  },
+    { id: '750x750',   label: '750×750', desc: 'WhatsApp Group',         icon: 'chat',          w: 750,  h: 750  },
+    { id: '1200x628',  label: '1200×628',desc: 'Meta Ad / OG',           icon: 'ads_click',     w: 1200, h: 628  },
+    { id: '1080x566',  label: '1080×566',desc: 'LinkedIn Post',          icon: 'business_center',w:1080, h: 566  },
+    { id: 'custom',    label: 'Custom',  desc: 'Enter any size',         icon: 'tune',          w: null, h: null },
 ]
 
 const LOGO_POSITIONS = [
@@ -1473,6 +1477,13 @@ function QuickPostPanel({
 }) {
     const { activeBrand } = useBrand()
     const logoUrl = activeBrand?.logoUrl || activeBrand?.logo || null
+    const [customW, setCustomW] = useState(1080)
+    const [customH, setCustomH] = useState(1080)
+
+    // Effective aspect ratio string to send to API
+    const effectiveRatio = qpRatio === 'custom'
+        ? `${customW}:${customH}`
+        : qpRatio
 
     const handleGenerate = async () => {
         if (!productDNA) return
@@ -1490,7 +1501,7 @@ function QuickPostPanel({
                     selectedMoodId,
                     productMoodDirections,
                     postType: qpType,
-                    aspectRatio: qpRatio,
+                    aspectRatio: effectiveRatio,
                     brandId,
                 }),
             })
@@ -1501,7 +1512,7 @@ function QuickPostPanel({
             if (data.backgroundUrl) {
                 const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
                 const composited = await compositeWithLogo(data.backgroundUrl, effectiveLogo, qpLogoPos)
-                if (composited) setQpCompositeUrls({ [qpRatio]: composited })
+                if (composited) setQpCompositeUrls({ [effectiveRatio]: composited })
             }
         } catch (e) {
             setQpError(e.message)
@@ -1564,19 +1575,41 @@ function QuickPostPanel({
             {/* Step 2: Size / Aspect Ratio */}
             <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Output Size</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
                     {QP_SIZES.map(s => (
                         <div key={s.id} onClick={() => setQpRatio(s.id)} style={{
                             borderRadius: 8, border: `1.5px solid ${qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
-                            padding: '8px 14px', cursor: 'pointer', transition: 'all 0.2s', flex: '1 1 auto', textAlign: 'center',
+                            padding: '8px 10px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center',
                             background: qpRatio === s.id ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)',
                         }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 2 }}>{s.icon}</span>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: qpRatio === s.id ? '#FFF' : 'rgba(255,255,255,0.5)' }}>{s.label}</div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{s.desc}</div>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 2 }}>{s.icon}</span>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: qpRatio === s.id ? '#FFF' : 'rgba(255,255,255,0.5)' }}>{s.label}</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{s.desc}</div>
                         </div>
                     ))}
                 </div>
+                {qpRatio === 'custom' && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>WIDTH (px)</div>
+                            <input
+                                type="number" value={customW} onChange={e => setCustomW(Math.max(100, Math.min(4000, parseInt(e.target.value) || 1080)))}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 7, padding: '8px 12px', color: '#FFF', fontSize: 14, fontWeight: 700, outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 700, marginTop: 14 }}>×</span>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>HEIGHT (px)</div>
+                            <input
+                                type="number" value={customH} onChange={e => setCustomH(Math.max(100, Math.min(4000, parseInt(e.target.value) || 1080)))}
+                                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 7, padding: '8px 12px', color: '#FFF', fontSize: 14, fontWeight: 700, outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 14, flexShrink: 0 }}>
+                            → {customW}×{customH}px
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Step 3: Logo Toggle + Position Grid */}
@@ -1735,7 +1768,7 @@ function QuickPostPanel({
     )
 }
 
-function APlusTool({ brandId }) {
+function APlusTool({ brandId, onContextReady, externalContext }) {
     const [inputMode, setInputMode] = useState('url') // url | catalog | sample
     const [productUrl, setProductUrl] = useState('')
     const [analyzedProduct, setAnalyzedProduct] = useState(null)
@@ -1901,7 +1934,20 @@ function APlusTool({ brandId }) {
 
     const handleSelectMood = async (moodId) => {
         setSelectedMood(moodId)
-        if (productDNA) await buildDesignContextFromMood(productDNA, moodId, productMoodDirections)
+        const dc = productDNA ? await buildDesignContextFromMood(productDNA, moodId, productMoodDirections) : null
+        // Bubble context up to parent PulseStudio so all tools share it
+        if (onContextReady && productDNA) {
+            onContextReady({
+                productData:           analyzedProduct,
+                productDNA,
+                productImages,
+                productUrl,
+                selectedMood:          moodId,
+                productMoodDirections,
+                moodImages,
+                designContext:         dc,
+            })
+        }
     }
 
     const handleUploadAndAnalyzeImages = async (files) => {
@@ -2799,45 +2845,322 @@ function HistoryTab({ brandId }) {
     )
 }
 
-// ── Main Page Framework ──────────────────────────────────────────────────────
+// ── Context Library Modal ─────────────────────────────────────────────────────
+function ContextLibraryModal({ brandId, onActivate, onClose }) {
+    const [contexts, setContexts]     = useState([])
+    const [loading, setLoading]       = useState(true)
+    const [search, setSearch]         = useState('')
+    const [activating, setActivating] = useState(null)
+
+    useEffect(() => {
+        if (!brandId) return
+        setLoading(true)
+        apiFetch(`/brand-studio/product-context?brandId=${brandId}&limit=60`)
+            .then(d => { if (d.success) setContexts(d.contexts || []) })
+            .catch(console.error)
+            .finally(() => setLoading(false))
+    }, [brandId])
+
+    const filtered = search
+        ? contexts.filter(c => c.productName.toLowerCase().includes(search.toLowerCase()))
+        : contexts
+
+    const handleActivate = async (ctx) => {
+        setActivating(ctx._id)
+        try {
+            const full = await apiFetch(`/brand-studio/product-context/${ctx._id}`)
+            if (full.success) { onActivate(full.context); onClose() }
+        } catch (e) { console.error(e) }
+        setActivating(null)
+    }
+
+    const handleDelete = async (id, e) => {
+        e.stopPropagation()
+        if (!confirm('Delete this saved context?')) return
+        await apiFetch(`/brand-studio/product-context/${id}`, { method: 'DELETE' })
+        setContexts(prev => prev.filter(c => c._id !== id))
+    }
+
+    return createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ background: '#0D0D14', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, width: '100%', maxWidth: 840, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 19, color: '#A78BFA' }}>library_books</span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#FFF' }}>Product Context Library</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Restore any saved product's palette, mood board, and DNA to use across all tools</div>
+                    </div>
+                    <input
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        placeholder="Search products..."
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 14px', color: '#FFF', fontSize: 13, outline: 'none', width: 200 }}
+                    />
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>close</span>
+                    </button>
+                </div>
+                {/* Grid */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
+                            <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                            Loading library...
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>inventory_2</span>
+                            {search ? 'No products match your search' : 'No saved contexts yet — analyze a product in A+ Listing, then click Save Context.'}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                            {filtered.map(ctx => (
+                                <div key={ctx._id} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.2s', background: '#0A0A0A' }}>
+                                    <div style={{ height: 110, background: '#111', position: 'relative', overflow: 'hidden' }}>
+                                        {ctx.thumbnail ? (
+                                            <img src={ctx.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ height: '100%', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'rgba(255,255,255,0.12)' }}>palette</span>
+                                            </div>
+                                        )}
+                                        <button onClick={e => handleDelete(ctx._id, e)} style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 5, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+                                        </button>
+                                        {ctx.usedIn?.length > 0 && (
+                                            <div style={{ position: 'absolute', bottom: 5, left: 5, display: 'flex', gap: 3 }}>
+                                                {ctx.usedIn.slice(0,3).map(t => (
+                                                    <span key={t} style={{ fontSize: 8, background: 'rgba(124,58,237,0.8)', color: '#FFF', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{t}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ padding: '10px 12px' }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctx.productName}</div>
+                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>{ctx.productCategory}{ctx.productBrand ? ` · ${ctx.productBrand}` : ''}</div>
+                                        <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+                                            {(ctx.palette || []).slice(0,7).map((c, i) => (
+                                                <div key={i} title={c.hex} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                            ))}
+                                        </div>
+                                        <button onClick={() => handleActivate(ctx)} style={{ width: '100%', padding: '7px 0', borderRadius: 7, background: activating === ctx._id ? 'rgba(124,58,237,0.4)' : 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#A78BFA', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                            {activating === ctx._id ? (
+                                                <><div style={{ width: 11, height: 11, border: '2px solid rgba(167,139,250,0.3)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Loading...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined" style={{ fontSize: 13 }}>bolt</span>Activate</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body
+    )
+}
+
+// ── Product Context Bar ───────────────────────────────────────────────────────
+// Sits above ALL tool tabs. When active, all tools use its palette + mood.
+function ProductContextBar({ brandId, activeContext, onContextChange }) {
+    const [showLibrary, setShowLibrary] = useState(false)
+    const [saving, setSaving]           = useState(false)
+    const [saved, setSaved]             = useState(false)
+
+    const handleSave = async () => {
+        if (!activeContext?.productDNA || !brandId) return
+        setSaving(true)
+        try {
+            const res = await apiFetch('/brand-studio/product-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    brandId,
+                    productName:     activeContext.productData?.title || activeContext.productDNA?.productCategory || 'Product',
+                    productCategory: activeContext.productDNA?.productCategory || '',
+                    productBrand:    activeContext.productData?.brand || '',
+                    productUrl:      activeContext.productUrl || '',
+                    productImages:   activeContext.productImages || [],
+                    palette:         activeContext.productDNA?.dominantColors || [],
+                    productDNA:      activeContext.productDNA,
+                    selectedMoodId:  activeContext.selectedMood,
+                    moodDirections:  activeContext.productMoodDirections || {},
+                    moodImages:      activeContext.moodImages || {},
+                    designContext:   activeContext.designContext || null,
+                })
+            })
+            if (res.success) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+        } catch (e) { console.error(e) }
+        setSaving(false)
+    }
+
+    const palette     = activeContext?.productDNA?.dominantColors || []
+    const moodName    = activeContext?.productMoodDirections?.[activeContext?.selectedMood]?.label || activeContext?.selectedMood || ''
+    const productName = activeContext?.productData?.title || activeContext?.productDNA?.productCategory || ''
+
+    return (
+        <>
+            <div style={{
+                background: activeContext
+                    ? 'linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(245,158,11,0.05) 100%)'
+                    : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${activeContext ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 14, padding: '13px 18px', marginBottom: 18,
+                display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: activeContext ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${activeContext ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: activeContext ? '#A78BFA' : 'rgba(255,255,255,0.4)' }}>palette</span>
+                </div>
+
+                {activeContext ? (
+                    <>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#22C55E' }}>check_circle</span>
+                                {productName || 'Active Product'}
+                                {moodName && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>· {moodName}</span>}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                                {palette.slice(0,8).map((c, i) => (
+                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                ))}
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
+                            </div>
+                        </div>
+                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.12)'}`, color: saved ? '#22C55E' : '#FFF', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{saved ? 'check' : saving ? 'hourglass_empty' : 'bookmark'}</span>
+                            {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Context'}
+                        </button>
+                        <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', color: '#A78BFA', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>library_books</span>Library
+                        </button>
+                        <button onClick={() => onContextChange(null)} title="Clear active context" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <div style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                            <strong style={{ color: 'rgba(255,255,255,0.8)' }}>No active product context.</strong> Analyze a product in A+ Listing to lock its palette + mood — or load a saved context from your library.
+                        </div>
+                        <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)', color: '#A78BFA', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Load Saved Context
+                        </button>
+                    </>
+                )}
+            </div>
+
+            {showLibrary && (
+                <ContextLibraryModal
+                    brandId={brandId}
+                    onActivate={ctx => onContextChange({
+                        productData:           { title: ctx.productName, brand: ctx.productBrand },
+                        productDNA:            ctx.productDNA,
+                        productImages:         ctx.productImages || [],
+                        productUrl:            ctx.productUrl,
+                        palette:               ctx.palette,
+                        selectedMood:          ctx.selectedMoodId,
+                        productMoodDirections: ctx.moodDirections,
+                        moodImages:            ctx.moodImages,
+                        designContext:         ctx.designContext,
+                        savedContextId:        ctx._id,
+                    })}
+                    onClose={() => setShowLibrary(false)}
+                />
+            )}
+        </>
+    )
+}
+
+// ── Main Page Framework ───────────────────────────────────────────────────────
 
 const TAB_DATA = [
-    { id: 'deck',    icon: 'slideshow',    label: 'Pulse Deck' },
-    { id: 'mail',    icon: 'mail',         label: 'Pulse Mail' },
-    { id: 'page',    icon: 'web',          label: 'Pulse Page' },
-    { id: 'aplus',   icon: 'stars',        label: 'A+ Listing' },
-    { id: 'history', icon: 'history',      label: 'History' }
+    { id: 'aplus',   icon: 'stars',        label: 'A+ & Posts'  },
+    { id: 'deck',    icon: 'slideshow',    label: 'Pulse Deck'  },
+    { id: 'mail',    icon: 'mail',         label: 'Pulse Mail'  },
+    { id: 'page',    icon: 'web',          label: 'Pulse Page'  },
+    { id: 'history', icon: 'history',      label: 'History'     },
 ]
 
 export default function PulseStudio() {
     const { activeBrand } = useBrand()
     const brandId = activeBrand?._id
-    const [activeTab, setActiveTab] = useState('deck')
+    const [activeTab, setActiveTab]   = useState('aplus')
     const [urlContext, setUrlContext] = useState('')
     const [referenceImage, setReferenceImage] = useState(null)
+
+    // ── Shared Product Creative Context (lives here — all tools inherit it) ──
+    const [activeProductContext, setActiveProductContext] = useState(null)
+
+    // Called from APlusTool when PDI runs + user selects a mood
+    const handleContextReady = useCallback((ctx) => {
+        setActiveProductContext(ctx)
+    }, [])
+
+    // Derived context object passed into each tool
+    const sharedProductContext = activeProductContext ? {
+        productDNA:    activeProductContext.productDNA,
+        designContext: activeProductContext.designContext,
+        productImages: activeProductContext.productImages || [],
+        palette:       activeProductContext.palette || activeProductContext.productDNA?.dominantColors || [],
+        moodLabel:     activeProductContext.productMoodDirections?.[activeProductContext.selectedMood]?.label || '',
+        productName:   activeProductContext.productData?.title || '',
+    } : null
 
     return (
         <DashboardLayout title="Pulse Studio">
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 32, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 16 }}>
+
+                {/* ── Shared Product Context Bar (above all tabs) ── */}
+                <ProductContextBar
+                    brandId={brandId}
+                    activeContext={activeProductContext}
+                    onContextChange={setActiveProductContext}
+                />
+
+                {/* ── Tab Navigation ── */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
                     {TAB_DATA.map(t => (
                         <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
                             background: activeTab === t.id ? 'rgba(255,255,255,0.1)' : 'transparent',
                             color: activeTab === t.id ? '#FFF' : 'rgba(255,255,255,0.5)',
-                            border: 'none', padding: '10px 20px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8,
-                            fontSize: 14, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                            border: activeTab === t.id ? '1px solid rgba(255,255,255,0.14)' : '1px solid transparent',
+                            padding: '9px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 7,
+                            fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
                         }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{t.icon}</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{t.icon}</span>
                             {t.label}
+                            {sharedProductContext && ['deck','mail','page'].includes(t.id) && (
+                                <div title="Product context active" style={{ width: 5, height: 5, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 5px #22C55E', flexShrink: 0 }} />
+                            )}
                         </button>
                     ))}
                 </div>
 
+                {/* ── Context active banner for Deck/Mail/Page tabs ── */}
+                {sharedProductContext && ['deck','mail','page'].includes(activeTab) && (
+                    <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 10, padding: '9px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E', flexShrink: 0 }}>bolt</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#22C55E' }}>Product Intelligence Active</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{sharedProductContext.productName}{sharedProductContext.moodLabel ? ` · ${sharedProductContext.moodLabel}` : ''}</span>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                            {(sharedProductContext.palette || []).slice(0,6).map((c, i) => (
+                                <div key={i} style={{ width: 11, height: 11, borderRadius: 2, background: c.hex || c, border: '1px solid rgba(255,255,255,0.1)' }} />
+                            ))}
+                        </div>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>Palette auto-injected into generation prompts</span>
+                    </div>
+                )}
+
+                {/* ── Tool Views ── */}
                 <div style={{ minHeight: 600 }}>
-                    {activeTab === 'deck'    && <DeckTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
-                    {activeTab === 'mail'    && <MailTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
-                    {activeTab === 'page'    && <PageTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} />}
-                    {activeTab === 'aplus'   && <APlusTool   brandId={brandId} />}
+                    {activeTab === 'aplus'   && <APlusTool   brandId={brandId} onContextReady={handleContextReady} externalContext={activeProductContext} />}
+                    {activeTab === 'deck'    && <DeckTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
+                    {activeTab === 'mail'    && <MailTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
+                    {activeTab === 'page'    && <PageTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
                     {activeTab === 'history' && <HistoryTab  brandId={brandId} />}
                 </div>
             </div>
