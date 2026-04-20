@@ -1,7 +1,28 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useBrand } from '../../context/BrandContext'
 import { apiFetch } from '../../services/api'
+
+// ── Image download helper (bypasses CORS on external CDN images) ──────────────
+async function downloadImageFile(imageUrl, filename) {
+    try {
+        // Fetch the image and create a local blob URL for CORS-safe download
+        const response = await fetch(imageUrl)
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = filename || 'image.jpg'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
+    } catch (err) {
+        // CORS fallback — open in new tab
+        window.open(imageUrl, '_blank')
+    }
+}
 
 // ── Shared ──────────────────────────────────────────────────────────
 
@@ -903,10 +924,11 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
                                                 {regenning ? 'Generating...' : 'Regenerate'}
                                             </button>
-                                            <a href={image} download={`module_${idx + 1}_${module.type}.jpg`} target="_blank" rel="noreferrer"
-                                                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                                            <button
+                                                onClick={() => downloadImageFile(image, `module_${idx + 1}_${module.type}.jpg`)}
+                                                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                                            </a>
+                                            </button>
                                         </div>
                                     </div>
                                     <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.5)', fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Amazon spec: {cfg.amazon}</div>
@@ -973,11 +995,13 @@ function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClos
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         {aiImg && (
-                            <a href={aiImg} download={`moodboard_${current.id}.jpg`} target="_blank" rel="noreferrer"
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                            <button
+                                onClick={() => downloadImageFile(aiImg, `moodboard_${current.id}.jpg`)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+                            >
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
                                 Download
-                            </a>
+                            </button>
                         )}
                         <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
@@ -989,11 +1013,6 @@ function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClos
                     {aiImg ? (
                         <>
                             <img src={aiImg} alt={current.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                            {/* Overlay original product to guarantee 100% fidelity without hallucination */}
-                            {(productDNA?.heroImageUrl || productDNA?.productRefImages?.[0]) && (
-                                <img src={productDNA.heroImageUrl || productDNA.productRefImages[0]} alt="Original Product"
-                                    style={{ position: 'absolute', bottom: '15%', right: '15%', height: '55%', objectFit: 'contain', filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))', pointerEvents: 'none', zIndex: 10 }} />
-                            )}
                         </>
                     ) : (
                         <div style={{ width: '100%', height: '100%', background: current.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1399,10 +1418,12 @@ function APlusTool({ brandId }) {
     const [productDNA, setProductDNA] = useState(null)
     const [selectedMood, setSelectedMood] = useState(null)
     const [moodImages, setMoodImages] = useState({})       // moodId → imageUrl (AI-generated)
+    const [productMoodDirections, setProductMoodDirections] = useState(null)  // AI-generated per-product moods
     const [designContext, setDesignContext] = useState(null)
     const [pdiError, setPdiError] = useState('')
     const [hoveredMood, setHoveredMood] = useState(null)
 
+    // Fallback mood options (used before AI generates product-specific ones)
     const MOOD_STATIC = {
         editorial: { id: 'editorial', label: 'Editorial Clean', icon: 'straighten',  desc: 'Clean, precise, studio-perfect', bg: 'linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%)' },
         bold:      { id: 'bold',      label: 'Bold Ambient',    icon: 'local_fire_department', desc: 'Dark, dramatic, cinematic', bg: 'linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 100%)' },
@@ -1410,11 +1431,42 @@ function APlusTool({ brandId }) {
         luxury:    { id: 'luxury',    label: 'Premium Minimal',  icon: 'diamond',     desc: 'Luxury, spacious, refined',   bg: 'linear-gradient(135deg, #f5f5f0 0%, #e8e4dc 100%)' },
     }
 
+    // Active mood map: AI-generated if available, else static fallback
+    const activeMoods = productMoodDirections
+        ? Object.fromEntries(Object.values(productMoodDirections).map((m, i) => {
+            const defaultIcons = ['graphic_eq', 'local_fire_department', 'wb_sunny', 'diamond']
+            const defaultBgs = [
+                'linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 100%)',
+                'linear-gradient(135deg, #1a0a0a 0%, #2e0d0d 100%)',
+                'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                'linear-gradient(135deg, #f5f5f0 0%, #e8e4dc 100%)',
+            ]
+            const palette = m.colorPalette || []
+            const bg = palette.length >= 2
+                ? `linear-gradient(135deg, ${palette[0]} 0%, ${palette[1]} 100%)`
+                : defaultBgs[i % defaultBgs.length]
+            return [m.id, {
+                ...m,
+                icon: m.icon || defaultIcons[i % defaultIcons.length],
+                desc: m.description || m.desc || '',
+                bg,
+            }]
+        }))
+        : MOOD_STATIC
+
     const handleAnalyzeUrl = async () => {
         if (!productUrl) return
         setAnalyzing(true)
         setPdiStep('analyzing')
         setPdiError('')
+        // ━━ Reset ALL prior product state so old product NEVER bleeds into new analysis ━━
+        setProductDNA(null)
+        setMoodImages({})
+        setProductMoodDirections(null)
+        setSelectedMood(null)
+        setDesignContext(null)
+        setAnalyzedProduct(null)
+        setProductImages([])
         try {
             const data = await apiFetch('/brand-studio/aplus/analyze-product', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1424,6 +1476,10 @@ function APlusTool({ brandId }) {
                 setAnalyzedProduct(data.product)
                 const images = data.product.images || []
                 setProductImages(images)
+                console.log(`📦 Product scraped: "${data.product.title}" — ${images.length} images found`)
+                if (images.length === 0) {
+                    console.warn('⚠️ No images scraped. PDI will run text-only fallback. Check if the URL is behind a login or bot-protection.')
+                }
                 await runProductIntelligence(images, data.product)
             }
         } catch (e) { setPdiError(e.message); setPdiStep('input') }
@@ -1443,43 +1499,65 @@ function APlusTool({ brandId }) {
                 const defaultMood = data.productDNA.defaultMoodDirection || 'editorial'
                 setSelectedMood(defaultMood)
                 setPdiStep('pdi_ready')
-                await buildDesignContextFromMood(data.productDNA, defaultMood)
-                generateMoodBoardInBackground(data.productDNA)
+                await buildDesignContextFromMood(data.productDNA, defaultMood, null)
+                generateMoodBoardInBackground(data.productDNA, product)
             }
         } catch (e) { console.warn('PDI failed:', e.message); setPdiStep('ready') }
     }
 
-    const buildDesignContextFromMood = async (dna, moodId) => {
+    const buildDesignContextFromMood = async (dna, moodId, customDirs = null) => {
         try {
             const data = await apiFetch('/brand-studio/design-context', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productDNA: dna, selectedMoodId: moodId, brandColors })
+                body: JSON.stringify({
+                    productDNA: dna,
+                    selectedMoodId: moodId,
+                    brandColors,
+                    customMoodDirections: customDirs || productMoodDirections || null,
+                })
             })
             if (data.success) setDesignContext(data.designContext)
         } catch (e) { console.warn('Design context build failed:', e.message) }
     }
 
-    const generateMoodBoardInBackground = async (dna) => {
+    const generateMoodBoardInBackground = async (dna, product) => {
         try {
             const data = await apiFetch('/brand-studio/mood-board', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productDNA: dna, brandId })
+                body: JSON.stringify({ productDNA: dna, productData: product || analyzedProduct, brandId })
             })
-            if (data.success && data.moods) {
-                const newImages = {}
-                data.moods.forEach(m => { if (m.imageUrl) newImages[m.id] = m.imageUrl })
-                setMoodImages(newImages)
+            if (data.success) {
+                // Store AI-generated mood directions (product-specific names and descriptions)
+                if (data.moodDirections && Object.keys(data.moodDirections).length >= 2) {
+                    setProductMoodDirections(data.moodDirections)
+                    // Select first AI mood direction as default
+                    const firstMoodId = Object.keys(data.moodDirections)[0]
+                    setSelectedMood(firstMoodId)
+                    if (dna) await buildDesignContextFromMood(dna, firstMoodId, data.moodDirections)
+                }
+                // Store mood images
+                if (data.moods) {
+                    const newImages = {}
+                    data.moods.forEach(m => { if (m.imageUrl) newImages[m.id] = m.imageUrl })
+                    setMoodImages(newImages)
+                }
             }
         } catch (e) { console.warn('Mood board AI gen failed (using static presets):', e.message) }
     }
 
     const handleSelectMood = async (moodId) => {
         setSelectedMood(moodId)
-        if (productDNA) await buildDesignContextFromMood(productDNA, moodId)
+        if (productDNA) await buildDesignContextFromMood(productDNA, moodId, productMoodDirections)
     }
 
     const handleUploadAndAnalyzeImages = async (files) => {
         const urls = await Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f) })))
+        // Reset all prior state before new upload analysis
+        setProductDNA(null)
+        setMoodImages({})
+        setProductMoodDirections(null)
+        setSelectedMood(null)
+        setDesignContext(null)
         setReferenceImages(urls); setProductImages(urls)
         setPdiStep('analyzing')
         await runProductIntelligence(urls, analyzedProduct || {})
@@ -1670,9 +1748,9 @@ function APlusTool({ brandId }) {
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                 {Object.entries(editedImages).map(([moduleId, imgUrl], i) => {
                                     const m = editedModules.find(m => m.id === moduleId); const cfg = MODULE_TYPE_CONFIG[m?.type] || { label: m?.type }
-                                    return <a key={i} href={imgUrl} download={`aplus_${i + 1}_${m?.type || 'module'}.jpg`} target="_blank" rel="noreferrer" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    return <button key={i} onClick={() => downloadImageFile(imgUrl, `aplus_${i + 1}_${m?.type || 'module'}.jpg`)} style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span>{i + 1}. {cfg.label?.split(' ')[0]}
-                                    </a>
+                                    </button>
                                 })}
                             </div>
                         </div>
@@ -1688,13 +1766,25 @@ function APlusTool({ brandId }) {
                         </div>
                     </div>
                 </div>
+
+                {/* Amazon listing preview — portalled to body so position:fixed works from any container */}
+                {previewOpen && createPortal(
+                    <AmazonListingPreview
+                        modules={editedModules}
+                        images={editedImages}
+                        isPremium={isPremiumResult}
+                        productName={plan.productName || productDNA?.productCategory}
+                        onClose={() => setPreviewOpen(false)}
+                    />,
+                    document.body
+                )}
             </div>
         )
     }
 
     // ── PDI Ready — Palette + Mood Selector + Generate ────────────────────────
     if (pdiStep === 'pdi_ready' && productDNA) {
-        const activeMood = MOOD_STATIC[selectedMood] || MOOD_STATIC.editorial
+        const activeMood = activeMoods[selectedMood] || activeMoods[Object.keys(activeMoods)[0]] || MOOD_STATIC.editorial
         return (
             <div style={{ position: 'relative' }}>
                 {/* ProductDNA Card */}
@@ -1715,10 +1805,31 @@ function APlusTool({ brandId }) {
                         </span>
                     </div>
 
+                    {/* Product Identity Confirmation — shows user EXACTLY what was analyzed */}
+                    {analyzedProduct?.title && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E', flexShrink: 0 }}>inventory_2</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: '#FFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{analyzedProduct.title}</div>
+                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                                    {productDNA.productCategory}
+                                    {analyzedProduct.brand ? ` · ${analyzedProduct.brand}` : ''}
+                                    {` · ${productImages.length} images analysed`}
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                {productImages.slice(0, 3).map((img, i) => (
+                                    <img key={i} src={img} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} onError={e => e.target.style.display='none'} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Color Palette — image-format strip */}
                     {productDNA.dominantColors?.length > 0 && (
                         <ColorPaletteStrip colors={productDNA.dominantColors} />
                     )}
+
 
                     {/* Mood Board Selector */}
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1736,7 +1847,7 @@ function APlusTool({ brandId }) {
                     </div>
                     {/* Mood boards — 2x2 grid for larger display */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
-                        {Object.values(MOOD_STATIC).map(mood => {
+                        {Object.values(activeMoods).map(mood => {
                             const aiImg = moodImages[mood.id]
                             const isSelected = selectedMood === mood.id
                             const moodSwatches = {
@@ -1810,8 +1921,11 @@ function APlusTool({ brandId }) {
                                     <div style={{ padding: '10px 12px', background: isSelected ? 'rgba(124,58,237,0.12)' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 16, color: isSelected ? '#A78BFA' : 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{mood.icon}</span>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? '#A78BFA' : '#FFF' }}>{mood.label}</div>
-                                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? '#A78BFA' : '#FFF', lineHeight: 1.3 }}>{mood.label}</div>
+                                                {productMoodDirections && <span style={{ fontSize: 8, color: 'rgba(139,92,246,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 3, padding: '1px 4px', fontWeight: 700, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>AI</span>}
+                                            </div>
+                                            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
                                         </div>
                                         {/* Swatch strip */}
                                         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
@@ -1862,7 +1976,7 @@ function APlusTool({ brandId }) {
                 {/* Mood board lightbox */}
                 {lightboxMood && (
                     <MoodBoardLightbox
-                        moods={MOOD_STATIC}
+                        moods={activeMoods}
                         moodImages={moodImages}
                         moodSwatches={{ editorial: ['#FFFFFF', '#F5F0EA', '#E8E4DF', '#D0C8BF'], bold: ['#0D0D0D', '#1A0D2E', '#7B2FFF', '#2A1A5A'], lifestyle: ['#C97B5A', '#8FA888', '#E8D5B7', '#6B8C6B'], luxury: ['#F8F4EF', '#C9A96E', '#2A2A2A', '#8B7355'] }}
                         openMoodId={lightboxMood}
@@ -2054,7 +2168,7 @@ function APlusTool({ brandId }) {
             {/* Mood board lightbox */}
             {lightboxMood && (
                 <MoodBoardLightbox
-                    moods={MOOD_STATIC}
+                    moods={activeMoods}
                     moodImages={moodImages}
                     moodSwatches={{ editorial: ['#FFFFFF', '#F5F0EA', '#E8E4DF', '#D0C8BF'], bold: ['#0D0D0D', '#1A0D2E', '#7B2FFF', '#2A1A5A'], lifestyle: ['#C97B5A', '#8FA888', '#E8D5B7', '#6B8C6B'], luxury: ['#F8F4EF', '#C9A96E', '#2A2A2A', '#8B7355'] }}
                     openMoodId={lightboxMood}
@@ -2063,16 +2177,6 @@ function APlusTool({ brandId }) {
                 />
             )}
 
-            {/* Amazon listing preview */}
-            {previewOpen && gen.result && (
-                <AmazonListingPreview
-                    modules={editedModules}
-                    images={editedImages}
-                    isPremium={gen.result?.isPremium || listingTier === 'premium'}
-                    productName={gen.result?.aplusPlan?.productName}
-                    onClose={() => setPreviewOpen(false)}
-                />
-            )}
         </div>
     )
 }

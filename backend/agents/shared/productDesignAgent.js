@@ -10,78 +10,121 @@
  * All generators (A+, Deck, Email, Page) consume the output of this agent.
  */
 
-import { callMultimodalAgent } from './agentUtils.js';
+import { callMultimodalAgent, callAgent } from './agentUtils.js';
 import { laozhangImageGenerate } from '../videoStudio/laozhangClient.js';
 
-// ── Mood Direction Definitions ──────────────────────────────────────────────────
-const MOOD_DIRECTIONS = {
+// ── Fallback Mood Directions (used during loading / when AI generation fails) ──
+// These are intentionally generic. The real moods are AI-generated per product.
+const FALLBACK_MOOD_DIRECTIONS = {
     editorial: {
-        id: 'editorial',
-        label: 'Editorial Clean',
+        id: 'editorial', label: 'Editorial Clean', icon: 'straighten',
         description: 'Clean, precise, professional — magazine-grade studio perfection',
-        shootDirective: 'Pure white or very light grey background, soft even front-fill lighting, product perfectly centered with crisp drop shadow, award-winning product photography. Think: Apple.com, Muji catalogue.',
-        moodBoardDirective: `
-Create a professional DESIGNER MOOD BOARD — a curated multi-panel collage. This is NOT a product photo.
-The mood board must contain ALL of these visual elements arranged in a clean grid layout:
-1. THREE large solid-color swatch rectangles: pure white (#FFFFFF), warm off-white (#F5F0EA), light warm grey (#E8E4DF) — these should be prominent flat-color blocks
-2. ONE material texture close-up panel: smooth linen fabric, uncoated paper grain, or fine matte concrete surface — extreme macro detail
-3. TWO editorial photography vignettes: minimal white studio interior with diffused natural light, flat-lay of minimal objects on white marble surface
-4. ONE typographic geometry panel: clean sans-serif letterform shapes as abstract graphic design elements
-Overall chromatic theme: white-dominant, neutral, restrained, crisp — magazine editorial quality
-Layout: think Behance moodboard, agency creative brief, Kinfolk editorial, Apple product direction
-CRITICAL: Do NOT show any product. Do NOT render readable text, words, or numbers. Fill entire frame.`,
+        shootDirective: 'Pure white or very light grey background, soft even front-fill lighting, product perfectly centered with crisp drop shadow. Think: Apple.com, Muji catalogue.',
     },
     bold: {
-        id: 'bold',
-        label: 'Bold Ambient',
+        id: 'bold', label: 'Bold Ambient', icon: 'local_fire_department',
         description: 'Dramatic, moody, powerful — dark environments with cinematic rim light',
-        shootDirective: 'Very dark background (#0d0d0d or deep navy), dramatic directional rim lighting from behind creating a glow or halo, high contrast, cinematic quality. Think: PlayStation, Bang & Olufsen, Monster Energy.',
-        moodBoardDirective: `
-Create a professional DESIGNER MOOD BOARD — a dark cinematic collage. This is NOT a product photo.
-The mood board must contain ALL of these visual elements in a dramatic grid:
-1. THREE large solid-color swatch rectangles: near-black (#0D0D0D), deep navy-purple (#1A0D2E), electric accent (vivid neon blue or purple #7B2FFF) — prominent flat-color blocks
-2. ONE material texture panel: brushed dark metal surface, carbon fiber weave, or polished volcanic basalt — extreme close-up
-3. TWO atmospheric photography vignettes: night cityscape with neon reflections in wet pavement, dark industrial space with single dramatic light beam
-4. ONE bold graphic element: sharp geometric angular shapes, high-contrast black-and-light abstract composition
-Overall chromatic theme: near-black dominant with electric accent highlights — cinematic, premium, powerful
-Layout: think gaming brand moodboard, Sony PlayStation, Apple Dark Mode direction, Rolls-Royce campaign
-CRITICAL: Do NOT show any product. Do NOT render readable text, words, or numbers. Fill entire frame.`,
+        shootDirective: 'Very dark background, dramatic directional rim lighting from behind, high contrast, cinematic quality. Think: PlayStation, Bang & Olufsen.',
     },
     lifestyle: {
-        id: 'lifestyle',
-        label: 'Lifestyle Vibrant',
+        id: 'lifestyle', label: 'Lifestyle Vibrant', icon: 'wb_sunny',
         description: 'Real-world, human, contextual — aspirational but relatable',
-        shootDirective: 'Real-world environment appropriate for how the product is used, natural warm light, human element implied, editorial lifestyle photography. Think: Glossier, Away Luggage, Oatly.',
-        moodBoardDirective: `
-Create a professional DESIGNER MOOD BOARD — a warm lifestyle editorial collage. This is NOT a product photo.
-The mood board must contain ALL of these visual elements:
-1. THREE large solid-color swatch rectangles: warm terracotta (#C97B5A), soft sage green (#8FA888), warm sand/cream (#E8D5B7) — prominent flat-color blocks
-2. ONE material texture panel: natural linen fabric weave, warm oak wood grain, or woven rattan — extreme close-up macro shot
-3. TWO lifestyle photography vignettes: sunlit kitchen corner with ceramic bowls and trailing plants, outdoor golden-hour table setting with warm drink and shadow play
-4. ONE botanical accent panel: macro close-up of dried botanicals, eucalyptus leaves, or pressed flowers — design element
-Overall chromatic theme: warm earth tones, natural materials, golden light — approachable, human, aspirational
-Layout: think D2C brand moodboard, Kinfolk magazine, Glossier creative direction, Away luggage campaign
-CRITICAL: Do NOT show any product. Do NOT render readable text, words, or numbers. Fill entire frame.`,
+        shootDirective: 'Real-world environment for how the product is used, natural warm light, human element implied. Think: Glossier, Away Luggage.',
     },
     luxury: {
-        id: 'luxury',
-        label: 'Premium Minimal',
+        id: 'luxury', label: 'Premium Minimal', icon: 'diamond',
         description: 'Ultra-premium, spacious, sophisticated — luxury goods treatment',
-        shootDirective: 'Extreme negative space, luxury surface textures (white marble, natural linen, brushed concrete) as backgrounds, single dramatic overhead or angled key light source, jewelry and luxury goods photography quality. Think: Bottega Veneta, Aesop, Bang & Olufsen.',
-        moodBoardDirective: `
-Create a professional DESIGNER MOOD BOARD — an ultra-premium minimalist collage. This is NOT a product photo.
-The mood board must contain ALL of these visual elements with extreme negative space:
-1. THREE large solid-color swatch rectangles: warm off-white (#F8F4EF), champagne gold (#C9A96E), deep charcoal (#2A2A2A) — prominent flat-color blocks with vast breathing room around them
-2. ONE luxury material texture panel: white Carrara marble with fine gold veins, or smooth ivory sand stone, or lustrous raw silk — extreme close-up macro detail
-3. TWO luxury editorial vignettes: extreme close-up of a fine leather edge or ceramic glaze, minimalist architectural interior with a single diagonal shaft of natural light
-4. ONE fine art element: abstract gestural ink brushstroke or a minimal sculptural form on neutral ground
-Overall chromatic theme: muted luxury neutrals, gold accent, whisper-quiet sophistication — extreme restraint
-Layout: think Aesop, Bottega Veneta, Loro Piana, Frama Copenhagen, Hermès brand direction
-CRITICAL: Do NOT show any product. Do NOT render readable text, words, or numbers. Fill entire frame.`,
+        shootDirective: 'Extreme negative space, luxury surface textures as backgrounds, single dramatic key light. Think: Bottega Veneta, Aesop.',
     },
 };
 
-export { MOOD_DIRECTIONS };
+export { FALLBACK_MOOD_DIRECTIONS as MOOD_DIRECTIONS };
+
+// ── Step 0: Generate Product-Specific Mood Directions via Claude ───────────────
+/**
+ * Uses Claude to generate 4 custom mood directions specific to THIS product.
+ * Real designers don't use the same 4 moods for every product — they invent
+ * creative territories that feel native to the product's world.
+ *
+ * @param {object} productDNA   - Output from analyzeProductDesign
+ * @param {object} productData  - Scraped product data (title, category, bullets)
+ * @param {string} brandContext - Brand DNA string
+ * @returns {object} moodDirections map keyed by id (same shape as FALLBACK_MOOD_DIRECTIONS)
+ */
+export async function generateProductMoodDirections(productDNA, productData = {}, brandContext = '') {
+    console.log(`PDI: Generating product-specific mood directions via Claude...`);
+
+    const productSummary = [
+        `Product: ${productDNA.productCategory || productData?.title || 'consumer product'}`,
+        `Materials: ${productDNA.materials || 'premium finish'}`,
+        `Form factor: ${productDNA.productShape || 'compact'}`,
+        `Surface finish: ${productDNA.surfaceFinish || 'refined'}`,
+        `Design mood tags: ${(productDNA.moodTags || []).join(', ')}`,
+        `Design directive: ${productDNA.designDirective || ''}`,
+        `Key features: ${(productData?.bulletPoints || []).slice(0, 4).join(' | ')}`,
+        `Target use: ${productData?.description?.substring(0, 200) || ''}`,
+        brandContext ? `Brand context: ${brandContext.substring(0, 150).replace(/\\n/g, ' ')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const systemPrompt = `You are the world's best senior art director and creative strategist at a top creative agency (think Wieden+Kennedy, R/GA).
+You create product mood boards for a living. You NEVER use the same creative territories for every product.
+You invent evocative, SPECIFIC creative directions that feel native to each product's world.
+
+Rules for mood direction naming:
+- Names must be evocative and specific to THIS product (NOT generic like "Bold Ambient" or "Editorial Clean")
+- Think of names like a photographer or art director would: "Golden Hour Glow", "Urban Kinetic", "Brutal Minimal", "Sunday Morning Ritual"
+- Each direction must feel like a completely different WORLD that this specific product could live in
+- The description should describe the emotional territory and consumer moment, not just visual adjectives
+
+Return ONLY valid JSON, no markdown.`;
+
+    const userPrompt = `PRODUCT PROFILE:
+${productSummary}
+
+Generate 4 creative mood directions for this specific product. Each direction is a distinct emotional/visual territory.
+
+Return this exact JSON structure:
+{
+  "directions": [
+    {
+      "id": "unique_snake_case_id",
+      "label": "Evocative 2-3 Word Name (e.g. 'Golden Hour Glow')",
+      "description": "One sentence describing the consumer MOMENT and emotional territory (not just visual adjectives). E.g.: 'For the early riser finding peace before the world wakes up.'",
+      "targetMoment": "The specific human moment / use context: where, when, who. Max 15 words.",
+      "shootDirective": "Precise photography/image direction for this territory. What background, lighting, environment, atmosphere? Reference real brands or photographers.",
+      "moodBoardDirective": "Detailed art direction for the mood board collage for this territory. What specific scenes, textures, colors, environments should appear?",
+      "colorPalette": ["a suggested hex code for the mood tone (background/accent, NOT the product itself)", "second hex"],
+      "icon": "a single material-symbols icon name that represents this mood"
+    }
+  ]
+}
+
+Make directions feel like they come from a REAL agency creative brief for this specific product. Be evocative, specific, unexpected. 4 directions that together cover the full emotional range of this product's potential consumer universe.`;
+
+    try {
+        const result = await callAgent(systemPrompt, userPrompt, 0.85, 2000, {
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-6',
+            timeoutMs: 30000,
+        });
+
+        if (result?.directions?.length >= 2) {
+            // Convert array to keyed map
+            const moodMap = {};
+            result.directions.slice(0, 4).forEach((d, i) => {
+                const id = d.id || `mood_${i}`;
+                moodMap[id] = { ...d, id };
+            });
+            console.log(`   PDI: Generated ${Object.keys(moodMap).length} product-specific moods:`, Object.keys(moodMap).map(k => moodMap[k].label).join(', '));
+            return moodMap;
+        }
+    } catch (err) {
+        console.warn(`   PDI: Mood direction generation failed: ${err.message}`);
+    }
+
+    // Fallback to generic directions
+    return FALLBACK_MOOD_DIRECTIONS;
+}
 
 // ── Step 1a: Per-Image Classification ─────────────────────────────────
 /**
@@ -91,12 +134,24 @@ export { MOOD_DIRECTIONS };
 async function classifyProductImageView(imageUrl) {
     const systemPrompt = `You are a product photography expert and Amazon listing consultant.
 Analyze this SINGLE product image and classify it precisely.
+
+CRITICAL FORM-FACTOR DISAMBIGUATION RULES — APPLY THESE STRICTLY:
+- HEADPHONES: Has ear-cups, headband, goes OVER the ear. Correct term: "Over-ear headphones" or "On-ear headphones". NEVER call these earphones, earbuds, or in-ear.
+- EARPHONES/EARBUDS: Has ear-tips, goes IN the ear canal, no headband. Correct term: "In-ear earphones" or "True wireless earbuds". NEVER call these headphones.
+- IEM: In-ear monitor — larger ear-tip design. Still NOT headphones.
+- NECKBAND: Neckband wireless earphones — has a neck cable+ear-tips. NOT headphones.
+- LAPTOP vs TABLET: check hinge/keyboard. Laptop has keyboard attached. Tablet is standalone screen.
+- MUG vs TUMBLER vs BOTTLE: Mug has handle. Tumbler is tall cylindrical no-handle. Bottle has cap.
+- WATCH vs FITNESS BAND: Watch has round/square dial face. Band is thin strip.
+Apply these rules before classifying. If you see ear-cups and a headband, it IS a headphone, period.
+
 Return ONLY a valid JSON object, no markdown, no extra text.`;
 
     const userPrompt = `Classify this product image precisely:
 {
   "viewType": "hero|front_face|back_panel|open_case|in_use|macro_detail|packaging|variant_color|lifestyle|flat_lay|group_shot|side_profile|angle_shot",
   "shortDescription": "1 sentence: exactly what is visible in this specific image",
+  "exactFormFactor": "CRITICAL: Identify EXACT product type and scale (e.g., 'over-ear headphone' vs 'in-ear earphone', 'mug' vs 'tumbler', 'laptop' vs 'tablet'). Apply the disambiguation rules from system prompt. DO NOT generalize.",
   "primaryColors": ["#hexcode of 2-3 most prominent colors actually visible in this image"],
   "materialsVisible": ["specific materials visible e.g. soft-touch matte plastic, brushed aluminum, silicone eartip"],
   "lightingStyle": "studio_clean|lifestyle_ambient|dark_dramatic|bright_airy|natural_outdoor",
@@ -132,14 +187,26 @@ async function synthesizeProductDNA(roster, allImages, productData, brief) {
 You have already classified each image individually (see roster below). Now synthesize a complete ProductDNA.
 Return ONLY a valid JSON object, no markdown, no extra text.`;
 
-    const userPrompt = `Product: ${productData?.title || 'Unknown product'}
-Bullet points: ${(productData?.bulletPoints || []).join(' | ')}
-Brief: ${brief || 'General marketing content'}
+    const productTitle = productData?.title || 'Unknown product';
+    const bullets = (productData?.bulletPoints || []).join(' | ');
+    const userPrompt = `PRODUCT TITLE (ground truth): "${productTitle}"
+PRODUCT CATEGORY (from listing): ${productData?.category || 'unknown'}
+BULLET POINTS: ${bullets}
+BRIEF: ${brief || 'General marketing content'}
 
 PER-IMAGE CLASSIFICATION ROSTER:
 ${rosterSummary}
 
 All ${allImages.length} product images are shown. Cross-reference them to identify TRUE product colors (consistent across views, not shadows/backgrounds).
+
+CLASSIFICATION GROUND RULES:
+1. The product title "${productTitle}" is the SINGLE MOST IMPORTANT signal for productCategory. Start there.
+2. Use the images to CONFIRM and REFINE the category — never override a clear title signal with image speculation.
+3. Only apply audio-device disambiguation if the title OR images explicitly show audio hardware:
+   - If the title says "headphone" or images show large over-ear cups + headband → "Over-ear Headphones"
+   - If the title says "earphone/earbud" or images show in-ear tips → "In-ear Earphones"
+   - For ALL other products: classify based on what the title and images actually show (skincare, footwear, furniture, phone, etc.)
+4. productCategory must be a specific, readable product name that a consumer would use (NOT a technical code or generic label like "consumer product").
 
 Return the composite ProductDNA:
 {
@@ -156,8 +223,8 @@ Return the composite ProductDNA:
   "backgroundSuggestions": ["#hex (reason)", "#hex", "#hex"],
   "materials": "Precise composite material description across all views",
   "productShape": "Shape character — angular/rounded/organic/cylindrical/compact/elongated",
-  "productCategory": "what type of product in 2-4 words",
-  "moodTags": ["3-5 mood tags matching the product's character"],
+  "productCategory": "The exact product type — derived primarily from the title '${productTitle}'. Specific, consumer-readable (e.g. 'Daily Moisturiser', 'Trail Running Shoes', 'Wireless Headphones', 'Oak Coffee Table')",
+  "moodTags": ["3-5 mood tags matching the product's character and lifestyle context"],
   "defaultMoodDirection": "editorial | bold | lifestyle | luxury",
   "photographyStyle": "Recommended photography style based on what works best across all views",
   "lightingRecommendation": "Specific lighting setup recommended",
@@ -292,119 +359,149 @@ function buildFallbackProductDNA(productData, brief) {
 
 // ── Step 2: Generate Mood Board Images ────────────────────────────────────────
 /**
- * Generate 4 mood direction images using NanoBanana 2.
- * Uses Promise.allSettled so partial failures don't block the whole board.
+ * Generates 4 product-world mood board images — one per custom mood direction.
  *
- * @param {object} productDNA - Output from analyzeProductDesign
- * @param {string} brandContext - Brand DNA string
- * @returns {{ moods: MoodImage[] }}
+ * Architecture (Real Designer Approach):
+ *   Each mood board is a TRUE DESIGNER COLLAGE that does 3 things:
+ *   1. Shows the PRODUCT placed NATURALLY in the mood's world (not pasted on top)
+ *   2. Surrounds it with world-building elements: color swatches, material textures, lifestyle scenes
+ *   3. The whole composition feels designed as a unit — like a Behance agency mood board
+ *
+ * @param {object} productDNA        - Output from analyzeProductDesign
+ * @param {string} brandContext      - Brand DNA string
+ * @param {object} customMoodDirs    - AI-generated moods from generateProductMoodDirections (or FALLBACK)
+ * @returns {{ moods: MoodImage[], moodDirections: object }}
  */
-export async function generateMoodBoardImages(productDNA, brandContext = '') {
-    console.log(`PDI: Generating 4 designer mood boards (product-anchored)...`);
+export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null) {
+    const moodDirections = customMoodDirs || FALLBACK_MOOD_DIRECTIONS;
+    console.log(`PDI: Generating ${Object.keys(moodDirections).length} product-world mood boards...`);
 
-    // ── Build rich product context from DNA ──────────────────────────────────
+    // ── Product Color Intelligence ─────────────────────────────────────────────
     const productColors = (productDNA.dominantColors || [])
         .filter(c => c.role !== 'background_suggestion')
         .slice(0, 5);
 
-    // Strong color anchor — explicit hex codes extracted from the real product
     const colorHexList = productColors.map(c => c.hex).filter(Boolean).join(', ');
-    const colorNameList = productColors.map(c => `${c.name} (${c.hex})`).join(', ');
+    const colorDetailList = productColors.map(c =>
+        `${c.name} (${c.hex}) — ${c.role?.replace('_', ' ')}`
+    ).join(', ');
 
-    const colorAnchor = productColors.length
-        ? [
-            `PRODUCT COLOR PALETTE — EXTRACTED FROM ACTUAL PRODUCT:`,
-            `The attached product images show the real product. Its dominant colors are: ${colorNameList}.`,
-            `These hex values MUST anchor the mood board's color swatch blocks: ${colorHexList}.`,
-            `The color swatches in the mood board should be built from these exact extracted tones, extended with complementary and analogous colors that harmonize with them.`,
-          ].join('\n')
-        : `Use an inspiring, brand-appropriate color palette. Harmonize swatches to feel cohesive and premium.`;
-
-    const productProfile = [
-        `PRODUCT PROFILE (use this to shape the mood board's aesthetic language):`,
-        `- Product category: ${productDNA.productCategory || 'consumer product'}`,
-        `- Materials: ${productDNA.materials || 'premium finish'}`,
-        `- Surface: ${productDNA.surfaceFinish || 'refined'}`,
-        `- Shape character: ${productDNA.productShape || 'compact form'}`,
-        `- Design mood tags: ${(productDNA.moodTags || []).join(', ') || 'modern, clean, premium'}`,
-        `- Brand design directive: ${productDNA.designDirective || 'Premium aesthetic, clean and consistent visual identity.'}`,
-        productDNA.photographyStyle ? `- Photography style: ${productDNA.photographyStyle}` : '',
-        brandContext ? `- Brand context: ${brandContext.substring(0, 180).replace(/\n/g, ' ')}` : '',
+    // ── Product World Description ──────────────────────────────────────────────
+    const productWorld = [
+        `PRODUCT: ${productDNA.productCategory || 'consumer product'}`,
+        `FORM: ${productDNA.productShape || 'compact form'}`,
+        `MATERIALS: ${productDNA.materials || 'premium materials'}`,
+        `SURFACE: ${productDNA.surfaceFinish || 'refined'} finish`,
+        `MOOD TAGS: ${(productDNA.moodTags || []).join(', ')}`,
+        `DESIGN BRIEF: ${productDNA.designDirective || ''}`,
+        brandContext ? `BRAND: ${brandContext.substring(0, 150).replace(/\n/g, ' ')}` : '',
     ].filter(Boolean).join('\n');
 
-    // Prefer diverse angles from roster: hero + lifestyle/in-use + macro detail
+    // ── Select best product reference images ──────────────────────────────────
     const roster = productDNA.productImageRoster || [];
     const heroImg = productDNA.heroImageUrl || roster.find(r => r.viewType === 'hero' || r.viewType === 'front_face')?.url;
     const lifestyleImg = productDNA.lifestyleImageUrl || roster.find(r => ['in_use', 'lifestyle', 'flat_lay'].includes(r.viewType))?.url;
     const detailImg = productDNA.detailImageUrl || roster.find(r => r.viewType === 'macro_detail')?.url;
 
-    // Build a diverse 3-image set — different angles give the AI richer visual context
-    const diversePick = [heroImg, lifestyleImg, detailImg]
-        .filter(Boolean)
-        .filter((url, i, arr) => arr.indexOf(url) === i); // dedupe
-
-    // Fill remaining slots with high-confidence roster images not already included
-    const fallbackPool = (productDNA.productRefImages || [])
-        .filter(url => !diversePick.includes(url));
-
-    const refImages = [...diversePick, ...fallbackPool]
-        .filter(Boolean)
-        .slice(0, 3);
-
+    const diversePick = [heroImg, lifestyleImg, detailImg].filter(Boolean).filter((url, i, arr) => arr.indexOf(url) === i);
+    const fallbackPool = (productDNA.productRefImages || []).filter(url => !diversePick.includes(url));
+    const refImages = [...diversePick, ...fallbackPool].filter(Boolean).slice(0, 3);
     const hasRefImages = refImages.length > 0;
 
-    // Import multimodal generator if we have images
     let laozhangMultimodalImageGenerate;
     if (hasRefImages) {
         const mod = await import('../videoStudio/laozhangClient.js');
         laozhangMultimodalImageGenerate = mod.laozhangMultimodalImageGenerate;
     }
 
-    const moodImageJobs = Object.values(MOOD_DIRECTIONS).map(async (mood) => {
+    // ── Generate a mood board for each direction ───────────────────────────────
+    const moodImageJobs = Object.values(moodDirections).map(async (mood) => {
 
+        // ── Build the designer collage prompt ─────────────────────────────────
         const prompt = [
-            // 1. What these reference images are (critical framing)
+
+            // [1] Contextual framing for the AI
             hasRefImages
-                ? `REFERENCE IMAGES: The attached images show the ACTUAL PRODUCT whose design DNA you must extract and use to anchor this mood board. Study the product's exact colors, material character, surface quality, and visual language. DO NOT reproduce or show the product in the output — use it only as a color and aesthetic reference.`
-                : '',
+                ? `REFERENCE IMAGES PROVIDED: The attached images show the ACTUAL PRODUCT (${productDNA.productCategory || 'consumer product'}).
+Your task: Use these product images as the VISUAL SOURCE to render the product naturally WITHIN the mood board scene.
+Do NOT paste the product as a cutout. Render it AS PART of the scene — as if it belongs there.
+The product's proportions, form factor, and colors must remain accurate to what you see in the reference images.`
+                : `You are creating a designer mood board. There are no product reference images — suggest where the product would appear using a realistic placeholder.`,
 
-            // 2. Color palette anchor
-            colorAnchor,
             '',
 
-            // 3. Product DNA profile
-            productProfile,
+            // [2] Product color palette — must anchor the collage
+            productColors.length
+                ? `PRODUCT COLOR PALETTE (EXTRACTED FROM ACTUAL PRODUCT — USE THESE IN THE COLLAGE):
+${colorDetailList}
+The color swatch strips in the mood board MUST reflect these exact extracted product tones: ${colorHexList}`
+                : `Use a harmonious color palette appropriate to this product and mood.`,
+
             '',
 
-            // 4. The actual mood board directive
-            mood.moodBoardDirective.trim(),
+            // [3] Product world context
+            `PRODUCT PROFILE:\n${productWorld}`,
+
             '',
 
-            // 5. Hard composition rules
-            `COMPOSITION RULES — STRICTLY FOLLOW:`,
-            `- Output: a DESIGNER MOOD BOARD / VISUAL DIRECTION REFERENCE COLLAGE, NOT a product photograph`,
-            `- Layout: multi-panel grid layout, like a Behance project mood board, agency creative brief, or Pinterest design board`,
-            `- Fill entire frame with the collage — no padding or white canvas border visible`,
-            `- Color swatch panels: clean flat solid-color rectangles using the EXTRACTED PRODUCT PALETTE from above`,
-            `- Texture panels: macro close-up photography of relevant surface materials, very high detail`,
-            `- Photography vignettes: atmospheric, evocative, editorial — match the ${mood.label} mood direction`,
-            `- DO NOT show, imply, or include the actual product in the mood board`,
-            `- DO NOT render any text, words, letters, numbers, or readable typography`,
-            `- Photorealistic, 8K quality, art director level composition`,
+            // [4] The mood-specific art direction
+            `CREATIVE TERRITORY: "${mood.label}"
+${mood.description || ''}
+${mood.targetMoment ? `Consumer Moment: ${mood.targetMoment}` : ''}
+
+ART DIRECTION FOR THIS TERRITORY:
+${mood.moodBoardDirective || mood.shootDirective || ''}`,
+
+            '',
+
+            // [5] Exact composition spec — this is the KEY change from the old system
+            `COMPOSITING INSTRUCTIONS — BUILD THIS EXACT LAYOUT:
+
+This is a DESIGNER MOOD BOARD — a multi-panel collage like an agency creative brief. Think Behance moodboard, Adobe XD design board, Figma mood board.
+
+Panel Layout (fill the entire ${hasRefImages ? '1344×768' : '1344×768'}px frame, NO white borders or padding):
+
+[LEFT PANEL — 60% width, full height]: THE PRODUCT IN ITS WORLD
+• Render the ${productDNA.productCategory || 'product'} NATURALLY PLACED in the environment of the "${mood.label}" creative territory
+• This is NOT a studio product shot. The product is in a REAL environment appropriate to the mood.
+• Lighting should match the mood's atmosphere completely
+• The product's exact colors (${colorHexList || 'as shown in reference'}) and materials must be preserved faithfully
+• The product looks like it BELONGS here — it's at home in this world
+• Professional photography quality — think editorial campaign, not e-commerce
+
+[RIGHT PANEL — 40% width, divided into 3 stacked sections]:
+
+TOP SECTION (right, ≈35% height): COLOR PALETTE STRIP
+• 4 flat solid-color rectangles arranged horizontally
+• First 2 colors: ${colorHexList.split(', ').slice(0, 2).join(', ') || 'product primary colors'} (from the actual product)
+• Last 2 colors: mood-complementary tones that harmonize with the product palette and the "${mood.label}" territory
+• Clean solid fills — no gradients, no texture in these swatches
+
+MIDDLE SECTION (right, ≈35% height): MATERIAL WORLD
+• Extreme macro close-up photograph of a surface texture that MATCHES the product's world
+• The texture should feel like the materials this product is made of or the environment it lives in
+• Examples: brushed aluminum macro, soft-touch matte plastic detail, premium foam cushion weave, carbon fiber pattern, quality leather grain
+• Photorealistic, ultra-sharp, cinematic macro photography
+
+BOTTOM SECTION (right, ≈30% height): CONTEXT DETAIL
+• A small atmospheric scene detail FROM the product's world — NOT the product itself
+• This is a supporting vignette that reinforces the mood territory
+• Examples: studio equipment in bokeh, city lights at night, morning coffee ritual, gym equipment detail
+
+SEPARATORS: Thin 1-2px lines between right-panel sections for visual clarity.
+
+QUALITY: Photorealistic, 8K, art director level composition. Every panel is a high-quality photograph or graphic element.
+CRITICAL: Do NOT render any readable text, words, letters, numbers, or typography anywhere in the image.`,
         ].filter(Boolean).join('\n');
 
         try {
             let result;
-            // FORCE TEXT-ONLY: Multimodal Image2Image causes the model to hallucinate details of the actual product 
-            // inside the collage. To guarantee zero product hallucination, we strictly generate the environment layout via text.
-            if (false && hasRefImages && laozhangMultimodalImageGenerate) {
-                // Multimodal — AI sees the actual product for color extraction
+            if (hasRefImages && laozhangMultimodalImageGenerate) {
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
                     model: 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             } else {
-                // Text-only fallback
                 result = await laozhangImageGenerate(prompt, {
                     model: 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
@@ -412,7 +509,7 @@ export async function generateMoodBoardImages(productDNA, brandContext = '') {
             }
 
             if (result?.imageUrl) {
-                console.log(`   PDI: Mood board generated — ${mood.id}`);
+                console.log(`   PDI: Mood board generated — "${mood.label}" (${mood.id})`);
                 return { ...mood, imageUrl: result.imageUrl, success: true };
             }
         } catch (err) {
@@ -422,13 +519,18 @@ export async function generateMoodBoardImages(productDNA, brandContext = '') {
     });
 
     const results = await Promise.allSettled(moodImageJobs);
-    const moods = results.map((r, i) => r.status === 'fulfilled' ? r.value : { ...Object.values(MOOD_DIRECTIONS)[i], imageUrl: null, success: false });
+    const moods = results.map((r, i) => {
+        if (r.status === 'fulfilled') return r.value;
+        const fallback = Object.values(moodDirections)[i];
+        return { ...fallback, imageUrl: null, success: false };
+    });
 
     const successCount = moods.filter(m => m.success).length;
-    console.log(`   PDI: ${successCount}/4 mood boards generated (${hasRefImages ? 'multimodal w/ product ref' : 'text-only fallback'})`);
+    console.log(`   PDI: ${successCount}/${Object.keys(moodDirections).length} mood boards generated`);
 
-    return { moods };
+    return { moods, moodDirections };
 }
+
 
 // ── Step 3: Build Color Guard Instruction ─────────────────────────────────────
 /**
@@ -475,8 +577,13 @@ Think of the product as a composited photograph dropped into a new scene. It is 
  * @param {string[]} brandColors  - Brand color hex codes from Brand DNA
  * @returns {object} designContext - Full design directive object
  */
-export function buildDesignContext(productDNA, selectedMoodId, brandColors = []) {
-    const mood = MOOD_DIRECTIONS[selectedMoodId] || MOOD_DIRECTIONS[productDNA?.defaultMoodDirection] || MOOD_DIRECTIONS.editorial;
+export function buildDesignContext(productDNA, selectedMoodId, brandColors = [], customMoodDirections = null) {
+    // Use AI-generated mood directions if available, fall back to static
+    const moodMap = customMoodDirections || FALLBACK_MOOD_DIRECTIONS;
+    const mood = moodMap[selectedMoodId]
+        || moodMap[productDNA?.defaultMoodDirection]
+        || moodMap[Object.keys(moodMap)[0]]   // first custom direction
+        || FALLBACK_MOOD_DIRECTIONS.editorial;
 
     const colorGuardBlock = buildColorGuardInstruction(productDNA);
 

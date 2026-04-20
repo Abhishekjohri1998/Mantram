@@ -8,7 +8,7 @@ import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
-import { analyzeProductDesign, generateMoodBoardImages, buildDesignContext } from '../agents/shared/productDesignAgent.js';
+import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
@@ -160,13 +160,18 @@ router.post('/product-intelligence', protect, async (req, res) => {
     try {
         const { productImages = [], productData = {}, brief = '', brandId } = req.body;
 
-        // Validate we have something to analyze
         if (!productImages.length && !productData?.title && !brief) {
             return res.status(400).json({ success: false, error: 'Provide productImages, productData, or brief' });
         }
 
-        console.log(`🎨 PDI: Running product intelligence for ${req.user._id}...`);
+        console.log(`🎨 PDI: Running product intelligence for "${productData?.title || 'untitled'}" — ${productImages.length} images`);
         const productDNA = await analyzeProductDesign(productImages, productData, brief);
+
+        // Diagnostic log — shows exactly what was classified
+        console.log(`✅ PDI Complete: category="${productDNA.productCategory}" | colors=${productDNA.dominantColors?.length || 0} | mood=${productDNA.defaultMoodDirection} | fallback=${productDNA.isFallback || false}`);
+        if (productDNA.dominantColors?.length) {
+            console.log(`   Colors: ${productDNA.dominantColors.slice(0, 3).map(c => `${c.name} ${c.hex}`).join(', ')}`);
+        }
 
         res.json({ success: true, productDNA });
     } catch (err) {
@@ -177,14 +182,14 @@ router.post('/product-intelligence', protect, async (req, res) => {
 
 // ── POST /api/brand-studio/mood-board ─────────────────────────
 // Generate 4 mood direction images using ProductDNA as creative anchor
-// Cost: 4 credits (1 per mood image)
+// Cost: 5 credits (1 for mood generation + 4 for mood images)
 router.post('/mood-board', protect, async (req, res) => {
     try {
-        const { productDNA, brandId } = req.body;
+        const { productDNA, productData, brandId } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
-        // Credit check (4 credits for 4 mood images)
-        const MOOD_CREDITS = 4;
+        // Credit check (5 credits: 1 for custom mood generation + 4 for images)
+        const MOOD_CREDITS = 5;
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < MOOD_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: MOOD_CREDITS });
 
@@ -195,10 +200,19 @@ router.post('/mood-board', protect, async (req, res) => {
             brandContext = ctx.brandContext || '';
         }
 
-        const result = await generateMoodBoardImages(productDNA, brandContext);
+        // Step 1: Generate product-specific mood directions via Claude
+        // This replaces the hardcoded 4 generic moods with AI-curated creative territories
+        const customMoodDirections = await generateProductMoodDirections(productDNA, productData || {}, brandContext);
+
+        // Step 2: Generate mood board images using the custom directions
+        const result = await generateMoodBoardImages(productDNA, brandContext, customMoodDirections);
         await deductCredits(req.user._id, MOOD_CREDITS, 'pulse-mood-board');
 
-        res.json({ success: true, moods: result.moods });
+        res.json({
+            success: true,
+            moods: result.moods,
+            moodDirections: customMoodDirections,  // ← send to frontend to replace MOOD_STATIC
+        });
     } catch (err) {
         console.error('❌ PDI mood-board:', err.message);
         res.status(500).json({ success: false, error: err.message });
@@ -210,10 +224,10 @@ router.post('/mood-board', protect, async (req, res) => {
 // Free (pure computation, no LLM call)
 router.post('/design-context', protect, async (req, res) => {
     try {
-        const { productDNA, selectedMoodId, brandColors = [] } = req.body;
+        const { productDNA, selectedMoodId, brandColors = [], customMoodDirections = null } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
-        const designContext = buildDesignContext(productDNA, selectedMoodId, brandColors);
+        const designContext = buildDesignContext(productDNA, selectedMoodId, brandColors, customMoodDirections);
         res.json({ success: true, designContext });
     } catch (err) {
         console.error('❌ PDI design-context:', err.message);
@@ -518,47 +532,103 @@ router.post('/aplus/analyze-product', protect, async (req, res) => {
         const { url } = req.body;
         if (!url) return res.status(400).json({ success: false, error: 'url required' });
 
-        // Scrape the page
+        console.log(`\ud83d\udd0d A+ Scraper: Fetching ${url}`);
+
         const fetchRes = await fetch(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Accept-Language': 'en-US,en;q=0.9' },
-            timeout: 15000
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            timeout: 20000
         });
         const html = await fetchRes.text();
         const $ = cheerio.load(html);
 
         let product = {};
+
         if (url.includes('amazon.')) {
+            // Image source 1: data-a-dynamic-image — extract all resolutions, pick highest
+            const dynamicImages = [];
+            $('img[data-a-dynamic-image]').each((_, el) => {
+                try {
+                    const parsed = JSON.parse($(el).attr('data-a-dynamic-image') || '{}');
+                    Object.entries(parsed).forEach(([imgUrl, dims]) => {
+                        dynamicImages.push({ url: imgUrl, area: (dims[0] || 0) * (dims[1] || 0) });
+                    });
+                } catch (_) {}
+            });
+            const sortedDynamic = dynamicImages
+                .sort((a, b) => b.area - a.area)
+                .map(i => i.url)
+                .filter((u, i, arr) => arr.indexOf(u) === i);
+
+            // Image source 2: alt image thumbnails → upscale to full-size
+            const altImgUrls = $('#altImages img, #imageBlock img')
+                .map((_, el) => {
+                    const src = $(el).attr('src') || '';
+                    return src.replace(/\._[A-Z0-9_,]+_\./g, '._SL1500_.');
+                }).get()
+                .filter(u => u && u.startsWith('http') && !u.includes('transparent') && !u.includes('grey-pixel'));
+
+            // Image source 3: og:image fallback
+            const ogImage = $('meta[property="og:image"]').attr('content');
+
+            const allImages = [...new Set([...sortedDynamic, ...altImgUrls, ...(ogImage ? [ogImage] : [])])]
+                .filter(u => u && u.startsWith('http'))
+                .slice(0, 8);
+
             product = {
                 title: $('#productTitle').text().trim() || $('h1').first().text().trim(),
+                brand: $('#bylineInfo').text().trim().replace(/^Brand:|^Visit the |Store$/g, '').trim() || '',
                 rating: $('#acrPopover').attr('title') || '',
                 reviewCount: $('#acrCustomerReviewText').text().trim(),
                 price: $('.a-price .a-offscreen').first().text().trim(),
-                bulletPoints: $('#feature-bullets li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 5).slice(0, 8),
-                description: $('#productDescription p').text().trim().substring(0, 800),
+                bulletPoints: $('#feature-bullets li span.a-list-item')
+                    .map((_, el) => $(el).text().trim())
+                    .get()
+                    .filter(t => t.length > 5 && !t.includes('Make sure'))
+                    .slice(0, 10),
+                description: $('#productDescription p').text().trim().substring(0, 1000),
                 category: $('#wayfinding-breadcrumbs_feature_div').text().replace(/\s+/g, ' ').trim().substring(0, 200),
-                images: $('img[data-a-dynamic-image]').map((_, el) => {
-                    try { return Object.keys(JSON.parse($(el).attr('data-a-dynamic-image') || '{}'))[0]; } catch (_) { return null; }
-                }).get().filter(Boolean).slice(0, 5),
+                images: allImages,
                 platform: 'amazon'
             };
+
         } else {
+            // Generic / Shopify scraper
             const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
                 try { return JSON.parse($(el).html()); } catch (_) { return null; }
             }).get().filter(Boolean).find(d => d?.['@type'] === 'Product');
+
+            const jsonLdImages = jsonLd?.image ? [].concat(jsonLd.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean) : [];
+            const ogImages = $('meta[property="og:image"]').map((_, el) => $(el).attr('content')).get().filter(Boolean);
+            const shopifyImages = $('img[src*="cdn.shopify"]').map((_, el) => {
+                return ($(el).attr('src') || '').replace(/_\d+x(\d+)?\./, '_2048x2048.');
+            }).get().filter(Boolean);
+
             product = {
                 title: jsonLd?.name || $('h1').first().text().trim(),
+                brand: jsonLd?.brand?.name || '',
                 price: jsonLd?.offers?.[0]?.price || $('[class*="price"]').first().text().trim(),
-                description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 800),
-                bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 200).slice(0, 6),
-                images: (jsonLd?.image ? [].concat(jsonLd.image) : [$('meta[property="og:image"]').attr('content')]).filter(Boolean).slice(0, 5),
+                description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
+                bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 300).slice(0, 8),
+                images: [...new Set([...jsonLdImages, ...ogImages, ...shopifyImages])].slice(0, 8),
                 category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
                 platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web'
             };
         }
 
+        console.log(`\u2705 Scraped: "${product.title}" \u2014 ${product.images?.length || 0} images, ${product.bulletPoints?.length || 0} bullets`);
+        if (product.images?.length) {
+            console.log(`   First images: ${product.images.slice(0, 2).map(u => u.substring(0, 70)).join(' | ')}`);
+        } else {
+            console.warn(`   \u26a0\ufe0f  No images found \u2014 PDI will run text-only. URL may require login or bot protection.`);
+        }
+
         res.json({ success: true, product });
     } catch (err) {
-        console.error('❌ A+ analyze-product:', err.message);
+        console.error('\u274c A+ analyze-product:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });

@@ -245,7 +245,33 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
 
     const contentParts = [];
     for (const url of imageUrls) {
-        if (url && url.startsWith('http')) contentParts.push({ type: 'image_url', image_url: { url } });
+        if (!url) continue;
+        
+        let finalUrl = url;
+        // If it's an external URL, fetch it server-side to bypass CDN 403 blocks that hit LaoZhang's servers directly
+        if (url.startsWith('http')) {
+            try {
+                console.log(`📥 [LaoZhang] Pre-fetching image URL to avoid CDN blocks: ${url.substring(0, 80)}...`);
+                const r = await fetch(url, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
+                });
+                if (r.ok) {
+                    const mimeType = r.headers.get('content-type') || 'image/jpeg';
+                    if (!mimeType.includes('text/html')) {
+                        const arr = await r.arrayBuffer();
+                        finalUrl = `data:${mimeType};base64,${Buffer.from(arr).toString('base64')}`;
+                    }
+                } else {
+                    console.warn(`⚠️ [LaoZhang] Pre-fetch failed (HTTP ${r.status}) for: ${url.substring(0,60)}`);
+                }
+            } catch (e) {
+                console.warn(`⚠️ [LaoZhang] Pre-fetch error: ${e.message}`);
+            }
+        }
+        
+        if (finalUrl.startsWith('http') || finalUrl.startsWith('data:')) {
+            contentParts.push({ type: 'image_url', image_url: { url: finalUrl } });
+        }
     }
     const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
     contentParts.push({ type: 'text', text: prompt + arInstruction });

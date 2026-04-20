@@ -44,11 +44,26 @@ export class GeminiProvider extends BaseProvider {
                 } else if (img.startsWith('http')) {
                     try {
                         console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
-                        const r = await fetch(img);
+                        const r = await fetch(img, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+                            }
+                        });
+                        
+                        if (!r.ok) {
+                            throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                        }
+                        
                         const arr = await r.arrayBuffer();
                         b64Data = Buffer.from(arr).toString('base64');
                         mimeType = r.headers.get('content-type') || 'image/jpeg';
-                    } catch(e) { console.warn('⚠️ Failed to fetch image URL for Gemini:', e.message); }
+                        
+                        // Guard against CDNs returning HTML CAPTCHAs disguised as images
+                        if (mimeType.includes('text/html')) {
+                            throw new Error('Received HTML page instead of image (likely CAPTCHA blocked)');
+                        }
+                    } catch(e) { console.warn(`⚠️ Failed to fetch image URL for Gemini (${img.substring(0,60)}...):`, e.message); }
                 }
                 
                 if (b64Data) {

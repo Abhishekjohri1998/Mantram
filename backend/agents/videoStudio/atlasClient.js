@@ -1,5 +1,17 @@
 /**
- * Atlas Cloud Client — Video generation for Seedance 2.0 (Supports Real Person Faces via reference-to-video)
+ * Atlas Cloud Client — Seedance 2.0 Video Generation
+ *
+ * ARCHITECTURE:
+ *  - Inference base:  https://api.atlascloud.ai/api/v1
+ *  - Console base:    https://console.atlascloud.ai/api/v1  (Asset Library — required for real person faces)
+ *
+ * REAL PERSON FACE FLOW (per Atlas Cloud docs):
+ *   1. Upload face image → POST /sd/assets → returns { id, atlas_asset_id, status: "Processing" }
+ *   2. Poll            → GET  /sd/assets/:id until status === "Active"
+ *   3. Use             → pass "asset://<atlas_asset_id>" in reference_images[]
+ *
+ * Without the asset:// URI, Atlas bypasses their face registration pipeline and
+ * the model can't lock onto a real person's likeness across frames.
  */
 
 import fetch from 'node-fetch';
@@ -7,8 +19,11 @@ import config from '../../config/env.js';
 import sharp from 'sharp';
 import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
 
-const ATLASCLOUD_BASE_URL = process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai';
+const ATLAS_INFERENCE_BASE  = 'https://api.atlascloud.ai/api/v1';
+const ATLAS_CONSOLE_BASE    = 'https://console.atlascloud.ai/api/v1';
 const ATLASCLOUD_MAX_PROMPT_LENGTH = 1950;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function truncatePrompt(prompt, maxLen = ATLASCLOUD_MAX_PROMPT_LENGTH) {
     if (!prompt || prompt.length <= maxLen) return prompt;
@@ -22,34 +37,35 @@ function truncatePrompt(prompt, maxLen = ATLASCLOUD_MAX_PROMPT_LENGTH) {
 }
 
 function getAtlasApiKey() {
-    const key = process.env.ATLASCLOUD_API_KEY || 'apikey-5213047d313643cc806219208e183def';
-    return key;
+    return process.env.ATLASCLOUD_API_KEY || 'apikey-5213047d313643cc806219208e183def';
 }
 
-function resolveTaskType(qualityMode, imageCount) {
+function authHeaders() {
+    return { 'Authorization': `Bearer ${getAtlasApiKey()}`, 'Content-Type': 'application/json' };
+}
+
+function resolveModelName(qualityMode, imageCount) {
+    // Per Atlas Cloud docs, the correct model namespace is atlascloud/workflow/seedance-2.0/...
+    const tier   = qualityMode === 'quality' ? 'seedance-2.0' : 'seedance-2.0-fast';
     if (imageCount > 1) {
-        console.log(`📌 Atlas Cloud: ${imageCount} images present → routing to reference-to-video for character consistency`);
-        if (qualityMode === 'quality') return 'bytedance/seedance-2.0/reference-to-video';
-        return 'bytedance/seedance-2.0-fast/reference-to-video';
-    } else if (imageCount === 1) {
-        console.log(`📌 Atlas Cloud: 1 image present → routing to image-to-video for first-frame anchoring`);
-        if (qualityMode === 'quality') return 'bytedance/seedance-2.0/image-to-video';
-        return 'bytedance/seedance-2.0-fast/image-to-video';
+        console.log(`📌 Atlas: ${imageCount} images → reference-to-video (${tier})`);
+        return `atlascloud/workflow/${tier}/reference-to-video`;
     }
-    if (qualityMode === 'quality') return 'bytedance/seedance-2.0/text-to-video';
-    return 'bytedance/seedance-2.0-fast/text-to-video';
+    if (imageCount === 1) {
+        console.log(`📌 Atlas: 1 image → image-to-video (${tier})`);
+        return `atlascloud/workflow/${tier}/image-to-video`;
+    }
+    return `atlascloud/workflow/${tier}/text-to-video`;
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
     try {
         const match = base64DataUri.match(/^data:([\w/+]+);base64,(.+)$/);
         if (!match) return base64DataUri;
-        const mimeType = match[1];
         const buffer = Buffer.from(match[2], 'base64');
         const [rw, rh] = targetRatio.split(':').map(Number);
         if (!rw || !rh) return base64DataUri;
-        const metadata = await sharp(buffer).metadata();
-        const { width, height } = metadata;
+        const { width, height } = await sharp(buffer).metadata();
         const currentRatio = width / height;
         const targetRatioFloat = rw / rh;
         if (Math.abs(currentRatio - targetRatioFloat) < 0.05) return base64DataUri;
@@ -57,7 +73,7 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
         if (currentRatio > targetRatioFloat) { newWidth = width; newHeight = Math.round(width / targetRatioFloat); }
         else { newHeight = height; newWidth = Math.round(height * targetRatioFloat); }
         const resized = await sharp(buffer).resize(newWidth, newHeight, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 1 } }).png().toBuffer();
-        console.log(`📐 Resized ref image: ${width}x${height} → ${newWidth}x${newHeight}`);
+        console.log(`📐 Resized: ${width}x${height} → ${newWidth}x${newHeight}`);
         return `data:image/png;base64,${resized.toString('base64')}`;
     } catch (e) {
         console.warn(`⚠️ Image resize failed: ${e.message}`);
@@ -65,149 +81,196 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
     }
 }
 
-export async function uploadImageToHostedUrl(base64DataUri) {
-    return await ensureS3Url(base64DataUri, 'video-studio/atlascloud');
-}
+// ── Media Upload (to Atlas native CDN — used for I2V first-frame) ─────────────
 
-async function uploadToAtlasCloud(imageUrl, apiKey) {
+async function uploadMediaToAtlasCDN(imageUrl) {
     try {
-        console.log(`📸 [Atlas Cloud] Downloading from S3 and uploading to native Atlas Storage...`);
+        console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${imageUrl.substring(0, 60)}...`);
         const imageRes = await fetch(imageUrl);
         const arrayBuffer = await imageRes.arrayBuffer();
-        
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         let extension = 'jpg';
         if (contentType.includes('png')) extension = 'png';
         else if (contentType.includes('webp')) extension = 'webp';
-        else if (contentType.includes('gif')) extension = 'gif';
-        
-        // Node 18+ natively supports standard Web API FormData/Blob
+
         const formData = new FormData();
-        const blob = new Blob([arrayBuffer], { type: contentType });
-        formData.append('file', blob, `source_image.${extension}`);
+        formData.append('file', new Blob([arrayBuffer], { type: contentType }), `media.${extension}`);
 
-        const uploadUrl = `${ATLASCLOUD_BASE_URL}/api/v1/model/uploadMedia`;
-        const uploadResponse = await fetch(uploadUrl, {
+        const res = await fetch(`${ATLAS_INFERENCE_BASE}/model/uploadMedia`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}` },
-            body: formData
+            headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` },
+            body: formData,
         });
-
-        const json = await uploadResponse.json();
-        // Atlas Cloud docs: upload response returns { url: "..." } at root level
-        const finalUrl = json?.url || json?.data?.url || json?.data?.download_url;
-        
+        const json = await res.json();
+        const finalUrl = json?.data?.download_url || json?.data?.url || json?.url;
         if (!finalUrl) {
-            console.error(`⚠️ Atlas upload response missing url:`, JSON.stringify(json));
-            return imageUrl; // fallback to s3 string just in case
+            console.error(`⚠️ Atlas CDN upload missing url:`, JSON.stringify(json));
+            return imageUrl;
         }
-        
-        console.log(`✅ [Atlas Cloud] Upload Media successful: ${finalUrl}`);
+        console.log(`✅ [Atlas CDN] Upload successful: ${finalUrl.substring(0, 80)}`);
         return finalUrl;
     } catch (e) {
-        console.error(`⚠️ [Atlas Cloud] Failed to run step 1 MediaUpload: ${e.message}`);
-        return imageUrl; // fallback
+        console.error(`⚠️ [Atlas CDN] Upload failed: ${e.message}`);
+        return imageUrl;
     }
 }
 
-async function submitAtlasCloudPayload(payload) {
-    const apiKey = getAtlasApiKey();
-    const MAX_ATTEMPTS = 3;
+// ── Asset Library (for real person faces) ────────────────────────────────────
+// Per Atlas Cloud docs:
+//   POST https://console.atlascloud.ai/api/v1/sd/assets  → { id, atlas_asset_id, status: "Processing" }
+//   GET  https://console.atlascloud.ai/api/v1/sd/assets/:id → poll until status === "Active"
+//   Pass "asset://<atlas_asset_id>" in reference_images[]
 
-    // Correct model string from the caller
-    const atlasModel = payload.task_type || payload.model || 'bytedance/seedance-2.0-fast/text-to-video';
+async function uploadFaceAsset(imageUrl, name = 'face_ref') {
+    try {
+        console.log(`👤 [Atlas Asset] Registering face asset: ${imageUrl.substring(0, 80)}...`);
+        const res = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ url: imageUrl, name }),
+        });
+        const json = await res.json();
+        const assetId       = json?.data?.id || json?.id;
+        const atlasAssetId  = json?.data?.atlas_asset_id || json?.atlas_asset_id;
+
+        if (!assetId) {
+            console.error(`⚠️ [Atlas Asset] No asset ID returned:`, JSON.stringify(json).substring(0, 300));
+            return null;
+        }
+
+        console.log(`📋 [Atlas Asset] Created asset id=${assetId} atlantasAssetId=${atlasAssetId} — polling until Active...`);
+        return await pollFaceAssetUntilActive(assetId, atlasAssetId);
+    } catch (e) {
+        console.error(`⚠️ [Atlas Asset] Upload failed: ${e.message}`);
+        return null;
+    }
+}
+
+async function pollFaceAssetUntilActive(assetId, atlasAssetId, maxWaitMs = 60000) {
+    const start = Date.now();
+    const POLL_INTERVAL = 2500;
+
+    while (Date.now() - start < maxWaitMs) {
+        try {
+            const res  = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets/${assetId}`, { headers: authHeaders() });
+            const json = await res.json();
+            const status       = json?.data?.status || json?.status || '';
+            const latestAssetId = json?.data?.atlas_asset_id || atlasAssetId;
+
+            console.log(`⏳ [Atlas Asset] id=${assetId} status=${status} (${Math.round((Date.now() - start) / 1000)}s)`);
+
+            if (status.toLowerCase() === 'active') {
+                const assetUri = `asset://${latestAssetId}`;
+                console.log(`✅ [Atlas Asset] Active! URI: ${assetUri}`);
+                return assetUri;
+            }
+            if (status.toLowerCase() === 'failed' || status.toLowerCase() === 'error') {
+                console.error(`❌ [Atlas Asset] Asset processing failed for id=${assetId}`);
+                return null;
+            }
+        } catch (e) {
+            console.warn(`⚠️ [Atlas Asset] Poll error: ${e.message}`);
+        }
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+    }
+
+    console.warn(`⏰ [Atlas Asset] Timed out waiting for asset ${assetId} to become Active`);
+    return null;
+}
+
+// Convert all face reference URLs to asset:// URIs (parallel)
+async function prepFaceReferencesAsAssets(imageUrls) {
+    if (!imageUrls || imageUrls.length === 0) return [];
+    console.log(`👤 [Atlas Asset] Registering ${imageUrls.length} face reference(s) via Asset Library...`);
+    const results = await Promise.all(
+        imageUrls.map((url, i) => uploadFaceAsset(url, `face_ref_${i + 1}`))
+    );
+    const assetUris = results.filter(Boolean);
+    console.log(`✅ [Atlas Asset] ${assetUris.length}/${imageUrls.length} face(s) ready: ${assetUris.join(', ')}`);
+    return assetUris;
+}
+
+// ── Core Video Submission ─────────────────────────────────────────────────────
+
+async function submitAtlasCloudPayload(payload) {
+    const MAX_ATTEMPTS = 3;
+    const atlasModel   = payload.task_type || payload.model || 'atlascloud/workflow/seedance-2.0-fast/text-to-video';
     const isR2V = atlasModel.includes('reference-to-video');
     const isI2V = atlasModel.includes('image-to-video');
+    const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
 
-    // Convert aspect_ratio to 'ratio' field (Atlas schema)
-    const rawRatio = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
-
-    // Atlas R2V only supports 480p/720p resolution
-    const resolution = '720p';
-
-    // Build the correct Atlas Cloud payload (confirmed from their schema)
     const atlasPayload = {
-        model: atlasModel,
-        prompt: payload.input?.prompt || '',
-        duration: payload.input?.duration || 5,
-        resolution,
-        ratio: rawRatio,
-        generate_audio: payload.input?.generate_audio !== false,
-        watermark: false,
+        model:           atlasModel,
+        prompt:          payload.input?.prompt || '',
+        duration:        payload.input?.duration || 5,
+        resolution:      '720p',
+        ratio:           rawRatio,
+        generate_audio:  payload.input?.generate_audio !== false,
+        watermark:       false,
         return_last_frame: false,
     };
 
-    const rawImageUrls = payload.input?.image_urls || [];
-    const rawRefImages = payload.input?.reference_images || [];
+    const rawImageUrls  = payload.input?.image_urls       || [];
+    const rawRefImages  = payload.input?.reference_images || [];
 
     if (isR2V) {
-        // reference-to-video uses 'reference_images' array (NOT image_urls)
+        // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
         const allRefs = [...rawRefImages, ...rawImageUrls];
         if (allRefs.length > 0) {
-            console.log(`📸 [Atlas R2V] Uploading ${allRefs.length} face reference(s) to Atlas native storage...`);
-            const uploadedUrls = await Promise.all(allRefs.map(s3Url => uploadToAtlasCloud(s3Url, apiKey)));
-            const validUrls = uploadedUrls.filter(Boolean).slice(0, 9); // max 9
-            atlasPayload.reference_images = validUrls;
-            console.log(`✅ [Atlas R2V] reference_images set: ${validUrls.length} image(s)`);
+            // Filter: asset:// URIs stay as-is, raw URLs get uploaded to CDN for fallback
+            const processedRefs = await Promise.all(allRefs.map(async url => {
+                if (url.startsWith('asset://')) return url; // ✅ already an Atlas asset
+                // Last resort: upload to Atlas CDN (not face-registered, but better than raw S3/HTTP)
+                return await uploadMediaToAtlasCDN(url);
+            }));
+            const validRefs = processedRefs.filter(Boolean).slice(0, 9);
+            atlasPayload.reference_images = validRefs;
+            console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
         }
     } else if (isI2V) {
-        // image-to-video uses 'image_url' for first frame according to official Atlas Cloud docs
         const allImages = [...rawImageUrls, ...rawRefImages];
         if (allImages.length > 0) {
-            console.log(`📸 [Atlas I2V] Uploading first frame to Atlas native storage...`);
-            const uploaded = await uploadToAtlasCloud(allImages[0], apiKey);
-            if (uploaded) atlasPayload.image_url = uploaded;
+            console.log(`📸 [Atlas I2V] Uploading first frame to Atlas CDN...`);
+            const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
+            if (uploaded) atlasPayload.image = uploaded;
         }
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        console.log(`🎬 [Atlas Cloud] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | ref_images=${atlasPayload.reference_images?.length || 0} | image_url=${atlasPayload.image_url ? 'yes' : 'no'}`);
-        console.log(`📝 [Atlas Cloud] Prompt (first 100): ${atlasPayload.prompt.substring(0, 100)}...`);
+        console.log(`🎬 [Atlas] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | refs=${atlasPayload.reference_images?.length || 0} | image=${atlasPayload.image ? 'yes' : 'no'}`);
+        console.log(`📝 [Atlas] Prompt (first 100): ${atlasPayload.prompt.substring(0, 100)}...`);
 
         try {
-            const endpointUrl = `${ATLASCLOUD_BASE_URL}/api/v1/model/generateVideo`;
-            const response = await fetch(endpointUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify(atlasPayload),
-                signal: AbortSignal.timeout(30000),
+            const response = await fetch(`${ATLAS_INFERENCE_BASE}/model/generateVideo`, {
+                method:  'POST',
+                headers: authHeaders(),
+                body:    JSON.stringify(atlasPayload),
+                signal:  AbortSignal.timeout(30000),
             });
 
             const rawText = await response.text();
-            console.log(`📥 [Atlas Cloud] Response attempt ${attempt} (${response.status}):`, rawText ? rawText.substring(0, 1000) : 'null');
+            console.log(`📥 [Atlas] Response ${response.status}:`, rawText.substring(0, 400));
 
             if (!response.ok) {
                 let errMsg = rawText;
-                try {
-                    const parsed = JSON.parse(rawText);
-                    errMsg = parsed.msg || parsed.message || parsed.error || JSON.stringify(parsed);
-                } catch(e) {}
-
+                try { const p = JSON.parse(rawText); errMsg = p.msg || p.message || p.error || JSON.stringify(p); } catch {}
                 if (response.status === 402 || errMsg.toLowerCase().includes('credit') || errMsg.toLowerCase().includes('balance')) {
                     throw new Error(`ATLAS_INSUFFICIENT_CREDITS: ${errMsg}`);
                 }
-                throw new Error(`Atlas Cloud submission failed (${response.status}): ${errMsg}`);
+                throw new Error(`Atlas submission failed (${response.status}): ${errMsg}`);
             }
 
-            const data = JSON.parse(rawText);
+            const data   = JSON.parse(rawText);
             const taskId = data?.data?.id || data?.id || data?.prediction_id || data?.task_id;
+            if (!taskId) throw new Error(`Atlas did not return a task ID. Response: ${rawText.substring(0, 300)}`);
 
-            if (!taskId) throw new Error(`Atlas Cloud did not return a prediction ID. Response: ${rawText.substring(0, 300)}`);
-
-            console.log(`✅ [Atlas Cloud] Task queued: predictionId=${taskId} | model=${atlasModel}`);
+            console.log(`✅ [Atlas] Task queued: id=${taskId} | model=${atlasModel}`);
             return taskId;
         } catch (e) {
-            if (e.message.startsWith('ATLAS_INSUFFICIENT_CREDITS') || e.message.startsWith('PiAPI_INSUFFICIENT_CREDITS')) {
-                console.error(`🚫 [Atlas Cloud] Non-retryable error: ${e.message}`);
-                throw e;
-            }
-
-            console.warn(`⚠️ [Atlas Cloud] Submit attempt ${attempt} failed: ${e.message}`);
+            if (e.message.startsWith('ATLAS_INSUFFICIENT_CREDITS')) { throw e; }
+            console.warn(`⚠️ [Atlas] Submit attempt ${attempt} failed: ${e.message}`);
             if (attempt < MAX_ATTEMPTS) {
-                console.log(`🔄 Retrying Atlas Cloud submit in 3s...`);
+                console.log(`🔄 Retrying in 3s...`);
                 await new Promise(r => setTimeout(r, 3000));
             } else {
                 throw e;
@@ -216,151 +279,115 @@ async function submitAtlasCloudPayload(payload) {
     }
 }
 
+// ── Public: Standard Video Generation (text-to-video / image-to-video / reference-to-video) ──
 
-export async function submitAtlasCloudVideoGeneration({ prompt, imageUrl, duration, aspectRatio, generateAudio = true, referenceImages = [], qualityMode = 'fast' }) {
-    console.log(`🎞️ Atlas Cloud received: ${referenceImages.length} ref images, imageUrl: ${imageUrl ? 'yes' : 'no'}, quality: ${qualityMode}`);
+export async function uploadImageToHostedUrl(base64DataUri) {
+    return await ensureS3Url(base64DataUri, 'video-studio/atlascloud');
+}
 
+export async function submitAtlasCloudVideoGeneration({
+    prompt, imageUrl, duration, aspectRatio, generateAudio = true,
+    referenceImages = [], qualityMode = 'fast',
+}) {
+    console.log(`🎞️ [Atlas] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | quality=${qualityMode}`);
+
+    // Extract ZH prompt from Universal Director bilingual JSON
     let finalPromptText = prompt;
     try {
         if (typeof prompt === 'string' && prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
             const parsed = JSON.parse(prompt);
             if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
                 finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
-                console.log(`   🈯 Extracted native ZH prompt for Atlas Cloud (${finalPromptText.length} chars)`);
+                console.log(`🈯 Extracted ZH prompt (${finalPromptText.length} chars)`);
             }
         }
     } catch { /* normal string */ }
 
-    let finalPrompt = finalPromptText;
-    const faceRefUrls = [];    // character/face reference images → reference-to-video
-    const firstFrameUrls = []; // scene first-frame → image-to-video anchor only
+    const faceS3Urls   = []; // face reference images (will be converted to asset:// URIs)
+    const firstFrameUrls = []; // scene first-frame anchor
 
-    // Step 1: Upload first-frame anchor (scene start, NOT character ref)
+    // Step 1 — ensure first-frame anchor is on S3
     if (imageUrl) {
         const url = await ensureS3Url(imageUrl, 'video-studio/atlascloud');
-        if (url) { 
-            firstFrameUrls.push(url);
-            console.log(`📸 First frame anchor ready: ${url.substring(0, 60)}...`); 
+        if (url) { firstFrameUrls.push(url); console.log(`📸 First frame anchor ready: ${url.substring(0, 60)}`); }
+    }
+
+    // Step 2 — ensure all face refs are on S3 first
+    if (referenceImages && referenceImages.length > 0) {
+        console.log(`📸 Ensuring ${referenceImages.length} face ref(s) on S3...`);
+        const uploaded = await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud')));
+        uploaded.forEach(url => { if (url) faceS3Urls.push(url); });
+    }
+
+    // Step 3 — KEY: Convert face S3 URLs → asset:// URIs via Atlas Asset Library
+    // This is the mechanism that enables real person face fidelity across frames
+    let faceAssetUris = [];
+    if (faceS3Urls.length > 0) {
+        faceAssetUris = await prepFaceReferencesAsAssets(faceS3Urls);
+        if (faceAssetUris.length === 0) {
+            // Asset registration failed, fall back to raw S3 URLs (faces may not lock perfectly)
+            console.warn(`⚠️ [Atlas] Asset registration failed — falling back to raw S3 URLs (face fidelity may be reduced)`);
+            faceAssetUris = faceS3Urls;
         }
     }
 
-    // Step 2: Upload face/character reference images
-    if (referenceImages && referenceImages.length > 0) {
-        console.log(`📸 Uploading ${referenceImages.length} face/character reference image(s)...`);
-        const uploadedUrls = await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud')));
-        uploadedUrls.forEach((url, i) => {
-            if (url) {
-                faceRefUrls.push(url);
-            }
-        });
-    }
+    // Step 4 — Build prompt with @Image tags
+    let cleanedPrompt = finalPromptText.replace(/@image\d+/gi, '').replace(/\s{2,}/g, ' ').trim();
 
-    // Build final image_urls: face refs first (they define the character), then first frame
-    const allImageUrls = [...faceRefUrls, ...firstFrameUrls];
-
-    // Step 3: Inject @Image tags into the prompt (Atlas Cloud Seedance uses @Image1, @Image2 — capital I)
-    // Strip out any pre-existing lowercase @image tags that were previously inserted by other providers
-    let cleanedPrompt = finalPrompt.replace(/@image\d+/gi, '').replace(/\s{2,}/g, ' ').trim();
-
-    if (faceRefUrls.length > 0) {
-        // Build a strong face-lock instruction at the start of the prompt
-        const faceTags = faceRefUrls.map((_, i) => `@Image${i + 1}`).join(' and ');
-        const faceInstruction = `${faceTags} ${faceRefUrls.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame. Do not hallucinate or substitute a different face.`;
-        cleanedPrompt = `${faceInstruction} ${cleanedPrompt}`;
-        console.log(`👤 [Atlas R2V] Face-lock instruction injected for ${faceRefUrls.length} reference image(s): ${faceTags}`);
-
-        // Also tag remaining images (first frame anchors) if present
+    if (faceAssetUris.length > 0) {
+        const faceTags  = faceAssetUris.map((_, i) => `@Image${i + 1}`).join(' and ');
+        const faceLock  = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;
+        cleanedPrompt   = `${faceLock} ${cleanedPrompt}`;
         firstFrameUrls.forEach((_, i) => {
-            const tag = `@Image${faceRefUrls.length + i + 1}`;
-            if (!cleanedPrompt.includes(tag)) {
-                cleanedPrompt += ` ${tag} sets the scene composition.`;
-            }
+            const tag = `@Image${faceAssetUris.length + i + 1}`;
+            if (!cleanedPrompt.includes(tag)) cleanedPrompt += ` ${tag} sets the scene.`;
         });
+        console.log(`👤 Face-lock injected for ${faceAssetUris.length} ref(s): ${faceTags}`);
     } else if (firstFrameUrls.length > 0) {
-        // No face refs — just tag the first frame
         if (!cleanedPrompt.includes('@Image1')) cleanedPrompt += ` @Image1 is the starting scene frame.`;
     }
 
-    finalPrompt = cleanedPrompt.replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim();
-    finalPrompt = truncatePrompt(finalPrompt);
+    const finalPrompt = truncatePrompt(cleanedPrompt.replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim());
 
-    // imageCount drives model selection: >1 = reference-to-video, 1 = image-to-video, 0 = text-to-video
-    const imageCount = faceRefUrls.length + firstFrameUrls.length;
-    // Force reference-to-video when there are face refs even if only 1 image
-    const effectiveCount = faceRefUrls.length > 0 ? Math.max(imageCount, 2) : imageCount;
-    const taskType = resolveTaskType(qualityMode, effectiveCount);
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15); // Atlas R2V allows 4-15s
+    // Step 5 — Resolve task model
+    const imageCount    = faceAssetUris.length + firstFrameUrls.length;
+    const effectiveCount = faceAssetUris.length > 0 ? Math.max(imageCount, 2) : imageCount;
+    const modelName     = resolveModelName(qualityMode, effectiveCount);
+    const dur           = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15);
 
-    console.log(`🎯 Atlas Cloud task_type: ${taskType} | duration: ${dur}s | face_refs: ${faceRefUrls.length} | first_frame: ${firstFrameUrls.length}`);
-    console.log(`📝 [Atlas R2V] Final prompt (first 200 chars): ${finalPrompt.substring(0, 200)}`);
+    console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | faceAssets=${faceAssetUris.length} | firstFrame=${firstFrameUrls.length}`);
+    console.log(`📝 [Atlas] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
 
-    // Build input using CORRECT Atlas Cloud field names (from their schema)
     const taskInput = {
-        prompt: finalPrompt,
-        aspect_ratio: aspectRatio || '16:9', // passed to submitAtlasCloudPayload which maps to 'ratio'
-        duration: dur,
-        generate_audio: generateAudio !== false,
+        prompt:          finalPrompt,
+        aspect_ratio:    aspectRatio || '16:9',
+        duration:        dur,
+        generate_audio:  generateAudio !== false,
     };
 
-    // Pass face references via reference_images (correct Atlas API field)
-    if (faceRefUrls.length > 0) {
-        taskInput.reference_images = faceRefUrls; // ✅ correct field name for R2V
-        console.log(`👤 Passing ${faceRefUrls.length} face reference(s) via reference_images`);
-    }
-    // Pass first frame via image_urls (for I2V mode, handled in submitAtlasCloudPayload)
-    if (firstFrameUrls.length > 0) {
-        taskInput.image_urls = firstFrameUrls;
-    }
+    if (faceAssetUris.length > 0)  taskInput.reference_images = faceAssetUris;
+    if (firstFrameUrls.length > 0) taskInput.image_urls        = firstFrameUrls;
 
-    const payload = { model: 'seedance', task_type: taskType, input: taskInput };
-    const taskId = await submitAtlasCloudPayload(payload);
+    const payload = { model: 'seedance', task_type: modelName, input: taskInput };
+    const taskId  = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0', _payload: payload, type: 'generation' };
 }
 
-/**
- * Trigger dedicated watermark removal task for a generated video
- */
-export async function submitAtlasCloudWatermarkRemoval(videoUrl) {
-    if (!videoUrl) throw new Error('Video URL is required for watermark removal');
-    
-    // Atlas Cloud does not support 'remove-watermark' model natively as of the recent update.
-    if (ATLASCLOUD_BASE_URL.includes('atlascloud')) {
-        console.log(`🧹 Atlas Cloud: Skipping watermark removal because Atlas Cloud dynamically skips or does not support local watermark removal.`);
-        return { taskId: 'skipped_atlas_' + Date.now(), provider: 'atlascloud', type: 'remove-watermark' };
-    }
+// ── Public: Image-to-Video ─────────────────────────────────────────────────────
 
-    console.log(`🧹 Atlas Cloud: Requesting watermark removal for ${videoUrl.substring(0, 80)}...`);
-
-    const payload = {
-        model: 'seedance', // Generic for removal
-        task_type: 'remove-watermark',
-        input: {
-            video_url: videoUrl,
-        }
-    };
-
-    const taskId = await submitAtlasCloudPayload(payload);
-    return { taskId, provider: 'atlascloud', type: 'remove-watermark' };
-}
-
-export async function resubmitAtlasCloudTask(storedPayload) {
-    console.log(`🔄 AUTO-RETRY: Resubmitting Atlas Cloud task...`);
-    const taskId = await submitAtlasCloudPayload(storedPayload);
-    return { taskId, provider: 'atlascloud', model: 'seedance-2.0' };
-}
-
-export async function submitAtlasCloudImageToVideo({ imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [] }) {
-    if (!imageUrl) throw new Error('Image URL is required for Image-to-Video');
-    console.log(`🖼️→🎬 Atlas Cloud I2V: imageUrl=${imageUrl.substring(0, 60)}..., refs=${referenceImages.length}`);
+export async function submitAtlasCloudImageToVideo({
+    imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [],
+}) {
+    if (!imageUrl) throw new Error('imageUrl is required for Image-to-Video');
+    console.log(`🖼️→🎬 [Atlas I2V]: imageUrl=${imageUrl.substring(0, 60)}... refs=${referenceImages.length}`);
 
     const [hostedUrl, ...hostedRefs] = await Promise.all([
         (async () => {
             const resized = imageUrl.startsWith('data:') ? await resizeToAspectRatio(imageUrl, aspectRatio || '16:9') : imageUrl;
             return await ensureS3Url(resized, 'video-studio/atlascloud');
         })(),
-        ...referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud'))
+        ...referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud')),
     ]);
-
     if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
 
     let finalPromptText = prompt || 'Animate this image with natural cinematic motion';
@@ -369,96 +396,97 @@ export async function submitAtlasCloudImageToVideo({ imageUrl, prompt, duration,
             const parsed = JSON.parse(prompt);
             if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
                 finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
-                console.log(`   🈯 Extracted native ZH prompt for Atlas Cloud I2V (${finalPromptText.length} chars)`);
             }
         }
-    } catch { /* normal string */ }
+    } catch { /* string */ }
 
     let finalPrompt = finalPromptText;
     if (!finalPrompt.includes('@image1')) finalPrompt = `@image1 ${finalPrompt}`;
-    finalPrompt = finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim();
-    finalPrompt = truncatePrompt(finalPrompt);
+    finalPrompt = truncatePrompt(finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim());
 
-    const taskType = resolveTaskType(qualityMode, 1 + hostedRefs.filter(Boolean).length);
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
-    console.log(`🎯 Atlas Cloud I2V task_type: ${taskType} | duration: ${dur}s`);
+    const modelName = resolveModelName(qualityMode, 1 + hostedRefs.filter(Boolean).length);
+    const dur       = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
+    console.log(`🎯 [Atlas I2V] model=${modelName} | dur=${dur}s`);
 
     const payload = {
-        model: 'seedance', task_type: taskType,
-        input: { prompt: finalPrompt, image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)], aspect_ratio: aspectRatio || '16:9', duration: dur, no_watermark: true },
+        model: 'seedance', task_type: modelName,
+        input: { prompt: finalPrompt, image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)], aspect_ratio: aspectRatio || '16:9', duration: dur },
     };
-
     const taskId = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0', mode: 'i2v', _payload: payload, type: 'generation' };
 }
 
+// ── Public: Video Extend ──────────────────────────────────────────────────────
+
 export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
-    if (!parentTaskId) throw new Error('Parent task ID is required for Video Extend');
+    if (!parentTaskId) throw new Error('parentTaskId is required for Video Extend');
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 10);
-    console.log(`🔗 Atlas Cloud Extend: parentTaskId=${parentTaskId}, duration=${dur}s`);
-    const taskType = resolveTaskType(qualityMode, 0);
-    const payload = { model: 'seedance', task_type: taskType, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId, no_watermark: true } };
-    const taskId = await submitAtlasCloudPayload(payload);
+    console.log(`🔗 [Atlas Extend]: parent=${parentTaskId} dur=${dur}s`);
+    const modelName = resolveModelName(qualityMode, 0);
+    const payload   = { model: 'seedance', task_type: modelName, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId } };
+    const taskId    = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
 }
 
+// ── Public: Resubmit ─────────────────────────────────────────────────────────
+
+export async function resubmitAtlasCloudTask(storedPayload) {
+    console.log(`🔄 [Atlas] Auto-retry resubmit...`);
+    const taskId = await submitAtlasCloudPayload(storedPayload);
+    return { taskId, provider: 'atlascloud', model: 'seedance-2.0' };
+}
+
+// ── Public: Watermark Removal ─────────────────────────────────────────────────
+
+export async function submitAtlasCloudWatermarkRemoval(videoUrl) {
+    if (!videoUrl) throw new Error('videoUrl required for watermark removal');
+    console.log(`🧹 [Atlas] Watermark removal skipped — not natively supported.`);
+    return { taskId: 'skipped_atlas_' + Date.now(), provider: 'atlascloud', type: 'remove-watermark' };
+}
+
+// ── Public: Poll Status ──────────────────────────────────────────────────────
+
 export async function getAtlasCloudGenerationStatus(taskId) {
     if (taskId && taskId.startsWith('skipped_atlas_')) {
-        console.log(`📊 [Atlas Cloud] Intercepted skipped task polling. Returning COMPLETED.`);
         return { status: 'COMPLETED', progress: 100 };
     }
 
-    const apiKey = getAtlasApiKey();
-    const statusUrl = `${ATLASCLOUD_BASE_URL}/api/v1/model/prediction/${taskId}`;
-    console.log(`📊 [Atlas Cloud Status] Polling: ${statusUrl}`);
-    
-    // Status polling using Atlas specific logic
-    const response = await fetch(statusUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } });
-    const rawText = await response.text();
-    console.log(`📊 [Atlas Cloud] Status raw for ${taskId}: ${rawText.substring(0, 300)}`);
+    const statusUrl = `${ATLAS_INFERENCE_BASE}/model/prediction/${taskId}`;
+    console.log(`📊 [Atlas Status] Polling: ${statusUrl}`);
+
+    const response  = await fetch(statusUrl, { headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` } });
+    const rawText   = await response.text();
+    console.log(`📊 [Atlas] Status raw for ${taskId}: ${rawText.substring(0, 300)}`);
 
     let result;
     try { result = JSON.parse(rawText); }
-    catch (e) { return { status: 'IN_PROGRESS', progress: 30 }; }
+    catch { return { status: 'IN_PROGRESS', progress: 30 }; }
 
-    if (!result?.data) {
-        return { status: 'IN_PROGRESS', progress: 30 };
-    }
+    if (!result?.data) return { status: 'IN_PROGRESS', progress: 30 };
 
     const taskStatus = (result.data.status || '').toLowerCase();
-    console.log(`📊 [Atlas Cloud] Task status: ${taskStatus}`);
+    console.log(`📊 [Atlas] Task ${taskId} status: ${taskStatus}`);
 
     if (taskStatus === 'completed' || taskStatus === 'success') {
-        const outputs = result.data.outputs || [];
+        const outputs  = result.data.outputs || [];
         const videoUrl = outputs[0] || result.data.video_url || '';
-        console.log(`✅ [Atlas Cloud] Video complete: ${videoUrl}`);
+        console.log(`✅ [Atlas] Video complete: ${videoUrl}`);
         return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: '', audioUrl: '' };
     }
 
     if (taskStatus === 'failed' || taskStatus === 'error') {
-        let errorMsg = result.data?.error || result.data?.message || result?.message || 'Atlas Cloud video generation failed';
+        let errorMsg = result.data?.error || result.data?.message || result?.message || 'Atlas video generation failed';
         let safetyTriggered = false;
-
-        if (typeof errorMsg === 'string' && errorMsg.includes('real person')) {
-            errorMsg = "Seedance AI blocked the generation because it detected a photo-realistic face. Auto-retrying by gracefully falling back to Safe Mode...";
-            safetyTriggered = true;
-        } else if (typeof errorMsg === 'string' && errorMsg.includes('safet')) {
-            errorMsg = "Generation blocked by AI safety filters. Auto-retrying in Safe Mode...";
+        if (typeof errorMsg === 'string' && (errorMsg.includes('real person') || errorMsg.includes('safety') || errorMsg.includes('safet'))) {
+            errorMsg = 'Generation blocked by safety filters. Retrying in Safe Mode...';
             safetyTriggered = true;
         }
-
-        console.warn(`⚠️ [Atlas Cloud] Task ${taskId} failed: ${errorMsg}`);
-        
-        // Return retryable=true for safety triggers to empower nodes.js to automatically strip images and retry
-        return { 
-            status: 'FAILED', 
-            progress: 0, 
-            error: errorMsg, 
-            retryable: safetyTriggered ? true : false,
-            safetyTriggered: safetyTriggered 
-        };
+        console.warn(`⚠️ [Atlas] Task ${taskId} failed: ${errorMsg}`);
+        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: safetyTriggered, safetyTriggered };
     }
 
-    if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') return { status: 'IN_PROGRESS', progress: 50 };
+    if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') {
+        return { status: 'IN_PROGRESS', progress: 50 };
+    }
     return { status: 'IN_QUEUE', progress: 10 };
 }
