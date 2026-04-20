@@ -15,7 +15,7 @@ import { auth } from '../services/api'
  */
 export default function useWalkthrough(studioId, opts = {}) {
   const { delay = 1500, dependsOn = null } = typeof opts === 'number' ? { delay: opts } : opts
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [active, setActive] = useState(false)
 
   const storageKey = user?._id
@@ -56,13 +56,15 @@ export default function useWalkthrough(studioId, opts = {}) {
     // 1. Immediate local feedback
     if (storageKey) localStorage.setItem(storageKey, 'completed')
     
-    // 2. Persist to Backend
+    // 2. Persist to Backend + sync React state
     if (user) {
-      auth.completeWalkthrough(studioId).catch(err => {
-        console.warn('⚠️ [useWalkthrough] Persistence failed:', err.message);
-      });
+      auth.completeWalkthrough(studioId)
+        .then(() => refreshUser()) // Sync updated completedWalkthroughs into AuthContext
+        .catch(err => {
+          console.warn('⚠️ [useWalkthrough] Persistence failed:', err.message);
+        });
     }
-  }, [storageKey, user, studioId])
+  }, [storageKey, user, studioId, refreshUser])
 
   const start = useCallback(() => {
     setActive(true)
