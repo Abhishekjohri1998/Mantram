@@ -1705,7 +1705,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setPsHistory(prev => [{ ...data, _brief: photoshootBrief, _timestamp: Date.now() }, ...prev])
                 saveToImageBank(data)
             } else if (data.modelBusy) {
-                setPhotoshootError(data.errorMessage || 'Model is busy — try switching to a different model using the selector above.')
+                setPhotoshootError(data.error || 'Model is busy — try switching to a different model using the selector above.')
             } else {
                 setPhotoshootError({
                     message: data.error || 'Generation failed',
@@ -4460,6 +4460,30 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         Upload a product image, choose your scene, and let AI create a professional photoshoot.
                                         Product details are preserved while the background and styling are transformed.
                                     </p>
+                                    {/* ── Photoshoot Error Display ── */}
+                                    {photoshootError && (
+                                        <div className="mt-5 mx-auto max-w-md p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-left animate-fade-in">
+                                            <div className="flex items-start gap-2.5">
+                                                <span className="material-symbols-outlined text-red-400 text-lg flex-shrink-0 mt-0.5">
+                                                    {typeof photoshootError === 'object' && photoshootError.isProviderError ? 'warning' : 'error'}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-red-400 mb-1">
+                                                        {typeof photoshootError === 'object' && photoshootError.isProviderError
+                                                            ? `${photoshootError.provider || 'AI Provider'} Notice`
+                                                            : 'Generation Failed'}
+                                                    </p>
+                                                    <p className="text-xs text-red-300/80">
+                                                        {typeof photoshootError === 'string' ? photoshootError : photoshootError?.message || 'An unexpected error occurred.'}
+                                                    </p>
+                                                    <button onClick={() => setPhotoshootError(null)}
+                                                        className="mt-2 text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer bg-transparent border-none p-0">
+                                                        Dismiss
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
