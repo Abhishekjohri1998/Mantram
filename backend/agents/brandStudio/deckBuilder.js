@@ -10,6 +10,7 @@ import { callAgent, loadBrandContext } from '../shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../videoStudio/laozhangClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
+import { injectDesignContext } from '../shared/productDesignAgent.js';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
@@ -100,7 +101,7 @@ JSON SCHEMA:
 }`;
 
 // ── Image Generator ────────────────────────────────────────────────
-async function generateImage(prompt, slideType, brandContext, referenceImage, tokens) {
+async function generateImage(prompt, slideType, brandContext, referenceImage, tokens, designContext = null) {
     if (!prompt) return null;
     let style = "contemporary premium aesthetic, photorealistic, 8k, cinematic lighting.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout, dramatic lighting.";
@@ -108,15 +109,22 @@ async function generateImage(prompt, slideType, brandContext, referenceImage, to
     style += ` Brand ethos: ${brandContext.substring(0, 120).replace(/\n/g, ' ')}`;
     style += ` CRITICAL: Do NOT render any text, words, letters, or typography in the image. Pure visual only.`;
 
+    // Inject PDI design context if provided (optional for deck)
+    const basePrompt = `${prompt}. ${style}`;
+    const fullPrompt = designContext ? injectDesignContext(basePrompt, designContext) : basePrompt;
+    const refImages = designContext?.productRefImages || [];
+
     try {
         const size = slideType === 'hero' || slideType === 'cta' ? '1792x1024' : '1024x768';
-        if (referenceImage) {
-            const r = await laozhangMultimodalImageGenerate(`${prompt}. ${style}`, [referenceImage], {
+        const primaryRef = referenceImage || refImages[0] || null;
+        if (primaryRef) {
+            const allRefs = [primaryRef, ...refImages.filter(r => r !== primaryRef)].slice(0, 2);
+            const r = await laozhangMultimodalImageGenerate(fullPrompt, allRefs, {
                 model: IMAGE_MODEL, size,
             });
             return r?.imageUrl || null;
         } else {
-            const r = await laozhangImageGenerate(`${prompt}. ${style}`, {
+            const r = await laozhangImageGenerate(fullPrompt, {
                 model: IMAGE_MODEL, size,
             });
             return r?.imageUrl || null;
@@ -586,7 +594,7 @@ ${slideSections}
 }
 
 // ── Main Export ────────────────────────────────────────────────
-export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch Deck', slideCount = 8, urlContext, referenceImage }) {
+export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch Deck', slideCount = 8, urlContext, referenceImage, designContext = null }) {
     const { brandContext } = await loadBrandContext(brandId);
     const tokens = generateBrandTokens('#6366F1', brandContext);
 
@@ -601,9 +609,9 @@ export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch D
     if (!plan?.slides?.length) throw new Error('Deck generation failed');
 
     // Generate images for ALL slides in parallel
-    console.log('📊 Pulse Deck: Generating visuals for all slides via NanoBanana 2...');
+    console.log(`📊 Pulse Deck: Generating visuals for all slides via NanoBanana 2${designContext ? ' (PDI-guided)' : ''}...`);
     const imagePromises = plan.slides.map(async (slide) => {
-        const imgUrl = await generateImage(slide.imagePrompt, slide.type, brandContext, referenceImage, tokens);
+        const imgUrl = await generateImage(slide.imagePrompt, slide.type, brandContext, referenceImage, tokens, designContext);
         return { key: slide.id, url: imgUrl };
     });
 

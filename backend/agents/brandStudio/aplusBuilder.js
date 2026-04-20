@@ -1,103 +1,227 @@
 /**
- * aplusBuilder.js — Amazon A+ Content Listing Generator
+ * aplusBuilder.js — Amazon A+ & Premium A++ Content Generator
+ *
+ * Tiers:
+ *   standard — Standard A+ Content (970px wide, up to 5 modules)
+ *   premium  — Premium A++ Content (1464px wide, up to 7 modules, carousel/hotspot/Q&A)
  *
  * Architecture:
- *  1. Product Intelligence — MCoT multimodal analysis of product images + URL scraping
+ *  1. Product Intelligence — MCoT multimodal analysis + URL scraping
  *  2. Competitive Intel   — MCP web_search for market positioning
- *  3. A+ Strategy Agent   — Claude plans optimal module layout + content strategy
- *  4. Module Content Gen  — Claude writes benefit-first copy per module
+ *  3. Strategy Agent      — Claude plans tier-appropriate module layout
+ *  4. Module Content Gen  — Claude writes Rufus-AI-optimised copy per module
  *  5. Image Pipeline      — NanoBanana 2 generates images at exact Amazon pixel dims
  *  6. Page Assembly       — Returns structured modules + images map
+ *
+ * Image Dimensions Source: Amazon Seller Central A+ Content Manager (2026 verified)
+ * All images generated at 2× scale for Retina / high-DPI displays.
  */
 
-import { callAgent, callMultimodalAgent, callAgentText, loadBrandContext } from '../shared/agentUtils.js';
+import { callAgent, callMultimodalAgent, loadBrandContext } from '../shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../videoStudio/laozhangClient.js';
 import { webSearch } from '../contentStudio/tools.js';
+import { analyzeProductDesign, buildDesignContext, injectDesignContext } from '../shared/productDesignAgent.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
-// ── Amazon A+ Module Specifications ────────────────────────────────────────────
-// Source: Amazon Seller Central A+ Content Manager (2025 verified)
+// ── Standard A+ Module Specifications ──────────────────────────────────────────
+// Amazon display widths: 970px max. Generated at 2× for Retina.
 export const APLUS_MODULES = {
     hero_banner: {
         id: 'hero_banner', label: 'Hero Banner',
-        width: 1940, height: 1200,   // 2x of Amazon's 970×600 for Retina
+        width: 1940, height: 1200,          // 2× of 970×600
         displayWidth: 970, displayHeight: 600,
-        description: 'Full-width lifestyle/product hero image. The first impression. Make it emotional.',
+        description: 'Full-width lifestyle/product hero image. Emotional first impression.',
         maxImages: 1, hasText: true,
-        textFields: ['headline', 'subheadline']
+        textFields: ['headline', 'subheadline'],
+        tier: 'standard',
     },
     image_text_left: {
         id: 'image_text_left', label: 'Image & Text (Image Left)',
-        width: 600, height: 600,
+        width: 600, height: 600,            // 2× of 300×300
         displayWidth: 300, displayHeight: 300,
-        description: 'Product or lifestyle image on the left, benefit-focused text on the right.',
+        description: 'Product or lifestyle image left, benefit-focused text right.',
         maxImages: 1, hasText: true,
-        textFields: ['headline', 'body', 'altText']
+        textFields: ['headline', 'body', 'altText'],
+        tier: 'standard',
     },
     image_text_right: {
         id: 'image_text_right', label: 'Image & Text (Image Right)',
         width: 600, height: 600,
         displayWidth: 300, displayHeight: 300,
-        description: 'Text on the left, image on the right — alternating with image_text_left for visual rhythm.',
+        description: 'Text left, image right — alternating with image_text_left for visual rhythm.',
         maxImages: 1, hasText: true,
-        textFields: ['headline', 'body', 'altText']
+        textFields: ['headline', 'body', 'altText'],
+        tier: 'standard',
     },
     three_features: {
         id: 'three_features', label: 'Three Features Grid',
         width: 600, height: 600,
         displayWidth: 300, displayHeight: 300,
-        description: 'Three equal columns — each with an icon/image and feature headline + descriptor.',
+        description: 'Three equal columns with icon/image + feature headline + descriptor.',
         maxImages: 3, hasText: true,
-        textFields: ['headline', 'items[0]', 'items[1]', 'items[2]']
+        textFields: ['headline', 'items[0]', 'items[1]', 'items[2]'],
+        tier: 'standard',
     },
     four_features: {
         id: 'four_features', label: 'Four Features Grid',
-        width: 440, height: 440,
+        width: 440, height: 440,            // 2× of 220×220
         displayWidth: 220, displayHeight: 220,
         description: 'Four equal columns — great for listing USPs with icon + label.',
         maxImages: 4, hasText: true,
-        textFields: ['headline', 'items[0]', 'items[1]', 'items[2]', 'items[3]']
+        textFields: ['headline', 'items[0]', 'items[1]', 'items[2]', 'items[3]'],
+        tier: 'standard',
     },
     comparison_chart: {
         id: 'comparison_chart', label: 'Comparison Chart',
-        width: 300, height: 600,
+        width: 300, height: 600,            // 2× of 150×300
         displayWidth: 150, displayHeight: 300,
-        description: 'Compare your product variants or models — Amazon allows this within your own brand.',
+        description: 'Compare your product variants or models within your own brand.',
         maxImages: 4, hasText: true,
-        textFields: ['headline', 'rows']
+        textFields: ['headline', 'rows'],
+        tier: 'standard',
     },
     image_highlights: {
         id: 'image_highlights', label: 'Image with Highlights',
         width: 600, height: 600,
         displayWidth: 300, displayHeight: 300,
-        description: 'Product display image with 4-6 bullet-point highlights beside it.',
+        description: 'Product display image with 4–6 bullet-point highlights beside it.',
         maxImages: 1, hasText: true,
-        textFields: ['headline', 'bullets', 'altText']
+        textFields: ['headline', 'bullets', 'altText'],
+        tier: 'standard',
     },
     header_overlay: {
         id: 'header_overlay', label: 'Header with Text Overlay',
-        width: 1940, height: 600,
+        width: 1940, height: 600,           // 2× of 970×300
         displayWidth: 970, displayHeight: 300,
-        description: 'Full-width banner image with text overlay — good for section dividers.',
+        description: 'Full-width section-divider banner with text overlay.',
         maxImages: 1, hasText: true,
-        textFields: ['headline', 'subheadline', 'altText']
+        textFields: ['headline', 'subheadline', 'altText'],
+        tier: 'standard',
     },
     brand_story: {
         id: 'brand_story', label: 'Brand Story',
         width: 1940, height: 1200,
         displayWidth: 970, displayHeight: 600,
-        description: 'Brand narrative section — mission, values, promise. Builds trust and loyalty.',
+        description: 'Brand narrative — mission, values, promise. Builds trust and loyalty.',
         maxImages: 1, hasText: true,
-        textFields: ['brandName', 'tagline', 'story']
-    }
+        textFields: ['brandName', 'tagline', 'story'],
+        tier: 'standard',
+    },
+    logo: {
+        id: 'logo', label: 'Brand Logo',
+        width: 1200, height: 360,           // 2× of 600×180
+        displayWidth: 600, displayHeight: 180,
+        description: 'Brand logo display — white or transparent background required.',
+        maxImages: 1, hasText: false,
+        textFields: ['altText'],
+        tier: 'standard',
+    },
 };
 
-// ── Product Intelligence: URL Scraper ───────────────────────────────────────────
+// ── Premium A++ Module Specifications ──────────────────────────────────────────
+// Amazon Premium A+ display width: 1464px. Generated at 2× for Retina.
+export const APLUS_PLUS_MODULES = {
+    // Full-width cinematic hero — the Premium signature module
+    premium_hero: {
+        id: 'premium_hero', label: 'Premium Hero Banner',
+        width: 2928, height: 1200,          // 2× of 1464×600
+        displayWidth: 1464, displayHeight: 600,
+        description: 'Full-bleed 1464px cinematic hero — the biggest first impression on Amazon.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['headline', 'subheadline', 'altText'],
+        tier: 'premium',
+    },
+    // Premium full-width section divider
+    premium_banner: {
+        id: 'premium_banner', label: 'Premium Full-Width Banner',
+        width: 2928, height: 600,           // 2× of 1464×300
+        displayWidth: 1464, displayHeight: 300,
+        description: 'Full-width 1464px section divider with optional text overlay.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['headline', 'altText'],
+        tier: 'premium',
+    },
+    // Premium image+text — larger than standard
+    premium_image_text: {
+        id: 'premium_image_text', label: 'Premium Image & Text',
+        width: 1464, height: 750,           // 2× of 732×375
+        displayWidth: 732, displayHeight: 375,
+        description: 'Larger image+text at full Premium width — more visual real estate.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['headline', 'body', 'altText'],
+        tier: 'premium',
+    },
+    // Carousel — 3 landscape images shown as swipeable slides
+    carousel: {
+        id: 'carousel', label: 'Image Carousel',
+        width: 2928, height: 1200,          // 2× of 1464×600 per slide
+        displayWidth: 1464, displayHeight: 600,
+        description: 'Swipeable full-width carousel — up to 3 slides. Great for variant/use-case storytelling.',
+        maxImages: 3, hasText: true, isVideo: false,
+        textFields: ['headline', 'slides[0]', 'slides[1]', 'slides[2]'],
+        tier: 'premium',
+    },
+    // Interactive hotspot — annotated hero image
+    hotspot: {
+        id: 'hotspot', label: 'Interactive Hotspot Image',
+        width: 2928, height: 1200,          // 2× of 1464×600
+        displayWidth: 1464, displayHeight: 600,
+        description: 'Tap numbered dots on the image to reveal feature callouts. Best for complex products.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['headline', 'altText', 'hotspots[0]', 'hotspots[1]', 'hotspots[2]', 'hotspots[3]'],
+        tier: 'premium',
+    },
+    // Video placeholder — user uploads MP4
+    video_module: {
+        id: 'video_module', label: 'Video Module',
+        width: 2928, height: 1200,          // Thumbnail/poster frame only
+        displayWidth: 1464, displayHeight: 600,
+        description: 'MP4 video embed (max 200MB, 3 min). AI generates a strong poster thumbnail frame.',
+        maxImages: 1, hasText: true, isVideo: true,
+        textFields: ['headline', 'videoCaption', 'altText'],
+        tier: 'premium',
+    },
+    // Q&A Panel — text-only, no image
+    qa_panel: {
+        id: 'qa_panel', label: 'Q&A Panel',
+        width: null, height: null,
+        displayWidth: 1464, displayHeight: null,
+        description: 'Structured Q&A addressing top buyer questions. Amazon Rufus AI reads this heavily.',
+        maxImages: 0, hasText: true, isVideo: false,
+        textFields: ['headline', 'questions'],
+        tier: 'premium',
+    },
+    // Enhanced full-width comparison chart
+    enhanced_comparison: {
+        id: 'enhanced_comparison', label: 'Enhanced Comparison Chart',
+        width: 2928, height: 600,           // 2× of 1464×300
+        displayWidth: 1464, displayHeight: 300,
+        description: 'Full Premium-width scrollable comparison table. Compare your variants or product line.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['headline', 'rows'],
+        tier: 'premium',
+    },
+    // Brand Story at Premium width
+    premium_brand_story: {
+        id: 'premium_brand_story', label: 'Premium Brand Story',
+        width: 2928, height: 1200,          // 2× of 1464×600
+        displayWidth: 1464, displayHeight: 600,
+        description: 'Full-bleed brand narrative at 1464px — the emotional closer of an A++ listing.',
+        maxImages: 1, hasText: true, isVideo: false,
+        textFields: ['brandName', 'tagline', 'story', 'altText'],
+        tier: 'premium',
+    },
+};
+
+// Combined for easy lookup
+export const ALL_MODULES = { ...APLUS_MODULES, ...APLUS_PLUS_MODULES };
+
+// ── Product URL Scraper ─────────────────────────────────────────────────────────
 async function scrapeProductUrl(url) {
     if (!url) return null;
     try {
-        console.log(`🔍 A+: Scraping product URL: ${url}`);
+        console.log(`A+: Scraping product URL: ${url}`);
         const res = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -109,7 +233,6 @@ async function scrapeProductUrl(url) {
         const html = await res.text();
         const $ = cheerio.load(html);
 
-        // ── Amazon-specific extraction ─────────────────────────────────────────
         if (url.includes('amazon.')) {
             return {
                 title: $('#productTitle').text().trim() || $('h1').first().text().trim(),
@@ -126,12 +249,10 @@ async function scrapeProductUrl(url) {
             };
         }
 
-        // ── Shopify-specific extraction ────────────────────────────────────────
         if (url.includes('myshopify.com') || url.includes('/products/')) {
             const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
                 try { return JSON.parse($(el).html()); } catch (_) { return null; }
             }).get().filter(Boolean).find(d => d['@type'] === 'Product');
-
             return {
                 title: jsonLd?.name || $('h1').first().text().trim(),
                 price: jsonLd?.offers?.[0]?.price || '',
@@ -143,7 +264,6 @@ async function scrapeProductUrl(url) {
             };
         }
 
-        // ── Generic extraction ─────────────────────────────────────────────────
         return {
             title: $('h1').first().text().trim() || $('meta[property="og:title"]').attr('content'),
             description: $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || '',
@@ -153,29 +273,40 @@ async function scrapeProductUrl(url) {
             platform: 'web'
         };
     } catch (err) {
-        console.warn(`⚠️ A+: URL scrape failed for ${url}: ${err.message}`);
+        console.warn(`A+: URL scrape failed for ${url}: ${err.message}`);
         return null;
     }
 }
 
-// ── Image Generation for A+ Modules ────────────────────────────────────────────
-async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = []) {
-    const { width, height, id: moduleType } = moduleSpec;
+// ── Image Generation for A+ / A++ Modules ──────────────────────────────────────
+async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = [], designContext = null) {
+    // Q&A and text-only modules skip image gen
+    if (!moduleSpec.width || !moduleSpec.height) return null;
+
+    const { width, height, id: moduleType, displayWidth, tier } = moduleSpec;
     const size = `${width}x${height}`;
 
     const colorContext = brandColors.length
-        ? `Brand colors: ${brandColors.map(c => `${c.hex} (${c.name || c.usage})`).join(', ')}. Apply these colors naturally.`
+        ? `Brand colors: ${brandColors.map(c => `${c.hex} (${c.name || c.usage})`).join(', ')}. Use in backgrounds/accents only.`
         : '';
 
-    const style = `Contemporary premium product photography aesthetic. ${colorContext} Ultra-sharp, 8K quality, professional studio lighting. CRITICAL: Do NOT render any text, words, letters, numbers, or typography anywhere in the image. Pure visual only.`;
+    const tierNote = tier === 'premium'
+        ? `This image will display at ${displayWidth}px (Premium A++ full-bleed). It must be cinematic, immersive, and hold up across the full viewport width. No letterboxing.`
+        : `This image displays at ${displayWidth}px (Standard A+).`;
 
-    const fullPrompt = `${prompt}. ${style}`;
+    const style = `Contemporary premium product photography. ${colorContext} ${tierNote} Ultra-sharp, 8K quality, professional lighting. CRITICAL: Do NOT render any text, words, letters, numbers, or typography anywhere in the image.`;
+
+    const basePrompt = `${prompt}. ${style}`;
+    const fullPrompt = designContext ? injectDesignContext(basePrompt, designContext) : basePrompt;
+
+    const refImages = designContext?.productRefImages?.length
+        ? designContext.productRefImages
+        : productImages;
 
     try {
         let result;
-        if (productImages.length > 0) {
-            // MCoT-style: ground the image in the actual product reference
-            result = await laozhangMultimodalImageGenerate(fullPrompt, productImages.slice(0, 2), {
+        if (refImages.length > 0) {
+            result = await laozhangMultimodalImageGenerate(fullPrompt, refImages.slice(0, 2), {
                 model: 'gemini-3.1-flash-image-preview', size
             });
         } else {
@@ -184,98 +315,18 @@ async function generateModuleImage(prompt, moduleSpec, productImages = [], brand
             });
         }
         if (result?.imageUrl) {
-            console.log(`   ✅ A+: Image generated for [${moduleType}] at ${size}`);
+            console.log(`   A+: Image generated [${moduleType}] at ${size} (${tier})${designContext ? ' PDI-guided' : ''}`);
             return result.imageUrl;
         }
     } catch (err) {
-        console.warn(`   ⚠️ A+: Image gen failed for [${moduleType}]: ${err.message}`);
+        console.warn(`   A+: Image gen failed [${moduleType}]: ${err.message}`);
     }
     return null;
 }
 
-// ── Main Entry Point ────────────────────────────────────────────────────────────
-export async function generateAplusListing({
-    brandId,
-    productUrl = null,
-    productData = null,   // Pre-loaded product from brand catalog
-    referenceImages = [], // User-uploaded A+ sample screenshots
-    brief = '',
-    moduleCount = 7,
-}) {
-    console.log('🏆 A+ Builder: Starting generation pipeline...');
-    const t0 = Date.now();
-
-    // ── 1. Load Brand Context ──────────────────────────────────────────────────
-    const { brand, brandContext } = await loadBrandContext(brandId);
-    const brandColors = brand?.dna?.colors || [];
-    const brandFonts = brand?.dna?.fonts || {};
-
-    // ── 2. Product Intelligence ────────────────────────────────────────────────
-    let product = productData;
-
-    if (!product && productUrl) {
-        product = await scrapeProductUrl(productUrl);
-    }
-
-    // If we have product images, use MCoT to deeply analyze them
-    const productImages = [
-        ...(product?.images || []),
-        ...(referenceImages || [])
-    ].filter(Boolean).slice(0, 4);
-
-    let visualIntelligence = '';
-    if (productImages.length > 0) {
-        console.log(`🧠 A+: MCoT visual analysis of ${productImages.length} product images...`);
-        const mcotResult = await callMultimodalAgent(
-            `You are an Amazon product listing expert and visual analyst. Analyze these product images deeply.
-            Return a JSON object with: {
-              "productCategory": "what type of product is this",
-              "visualStyle": "describe the aesthetic, materials, finish, colors",
-              "primaryUseCase": "who uses this and how",
-              "emotionalAppeal": "what feeling/aspiration does this product evoke",
-              "standoutFeatures": ["visible feature 1", "visible feature 2", ...],
-              "targetAudience": "describe the typical buyer",
-              "imageryStrategy": "what types of A+ images would work best for this product",
-              "competitivePosition": "premium/budget/value/specialized"
-            }`,
-            `Product: ${product?.title || 'Unknown'}. Brief: ${brief}. Analyze the product images for A+ content creation.`,
-            productImages,
-            { temperature: 0.3, maxTokens: 1000 }
-        );
-        visualIntelligence = JSON.stringify(mcotResult);
-        console.log(`   ✅ A+: MCoT visual analysis complete`);
-    }
-
-    // ── 3. Competitive Intel (MCP web_search) ──────────────────────────────────
-    let competitiveIntel = '';
-    if (product?.title || brief) {
-        try {
-            console.log(`🔍 A+: Fetching competitive intel via web_search...`);
-            const searchQuery = `Amazon A+ content best examples "${product?.title || brief}" category competitor listing features`;
-            const searchResult = await webSearch(searchQuery, 'quick');
-            competitiveIntel = typeof searchResult === 'string'
-                ? searchResult.substring(0, 800)
-                : JSON.stringify(searchResult).substring(0, 800);
-            console.log(`   ✅ A+: Competitive intel fetched`);
-        } catch (err) {
-            console.warn(`   ⚠️ A+: web_search skipped: ${err.message}`);
-        }
-    }
-
-    // ── 4. A+ Strategy Agent (Claude) ─────────────────────────────────────────
-    console.log('🧠 A+: Strategy Agent planning module layout...');
-
-    const productContext = product ? `
-Product Title: ${product.title || 'N/A'}
-Price: ${product.price || 'N/A'}
-Category: ${product.category || 'N/A'}
-Description: ${(product.description || '').substring(0, 500)}
-Key Features/Bullets: ${(product.bulletPoints || []).join(' | ')}
-Platform: ${product.platform || 'N/A'}
-Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
-` : brief;
-
-    const strategyPrompt = `You are the world's best Amazon A+ Content strategist. Your A+ content has generated millions in incremental revenue. 
+// ── Build strategy prompt for Standard A+ ──────────────────────────────────────
+function buildStandardStrategyPrompt(productContext, visualIntelligence, competitiveIntel, brandContext, brief, moduleCount) {
+    return `You are the world's best Amazon A+ Content strategist. Your A+ listings consistently drive 10–20% conversion lifts.
 
 ${brandContext}
 
@@ -288,105 +339,348 @@ ${visualIntelligence || 'No visual analysis available'}
 COMPETITIVE INTEL:
 ${competitiveIntel || 'No competitive data'}
 
-USER BRIEF:
-${brief}
+USER BRIEF: ${brief}
 
-AMAZON A+ RULES:
-- No pricing, no promotional language ("free", "discounted", "best-seller")  
-- No competitor comparisons (only own-brand comparisons in comparison charts)
-- No external links, QR codes, or contact info
-- All claims must be verifiable (no unverified superlatives)
-- Mobile-first: 70% of traffic is mobile, keep text short
+AMAZON CONTENT RULES (2026):
+- No pricing, promotional language ("free", "discounted", "best", "#1"), competitor names
+- No external links, QR codes, contact info
+- All claims must be verifiable (no unverified superlatives like "world's best")
+- Mobile-first: 70%+ traffic is mobile — keep text short and scannable
+- Alt-text: Must be descriptive and SEO-relevant (Google indexes A+ content)
+- RUFUS AI: Amazon's AI shopping assistant reads your A+ content — write copy that answers "why this product?", "who is it for?", "how does it work?" in natural language
 
-AVAILABLE MODULES (you can pick any combination):
-hero_banner, image_text_left, image_text_right, three_features, four_features, comparison_chart, image_highlights, header_overlay, brand_story
+VISUAL NARRATIVE STRUCTURE (follow this arc):
+1. Emotional hook (hero) → 2. Problem solved → 3. Key features → 4. Social proof/comparison → 5. Brand trust close
 
-Create an optimized A+ Content plan. Return a JSON object:
+AVAILABLE MODULES: hero_banner, image_text_left, image_text_right, three_features, four_features, comparison_chart, image_highlights, header_overlay, brand_story
+
+Return a JSON object:
 {
-  "productName": "short, punchy product name for A+ header",
-  "targetAudience": "primary buyer persona",
-  "contentStrategy": "overall narrative arc (1-2 sentences)",
+  "productName": "short punchy product name",
+  "targetAudience": "primary buyer persona in 1 sentence",
+  "contentStrategy": "overall narrative arc (1–2 sentences)",
+  "rufusOptimizations": ["question 1 this content answers", "question 2", "question 3"],
   "modules": [
     {
       "id": "unique_id_e.g._hero_1",
-      "type": "module type from available list",
-      "headline": "punchy, benefit-first headline (max 150 chars)",
-      "subheadline": "supporting line (max 200 chars, optional)",
-      "body": "2-3 sentence benefit-focused copy (max 300 chars, plain text only)",
-      "bullets": ["bullet 1", "bullet 2", "bullet 3"] (optional, max 6),
-      "items": [{"title": "feature name", "description": "short descriptor", "icon": "emoji"}, ...] (for grid modules),
-      "rows": [{"feature": "feature name", "model1": "Our Product", "model1Value": "✓", "model2": "Basic", "model2Value": "✗"}] (for comparison),
-      "altText": "SEO-optimized image description for accessibility (include relevant keywords)",
-      "imagePrompt": "Detailed image generation prompt that is product-aware, does NOT ask for any text/words in the image, and matches the brand aesthetic",
-      "imageStyle": "hero-lifestyle / product-detail / infographic / brand-ambient",
-      "rationale": "Why this module here, why this content"
+      "type": "module_type_from_list",
+      "headline": "benefit-first headline, max 150 chars, NO promotional language",
+      "subheadline": "supporting line max 200 chars (optional)",
+      "body": "2–3 sentence benefit-focused copy, max 300 chars, plain text only, Rufus-friendly natural language",
+      "bullets": ["bullet 1", "bullet 2", "bullet 3"],
+      "items": [{"title": "Feature Name", "description": "short descriptor", "icon": "single emoji"}],
+      "rows": [{"feature": "Feature", "model1": "Our Product", "model1Value": "Yes", "model2": "Alternative", "model2Value": "No"}],
+      "hotspots": [],
+      "altText": "Descriptive, keyword-rich alt text for Google indexing (max 100 chars)",
+      "imagePrompt": "Detailed image generation prompt, product-aware, NO text in image, matches brand mood",
+      "imageStyle": "hero-lifestyle | product-detail | infographic | brand-ambient | feature-closeup",
+      "rationale": "Why this module here, 1 sentence"
     }
   ]
 }
 
-Generate exactly ${moduleCount} modules. Start with hero_banner, end with a brand_story or image_highlights. Use progressive reveal: emotional hook → problem → solution → features → social proof/comparison → brand story.`;
+Generate exactly ${moduleCount} modules. Start with hero_banner. End with brand_story or image_highlights. Follow the emotional arc.`;
+}
 
-    const aplusPlan = await callAgent(strategyPrompt, `Create A+ content for: ${product?.title || brief}`, 0.7, 6000, {
-        provider: 'anthropic', model: 'claude-sonnet-4-6', timeoutMs: 120_000
-    });
+// ── Build strategy prompt for Premium A++ ──────────────────────────────────────
+function buildPremiumStrategyPrompt(productContext, visualIntelligence, competitiveIntel, brandContext, brief, moduleCount) {
+    return `You are the world's best Amazon Premium A++ Content strategist. Premium A++ is the highest-tier Amazon listing enhancement — 1464px wide, interactive modules, video, carousel, hotspot. Your listings consistently drive 20–30% conversion lifts.
+
+${brandContext}
+
+PRODUCT DATA:
+${productContext}
+
+VISUAL ANALYSIS (MCoT):
+${visualIntelligence || 'No visual analysis available'}
+
+COMPETITIVE INTEL:
+${competitiveIntel || 'No competitive data'}
+
+USER BRIEF: ${brief}
+
+AMAZON PREMIUM A++ RULES (2026):
+- Same content rules as standard A+ (no pricing, no promotions, no competitor names)
+- Mobile-optimized: full-bleed 1464px imagery must stack cleanly on mobile
+- Rufus AI: heavily reads Premium A+ content — structure as natural-language Q&A and benefit narratives
+- Alt-text: critical for Google indexing — use relevant keyword phrases naturally
+- Video: script should demonstrate product in first 5 seconds (hook) — max 3 min, MP4 only
+- Hotspot: identify 3–4 specific physical product features to annotate on the hero image
+- Carousel: 3 slides that tell a use-case story (e.g., morning ritual, travel, gifting scenario)
+
+PREMIUM A++ MODULE TYPES (you must use Premium modules, not standard):
+- premium_hero: Full-bleed 1464px cinematic hero — REQUIRED first module
+- premium_banner: 1464px section divider with minimal text
+- premium_image_text: Large image+text at Premium width
+- carousel: 3-slide swipeable story carousel (generates 3 separate images)
+- hotspot: Interactive annotated hero image (generates base image + hotspot copy)
+- video_module: Video with poster thumbnail (generates poster; user uploads video)
+- qa_panel: Q&A panel — NO image, just structured questions/answers (Rufus gold)
+- enhanced_comparison: Full-width comparison table
+- premium_brand_story: Full-bleed 1464px emotional brand close — REQUIRED last module
+
+VISUAL NARRATIVE STRUCTURE (immersive Premium arc):
+1. premium_hero (cinematic emotional hook)
+2. carousel (use-case story — 3 scenarios)
+3. hotspot (feature deep-dive — annotated product)
+4. qa_panel (Rufus-optimized Q&A — buyer questions answered)
+5. premium_image_text (key differentiator)
+6. enhanced_comparison (your variant / product family)
+7. premium_brand_story (emotional brand close)
+
+Return a JSON object:
+{
+  "productName": "short punchy product name",
+  "targetAudience": "primary buyer persona in 1 sentence",
+  "contentStrategy": "Premium A++ narrative arc (1–2 sentences)",
+  "rufusOptimizations": ["top buyer question 1 this answers", "question 2", "question 3", "question 4"],
+  "modules": [
+    {
+      "id": "unique_id_e.g._hero_1",
+      "type": "premium_module_type_from_list",
+      "headline": "benefit-first headline, max 150 chars, NO promotional language",
+      "subheadline": "supporting line max 200 chars",
+      "body": "2–3 sentence benefit-focused copy, max 400 chars, natural Rufus-friendly language",
+      "slides": [
+        {"headline": "Slide 1 Headline", "body": "Slide 1 copy", "imagePrompt": "Detailed prompt for slide 1 image", "altText": "alt text"}
+      ],
+      "hotspots": [
+        {"number": 1, "x": 30, "y": 45, "title": "Feature Name", "description": "What this feature does in 1 sentence"}
+      ],
+      "questions": [
+        {"question": "Customer question?", "answer": "Clear, helpful answer in 2–3 sentences using natural language"}
+      ],
+      "rows": [{"feature": "Feature", "model1": "Our Model A", "model1Value": "Yes", "model2": "Our Model B", "model2Value": "No"}],
+      "videoCaption": "What the video demonstrates (for video_module)",
+      "altText": "Keyword-rich descriptive alt text (max 100 chars)",
+      "imagePrompt": "Detailed image generation prompt for this module (if applicable). Product-aware. NO text in image.",
+      "imageStyle": "cinematic-lifestyle | product-hero | feature-closeup | brand-ambient",
+      "rationale": "Why this module in this position"
+    }
+  ]
+}
+
+Generate exactly ${moduleCount} modules. MUST start with premium_hero. MUST end with premium_brand_story. Use the full Premium module set. Follow the immersive Premium arc.`;
+}
+
+// ── Main Entry Point ────────────────────────────────────────────────────────────
+export async function generateAplusListing({
+    brandId,
+    productUrl = null,
+    productData = null,
+    referenceImages = [],
+    brief = '',
+    moduleCount = 7,
+    listingTier = 'standard',   // 'standard' | 'premium'
+    designContext = null,        // PDI locked design directive from frontend
+    productDNA = null,
+}) {
+    const isPremium = listingTier === 'premium';
+    console.log(`A+ Builder: Starting ${isPremium ? 'Premium A++' : 'Standard A+'} generation pipeline...`);
+    const t0 = Date.now();
+
+    // Force correct module counts per tier
+    const effectiveModuleCount = isPremium
+        ? Math.min(Math.max(moduleCount, 5), 7)
+        : Math.min(Math.max(moduleCount, 3), 5);
+
+    // ── 1. Load Brand Context ──────────────────────────────────────────────────
+    const { brand, brandContext } = await loadBrandContext(brandId);
+    const brandColors = brand?.dna?.colors || [];
+
+    // ── 2. Product Intelligence ────────────────────────────────────────────────
+    let product = productData;
+    if (!product && productUrl) {
+        product = await scrapeProductUrl(productUrl);
+    }
+
+    // Keep up to 8 images for PDI — two-stage classification benefits from seeing all angles
+    const allProductImages = [
+        ...(product?.images || []),
+        ...(referenceImages || [])
+    ].filter(Boolean).slice(0, 8);
+
+    // ── PDI: Resolve Design Context ────────────────────────────────────────────
+    let activeDesignContext = designContext;
+    let activeProductDNA = productDNA;
+
+    if (!activeDesignContext && allProductImages.length > 0) {
+        console.log(`A+: Running inline PDI analysis on ${allProductImages.length} images...`);
+        activeProductDNA = await analyzeProductDesign(allProductImages, product || {}, brief);
+        activeDesignContext = buildDesignContext(activeProductDNA, activeProductDNA.defaultMoodDirection || 'editorial');
+    }
+
+    // For image generation: use PDI's curated roster (diversity-ranked) or first 4 images
+    const productImages = activeProductDNA?.productRefImages?.slice(0, 4)
+        || allProductImages.slice(0, 4);
+
+    // ── MCoT Visual Intelligence ───────────────────────────────────────────────
+    let visualIntelligence = '';
+    if (productImages.length > 0) {
+        console.log(`A+: MCoT visual analysis of ${productImages.length} product images...`);
+        const mcotResult = await callMultimodalAgent(
+            `You are an Amazon product listing expert and visual analyst. Analyze these product images deeply.
+Return a JSON object with: {
+  "productCategory": "type of product",
+  "visualStyle": "aesthetic, materials, finish, colors",
+  "primaryUseCase": "who uses this and how",
+  "emotionalAppeal": "feeling/aspiration this product evokes",
+  "standoutFeatures": ["visible feature 1", "visible feature 2"],
+  "targetAudience": "typical buyer description",
+  "imageryStrategy": "what A+ image styles work best for this product",
+  "competitivePosition": "premium | budget | value | specialized",
+  "rufusKeywords": ["natural-language phrase a buyer would use to find this", "phrase 2", "phrase 3"]
+}`,
+            `Product: ${product?.title || 'Unknown'}. Brief: ${brief}. Listing tier: ${isPremium ? 'Premium A++' : 'Standard A+'}.`,
+            productImages,
+            { temperature: 0.3, maxTokens: 1200 }
+        );
+        visualIntelligence = JSON.stringify(mcotResult);
+        console.log(`   A+: MCoT visual analysis complete`);
+    }
+
+    // ── 3. Competitive Intel ───────────────────────────────────────────────────
+    let competitiveIntel = '';
+    if (product?.title || brief) {
+        try {
+            console.log(`A+: Fetching competitive intel...`);
+            const searchQuery = `Amazon A+ content best examples "${product?.title || brief}" category listing features 2025`;
+            const searchResult = await webSearch(searchQuery, 'quick');
+            competitiveIntel = typeof searchResult === 'string'
+                ? searchResult.substring(0, 800)
+                : JSON.stringify(searchResult).substring(0, 800);
+            console.log(`   A+: Competitive intel fetched`);
+        } catch (err) {
+            console.warn(`   A+: web_search skipped: ${err.message}`);
+        }
+    }
+
+    // ── 4. Strategy Agent (Claude) ─────────────────────────────────────────────
+    console.log(`A+: Strategy Agent planning ${effectiveModuleCount} modules (${isPremium ? 'Premium A++' : 'Standard A+'})...`);
+
+    const productContext = product ? `
+Product Title: ${product.title || 'N/A'}
+Price: ${product.price || 'N/A'}
+Category: ${product.category || 'N/A'}
+Description: ${(product.description || '').substring(0, 500)}
+Key Features: ${(product.bulletPoints || []).join(' | ')}
+Platform: ${product.platform || 'N/A'}
+Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
+` : brief;
+
+    const strategyPrompt = isPremium
+        ? buildPremiumStrategyPrompt(productContext, visualIntelligence, competitiveIntel, brandContext, brief, effectiveModuleCount)
+        : buildStandardStrategyPrompt(productContext, visualIntelligence, competitiveIntel, brandContext, brief, effectiveModuleCount);
+
+    const aplusPlan = await callAgent(
+        strategyPrompt,
+        `Create ${isPremium ? 'Premium A++' : 'Standard A+'} content for: ${product?.title || brief}`,
+        0.7, 8000,
+        { provider: 'anthropic', model: 'claude-sonnet-4-6', timeoutMs: 150_000 }
+    );
 
     if (!aplusPlan?.modules?.length) {
         throw new Error('A+ strategy agent returned invalid plan');
     }
 
-    console.log(`   ✅ A+: Strategy complete — ${aplusPlan.modules.length} modules planned`);
+    // Attach tier info to plan
+    aplusPlan.listingTier = listingTier;
+    aplusPlan.isPremium = isPremium;
 
-    // ── 5. Parallel Image Generation (NanoBanana 2) ───────────────────────────
-    console.log(`🎨 A+: Generating ${aplusPlan.modules.length} module images in parallel...`);
+    console.log(`   A+: Strategy complete — ${aplusPlan.modules.length} modules planned`);
+
+    // ── 5. Parallel Image Generation ──────────────────────────────────────────
+    const moduleLibrary = isPremium ? APLUS_PLUS_MODULES : APLUS_MODULES;
+
+    console.log(`A+: Generating images for ${aplusPlan.modules.length} modules (${isPremium ? '1464px Premium' : '970px Standard'})...`);
 
     const imageResults = await Promise.allSettled(
-        aplusPlan.modules.map(async (module) => {
-            const spec = APLUS_MODULES[module.type] || APLUS_MODULES.image_text_left;
-            const imgUrl = await generateModuleImage(
-                module.imagePrompt,
-                spec,
-                productImages,
-                brandColors
-            );
-            return { moduleId: module.id, imageUrl: imgUrl };
+        aplusPlan.modules.flatMap((module) => {
+            const spec = ALL_MODULES[module.type] || (isPremium ? APLUS_PLUS_MODULES.premium_hero : APLUS_MODULES.image_text_left);
+
+            // Skip image gen for Q&A panels and text-only modules
+            if (spec.maxImages === 0 || !spec.width) return [];
+
+            // Carousel: generate each slide's image separately
+            if (module.type === 'carousel' && module.slides?.length) {
+                return module.slides.map(async (slide, idx) => {
+                    const imgUrl = await generateModuleImage(
+                        slide.imagePrompt || module.imagePrompt || `${module.headline} — slide ${idx + 1} lifestyle scene`,
+                        spec, productImages, brandColors, activeDesignContext
+                    );
+                    return { moduleId: `${module.id}_slide_${idx}`, imageUrl: imgUrl };
+                });
+            }
+
+            // Standard: generate single image
+            return [async () => {
+                const imgUrl = await generateModuleImage(
+                    module.imagePrompt || module.headline,
+                    spec, productImages, brandColors, activeDesignContext
+                );
+                return { moduleId: module.id, imageUrl: imgUrl };
+            }].map(fn => fn());
         })
     );
 
     const images = {};
     imageResults.forEach((r) => {
-        if (r.status === 'fulfilled' && r.value.imageUrl) {
+        if (r.status === 'fulfilled' && r.value?.imageUrl) {
             images[r.value.moduleId] = r.value.imageUrl;
         } else if (r.status === 'rejected') {
-            console.warn(`   ⚠️ A+: Image gen rejected:`, r.reason?.message);
+            console.warn(`   A+: Image rejected:`, r.reason?.message);
         }
     });
 
     const successCount = Object.keys(images).length;
-    console.log(`   ✅ A+: ${successCount}/${aplusPlan.modules.length} images generated`);
+    console.log(`   A+: ${successCount} images generated`);
 
-    // ── 6. Derive export-ready text content ───────────────────────────────────
-    // Build a clean text summary for Seller Central copy-paste
+    // ── 6. Export text ────────────────────────────────────────────────────────
     const exportText = aplusPlan.modules.map((m, i) => {
-        const lines = [`[Module ${i + 1}: ${APLUS_MODULES[m.type]?.label || m.type}]`];
+        const spec = ALL_MODULES[m.type];
+        const lines = [`[Module ${i + 1}: ${spec?.label || m.type}${spec?.tier === 'premium' ? ' (Premium A++)' : ''}]`];
         if (m.headline) lines.push(`Headline: ${m.headline}`);
         if (m.subheadline) lines.push(`Subheadline: ${m.subheadline}`);
         if (m.body) lines.push(`Body: ${m.body}`);
         if (m.bullets?.length) lines.push(`Bullets:\n${m.bullets.map(b => `  • ${b}`).join('\n')}`);
         if (m.altText) lines.push(`Alt Text: ${m.altText}`);
+        if (m.slides?.length) {
+            m.slides.forEach((s, si) => {
+                lines.push(`  Slide ${si + 1}: ${s.headline || ''} — ${s.body || ''}`);
+            });
+        }
+        if (m.hotspots?.length) {
+            m.hotspots.forEach(h => lines.push(`  Hotspot ${h.number}: ${h.title} — ${h.description}`));
+        }
+        if (m.questions?.length) {
+            m.questions.forEach(q => {
+                lines.push(`  Q: ${q.question}`);
+                lines.push(`  A: ${q.answer}`);
+            });
+        }
+        if (m.rows?.length) {
+            lines.push(`Comparison Rows: ${m.rows.map(r => `${r.feature}: ${r.model1Value}`).join(' | ')}`);
+        }
         return lines.join('\n');
     }).join('\n\n─────────────────────────────────\n\n');
 
     const elapsed = Math.round((Date.now() - t0) / 1000);
-    console.log(`🏆 A+ Builder: Complete in ${elapsed}s — ${aplusPlan.modules.length} modules, ${successCount} images`);
+    console.log(`A+ Builder: Complete in ${elapsed}s — ${aplusPlan.modules.length} modules (${listingTier}), ${successCount} images`);
 
     return {
         aplusPlan,
         images,
         exportText,
         productData: product,
-        visualIntelligence: visualIntelligence ? JSON.parse(visualIntelligence) : null,
+        productDNA: activeProductDNA || null,
+        designContext: activeDesignContext
+            ? { moodId: activeDesignContext.moodId, moodLabel: activeDesignContext.moodLabel }
+            : null,
+        visualIntelligence: visualIntelligence ? (() => { try { return JSON.parse(visualIntelligence); } catch { return null; } })() : null,
         moduleCount: aplusPlan.modules.length,
+        listingTier,
+        isPremium,
         generatedAt: new Date().toISOString(),
-        elapsedSeconds: elapsed
+        elapsedSeconds: elapsed,
     };
 }

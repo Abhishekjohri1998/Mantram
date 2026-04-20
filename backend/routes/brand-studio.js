@@ -8,13 +8,14 @@ import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
+import { analyzeProductDesign, generateMoodBoardImages, buildDesignContext } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
 const router = express.Router();
 
-const CREDITS = { deck: 20, email: 12, landing: 18, aplus: 25 };
+const CREDITS = { deck: 20, email: 12, landing: 18, aplus: 15, aplusPlus: 25 };
 
 // ── POST /api/brand-studio/fetch-url ─────────────────────────
 // Scrapes a product/brand URL and returns structured content
@@ -152,10 +153,78 @@ router.post('/fetch-url', protect, async (req, res) => {
     }
 });
 
+// ── POST /api/brand-studio/product-intelligence ────────────────
+// Step 0 of Pulse generation: MCoT product image analysis → ProductDNA
+// Free (no credit cost) — this is context building, not content generation
+router.post('/product-intelligence', protect, async (req, res) => {
+    try {
+        const { productImages = [], productData = {}, brief = '', brandId } = req.body;
+
+        // Validate we have something to analyze
+        if (!productImages.length && !productData?.title && !brief) {
+            return res.status(400).json({ success: false, error: 'Provide productImages, productData, or brief' });
+        }
+
+        console.log(`🎨 PDI: Running product intelligence for ${req.user._id}...`);
+        const productDNA = await analyzeProductDesign(productImages, productData, brief);
+
+        res.json({ success: true, productDNA });
+    } catch (err) {
+        console.error('❌ PDI product-intelligence:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/mood-board ─────────────────────────
+// Generate 4 mood direction images using ProductDNA as creative anchor
+// Cost: 4 credits (1 per mood image)
+router.post('/mood-board', protect, async (req, res) => {
+    try {
+        const { productDNA, brandId } = req.body;
+        if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
+
+        // Credit check (4 credits for 4 mood images)
+        const MOOD_CREDITS = 4;
+        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        if (balance < MOOD_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: MOOD_CREDITS });
+
+        let brandContext = '';
+        if (brandId) {
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const ctx = await loadBrandContext(brandId);
+            brandContext = ctx.brandContext || '';
+        }
+
+        const result = await generateMoodBoardImages(productDNA, brandContext);
+        await deductCredits(req.user._id, MOOD_CREDITS, 'pulse-mood-board');
+
+        res.json({ success: true, moods: result.moods });
+    } catch (err) {
+        console.error('❌ PDI mood-board:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/design-context ─────────────────────
+// Build the locked design directive from ProductDNA + selected mood + brand colors
+// Free (pure computation, no LLM call)
+router.post('/design-context', protect, async (req, res) => {
+    try {
+        const { productDNA, selectedMoodId, brandColors = [] } = req.body;
+        if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
+
+        const designContext = buildDesignContext(productDNA, selectedMoodId, brandColors);
+        res.json({ success: true, designContext });
+    } catch (err) {
+        console.error('❌ PDI design-context:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ── POST /api/brand-studio/deck/generate ─────────────────────
 router.post('/deck/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, deckType, slideCount, urlContext, referenceImage } = req.body;
+        const { brandId, brief, deckType, slideCount, urlContext, referenceImage, designContext } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
@@ -166,7 +235,8 @@ router.post('/deck/generate', protect, async (req, res) => {
             brandId, brief,
             deckType: deckType || 'campaign',
             slideCount: parseInt(slideCount || 8),
-            urlContext, referenceImage
+            urlContext, referenceImage,
+            designContext: designContext || null,   // PDI design context
         });
 
         if (!result.success) throw new Error('Deck generation failed');
@@ -248,14 +318,14 @@ router.post('/deck/regenerate-image', protect, async (req, res) => {
 // ── POST /api/brand-studio/email/generate ────────────────────
 router.post('/email/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, emailType, urlContext, referenceImage } = req.body;
+        const { brandId, brief, emailType, urlContext, referenceImage, designContext } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.email) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.email });
 
-        const result = await generateEmail({ brandId, brief, emailType: emailType || 'campaign', urlContext, referenceImage });
+        const result = await generateEmail({ brandId, brief, emailType: emailType || 'campaign', urlContext, referenceImage, designContext: designContext || null });
         if (!result.success) throw new Error('Email generation failed');
         await deductCredits(req.user._id, CREDITS.email, 'pulse-mail');
 
@@ -312,14 +382,14 @@ router.post('/email/export', protect, async (req, res) => {
 // ── POST /api/brand-studio/landing-page/generate ─────────────
 router.post('/landing-page/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, pageType, urlContext, referenceImage } = req.body;
+        const { brandId, brief, pageType, urlContext, referenceImage, designContext } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.landing) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.landing });
 
-        const result = await generateLandingPage({ brandId, brief, pageType, urlContext, referenceImage });
+        const result = await generateLandingPage({ brandId, brief, pageType, urlContext, referenceImage, designContext: designContext || null });
         if (!result.success) throw new Error('Page generation failed');
         await deductCredits(req.user._id, CREDITS.landing, 'pulse-page');
 
@@ -496,11 +566,31 @@ router.post('/aplus/analyze-product', protect, async (req, res) => {
 // ── POST /api/brand-studio/aplus/generate ────────────────────
 router.post('/aplus/generate', protect, async (req, res) => {
     try {
-        const { brandId, productUrl, productData, referenceImages, brief, moduleCount = 7 } = req.body;
+        const {
+            brandId, productUrl, productData, referenceImages,
+            brief, moduleCount = 7, designContext, productDNA,
+            listingTier = 'standard',  // 'standard' | 'premium'
+        } = req.body;
+
         if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
         if (!brief && !productUrl && !productData) return res.status(400).json({ success: false, error: 'Provide a product URL, product data, or brief' });
 
-        const result = await generateAplusListing({ brandId, productUrl, productData, referenceImages, brief, moduleCount });
+        const isPremium = listingTier === 'premium';
+        const creditCost = isPremium ? CREDITS.aplusPlus : CREDITS.aplus;
+
+        // ── Credit balance pre-flight check ───────────────────────────────────────
+        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        if (balance < creditCost) return res.status(402).json({ success: false, error: 'Insufficient credits', required: creditCost });
+
+        const result = await generateAplusListing({
+            brandId, productUrl, productData, referenceImages, brief, moduleCount,
+            listingTier,
+            designContext: designContext || null,
+            productDNA: productDNA || null,
+        });
+
+        // ── Deduct credits ──────────────────────────────────────────────────
+        await deductCredits(req.user._id, creditCost, isPremium ? 'pulse-aplus-premium' : 'pulse-aplus');
 
         // Thumbnail = first module's hero image
         const firstImg = Object.values(result.images || {})[0] || null;
@@ -517,8 +607,12 @@ router.post('/aplus/generate', protect, async (req, res) => {
             aplusProductData: result.productData,
             aplusExportText: result.exportText,
             aplusModuleCount: result.moduleCount,
+            aplusPlan: result.aplusPlan || null,
+            aplusProductDNA: productDNA || null,        // PDI: extracted product DNA
+            aplusDesignContext: designContext || null,  // PDI: locked design directive
+            aplusTier: listingTier,
             thumbnailUrl: firstImg,
-            creditsUsed: CREDITS.aplus,
+            creditsUsed: creditCost,
             status: 'completed'
         });
 
@@ -530,6 +624,8 @@ router.post('/aplus/generate', protect, async (req, res) => {
             productData: result.productData,
             visualIntelligence: result.visualIntelligence,
             moduleCount: result.moduleCount,
+            listingTier: result.listingTier,
+            isPremium: result.isPremium,
             elapsedSeconds: result.elapsedSeconds
         });
     } catch (err) {
@@ -561,12 +657,19 @@ router.post('/aplus/regenerate-image', protect, async (req, res) => {
         const { imagePrompt, moduleType, productImages, brandColors } = req.body;
         if (!imagePrompt) return res.status(400).json({ success: false, error: 'imagePrompt required' });
 
-        // Module type → Amazon pixel dimensions (at 2x for Retina)
+        // Module type → Amazon pixel dimensions (at 2× for Retina)
+        // Standard A+ (970px base) and Premium A++ (1464px base)
         const SIZES = {
+            // Standard A+ modules
             hero_banner: '1940x1200', header_overlay: '1940x600', brand_story: '1940x1200',
             image_text_left: '600x600', image_text_right: '600x600',
             image_highlights: '600x600', three_features: '600x600',
-            four_features: '440x440', comparison_chart: '300x600'
+            four_features: '440x440', comparison_chart: '300x600',
+            // Premium A++ modules (1464px base, 2×)
+            premium_hero: '2928x1200', premium_banner: '2928x600',
+            premium_image_text: '1464x750', carousel: '2928x1200',
+            hotspot: '2928x1200', video_module: '2928x1200',
+            enhanced_comparison: '2928x600', premium_brand_story: '2928x1200',
         };
         const size = SIZES[moduleType] || '600x600';
         const colorHints = (brandColors || []).map(c => `${c.hex} (${c.name || c.usage})`).join(', ');

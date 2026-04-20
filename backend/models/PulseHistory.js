@@ -52,6 +52,10 @@ const pulseHistorySchema = new mongoose.Schema({
     aplusProductData: { type: mongoose.Schema.Types.Mixed, default: null },
     aplusExportText:  { type: String, default: null },
     aplusModuleCount: { type: Number, default: null },
+    aplusProductDNA:  { type: mongoose.Schema.Types.Mixed, default: null },  // PDI extracted DNA
+    aplusDesignContext: { type: mongoose.Schema.Types.Mixed, default: null }, // PDI locked design directive
+    aplusPlan:        { type: mongoose.Schema.Types.Mixed, default: null },
+    aplusTier:        { type: String, enum: ['standard', 'premium'], default: 'standard' }, // A+ vs A++
 
     // Credits used
     creditsUsed:  { type: Number, default: 0 },
