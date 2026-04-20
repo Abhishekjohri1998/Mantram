@@ -1469,7 +1469,7 @@ async function compositeWithLogo(backgroundUrl, logoUrl, logoPos) {
 
 function QuickPostPanel({
     productDNA, productData, selectedMoodId, productMoodDirections, brandId,
-    qpType, setQpType, qpRatio, setQpRatio,
+    qpType, setQpType, qpRatios, toggleQpRatio,
     qpLogoOn, setQpLogoOn, qpLogoPos, setQpLogoPos,
     qpLoading, setQpLoading, qpResult, setQpResult,
     qpError, setQpError, qpCompositeUrls, setQpCompositeUrls,
@@ -1491,6 +1491,9 @@ function QuickPostPanel({
         setQpResult(null)
         setQpError('')
         setQpCompositeUrls({})
+        const effectiveRatio = `${customW}:${customH}`
+        const ratioList = [...qpRatios].filter(r => r !== 'custom')
+        if (qpRatios.has('custom')) ratioList.push(effectiveRatio)
         try {
             const data = await apiFetch('/brand-studio/quick-post', {
                 method: 'POST',
@@ -1501,19 +1504,24 @@ function QuickPostPanel({
                     selectedMoodId,
                     productMoodDirections,
                     postType: qpType,
-                    aspectRatio: effectiveRatio,
+                    aspectRatios: ratioList,   // send array → parallel generation
                     brandId,
                 }),
             })
             if (!data.success) throw new Error(data.error || 'Generation failed')
             setQpResult(data)
 
-            // Composite logo onto background
-            if (data.backgroundUrl) {
-                const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
-                const composited = await compositeWithLogo(data.backgroundUrl, effectiveLogo, qpLogoPos)
-                if (composited) setQpCompositeUrls({ [effectiveRatio]: composited })
-            }
+            // Composite logo onto each background in parallel
+            const backgrounds = data.backgrounds || { [ratioList[0]]: data.backgroundUrl }
+            const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
+            const compositeEntries = await Promise.all(
+                Object.entries(backgrounds).map(async ([ratio, url]) => {
+                    if (!url) return [ratio, null]
+                    const composited = await compositeWithLogo(url, effectiveLogo, qpLogoPos)
+                    return [ratio, composited]
+                })
+            )
+            setQpCompositeUrls(Object.fromEntries(compositeEntries))
         } catch (e) {
             setQpError(e.message)
         }
@@ -1572,23 +1580,35 @@ function QuickPostPanel({
                 </div>
             </div>
 
-            {/* Step 2: Size / Aspect Ratio */}
+            {/* Step 2: Size / Aspect Ratio — multi-select */}
             <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Output Size</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                    {QP_SIZES.map(s => (
-                        <div key={s.id} onClick={() => setQpRatio(s.id)} style={{
-                            borderRadius: 8, border: `1.5px solid ${qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
-                            padding: '8px 10px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center',
-                            background: qpRatio === s.id ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)',
-                        }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 2 }}>{s.icon}</span>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: qpRatio === s.id ? '#FFF' : 'rgba(255,255,255,0.5)' }}>{s.label}</div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{s.desc}</div>
-                        </div>
-                    ))}
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                    Output Sizes
+                    <span style={{ marginLeft: 8, fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>select multiple — generated in parallel</span>
                 </div>
-                {qpRatio === 'custom' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                    {QP_SIZES.map(s => {
+                        const active = qpRatios.has(s.id)
+                        return (
+                            <div key={s.id} onClick={() => toggleQpRatio(s.id)} style={{
+                                borderRadius: 8, border: `1.5px solid ${active ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
+                                padding: '7px 8px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center',
+                                background: active ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
+                                position: 'relative',
+                            }}>
+                                {active && (
+                                    <div style={{ position: 'absolute', top: 4, right: 4, width: 10, height: 10, borderRadius: '50%', background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 7, color: '#000' }}>check</span>
+                                    </div>
+                                )}
+                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: active ? '#F59E0B' : 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 2 }}>{s.icon}</span>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: active ? '#FFF' : 'rgba(255,255,255,0.5)' }}>{s.label}</div>
+                                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{s.desc}</div>
+                            </div>
+                        )
+                    })}
+                </div>
+                {qpRatios.has('custom') && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
                         <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>WIDTH (px)</div>
@@ -1605,9 +1625,13 @@ function QuickPostPanel({
                                 style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 7, padding: '8px 12px', color: '#FFF', fontSize: 14, fontWeight: 700, outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
                             />
                         </div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 14, flexShrink: 0 }}>
-                            → {customW}×{customH}px
-                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 14, flexShrink: 0 }}>→ {customW}×{customH}px</div>
+                    </div>
+                )}
+                {qpRatios.size > 1 && (
+                    <div style={{ fontSize: 10, color: '#F59E0B', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>bolt</span>
+                        {qpRatios.size} sizes selected — all generated in parallel — 12 credits
                     </div>
                 )}
             </div>
@@ -1800,8 +1824,8 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
     const [hoveredMood, setHoveredMood] = useState(null)
 
     // ── Quick Posts State ──────────────────────────────────────────────────────
-    const [qpType, setQpType]               = useState('promo')    // 'promo' | 'order' | 'feature'
-    const [qpRatio, setQpRatio]             = useState('1:1')      // '1:1' | '9:16' | '16:9' | '4:5'
+    const [qpType, setQpType]               = useState('promo')
+    const [qpRatios, setQpRatios]           = useState(new Set(['1:1']))  // multi-select set
     const [qpLogoOn, setQpLogoOn]           = useState(false)
     const [qpLogoPos, setQpLogoPos]         = useState('top-left')
     const [qpLoading, setQpLoading]         = useState(false)
@@ -1809,6 +1833,16 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
     const [qpError, setQpError]             = useState('')
     const [qpCompositeUrls, setQpCompositeUrls] = useState({})
     const canvasRef                         = useRef(null)
+
+    // Toggle a size in the qpRatios set
+    const toggleQpRatio = (id) => {
+        setQpRatios(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) { if (next.size > 1) next.delete(id) }  // always keep at least one
+            else next.add(id)
+            return next
+        })
+    }
 
     // Fallback mood options (used before AI generates product-specific ones)
     const MOOD_STATIC = {
@@ -2354,7 +2388,7 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
                     brandId={brandId}
                     brand={null}
                     qpType={qpType} setQpType={setQpType}
-                    qpRatio={qpRatio} setQpRatio={setQpRatio}
+                    qpRatios={qpRatios} toggleQpRatio={toggleQpRatio}
                     qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
                     qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
                     qpLoading={qpLoading} setQpLoading={setQpLoading}
