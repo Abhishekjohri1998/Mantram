@@ -248,9 +248,22 @@ export default function VideoStudio() {
         setShowHistory(false)
     }
 
-    // Load history on mount
+    // ── Fetch history with brand filter ──
+    const fetchHistory = useCallback(async (limit = 50) => {
+        try {
+            const url = `/video-studio?limit=${limit}${activeBrand?._id ? `&brandId=${activeBrand._id}` : ''}`
+            const d = await api(url)
+            setProjects(d.projects || [])
+        } catch { }
+        finally { setProjectsLoaded(true) }
+    }, [activeBrand?._id])
+
+    // Load history on mount & brand change
     useEffect(() => {
-        api('/video-studio?limit=50').then(d => { setProjects(d.projects || []); setProjectsLoaded(true); }).catch(() => { setProjectsLoaded(true); })
+        fetchHistory(50)
+    }, [fetchHistory])
+
+    useEffect(() => {
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
 
         // Check for brainstorm context
@@ -594,7 +607,7 @@ export default function VideoStudio() {
             setProjectId(null)
             setBrief(''); setImages([]); setConcepts([]); setScript(null); setBackendPrompt('')
             setRouting(null); setGeneration(null); setCritique(null)
-            api('/video-studio?limit=10').then(d => setProjects(d.projects || [])).catch(() => { })
+            fetchHistory(10)
         } catch (err) { 
             if (err.name === 'AbortError') return
             setError({ 
@@ -692,7 +705,7 @@ export default function VideoStudio() {
                             <button onClick={() => {
                                 const opening = !showHistory
                                 setShowHistory(opening)
-                                if (opening) api('/video-studio?limit=20').then(d => setProjects(d.projects || [])).catch(() => {})
+                                if (opening) fetchHistory(20)
                             }} className="flex items-center gap-2 px-3 py-2 rounded-xl studio-nav-tab-inactive text-[13px] cursor-pointer">
                                 <span className="material-symbols-outlined text-base opacity-70">history</span>
                                 <span>History</span>
@@ -736,7 +749,7 @@ export default function VideoStudio() {
                                     </button>
                                 </div>
                                 <button onClick={() => {
-                                    api('/video-studio?limit=50').then(d => setProjects(d.projects || [])).catch(() => { })
+                                    fetchHistory(50)
                                 }} className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--sys-surface)] transition-all">
                                     <span className="material-symbols-outlined text-sm">refresh</span> Refresh
                                 </button>
