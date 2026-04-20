@@ -1480,10 +1480,8 @@ function QuickPostPanel({
     const [customW, setCustomW] = useState(1080)
     const [customH, setCustomH] = useState(1080)
 
-    // Effective aspect ratio string to send to API
-    const effectiveRatio = qpRatio === 'custom'
-        ? `${customW}:${customH}`
-        : qpRatio
+    // Custom size effective label (used when 'custom' is in qpRatios)
+    const customRatioLabel = `${customW}:${customH}`
 
     const handleGenerate = async () => {
         if (!productDNA) return
@@ -1537,10 +1535,17 @@ function QuickPostPanel({
     }
 
     const handleRecomposite = async () => {
-        if (!qpResult?.backgroundUrl) return
+        if (!qpResult) return
+        const backgrounds = qpResult.backgrounds || {}
         const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
-        const composited = await compositeWithLogo(qpResult.backgroundUrl, effectiveLogo, qpLogoPos)
-        if (composited) setQpCompositeUrls(prev => ({ ...prev, [qpRatio]: composited }))
+        const compositeEntries = await Promise.all(
+            Object.entries(backgrounds).map(async ([ratio, url]) => {
+                if (!url) return [ratio, null]
+                const composited = await compositeWithLogo(url, effectiveLogo, qpLogoPos)
+                return [ratio, composited]
+            })
+        )
+        setQpCompositeUrls(Object.fromEntries(compositeEntries))
     }
 
     const copy = qpResult?.copy || {}
@@ -1739,19 +1744,25 @@ function QuickPostPanel({
                         )}
                     </div>
 
-                    {/* Composite Image Preview */}
-                    {(qpCompositeUrls[qpRatio] || qpResult.backgroundUrl) && (
+                    {/* Composite Image Preview — show all generated backgrounds */}
+                    {Object.keys(qpCompositeUrls).length > 0 || qpResult.backgroundUrl ? (
                         <div style={{ marginBottom: 16 }}>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Generated Background + Logo Composite</div>
-                            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-                                <img
-                                    src={qpCompositeUrls[qpRatio] || qpResult.backgroundUrl}
-                                    alt="Quick Post Background"
-                                    style={{ width: '100%', display: 'block', maxHeight: 500, objectFit: 'contain', background: '#000' }}
-                                />
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Generated Backgrounds</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Object.keys(qpCompositeUrls).length || 1, 2)}, 1fr)`, gap: 8 }}>
+                                {Object.keys(qpCompositeUrls).length > 0
+                                    ? Object.entries(qpCompositeUrls).map(([ratio, url]) => url && (
+                                        <div key={ratio} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+                                            <div style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, background: 'rgba(0,0,0,0.6)', color: '#FFF', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{ratio}</div>
+                                            <img src={url} alt={ratio} style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain', background: '#000' }} />
+                                        </div>
+                                    ))
+                                    : <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <img src={qpResult.backgroundUrl} alt="background" style={{ width: '100%', display: 'block', maxHeight: 500, objectFit: 'contain', background: '#000' }} />
+                                      </div>
+                                }
                             </div>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Download Panel */}
                     <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
@@ -1760,9 +1771,9 @@ function QuickPostPanel({
                             Download Creative
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                            {[qpRatio].map(size => {
-                                const url = qpCompositeUrls[size] || qpResult.backgroundUrl
-                                return url ? (
+                            {Object.entries({ ...qpResult.backgrounds, ...qpCompositeUrls })
+                                .filter(([, url]) => url)
+                                .map(([size, url]) => (
                                     <button key={size} onClick={() => handleDownload(url, size)} style={{
                                         background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
                                         color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
@@ -1771,8 +1782,8 @@ function QuickPostPanel({
                                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
                                         Download {size}
                                     </button>
-                                ) : null
-                            })}
+                                ))}
+
                             <button onClick={handleGenerate} style={{
                                 background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
                                 color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
