@@ -54,10 +54,12 @@ const VIDEO_TYPES = [
     { id: 'explainer', label: 'Explainer', icon: 'lightbulb', desc: 'Explain a concept or service' },
 ]
 
-// ── Lazy Video Thumbnail ──
+// ── Poster-first Thumbnail: shows static image, video only on hover ──
 const LazyVideoThumbnail = ({ src, poster }) => {
     const [isVisible, setIsVisible] = useState(false)
+    const [isHovered, setIsHovered] = useState(false)
     const ref = useRef()
+    const videoRef = useRef()
 
     useEffect(() => {
         const observer = new IntersectionObserver(entries => {
@@ -70,14 +72,34 @@ const LazyVideoThumbnail = ({ src, poster }) => {
         return () => observer.disconnect()
     }, [])
 
+    useEffect(() => {
+        if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
+        else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
+    }, [isHovered])
+
+    const posterUrl = poster || ''
+
     return (
-        <div ref={ref} className="w-full h-full bg-[var(--sys-surface)] relative overflow-hidden">
-            {isVisible ? (
-                <video src={src} poster={poster} className="w-full h-full object-cover block" muted playsInline crossOrigin="anonymous" preload="metadata" onLoadedData={e => { e.target.currentTime = 1 }} />
-            ) : poster ? (
-                <img src={poster} className="w-full h-full object-cover block" loading="lazy" alt="" />
-            ) : (
+        <div ref={ref} className="w-full h-full bg-[var(--sys-surface)] relative overflow-hidden"
+            onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+            {/* Poster image — always visible until hovered */}
+            {isVisible && posterUrl ? (
+                <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" alt=""
+                    style={{ opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', pointerEvents: 'none' }} />
+            ) : !isVisible ? (
                 <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
+            ) : null}
+
+            {/* Video only loads on hover */}
+            {isVisible && isHovered && src && (
+                <video ref={videoRef} src={src} className="w-full h-full object-cover block" muted loop playsInline preload="auto" />
+            )}
+
+            {/* Fallback: no poster, not hovered */}
+            {isVisible && !posterUrl && !isHovered && (
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.06), rgba(0,0,0,0.1))' }}>
+                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl" style={{ opacity: 0.3 }}>movie</span>
+                </div>
             )}
         </div>
     )
@@ -698,7 +720,7 @@ export default function VideoStudio() {
     const filteredProjects = projects.filter(p => {
         const hasVideo = !!p.generation?.videoUrl;
         const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
-        const isCompleted = p.status === 'done' || p.status === 'critique' || hasVideo;
+        const isCompleted = p.status === 'done' || p.status === 'critique' || p.status === 'completed' || hasVideo;
         
         if (historyTab === 'completed') return isCompleted;
         if (historyTab === 'progress') return !isCompleted && isGenerating;
@@ -801,8 +823,8 @@ export default function VideoStudio() {
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {filteredProjects.map(p => {
                                     const rawVideoUrl = p.generation?.videoUrl || '';
-                                    // Use proxy URL to serve from local cache (PiAPI CDN URLs expire)
-                                    const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
+                                    // Use CDN URL directly — eliminates DB proxy query per video
+                                    const videoUrl = rawVideoUrl || '';
                                     const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
@@ -817,7 +839,7 @@ export default function VideoStudio() {
                                             <div className="relative w-full sm:w-28 h-40 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <LazyVideoThumbnail src={`${videoUrl}#t=1`} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
+                                                    <LazyVideoThumbnail src={videoUrl} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
@@ -897,7 +919,8 @@ export default function VideoStudio() {
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {filteredProjects.map(p => {
                                     const rawVideoUrl = p.generation?.videoUrl || '';
-                                    const videoUrl = rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '';
+                                    // Use CDN URL directly — eliminates DB proxy query per video
+                                    const videoUrl = rawVideoUrl || '';
                                     const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
@@ -911,7 +934,7 @@ export default function VideoStudio() {
                                             <div className="relative aspect-video bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
                                                 {videoUrl ? (
-                                                    <LazyVideoThumbnail src={`${videoUrl}#t=1`} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
+                                                    <LazyVideoThumbnail src={videoUrl} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">

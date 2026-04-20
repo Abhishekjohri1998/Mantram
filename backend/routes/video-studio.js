@@ -4788,7 +4788,10 @@ router.get('/', protect, async (req, res) => {
             })).catch(() => {});
         }
 
-        res.json({ success: true, projects: await signVideoProjectAssets(projects), total });
+        // Return projects directly — video URLs are CDN/Atlas links that don't need S3 signing.
+        // The /:id/video proxy endpoint remains as a fallback for expired URLs.
+        // Removing signVideoProjectAssets() eliminates ~200+ async S3 signing operations per request.
+        res.json({ success: true, projects, total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

@@ -211,9 +211,13 @@ function ConfigDropdown({ value, onChange, options, label }) {
 }
 
 // ── Lazy Video Thumbnail ──
-const LazyVideoThumbnail = ({ src, poster }) => {
-    const [isVisible, setIsVisible] = useState(false)
+// ── Poster-first thumbnail: shows static image by default, video only on hover ──
+// This eliminates 16+ concurrent video preloads on page load.
+const PosterThumbnail = ({ src, poster }) => {
     const ref = useRef()
+    const videoRef = useRef()
+    const [isVisible, setIsVisible] = useState(false)
+    const [isHovered, setIsHovered] = useState(false)
 
     useEffect(() => {
         const observer = new IntersectionObserver(entries => {
@@ -226,18 +230,59 @@ const LazyVideoThumbnail = ({ src, poster }) => {
         return () => observer.disconnect()
     }, [])
 
+    // Auto-play/pause on hover
+    useEffect(() => {
+        if (isHovered && videoRef.current) {
+            videoRef.current.play().catch(() => {})
+        } else if (!isHovered && videoRef.current) {
+            videoRef.current.pause()
+            videoRef.current.currentTime = 0
+        }
+    }, [isHovered])
+
+    const posterUrl = poster || ''
+
     return (
-        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-            {isVisible ? (
-                <video src={src} poster={poster} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} muted loop autoPlay={false} playsInline preload="metadata" />
-            ) : poster ? (
-                <img src={poster} loading="lazy" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-            ) : (
+        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {/* Always show poster image for instant rendering */}
+            {isVisible && posterUrl ? (
+                <img
+                    src={posterUrl}
+                    loading="lazy"
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none',
+                        opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'absolute', inset: 0, zIndex: 2 }}
+                />
+            ) : !isVisible ? (
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
+            ) : null}
+
+            {/* Video element: only mount when visible AND hovered (lazy load) */}
+            {isVisible && isHovered && src && (
+                <video
+                    ref={videoRef}
+                    src={src}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                    muted loop playsInline preload="auto"
+                />
+            )}
+
+            {/* Fallback: no poster, no hover — show subtle gradient */}
+            {isVisible && !posterUrl && !isHovered && (
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,77,0,0.08), rgba(0,0,0,0.15))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-text-muted)', opacity: 0.4 }}>movie</span>
+                </div>
             )}
         </div>
     )
 }
+
+// Keep old name as alias for backward compatibility in VideoStudio.jsx history
+const LazyVideoThumbnail = PosterThumbnail
 
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
     // ── Completed videos grid (local state, prepend new ones) ──
@@ -894,11 +939,15 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     </div>
                 ))}
 
-                {/* Completed videos */}
+                {/* Completed videos — uses CDN URLs directly (no proxy DB queries) */}
                 {gridVideos.slice(0, Math.max(0, 16 - jobs.length)).map((p, i) => {
-                    const videoSrc = `${API_BASE}/video-studio/${p._id}/video`
+                    // Use CDN URL directly from API response — eliminates N+1 DB proxy queries
+                    const cdnUrl = p.generation?.videoUrl || ''
+                    const proxyUrl = p._id ? `${API_BASE}/video-studio/${p._id}/video` : ''
+                    const videoSrc = cdnUrl || proxyUrl
                     const ac = p.advancedConfig || {}
                     const promptText = ac.enhancedPrompt || ac.prompt || p.input?.brief || p.title || ''
+                    const posterUrl = p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''
                     const viewData = {
                         url: videoSrc,
                         prompt: promptText,
@@ -910,13 +959,10 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         refImages: ac.referenceImages || [],
                     }
                     return (
-                        <div key={p._id || i} className="vm-bg-item"
-                            onMouseEnter={e => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
-                            onMouseLeave={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 1; } }}
-                        >
-                            <LazyVideoThumbnail
-                                src={`${videoSrc}#t=1`}
-                                poster={p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''}
+                        <div key={p._id || i} className="vm-bg-item">
+                            <PosterThumbnail
+                                src={videoSrc}
+                                poster={posterUrl}
                             />
                             {/* pointer-events: none on overlay, auto on buttons only */}
                             <div className="vm-bg-overlay">
