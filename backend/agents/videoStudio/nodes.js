@@ -29,7 +29,7 @@ import {
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
-import { getPiApiGenerationStatus, resubmitPiApiTask, uploadImageToHostedUrl, submitPiApiWatermarkRemoval } from './piApiClient.js';
+import { getAtlasCloudGenerationStatus, resubmitAtlasCloudTask, uploadImageToHostedUrl, submitAtlasCloudWatermarkRemoval } from './atlasClient.js';
 import { getMuApiGenerationStatus, resubmitMuApiTask, submitMuApiVideoGeneration } from './muapiClient.js';
 import { geminiImageGenerate } from './firstFrame.js';
 
@@ -495,7 +495,7 @@ export async function videoGeneratorNode(state) {
         ...(state.references?.userUploaded || []).map(img => img.url),
     ].filter(u => u && isExternallyAccessible(u));
 
-    const { requestId, endpoint, statusUrl, resultUrl, provider, _piApiPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
+    const { requestId, endpoint, statusUrl, resultUrl, provider, _atlasCloudPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
         prompt,
         imageUrl,
@@ -515,8 +515,8 @@ export async function videoGeneratorNode(state) {
             falEndpoint: endpoint,
             falStatusUrl: statusUrl,   // null for Grok & LZ
             falResultUrl: resultUrl,   // null for Grok & LZ
-            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'piapi', 'muapi', 'laozhang'
-            _piApiPayload: _piApiPayload || null, // For PiAPI auto-retry
+            provider: provider || 'fal', // 'grok', 'fal', 'kie', 'atlascloud', 'muapi', 'laozhang'
+            _atlasCloudPayload: _atlasCloudPayload || null, // For Atlas Cloud auto-retry
             _muApiPayload: _muApiPayload || null, // For MuAPI auto-retry
             _laozhangVideoUrl: _laozhangVideoUrl || null, // LZ sync video URL
             videoUrl: _laozhangVideoUrl || '',
@@ -556,16 +556,16 @@ export async function pollGenerationStatus(state) {
     // Branch polling based on provider (strict provider-based routing)
     if (state.generation?.provider === 'grok') {
         statusResult = await getGrokGenerationStatus(state.generation.falRequestId);
-    } else if (state.generation?.provider === 'piapi') {
-        // PiAPI polling — Seedance 2.0 (when PiAPI is active provider)
-        statusResult = await getPiApiGenerationStatus(state.generation.falRequestId);
+    } else if (state.generation?.provider === 'atlascloud' || state.generation?.provider === 'piapi') {
+        // Atlas Cloud polling — Seedance 2.0 (when Atlas Cloud is active provider)
+        statusResult = await getAtlasCloudGenerationStatus(state.generation.falRequestId);
 
         // 🧹 WATERMARK REMOVAL CASCADE:
         // If generation is complete but we haven't removed the watermark yet, trigger the removal task
         if (statusResult.status === 'COMPLETED' && !state.generation.isWatermarkRemoved) {
-            console.log(`✨ PiAPI: Video generation done (${statusResult.videoUrl.substring(0, 60)}...). Starting watermark removal...`);
+            console.log(`✨ Atlas Cloud: Video generation done (${statusResult.videoUrl.substring(0, 60)}...). Starting watermark removal...`);
             try {
-                const unwatermark = await submitPiApiWatermarkRemoval(statusResult.videoUrl);
+                const unwatermark = await submitAtlasCloudWatermarkRemoval(statusResult.videoUrl);
                 return {
                     ...state,
                     generation: {
@@ -578,20 +578,20 @@ export async function pollGenerationStatus(state) {
                     status: state.status || 'generating', // Keep in generating/advanced-generating
                 };
             } catch (err) {
-                console.warn(`⚠️ PiAPI: Automatic watermark removal failed: ${err.message}. Proceeding with watermarked video.`);
+                console.warn(`⚠️ Atlas Cloud: Automatic watermark removal failed: ${err.message}. Proceeding with watermarked video.`);
                 // Fall through to proceed with the watermarked video if removal task submission fails
             }
         }
 
-        // AUTO-RETRY: PiAPI intermittently fails with "failed to process task" (code 10000)
+        // AUTO-RETRY: Atlas Cloud intermittently fails with "failed to process task" (code 10000)
         // Automatically resubmit up to 2 times using the stored payload
-        if (statusResult.status === 'FAILED' && statusResult.retryable && state.generation._piApiPayload) {
-            const retryCount = state.generation._piApiRetryCount || 0;
+        if (statusResult.status === 'FAILED' && statusResult.retryable && (state.generation._atlasCloudPayload || state.generation._piApiPayload)) {
+            const retryCount = state.generation._atlasCloudRetryCount || state.generation._piApiRetryCount || 0;
             const MAX_RETRIES = 2;
             if (retryCount < MAX_RETRIES) {
-                console.log(`🔄 PiAPI auto-retry ${retryCount + 1}/${MAX_RETRIES}: resubmitting task...`);
+                console.log(`🔄 Atlas Cloud auto-retry ${retryCount + 1}/${MAX_RETRIES}: resubmitting task...`);
                 try {
-                    let retryPayload = JSON.parse(JSON.stringify(state.generation._piApiPayload)); // Deep copy 
+                    let retryPayload = JSON.parse(JSON.stringify(state.generation._atlasCloudPayload || state.generation._piApiPayload)); // Deep copy 
 
                     // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
                     // Strip the offending starting image (Avatar) and retry. Let Seedance hallucinate 
@@ -601,7 +601,7 @@ export async function pollGenerationStatus(state) {
                         retryPayload.input.image_urls.shift(); // Drop the first image
                     }
 
-                    const retryResult = await resubmitPiApiTask(retryPayload);
+                    const retryResult = await resubmitAtlasCloudTask(retryPayload);
                     return {
                         ...state,
                         generation: {
@@ -610,17 +610,17 @@ export async function pollGenerationStatus(state) {
                             progress: 5,
                             startedAt: new Date(),
                             error: '',
-                            _piApiRetryCount: retryCount + 1,
-                            _piApiPayload: retryPayload, // Update payload for potential 2nd retry
+                            _atlasCloudRetryCount: retryCount + 1,
+                            _atlasCloudPayload: retryPayload, // Update payload for potential 2nd retry
                         },
                         status: state.status, // Keep current status (generating/advanced-generating)
                     };
                 } catch (retryErr) {
-                    console.error(`❌ PiAPI auto-retry failed: ${retryErr.message}`);
+                    console.error(`❌ Atlas Cloud auto-retry failed: ${retryErr.message}`);
                     // Fall through to normal failure handling
                 }
             } else {
-                console.warn(`⚠️ PiAPI exhausted ${MAX_RETRIES} auto-retries, reporting failure`);
+                console.warn(`⚠️ Atlas Cloud exhausted ${MAX_RETRIES} auto-retries, reporting failure`);
             }
         }
     } else if (state.generation?.provider === 'muapi') {
@@ -898,7 +898,7 @@ export async function advancedGenerateNode(state) {
         throw new Error('Video generation failed: Prompt is missing or empty after processing.');
     }
 
-    // For PiAPI (seedance), base64 is supported in image_urls — other providers use ensureS3Url
+    // For Atlas Cloud (seedance), base64 is supported in image_urls — other providers use ensureS3Url
     let imageUrl = state.firstImageUrl || undefined;
     if (imageUrl && model !== 'seedance-2.0') {
         if (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
@@ -930,7 +930,7 @@ export async function advancedGenerateNode(state) {
             falStatusUrl: result.statusUrl,
             falResultUrl: result.resultUrl,
             provider: result.provider || 'fal',
-            _piApiPayload: result._piApiPayload || null, // For PiAPI auto-retry
+            _atlasCloudPayload: result._atlasCloudPayload || result._piApiPayload || null, // For Atlas Cloud auto-retry
             _muApiPayload: result._muApiPayload || null, // For MuAPI auto-retry
             _laozhangVideoUrl: result._laozhangVideoUrl || null, // LZ sync video URL
             videoUrl: result._laozhangVideoUrl || '', // Pre-fill if LZ sync

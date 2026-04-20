@@ -96,7 +96,7 @@ const DEFAULT_CREDIT_COSTS = {
     voiceTranscribe: 1,
     promptEnhance: 1,
     imageEnhance: 2,
-    ugcProGenerate: 15,            // Seedance 2.0 via MuAPI (base cost, chained adds 10 per segment)
+    ugcProGenerate: 40,            // Seedance 2.0 via Atlas Cloud (base cost, chained adds 10 per segment)
     ugcProAnalyze: 1,              // Product intelligence analysis
 };
 

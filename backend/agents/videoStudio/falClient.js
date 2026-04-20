@@ -4,7 +4,7 @@
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
-import { submitPiApiVideoGeneration, submitPiApiVideoExtend } from './piApiClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend } from './atlasClient.js';
 import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
@@ -253,23 +253,23 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             console.warn(`⚠️ [Cascade] Step 1 LZ seedance-2.0 failed: ${e.message?.substring(0, 100)}`);
         }
     }
-    // Step 2: Try PiAPI/Atlas Cloud (supports image_url for I2V) BEFORE switching models
+    // Step 2: Try Atlas Cloud (supports image_url for I2V) BEFORE switching models
     try {
-        const piResult = await submitPiApiVideoGeneration({
+        const atlasResult = await submitAtlasCloudVideoGeneration({
             prompt, imageUrl: imageUrl || null, duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
             refAudio, refVideo,
         });
-        if (piResult?.taskId) {
-            console.log('✅ [Cascade] Step 2 done: PiAPI/Atlas Cloud (seedance)');
-            return { taskId: piResult.taskId, provider: 'piapi', async: true, _piApiPayload: piResult._payload };
+        if (atlasResult?.taskId) {
+            console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
+            return { taskId: atlasResult.taskId, provider: 'atlascloud', async: true, _atlasCloudPayload: atlasResult._payload };
         }
-    } catch (piErr) {
-        if (piErr.message.includes('PiAPI_INSUFFICIENT_CREDITS')) {
-            console.warn(`⚠️ [Cascade] Step 2 PiAPI exhausted: ${piErr.message?.substring(0, 100)}`);
+    } catch (atlasErr) {
+        if (atlasErr.message.includes('INSUFFICIENT_CREDITS')) {
+            console.warn(`⚠️ [Cascade] Step 2 Atlas Cloud exhausted: ${atlasErr.message?.substring(0, 100)}`);
         } else {
-            console.warn(`⚠️ [Cascade] Step 2 PiAPI failed: ${piErr.message?.substring(0, 100)}`);
+            console.warn(`⚠️ [Cascade] Step 2 Atlas Cloud failed: ${atlasErr.message?.substring(0, 100)}`);
         }
     }
     // Step 3: Try KIE (supports imageUrl for I2V)
@@ -305,7 +305,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             console.warn(`⚠️ [Cascade] Step 4 LZ veo-3.1-fast failed: ${e.message?.substring(0, 100)}`);
         }
     }
-    throw new Error('All video providers exhausted: MuAPI, PiAPI, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
+    throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {
@@ -355,6 +355,31 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
     if (model === 'seedance-2.0') {
+        const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
+        
+        // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
+        // Only Atlas Cloud supports the reference-to-video model that locks real facial identity
+        if (hasRealFaceRefs) {
+            console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
+            try {
+                const result = await submitAtlasCloudVideoGeneration({
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    aspectRatio: aspectRatio || '16:9', generateAudio,
+                    referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
+                    refAudio: s3RefAudio, refVideo: s3RefVideo,
+                });
+                return {
+                    requestId: result.taskId, endpoint: 'atlascloud-r2v',
+                    statusUrl: null, resultUrl: null, provider: 'atlascloud',
+                    _atlasCloudPayload: result._payload,
+                };
+            } catch (r2vErr) {
+                console.error(`❌ [Atlas R2V] Atlas Cloud reference-to-video failed: ${r2vErr.message}`);
+                throw new Error(`Atlas Cloud reference-to-video failed: ${r2vErr.message}. Real-person face generation requires Atlas Cloud to be available.`);
+            }
+        }
+        
+        // Standard routing (no face refs) — use active provider or cascade
         const provider = activeProvider || 'muapi';
         console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
         try {
@@ -370,17 +395,17 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     statusUrl: null, resultUrl: null, provider: 'muapi',
                     _muApiPayload: result._muApiPayload,
                 };
-            } else if (provider === 'piapi') {
-                const result = await submitPiApiVideoGeneration({
+            } else if (provider === 'atlascloud' || provider === 'piapi') {
+                const result = await submitAtlasCloudVideoGeneration({
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
-                    requestId: result.taskId, endpoint: 'piapi-seedance-2.0',
-                    statusUrl: null, resultUrl: null, provider: 'piapi',
-                    _piApiPayload: result._payload,
+                    requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
+                    statusUrl: null, resultUrl: null, provider: 'atlascloud',
+                    _atlasCloudPayload: result._payload,
                 };
             } else if (provider === 'laozhang' && isLaozhangAvailable()) {
                 const lzResult = await submitLaozhangVideoGeneration({
@@ -410,7 +435,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 requestId: cascade.taskId || `lz-${Date.now()}`,
                 endpoint: `${cascade.provider}-cascade`,
                 statusUrl: null, resultUrl: null, provider: cascade.provider,
-                _piApiPayload: cascade._piApiPayload,
+                _atlasCloudPayload: cascade._atlasCloudPayload,
                 _laozhangVideoUrl: cascade.videoUrl,
             };
         }
