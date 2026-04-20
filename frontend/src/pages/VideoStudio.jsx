@@ -356,13 +356,26 @@ export default function VideoStudio() {
         return () => abortControllerRef.current?.abort()
     }, [])
 
-    // Reset loop if brand changes mid-process
+    // Reset loop if brand changes mid-process (skip initial brand context load)
+    const brandInitializedRef = useRef(false)
     useEffect(() => {
-        if (activeBrand?._id !== activeBrandIdRef.current) {
-            console.log('Brand changed, aborting video processing...')
+        const prevId = activeBrandIdRef.current
+        const newId = activeBrand?._id
+
+        // Always sync the ref
+        activeBrandIdRef.current = newId
+
+        // Skip the very first brand load (undefined → actual brand)
+        // This is NOT a user-initiated brand switch, it's just React context hydrating
+        if (!brandInitializedRef.current) {
+            brandInitializedRef.current = true
+            return
+        }
+
+        // Only abort if brand actually changed (genuine user switch)
+        if (newId !== prevId) {
+            console.log('Brand switched by user, resetting video processing...')
             abortControllerRef.current?.abort()
-            activeBrandIdRef.current = activeBrand?._id
-            // Reset to step 0 if we were processing
             if (loading) {
                 setLoading(false)
                 setStep(0)
