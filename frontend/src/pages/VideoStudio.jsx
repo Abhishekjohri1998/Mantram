@@ -54,12 +54,15 @@ const VIDEO_TYPES = [
     { id: 'explainer', label: 'Explainer', icon: 'lightbulb', desc: 'Explain a concept or service' },
 ]
 
-// ── Poster-first Thumbnail: shows static image, video only on hover ──
+// ── Smart Thumbnail: poster-first when available, video-frame fallback when not ──
 const LazyVideoThumbnail = ({ src, poster }) => {
     const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
     const ref = useRef()
     const videoRef = useRef()
+
+    const posterUrl = poster || ''
+    const hasPoster = !!posterUrl
 
     useEffect(() => {
         const observer = new IntersectionObserver(entries => {
@@ -67,7 +70,7 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                 setIsVisible(true)
                 observer.disconnect()
             }
-        }, { rootMargin: '100px' })
+        }, { rootMargin: '200px' })
         if (ref.current) observer.observe(ref.current)
         return () => observer.disconnect()
     }, [])
@@ -77,29 +80,31 @@ const LazyVideoThumbnail = ({ src, poster }) => {
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
-    const posterUrl = poster || ''
-
     return (
         <div ref={ref} className="w-full h-full bg-[var(--sys-surface)] relative overflow-hidden"
             onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-            {/* Poster image — always visible until hovered */}
-            {isVisible && posterUrl ? (
+
+            {/* Layer 1: Poster image (fades out on hover) */}
+            {isVisible && hasPoster && (
                 <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" alt=""
                     style={{ opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', pointerEvents: 'none' }} />
-            ) : !isVisible ? (
-                <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
-            ) : null}
-
-            {/* Video only loads on hover */}
-            {isVisible && isHovered && src && (
-                <video ref={videoRef} src={src} className="w-full h-full object-cover block" muted loop playsInline preload="auto" />
             )}
 
-            {/* Fallback: no poster, not hovered */}
-            {isVisible && !posterUrl && !isHovered && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.06), rgba(0,0,0,0.1))' }}>
-                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl" style={{ opacity: 0.3 }}>movie</span>
-                </div>
+            {/* Layer 2: Video element
+                 - If poster exists: only mount on hover (saves bandwidth)
+                 - If NO poster: always mount with preload=metadata to grab a visual frame */}
+            {isVisible && src && (hasPoster ? isHovered : true) && (
+                <video ref={videoRef} src={src}
+                    className="w-full h-full object-cover block"
+                    muted loop playsInline
+                    preload={hasPoster ? 'auto' : 'metadata'}
+                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
+                />
+            )}
+
+            {/* Layer 3: Loading skeleton (before intersection observer fires) */}
+            {!isVisible && (
+                <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
             )}
         </div>
     )

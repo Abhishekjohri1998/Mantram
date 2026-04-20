@@ -211,13 +211,17 @@ function ConfigDropdown({ value, onChange, options, label }) {
 }
 
 // ── Lazy Video Thumbnail ──
-// ── Poster-first thumbnail: shows static image by default, video only on hover ──
-// This eliminates 16+ concurrent video preloads on page load.
+// ── Smart Thumbnail: poster-first when available, video-frame fallback when not ──
+// Videos WITH poster: show image instantly, load video only on hover (saves bandwidth)
+// Videos WITHOUT poster: load video with preload=metadata to grab frame 1
 const PosterThumbnail = ({ src, poster }) => {
     const ref = useRef()
     const videoRef = useRef()
     const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
+
+    const posterUrl = poster || ''
+    const hasPoster = !!posterUrl
 
     useEffect(() => {
         const observer = new IntersectionObserver(entries => {
@@ -225,63 +229,49 @@ const PosterThumbnail = ({ src, poster }) => {
                 setIsVisible(true)
                 observer.disconnect()
             }
-        }, { rootMargin: '100px' })
+        }, { rootMargin: '200px' })
         if (ref.current) observer.observe(ref.current)
         return () => observer.disconnect()
     }, [])
 
-    // Auto-play/pause on hover
     useEffect(() => {
-        if (isHovered && videoRef.current) {
-            videoRef.current.play().catch(() => {})
-        } else if (!isHovered && videoRef.current) {
-            videoRef.current.pause()
-            videoRef.current.currentTime = 0
-        }
+        if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
+        else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
-
-    const posterUrl = poster || ''
 
     return (
         <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Always show poster image for instant rendering */}
-            {isVisible && posterUrl ? (
-                <img
-                    src={posterUrl}
-                    loading="lazy"
-                    alt=""
+            {/* Layer 1: Poster image (fades out on hover) */}
+            {isVisible && hasPoster && (
+                <img src={posterUrl} loading="lazy" alt=""
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none',
-                        opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'absolute', inset: 0, zIndex: 2 }}
-                />
-            ) : !isVisible ? (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
-            ) : null}
+                        opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'absolute', inset: 0, zIndex: 2 }} />
+            )}
 
-            {/* Video element: only mount when visible AND hovered (lazy load) */}
-            {isVisible && isHovered && src && (
-                <video
-                    ref={videoRef}
-                    src={src}
+            {/* Layer 2: Video element
+                 - Has poster: only mount on hover
+                 - No poster: always mount with preload=metadata to grab a frame */}
+            {isVisible && src && (hasPoster ? isHovered : true) && (
+                <video ref={videoRef} src={src}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-                    muted loop playsInline preload="auto"
+                    muted loop playsInline
+                    preload={hasPoster ? 'auto' : 'metadata'}
+                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
                 />
             )}
 
-            {/* Fallback: no poster, no hover — show subtle gradient */}
-            {isVisible && !posterUrl && !isHovered && (
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,77,0,0.08), rgba(0,0,0,0.15))',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-text-muted)', opacity: 0.4 }}>movie</span>
-                </div>
+            {/* Layer 3: Loading skeleton */}
+            {!isVisible && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
             )}
         </div>
     )
 }
 
-// Keep old name as alias for backward compatibility in VideoStudio.jsx history
+// Keep old name as alias for backward compatibility
 const LazyVideoThumbnail = PosterThumbnail
 
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
