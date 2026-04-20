@@ -97,6 +97,7 @@ Return ONLY a valid JSON object, no markdown, no extra text.`;
 {
   "viewType": "hero|front_face|back_panel|open_case|in_use|macro_detail|packaging|variant_color|lifestyle|flat_lay|group_shot|side_profile|angle_shot",
   "shortDescription": "1 sentence: exactly what is visible in this specific image",
+  "exactFormFactor": "CRITICAL: Identify EXACT product type and scale (e.g., 'over-ear headphone' vs 'in-ear earphone', 'mug' vs 'tumbler', 'laptop' vs 'tablet'). DO NOT generalize.",
   "primaryColors": ["#hexcode of 2-3 most prominent colors actually visible in this image"],
   "materialsVisible": ["specific materials visible e.g. soft-touch matte plastic, brushed aluminum, silicone eartip"],
   "lightingStyle": "studio_clean|lifestyle_ambient|dark_dramatic|bright_airy|natural_outdoor",
@@ -156,7 +157,7 @@ Return the composite ProductDNA:
   "backgroundSuggestions": ["#hex (reason)", "#hex", "#hex"],
   "materials": "Precise composite material description across all views",
   "productShape": "Shape character — angular/rounded/organic/cylindrical/compact/elongated",
-  "productCategory": "what type of product in 2-4 words",
+  "productCategory": "exact form factor — be highly specific (e.g. 'Over-ear Headphones', NOT 'Audio Device' or 'Earphones')",
   "moodTags": ["3-5 mood tags matching the product's character"],
   "defaultMoodDirection": "editorial | bold | lifestyle | luxury",
   "photographyStyle": "Recommended photography style based on what works best across all views",

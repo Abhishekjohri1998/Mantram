@@ -1688,6 +1688,17 @@ function APlusTool({ brandId }) {
                         </div>
                     </div>
                 </div>
+
+                {/* Amazon listing preview */}
+                {previewOpen && (
+                    <AmazonListingPreview
+                        modules={editedModules}
+                        images={editedImages}
+                        isPremium={isPremiumResult}
+                        productName={plan.productName || productDNA?.productCategory}
+                        onClose={() => setPreviewOpen(false)}
+                    />
+                )}
             </div>
         )
     }
@@ -2063,16 +2074,6 @@ function APlusTool({ brandId }) {
                 />
             )}
 
-            {/* Amazon listing preview */}
-            {previewOpen && gen.result && (
-                <AmazonListingPreview
-                    modules={editedModules}
-                    images={editedImages}
-                    isPremium={gen.result?.isPremium || listingTier === 'premium'}
-                    productName={gen.result?.aplusPlan?.productName}
-                    onClose={() => setPreviewOpen(false)}
-                />
-            )}
         </div>
     )
 }
