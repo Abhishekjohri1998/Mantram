@@ -184,14 +184,18 @@ router.post('/product-intelligence', protect, async (req, res) => {
 // ── POST /api/brand-studio/quick-post ─────────────────────────────────────────
 // 2-step Quick Post generator:
 //   Step 1 → Claude extracts structured copy (headline, heroSpec, features, CTA)
-//   Step 2 → NanoBanana generates background world image (canvas composites text)
-// Cost: 8 credits
+//   Step 2 → NanoBanana generates background world image for each requested ratio
+// Cost: 8 credits (single) / 12 credits (multi-size batch)
 router.post('/quick-post', protect, async (req, res) => {
     try {
-        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, brandId } = req.body;
+        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, aspectRatios, brandId } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
-        const QUICK_POST_CREDITS = 8;
+        // Support both single ratio (aspectRatio) and multi-ratio batch (aspectRatios[])
+        const ratioList = aspectRatios?.length ? aspectRatios : [aspectRatio || '1:1'];
+        const isMulti   = ratioList.length > 1;
+        const QUICK_POST_CREDITS = isMulti ? 12 : 8;  // Batch discount vs. individual
+
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < QUICK_POST_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: QUICK_POST_CREDITS });
 
@@ -202,7 +206,7 @@ router.post('/quick-post', protect, async (req, res) => {
             brandContext = ctx.brandContext || '';
         }
 
-        // Resolve selected mood direction object
+        // Resolve mood direction
         const moodMap = productMoodDirections || {};
         const selectedMoodDir = moodMap[selectedMoodId] || Object.values(moodMap)[0] || {
             label: 'Professional',
@@ -211,19 +215,44 @@ router.post('/quick-post', protect, async (req, res) => {
             moodBoardDirective: 'Professional commercial photography with clean backdrop',
         };
 
-        console.log(`🎯 [QuickPost] type=${postType} ratio=${aspectRatio} mood="${selectedMoodDir.label}" product="${productData?.title?.substring(0,40)}"`);
+        console.log(`🎯 [QuickPost] type=${postType} ratios=${ratioList.join(',')} mood="${selectedMoodDir.label}"`);
 
-        const result = await generateQuickPost(
-            productDNA,
-            productData,
-            selectedMoodDir,
-            postType || 'promo',
-            aspectRatio || '1:1',
-            brandContext,
+        // Step 1: Claude extracts structured copy ONCE (shared across all sizes)
+        // Step 2: NanoBanana generates background for each ratio IN PARALLEL
+        const { generateQuickPostCopy, generateQuickPostBackground } = await import('../agents/shared/productDesignAgent.js').then(m => ({
+            generateQuickPostCopy:       m.generateQuickPost,      // we'll call it for first ratio to get copy
+            generateQuickPostBackground: m.generateQuickPost,      // for additional ratios
+        }));
+
+        // Call once to get copy + first background, then parallel for rest
+        const [firstResult, ...extraResults] = await Promise.all(
+            ratioList.map((ratio, i) =>
+                generateQuickPost(
+                    productDNA,
+                    productData,
+                    selectedMoodDir,
+                    postType || 'promo',
+                    ratio,
+                    brandContext,
+                    i === 0,   // only extract copy on first call
+                )
+            )
         );
 
-        await req.user.deductCredits(QUICK_POST_CREDITS, 'quick_post');
-        res.json({ success: true, ...result });
+        // Merge: use copy from first, collect all backgrounds by ratio
+        const backgrounds = {};
+        ratioList.forEach((ratio, i) => {
+            backgrounds[ratio] = (i === 0 ? firstResult : extraResults[i - 1])?.backgroundUrl || null;
+        });
+
+        await deductCredits(req.user._id, QUICK_POST_CREDITS, 'quick_post');
+        res.json({
+            success: true,
+            copy:       firstResult.copy,
+            palette:    firstResult.palette,
+            backgrounds,                      // { '1:1': url, '9:16': url, ... }
+            backgroundUrl: backgrounds[ratioList[0]],  // compat: first ratio
+        });
     } catch (err) {
         console.error('❌ [QuickPost]:', err.message);
         res.status(500).json({ success: false, error: err.message });
