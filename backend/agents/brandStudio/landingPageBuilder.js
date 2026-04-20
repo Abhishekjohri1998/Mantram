@@ -150,7 +150,7 @@ JSON SCHEMA (Return exactly this structure with filled content):
 }`;
 
 // ── Phase 3: Image Generation ──────────────────────────────────
-function buildBrandImagePrompt(basePrompt, type, brandContext, tokens) {
+function buildBrandImagePrompt(basePrompt, type, brandContext, tokens, designContext) {
     if (!basePrompt) return null;
     let style = "contemporary premium aesthetic.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout.";
@@ -159,6 +159,14 @@ function buildBrandImagePrompt(basePrompt, type, brandContext, tokens) {
     
     // Add explicitly calculated style DNA
     style += ` Strictly follow this brand ethos: ${brandContext.substring(0, 150).replace(/\n/g, ' ')}`;
+    
+    // PDI Color Guard & Mood injection
+    if (designContext?.colorGuardHex?.length) {
+        style += ` STRICT COLOR GUARD: Preserve exactly these product hex colors: ${designContext.colorGuardHex.join(', ')}. Do NOT alter product color under any circumstances.`;
+    }
+    if (designContext?.moodLabel) {
+        style += ` Visual mood directive: ${designContext.moodLabel}. ${designContext.shootDirective || ''}`;
+    }
 
     if (type === 'hero' || type === 'background') {
         return `${basePrompt}, cinematic lighting, photorealistic, 8k resolution. ${style}`;
@@ -167,15 +175,15 @@ function buildBrandImagePrompt(basePrompt, type, brandContext, tokens) {
     }
 }
 
-async function generatePageImages(plan, brandContext, referenceImage, tokens) {
+async function generatePageImages(plan, brandContext, referenceImage, tokens, designContext) {
     const tasks = [];
     for (const s of (plan.sections || [])) {
         if (!s.imagePrompt) continue;
         const size = s.id === 'sec_hero' ? '1792x1024' : '1024x768';
-        const finalPrompt = buildBrandImagePrompt(s.imagePrompt, s.id === 'sec_hero' ? 'hero' : 'product', brandContext, tokens);
+        const finalPrompt = buildBrandImagePrompt(s.imagePrompt, s.id === 'sec_hero' ? 'hero' : 'product', brandContext, tokens, designContext);
         
         tasks.push({
-            key: s.id, // ID is statically assigned now
+            key: s.id,
             prompt: finalPrompt,
             size,
         });
@@ -588,17 +596,23 @@ export function generateEmbedCode(hostedUrl) {
 }
 
 // ── Main Export ────────────────────────────────────────────────
-export async function generateLandingPage({ brandId, brief, pageType = 'campaign', urlContext, referenceImage }) {
+export async function generateLandingPage({ brandId, brief, pageType = 'campaign', urlContext, referenceImage, designContext }) {
     const { brandContext } = await loadBrandContext(brandId);
     
     // Brand Token System initialization
-    const primaryHex = '#6366F1'; // In the future extract real hex from brandContext
+    const primaryHex = designContext?.colorGuardHex?.[0] || '#6366F1';
     const tokens = generateBrandTokens(primaryHex, brandContext);
+    
+    // Override accent tokens with PDI palette if available
+    if (designContext?.colorGuardHex?.length > 1) {
+        tokens.colors.accent     = designContext.colorGuardHex[0];
+        tokens.colors.accentDark = designContext.colorGuardHex[1] || designContext.colorGuardHex[0];
+    }
 
-    console.log('🌐 Pulse Page: Gathering market intelligence...');
+    console.log('Pulse Page: Gathering market intelligence...');
     const intel = await gatherIntelligence(brief, brandId);
 
-    console.log('🌐 Pulse Page: Claude formatting content...');
+    console.log('Pulse Page: Claude formatting content...');
     const plan = await callAgent(
         PAGE_SYSTEM(brandContext, intel, urlContext),
         `BRIEF: ${brief}\nPAGE TYPE: ${pageType}`,
@@ -611,9 +625,9 @@ export async function generateLandingPage({ brandId, brief, pageType = 'campaign
     // Inject IDs matching our robust template set to avoid missing section bugs
     plan.sections.forEach((s, idx) => { s.id = SECTION_TEMPLATE[idx]?.id || s.id; });
 
-    const images = await generatePageImages(plan, brandContext, referenceImage, tokens);
+    const images = await generatePageImages(plan, brandContext, referenceImage, tokens, designContext);
 
-    console.log('🌐 Assembling interactive robust page...');
+    console.log('Assembling interactive robust page...');
     const slug = plan.seo?.slug || uuidv4().substring(0,8);
     const html = buildInteractiveHTML(plan, images, tokens, brandId, slug);
 

@@ -65,12 +65,20 @@ JSON SCHEMA:
   }
 }`;
 
-async function generateSectionImage(prompt, type, brandContext, referenceImage, tokens) {
+async function generateSectionImage(prompt, type, brandContext, referenceImage, tokens, designContext) {
     if (!prompt) return null;
     let style = "contemporary premium aesthetic.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout.";
     if (tokens?.colors?.primary) style += ` Use a prominent color accent matching the hex code ${tokens.colors.primary}.`;
     style += ` Strictly follow this brand ethos: ${brandContext.substring(0, 150).replace(/\n/g, ' ')}`;
+    
+    // PDI Color Guard injection
+    if (designContext?.colorGuardHex?.length) {
+        style += ` STRICT COLOR GUARD: The product colors are locked. Preserve exactly these hex values in the product: ${designContext.colorGuardHex.join(', ')}. Do NOT change or alter the product color under any circumstances.`;
+    }
+    if (designContext?.moodLabel) {
+        style += ` Visual mood: ${designContext.moodLabel}. ${designContext.shootDirective || ''}`;
+    }
     
     try {
         const size = type === 'hero' ? '1200x628' : '600x400';
@@ -89,7 +97,7 @@ async function generateSectionImage(prompt, type, brandContext, referenceImage, 
             return r?.imageUrl || null;
         }
     } catch (err) {
-        console.warn(`⚠️ Email image generation failed: ${err.message}`);
+        console.warn(`Email image generation failed: ${err.message}`);
         return null;
     }
 }
@@ -218,11 +226,17 @@ function buildMJML(plan, heroImage, tokens) {
     return mjmlContent;
 }
 
-export async function generateEmail({ brandId, brief, emailType = 'campaign', urlContext, referenceImage }) {
+export async function generateEmail({ brandId, brief, emailType = 'campaign', urlContext, referenceImage, designContext }) {
     const { brandContext } = await loadBrandContext(brandId);
     const tokens = generateBrandTokens('#6366F1', brandContext);
+    
+    // If PDI designContext provided, override primary token color with product primary
+    if (designContext?.colorGuardHex?.length) {
+        tokens.colors.primary = designContext.colorGuardHex[0];
+        tokens.colors.accent   = designContext.colorGuardHex[0];
+    }
 
-    console.log('📧 Pulse Mail: Formatting strategic copy...');
+    console.log('Pulse Mail: Formatting strategic copy...');
     const plan = await callAgent(
         EMAIL_SYSTEM(brandContext, urlContext),
         `BRIEF: ${brief}\nTYPE: ${emailType}`,
@@ -232,8 +246,8 @@ export async function generateEmail({ brandId, brief, emailType = 'campaign', ur
 
     if (!plan?.sections?.hero) throw new Error('Email generic failure — invalid sections.');
 
-    console.log(`📧 Generating Hero visual via NanoBanana...`);
-    const heroImage = await generateSectionImage(plan.sections.hero.imagePrompt, 'hero', brandContext, referenceImage, tokens);
+    console.log(`Generating Hero visual via NanoBanana...`);
+    const heroImage = await generateSectionImage(plan.sections.hero.imagePrompt, 'hero', brandContext, referenceImage, tokens, designContext);
 
     const mjmlSrc = buildMJML(plan, heroImage, tokens);
     const { html, errors } = await mjml(mjmlSrc, { validationLevel: 'soft' });

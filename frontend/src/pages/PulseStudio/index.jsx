@@ -6,27 +6,27 @@ import { apiFetch } from '../../services/api'
 // ── Shared ──────────────────────────────────────────────────────────
 
 const DECK_STAGES = [
-    "🔍 Researching your campaign context...",
-    "🧠 Claude Opus 4.7 planning slide strategy...",
-    "🖼️ Generating slide visuals with Nano Banana 2...",
-    "📊 Assembling your presentation...",
-    "✨ Applying premium design system..."
+    "Researching your campaign context...",
+    "Claude Opus planning slide strategy...",
+    "Generating slide visuals with NanoBanana 2...",
+    "Assembling your presentation...",
+    "Applying premium design system..."
 ]
 
 const PAGE_STAGES = [
-    "🔍 Gathering live market intelligence...",
-    "🧠 Claude designing page strategy...",
-    "🖼️ Generating brand images...",
-    "⚡ Building interactive page with GSAP...",
-    "🚀 Uploading to CDN..."
+    "Gathering live market intelligence...",
+    "Claude designing page strategy...",
+    "Generating brand images...",
+    "Building interactive page with GSAP...",
+    "Uploading to CDN..."
 ]
 
 const MAIL_STAGES = [
-    "🔍 Analyzing your campaign brief...",
-    "🧠 Claude writing your email copy...",
-    "🖼️ Generating email visuals...",
-    "💌 Compiling responsive HTML...",
-    "✅ Email ready!"
+    "Analyzing your campaign brief...",
+    "Claude writing your email copy...",
+    "Generating email visuals...",
+    "Compiling responsive HTML...",
+    "Email ready!"
 ]
 
 function useGenerate(stagesList) {
@@ -545,7 +545,7 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
                 {/* Visual Preview */}
                 <div>
                     <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 700, marginBottom: 12 }}>🧠 How Claude designed this page</div>
+                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span className="material-symbols-outlined" style={{ fontSize: 16, color: '#A78BFA' }}>psychology</span> How Claude designed this page</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             {Object.entries(gen.result.plan?.pageStrategy || {}).map(([k, v]) => (
                                 <div key={k}>
@@ -698,14 +698,58 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 // ── A+ Listing Tool ──────────────────────────────────────────────────────────
 
 const APLUS_STAGES = [
-    '🔍 Analyzing product data with MCoT Vision...',
-    '🌐 Fetching competitive intel via web search...',
-    '🧠 Claude crafting A+ content strategy...',
-    '✍️ Writing benefit-first copy for each module...',
-    '🎨 Generating Amazon-spec images with NanoBanana 2...',
-    '📋 Assembling your A+ listing page...',
-    '✅ A+ Listing ready for Amazon!'
+    'Analyzing product data with MCoT Vision...',
+    'Fetching competitive intel via web search...',
+    'Claude crafting A+ content strategy...',
+    'Writing benefit-first copy for each module...',
+    'Generating Amazon-spec images with NanoBanana 2...',
+    'Assembling your A+ listing page...',
+    'A+ Listing ready for Amazon!'
 ]
+
+// ── Color Palette Strip — visual image-format palette renderer ──────────────
+function ColorPaletteStrip({ colors }) {
+    if (!colors?.length) return null
+    return (
+        <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>palette</span>
+                Extracted Color Palette — Color Guard Active
+            </div>
+            {/* Full-width palette strip */}
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 10 }}>
+                <div style={{ display: 'flex', height: 56 }}>
+                    {colors.map((c, i) => (
+                        <div key={i} title={`${c.name} · ${c.hex}`} style={{
+                            flex: 1,
+                            background: c.hex,
+                            position: 'relative',
+                            transition: 'flex 0.2s',
+                        }}
+                            onMouseEnter={e => e.currentTarget.style.flex = '1.5'}
+                            onMouseLeave={e => e.currentTarget.style.flex = '1'}
+                        >
+                            {c.role === 'product_primary' && (
+                                <div style={{ position: 'absolute', top: 4, right: 4, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 10, color: '#fff' }}>star</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                {/* Labels row below strip */}
+                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    {colors.map((c, i) => (
+                        <div key={i} style={{ flex: 1, padding: '5px 6px', borderRight: i < colors.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', minWidth: 0 }}>
+                            <div style={{ fontSize: 9, color: c.role === 'product_primary' ? '#A78BFA' : 'rgba(255,255,255,0.7)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>{c.hex}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 const MODULE_TYPE_CONFIG = {
     hero_banner:     { label: 'Hero Banner',         icon: 'panorama',     color: '#7c3aed', amazon: '970×600px' },
@@ -723,6 +767,15 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
     const cfg = MODULE_TYPE_CONFIG[module.type] || { label: module.type, icon: 'layers', color: '#7c3aed', amazon: '' }
     const c = cfg.color
     const [expanded, setExpanded] = useState(idx === 0)
+
+    // Parse the amazon spec string (e.g. '970×600px' or '300×300px ×3') to get the display aspect ratio
+    const getAspectRatio = () => {
+        const spec = cfg.amazon || '300×300px'
+        const match = spec.match(/(\d+)[\u00d7x](\d+)/)
+        if (match) return parseInt(match[1]) / parseInt(match[2])
+        return 1
+    }
+    const aspectRatio = getAspectRatio()
 
     const Field = ({ field, value, label, multiline = false }) => (
         <div style={{ marginBottom: 12 }}>
@@ -799,7 +852,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 8 }}>Feature Items</div>
                                     {module.items.map((item, ii) => (
                                         <div key={ii} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', marginBottom: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                                            <span style={{ fontSize: 24, width: 32, flexShrink: 0 }}>{item.icon || '✨'}</span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 22, width: 32, flexShrink: 0, color: '#A78BFA' }}>{item.icon && item.icon.length > 2 ? item.icon : 'auto_awesome'}</span>
                                             <div style={{ flex: 1 }}>
                                                 <div contentEditable suppressContentEditableWarning
                                                     onBlur={e => onUpdate(idx, `items.${ii}.title`, e.currentTarget.textContent)}
@@ -835,22 +888,26 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                             )}
                         </div>
 
-                        {/* Image Panel */}
+                        {/* Image Panel — aspect-ratio-aware preview */}
                         <div>
                             {image ? (
                                 <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
-                                    <img src={image} alt={module.altText || ''} style={{ width: '100%', display: 'block', objectFit: 'cover', maxHeight: 200 }} />
-                                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}></div>
-                                    <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', gap: 6 }}>
-                                        <button onClick={() => onRegenImage(idx)} disabled={regenning}
-                                            style={{ flex: 1, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
-                                            {regenning ? 'Generating...' : 'Regenerate'}
-                                        </button>
-                                        <a href={image} download={`module_${idx + 1}_${module.type}.jpg`} target="_blank" rel="noreferrer"
-                                            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                                        </a>
+                                    {/* Aspect-ratio-preserving container */}
+                                    <div style={{ position: 'relative', width: '100%', paddingBottom: `${(1 / aspectRatio) * 100}%`, overflow: 'hidden', maxHeight: aspectRatio < 1 ? 260 : 'none' }}>
+                                        <img src={image} alt={module.altText || ''}
+                                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}></div>
+                                        <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', gap: 6 }}>
+                                            <button onClick={() => onRegenImage(idx)} disabled={regenning}
+                                                style={{ flex: 1, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
+                                                {regenning ? 'Generating...' : 'Regenerate'}
+                                            </button>
+                                            <a href={image} download={`module_${idx + 1}_${module.type}.jpg`} target="_blank" rel="noreferrer"
+                                                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                            </a>
+                                        </div>
                                     </div>
                                     <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.5)', fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Amazon spec: {cfg.amazon}</div>
                                 </div>
@@ -872,6 +929,450 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
     )
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// Mood Board Lightbox
+// ══════════════════════════════════════════════════════════════════════════
+function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClose, productDNA }) {
+    const moodList = Object.values(moods)
+    const [currentIdx, setCurrentIdx] = useState(moodList.findIndex(m => m.id === openMoodId) || 0)
+    const current = moodList[currentIdx]
+    const aiImg = moodImages[current?.id]
+
+    useEffect(() => {
+        const handleKey = (e) => {
+            if (e.key === 'Escape') onClose()
+            if (e.key === 'ArrowRight') setCurrentIdx(i => (i + 1) % moodList.length)
+            if (e.key === 'ArrowLeft') setCurrentIdx(i => (i - 1 + moodList.length) % moodList.length)
+        }
+        window.addEventListener('keydown', handleKey)
+        return () => window.removeEventListener('keydown', handleKey)
+    }, [moodList.length, onClose])
+
+    if (!current) return null
+    const swatchColors = (moodSwatches[current.id] || [])
+    const dnaColors = productDNA?.dominantColors?.slice(0, 6) || []
+
+    return (
+        <div onClick={onClose} style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+            <div onClick={e => e.stopPropagation()} style={{
+                width: '90vw', maxWidth: 960, borderRadius: 20,
+                background: '#111', border: '1px solid rgba(255,255,255,0.1)',
+                overflow: 'hidden', boxShadow: '0 40px 120px rgba(0,0,0,0.8)',
+            }}>
+                {/* Header */}
+                <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Mood Board</span>
+                        <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.15)' }} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#FFF' }}>{current.label}</span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{currentIdx + 1} / {moodList.length}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {aiImg && (
+                            <a href={aiImg} download={`moodboard_${current.id}.jpg`} target="_blank" rel="noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                Download
+                            </a>
+                        )}
+                        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                        </button>
+                    </div>
+                </div>
+                {/* Image */}
+                <div style={{ position: 'relative', height: '55vh', background: '#000', overflow: 'hidden' }}>
+                    {aiImg ? (
+                        <>
+                            <img src={aiImg} alt={current.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            {/* Overlay original product to guarantee 100% fidelity without hallucination */}
+                            {(productDNA?.heroImageUrl || productDNA?.productRefImages?.[0]) && (
+                                <img src={productDNA.heroImageUrl || productDNA.productRefImages[0]} alt="Original Product"
+                                    style={{ position: 'absolute', bottom: '15%', right: '15%', height: '55%', objectFit: 'contain', filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))', pointerEvents: 'none', zIndex: 10 }} />
+                            )}
+                        </>
+                    ) : (
+                        <div style={{ width: '100%', height: '100%', background: current.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}>hourglass_empty</span>
+                                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Generating mood board...</div>
+                            </div>
+                        </div>
+                    )}
+                    {/* Navigation arrows */}
+                    <button onClick={() => setCurrentIdx(i => (i - 1 + moodList.length) % moodList.length)}
+                        style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>chevron_left</span>
+                    </button>
+                    <button onClick={() => setCurrentIdx(i => (i + 1) % moodList.length)}
+                        style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>chevron_right</span>
+                    </button>
+                    {/* Slide dots */}
+                    <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
+                        {moodList.map((_, i) => (
+                            <div key={i} onClick={() => setCurrentIdx(i)} style={{ width: i === currentIdx ? 20 : 6, height: 6, borderRadius: 3, background: i === currentIdx ? '#A78BFA' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.2s' }} />
+                        ))}
+                    </div>
+                </div>
+                {/* Footer: colors + desc */}
+                <div style={{ padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>{current.desc}</div>
+                        {dnaColors.length > 0 && (
+                            <div>
+                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Product Colors Locked</div>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {dnaColors.map((c, i) => (
+                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px' }}>
+                                            <div style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, flexShrink: 0 }} />
+                                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{c.hex}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end', maxWidth: 160 }}>
+                        {(swatchColors.length > 0 ? swatchColors : []).map((sw, i) => (
+                            <div key={i} style={{ width: 28, height: 28, borderRadius: 6, background: sw, border: '1px solid rgba(255,255,255,0.12)' }} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Amazon Listing Preview
+// ══════════════════════════════════════════════════════════════════════════
+const ALL_MODULE_LABELS = {
+    hero_banner: 'Hero Banner', image_text_left: 'Image & Text', image_text_right: 'Image & Text',
+    three_features: 'Three Features', four_features: 'Four Features', comparison_chart: 'Comparison Chart',
+    image_highlights: 'Image Highlights', header_overlay: 'Header Banner', brand_story: 'Brand Story', logo: 'Brand Logo',
+    premium_hero: 'Premium Hero', premium_banner: 'Premium Banner', premium_image_text: 'Premium Image & Text',
+    carousel: 'Image Carousel', hotspot: 'Interactive Hotspot', video_module: 'Video Module',
+    qa_panel: 'Q&A Panel', enhanced_comparison: 'Enhanced Comparison', premium_brand_story: 'Premium Brand Story',
+}
+
+function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
+    const baseText = { fontFamily: 'Arial, sans-serif', color: '#111' }
+    const headline = { ...baseText, fontSize: isMobile ? 16 : 20, fontWeight: 700, marginBottom: 8, lineHeight: 1.3 }
+    const body = { ...baseText, fontSize: isMobile ? 12 : 13, lineHeight: 1.6, color: '#444', marginBottom: 0 }
+    const moduleWidth = isPremium ? (isMobile ? '100%' : '1464px') : (isMobile ? '100%' : '970px')
+
+    switch (module.type) {
+        case 'hero_banner': case 'premium_hero': {
+            const imgH = isMobile ? 220 : (isPremium ? 484 : 400)
+            return (
+                <div style={{ width: '100%', position: 'relative', background: '#f5f5f5', overflow: 'hidden', height: imgH }}>
+                    {imageUrl ? (
+                        <img src={imageUrl} alt={module.altText || module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1a1a1a, #333)' }} />}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '12px 16px' : '24px 40px', background: 'linear-gradient(transparent, rgba(0,0,0,0.7))' }}>
+                        {module.headline && <div style={{ ...headline, color: '#FFF', fontSize: isMobile ? 18 : 28, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>{module.headline}</div>}
+                        {module.subheadline && <div style={{ ...body, color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? 12 : 15 }}>{module.subheadline}</div>}
+                    </div>
+                </div>
+            )
+        }
+        case 'header_overlay': case 'premium_banner': {
+            const imgH = isMobile ? 120 : 180
+            return (
+                <div style={{ width: '100%', position: 'relative', height: imgH, overflow: 'hidden' }}>
+                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#222' }} />}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)' }}>
+                        {module.headline && <div style={{ ...headline, color: '#FFF', textAlign: 'center', fontSize: isMobile ? 15 : 22 }}>{module.headline}</div>}
+                    </div>
+                </div>
+            )
+        }
+        case 'image_text_left': case 'premium_image_text': {
+            const stacked = isMobile
+            return (
+                <div style={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', gap: 0 }}>
+                    <div style={{ width: stacked ? '100%' : '50%', aspectRatio: '1', overflow: 'hidden', flexShrink: 0 }}>
+                        {imageUrl ? <img src={imageUrl} alt={module.altText} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', background: '#e8e8e8' }} />}
+                    </div>
+                    <div style={{ padding: stacked ? '16px' : '24px 32px', flex: 1 }}>
+                        {module.headline && <div style={headline}>{module.headline}</div>}
+                        {module.body && <div style={body}>{module.body}</div>}
+                    </div>
+                </div>
+            )
+        }
+        case 'image_text_right': {
+            const stacked = isMobile
+            return (
+                <div style={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', gap: 0 }}>
+                    {!stacked && <div style={{ padding: '24px 32px', flex: 1 }}>
+                        {module.headline && <div style={headline}>{module.headline}</div>}
+                        {module.body && <div style={body}>{module.body}</div>}
+                    </div>}
+                    <div style={{ width: stacked ? '100%' : '50%', aspectRatio: '1', flexShrink: 0 }}>
+                        {imageUrl ? <img src={imageUrl} alt={module.altText} style={{ width: '100%', height: stacked ? 200 : '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: stacked ? 200 : '100%', background: '#e8e8e8' }} />}
+                    </div>
+                    {stacked && <div style={{ padding: '12px 16px', flex: 1 }}>
+                        {module.headline && <div style={headline}>{module.headline}</div>}
+                        {module.body && <div style={body}>{module.body}</div>}
+                    </div>}
+                </div>
+            )
+        }
+        case 'three_features': case 'four_features': {
+            const items = module.items || []
+            const cols = module.type === 'four_features' ? 4 : 3
+            return (
+                <div style={{ padding: isMobile ? '16px' : '24px 32px' }}>
+                    {module.headline && <div style={{ ...headline, textAlign: 'center', marginBottom: 20 }}>{module.headline}</div>}
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${cols}, 1fr)`, gap: isMobile ? 12 : 20 }}>
+                        {items.map((item, i) => (
+                            <div key={i} style={{ textAlign: 'center', padding: isMobile ? 8 : 12 }}>
+                                <div style={{ fontSize: isMobile ? 24 : 32, marginBottom: 6 }}>{item.icon || '✦'}</div>
+                                <div style={{ ...baseText, fontSize: isMobile ? 11 : 13, fontWeight: 700, marginBottom: 4 }}>{item.title}</div>
+                                <div style={{ ...baseText, fontSize: isMobile ? 10 : 12, color: '#666' }}>{item.description}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        }
+        case 'image_highlights': {
+            const bullets = module.bullets || []
+            return (
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'flex-start' }}>
+                    <div style={{ width: isMobile ? '100%' : '45%', height: isMobile ? 200 : 300, flexShrink: 0, overflow: 'hidden' }}>
+                        {imageUrl ? <img src={imageUrl} alt={module.altText} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#e8e8e8' }} />}
+                    </div>
+                    <div style={{ padding: isMobile ? '12px 16px' : '24px 28px', flex: 1 }}>
+                        {module.headline && <div style={{ ...headline, marginBottom: 14 }}>{module.headline}</div>}
+                        <ul style={{ margin: 0, padding: '0 0 0 18px' }}>
+                            {bullets.slice(0, 6).map((b, i) => <li key={i} style={{ ...body, marginBottom: 8 }}>{b}</li>)}
+                        </ul>
+                    </div>
+                </div>
+            )
+        }
+        case 'comparison_chart': case 'enhanced_comparison': {
+            const rows = module.rows || []
+            const cols = rows[0] ? Object.keys(rows[0]).filter(k => k !== 'feature') : []
+            return (
+                <div style={{ padding: isMobile ? '12px 8px' : '20px 32px', overflowX: 'auto' }}>
+                    {module.headline && <div style={{ ...headline, textAlign: 'center', marginBottom: 16 }}>{module.headline}</div>}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? 11 : 13, fontFamily: 'Arial, sans-serif' }}>
+                        <thead>
+                            <tr style={{ background: '#f0f0f0' }}>
+                                <th style={{ padding: '10px 12px', textAlign: 'left', color: '#333' }}>Feature</th>
+                                {cols.filter((_, i) => i % 2 === 0).map((c, i) => (
+                                    <th key={i} style={{ padding: '10px 12px', textAlign: 'center', color: '#c45500' }}>{c.replace('model', 'Model ').replace(/([A-Z])/g, ' $1').trim()}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.slice(0, 6).map((row, rIdx) => (
+                                <tr key={rIdx} style={{ borderBottom: '1px solid #eee', background: rIdx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                    <td style={{ padding: '9px 12px', fontWeight: 600 }}>{row.feature}</td>
+                                    {[row.model1Value, row.model2Value, row.model3Value].filter(Boolean).map((v, i) => (
+                                        <td key={i} style={{ padding: '9px 12px', textAlign: 'center', color: v === 'Yes' || v === '✓' ? '#007600' : v === 'No' || v === '✗' ? '#c00' : '#333' }}>{v}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )
+        }
+        case 'carousel': {
+            const slides = module.slides || []
+            return (
+                <div style={{ width: '100%', position: 'relative' }}>
+                    <div style={{ width: '100%', height: isMobile ? 220 : (isPremium ? 484 : 400), overflow: 'hidden', position: 'relative' }}>
+                        {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1a1a1a, #444)' }} />}
+                        {/* Carousel arrows */}
+                        <div style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#333' }}>chevron_left</span>
+                        </div>
+                        <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.9)', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#333' }}>chevron_right</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '10px 0', background: '#f5f5f5' }}>
+                        {[0, 1, 2].map(i => <div key={i} style={{ width: i === 0 ? 20 : 8, height: 8, borderRadius: 4, background: i === 0 ? '#c45500' : '#ccc', transition: 'all 0.2s' }} />)}
+                    </div>
+                    {module.headline && <div style={{ ...baseText, fontSize: isMobile ? 13 : 16, fontWeight: 700, textAlign: 'center', padding: '8px 16px' }}>{module.headline}</div>}
+                </div>
+            )
+        }
+        case 'hotspot': {
+            const hotspots = module.hotspots || []
+            return (
+                <div style={{ width: '100%', position: 'relative' }}>
+                    {module.headline && <div style={{ ...headline, padding: '16px 20px 8px' }}>{module.headline}</div>}
+                    <div style={{ position: 'relative', width: '100%', height: isMobile ? 250 : (isPremium ? 500 : 380), overflow: 'hidden' }}>
+                        {imageUrl ? <img src={imageUrl} alt={module.altText} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#e8e8e8' }} />}
+                        {hotspots.slice(0, 4).map((h, i) => (
+                            <div key={i} style={{ position: 'absolute', left: `${h.x || (20 + i * 20)}%`, top: `${h.y || (30 + i * 15)}%`, transform: 'translate(-50%, -50%)', zIndex: 2 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#c45500', border: '2px solid #FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontSize: 12, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.4)', cursor: 'pointer', fontFamily: 'Arial' }}>{h.number || i+1}</div>
+                            </div>
+                        ))}
+                    </div>
+                    {hotspots.length > 0 && (
+                        <div style={{ padding: isMobile ? '10px 12px' : '12px 20px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8, background: '#f8f8f8', borderTop: '1px solid #eee' }}>
+                            {hotspots.slice(0, 4).map((h, i) => (
+                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#c45500', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, fontFamily: 'Arial' }}>{h.number || i+1}</div>
+                                    <div style={{ fontSize: 11, color: '#333', fontFamily: 'Arial' }}><strong>{h.title}</strong> — {h.description}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )
+        }
+        case 'qa_panel': {
+            const questions = module.questions || []
+            return (
+                <div style={{ padding: isMobile ? '12px 14px' : '20px 32px' }}>
+                    {module.headline && <div style={{ ...headline, marginBottom: 16 }}>{module.headline}</div>}
+                    {questions.slice(0, 5).map((q, i) => (
+                        <div key={i} style={{ borderBottom: '1px solid #eee', paddingBottom: 14, marginBottom: 14 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                                <span style={{ color: '#c45500', fontWeight: 700, fontSize: 14, fontFamily: 'Arial', flexShrink: 0 }}>Q:</span>
+                                <div style={{ ...baseText, fontSize: isMobile ? 12 : 14, fontWeight: 700 }}>{q.question}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <span style={{ color: '#007600', fontWeight: 700, fontSize: 14, fontFamily: 'Arial', flexShrink: 0 }}>A:</span>
+                                <div style={{ ...body }}>{q.answer}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )
+        }
+        case 'video_module': {
+            return (
+                <div style={{ width: '100%', position: 'relative', height: isMobile ? 200 : (isPremium ? 484 : 350), background: '#000', overflow: 'hidden' }}>
+                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} /> : <div style={{ width: '100%', height: '100%', background: '#111' }} />}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: isMobile ? 48 : 64, height: isMobile ? 48 : 64, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: isMobile ? 30 : 38, color: '#c45500', marginLeft: 4 }}>play_arrow</span>
+                        </div>
+                        {module.headline && <div style={{ color: '#FFF', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 13 : 16, marginTop: 14, textShadow: '0 2px 8px rgba(0,0,0,0.7)', textAlign: 'center', padding: '0 20px' }}>{module.headline}</div>}
+                        {module.videoCaption && <div style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'Arial', fontSize: isMobile ? 11 : 13, marginTop: 6, textAlign: 'center' }}>{module.videoCaption}</div>}
+                    </div>
+                </div>
+            )
+        }
+        case 'brand_story': case 'premium_brand_story': {
+            return (
+                <div style={{ width: '100%', position: 'relative', minHeight: isMobile ? 260 : (isPremium ? 500 : 400), overflow: 'hidden' }}>
+                    {imageUrl ? (
+                        <img src={imageUrl} alt={module.tagline || module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
+                    ) : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a1a, #0d0d0d)' }} />}
+                    <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '32px 20px' : '60px 80px', background: 'linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%)' }}>
+                        {module.brandName && <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Arial', fontSize: isMobile ? 10 : 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>{module.brandName}</div>}
+                        {(module.tagline || module.headline) && <div style={{ color: '#FFF', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 20 : 30, marginBottom: 16, lineHeight: 1.25 }}>{module.tagline || module.headline}</div>}
+                        {module.story && <div style={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Arial', fontSize: isMobile ? 12 : 15, lineHeight: 1.7, maxWidth: 560 }}>{module.story}</div>}
+                    </div>
+                </div>
+            )
+        }
+        default:
+            return (
+                <div style={{ padding: isMobile ? '14px 16px' : '20px 32px' }}>
+                    {module.headline && <div style={headline}>{module.headline}</div>}
+                    {module.body && <div style={body}>{module.body}</div>}
+                    {imageUrl && <img src={imageUrl} alt={module.headline} style={{ width: '100%', marginTop: 12, borderRadius: 4 }} />}
+                </div>
+            )
+    }
+}
+
+function AmazonListingPreview({ modules, images, isPremium, onClose, productName }) {
+    const [viewMode, setViewMode] = useState('desktop')
+    const isMobile = viewMode === 'mobile'
+    const previewWidth = isMobile ? 390 : (isPremium ? 1464 : 970)
+    const containerScale = Math.min(1, (window.innerWidth - 80) / previewWidth)
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Toolbar */}
+            <div style={{ background: '#1a1a1a', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Faint Amazon logo */}
+                    <div style={{ fontSize: 18, fontWeight: 900, color: '#FF9900', fontFamily: 'Arial' }}>amazon</div>
+                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.15)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>Listing Preview</span>
+                    {isPremium && (
+                        <span style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid rgba(245,158,11,0.3)' }}>Premium A++</span>
+                    )}
+                    {productName && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{productName}</span>}
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* View toggle */}
+                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 3, border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {[{id:'desktop',icon:'monitor'},{id:'mobile',icon:'smartphone'}].map(v => (
+                            <button key={v.id} onClick={() => setViewMode(v.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: 'none', background: viewMode === v.id ? 'rgba(255,255,255,0.15)' : 'transparent', color: viewMode === v.id ? '#FFF' : 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{v.icon}</span>
+                                {v.id.charAt(0).toUpperCase() + v.id.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{previewWidth}px{isMobile ? '' : (containerScale < 1 ? ` · scaled ${Math.round(containerScale * 100)}%` : '')}</span>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Preview canvas */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#888' }}>
+                <div style={{ width: previewWidth, transform: `scale(${containerScale})`, transformOrigin: 'top center', marginBottom: (containerScale < 1 ? -(previewWidth * (1 - containerScale) * 0.6) : 0) }}>
+                    {/* Amazon product page frame */}
+                    <div style={{ background: '#FFF', fontFamily: 'Arial, sans-serif', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
+                        {/* Simulated breadcrumb + title bar */}
+                        <div style={{ padding: '10px 18px', borderBottom: '1px solid #ddd', background: '#f5f5f5' }}>
+                            <div style={{ fontSize: 11, color: '#007185' }}>Home &nbsp;›&nbsp; Electronics &nbsp;›&nbsp; {ALL_MODULE_LABELS[modules[0]?.type] || 'Product'}</div>
+                        </div>
+                        <div style={{ padding: '10px 18px', borderBottom: '2px solid #FF9900', background: '#FFF' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F1111' }}>{productName || 'Product Name'}</div>
+                        </div>
+
+                        {/* A+ content zone label */}
+                        <div style={{ padding: '8px 18px', background: '#FFFBF0', borderBottom: '1px solid #FFE08A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 10, color: '#996600', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{isPremium ? '★ Premium A++ Content' : 'A+ Content'}</span>
+                            <span style={{ fontSize: 10, color: '#999' }}>· {modules.length} modules</span>
+                        </div>
+
+                        {/* Modules */}
+                        {modules.map((module, idx) => {
+                            const imgKey = Object.keys(images || {}).find(k => k === module.id || k.startsWith(`${module.id}_slide_`))
+                            const imgUrl = images?.[module.id] || images?.[`${module.id}_slide_0`] || null
+                            return (
+                                <div key={module.id || idx} style={{ borderBottom: idx < modules.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                                    {renderAplusModulePreview(module, imgUrl, isMobile, isPremium)}
+                                </div>
+                            )
+                        })}
+
+                        {/* Amazon footer watermark */}
+                        <div style={{ padding: '14px 18px', background: '#f5f5f5', borderTop: '1px solid #ddd', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ fontSize: 16, fontWeight: 900, color: '#FF9900' }}>amazon</div>
+                            <span style={{ fontSize: 11, color: '#999' }}>A+ Content — Enhanced Brand Content</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
 function APlusTool({ brandId }) {
     const [inputMode, setInputMode] = useState('url') // url | catalog | sample
     const [productUrl, setProductUrl] = useState('')
@@ -880,6 +1381,7 @@ function APlusTool({ brandId }) {
     const [brief, setBrief] = useState('')
     const [referenceImages, setReferenceImages] = useState([])
     const [moduleCount, setModuleCount] = useState(7)
+    const [listingTier, setListingTier] = useState('standard')  // 'standard' | 'premium'
 
     const gen = useGenerate(APLUS_STAGES)
     const [editedModules, setEditedModules] = useState([])
@@ -889,10 +1391,30 @@ function APlusTool({ brandId }) {
     const [rephrasing, setRephrasing] = useState(false)
     const [regenning, setRegenning] = useState(false)
     const [exportCopied, setExportCopied] = useState(false)
+    const [previewOpen, setPreviewOpen] = useState(false)
+    const [lightboxMood, setLightboxMood] = useState(null)
+
+    // ── PDI State ──────────────────────────────────────────────────────────────
+    const [pdiStep, setPdiStep] = useState('input')       // 'input' | 'analyzing' | 'pdi_ready' | 'ready'
+    const [productDNA, setProductDNA] = useState(null)
+    const [selectedMood, setSelectedMood] = useState(null)
+    const [moodImages, setMoodImages] = useState({})       // moodId → imageUrl (AI-generated)
+    const [designContext, setDesignContext] = useState(null)
+    const [pdiError, setPdiError] = useState('')
+    const [hoveredMood, setHoveredMood] = useState(null)
+
+    const MOOD_STATIC = {
+        editorial: { id: 'editorial', label: 'Editorial Clean', icon: 'straighten',  desc: 'Clean, precise, studio-perfect', bg: 'linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%)' },
+        bold:      { id: 'bold',      label: 'Bold Ambient',    icon: 'local_fire_department', desc: 'Dark, dramatic, cinematic', bg: 'linear-gradient(135deg, #0d0d1a 0%, #1a0d2e 100%)' },
+        lifestyle: { id: 'lifestyle', label: 'Lifestyle Vibrant',icon: 'wb_sunny',    desc: 'Real-world, warm, relatable', bg: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' },
+        luxury:    { id: 'luxury',    label: 'Premium Minimal',  icon: 'diamond',     desc: 'Luxury, spacious, refined',   bg: 'linear-gradient(135deg, #f5f5f0 0%, #e8e4dc 100%)' },
+    }
 
     const handleAnalyzeUrl = async () => {
         if (!productUrl) return
         setAnalyzing(true)
+        setPdiStep('analyzing')
+        setPdiError('')
         try {
             const data = await apiFetch('/brand-studio/aplus/analyze-product', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -900,10 +1422,67 @@ function APlusTool({ brandId }) {
             })
             if (data.success) {
                 setAnalyzedProduct(data.product)
-                setProductImages(data.product.images || [])
+                const images = data.product.images || []
+                setProductImages(images)
+                await runProductIntelligence(images, data.product)
             }
-        } catch (e) { console.error(e) }
+        } catch (e) { setPdiError(e.message); setPdiStep('input') }
         setAnalyzing(false)
+    }
+
+    const runProductIntelligence = async (images, product) => {
+        if (!images.length && !product?.title) { setPdiStep('ready'); return }
+        try {
+            const data = await apiFetch('/brand-studio/product-intelligence', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                // Pass all images (up to 8) for two-stage diversity classification
+                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brief, brandId })
+            })
+            if (data.success && data.productDNA) {
+                setProductDNA(data.productDNA)
+                const defaultMood = data.productDNA.defaultMoodDirection || 'editorial'
+                setSelectedMood(defaultMood)
+                setPdiStep('pdi_ready')
+                await buildDesignContextFromMood(data.productDNA, defaultMood)
+                generateMoodBoardInBackground(data.productDNA)
+            }
+        } catch (e) { console.warn('PDI failed:', e.message); setPdiStep('ready') }
+    }
+
+    const buildDesignContextFromMood = async (dna, moodId) => {
+        try {
+            const data = await apiFetch('/brand-studio/design-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productDNA: dna, selectedMoodId: moodId, brandColors })
+            })
+            if (data.success) setDesignContext(data.designContext)
+        } catch (e) { console.warn('Design context build failed:', e.message) }
+    }
+
+    const generateMoodBoardInBackground = async (dna) => {
+        try {
+            const data = await apiFetch('/brand-studio/mood-board', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productDNA: dna, brandId })
+            })
+            if (data.success && data.moods) {
+                const newImages = {}
+                data.moods.forEach(m => { if (m.imageUrl) newImages[m.id] = m.imageUrl })
+                setMoodImages(newImages)
+            }
+        } catch (e) { console.warn('Mood board AI gen failed (using static presets):', e.message) }
+    }
+
+    const handleSelectMood = async (moodId) => {
+        setSelectedMood(moodId)
+        if (productDNA) await buildDesignContextFromMood(productDNA, moodId)
+    }
+
+    const handleUploadAndAnalyzeImages = async (files) => {
+        const urls = await Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f) })))
+        setReferenceImages(urls); setProductImages(urls)
+        setPdiStep('analyzing')
+        await runProductIntelligence(urls, analyzedProduct || {})
     }
 
     const handleGenerate = async () => {
@@ -914,9 +1493,12 @@ function APlusTool({ brandId }) {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     brandId, brief, moduleCount,
+                    listingTier,
                     productUrl: inputMode === 'url' ? productUrl : null,
                     productData: analyzedProduct || null,
-                    referenceImages: referenceImages.length ? referenceImages : null
+                    referenceImages: referenceImages.length ? referenceImages : null,
+                    designContext: designContext || null,
+                    productDNA: productDNA || null,
                 })
             })
             if (!data.success) throw new Error(data.error)
@@ -924,36 +1506,21 @@ function APlusTool({ brandId }) {
             setEditedModules(JSON.parse(JSON.stringify(data.aplusPlan.modules || [])))
             setEditedImages(data.images || {})
             if (data.productData?.images) setProductImages(data.productData.images)
-            if (data.visualIntelligence) setBrandColors([]) // colors come from brand context
             gen.stop(true)
-        } catch (err) {
-            gen.setError(err.message)
-            gen.stop(false)
-        }
+        } catch (err) { gen.setError(err.message); gen.stop(false) }
     }
 
     const updateModuleField = (moduleIdx, field, value) => {
         setEditedModules(prev => {
-            const updated = [...prev]
-            const m = { ...updated[moduleIdx] }
-            const parts = field.split('.')
-            if (parts.length === 1) {
-                m[parts[0]] = value
-            } else if (parts.length === 2) {
-                if (parts[0] === 'bullets') {
-                    const arr = [...(m.bullets || [])]
-                    arr[parseInt(parts[1])] = value
-                    m.bullets = arr
-                } else {
-                    m[parts[0]] = { ...(m[parts[0]] || {}), [parts[1]]: value }
-                }
+            const updated = [...prev]; const m = { ...updated[moduleIdx] }; const parts = field.split('.')
+            if (parts.length === 1) { m[parts[0]] = value }
+            else if (parts.length === 2) {
+                if (parts[0] === 'bullets') { const arr = [...(m.bullets || [])]; arr[parseInt(parts[1])] = value; m.bullets = arr }
+                else { m[parts[0]] = { ...(m[parts[0]] || {}), [parts[1]]: value } }
             } else if (parts.length === 3) {
-                const arr = [...(m[parts[0]] || [])]
-                arr[parseInt(parts[1])] = { ...arr[parseInt(parts[1])], [parts[2]]: value }
-                m[parts[0]] = arr
+                const arr = [...(m[parts[0]] || [])]; arr[parseInt(parts[1])] = { ...arr[parseInt(parts[1])], [parts[2]]: value }; m[parts[0]] = arr
             }
-            updated[moduleIdx] = m
-            return updated
+            updated[moduleIdx] = m; return updated
         })
     }
 
@@ -975,11 +1542,9 @@ function APlusTool({ brandId }) {
             const module = editedModules[moduleIdx]
             const res = await apiFetch('/brand-studio/aplus/regenerate-image', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imagePrompt: module.imagePrompt, moduleType: module.type, productImages, brandColors })
+                body: JSON.stringify({ imagePrompt: module.imagePrompt, moduleType: module.type, productImages, brandColors, designContext })
             })
-            if (res.success && res.imageUrl) {
-                setEditedImages(prev => ({ ...prev, [module.id]: res.imageUrl }))
-            }
+            if (res.success && res.imageUrl) setEditedImages(prev => ({ ...prev, [module.id]: res.imageUrl }))
         } catch (e) { console.error(e) }
         setRegenning(false)
     }
@@ -987,117 +1552,138 @@ function APlusTool({ brandId }) {
     const handleCopyExportText = () => {
         const text = editedModules.map((m, i) => {
             const cfg = MODULE_TYPE_CONFIG[m.type] || { label: m.type }
-            const lines = [`[Module ${i + 1}: ${cfg.label}]`]
+            const lines = [`[Module ${i + 1}: ${cfg.label}${m.type?.startsWith('premium_') || ['carousel','hotspot','video_module','qa_panel','enhanced_comparison'].includes(m.type) ? ' — Premium A++' : ''}]`]
             if (m.headline) lines.push(`Headline: ${m.headline}`)
             if (m.subheadline) lines.push(`Subheadline: ${m.subheadline}`)
             if (m.body) lines.push(`Body: ${m.body}`)
             if (m.story) lines.push(`Brand Story: ${m.story}`)
             if (m.bullets?.length) lines.push(`Bullets:\n${m.bullets.map(b => `  • ${b}`).join('\n')}`)
-            if (m.altText) lines.push(`Alt Text (for image upload): ${m.altText}`)
+            if (m.altText) lines.push(`Alt Text: ${m.altText}`)
+            // Premium module exports
+            if (m.slides?.length) {
+                m.slides.forEach((s, si) => lines.push(`  Slide ${si+1}: ${s.headline || ''} — ${s.body || ''}`))
+            }
+            if (m.hotspots?.length) {
+                m.hotspots.forEach(h => lines.push(`  Hotspot ${h.number}: ${h.title} — ${h.description}`))
+            }
+            if (m.questions?.length) {
+                m.questions.forEach(q => { lines.push(`  Q: ${q.question}`); lines.push(`  A: ${q.answer}`) })
+            }
+            if (m.rows?.length) lines.push(`Comparison: ${m.rows.map(r => `${r.feature}: ${r.model1Value}`).join(' | ')}`)
             return lines.join('\n')
         }).join('\n\n─────────────────────────────────\n\n')
-        navigator.clipboard.writeText(text)
-        setExportCopied(true)
-        setTimeout(() => setExportCopied(false), 2500)
+        navigator.clipboard.writeText(text); setExportCopied(true); setTimeout(() => setExportCopied(false), 2500)
     }
 
     // ── Result View ──────────────────────────────────────────────────────────
     if (gen.result && editedModules.length > 0) {
-        const plan = gen.result.aplusPlan
-        const imageCount = Object.keys(editedImages).length
-
+        const plan = gen.result.aplusPlan; const imageCount = Object.keys(editedImages).length
+        const resultMood = gen.result.designContext?.moodLabel
+        const isPremiumResult = gen.result.isPremium || listingTier === 'premium'
         return (
             <div>
-                {/* Header */}
+                {(productDNA || resultMood) && (
+                    <div style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.1), rgba(245,158,11,0.08))', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>palette</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#A78BFA' }}>Product Design Intelligence Active</span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                            {resultMood && `${resultMood}`}{productDNA?.dominantColors?.length > 0 && ` · ${productDNA.dominantColors.length} colors locked`} · Color Guard enabled
+                        </span>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                            {productDNA?.dominantColors?.slice(0, 6).map((c, i) => (
+                                <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 16, height: 16, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.15)' }} />
+                            ))}
+                        </div>
+                    </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }}></div>
                             <span style={{ fontSize: 16, fontWeight: 700, color: '#FFF' }}>{plan.productName || 'A+ Listing'}</span>
-                            <span style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA', padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>{editedModules.length} modules</span>
+                            {isPremiumResult ? (
+                                <span style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.2))', color: '#F59E0B', padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>diamond</span>
+                                    Premium A++
+                                </span>
+                            ) : (
+                                <span style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA', padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>Standard A+</span>
+                            )}
+                            <span style={{ background: 'rgba(124,58,237,0.15)', color: '#C4B5FD', padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>{editedModules.length} modules</span>
                             <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>{imageCount} images</span>
                         </div>
                         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{plan.contentStrategy}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={handleCopyExportText}
-                            style={{ background: exportCopied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)', border: '1px solid ' + (exportCopied ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.15)'), color: exportCopied ? '#22C55E' : '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                     <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={handleCopyExportText} style={{ background: exportCopied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)', border: '1px solid ' + (exportCopied ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.15)'), color: exportCopied ? '#22C55E' : '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{exportCopied ? 'check' : 'content_copy'}</span>
                             {exportCopied ? 'Copied!' : 'Copy All Text'}
                         </button>
-                        <button onClick={gen.reset}
-                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-                            ↻ Start Over
+                        <button onClick={() => setPreviewOpen(true)} style={{ background: 'linear-gradient(135deg, rgba(255,153,0,0.2), rgba(255,153,0,0.1))', border: '1px solid rgba(255,153,0,0.4)', color: '#FF9900', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>preview</span>
+                            Preview on Amazon
                         </button>
+                        <button onClick={gen.reset} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>↻ Start Over</button>
                     </div>
                 </div>
-
-                {/* Amazon Compliance Notice */}
-                <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '12px 18px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B', flexShrink: 0, marginTop: 1 }}>warning</span>
+                {/* Amazon compliance + tier notice */}
+                <div style={{ background: isPremiumResult ? 'rgba(245,158,11,0.07)' : 'rgba(245,158,11,0.07)', border: `1px solid ${isPremiumResult ? 'rgba(245,158,11,0.25)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B', flexShrink: 0, marginTop: 1 }}>{isPremiumResult ? 'diamond' : 'warning'}</span>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-                        <strong style={{ color: '#FFF' }}>Amazon A+ Content Rules Applied</strong> — No pricing, competitor mentions, or unverified claims. All images are text-free. Review each module before uploading to Seller Central. Expand any module to edit content or regenerate images.
+                        {isPremiumResult ? (
+                            <><strong style={{ color: '#F59E0B' }}>Premium A++ Content (1464px)</strong> — Full-bleed immersive layout with Carousel, Hotspot, and Q&A modules. Upload to Seller Central → A+ Content Manager → Premium A+. Images must be &lt;2MB each, RGB, JPG/PNG only.</>
+                        ) : (
+                            <><strong style={{ color: '#FFF' }}>Standard A+ Content (970px)</strong> — Amazon rules applied. No pricing, competitor mentions, or unverified claims. All images are text-free. Review each module before uploading to Seller Central.</>
+                        )}
                     </div>
                 </div>
-
-                {/* Module Editor Cards */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
                     {editedModules.map((module, idx) => (
-                        <AplusModuleCard
-                            key={module.id || idx}
-                            module={module} idx={idx}
-                            image={editedImages[module.id]}
-                            onUpdate={updateModuleField}
-                            onRephrase={handleRephrase}
-                            onRegenImage={handleRegenImage}
-                            rephrasing={rephrasing}
-                            regenning={regenning}
-                            productImages={productImages}
-                            brandColors={brandColors}
-                        />
+                        <AplusModuleCard key={module.id || idx} module={module} idx={idx} image={editedImages[module.id]}
+                            onUpdate={updateModuleField} onRephrase={handleRephrase} onRegenImage={handleRegenImage}
+                            rephrasing={rephrasing} regenning={regenning} productImages={productImages} brandColors={brandColors} />
                     ))}
                 </div>
-
-                {/* Export Panel */}
                 <div style={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 24 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#FFF', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B' }}>upload</span>
                         Upload to Amazon Seller Central
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div style={{ fontSize: 24, marginBottom: 8 }}>1️⃣</div>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#F59E0B' }}>content_copy</span>
+                            </div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Copy Text</div>
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Copy all module headlines, body, and alt-text for Seller Central</div>
-                            <button onClick={handleCopyExportText} style={{ width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                                {exportCopied ? '✓ Copied!' : 'Copy All Text'}
+                            <button onClick={handleCopyExportText} style={{ width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{exportCopied ? 'check' : 'content_copy'}</span>
+                                {exportCopied ? 'Copied!' : 'Copy All Text'}
                             </button>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div style={{ fontSize: 24, marginBottom: 8 }}>2️⃣</div>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22C55E' }}>download</span>
+                            </div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Download Images</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Download each module image (named by module type)</div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Download each module image named by module type</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                 {Object.entries(editedImages).map(([moduleId, imgUrl], i) => {
-                                    const m = editedModules.find(m => m.id === moduleId)
-                                    const cfg = MODULE_TYPE_CONFIG[m?.type] || { label: m?.type }
-                                    return (
-                                        <a key={i} href={imgUrl} download={`aplus_${i + 1}_${m?.type || 'module'}.jpg`} target="_blank" rel="noreferrer"
-                                            style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span>
-                                            {i + 1}. {cfg.label?.split(' ')[0]}
-                                        </a>
-                                    )
+                                    const m = editedModules.find(m => m.id === moduleId); const cfg = MODULE_TYPE_CONFIG[m?.type] || { label: m?.type }
+                                    return <a key={i} href={imgUrl} download={`aplus_${i + 1}_${m?.type || 'module'}.jpg`} target="_blank" rel="noreferrer" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span>{i + 1}. {cfg.label?.split(' ')[0]}
+                                    </a>
                                 })}
                             </div>
                         </div>
                         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div style={{ fontSize: 24, marginBottom: 8 }}>3️⃣</div>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#F59E0B' }}>open_in_new</span>
+                            </div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Upload to Amazon</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Go to Seller Central → A+ Content Manager and paste your content module by module</div>
-                            <a href="https://sellercentral.amazon.com/enhanced-content/overview" target="_blank" rel="noreferrer"
-                                style={{ display: 'block', width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-                                Open Seller Central ↗
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Go to Seller Central → A+ Content Manager and paste module by module</div>
+                            <a href="https://sellercentral.amazon.com/enhanced-content/overview" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>Open Seller Central
                             </a>
                         </div>
                     </div>
@@ -1106,73 +1692,246 @@ function APlusTool({ brandId }) {
         )
     }
 
-    // ── Input View ───────────────────────────────────────────────────────────
+    // ── PDI Ready — Palette + Mood Selector + Generate ────────────────────────
+    if (pdiStep === 'pdi_ready' && productDNA) {
+        const activeMood = MOOD_STATIC[selectedMood] || MOOD_STATIC.editorial
+        return (
+            <div style={{ position: 'relative' }}>
+                {/* ProductDNA Card */}
+                <div style={{ background: '#0A0A0A', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                        <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>palette</span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#A78BFA' }}>auto_awesome</span>
+                                Product Design Intelligence
+                            </div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{productDNA.productCategory} · {productDNA.materials} · {productDNA.surfaceFinish}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#22C55E', fontWeight: 700, background: 'rgba(34,197,94,0.1)', padding: '4px 10px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span> Colors Locked
+                        </span>
+                    </div>
+
+                    {/* Color Palette — image-format strip */}
+                    {productDNA.dominantColors?.length > 0 && (
+                        <ColorPaletteStrip colors={productDNA.dominantColors} />
+                    )}
+
+                    {/* Mood Board Selector */}
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>style</span>
+                        Visual Mood Direction — Designer Mood Boards
+                        {Object.keys(moodImages).length > 0 ? (
+                            <span style={{ marginLeft: 4, color: '#A78BFA', textTransform: 'none', letterSpacing: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>auto_awesome</span> AI mood boards ready
+                            </span>
+                        ) : (
+                            <span style={{ marginLeft: 4, color: 'rgba(124,58,237,0.5)', textTransform: 'none', letterSpacing: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>hourglass_empty</span> Generating mood boards...
+                            </span>
+                        )}
+                    </div>
+                    {/* Mood boards — 2x2 grid for larger display */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+                        {Object.values(MOOD_STATIC).map(mood => {
+                            const aiImg = moodImages[mood.id]
+                            const isSelected = selectedMood === mood.id
+                            const moodSwatches = {
+                                editorial: ['#FFFFFF', '#F5F0EA', '#E8E4DF', '#D0C8BF'],
+                                bold:      ['#0D0D0D', '#1A0D2E', '#7B2FFF', '#2A1A5A'],
+                                lifestyle: ['#C97B5A', '#8FA888', '#E8D5B7', '#6B8C6B'],
+                                luxury:    ['#F8F4EF', '#C9A96E', '#2A2A2A', '#8B7355'],
+                            }
+                            const swatches = moodSwatches[mood.id] || []
+                            const isHovered = hoveredMood === mood.id
+                            return (
+                                <div key={mood.id}
+                                    onClick={() => handleSelectMood(mood.id)}
+                                    onMouseEnter={() => setHoveredMood(mood.id)}
+                                    onMouseLeave={() => setHoveredMood(null)}
+                                    style={{
+                                        borderRadius: 14, border: `2px solid ${isSelected ? '#A78BFA' : 'rgba(255,255,255,0.08)'}`,
+                                        overflow: 'hidden', cursor: 'pointer', transition: 'all 0.25s',
+                                        boxShadow: isSelected ? '0 0 0 3px rgba(124,58,237,0.25), 0 8px 32px rgba(124,58,237,0.2)' : '0 2px 8px rgba(0,0,0,0.3)',
+                                        background: '#0A0A0A', transform: isSelected ? 'scale(1.02)' : 'none', position: 'relative',
+                                    }}>
+                                    {/* Main mood board image */}
+                                    <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
+                                        {aiImg ? (
+                                            <img src={aiImg} alt={`${mood.label} mood board`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                        ) : (
+                                            <div style={{ height: '100%', background: mood.bg, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                                                <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2 }}>
+                                                    <div style={{ background: `linear-gradient(135deg, ${swatches[0]}, ${swatches[1]})`, borderRadius: '0 0 4px 0' }} />
+                                                    <div style={{ background: swatches[2] || swatches[1], borderRadius: '0 0 0 4px' }} />
+                                                    <div style={{ background: swatches[3] || swatches[0], opacity: 0.85, borderRadius: '0 4px 0 0' }} />
+                                                    <div style={{ background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: '4px 0 0 0' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: mood.id === 'editorial' ? '#888' : mood.id === 'bold' ? '#A78BFA' : mood.id === 'lifestyle' ? '#D97706' : '#C9A96E' }}>{mood.icon}</span>
+                                                    </div>
+                                                </div>
+                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 20, display: 'flex' }}>
+                                                    {swatches.map((sw, si) => <div key={si} style={{ flex: 1, background: sw }} />)}
+                                                </div>
+                                                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%)' }} />
+                                            </div>
+                                        )}
+                                        {/* Hover overlay with zoom + download */}
+                                        {isHovered && (
+                                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s' }}>
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); setLightboxMood(mood.id) }}
+                                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#FFF', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 22, marginTop: 10 }}>zoom_in</span>
+                                                    <span style={{ fontSize: 9, fontWeight: 600 }}>View</span>
+                                                </button>
+                                                {aiImg && (
+                                                    <a href={aiImg} download={`moodboard_${mood.id}.jpg`} target="_blank" rel="noreferrer"
+                                                        onClick={e => e.stopPropagation()}
+                                                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#FFF', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', textDecoration: 'none', backdropFilter: 'blur(8px)' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 22, marginTop: 10 }}>download</span>
+                                                        <span style={{ fontSize: 9, fontWeight: 600 }}>Save</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                        {/* Selection check */}
+                                        {isSelected && (
+                                            <div style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(124,58,237,0.5)' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>check</span>
+                                            </div>
+                                        )}
+                                        {/* Mood board label */}
+                                        <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, color: isSelected ? '#C4B5FD' : 'rgba(255,255,255,0.8)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Mood Board</div>
+                                    </div>
+                                    {/* Card details */}
+                                    <div style={{ padding: '10px 12px', background: isSelected ? 'rgba(124,58,237,0.12)' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: isSelected ? '#A78BFA' : 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{mood.icon}</span>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? '#A78BFA' : '#FFF' }}>{mood.label}</div>
+                                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc}</div>
+                                        </div>
+                                        {/* Swatch strip */}
+                                        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                                            {swatches.slice(0, 3).map((sw, si) => (
+                                                <div key={si} style={{ width: 10, height: 10, borderRadius: 2, background: sw, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E' }}>lock</span>
+                        Product colors are locked. AI will NOT change product color under any circumstances.
+                    </div>
+                </div>
+
+                {/* Brief */}
+                <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
+                    <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={3}
+                        placeholder="Key USPs, target audience, tone. E.g. 'Indian millennials, 65hr battery, ANC, emphasize music clarity.'"
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#FFF', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
+                        <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Modules:</label>
+                        {[5, 6, 7, 8].map(n => (
+                            <button key={n} onClick={() => setModuleCount(n)} style={{ width: 36, height: 36, borderRadius: 8, background: moduleCount === n ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (moduleCount === n ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), color: moduleCount === n ? '#A78BFA' : 'rgba(255,255,255,0.5)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{n}</button>
+                        ))}
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>25 credits · ~90s</span>
+                    </div>
+                </div>
+
+                <button onClick={handleGenerate} disabled={gen.loading} style={{
+                    width: '100%', padding: '15px 32px', borderRadius: 12, border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800,
+                    background: 'linear-gradient(135deg, #7c3aed 0%, #F59E0B 150%)',
+                    cursor: gen.loading ? 'not-allowed' : 'pointer', opacity: gen.loading ? 0.6 : 1,
+                    boxShadow: '0 8px 32px rgba(124,58,237,0.4)', transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+                }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>{activeMood.icon}</span>
+                    Generate with {activeMood.label} — 25 credits
+                </button>
+                <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="stars" />
+
+                {/* Mood board lightbox */}
+                {lightboxMood && (
+                    <MoodBoardLightbox
+                        moods={MOOD_STATIC}
+                        moodImages={moodImages}
+                        moodSwatches={{ editorial: ['#FFFFFF', '#F5F0EA', '#E8E4DF', '#D0C8BF'], bold: ['#0D0D0D', '#1A0D2E', '#7B2FFF', '#2A1A5A'], lifestyle: ['#C97B5A', '#8FA888', '#E8D5B7', '#6B8C6B'], luxury: ['#F8F4EF', '#C9A96E', '#2A2A2A', '#8B7355'] }}
+                        openMoodId={lightboxMood}
+                        onClose={() => setLightboxMood(null)}
+                        productDNA={productDNA}
+                    />
+                )}
+            </div>
+        )
+    }
+
+    // ── Input View (Step 1) ────────────────────────────────────────────────────
     return (
         <div style={{ position: 'relative' }}>
-            {/* Input Mode Selector */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                {[
-                    { id: 'url', label: 'Product URL', icon: 'link' },
-                    { id: 'catalog', label: 'Brand Catalog', icon: 'inventory_2' },
-                    { id: 'sample', label: 'Upload Sample', icon: 'upload' }
-                ].map(m => (
-                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{
-                        padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'),
-                        background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)',
-                        color: inputMode === m.id ? '#A78BFA' : 'rgba(255,255,255,0.6)',
-                        fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7
-                    }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{m.icon}</span>
-                        {m.label}
+                {[{ id: 'url', label: 'Product URL', icon: 'link' }, { id: 'catalog', label: 'Brand Catalog', icon: 'inventory_2' }, { id: 'sample', label: 'Upload Sample', icon: 'upload' }].map(m => (
+                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', color: inputMode === m.id ? '#A78BFA' : 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{m.icon}</span>{m.label}
                     </button>
                 ))}
             </div>
 
-            {/* URL Mode */}
             {inputMode === 'url' && (
                 <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
                     <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Product URL (Amazon, Shopify, or any website)</label>
                     <div style={{ display: 'flex', gap: 10 }}>
-                        <input
-                            value={productUrl} onChange={e => setProductUrl(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAnalyzeUrl()}
+                        <input value={productUrl} onChange={e => setProductUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAnalyzeUrl()}
                             placeholder="https://www.amazon.in/dp/XXXXXXXXXX or any product link..."
-                            style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: '#FFF', fontSize: 14, outline: 'none' }}
-                        />
-                        <button onClick={handleAnalyzeUrl} disabled={analyzing || !productUrl}
-                            style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)', color: '#A78BFA', padding: '12px 20px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>
-                            {analyzing ? '🔍 Analyzing...' : '🔍 Analyze'}
+                            style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: '#FFF', fontSize: 14, outline: 'none' }} />
+                        <button onClick={handleAnalyzeUrl} disabled={pdiStep === 'analyzing' || !productUrl}
+                            style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)', color: '#A78BFA', padding: '12px 20px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{pdiStep === 'analyzing' ? 'hourglass_empty' : 'palette'}</span>
+                            {pdiStep === 'analyzing' ? 'Analyzing...' : 'Analyze + Design'}
                         </button>
                     </div>
-
-                    {/* Analyzed Product Preview */}
-                    {analyzedProduct && (
-                        <div style={{ marginTop: 16, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 10, padding: 16 }}>
-                            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                                {analyzedProduct.images?.[0] && (
-                                    <img src={analyzedProduct.images[0]} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }} />
-                                )}
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>{analyzedProduct.title}</div>
-                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                        {analyzedProduct.price && <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '2px 8px', borderRadius: 4 }}>{analyzedProduct.price}</span>}
-                                        {analyzedProduct.rating && <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 8px', borderRadius: 4 }}>⭐ {analyzedProduct.rating}</span>}
-                                        {analyzedProduct.platform && <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', padding: '2px 8px', borderRadius: 4 }}>{analyzedProduct.platform}</span>}
-                                    </div>
-                                    {analyzedProduct.bulletPoints?.length > 0 && (
-                                        <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                                            {analyzedProduct.bulletPoints.slice(0, 3).map((b, i) => <div key={i}>• {b}</div>)}
-                                        </div>
-                                    )}
+                    {pdiStep === 'analyzing' && (
+                        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {[
+                                { icon: 'search', text: 'Scraping product data...' },
+                                { icon: 'palette', text: 'Extracting color palette via AI vision...' },
+                                { icon: 'psychology', text: 'Building design intelligence...' }
+                            ].map((s, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                                    <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.2)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{s.icon}</span>
+                                    {s.text}
                                 </div>
-                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22C55E', flexShrink: 0 }}>check_circle</span>
+                            ))}
+                        </div>
+                    )}
+                    {analyzedProduct && pdiStep !== 'analyzing' && (
+                        <div style={{ marginTop: 14, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 10, padding: 14 }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                {analyzedProduct.images?.[0] && <img src={analyzedProduct.images[0]} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>{analyzedProduct.title}</div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                                        {analyzedProduct.price && <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '2px 7px', borderRadius: 4 }}>{analyzedProduct.price}</span>}
+                                        {analyzedProduct.rating && <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 7px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>star</span> {analyzedProduct.rating}</span>}
+                                    </div>
+                                </div>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22C55E' }}>check_circle</span>
                             </div>
                         </div>
                     )}
+                    {pdiError && <div style={{ marginTop: 10, color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>{pdiError}</div>}
                 </div>
             )}
 
-            {/* Catalog Mode */}
             {inputMode === 'catalog' && (
                 <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
@@ -1182,76 +1941,150 @@ function APlusTool({ brandId }) {
                 </div>
             )}
 
-            {/* Sample Mode */}
             {inputMode === 'sample' && (
                 <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Upload Reference A+ Listing Screenshots</label>
+                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Upload Product Images or Reference A+ Screenshots</label>
                     <div style={{ border: '2px dashed rgba(255,255,255,0.15)', borderRadius: 10, padding: '28px 20px', textAlign: 'center', cursor: 'pointer' }}
                         onClick={() => document.getElementById('aplus-ref-upload').click()}>
                         <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.2)', display: 'block', marginBottom: 8 }}>upload_file</span>
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Drop screenshots of an A+ listing you want to match</div>
-                        <input id="aplus-ref-upload" type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={async e => {
-                            const files = Array.from(e.target.files || [])
-                            const urls = await Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f) })))
-                            setReferenceImages(urls)
-                        }} />
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Drop product images or A+ reference screenshots</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>PDI will extract color palette + design DNA automatically</div>
+                        <input id="aplus-ref-upload" type="file" accept="image/*" multiple style={{ display: 'none' }}
+                            onChange={async e => await handleUploadAndAnalyzeImages(Array.from(e.target.files || []))} />
                     </div>
-                    {referenceImages.length > 0 && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                            {referenceImages.map((img, i) => <img key={i} src={img} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }} />)}
-                        </div>
-                    )}
+                    {referenceImages.length > 0 && <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>{referenceImages.map((img, i) => <img key={i} src={img} alt="" style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }} />)}</div>}
+                    {pdiStep === 'analyzing' && <div style={{ marginTop: 10, fontSize: 12, color: '#A78BFA', display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.2)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing product design...</div>}
                 </div>
             )}
 
-            {/* Brief + Options */}
             <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
+                {/* Listing Tier Selector */}
+                <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>workspace_premium</span>
+                        Listing Tier
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {/* Standard A+ */}
+                        <div onClick={() => setListingTier('standard')} style={{
+                            borderRadius: 12, border: `2px solid ${listingTier === 'standard' ? '#7c3aed' : 'rgba(255,255,255,0.08)'}`,
+                            padding: '14px 16px', cursor: 'pointer', transition: 'all 0.2s',
+                            background: listingTier === 'standard' ? 'rgba(124,58,237,0.10)' : 'rgba(255,255,255,0.03)',
+                            boxShadow: listingTier === 'standard' ? '0 0 0 2px rgba(124,58,237,0.15)' : 'none',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: listingTier === 'standard' ? '#A78BFA' : 'rgba(255,255,255,0.4)' }}>stars</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: listingTier === 'standard' ? '#FFF' : 'rgba(255,255,255,0.6)' }}>Standard A+</span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                                {['970px wide', 'Up to 5 modules', 'Image + Text', 'Hero Banner', 'Comparison'].map(f => (
+                                    <span key={f} style={{ fontSize: 10, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)', padding: '2px 7px', borderRadius: 4 }}>{f}</span>
+                                ))}
+                            </div>
+                            <div style={{ fontSize: 12, color: listingTier === 'standard' ? '#A78BFA' : 'rgba(255,255,255,0.3)', fontWeight: 700 }}>15 credits</div>
+                        </div>
+                        {/* Premium A++ */}
+                        <div onClick={() => setListingTier('premium')} style={{
+                            borderRadius: 12, border: `2px solid ${listingTier === 'premium' ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
+                            padding: '14px 16px', cursor: 'pointer', transition: 'all 0.2s',
+                            background: listingTier === 'premium' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)',
+                            boxShadow: listingTier === 'premium' ? '0 0 0 2px rgba(245,158,11,0.15)' : 'none',
+                            position: 'relative', overflow: 'hidden',
+                        }}>
+                            {/* Premium shimmer top border */}
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, #F59E0B, #EAB308, #F59E0B)', opacity: listingTier === 'premium' ? 1 : 0, transition: 'opacity 0.2s' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: listingTier === 'premium' ? '#F59E0B' : 'rgba(255,255,255,0.4)' }}>diamond</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: listingTier === 'premium' ? '#FFF' : 'rgba(255,255,255,0.6)' }}>Premium A++</span>
+                                <span style={{ fontSize: 9, background: 'rgba(245,158,11,0.2)', color: '#F59E0B', padding: '1px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New</span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                                {['1464px full-bleed', 'Up to 7 modules', 'Carousel', 'Hotspot', 'Q&A', 'Video'].map(f => (
+                                    <span key={f} style={{ fontSize: 10, background: 'rgba(245,158,11,0.1)', color: 'rgba(245,158,11,0.8)', padding: '2px 7px', borderRadius: 4 }}>{f}</span>
+                                ))}
+                            </div>
+                            <div style={{ fontSize: 12, color: listingTier === 'premium' ? '#F59E0B' : 'rgba(255,255,255,0.3)', fontWeight: 700 }}>25 credits · 15-30% higher conversion</div>
+                        </div>
+                    </div>
+                </div>
+
                 <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
-                <textarea
-                    value={brief} onChange={e => setBrief(e.target.value)} rows={4}
+                <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={4}
                     placeholder="Describe your product, target audience, key USPs, tone, and any specific messaging goals. E.g. 'Premium wireless earbuds targeting Indian millennials. USPs: 65hr battery, ANC, IPX5. Emphasize music clarity + durability.'"
                     style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#FFF', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
                 />
                 <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
                     <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Modules:</label>
-                    {[5, 6, 7, 8].map(n => (
-                        <button key={n} onClick={() => setModuleCount(n)} style={{
-                            width: 36, height: 36, borderRadius: 8,
-                            background: moduleCount === n ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)',
-                            border: '1px solid ' + (moduleCount === n ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'),
-                            color: moduleCount === n ? '#A78BFA' : 'rgba(255,255,255,0.5)',
-                            fontWeight: 700, cursor: 'pointer', fontSize: 13
-                        }}>{n}</button>
+                    {(listingTier === 'premium' ? [5, 6, 7] : [3, 4, 5]).map(n => (
+                        <button key={n} onClick={() => setModuleCount(n)} style={{ width: 36, height: 36, borderRadius: 8, background: moduleCount === n ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (moduleCount === n ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), color: moduleCount === n ? '#A78BFA' : 'rgba(255,255,255,0.5)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{n}</button>
                     ))}
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>25 credits · ~90s generation</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>
+                        {listingTier === 'premium' ? '25 credits · 1464px · ~2min' : '15 credits · 970px · ~90s'}
+                    </span>
                 </div>
             </div>
 
-            {/* Generate Button */}
-            <button onClick={handleGenerate} disabled={gen.loading || (!brief && !analyzedProduct)}
-                style={{
-                    width: '100%', padding: '15px 32px', borderRadius: 12,
-                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                    border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800,
-                    cursor: gen.loading || (!brief && !analyzedProduct) ? 'not-allowed' : 'pointer',
-                    opacity: gen.loading || (!brief && !analyzedProduct) ? 0.6 : 1,
-                    boxShadow: '0 8px 24px rgba(245,158,11,0.3)', transition: 'all 0.2s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
-                }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>stars</span>
-                Generate A+ Listing — 25 credits
-            </button>
+            {/* Generate CTA */}
+            {pdiStep === 'input' && brief && (
+                <button onClick={handleGenerate} disabled={gen.loading || (!brief && !analyzedProduct)}
+                    style={{
+                        width: '100%', padding: '15px 32px', borderRadius: 12,
+                        background: listingTier === 'premium'
+                            ? 'linear-gradient(135deg, #F59E0B, #D97706)'
+                            : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                        border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800,
+                        cursor: gen.loading || (!brief && !analyzedProduct) ? 'not-allowed' : 'pointer',
+                        opacity: gen.loading || (!brief && !analyzedProduct) ? 0.6 : 1,
+                        boxShadow: listingTier === 'premium' ? '0 8px 24px rgba(245,158,11,0.3)' : '0 8px 24px rgba(124,58,237,0.3)',
+                        transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+                    }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{listingTier === 'premium' ? 'diamond' : 'stars'}</span>
+                    {listingTier === 'premium' ? 'Generate Premium A++ — 25 credits' : 'Generate A+ Listing — 15 credits'}
+                </button>
+            )}
+
+            {pdiStep === 'input' && !brief && (
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>
+                    Enter a product URL above to analyze &amp; auto-build design intelligence, or add a brief to generate directly
+                </div>
+            )}
 
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="stars" />
+
+            {/* Mood board lightbox */}
+            {lightboxMood && (
+                <MoodBoardLightbox
+                    moods={MOOD_STATIC}
+                    moodImages={moodImages}
+                    moodSwatches={{ editorial: ['#FFFFFF', '#F5F0EA', '#E8E4DF', '#D0C8BF'], bold: ['#0D0D0D', '#1A0D2E', '#7B2FFF', '#2A1A5A'], lifestyle: ['#C97B5A', '#8FA888', '#E8D5B7', '#6B8C6B'], luxury: ['#F8F4EF', '#C9A96E', '#2A2A2A', '#8B7355'] }}
+                    openMoodId={lightboxMood}
+                    onClose={() => setLightboxMood(null)}
+                    productDNA={productDNA}
+                />
+            )}
+
+            {/* Amazon listing preview */}
+            {previewOpen && gen.result && (
+                <AmazonListingPreview
+                    modules={editedModules}
+                    images={editedImages}
+                    isPremium={gen.result?.isPremium || listingTier === 'premium'}
+                    productName={gen.result?.aplusPlan?.productName}
+                    onClose={() => setPreviewOpen(false)}
+                />
+            )}
         </div>
     )
 }
+
 
 // ── History Tab ───────────────────────────────────────────────────────────────
 function HistoryTab({ brandId }) {
     const [items, setItems] = useState([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
+    const [expandedId, setExpandedId] = useState(null)
+    const [copiedId, setCopiedId] = useState(null)
 
     useEffect(() => {
         fetchHistory()
@@ -1295,7 +2128,19 @@ function HistoryTab({ brandId }) {
         if (item.tool === 'deck') return item.hostedUrl
         if (item.tool === 'email') return item.emailHostedUrl
         if (item.tool === 'page') return item.pageHostedUrl
-        return null
+        return null  // aplus has no hosted URL — uses inline expansion
+    }
+
+    const handleCopyAplusText = async (item) => {
+        const text = item.aplusExportText || (
+            (item.aplusModules || []).map((m, i) =>
+                `MODULE ${i + 1}: ${m.type?.replace(/_/g,' ').toUpperCase()}\n${m.headline || ''}\n${m.body || ''}\n${m.altText ? 'ALT: ' + m.altText : ''}\n`
+            ).join('\n---\n')
+        )
+        if (!text) return
+        await navigator.clipboard.writeText(text)
+        setCopiedId(item._id)
+        setTimeout(() => setCopiedId(null), 2000)
     }
 
     return (
@@ -1333,61 +2178,141 @@ function HistoryTab({ brandId }) {
                         const color = toolColors[item.tool] || '#7c3aed'
                         const openUrl = getOpenUrl(item)
                         return (
-                            <div key={item._id} style={{
-                                background: '#0A0A0A', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
-                                padding: 20, display: 'flex', alignItems: 'center', gap: 16, transition: 'all 0.2s'
-                            }}>
-                                {/* Icon */}
-                                <div style={{
-                                    width: 44, height: 44, borderRadius: 12,
-                                    background: `${color}15`, border: `1px solid ${color}30`,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                                }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 22, color }}>{toolIcons[item.tool]}</span>
+                            <div key={item._id} style={{ borderRadius: 12, border: `1px solid ${item._id === expandedId ? color + '40' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden', transition: 'all 0.2s', background: item._id === expandedId ? `${color}08` : '#0A0A0A' }}>
+                                {/* Main row */}
+                                <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16,
+                                    cursor: item.tool === 'aplus' ? 'pointer' : 'default'
+                                }} onClick={() => item.tool === 'aplus' && setExpandedId(expandedId === item._id ? null : item._id)}>
+                                    {/* Icon */}
+                                    <div style={{
+                                        width: 44, height: 44, borderRadius: 12,
+                                        background: `${color}15`, border: `1px solid ${color}30`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 22, color }}>{toolIcons[item.tool]}</span>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color, fontWeight: 700, background: `${color}15`, padding: '2px 8px', borderRadius: 4 }}>
+                                                {toolLabels[item.tool]}
+                                            </span>
+                                            {item.subType && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>· {item.subType}</span>}
+                                        </div>
+                                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.brief}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                                            <span>{formatDate(item.createdAt)}</span>
+                                            {item.slideCount && <span>· {item.slideCount} slides</span>}
+                                            {item.aplusModuleCount && <span>· {item.aplusModuleCount} modules</span>}
+                                            {item.creditsUsed > 0 && <span>· {item.creditsUsed} credits</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Thumbnail */}
+                                    {item.thumbnailUrl && (
+                                        <div style={{ width: 80, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <img src={item.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
+                                    )}
+
+                                    {/* Actions */}
+                                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                        {item.tool === 'aplus' ? (
+                                            // A+ uses expand-in-place
+                                            <button title={expandedId === item._id ? 'Collapse' : 'View Listing'} style={{
+                                                width: 36, height: 36, borderRadius: 8, background: `${color}15`, border: `1px solid ${color}30`,
+                                                color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                            }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                                                    {expandedId === item._id ? 'expand_less' : 'expand_more'}
+                                                </span>
+                                            </button>
+                                        ) : openUrl ? (
+                                            <button onClick={() => window.open(openUrl, '_blank')} title="Open" style={{
+                                                width: 36, height: 36, borderRadius: 8, background: `${color}15`, border: `1px solid ${color}30`,
+                                                color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                            }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
+                                            </button>
+                                        ) : null}
+                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(item._id) }} title="Delete" style={{
+                                            width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                                            color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                        }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Content */}
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color, fontWeight: 700, background: `${color}15`, padding: '2px 8px', borderRadius: 4 }}>
-                                            {toolLabels[item.tool]}
-                                        </span>
-                                        {item.subType && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>· {item.subType}</span>}
-                                    </div>
-                                    <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {item.brief}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
-                                        <span>{formatDate(item.createdAt)}</span>
-                                        {item.slideCount && <span>· {item.slideCount} slides</span>}
-                                        {item.creditsUsed > 0 && <span>· {item.creditsUsed} credits</span>}
-                                    </div>
-                                </div>
+                                {/* A+ Expanded Panel */}
+                                {item.tool === 'aplus' && expandedId === item._id && (
+                                    <div style={{ borderTop: `1px solid ${color}20`, padding: '20px 20px 24px', background: 'rgba(0,0,0,0.3)' }}>
+                                        {/* Header action bar */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: '#A78BFA', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>stars</span>
+                                                A+ Listing — {item.aplusModuleCount || (item.aplusModules?.length) || 0} Modules
+                                                {item.aplusProductData?.title && <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.35)' }}>· {item.aplusProductData.title}</span>}
+                                            </div>
+                                            <button onClick={() => handleCopyAplusText(item)} style={{
+                                                background: copiedId === item._id ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.12)',
+                                                border: `1px solid ${copiedId === item._id ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.25)'}`,
+                                                color: copiedId === item._id ? '#22C55E' : '#F59E0B',
+                                                padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                                                display: 'flex', alignItems: 'center', gap: 6
+                                            }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{copiedId === item._id ? 'check' : 'content_copy'}</span>
+                                                {copiedId === item._id ? 'Copied!' : 'Copy All Text'}
+                                            </button>
+                                        </div>
 
-                                {/* Thumbnail */}
-                                {item.thumbnailUrl && (
-                                    <div style={{ width: 80, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        <img src={item.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        {/* Module images grid */}
+                                        {item.aplusImages && Object.keys(item.aplusImages).length > 0 ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
+                                                {Object.entries(item.aplusImages).map(([moduleId, imgUrl], i) => {
+                                                    const mod = (item.aplusModules || []).find(m => m.id === moduleId)
+                                                    return (
+                                                        <div key={moduleId} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                                                            <img src={imgUrl} alt={mod?.type || `Module ${i+1}`} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.7)', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mod?.type?.replace(/_/g,' ') || `Module ${i+1}`}</span>
+                                                                <a href={imgUrl} download={`aplus_${i+1}_${mod?.type || 'module'}.jpg`} target="_blank" rel="noreferrer"
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    style={{ color: '#A78BFA', display: 'flex' }}>
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>download</span>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13, border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 16 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 28, display: 'block', marginBottom: 8 }}>image_not_supported</span>
+                                                Images not available in this history item
+                                            </div>
+                                        )}
+
+                                        {/* Module text summary */}
+                                        {(item.aplusModules || []).length > 0 && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                {item.aplusModules.slice(0, 4).map((m, i) => (
+                                                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                        <div style={{ fontSize: 10, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{m.type?.replace(/_/g,' ') || `Module ${i+1}`}</div>
+                                                        {m.headline && <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 2 }}>{m.headline}</div>}
+                                                        {m.body && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>{m.body.substring(0, 120)}{m.body.length > 120 ? '...' : ''}</div>}
+                                                    </div>
+                                                ))}
+                                                {item.aplusModules.length > 4 && (
+                                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', textAlign: 'center', paddingTop: 4 }}>+{item.aplusModules.length - 4} more modules in full listing</div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-
-                                {/* Actions */}
-                                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                                    {openUrl && (
-                                        <button onClick={() => window.open(openUrl, '_blank')} title="Open" style={{
-                                            width: 36, height: 36, borderRadius: 8, background: `${color}15`, border: `1px solid ${color}30`,
-                                            color, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                                        }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
-                                        </button>
-                                    )}
-                                    <button onClick={() => handleDelete(item._id)} title="Delete" style={{
-                                        width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-                                        color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                                    }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
-                                    </button>
-                                </div>
                             </div>
                         )
                     })}
