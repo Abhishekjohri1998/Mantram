@@ -8,8 +8,9 @@ import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
-import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext } from '../agents/shared/productDesignAgent.js';
+import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext, generateQuickPost } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
+import ProductContext from '../models/ProductContext.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
@@ -176,6 +177,55 @@ router.post('/product-intelligence', protect, async (req, res) => {
         res.json({ success: true, productDNA });
     } catch (err) {
         console.error('❌ PDI product-intelligence:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/quick-post ─────────────────────────────────────────
+// 2-step Quick Post generator:
+//   Step 1 → Claude extracts structured copy (headline, heroSpec, features, CTA)
+//   Step 2 → NanoBanana generates background world image (canvas composites text)
+// Cost: 8 credits
+router.post('/quick-post', protect, async (req, res) => {
+    try {
+        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, brandId } = req.body;
+        if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
+
+        const QUICK_POST_CREDITS = 8;
+        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        if (balance < QUICK_POST_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: QUICK_POST_CREDITS });
+
+        let brandContext = '';
+        if (brandId) {
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const ctx = await loadBrandContext(brandId);
+            brandContext = ctx.brandContext || '';
+        }
+
+        // Resolve selected mood direction object
+        const moodMap = productMoodDirections || {};
+        const selectedMoodDir = moodMap[selectedMoodId] || Object.values(moodMap)[0] || {
+            label: 'Professional',
+            description: 'Professional product photography',
+            shootDirective: 'Studio quality, clean, well-lit',
+            moodBoardDirective: 'Professional commercial photography with clean backdrop',
+        };
+
+        console.log(`🎯 [QuickPost] type=${postType} ratio=${aspectRatio} mood="${selectedMoodDir.label}" product="${productData?.title?.substring(0,40)}"`);
+
+        const result = await generateQuickPost(
+            productDNA,
+            productData,
+            selectedMoodDir,
+            postType || 'promo',
+            aspectRatio || '1:1',
+            brandContext,
+        );
+
+        await req.user.deductCredits(QUICK_POST_CREDITS, 'quick_post');
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('❌ [QuickPost]:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -760,6 +810,109 @@ router.post('/aplus/regenerate-image', protect, async (req, res) => {
         res.json({ success: true, imageUrl: result.imageUrl });
     } catch (err) {
         console.error('❌ A+ regenerate-image:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══ POST /api/brand-studio/product-context ─ Save a Product Creative Context ───────────
+// Saves the full PDI result (palette + mood boards + DNA) as a reusable design session.
+// Called after user picks their mood and clicks "Save Context".
+router.post('/product-context', protect, async (req, res) => {
+    try {
+        const {
+            productName, productCategory, productBrand, productUrl,
+            productImages, palette, productDNA, selectedMoodId,
+            moodDirections, moodImages, designContext, tags, notes, brandId,
+        } = req.body;
+
+        if (!productName || !brandId) {
+            return res.status(400).json({ success: false, error: 'productName and brandId required' });
+        }
+
+        // Use first mood board image as the thumbnail for gallery preview
+        const thumbnail = moodImages?.[selectedMoodId] || Object.values(moodImages || {})[0] || '';
+
+        const ctx = await ProductContext.create({
+            brandId,
+            userId: req.user._id,
+            productName: productName.trim(),
+            productCategory: productCategory || '',
+            productBrand:    productBrand || '',
+            productUrl:      productUrl || '',
+            productImages:   productImages || [],
+            palette:         palette || [],
+            productDNA:      productDNA || {},
+            selectedMoodId:  selectedMoodId || '',
+            moodDirections:  moodDirections || {},
+            moodImages:      moodImages || {},
+            designContext:   designContext || null,
+            tags:            tags || [],
+            thumbnail,
+            notes:           notes || '',
+        });
+
+        res.json({ success: true, context: ctx });
+    } catch (err) {
+        console.error('❌ [ProductContext save]:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══ GET /api/brand-studio/product-context ─ List all saved contexts for a brand ──────
+router.get('/product-context', protect, async (req, res) => {
+    try {
+        const { brandId, search, limit = 50 } = req.query;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
+
+        const query = { brandId };
+        if (search) query.productName = { $regex: search, $options: 'i' };
+
+        const contexts = await ProductContext
+            .find(query)
+            .sort({ updatedAt: -1 })
+            .limit(parseInt(limit))
+            // Only return fields needed for the gallery — not the full DNA blob
+            .select('productName productCategory productBrand productUrl palette selectedMoodId thumbnail usedIn tags createdAt updatedAt');
+
+        res.json({ success: true, contexts });
+    } catch (err) {
+        console.error('❌ [ProductContext list]:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══ GET /api/brand-studio/product-context/:id ─ Get full context (to activate) ──────
+router.get('/product-context/:id', protect, async (req, res) => {
+    try {
+        const ctx = await ProductContext.findById(req.params.id);
+        if (!ctx) return res.status(404).json({ success: false, error: 'Context not found' });
+        res.json({ success: true, context: ctx });
+    } catch (err) {
+        console.error('❌ [ProductContext get]:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══ PATCH /api/brand-studio/product-context/:id/used-in ─ Mark a tool as having used it
+router.patch('/product-context/:id/used-in', protect, async (req, res) => {
+    try {
+        const { tool } = req.body;
+        const ctx = await ProductContext.findById(req.params.id);
+        if (!ctx) return res.status(404).json({ success: false, error: 'Not found' });
+        await ctx.markUsedIn(tool);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══ DELETE /api/brand-studio/product-context/:id ─ Delete a saved context ────────
+router.delete('/product-context/:id', protect, async (req, res) => {
+    try {
+        await ProductContext.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('❌ [ProductContext delete]:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
