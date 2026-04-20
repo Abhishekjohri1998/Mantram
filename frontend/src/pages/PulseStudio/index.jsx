@@ -1392,6 +1392,349 @@ function AmazonListingPreview({ modules, images, isPremium, onClose, productName
 }
 
 
+// ── Quick Post Panel ──────────────────────────────────────────────────────────
+// Renders inside APlusTool pdi_ready state, after mood selection.
+// 2-step flow: backend generates background image → canvas compositor adds logo → download all sizes.
+
+const QP_TYPES = [
+    { id: 'promo',   icon: 'campaign',     label: 'Promo Post',   desc: 'Social media, consumer-facing' },
+    { id: 'order',   icon: 'shopping_bag', label: 'Order Post',   desc: 'Distributors & retailers, BOX QTY + ORDER NOW' },
+    { id: 'feature', icon: 'star',         label: 'Feature Card', desc: 'Spotlight one key feature' },
+]
+
+const QP_SIZES = [
+    { id: '1:1',  label: '1:1',   desc: 'Instagram / Facebook', icon: 'crop_square' },
+    { id: '9:16', label: '9:16',  desc: 'Story / Reel / Status', icon: 'crop_portrait' },
+    { id: '16:9', label: '16:9',  desc: 'YouTube / Banner',      icon: 'crop_landscape' },
+    { id: '4:5',  label: '4:5',   desc: 'Feed Optimal',          icon: 'crop_5_4' },
+]
+
+const LOGO_POSITIONS = [
+    'top-left', 'top-center', 'top-right',
+    'mid-left', 'center',     'mid-right',
+    'bot-left', 'bot-center', 'bot-right',
+]
+
+// Canvas compositor: overlays logo at chosen grid position on the background image
+async function compositeWithLogo(backgroundUrl, logoUrl, logoPos) {
+    return new Promise((resolve) => {
+        if (!backgroundUrl) { resolve(null); return }
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const bgImg = new Image()
+        bgImg.crossOrigin = 'anonymous'
+        bgImg.onload = async () => {
+            canvas.width  = bgImg.naturalWidth
+            canvas.height = bgImg.naturalHeight
+            ctx.drawImage(bgImg, 0, 0)
+
+            if (logoUrl) {
+                const logoImg = new Image()
+                logoImg.crossOrigin = 'anonymous'
+                logoImg.onload = () => {
+                    const W = canvas.width, H = canvas.height
+                    const logoW = Math.min(W * 0.18, 160)
+                    const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
+                    const pad   = W * 0.04
+
+                    const posMap = {
+                        'top-left':    [pad, pad],
+                        'top-center':  [(W - logoW) / 2, pad],
+                        'top-right':   [W - logoW - pad, pad],
+                        'mid-left':    [pad, (H - logoH) / 2],
+                        'center':      [(W - logoW) / 2, (H - logoH) / 2],
+                        'mid-right':   [W - logoW - pad, (H - logoH) / 2],
+                        'bot-left':    [pad, H - logoH - pad],
+                        'bot-center':  [(W - logoW) / 2, H - logoH - pad],
+                        'bot-right':   [W - logoW - pad, H - logoH - pad],
+                    }
+                    const [x, y] = posMap[logoPos] || posMap['top-left']
+                    ctx.drawImage(logoImg, x, y, logoW, logoH)
+                    resolve(canvas.toDataURL('image/jpeg', 0.92))
+                }
+                logoImg.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.92))
+                logoImg.src = logoUrl
+            } else {
+                resolve(canvas.toDataURL('image/jpeg', 0.92))
+            }
+        }
+        bgImg.onerror = () => resolve(null)
+        bgImg.src = backgroundUrl
+    })
+}
+
+function QuickPostPanel({
+    productDNA, productData, selectedMoodId, productMoodDirections, brandId,
+    qpType, setQpType, qpRatio, setQpRatio,
+    qpLogoOn, setQpLogoOn, qpLogoPos, setQpLogoPos,
+    qpLoading, setQpLoading, qpResult, setQpResult,
+    qpError, setQpError, qpCompositeUrls, setQpCompositeUrls,
+    canvasRef,
+}) {
+    const { activeBrand } = useBrand()
+    const logoUrl = activeBrand?.logoUrl || activeBrand?.logo || null
+
+    const handleGenerate = async () => {
+        if (!productDNA) return
+        setQpLoading(true)
+        setQpResult(null)
+        setQpError('')
+        setQpCompositeUrls({})
+        try {
+            const data = await apiFetch('/brand-studio/quick-post', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    productDNA,
+                    productData,
+                    selectedMoodId,
+                    productMoodDirections,
+                    postType: qpType,
+                    aspectRatio: qpRatio,
+                    brandId,
+                }),
+            })
+            if (!data.success) throw new Error(data.error || 'Generation failed')
+            setQpResult(data)
+
+            // Composite logo onto background
+            if (data.backgroundUrl) {
+                const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
+                const composited = await compositeWithLogo(data.backgroundUrl, effectiveLogo, qpLogoPos)
+                if (composited) setQpCompositeUrls({ [qpRatio]: composited })
+            }
+        } catch (e) {
+            setQpError(e.message)
+        }
+        setQpLoading(false)
+    }
+
+    const handleDownload = (dataUrl, size) => {
+        if (!dataUrl) return
+        const a = document.createElement('a')
+        a.href = dataUrl
+        a.download = `quick_post_${size.replace(':', 'x')}_${Date.now()}.jpg`
+        a.click()
+    }
+
+    const handleRecomposite = async () => {
+        if (!qpResult?.backgroundUrl) return
+        const effectiveLogo = qpLogoOn && logoUrl ? logoUrl : null
+        const composited = await compositeWithLogo(qpResult.backgroundUrl, effectiveLogo, qpLogoPos)
+        if (composited) setQpCompositeUrls(prev => ({ ...prev, [qpRatio]: composited }))
+    }
+
+    const copy = qpResult?.copy || {}
+    const palette = qpResult?.palette || productDNA?.dominantColors?.slice(0, 5) || []
+
+    return (
+        <div style={{ background: 'linear-gradient(135deg, #0d0d1a 0%, #0A0A14 100%)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 16, padding: 24, marginBottom: 20 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(245,158,11,0.2))', border: '1px solid rgba(124,58,237,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#A78BFA' }}>campaign</span>
+                </div>
+                <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#FFF', letterSpacing: '-0.01em' }}>Quick Posts</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Generate promo posts, order posts &amp; feature cards using your locked palette + mood</div>
+                </div>
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#F59E0B', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', padding: '3px 8px', borderRadius: 5, fontWeight: 700 }}>8 credits · ~45s</span>
+            </div>
+
+            {/* Step 1: Post Type */}
+            <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Post Type</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {QP_TYPES.map(t => (
+                        <div key={t.id} onClick={() => setQpType(t.id)} style={{
+                            borderRadius: 10, border: `1.5px solid ${qpType === t.id ? '#A78BFA' : 'rgba(255,255,255,0.08)'}`,
+                            padding: '12px 14px', cursor: 'pointer', transition: 'all 0.2s',
+                            background: qpType === t.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: qpType === t.id ? '#A78BFA' : 'rgba(255,255,255,0.4)' }}>{t.icon}</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: qpType === t.id ? '#FFF' : 'rgba(255,255,255,0.6)' }}>{t.label}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', lineHeight: 1.4 }}>{t.desc}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Step 2: Size / Aspect Ratio */}
+            <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Output Size</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {QP_SIZES.map(s => (
+                        <div key={s.id} onClick={() => setQpRatio(s.id)} style={{
+                            borderRadius: 8, border: `1.5px solid ${qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
+                            padding: '8px 14px', cursor: 'pointer', transition: 'all 0.2s', flex: '1 1 auto', textAlign: 'center',
+                            background: qpRatio === s.id ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)',
+                        }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: qpRatio === s.id ? '#F59E0B' : 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 2 }}>{s.icon}</span>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: qpRatio === s.id ? '#FFF' : 'rgba(255,255,255,0.5)' }}>{s.label}</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{s.desc}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Step 3: Logo Toggle + Position Grid */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: qpLogoOn ? 14 : 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)' }}>corporate_fare</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#FFF', flex: 1 }}>Brand Logo Placement</span>
+                    {logoUrl ? (
+                        <img src={logoUrl} alt="brand logo" style={{ height: 22, maxWidth: 60, objectFit: 'contain', borderRadius: 4, opacity: 0.7 }} onError={e => e.target.style.display='none'} />
+                    ) : (
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Upload logo in Brand DNA</span>
+                    )}
+                    {/* Toggle */}
+                    <div onClick={() => setQpLogoOn(v => !v)} style={{ width: 42, height: 24, borderRadius: 12, background: qpLogoOn ? '#7c3aed' : 'rgba(255,255,255,0.12)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                        <div style={{ position: 'absolute', top: 3, left: qpLogoOn ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#FFF', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }} />
+                    </div>
+                </div>
+                {qpLogoOn && (
+                    <div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>Logo Position — click to place</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, maxWidth: 160 }}>
+                            {LOGO_POSITIONS.map(pos => (
+                                <div key={pos} onClick={() => { setQpLogoPos(pos); handleRecomposite() }} style={{
+                                    width: '100%', aspectRatio: '1', borderRadius: 6,
+                                    border: `1.5px solid ${qpLogoPos === pos ? '#A78BFA' : 'rgba(255,255,255,0.1)'}`,
+                                    background: qpLogoPos === pos ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.04)',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+                                }}>
+                                    {qpLogoPos === pos && (
+                                        <span className="material-symbols-outlined" style={{ fontSize: 10, color: '#A78BFA' }}>corporate_fare</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Generate Button */}
+            <button onClick={handleGenerate} disabled={qpLoading} style={{
+                width: '100%', padding: '14px 24px', borderRadius: 12, border: 'none',
+                background: qpLoading ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #7c3aed 0%, #F59E0B 180%)',
+                color: '#FFF', fontSize: 15, fontWeight: 800, cursor: qpLoading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                boxShadow: qpLoading ? 'none' : '0 6px 24px rgba(124,58,237,0.35)', transition: 'all 0.2s',
+            }}>
+                {qpLoading ? (
+                    <>
+                        <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.2)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                        Claude extracting copy · NanoBanana generating background...
+                    </>
+                ) : (
+                    <>
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>auto_awesome</span>
+                        Generate {QP_TYPES.find(t => t.id === qpType)?.label} — 8 credits
+                    </>
+                )}
+            </button>
+
+            {qpError && <div style={{ marginTop: 10, color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>{qpError}</div>}
+
+            {/* Result */}
+            {qpResult && !qpLoading && (
+                <div style={{ marginTop: 20 }}>
+                    {/* Extracted Copy Preview */}
+                    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Extracted Copy</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div>
+                                <div style={{ fontSize: 18, fontWeight: 900, color: '#FFF', lineHeight: 1.1 }}>{copy.productName}</div>
+                                {copy.tagline && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{copy.tagline}</div>}
+                                {copy.heroSpec && (
+                                    <div style={{ marginTop: 8 }}>
+                                        <div style={{ fontSize: 32, fontWeight: 900, color: palette[1]?.hex || '#A78BFA', lineHeight: 1 }}>{copy.heroSpec}</div>
+                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.1em' }}>{copy.heroSpecLabel}</div>
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                {(copy.features || []).map((f, i) => (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#A78BFA' }}>{f.icon}</span>
+                                        </div>
+                                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{f.text}</span>
+                                    </div>
+                                ))}
+                                {copy.boxQty && (
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                        <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>BOX QTY: {copy.boxQty}</span>
+                                        <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>{copy.cta}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        {/* Palette mini strip */}
+                        {palette.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
+                                {palette.map((c, i) => (
+                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ flex: 1, height: 8, borderRadius: 4, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Composite Image Preview */}
+                    {(qpCompositeUrls[qpRatio] || qpResult.backgroundUrl) && (
+                        <div style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Generated Background + Logo Composite</div>
+                            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+                                <img
+                                    src={qpCompositeUrls[qpRatio] || qpResult.backgroundUrl}
+                                    alt="Quick Post Background"
+                                    style={{ width: '100%', display: 'block', maxHeight: 500, objectFit: 'contain', background: '#000' }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Download Panel */}
+                    <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ fontSize: 10, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                            Download Creative
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                            {[qpRatio].map(size => {
+                                const url = qpCompositeUrls[size] || qpResult.backgroundUrl
+                                return url ? (
+                                    <button key={size} onClick={() => handleDownload(url, size)} style={{
+                                        background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
+                                        color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
+                                        fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
+                                        Download {size}
+                                    </button>
+                                ) : null
+                            })}
+                            <button onClick={handleGenerate} style={{
+                                background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
+                                color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
+                                fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                                Regenerate
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Hidden canvas for compositor */}
+                    <canvas ref={canvasRef} style={{ display: 'none' }} />
+                </div>
+            )}
+        </div>
+    )
+}
+
 function APlusTool({ brandId }) {
     const [inputMode, setInputMode] = useState('url') // url | catalog | sample
     const [productUrl, setProductUrl] = useState('')
@@ -1422,6 +1765,17 @@ function APlusTool({ brandId }) {
     const [designContext, setDesignContext] = useState(null)
     const [pdiError, setPdiError] = useState('')
     const [hoveredMood, setHoveredMood] = useState(null)
+
+    // ── Quick Posts State ──────────────────────────────────────────────────────
+    const [qpType, setQpType]               = useState('promo')    // 'promo' | 'order' | 'feature'
+    const [qpRatio, setQpRatio]             = useState('1:1')      // '1:1' | '9:16' | '16:9' | '4:5'
+    const [qpLogoOn, setQpLogoOn]           = useState(false)
+    const [qpLogoPos, setQpLogoPos]         = useState('top-left')
+    const [qpLoading, setQpLoading]         = useState(false)
+    const [qpResult, setQpResult]           = useState(null)
+    const [qpError, setQpError]             = useState('')
+    const [qpCompositeUrls, setQpCompositeUrls] = useState({})
+    const canvasRef                         = useRef(null)
 
     // Fallback mood options (used before AI generates product-specific ones)
     const MOOD_STATIC = {
@@ -1944,6 +2298,25 @@ function APlusTool({ brandId }) {
                         Product colors are locked. AI will NOT change product color under any circumstances.
                     </div>
                 </div>
+
+                {/* ── Quick Posts Section ── */}
+                <QuickPostPanel
+                    productDNA={productDNA}
+                    productData={analyzedProduct}
+                    selectedMoodId={selectedMood}
+                    productMoodDirections={productMoodDirections}
+                    brandId={brandId}
+                    brand={null}
+                    qpType={qpType} setQpType={setQpType}
+                    qpRatio={qpRatio} setQpRatio={setQpRatio}
+                    qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
+                    qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
+                    qpLoading={qpLoading} setQpLoading={setQpLoading}
+                    qpResult={qpResult} setQpResult={setQpResult}
+                    qpError={qpError} setQpError={setQpError}
+                    qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
+                    canvasRef={canvasRef}
+                />
 
                 {/* Brief */}
                 <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>

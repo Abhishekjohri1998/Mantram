@@ -8,7 +8,7 @@ import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
-import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext } from '../agents/shared/productDesignAgent.js';
+import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext, generateQuickPost } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
@@ -176,6 +176,55 @@ router.post('/product-intelligence', protect, async (req, res) => {
         res.json({ success: true, productDNA });
     } catch (err) {
         console.error('❌ PDI product-intelligence:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/brand-studio/quick-post ─────────────────────────────────────────
+// 2-step Quick Post generator:
+//   Step 1 → Claude extracts structured copy (headline, heroSpec, features, CTA)
+//   Step 2 → NanoBanana generates background world image (canvas composites text)
+// Cost: 8 credits
+router.post('/quick-post', protect, async (req, res) => {
+    try {
+        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, brandId } = req.body;
+        if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
+
+        const QUICK_POST_CREDITS = 8;
+        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        if (balance < QUICK_POST_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: QUICK_POST_CREDITS });
+
+        let brandContext = '';
+        if (brandId) {
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const ctx = await loadBrandContext(brandId);
+            brandContext = ctx.brandContext || '';
+        }
+
+        // Resolve selected mood direction object
+        const moodMap = productMoodDirections || {};
+        const selectedMoodDir = moodMap[selectedMoodId] || Object.values(moodMap)[0] || {
+            label: 'Professional',
+            description: 'Professional product photography',
+            shootDirective: 'Studio quality, clean, well-lit',
+            moodBoardDirective: 'Professional commercial photography with clean backdrop',
+        };
+
+        console.log(`🎯 [QuickPost] type=${postType} ratio=${aspectRatio} mood="${selectedMoodDir.label}" product="${productData?.title?.substring(0,40)}"`);
+
+        const result = await generateQuickPost(
+            productDNA,
+            productData,
+            selectedMoodDir,
+            postType || 'promo',
+            aspectRatio || '1:1',
+            brandContext,
+        );
+
+        await req.user.deductCredits(QUICK_POST_CREDITS, 'quick_post');
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('❌ [QuickPost]:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
