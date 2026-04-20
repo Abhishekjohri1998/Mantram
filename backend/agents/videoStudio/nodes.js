@@ -595,23 +595,17 @@ export async function pollGenerationStatus(state) {
 
                     // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
                     if (statusResult.safetyTriggered) {
-                        console.log(`🛡️ Safe Mode Pivot: Dropping offending image references to bypass safety protocol`);
-                        // Strip image URLs
-                        if (retryPayload.input?.image_urls) retryPayload.input.image_urls = [];
-                        if (retryPayload.input?.reference_images) retryPayload.input.reference_images = [];
+                        console.log(`🛡️ Safe Mode Pivot: Bytedance blocked real-person faces. Auto-rerouting to Wan-2.7 which accepts real faces!`);
                         
-                        // Strip injected face-lock instruction from prompt
-                        if (retryPayload.input?.prompt) {
-                            retryPayload.input.prompt = retryPayload.input.prompt
-                                .replace(/@Image\d+\s+(?:and\s+@Image\d+\s+)*(?:is|are) the real person who must appear in this video\. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame\. Do not hallucinate or substitute a different face\./gi, '')
-                                .trim();
-                        }
-                        
-                        // Fallback task type to text-to-video since we have no images
-                        if (retryPayload.task_type && retryPayload.task_type.includes('reference-to-video')) {
-                            retryPayload.task_type = retryPayload.task_type.replace('reference-to-video', 'text-to-video');
-                        } else if (retryPayload.task_type && retryPayload.task_type.includes('image-to-video')) {
-                            retryPayload.task_type = retryPayload.task_type.replace('image-to-video', 'text-to-video');
+                        // Switch model to Alibaba Wan-2.7 which bypasses the strict face filter
+                        if (retryPayload.task_type) {
+                            if (retryPayload.task_type.includes('reference-to-video')) {
+                                retryPayload.task_type = 'alibaba/wan-2.7/reference-to-video';
+                            } else if (retryPayload.task_type.includes('image-to-video')) {
+                                retryPayload.task_type = 'alibaba/wan-2.7/image-to-video';
+                            } else {
+                                retryPayload.task_type = 'alibaba/wan-2.7/text-to-video';
+                            }
                         }
                     }
 
