@@ -17,9 +17,9 @@ const INTENT_ICONS = {
 }
 
 const CHANNEL_CONFIG = {
-    instagram_dm: { label: 'Instagram DM', icon: 'photo_camera', color: 'text-[#FF7A00]', bg: 'bg-[#FF4D00]/10' },
-    facebook_messenger: { label: 'Messenger', icon: 'messenger', color: 'text-[#FF4D00]', bg: 'bg-[#FF4D00]/10' },
-    instagram_comment: { label: 'IG Comment', icon: 'mode_comment', color: 'text-[#FF4D00]', bg: 'bg-[#FF4D00]/10' },
+    instagram_dm: { label: 'Instagram DM', icon: 'photo_camera', color: 'text-[#FF7A00]', bg: 'bg-[var(--sys-primary-dim)]' },
+    facebook_messenger: { label: 'Messenger', icon: 'messenger', color: 'text-primary', bg: 'bg-[var(--sys-primary-dim)]' },
+    instagram_comment: { label: 'IG Comment', icon: 'mode_comment', color: 'text-primary', bg: 'bg-[var(--sys-primary-dim)]' },
     instagram_story_reply: { label: 'Story Reply', icon: 'auto_stories', color: 'text-[var(--sys-primary)]', bg: 'bg-[var(--sys-surface)]' },
     instagram_mention: { label: 'Mention', icon: 'alternate_email', color: 'text-primary', bg: 'bg-[var(--sys-primary-dim)]' },
 }
@@ -197,7 +197,7 @@ export default function ConversationStudio() {
                         {[
                             { label: 'Total', value: stats.total, icon: 'forum', color: 'text-primary' },
                             { label: 'Active', value: stats.active, icon: 'mark_chat_unread', color: 'text-primary' },
-                            { label: 'AI Handled', value: stats.aiHandled, icon: 'smart_toy', color: 'text-[#FF4D00]' },
+                            { label: 'AI Handled', value: stats.aiHandled, icon: 'smart_toy', color: 'text-primary' },
                             { label: 'Human', value: stats.handedOff, icon: 'person', color: 'text-primary' },
                             { label: 'Resolved', value: stats.resolved, icon: 'check_circle', color: 'text-[var(--sys-text-muted)]' },
                         ].map((s, i) => (
@@ -224,7 +224,7 @@ export default function ConversationStudio() {
                         {STATUS_TABS.map(t => (
                             <button key={t.id} onClick={() => setStatusFilter(t.id)}
                                 className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1
-                                    ${statusFilter === t.id ? 'bg-primary/10 text-primary' : 'text-[var(--sys-text-muted)] hover:text-white hover:bg-[var(--sys-surface)]'}`}>
+                                    ${statusFilter === t.id ? 'bg-primary/10 text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
                                 <span className="material-symbols-outlined text-xs">{t.icon}</span>
                                 {t.label}
                             </button>
@@ -235,7 +235,7 @@ export default function ConversationStudio() {
                     <div className="flex-1 overflow-y-auto">
                         {!hasBrand ? (
                             <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">domain</span>
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4">domain</span>
                                 <p className="text-[var(--sys-text)] font-bold mb-1">Select a Brand</p>
                                 <p className="text-[var(--sys-text-muted)] text-xs">Choose a brand profile first to view and manage conversations.</p>
                             </div>
@@ -245,7 +245,7 @@ export default function ConversationStudio() {
                             </div>
                         ) : threads.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">forum</span>
+                                <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4">forum</span>
                                 <p className="text-[var(--sys-text)] font-bold mb-1">No conversations yet</p>
                                 <p className="text-[var(--sys-text-muted)] text-xs">Instagram & Facebook DMs will appear here automatically via Meta integration.</p>
                             </div>
@@ -293,7 +293,7 @@ export default function ConversationStudio() {
                                         </span>
                                     )}
                                     {t.isAIHandling && (
-                                        <span className="px-2 py-0.5 rounded-md bg-[#FF4D00]/10 text-[#FF4D00] text-xs font-bold">AI</span>
+                                        <span className="px-2 py-0.5 rounded-md bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">AI</span>
                                     )}
                                 </div>
                             </button>
@@ -305,7 +305,7 @@ export default function ConversationStudio() {
                 <div className="flex-1 flex flex-col">
                     {!conversation ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-                            <span className="material-symbols-outlined text-7xl text-slate-800 mb-4">chat</span>
+                            <span className="material-symbols-outlined text-7xl text-[var(--sys-text-muted)] mb-4">chat</span>
                             <p className="text-[var(--sys-text)] font-bold text-lg mb-1">Select a conversation</p>
                             <p className="text-[var(--sys-text-muted)] text-sm max-w-sm">Pick a thread from the left to view messages, get AI suggestions, and reply in your brand voice.</p>
                         </div>
@@ -343,7 +343,7 @@ export default function ConversationStudio() {
                                     {/* AI toggle */}
                                     <button onClick={handleToggleAI}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer
-                                            ${conversation.isAIHandling ? 'bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
+                                            ${conversation.isAIHandling ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-primary-dim)]' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
                                         <span className="material-symbols-outlined text-sm">{conversation.isAIHandling ? 'smart_toy' : 'person'}</span>
                                         {conversation.isAIHandling ? 'AI Mode' : 'Human'}
                                     </button>
@@ -390,7 +390,7 @@ export default function ConversationStudio() {
                                             </div>
                                         ) : (
                                             <div className={`max-w-[70%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${m.role === 'brand'
-                                                ? 'bg-primary/20 text-white rounded-br-md'
+                                                ? 'bg-primary text-white rounded-br-md'
                                                 : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-md'
                                                 }`}>
                                                 <p>{m.content}</p>
@@ -550,7 +550,7 @@ export default function ConversationStudio() {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-                            <span className="material-symbols-outlined text-4xl text-slate-800 mb-3">contact_page</span>
+                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3">contact_page</span>
                             <p className="text-xs text-[var(--sys-text-muted)]">Select a conversation to view contact details</p>
                         </div>
                     )}
