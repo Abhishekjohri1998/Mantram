@@ -213,6 +213,114 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
     }
 });
 
+// POST /api/agents/scan-local-business — AI synthesis of local business profile
+router.post('/scan-local-business', optionalAuth, async (req, res) => {
+    try {
+        const { businessName, location } = req.body;
+        if (!businessName || !location) {
+            return res.status(400).json({ success: false, error: 'Business Name and Location are required' });
+        }
+
+        const orchestrator = getOrchestrator();
+        
+        // Formulate prompt specifically for local business synthesis
+        const systemPrompt = `You are an expert brand analyst and local business researcher. 
+Your task is to analyze the local business provided by the user using your extensive knowledge base of public data, Google Maps listings, direct knowledge, and general business patterns for that specific area. 
+Extract their likely brand identity. 
+Return valid JSON with the exact following structure: 
+{ "name": "", "tagline": "", "personality": "", "voiceDescription": "", "industry": "", "targetAudience": "", "dos": [], "donts": [], "keyPhrases": [], "colorSuggestions": [{"name": "", "hex": "", "usage": ""}], "fontSuggestions": {"heading": "", "body": ""} }`;
+        
+        const userPrompt = `Research the local business: "${businessName}" located in/near "${location}". 
+Infer their brand identity based on public knowledge of this entity, or if unknown, deduce the precise brand archetype for a high-quality ${businessName} in ${location}.`;
+
+        const result = await orchestrator.smartRouter.modelRouter.generateText({
+            systemPrompt,
+            userPrompt,
+            temperature: 0.5,
+        });
+
+        let brandData;
+        try {
+            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+            brandData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+            if (!brandData) throw new Error('Failed to parse AI output');
+        } catch (parseError) {
+            console.error('[scan-local] Parse error, raw output:', result.text);
+            return res.status(500).json({ success: false, error: 'Failed to synthesize business data properly.' });
+        }
+
+        // Clean values
+        const finalName = brandData.name && brandData.name !== "" ? brandData.name : businessName;
+
+        const dna = {
+            logo: { url: '', metadata: {} },
+            voice: {
+                personality: brandData.personality || 'Professional & Local',
+                description: brandData.voiceDescription || `A local business voice for ${finalName}.`,
+                tone: 60, clarity: 80, formality: 50, warmth: 80,
+                keywords: brandData.keyPhrases || [],
+            },
+            contentStyle: {
+                dos: brandData.dos || [],
+                donts: brandData.donts || [],
+                keyPhrases: brandData.keyPhrases || [],
+            },
+            colors: (brandData.colorSuggestions || []).map(c => ({
+                name: c.name || 'Primary', hex: c.hex || '#000000', usage: c.usage || 'primary',
+            })),
+            fonts: {
+                heading: { family: brandData.fontSuggestions?.heading || 'Inter', weight: '700' },
+                body: { family: brandData.fontSuggestions?.body || 'Inter', weight: '400' },
+            },
+            industry: brandData.industry || 'Local Business',
+            targetAudience: brandData.targetAudience || `Locals and visitors in ${location}`,
+            brandDescription: `Based in ${location}. ${brandData.tagline || ''}`,
+            country: 'India',
+        };
+
+        let brand = null;
+        if (req.user) {
+            const tempBrandId = crypto.randomUUID();
+            await mirrorBrandAssets(dna, tempBrandId);
+
+            brand = await Brand.create({
+                user: req.user._id,
+                name: finalName,
+                website: '',
+                onboardingMethod: 'local-search',
+                dna,
+                rawScanData: JSON.stringify(brandData),
+            });
+
+            await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
+            
+            // Auto triggers (optional background jobs)
+            import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
+                try {
+                    const visualDNA = await analyzeVisualDNA(brand);
+                    if (visualDNA) {
+                        await Brand.findOneAndUpdate({ _id: brand._id }, { $set: { 'dna.visualDNA': visualDNA } });
+                    }
+                } catch (e) { }
+            });
+        } else {
+            brand = {
+                _id: 'preview',
+                name: finalName,
+                website: '',
+                onboardingMethod: 'local-search',
+                dna,
+                status: 'preview',
+            };
+        }
+
+        res.json({ success: true, brand });
+    } catch (error) {
+        console.error('Scan Local Business error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // POST /api/agents/brainstorm — AI Brand Brainstorming Agent
 router.post('/brainstorm', optionalAuth, async (req, res) => {
     try {

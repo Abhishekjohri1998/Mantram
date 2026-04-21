@@ -32,6 +32,7 @@ function ProgressIndicator({ step, total }) {
 function ChoosePath({ onSelect }) {
     const paths = [
         { id: 'website', icon: 'language', title: 'Scan My Website', desc: 'We\'ll analyze your website and extract everything — logo, colors, fonts, voice, content style.', badge: 'RECOMMENDED' },
+        { id: 'local', icon: 'storefront', title: 'Search Local Business', desc: 'Find your business on Google Maps. We\'ll extract brand details from public listings and reviews.' },
         { id: 'upload', icon: 'upload_file', title: 'Upload Brand Assets', desc: 'Upload your logo, brand guidelines, or any brand-related documents and images.' },
         { id: 'brainstorm', icon: 'psychology', title: 'AI Brainstorming', desc: 'Don\'t have existing brand assets? Let AI help you build a brand identity from scratch.' },
     ]
@@ -296,6 +297,143 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                                          '• Finalizing DNA'}
                                     </span>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============= Step 2a-2: Local Business Search =============
+function LocalBusinessScan({ onComplete, onBack }) {
+    const [businessName, setBusinessName] = useState('')
+    const [location, setLocation] = useState('')
+    const [scanning, setScanning] = useState(false)
+    const [currentStep, setCurrentStep] = useState('')
+    const [error, setError] = useState(null)
+
+    const handleSearch = async () => {
+        if (!businessName.trim() || !location.trim()) return
+        
+        setScanning(true)
+        setError(null)
+        
+        try {
+            setCurrentStep('Searching local directories & maps...')
+            // Fake animation progression
+            const steps = [
+                'Searching public listings...',
+                'Extracting business categories...',
+                'Analyzing reviews and audience...',
+                'Synthesizing Brand DNA...'
+            ];
+            let stepIdx = 0;
+            const timer = setInterval(() => {
+                stepIdx++;
+                if (stepIdx < steps.length) {
+                    setCurrentStep(steps[stepIdx]);
+                }
+            }, 2500);
+
+            const data = await agents.scanLocalBusiness(businessName.trim(), location.trim())
+            clearInterval(timer)
+            
+            setCurrentStep('Brand DNA built successfully!')
+            setTimeout(() => onComplete(data.brand), 800)
+        } catch (err) {
+            setScanning(false)
+            setError({
+                message: err.message || 'Failed to find or analyze local business. Please try again.',
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto animate-fade-in">
+            {!scanning ? (
+                <div className="text-center">
+                    <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-8 hover:text-[var(--sys-text)] transition-colors cursor-pointer mx-auto">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+                    </button>
+
+                    <div className="glass-panel rounded-3xl p-10 max-w-lg mx-auto relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] pointer-events-none" />
+                        <div className="relative">
+                            <h2 className="text-3xl font-extrabold mb-2 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                                Locate your business
+                            </h2>
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-8">Enter your shop or local business details to extract data from public listings.</p>
+
+                            <div className="space-y-4 mb-6 text-left">
+                                <div>
+                                    <label className="text-xs uppercase tracking-widest font-bold text-[var(--sys-text-muted)] block mb-1">Business Name</label>
+                                    <input
+                                        value={businessName}
+                                        onChange={e => setBusinessName(e.target.value)}
+                                        placeholder="e.g., Aosa Coffee"
+                                        className="w-full py-4 px-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-[var(--sys-surface)] transition-all"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs uppercase tracking-widest font-bold text-[var(--sys-text-muted)] block mb-1">City / Location</label>
+                                    <input
+                                        value={location}
+                                        onChange={e => setLocation(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                        placeholder="e.g., Udaipur, Rajasthan"
+                                        className="w-full py-4 px-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-[var(--sys-surface)] transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <button onClick={handleSearch} disabled={!businessName.trim() || !location.trim()}
+                                className="btn-primary w-full py-4 rounded-2xl text-lg disabled:opacity-30">
+                                Search & Add Business
+                            </button>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="mt-6 p-4 rounded-xl border bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-orange-500 text-sm flex items-center gap-2 max-w-lg mx-auto">
+                            <span className="material-symbols-outlined text-lg">error</span>
+                            <div className="flex-1 text-left">{error.message}</div>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center min-h-[70vh] animate-fade-in">
+                    <div className="fixed inset-0 pointer-events-none" style={{
+                        background: 'radial-gradient(ellipse 60% 40% at 50% 50%, rgba(var(--primary-rgb, 255, 77, 0), 0.08) 0%, transparent 70%)',
+                    }} />
+
+                    <div className="glass-panel rounded-3xl p-10 max-w-lg w-full text-center relative overflow-hidden">
+                        <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{
+                            background: 'linear-gradient(to right, rgba(255, 77, 0, 0.1), transparent 40%, transparent 60%, rgba(255, 77, 0, 0.08))',
+                        }} />
+
+                        <div className="relative">
+                            <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-3xl mx-auto mb-4 animate-pulse">
+                                <span className="material-symbols-outlined">map</span>
+                            </div>
+                            <h2 className="text-3xl font-extrabold mb-3 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                                Locating {businessName}
+                            </h2>
+                            
+                            <div className="inline-flex flex-col gap-2 p-5 rounded-2xl mb-4 transition-all duration-500 w-full"
+                                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                <div className="flex items-center justify-center gap-2 text-primary font-medium">
+                                    <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
+                                    {currentStep}
+                                </div>
+                                <div className="text-xs text-[var(--sys-text-muted)] text-center flex items-center justify-center gap-1">
+                                    <span className="material-symbols-outlined text-[10px]">location_on</span>
+                                    {location}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1675,6 +1813,7 @@ export default function BrandOnboarding() {
 
                 {step === 0 && <ChoosePath onSelect={handlePathSelect} />}
                 {step === 1 && path === 'website' && <WebsiteScan onComplete={handleBrandCreated} onBack={() => setStep(0)} initialUrl={scanUrlParam} />}
+                {step === 1 && path === 'local' && <LocalBusinessScan onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 1 && path === 'upload' && <FileUpload onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 1 && path === 'brainstorm' && <Brainstorm onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 2 && <ReviewBrand brand={brand} onFinish={handleFinish} />}

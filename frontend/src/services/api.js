@@ -263,6 +263,7 @@ export const creatives = {
 // ============ Agent API ============
 export const agents = {
     scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }) }),
+    scanLocalBusiness: (businessName, location) => apiFetch('/agents/scan-local-business', { method: 'POST', body: JSON.stringify({ businessName, location }) }),
     // SSE streaming version — returns EventSource URL for real-time progress
     getScanStreamUrl: (url) => {
         const token = localStorage.getItem('mantram_token') || '';
