@@ -2483,7 +2483,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             
                                             <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative group shadow-inner">
                                                 {animateImageRef.current || (result && result.imageUrl) ? (
-                                                    <img src={animateImageRef.current || result.imageUrl} alt="Source for animation" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
+                                                    <img loading="lazy" decoding="async" src={animateImageRef.current || result.imageUrl} alt="Source for animation" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
                                                 ) : (
                                                     <div className="w-full aspect-video flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
                                                         <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
@@ -2675,7 +2675,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <MaskingCanvas ref={maskingCanvasRef} imageUrl={editSourceImageUrl} />
                                                             </div>
                                                         ) : (
-                                                            <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
+                                                            <img loading="lazy" decoding="async" src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 xl:max-h-[420px]" />
                                                         )}
                                                     </div>
                                                 ) : (
@@ -2776,7 +2776,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             {editResult && (
                                                 <div className="mb-5 rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
                                                     <div className="relative">
-                                                        <img src={editResult.imageUrl} alt="Edited result" className="w-full max-h-[280px] xl:max-h-[300px] object-contain bg-black/30 cursor-pointer"
+                                                        <img loading="lazy" decoding="async" src={editResult.imageUrl} alt="Edited result" className="w-full max-h-[280px] xl:max-h-[300px] object-contain bg-black/30 cursor-pointer"
                                                             onClick={() => setZoomImage(editResult.imageUrl)} />
                                                         <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/20 flex items-center gap-1.5 shadow-lg">
                                                             <span className="material-symbols-outlined text-[12px]">check_circle</span> Edit Applied
@@ -3337,7 +3337,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {filtered.map(img => (
                                             <div key={img._id} className="group relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]"
                                                 onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
-                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                     loading="lazy" decoding="async"
                                                     className="w-full aspect-square object-cover" />
                                                 {/* Hover overlay with actions */}
@@ -3387,7 +3387,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
-                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                            <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                 loading="lazy" decoding="async"
                                                 className="w-full h-full object-cover block"
                                                 style={{ maxHeight: '400px' }} />
@@ -3723,7 +3723,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {/* Style Block */}
                                         {referenceImages.style ? (
                                             <div className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
-                                                <img src={referenceImages.style} className="w-full h-full rounded-2xl object-cover border border-[var(--sys-border)]" />
+                                                <img loading="lazy" decoding="async" src={referenceImages.style} className="w-full h-full rounded-2xl object-cover border border-[var(--sys-border)]" />
                                                 <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
                                                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur shadow-sm">Style</span>
                                             </div>
@@ -3736,7 +3736,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {/* Character Blocks */}
                                         {characters.map((char, idx) => (
                                             <div key={idx} className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
-                                                <img src={char.image} alt={char.name} className="w-full h-full rounded-2xl object-cover border border-primary/50" />
+                                                <img loading="lazy" decoding="async" src={char.image} alt={char.name} className="w-full h-full rounded-2xl object-cover border border-primary/50" />
                                                 <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
                                             </div>
                                         ))}
@@ -3793,7 +3793,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
                                                         }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
                                                             <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--sys-border)] shrink-0 bg-[var(--sys-surface)]">
-                                                                <img src={char.image} alt="" className="w-full h-full object-cover" />
+                                                                <img loading="lazy" decoding="async" src={char.image} alt="" className="w-full h-full object-cover" />
                                                             </div>
                                                             <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name.replace(/\s/g, '')}</p></div>
                                                         </button>
@@ -3963,7 +3963,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="p-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative">
                                         {productImage ? (
                                             <div className="relative rounded-lg overflow-hidden border border-[var(--sys-border)] h-24 group">
-                                                <img src={productImage} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                <img loading="lazy" decoding="async" src={productImage} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                                                 <button onClick={() => {setProductImage(null); setProductFile(null)}} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all"><span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span></button>
                                             </div>
                                         ) : (
@@ -4059,7 +4059,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <div key={ref.key}>
                                                 {referenceImages[ref.key] ? (
                                                     <div className="relative rounded-xl overflow-hidden aspect-video border border-[var(--sys-border)] group">
-                                                        <img src={referenceImages[ref.key]} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                        <img loading="lazy" decoding="async" src={referenceImages[ref.key]} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                                                         <button onClick={() => setReferenceImages(prev => ({...prev,[ref.key]:null}))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--sys-bg)]/90 backdrop-blur shadow flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--sys-text)] hover:text-[var(--sys-bg)]"><span className="material-symbols-outlined text-[12px]">close</span></button>
                                                         <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-[var(--sys-bg)]/80 backdrop-blur py-0.5">{ref.label}</span>
                                                     </div>
@@ -4135,7 +4135,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 if (img.prompt) { setPhotoshootBrief(img.prompt); setSceneKeywords(img.tags || []) }
                                             }}>
                                             <div className="relative h-24 overflow-hidden">
-                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Photoshoot'} loading="lazy"
+                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Photoshoot'} loading="lazy"
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)]" />
                                                 <div className="absolute bottom-1.5 left-2 right-2">
@@ -4178,7 +4178,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                             <div className="rounded-2xl overflow-hidden bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] relative shadow-inner">
                                                 {editSourceImageUrl ? (
-                                                    <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[340px]" />
+                                                    <img loading="lazy" decoding="async" src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[340px]" />
                                                 ) : (
                                                     <div className="w-full aspect-square flex flex-col items-center justify-center text-[var(--sys-text-muted)]">
                                                         <span className="material-symbols-outlined text-3xl mb-2">image_not_supported</span>
@@ -4240,7 +4240,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             {editResult && (
                                                 <div className="rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
                                                     <div className="relative">
-                                                        <img src={editResult.imageUrl} alt="Edited" className="w-full max-h-[220px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
+                                                        <img loading="lazy" decoding="async" src={editResult.imageUrl} alt="Edited" className="w-full max-h-[220px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
                                                         <div className="absolute top-2 left-2 bg-emerald-500/80 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
                                                             <span className="material-symbols-outlined text-[10px]">check_circle</span> Done
                                                         </div>
@@ -4353,7 +4353,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 setProductPickerOpen(false)
                                                             }}
                                                             className="aspect-square rounded-xl overflow-hidden border border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] group relative">
-                                                            <img src={img.url} alt={img.alt || `Brand ${i + 1}`} className="w-full h-full object-cover" />
+                                                            <img loading="lazy" decoding="async" src={img.url} alt={img.alt || `Brand ${i + 1}`} className="w-full h-full object-cover" />
                                                             <div className="absolute inset-0 bg-black/60 group-hover:bg-[var(--sys-surface)] transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                                                                 <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">check_circle</span>
                                                             </div>
@@ -4439,7 +4439,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 </div>
                                                 {productLinkUrl.trim() && (
                                                     <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] max-h-48">
-                                                        <img src={productLinkUrl.trim()} alt="Preview"
+                                                        <img loading="lazy" decoding="async" src={productLinkUrl.trim()} alt="Preview"
                                                             className="w-full h-full object-contain bg-[var(--sys-surface)]"
                                                             onError={e => { e.target.style.display = 'none' }} />
                                                     </div>
@@ -4498,7 +4498,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             {photoshootResult && (
                                 <div className="w-full animate-fade-in">
                                     <div className="relative rounded-2xl overflow-hidden mb-4">
-                                        <img ref={psImageRef} src={photoshootResult.imageUrl} alt="AI Photoshoot"
+                                        <img loading="lazy" decoding="async" ref={psImageRef} src={photoshootResult.imageUrl} alt="AI Photoshoot"
                                             className="w-full rounded-2xl" />
                                     </div>
 
@@ -4723,7 +4723,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {filtered.map(img => (
                                             <div key={img._id} className="group relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)]"
                                                 onClick={() => setZoomImage(img.imageUrl || img.thumbnailUrl)}>
-                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                     loading="lazy" decoding="async"
                                                     className="w-full aspect-square object-cover" />
                                                 {/* Hover overlay with actions */}
@@ -4773,7 +4773,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
-                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Creative'}
+                                            <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                 loading="lazy" decoding="async"
                                                 className="w-full h-full object-cover block"
                                                 style={{ maxHeight: '400px' }} />
@@ -5220,7 +5220,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                             {clgResults.map((url,i)=>(
                                                 <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-bg)] group relative">
-                                                    <img src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
+                                                    <img loading="lazy" decoding="async" src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
                                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">download</span>Save</a>
                                                         <button onClick={()=>{setCampCampaignLogo(url);setStudioMode('campaigns');creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:'Campaign Logo',source:'campaign-logo'}).catch(()=>{})}} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-xs font-medium hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">campaign</span>Use in Campaign</button>
@@ -5293,7 +5293,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <span className="material-symbols-outlined text-xs">download</span> Full
                                                 </a>
                                             </div>
-                                            <img src={carouselResult.panoramicUrl} alt="Panoramic" className="w-full rounded-lg shadow-lg" />
+                                            <img loading="lazy" decoding="async" src={carouselResult.panoramicUrl} alt="Panoramic" className="w-full rounded-lg shadow-lg" />
                                         </div>
                                     )}
 
@@ -5332,7 +5332,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             {/* Swipeable Carousel Preview */}
                                             <div className="relative">
                                                 <div className="overflow-hidden rounded-xl">
-                                                    <img
+                                                    <img loading="lazy" decoding="async"
                                                         src={carouselResult.panels[carouselCurrentSlide]}
                                                         alt={`Panel ${carouselCurrentSlide + 1}`}
                                                         className="w-full rounded-xl shadow-lg transition-all duration-300"
@@ -5368,7 +5368,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         className={`flex-shrink-0 relative rounded-lg overflow-hidden cursor-pointer transition-all ${
                                                             i === carouselCurrentSlide ? 'ring-2  scale-105' : 'opacity-60 hover:opacity-100'
                                                         }`} style={{ width: '80px' }}>
-                                                        <img src={url} alt={`P${i + 1}`} className="w-full aspect-square object-cover" />
+                                                        <img loading="lazy" decoding="async" src={url} alt={`P${i + 1}`} className="w-full aspect-square object-cover" />
                                                         <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold bg-[var(--sys-surface)] text-[var(--sys-text)] px-1 rounded">{i + 1}</span>
                                                     </button>
                                                 ))}
@@ -5486,7 +5486,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {carouselThemeImage ? (
                                             <div className="flex items-center gap-1.5">
                                                 <div className="relative group/dna">
-                                                    <img src={carouselThemeImage} alt="Theme" className="w-6 h-6 rounded-md object-cover border border-[var(--sys-text)] cursor-pointer" onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }} />
+                                                    <img loading="lazy" decoding="async" src={carouselThemeImage} alt="Theme" className="w-6 h-6 rounded-md object-cover border border-[var(--sys-text)] cursor-pointer" onClick={() => { setCarouselThemeImage(null); setCarouselThemeAnalysis(null); setCarouselThemeError(null); }} />
                                                     {carouselAnalyzing && <div className="absolute inset-0 bg-black/60 rounded-md flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)] text-[10px] animate-spin">progress_activity</span></div>}
                                                     {carouselThemeAnalysis && !carouselAnalyzing && <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--sys-surface)] border border-black flex items-center justify-center"><span className="material-symbols-outlined text-[var(--sys-text)]" style={{fontSize:'8px'}}>check</span></div>}
                                                 </div>
@@ -5557,7 +5557,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <span className="absolute -top-1 -left-1 z-10 w-3 h-3 rounded-full bg-[var(--sys-text)] text-[var(--sys-bg)] text-[7px] font-bold flex items-center justify-center">{i + 1}</span>
                                             {carouselProductImages[i] ? (
                                                 <div className="relative group w-full aspect-square">
-                                                    <img src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full h-full rounded-lg object-cover border border-[var(--sys-border)]" />
+                                                    <img loading="lazy" decoding="async" src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full h-full rounded-lg object-cover border border-[var(--sys-border)]" />
                                                     <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
                                                         className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
                                                 </div>
@@ -5803,7 +5803,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex flex-wrap gap-2 mb-2">
                                                         {campProducts.map((p,i)=>(
                                                             <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--sys-text)] border border-[var(--sys-text)]">
-                                                                {p.image&&<img src={p.image} alt="" className="w-6 h-6 rounded object-cover" />}
+                                                                {p.image&&<img loading="lazy" decoding="async" src={p.image} alt="" className="w-6 h-6 rounded object-cover" />}
                                                                 <span className="text-xs text-[var(--sys-text)] font-medium">{p.title}</span>
                                                                 {p.price?.amount&&<span className="text-[10px] text-primary">₹{p.price.amount.toLocaleString('en-IN')}</span>}
                                                                 <button onClick={()=>setCampProducts(prev=>prev.filter((_,j)=>j!==i))} className="text-primary hover:text-[var(--sys-primary)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
@@ -5824,7 +5824,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                         if(isSelected){setCampProducts(prev=>prev.filter(p=>p.productId!==prod._id))}
                                                                         else{setCampProducts(prev=>[...prev,{productId:prod._id,title:prod.title,image:prod.images?.[0]?.url||'',features:prod.features||[],price:prod.price,source:'catalog'}])}
                                                                     }} className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs border transition-all cursor-pointer ${isSelected?'border-[var(--sys-text)] bg-[var(--sys-text)] text-[var(--sys-text)]':'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-[var(--sys-text)]'}`}>
-                                                                        {prod.images?.[0]?.url?<img src={prod.images[0].url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0"/>:<div className="w-8 h-8 rounded bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">inventory_2</span></div>}
+                                                                        {prod.images?.[0]?.url?<img loading="lazy" decoding="async" src={prod.images[0].url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0"/>:<div className="w-8 h-8 rounded bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">inventory_2</span></div>}
                                                                         <div className="min-w-0">
                                                                             <p className="truncate font-medium">{prod.title}</p>
                                                                             {prod.price?.amount&&<p className="text-[9px] text-primary">₹{prod.price.amount.toLocaleString('en-IN')}</p>}
@@ -6092,7 +6092,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-yellow-400 text-lg">emoji_events</span>Style from Best Performing</h3>
                                     {campStyleRef?(
                                         <div className="relative rounded-xl overflow-hidden group">
-                                            <img src={campStyleRef} alt="Style Ref" className="w-full h-20 object-cover rounded-xl" />
+                                            <img loading="lazy" decoding="async" src={campStyleRef} alt="Style Ref" className="w-full h-20 object-cover rounded-xl" />
                                             <button onClick={()=>setCampStyleRef(null)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px]">✕</button>
                                         </div>
                                     ):(
@@ -6110,14 +6110,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-primary text-lg">verified</span>Campaign Logo <span className="text-xs text-[var(--sys-text-muted)] font-normal">(optional)</span></h3>
                                     {campCampaignLogo?(
                                         <div className="relative rounded-xl overflow-hidden group">
-                                            <img src={campCampaignLogo} alt="Campaign Logo" className="w-full h-24 object-contain rounded-xl bg-[var(--sys-surface)]" />
+                                            <img loading="lazy" decoding="async" src={campCampaignLogo} alt="Campaign Logo" className="w-full h-24 object-contain rounded-xl bg-[var(--sys-surface)]" />
                                             <button onClick={()=>setCampCampaignLogo(null)} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                                         </div>
                                     ):(
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {activeBrand?.dna?.logo?.url&&(
                                                 <button onClick={()=>setCampCampaignLogo(activeBrand.dna.logo.url)} className="flex flex-col items-center justify-center h-20 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] bg-[var(--sys-primary-dim)] cursor-pointer transition-all group">
-                                                    <img src={activeBrand.dna.logo.url} alt="Brand logo" className="h-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
+                                                    <img loading="lazy" decoding="async" src={activeBrand.dna.logo.url} alt="Brand logo" className="h-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
                                                     <span className="text-[10px] text-[var(--sys-primary)] mt-1">Brand Logo</span>
                                                 </button>
                                             )}
@@ -6324,7 +6324,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                         {campResults.map((r,i)=>(
                                             <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-surface)] border border-[var(--sys-border)] group">
-                                                <div className="relative"><img src={r.url} alt={`Creative ${i+1}`} className="w-full h-auto object-contain" />
+                                                <div className="relative"><img loading="lazy" decoding="async" src={r.url} alt={`Creative ${i+1}`} className="w-full h-auto object-contain" />
                                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                         <a href={r.url} download={`campaign-${i+1}.png`} target="_blank" rel="noreferrer" className="px-2 py-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-[10px] font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">download</span></a>
                                                         <button onClick={()=>{setDesignBaseImage(r.url);setPrompt(r.copy?.headline||campName||campKeyword||'Edit this creative');setStudioMode('create');setShowQuickStart(false)}} className="px-2 py-1 rounded-lg bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-[10px] font-medium hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">edit</span></button>
@@ -6355,7 +6355,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {bplCreatives.map((c,i)=>(
                                                 <button key={i} onClick={()=>{if(bplMode==='logo')setCampCampaignLogo(c.imageUrl);else setCampStyleRef(c.imageUrl);setBplOpen(false)}} className="rounded-xl overflow-hidden border border-[var(--sys-border)] hover:border-yellow-400/30 transition-all cursor-pointer group">
-                                                    <img src={c.imageUrl} alt={c.title||`Creative ${i+1}`} className="w-full h-32 object-cover" />
+                                                    <img loading="lazy" decoding="async" src={c.imageUrl} alt={c.title||`Creative ${i+1}`} className="w-full h-32 object-cover" />
                                                     <div className="p-2 bg-[var(--sys-surface)]"><p className="text-[var(--sys-text)] text-[10px] font-medium truncate">{c.title||c.type||'Creative'}</p><p className="text-primary text-[9px]">Click to use as style</p></div>
                                                 </button>
                                             ))}
@@ -6701,7 +6701,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                                             {newTmpl.referenceImageUrl ? (
                                                 <div className="relative rounded-xl overflow-hidden mb-2">
-                                                    <img src={newTmpl.referenceImageUrl} alt="Reference" className="w-full max-h-44 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                                    <img loading="lazy" decoding="async" src={newTmpl.referenceImageUrl} alt="Reference" className="w-full max-h-44 object-contain bg-[var(--sys-surface)] rounded-xl" />
                                                     <button onClick={() => setNewTmpl(p => ({ ...p, referenceImageUrl: '' }))}
                                                         className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-text)] hover:text-[var(--sys-bg)] cursor-pointer transition-colors shadow">
                                                         <span className="material-symbols-outlined text-xs">close</span>
@@ -6824,7 +6824,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Product / Reference Image</label>
                                                         {newTmpl._simpleImage ? (
                                                             <div className="relative rounded-xl overflow-hidden bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                                                                <img src={newTmpl._simpleImage} alt="Selected" className="w-full max-h-40 object-contain" />
+                                                                <img loading="lazy" decoding="async" src={newTmpl._simpleImage} alt="Selected" className="w-full max-h-40 object-contain" />
                                                                 <button onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: '' }))}
                                                                     className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
                                                                     <span className="material-symbols-outlined text-xs">close</span>
@@ -6879,7 +6879,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 </div>
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
                                                                     {newTmpl._brandImageList.map((img, i) => (
-                                                                        <img key={i} src={img.url} alt=""
+                                                                        <img loading="lazy" decoding="async" key={i} src={img.url} alt=""
                                                                             className="w-full h-16 object-cover rounded-lg cursor-pointer border border-transparent hover:border-primary transition-all"
                                                                             onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: img.url, _showBrandImages: false }))} />
                                                                     ))}
@@ -6962,7 +6962,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                     <div className="mt-2 ml-7">
                                                                         {f._selectedImage ? (
                                                                             <div className="relative rounded-lg overflow-hidden bg-[var(--sys-surface)] inline-block">
-                                                                                <img src={f._selectedImage} alt="" className="max-h-24 object-contain rounded-lg" />
+                                                                                <img loading="lazy" decoding="async" src={f._selectedImage} alt="" className="max-h-24 object-contain rounded-lg" />
                                                                                 <button onClick={() => {
                                                                                     const updated = [...newTmpl.fields]
                                                                                     updated[i] = { ...f, _selectedImage: '' }
@@ -7020,7 +7020,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                             <div className="mt-1.5 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1 max-h-24 overflow-y-auto">
                                                                                     {f._pickerImages.map((img, pi) => (
-                                                                                        <img key={pi} src={img.url} alt=""
+                                                                                        <img loading="lazy" decoding="async" key={pi} src={img.url} alt=""
                                                                                             className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-primary"
                                                                                             onClick={() => {
                                                                                                 const updated = [...newTmpl.fields]
@@ -7262,7 +7262,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <div>
                                                         {templateFields[field.key] ? (
                                                             <div className="relative rounded-xl overflow-hidden">
-                                                                <img src={templateFields[field.key]} alt="Uploaded" className="w-full max-h-40 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                                                <img loading="lazy" decoding="async" src={templateFields[field.key]} alt="Uploaded" className="w-full max-h-40 object-contain bg-[var(--sys-surface)] rounded-xl" />
                                                                 <button onClick={() => setTemplateFields(prev => { const next = { ...prev }; delete next[field.key]; return next })}
                                                                     className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
                                                                     <span className="material-symbols-outlined text-xs">close</span>
@@ -7349,7 +7349,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                                     })
                                                                                 }}
                                                                                     className="group relative rounded-lg overflow-hidden aspect-square cursor-pointer  hover: transition-all">
-                                                                                    <img src={img.url} alt={img.alt || ''} className="w-full h-full object-cover" />
+                                                                                    <img loading="lazy" decoding="async" src={img.url} alt={img.alt || ''} className="w-full h-full object-cover" />
                                                                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                                                         <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
                                                                                     </div>
@@ -7378,7 +7378,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                                     {templateRefImage ? (
                                         <div className="relative rounded-xl overflow-hidden mb-3">
-                                            <img src={templateRefImage} alt="Reference" className="w-full max-h-32 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                            <img loading="lazy" decoding="async" src={templateRefImage} alt="Reference" className="w-full max-h-32 object-contain bg-[var(--sys-surface)] rounded-xl" />
                                             <button onClick={() => setTemplateRefImage(null)}
                                                 className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
                                                 <span className="material-symbols-outlined text-xs">close</span>
@@ -7418,7 +7418,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                             <button key={i}
                                                                 onClick={() => handleReversePrompt(img.url, activeTemplate.id)}
                                                                 className="rounded-lg overflow-hidden border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer transition-all">
-                                                                <img src={img.url} alt="" className="w-full aspect-square object-cover"
+                                                                <img loading="lazy" decoding="async" src={img.url} alt="" className="w-full aspect-square object-cover"
                                                                     onError={e => e.target.parentElement.style.display = 'none'} />
                                                             </button>
                                                         ))}
@@ -7723,7 +7723,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                             <MaskingCanvas ref={maskingCanvasRef} imageUrl={editSourceImageUrl} />
                                                         </div>
                                                     ) : (
-                                                        <img src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[360px]" />
+                                                        <img loading="lazy" decoding="async" src={editSourceImageUrl} alt="Image being edited" className="w-full h-auto object-contain bg-black/40 max-h-[360px]" />
                                                     )}
                                                 </div>
                                             ) : (
@@ -7802,7 +7802,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         {editResult && (
                                             <div className="rounded-xl overflow-hidden border border-primary/30 bg-primary/5">
                                                 <div className="relative">
-                                                    <img src={editResult.imageUrl} alt="Edited" className="w-full max-h-[280px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
+                                                    <img loading="lazy" decoding="async" src={editResult.imageUrl} alt="Edited" className="w-full max-h-[280px] object-contain bg-black/20 cursor-pointer" onClick={() => setZoomImage(editResult.imageUrl)} />
                                                     <div className="absolute top-2 left-2 bg-primary/90 px-2 py-0.5 rounded text-[9px] font-bold text-white uppercase flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-[10px]">check_circle</span> Edit Applied
                                                     </div>
@@ -8043,7 +8043,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             {/* Thumbnail */}
                                             <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--sys-surface)] cursor-pointer"
                                                 onClick={() => setLightboxIdx(idx)}>
-                                                <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Image'} loading="lazy"
+                                                <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Image'} loading="lazy"
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">zoom_in</span>
@@ -8134,7 +8134,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     return (
                                         <div key={img._id} className="studio-card overflow-hidden group relative cursor-pointer"
                                             onClick={() => setLightboxIdx(idx)}>
-                                            <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || 'Generated'} loading="lazy"
+                                            <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Generated'} loading="lazy"
                                                 className="w-full object-cover transition-transform duration-300 group-hover:scale-105" style={{ minHeight: '120px', maxHeight: '300px' }} />
 
                                             {/* Hover overlay */}
@@ -8316,7 +8316,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     onClick={() => setZoomImage(null)}>
                     <div className="absolute inset-0 bg-black/60 " />
                     <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain relative z-10" />
+                        <img loading="lazy" decoding="async" src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain relative z-10" />
                         
                         {/* Bottom Actions Dock */}
                         <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
@@ -8531,7 +8531,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                             setRefPickerSlot(null)
                                                         }}
                                                         className="aspect-square rounded-xl overflow-hidden border border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg hover:shadow-none group relative">
-                                                        <img src={img.imageUrl || img.thumbnailUrl} alt={img.title || ''} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                                                        <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || ''} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                                         <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                                                             <span className="text-[9px] text-[var(--sys-text)] font-medium truncate">{img.title || img.type}</span>
                                                         </div>
@@ -8568,7 +8568,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                             setRefPickerSlot(null)
                                                         }}
                                                         className="aspect-square rounded-xl overflow-hidden border border-transparent hover:border-[var(--sys-border)] cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg hover:shadow-none group relative">
-                                                        <img src={img.url} alt={img.alt || ''} className="w-full h-full object-cover"
+                                                        <img loading="lazy" decoding="async" src={img.url} alt={img.alt || ''} className="w-full h-full object-cover"
                                                             onError={e => e.target.parentElement.style.display = 'none'} />
                                                         <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                                                             <span className="text-[9px] text-[var(--sys-text)] font-medium truncate">{img.alt || img.source || 'Brand image'}</span>
@@ -8636,7 +8636,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             className="text-left glass-panel rounded-xl overflow-hidden hover:border-[var(--sys-border)] transition-all cursor-pointer hover:scale-[1.02]">
                                             <div className="h-24 bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center overflow-hidden">
                                                 {p.images?.[0]?.url ? (
-                                                    <img src={p.images[0].url} alt={p.title} className="w-full h-full object-cover" />
+                                                    <img loading="lazy" decoding="async" src={p.images[0].url} alt={p.title} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)]">inventory_2</span>
                                                 )}
@@ -8674,7 +8674,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             }}
                                             className="rounded-xl overflow-hidden border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all cursor-pointer hover:scale-[1.03] group">
                                             <div className="h-20 bg-[var(--sys-surface)] overflow-hidden">
-                                                <img src={img.url} alt={img.alt || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                <img loading="lazy" decoding="async" src={img.url} alt={img.alt || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                                     onError={e => e.target.parentElement.parentElement.style.display = 'none'} />
                                             </div>
                                             {img.source && (
@@ -8739,7 +8739,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </label>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={vtoPersonImage} alt="Person" className="w-full h-40 object-cover rounded-xl" />
+                                        <img loading="lazy" decoding="async" src={vtoPersonImage} alt="Person" className="w-full h-40 object-cover rounded-xl" />
                                         <button onClick={() => { setVtoPersonImage(null); setVtoPreviewResult(null); setVtoHdResult(null) }}
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">close</span>
@@ -8770,7 +8770,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </label>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={vtoGarmentImage} alt="Garment" className="w-full h-40 object-cover rounded-xl" />
+                                        <img loading="lazy" decoding="async" src={vtoGarmentImage} alt="Garment" className="w-full h-40 object-cover rounded-xl" />
                                         <button onClick={() => { setVtoGarmentImage(null); setVtoPreviewResult(null); setVtoHdResult(null) }}
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">close</span>
@@ -8953,7 +8953,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {(vtoHdResult || vtoPreviewResult) ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain object-left max-h-[500px]" />
+                                            <img loading="lazy" decoding="async" src={vtoHdResult || vtoPreviewResult} alt="Virtual Try-On Result" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(vtoHdResult || vtoPreviewResult, "try-on-result.png")}
@@ -9045,7 +9045,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </label>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={mockupProductImage} alt="Product" className="w-full h-40 object-cover rounded-xl" />
+                                        <img loading="lazy" decoding="async" src={mockupProductImage} alt="Product" className="w-full h-40 object-cover rounded-xl" />
                                         <button onClick={() => { setMockupProductImage(null); setMockupResult(null) }}
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">close</span>
@@ -9078,7 +9078,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </label>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={mockupTemplateImage} alt="Template Scene" className="w-full h-28 object-cover rounded-xl" />
+                                        <img loading="lazy" decoding="async" src={mockupTemplateImage} alt="Template Scene" className="w-full h-28 object-cover rounded-xl" />
                                         <div className="absolute inset-0 bg-black/60 group-hover:bg-[var(--sys-surface)] transition-all" />
                                         <button onClick={() => { setMockupTemplateImage(null); setMockupResult(null) }}
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
@@ -9451,7 +9451,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {mockupResult ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
+                                            <img loading="lazy" decoding="async" src={mockupResult} alt="Lifestyle Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(mockupResult, "lifestyle-mockup.png")}
@@ -9527,7 +9527,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={logoImage} alt="Logo" className="w-full h-36 object-contain rounded-xl bg-[var(--sys-surface)]" />
+                                        <img loading="lazy" decoding="async" src={logoImage} alt="Logo" className="w-full h-36 object-contain rounded-xl bg-[var(--sys-surface)]" />
                                         <button onClick={() => { setLogoImage(null); setLogoResult(null) }}
                                             className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-sm">close</span>
@@ -9663,7 +9663,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </label>
                                 ) : (
                                     <div className="relative rounded-xl overflow-hidden group">
-                                        <img src={logoStyleRef} alt="Style Ref" className="w-full h-24 object-cover rounded-xl" />
+                                        <img loading="lazy" decoding="async" src={logoStyleRef} alt="Style Ref" className="w-full h-24 object-cover rounded-xl" />
                                         <button onClick={() => setLogoStyleRef(null)}
                                             className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                             <span className="material-symbols-outlined text-xs">close</span>
@@ -9779,7 +9779,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {logoResult ? (
                                     <div className="flex-1 flex flex-col">
                                         <div className="flex-1 rounded-xl overflow-hidden bg-[var(--sys-surface)] mb-3">
-                                            <img src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
+                                            <img loading="lazy" decoding="async" src={logoResult} alt="Logo Mockup" className="w-full h-full object-contain object-left max-h-[500px]" />
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleDownloadImage(logoResult, "logo-mockup.png")}
