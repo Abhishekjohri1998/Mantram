@@ -421,33 +421,33 @@ export default function RetentionStudio() {
                                 { label: 'Completed', value: campaigns.filter(c => c.status === 'completed' || c.status === 'sent').length, icon: 'check_circle', color: '#f59e0b' },
                                 { label: 'Total Contacts', value: campaigns.reduce((sum, c) => sum + (c.ingestData?.totalImported || 0), 0), icon: 'group', color: '#ec4899' },
                             ].map((stat, i) => (
-                                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 24px' }}>
+                                <div key={i} style={{ background: 'color-mix(in srgb, var(--sys-text) 3%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)', borderRadius: 16, padding: '20px 24px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                                         <div style={{ width: 36, height: 36, borderRadius: 10, background: `${stat.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 20, color: stat.color }}>{stat.icon}</span>
                                         </div>
-                                        <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600 }}>{stat.label}</span>
+                                        <span style={{ color: 'var(--sys-text-muted)', fontSize: 12, fontWeight: 600 }}>{stat.label}</span>
                                     </div>
-                                    <div style={{ color: '#fff', fontSize: 28, fontWeight: 800 }}>{stat.value}</div>
+                                    <div style={{ color: 'var(--sys-text)', fontSize: 28, fontWeight: 800 }}>{stat.value}</div>
                                 </div>
                             ))}
                         </div>
 
                         {/* Campaign List */}
                         {loading ? (
-                            <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
+                            <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
                                 <div style={{ width: 32, height: 32, border: '3px solid rgba(99,102,241,0.2)', borderTop: '3px solid #6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
                                 Loading campaigns...
                             </div>
                         ) : campaigns.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '80px 40px', background: 'rgba(255,255,255,0.02)', borderRadius: 20, border: '1px dashed rgba(255,255,255,0.1)' }}>
+                            <div style={{ textAlign: 'center', padding: '80px 40px', background: 'color-mix(in srgb, var(--sys-text) 2%, transparent)', borderRadius: 20, border: '1px dashed color-mix(in srgb, var(--sys-text) 10%, transparent)' }}>
                                 <div style={{ fontSize: 56, marginBottom: 16 }}>📧</div>
-                                <h3 style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No campaigns yet</h3>
-                                <p style={{ color: '#64748b', fontSize: 14, maxWidth: 400, margin: '0 auto 24px' }}>
+                                <h3 style={{ color: 'var(--sys-text)', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>No campaigns yet</h3>
+                                <p style={{ color: 'var(--sys-text-muted)', fontSize: 14, maxWidth: 400, margin: '0 auto 24px' }}>
                                     Create your first Amazon→D2C re-engagement campaign to start converting marketplace customers into loyal website buyers.
                                 </p>
                                 <button onClick={createCampaign}
-                                    style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 12, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
+                                    style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 12, padding: '12px 28px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
                                     Create First Campaign
                                 </button>
                             </div>
@@ -455,26 +455,26 @@ export default function RetentionStudio() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 {campaigns.map(c => (
                                     <div key={c._id} onClick={() => loadCampaign(c._id)}
-                                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s' }}
+                                        style={{ background: 'color-mix(in srgb, var(--sys-text) 3%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)', borderRadius: 16, padding: '20px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s' }}
                                         onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'}
-                                        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}>
+                                        onMouseLeave={e => e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--sys-text) 6%, transparent)'}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                                             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--sys-primary), rgba(255, 77, 0,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#a78bfa' }}>campaign</span>
                                             </div>
                                             <div>
-                                                <h4 style={{ color: '#fff', fontSize: 15, fontWeight: 700, margin: 0 }}>{c.title}</h4>
-                                                <p style={{ color: '#64748b', fontSize: 12, margin: '4px 0 0' }}>{new Date(c.createdAt).toLocaleDateString()} • {c.ingestData?.totalImported || 0} contacts</p>
+                                                <h4 style={{ color: 'var(--sys-text)', fontSize: 15, fontWeight: 700, margin: 0 }}>{c.title}</h4>
+                                                <p style={{ color: 'var(--sys-text-muted)', fontSize: 12, margin: '4px 0 0' }}>{new Date(c.createdAt).toLocaleDateString()} • {c.ingestData?.totalImported || 0} contacts</p>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                             <span style={{
                                                 background: c.status === 'sent' || c.status === 'completed' ? 'rgba(16,185,129,0.15)' : c.status === 'failed' ? 'rgba(239,68,68,0.15)' : c.status === 'draft' ? 'rgba(100,116,139,0.15)' : 'rgba(99,102,241,0.15)',
-                                                color: c.status === 'sent' || c.status === 'completed' ? '#10b981' : c.status === 'failed' ? '#ef4444' : c.status === 'draft' ? '#94a3b8' : '#818cf8',
+                                                color: c.status === 'sent' || c.status === 'completed' ? '#10b981' : c.status === 'failed' ? '#ef4444' : c.status === 'draft' ? 'var(--sys-text-muted)' : '#818cf8',
                                                 padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
                                             }}>{c.status}</span>
                                             <button onClick={e => { e.stopPropagation(); deleteCampaign(c._id); }}
-                                                style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}>
+                                                style={{ background: 'none', border: 'none', color: 'var(--sys-text-muted)', cursor: 'pointer', padding: 4 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
                                             </button>
                                         </div>
@@ -489,26 +489,26 @@ export default function RetentionStudio() {
                 {mode === 'pipeline' && view === 'campaign' && activeCampaign && (
                     <div>
                         {/* Pipeline Progress Stepper */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32, background: 'rgba(255,255,255,0.02)', borderRadius: 16, padding: '16px 24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 32, background: 'color-mix(in srgb, var(--sys-text) 2%, transparent)', borderRadius: 16, padding: '16px 24px', border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)' }}>
                             {PIPELINE_STEPS.map((step, i) => (
                                 <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 }}>
                                         <div style={{
                                             width: 40, height: 40, borderRadius: '50%',
-                                            background: i < currentStep ? 'var(--sys-primary)' : i === currentStep ? 'var(--sys-primary)' : 'rgba(255,255,255,0.05)',
+                                            background: i < currentStep ? 'var(--sys-primary)' : i === currentStep ? 'var(--sys-primary)' : 'color-mix(in srgb, var(--sys-text) 5%, transparent)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             border: i === currentStep ? '2px solid rgba(99,102,241,0.5)' : '2px solid transparent',
                                             boxShadow: i === currentStep ? '0 0 20px rgba(99,102,241,0.3)' : 'none',
                                             transition: 'all 0.3s',
                                         }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: i <= currentStep ? '#fff' : '#475569' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: i <= currentStep ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>
                                                 {i < currentStep ? 'check' : step.icon}
                                             </span>
                                         </div>
-                                        <span style={{ color: i <= currentStep ? '#e2e8f0' : '#475569', fontSize: 11, fontWeight: 600, textAlign: 'center' }}>{step.label}</span>
+                                        <span style={{ color: i <= currentStep ? 'var(--sys-text)' : 'var(--sys-text-muted)', fontSize: 11, fontWeight: 600, textAlign: 'center' }}>{step.label}</span>
                                     </div>
                                     {i < PIPELINE_STEPS.length - 1 && (
-                                        <div style={{ height: 2, flex: '0 0 40px', background: i < currentStep ? '#10b981' : 'rgba(255,255,255,0.08)', borderRadius: 1, transition: 'background 0.3s' }} />
+                                        <div style={{ height: 2, flex: '0 0 40px', background: i < currentStep ? '#10b981' : 'color-mix(in srgb, var(--sys-text) 8%, transparent)', borderRadius: 1, transition: 'background 0.3s' }} />
                                     )}
                                 </div>
                             ))}
@@ -525,28 +525,28 @@ export default function RetentionStudio() {
                                     { label: 'Open Rate', value: `${analytics.openRate}%`, icon: 'visibility' },
                                     { label: 'Click Rate', value: `${analytics.clickRate}%`, icon: 'touch_app' },
                                 ].map((m, i) => (
-                                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <div key={i} style={{ background: 'color-mix(in srgb, var(--sys-text) 3%, transparent)', borderRadius: 12, padding: '12px 16px', border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6366f1' }}>{m.icon}</span>
-                                            <span style={{ color: '#64748b', fontSize: 10, fontWeight: 600 }}>{m.label}</span>
+                                            <span style={{ color: 'var(--sys-text-muted)', fontSize: 10, fontWeight: 600 }}>{m.label}</span>
                                         </div>
-                                        <div style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>{m.value}</div>
+                                        <div style={{ color: 'var(--sys-text)', fontSize: 20, fontWeight: 800 }}>{m.value}</div>
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {/* ── Node Content Panels ── */}
-                        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 2%, transparent)', borderRadius: 20, border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)', overflow: 'hidden' }}>
                             
                             {/* NODE 1: Data Ingest */}
                             {currentStep === 0 && (
                                 <div style={{ padding: 32 }}>
-                                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h3 style={{ color: 'var(--sys-text)', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#6366f1' }}>upload_file</span>
                                         Import Amazon Customer Data
                                     </h3>
-                                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginBottom: 20 }}>
                                         Paste your Amazon order export CSV below. Include columns: Name, Email, Product Name, ASIN, Price, Order Date.
                                     </p>
 
@@ -555,16 +555,16 @@ export default function RetentionStudio() {
                                         onChange={e => setCsvText(e.target.value)}
                                         placeholder={SAMPLE_CSV}
                                         rows={10}
-                                        style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 16, color: '#e2e8f0', fontSize: 13, fontFamily: 'monospace', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                                        style={{ width: '100%', background: 'color-mix(in srgb, var(--sys-text) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 10%, transparent)', borderRadius: 12, padding: 16, color: 'var(--sys-text)', fontSize: 13, fontFamily: 'monospace', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
                                     />
 
                                     <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                                         <button onClick={() => setCsvText(SAMPLE_CSV)}
-                                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 20px', color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}>
+                                            style={{ background: 'color-mix(in srgb, var(--sys-text) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 10%, transparent)', borderRadius: 10, padding: '10px 20px', color: 'var(--sys-text-muted)', cursor: 'pointer', fontSize: 13 }}>
                                             Load Sample Data
                                         </button>
                                         <button onClick={runIngest} disabled={nodeLoading === 'ingest'}
-                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'ingest' ? 0.6 : 1 }}>
+                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'ingest' ? 0.6 : 1 }}>
                                             {nodeLoading === 'ingest' ? (
                                                 <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Parsing...</>
                                             ) : (
@@ -578,30 +578,30 @@ export default function RetentionStudio() {
                             {/* NODE 2: Match & Enrich */}
                             {currentStep === 1 && (
                                 <div style={{ padding: 32 }}>
-                                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h3 style={{ color: 'var(--sys-text)', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#10b981' }}>compare_arrows</span>
                                         Match Products to Shopify Catalog
                                     </h3>
-                                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginBottom: 20 }}>
                                         We'll match {activeCampaign.contacts?.length || 0} Amazon products against your Shopify catalog and calculate price savings.
                                     </p>
 
                                     {/* Contacts preview */}
-                                    <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 16, marginBottom: 20, maxHeight: 300, overflowY: 'auto' }}>
+                                    <div style={{ background: 'color-mix(in srgb, var(--sys-text) 5%, transparent)', borderRadius: 12, padding: 16, marginBottom: 20, maxHeight: 300, overflowY: 'auto' }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                             <thead>
                                                 <tr>
                                                     {['Name', 'Email', 'Product', 'Amazon Price'].map(h => (
-                                                        <th key={h} style={{ color: '#64748b', fontSize: 11, fontWeight: 600, padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                                                        <th key={h} style={{ color: 'var(--sys-text-muted)', fontSize: 11, fontWeight: 600, padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)' }}>{h}</th>
                                                     ))}
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {(activeCampaign.contacts || []).slice(0, 20).map((c, i) => (
                                                     <tr key={i}>
-                                                        <td style={{ color: '#e2e8f0', fontSize: 12, padding: '8px 12px' }}>{c.name}</td>
-                                                        <td style={{ color: '#94a3b8', fontSize: 12, padding: '8px 12px' }}>{c.email}</td>
-                                                        <td style={{ color: '#e2e8f0', fontSize: 12, padding: '8px 12px' }}>{c.amazonProductTitle}</td>
+                                                        <td style={{ color: 'var(--sys-text)', fontSize: 12, padding: '8px 12px' }}>{c.name}</td>
+                                                        <td style={{ color: 'var(--sys-text-muted)', fontSize: 12, padding: '8px 12px' }}>{c.email}</td>
+                                                        <td style={{ color: 'var(--sys-text)', fontSize: 12, padding: '8px 12px' }}>{c.amazonProductTitle}</td>
                                                         <td style={{ color: '#f59e0b', fontSize: 12, padding: '8px 12px', fontWeight: 600 }}>₹{c.amazonPrice}</td>
                                                     </tr>
                                                 ))}
@@ -610,7 +610,7 @@ export default function RetentionStudio() {
                                     </div>
 
                                     <button onClick={runMatch} disabled={nodeLoading === 'match'}
-                                        style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'match' ? 0.6 : 1 }}>
+                                        style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'match' ? 0.6 : 1 }}>
                                         {nodeLoading === 'match' ? (
                                             <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Matching...</>
                                         ) : (
@@ -623,11 +623,11 @@ export default function RetentionStudio() {
                             {/* NODE 3: Creative Design */}
                             {currentStep === 2 && (
                                 <div style={{ padding: 32 }}>
-                                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h3 style={{ color: 'var(--sys-text)', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#f59e0b' }}>palette</span>
                                         Design Price Comparison Creative
                                     </h3>
-                                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginBottom: 20 }}>
                                         {activeCampaign.matchResults?.totalMatched || 0} products matched • Average savings: ₹{activeCampaign.matchResults?.avgSavings || 0}
                                     </p>
 
@@ -635,10 +635,10 @@ export default function RetentionStudio() {
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
                                         {CREATIVE_TEMPLATES.map(t => (
                                             <div key={t.id} onClick={() => setCreativeTemplate(t.id)}
-                                                style={{ background: creativeTemplate === t.id ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${creativeTemplate === t.id ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                                style={{ background: creativeTemplate === t.id ? 'rgba(99,102,241,0.15)' : 'color-mix(in srgb, var(--sys-text) 3%, transparent)', border: `1px solid ${creativeTemplate === t.id ? 'rgba(99,102,241,0.4)' : 'color-mix(in srgb, var(--sys-text) 6%, transparent)'}`, borderRadius: 14, padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
                                                 <div style={{ fontSize: 28, marginBottom: 8 }}>{t.icon}</div>
-                                                <h5 style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>{t.label}</h5>
-                                                <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>{t.desc}</p>
+                                                <h5 style={{ color: 'var(--sys-text)', fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>{t.label}</h5>
+                                                <p style={{ color: 'var(--sys-text-muted)', fontSize: 11, margin: 0 }}>{t.desc}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -646,19 +646,19 @@ export default function RetentionStudio() {
                                     {/* Show generated creative if exists */}
                                     {activeCampaign.creative?.generatedHtml && (
                                         <div style={{ marginBottom: 20 }}>
-                                            <h4 style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Generated Creative Preview:</h4>
-                                            <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 600 }}
+                                            <h4 style={{ color: 'var(--sys-text)', fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Generated Creative Preview:</h4>
+                                            <div style={{ background: 'var(--sys-text)', borderRadius: 12, padding: 20, maxWidth: 600 }}
                                                 dangerouslySetInnerHTML={{ __html: activeCampaign.creative.generatedHtml }} />
                                             
                                             {/* Product comparison image */}
-                                            <div style={{ marginTop: 16, padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                            <div style={{ marginTop: 16, padding: 16, background: 'color-mix(in srgb, var(--sys-text) 3%, transparent)', borderRadius: 12, border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                                    <h4 style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <h4 style={{ color: 'var(--sys-text)', fontSize: 14, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#f59e0b' }}>image</span>
                                                         Product Price Comparison Image
                                                     </h4>
                                                     <button onClick={generateProductImage} disabled={imageLoading}
-                                                        style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '8px 16px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, opacity: imageLoading ? 0.6 : 1 }}>
+                                                        style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '8px 16px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, opacity: imageLoading ? 0.6 : 1 }}>
                                                         {imageLoading ? (
                                                             <><div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Generating...</>
                                                         ) : (
@@ -667,24 +667,24 @@ export default function RetentionStudio() {
                                                     </button>
                                                 </div>
                                                 {(generatedImageUrl || activeCampaign.creative.previewImageUrl) && (
-                                                    <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', maxWidth: 600 }}>
+                                                    <div style={{ background: 'var(--sys-text)', borderRadius: 10, overflow: 'hidden', maxWidth: 600 }}>
                                                         <img src={generatedImageUrl || activeCampaign.creative.previewImageUrl} alt="Product Comparison" 
                                                             style={{ width: '100%', display: 'block' }} />
                                                     </div>
                                                 )}
                                                 {!generatedImageUrl && !activeCampaign.creative.previewImageUrl && (
-                                                    <p style={{ color: '#64748b', fontSize: 12, margin: 0 }}>Click "Generate Image" to create an AI-generated product price comparison banner for your email.</p>
+                                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 12, margin: 0 }}>Click "Generate Image" to create an AI-generated product price comparison banner for your email.</p>
                                                 )}
                                             </div>
 
                                             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                                                 <button onClick={() => approveItem('creative')} disabled={activeCampaign.creative.approved}
-                                                    style={{ background: activeCampaign.creative.approved ? 'rgba(16,185,129,0.2)' : 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 20px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    style={{ background: activeCampaign.creative.approved ? 'rgba(16,185,129,0.2)' : 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 20px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCampaign.creative.approved ? 'check_circle' : 'thumb_up'}</span>
                                                     {activeCampaign.creative.approved ? 'Approved ✓' : 'Approve Creative'}
                                                 </button>
                                                 <button onClick={runCreative} disabled={nodeLoading === 'creative'}
-                                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 20px', color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}>
+                                                    style={{ background: 'color-mix(in srgb, var(--sys-text) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 10%, transparent)', borderRadius: 10, padding: '10px 20px', color: 'var(--sys-text-muted)', cursor: 'pointer', fontSize: 13 }}>
                                                     ↻ Regenerate
                                                 </button>
                                             </div>
@@ -693,7 +693,7 @@ export default function RetentionStudio() {
 
                                     {!activeCampaign.creative?.generatedHtml && (
                                         <button onClick={runCreative} disabled={nodeLoading === 'creative'}
-                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'creative' ? 0.6 : 1 }}>
+                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'creative' ? 0.6 : 1 }}>
                                             {nodeLoading === 'creative' ? (
                                                 <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Generating...</>
                                             ) : (
@@ -707,11 +707,11 @@ export default function RetentionStudio() {
                             {/* NODE 4: Mailer Compose */}
                             {currentStep === 3 && (
                                 <div style={{ padding: 32 }}>
-                                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h3 style={{ color: 'var(--sys-text)', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#ec4899' }}>mail</span>
                                         Compose Email Template
                                     </h3>
-                                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginBottom: 20 }}>
                                         AI will generate a complete email using your Brand DNA's voice, colors, and style.
                                     </p>
 
@@ -719,10 +719,10 @@ export default function RetentionStudio() {
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
                                         {MAILER_TEMPLATES.map(t => (
                                             <div key={t.id} onClick={() => setMailerTemplate(t.id)}
-                                                style={{ background: mailerTemplate === t.id ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${mailerTemplate === t.id ? 'rgba(236,72,153,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                                                style={{ background: mailerTemplate === t.id ? 'rgba(236,72,153,0.15)' : 'color-mix(in srgb, var(--sys-text) 3%, transparent)', border: `1px solid ${mailerTemplate === t.id ? 'rgba(236,72,153,0.4)' : 'color-mix(in srgb, var(--sys-text) 6%, transparent)'}`, borderRadius: 14, padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
                                                 <div style={{ fontSize: 28, marginBottom: 8 }}>{t.icon}</div>
-                                                <h5 style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>{t.label}</h5>
-                                                <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>{t.desc}</p>
+                                                <h5 style={{ color: 'var(--sys-text)', fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>{t.label}</h5>
+                                                <p style={{ color: 'var(--sys-text-muted)', fontSize: 11, margin: 0 }}>{t.desc}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -732,35 +732,35 @@ export default function RetentionStudio() {
                                         <div style={{ marginBottom: 20 }}>
                                             <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
                                                 <div>
-                                                    <span style={{ color: '#64748b', fontSize: 11 }}>Subject Line:</span>
-                                                    <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 0' }}>{previewData?.subjectLine || activeCampaign.mailer.subjectLine}</p>
+                                                    <span style={{ color: 'var(--sys-text-muted)', fontSize: 11 }}>Subject Line:</span>
+                                                    <p style={{ color: 'var(--sys-text)', fontSize: 14, fontWeight: 600, margin: '4px 0 0' }}>{previewData?.subjectLine || activeCampaign.mailer.subjectLine}</p>
                                                 </div>
                                                 <div>
-                                                    <span style={{ color: '#64748b', fontSize: 11 }}>Preview Text:</span>
-                                                    <p style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 0' }}>{previewData?.previewText || activeCampaign.mailer.previewText}</p>
+                                                    <span style={{ color: 'var(--sys-text-muted)', fontSize: 11 }}>Preview Text:</span>
+                                                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, margin: '4px 0 0' }}>{previewData?.previewText || activeCampaign.mailer.previewText}</p>
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                                                <h4 style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 600, margin: 0 }}>Email Preview{previewData ? ' (Live Data)' : ''}:</h4>
-                                                {!previewData && <button onClick={loadPreview} style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '4px 12px', color: '#818cf8', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Load Live Preview</button>}
+                                                <h4 style={{ color: 'var(--sys-text)', fontSize: 14, fontWeight: 600, margin: 0 }}>Email Preview{previewData ? ' (Live Data)' : ''}:</h4>
+                                                {!previewData && <button onClick={loadPreview} style={{ background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-primary)', borderRadius: 8, padding: '4px 12px', color: 'var(--sys-primary)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Load Live Preview</button>}
                                             </div>
-                                            <div style={{ background: '#fff', borderRadius: 12, maxWidth: 640, maxHeight: 500, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+                                            <div style={{ background: 'var(--sys-text)', borderRadius: 12, maxWidth: 640, maxHeight: 500, overflowY: 'auto', boxShadow: '0 8px 32px color-mix(in srgb, var(--sys-text) 8%, transparent)' }}>
                                                 <iframe srcDoc={previewData?.bodyHtml || activeCampaign.mailer.bodyHtml} title="Email Preview"
                                                     style={{ width: '100%', minHeight: 400, border: 'none', borderRadius: 12 }} />
                                             </div>
                                             
                                             {/* Test Email */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, background: 'color-mix(in srgb, var(--sys-text) 3%, transparent)', borderRadius: 12, padding: '12px 16px', border: '1px solid color-mix(in srgb, var(--sys-text) 6%, transparent)' }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#6366f1' }}>forward_to_inbox</span>
                                                 <input
                                                     type="email"
                                                     value={testEmail}
                                                     onChange={e => setTestEmail(e.target.value)}
                                                     placeholder="Enter email to send test..."
-                                                    style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+                                                    style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 10%, transparent)', borderRadius: 8, padding: '8px 12px', color: 'var(--sys-text)', fontSize: 13, outline: 'none' }}
                                                 />
                                                 <button onClick={sendTestEmail} disabled={nodeLoading === 'test'}
-                                                    style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 12, opacity: nodeLoading === 'test' ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                                    style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 8, padding: '8px 16px', color: 'var(--sys-text)', fontWeight: 600, cursor: 'pointer', fontSize: 12, opacity: nodeLoading === 'test' ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                                                     {nodeLoading === 'test' ? 'Sending...' : '📧 Send Test'}
                                                 </button>
                                             </div>
@@ -768,12 +768,12 @@ export default function RetentionStudio() {
 
                                             <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                                                 <button onClick={() => approveItem('mailer')} disabled={activeCampaign.mailer.approved}
-                                                    style={{ background: activeCampaign.mailer.approved ? 'rgba(16,185,129,0.2)' : 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 20px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    style={{ background: activeCampaign.mailer.approved ? 'rgba(16,185,129,0.2)' : 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 20px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{activeCampaign.mailer.approved ? 'check_circle' : 'thumb_up'}</span>
                                                     {activeCampaign.mailer.approved ? 'Approved ✓' : 'Approve Email'}
                                                 </button>
                                                 <button onClick={runCompose} disabled={nodeLoading === 'compose'}
-                                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 20px', color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}>
+                                                    style={{ background: 'color-mix(in srgb, var(--sys-text) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--sys-text) 10%, transparent)', borderRadius: 10, padding: '10px 20px', color: 'var(--sys-text-muted)', cursor: 'pointer', fontSize: 13 }}>
                                                     ↻ Regenerate
                                                 </button>
                                             </div>
@@ -782,7 +782,7 @@ export default function RetentionStudio() {
 
                                     {!activeCampaign.mailer?.bodyHtml && (
                                         <button onClick={runCompose} disabled={nodeLoading === 'compose'}
-                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'compose' ? 0.6 : 1 }}>
+                                            style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '10px 24px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, opacity: nodeLoading === 'compose' ? 0.6 : 1 }}>
                                             {nodeLoading === 'compose' ? (
                                                 <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Composing...</>
                                             ) : (
@@ -796,7 +796,7 @@ export default function RetentionStudio() {
                             {/* NODE 5: Send & Track */}
                             {currentStep === 4 && (
                                 <div style={{ padding: 32 }}>
-                                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h3 style={{ color: 'var(--sys-text)', fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#FF4D00' }}>send</span>
                                         {activeCampaign.status === 'sent' || activeCampaign.status === 'completed' ? 'Campaign Sent!' : 'Ready to Send'}
                                     </h3>
@@ -806,7 +806,7 @@ export default function RetentionStudio() {
                                             <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 16, padding: '24px', marginBottom: 20, textAlign: 'center' }}>
                                                 <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
                                                 <h4 style={{ color: '#10b981', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Emails dispatched!</h4>
-                                                <p style={{ color: '#64748b', fontSize: 13 }}>
+                                                <p style={{ color: 'var(--sys-text-muted)', fontSize: 13 }}>
                                                     {activeCampaign.sendResults?.totalSent || 0} emails sent to matched customers
                                                 </p>
                                             </div>
@@ -819,14 +819,14 @@ export default function RetentionStudio() {
                                                 ].map((s, i) => (
                                                     <div key={i} style={{ background: `${s.color}10`, borderRadius: 12, padding: '16px', textAlign: 'center', border: `1px solid ${s.color}30` }}>
                                                         <div style={{ color: s.color, fontSize: 28, fontWeight: 800 }}>{s.value}</div>
-                                                        <div style={{ color: '#64748b', fontSize: 11, fontWeight: 600, marginTop: 4 }}>{s.label}</div>
+                                                        <div style={{ color: 'var(--sys-text-muted)', fontSize: 11, fontWeight: 600, marginTop: 4 }}>{s.label}</div>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     ) : (
                                         <div>
-                                            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>
+                                            <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginBottom: 20 }}>
                                                 Your mailer is approved and ready to send to {activeCampaign.contacts?.filter(c => c.matched).length || 0} matched customers.
                                             </p>
                                             <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, color: '#34d399', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -834,7 +834,7 @@ export default function RetentionStudio() {
                                                 Real emails will be sent via Gmail SMTP to each matched customer with personalized product & price data.
                                             </div>
                                             <button onClick={runSend} disabled={nodeLoading === 'send'}
-                                                style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '12px 28px', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(255, 77, 0,0.3)', opacity: nodeLoading === 'send' ? 0.6 : 1 }}>
+                                                style={{ background: 'var(--sys-primary)', border: 'none', borderRadius: 10, padding: '12px 28px', color: 'var(--sys-text)', fontWeight: 700, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(255, 77, 0,0.3)', opacity: nodeLoading === 'send' ? 0.6 : 1 }}>
                                                 {nodeLoading === 'send' ? (
                                                     <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Sending...</>
                                                 ) : (
