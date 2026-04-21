@@ -340,6 +340,7 @@ function LocalBusinessScan({ onComplete, onBack }) {
             const decoder = new TextDecoder()
             let buffer = ''
             let finalBrand = null
+            let currentEventType = null  // Persists across read chunks — critical for large payloads
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -347,8 +348,6 @@ function LocalBusinessScan({ onComplete, onBack }) {
                 buffer += decoder.decode(value, { stream: true })
                 const lines = buffer.split('\n')
                 buffer = lines.pop() || ''
-
-                let currentEventType = null
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
                         currentEventType = line.slice(7).trim()
@@ -1306,6 +1305,59 @@ function ReviewBrand({ brand, onFinish }) {
                                 <p className="text-[var(--sys-text-muted)] text-sm">No colors detected</p>
                             )}
                         </div>
+                    </div>
+
+                    {/* ═══ RIGHT: Description & Overview ═══ */}
+                    <div className="space-y-5">
+                        {/* Brand Description */}
+                        {dna.brandDescription && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">description</span> About
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.brandDescription}</p>
+                            </div>
+                        )}
+
+                        {/* Target Audience */}
+                        {dna.targetAudience && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">group</span> Target Audience
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.targetAudience}</p>
+                            </div>
+                        )}
+
+                        {/* Photography Style */}
+                        {dna.photographyStyle && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">photo_camera</span> Photography Style
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] capitalize">{dna.photographyStyle}</p>
+                            </div>
+                        )}
+
+                        {/* Brand Images Preview (inline) */}
+                        {brandImages.length > 0 && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">photo_library</span> Discovered Images
+                                    <span className="ml-auto text-[10px] font-normal">{brandImages.length} found</span>
+                                </p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {brandImages.filter(img => img.url).slice(0, 6).map((img, i) => (
+                                        <div key={i} className="aspect-square rounded-lg overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-bg)]">
+                                            <img src={img.url} alt={img.alt || `Image ${i+1}`}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                                onError={e => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
