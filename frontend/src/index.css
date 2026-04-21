@@ -109,6 +109,23 @@
     background: var(--sys-text-muted);
   }
 
+  /* ── Fix for Material Symbols Ligature FOUT/Flash ── */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    color: inherit;
+  }
+
   /* ── Responsive Font Scale ── */
   @media (max-width: 768px) {
     html {
