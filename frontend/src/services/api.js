@@ -116,6 +116,11 @@ export async function apiFetch(endpoint, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
+        // Broadcast global unauthorized event if token is invalid or expired
+        if (response.status === 401 && token) {
+            window.dispatchEvent(new CustomEvent('mantram:unauthorized', { detail: { message: data.error || 'Session expired' } }));
+        }
+
         const err = new Error(data.error || 'API request failed');
         // Attach domain-specific metadata for specialized error UI (e.g. SEO Audit Guard)
         if (data.diagnosis) err.diagnosis = data.diagnosis;
