@@ -1197,6 +1197,97 @@ function ReviewBrand({ brand, onFinish }) {
             </div>
 
             {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B.1 — Local Business Details (Google Maps data) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {dna.localBusiness && (dna.localBusiness.address || dna.localBusiness.rating || dna.localBusiness.phone) && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-primary">location_on</span> Business Details
+                        {dna.localBusiness.googleMapsUrl && (
+                            <a href={dna.localBusiness.googleMapsUrl} target="_blank" rel="noopener"
+                                className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
+                                View on Google Maps <span className="material-symbols-outlined text-xs">open_in_new</span>
+                            </a>
+                        )}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {dna.localBusiness.rating && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center">
+                                <p className="text-2xl font-extrabold text-[var(--sys-text)]">⭐ {dna.localBusiness.rating}</p>
+                                {dna.localBusiness.reviewCount && (
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">{dna.localBusiness.reviewCount} reviews</p>
+                                )}
+                            </div>
+                        )}
+                        {dna.localBusiness.category && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">storefront</span>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{dna.localBusiness.category}</p>
+                            </div>
+                        )}
+                        {dna.localBusiness.priceRange && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">payments</span>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{dna.localBusiness.priceRange}</p>
+                            </div>
+                        )}
+                        {dna.localBusiness.hours && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">schedule</span>
+                                <p className="text-[10px] text-[var(--sys-text-muted)] leading-tight">{dna.localBusiness.hours}</p>
+                            </div>
+                        )}
+                    </div>
+                    {(dna.localBusiness.address || dna.localBusiness.phone) && (
+                        <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-[var(--sys-border)]">
+                            {dna.localBusiness.address && (
+                                <p className="text-xs text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-xs text-primary">pin_drop</span>
+                                    {dna.localBusiness.address}
+                                </p>
+                            )}
+                            {dna.localBusiness.phone && (
+                                <p className="text-xs text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-xs text-primary">call</span>
+                                    {dna.localBusiness.phone}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B.1b — Brand Images Gallery */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {brandImages.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-primary">photo_library</span> Brand Images
+                        <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-auto">{brandImages.length} images found</span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {brandImages.filter(img => img.url && !img.url.startsWith('data:')).slice(0, 12).map((img, i) => (
+                            <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                <img
+                                    src={img.url}
+                                    alt={img.alt || `Brand image ${i + 1}`}
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    loading="lazy"
+                                    onError={e => { e.target.style.display = 'none'; e.target.parentElement.classList.add('hidden'); }}
+                                />
+                                {img.source && (
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <p className="text-[10px] text-white/80 truncate">{img.source}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
             {/* SECTION B.2 — Strategy & Positioning */}
             {/* ══════════════════════════════════════════════════════════════ */}
             {(dna.companyOverview || dna.uniqueSellingPoints?.length > 0 || dna.servicesOffered?.length > 0 || dna.missionStatement || dna.brandValues?.length > 0) && (
