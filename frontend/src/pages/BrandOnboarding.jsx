@@ -312,42 +312,88 @@ function LocalBusinessScan({ onComplete, onBack }) {
     const [location, setLocation] = useState('')
     const [scanning, setScanning] = useState(false)
     const [currentStep, setCurrentStep] = useState('')
+    const [progress, setProgress] = useState(0)
     const [error, setError] = useState(null)
+    const [discoveryData, setDiscoveryData] = useState(null) // Live discovery chips
+    const [completedSteps, setCompletedSteps] = useState([]) // Log of completed steps
 
     const handleSearch = async () => {
         if (!businessName.trim() || !location.trim()) return
         
         setScanning(true)
         setError(null)
+        setProgress(0)
+        setCurrentStep('Initializing scan...')
+        setDiscoveryData(null)
+        setCompletedSteps([])
         
         try {
-            setCurrentStep('Searching Google for your business...')
-            const steps = [
-                'Checking Google Maps listing...',
-                'Extracting address, rating & reviews...',
-                'Discovering social media profiles...',
-                'Looking for official website...',
-                'Running deep brand scan...',
-                'Extracting logo, colors & images...',
-                'Analyzing brand voice & personality...',
-                'Discovering competitors...',
-                'Building your Brand DNA...',
-            ];
-            let stepIdx = 0;
-            const timer = setInterval(() => {
-                stepIdx++;
-                if (stepIdx < steps.length) {
-                    setCurrentStep(steps[stepIdx]);
-                }
-            }, 3500);
+            const streamUrl = agents.getLocalScanStreamUrl(businessName.trim(), location.trim())
+            const response = await fetch(streamUrl)
 
-            const data = await agents.scanLocalBusiness(businessName.trim(), location.trim())
-            clearInterval(timer)
-            
-            setCurrentStep('Brand DNA built successfully!')
-            setTimeout(() => onComplete(data.brand), 800)
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({ error: 'Connection failed' }))
+                throw new Error(errData.error || `Server error: ${response.status}`)
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let finalBrand = null
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                let currentEventType = null
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        currentEventType = line.slice(7).trim()
+                        continue
+                    }
+                    if (!line.startsWith('data: ')) continue
+                    const raw = line.slice(6).trim()
+                    if (!raw) continue
+
+                    try {
+                        const evt = JSON.parse(raw)
+
+                        if (currentEventType === 'progress') {
+                            setCurrentStep(evt.message)
+                            if (evt.percent != null) setProgress(evt.percent)
+                            // Track completed major steps for the log
+                            if (evt.step && (evt.step.endsWith('-done') || evt.step === 'merge' || evt.step === 'saving')) {
+                                setCompletedSteps(prev => {
+                                    const exists = prev.some(s => s.step === evt.step)
+                                    return exists ? prev : [...prev, { step: evt.step, message: evt.message, time: new Date() }]
+                                })
+                            }
+                        } else if (currentEventType === 'discovery') {
+                            setDiscoveryData(evt)
+                        } else if (currentEventType === 'complete') {
+                            finalBrand = evt.brand
+                        } else if (currentEventType === 'error') {
+                            throw new Error(evt.error)
+                        }
+                    } catch (parseErr) {
+                        if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
+                    }
+                }
+            }
+
+            if (finalBrand) {
+                setCurrentStep('Brand DNA built successfully!')
+                setProgress(100)
+                setTimeout(() => onComplete(finalBrand), 800)
+            } else {
+                throw new Error('Scan completed but no brand data was received. Please try again.')
+            }
         } catch (err) {
             setScanning(false)
+            setProgress(0)
             setError({
                 message: err.message || 'Failed to find or analyze local business. Please try again.',
                 isProviderError: err.isProviderError,
@@ -428,17 +474,85 @@ function LocalBusinessScan({ onComplete, onBack }) {
                                 Locating {businessName}
                             </h2>
                             
-                            <div className="inline-flex flex-col gap-2 p-5 rounded-2xl mb-4 transition-all duration-500 w-full"
+                            {/* Progress Bar */}
+                            <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-4" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div className="h-full rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--primary), #ff9040)' }} />
+                            </div>
+
+                            {/* Current step */}
+                            <div className="inline-flex flex-col gap-2 p-4 rounded-2xl mb-4 transition-all duration-500 w-full"
                                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                <div className="flex items-center justify-center gap-2 text-primary font-medium">
-                                    <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
+                                <div className="flex items-center justify-center gap-2 text-primary font-medium text-sm">
+                                    {progress < 100 ? (
+                                        <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
+                                    ) : (
+                                        <span className="material-symbols-outlined text-sm text-green-400">check_circle</span>
+                                    )}
                                     {currentStep}
                                 </div>
-                                <div className="text-xs text-[var(--sys-text-muted)] text-center flex items-center justify-center gap-1">
-                                    <span className="material-symbols-outlined text-[10px]">location_on</span>
-                                    {location}
+                                <div className="flex items-center justify-center gap-3 text-xs text-[var(--sys-text-muted)]">
+                                    <span className="flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">location_on</span>
+                                        {location}
+                                    </span>
+                                    <span className="text-primary font-bold">{progress}%</span>
                                 </div>
                             </div>
+
+                            {/* Discovery Chips — appear live as data arrives */}
+                            {discoveryData && (
+                                <div className="flex flex-wrap justify-center gap-2 mb-4 animate-fade-in">
+                                    {discoveryData.rating && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(250, 204, 21, 0.15)', color: '#facc15', border: '1px solid rgba(250, 204, 21, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">star</span>
+                                            {discoveryData.rating}{discoveryData.reviewCount ? ` (${discoveryData.reviewCount})` : ''}
+                                        </span>
+                                    )}
+                                    {discoveryData.website && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">language</span>
+                                            Website found
+                                        </span>
+                                    )}
+                                    {!discoveryData.website && discoveryData.rating && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(251, 146, 60, 0.15)', color: '#fb923c', border: '1px solid rgba(251, 146, 60, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">public_off</span>
+                                            No website — AI synthesis
+                                        </span>
+                                    )}
+                                    {discoveryData.socialCount > 0 && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(147, 51, 234, 0.15)', color: '#a78bfa', border: '1px solid rgba(147, 51, 234, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">share</span>
+                                            {discoveryData.socialCount} social
+                                        </span>
+                                    )}
+                                    {discoveryData.category && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">category</span>
+                                            {discoveryData.category}
+                                        </span>
+                                    )}
+                                    {discoveryData.address && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">pin_drop</span>
+                                            Address found
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Completed steps log */}
+                            {completedSteps.length > 0 && (
+                                <div className="mt-3 max-h-28 overflow-y-auto text-left space-y-1 px-2" style={{ scrollBehavior: 'smooth' }}>
+                                    {completedSteps.map((s, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-xs text-[var(--sys-text-muted)] animate-fade-in">
+                                            <span className="text-green-500 text-[10px]">✓</span>
+                                            <span className="opacity-70">{s.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

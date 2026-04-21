@@ -272,6 +272,13 @@ export const agents = {
         // EventSource doesn't support custom headers, so we pass token as query param
         return `${API_BASE}/agents/scan-website/stream?url=${encodedUrl}${token ? `&token=${token}` : ''}`;
     },
+    // SSE streaming for local business scan — returns URL for fetch + ReadableStream
+    getLocalScanStreamUrl: (businessName, location) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const params = new URLSearchParams({ businessName, location });
+        if (token) params.set('token', token);
+        return `${API_BASE}/agents/scan-local-business/stream?${params.toString()}`;
+    },
     brainstorm: (data) => apiFetch('/agents/brainstorm', { method: 'POST', body: JSON.stringify(data) }),
     saveBrainstorm: (brandData) => apiFetch('/agents/brainstorm/save', { method: 'POST', body: JSON.stringify({ brandData }) }),
     generateLogo: (data) => apiFetch('/agents/generate-logo', { method: 'POST', body: JSON.stringify(data) }),
