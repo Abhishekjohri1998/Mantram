@@ -1338,9 +1338,7 @@ export default function FunnelStudio() {
             </div>
 
             {/* ── Intelligence Hero Banner ── */}
-            <div className="glass-panel rounded-2xl p-6 mb-6 border border-[var(--sys-border)] relative overflow-hidden">
-                {/* Subtle Gradient Accent */}
-                <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'var(--sys-primary)' }} />
+            <div className="glass-panel rounded-2xl p-6 mb-6 border border-[var(--sys-border)]" style={{ borderTop: '4px solid var(--sys-primary)' }}>
                 
                 <div className="flex items-center justify-between mb-5">
                     <div>
@@ -1380,14 +1378,14 @@ export default function FunnelStudio() {
             </div>
 
             {/* ── Quick Actions Bar ── */}
-            <div className="flex items-center gap-3 mb-4 overflow-x-auto pb-4">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
                 {[
                     { label: 'AI Generate', icon: 'auto_awesome', color: '#8b5cf6', onClick: () => setShowAIModal(true) },
                     { label: 'Marketplace', icon: 'storefront', color: '#6366f1', onClick: async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } ; setView('sharing') } },
                     { label: 'How It Works', icon: 'menu_book', color: '#06b6d4', onClick: () => setView('help') },
                 ].map(a => (
                     <button key={a.label} onClick={a.onClick}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] transition-all cursor-pointer whitespace-nowrap hover:shadow-md hover:border-primary/30">
+                        className="flex flex-shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] transition-all cursor-pointer whitespace-nowrap shadow-sm hover:border-[var(--sys-primary)]">
                         <span className="material-symbols-outlined text-base" style={{ color: a.color }}>{a.icon}</span> {a.label}
                     </button>
                 ))}
