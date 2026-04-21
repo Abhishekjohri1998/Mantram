@@ -213,7 +213,7 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
     }
 });
 
-// POST /api/agents/scan-local-business — AI synthesis of local business profile
+// POST /api/agents/scan-local-business — 3-Phase Deep Local Business Pipeline
 router.post('/scan-local-business', optionalAuth, async (req, res) => {
     try {
         const { businessName, location } = req.body;
@@ -222,62 +222,266 @@ router.post('/scan-local-business', optionalAuth, async (req, res) => {
         }
 
         const orchestrator = getOrchestrator();
-        
-        // Formulate prompt specifically for local business synthesis
-        const systemPrompt = `You are an expert brand analyst and local business researcher. 
-Your task is to analyze the local business provided by the user using your extensive knowledge base of public data, Google Maps listings, direct knowledge, and general business patterns for that specific area. 
-Extract their likely brand identity. 
-Return valid JSON with the exact following structure: 
-{ "name": "", "tagline": "", "personality": "", "voiceDescription": "", "industry": "", "targetAudience": "", "dos": [], "donts": [], "keyPhrases": [], "colorSuggestions": [{"name": "", "hex": "", "usage": ""}], "fontSuggestions": {"heading": "", "body": ""} }`;
-        
-        const userPrompt = `Research the local business: "${businessName}" located in/near "${location}". 
-Infer their brand identity based on public knowledge of this entity, or if unknown, deduce the precise brand archetype for a high-quality ${businessName} in ${location}.`;
+        const aiRouter = orchestrator.smartRouter.modelRouter;
 
-        const result = await orchestrator.smartRouter.modelRouter.generateText({
-            systemPrompt,
-            userPrompt,
-            temperature: 0.5,
-        });
+        console.log(`\n══════ LOCAL BUSINESS SCAN: "${businessName}" in "${location}" ══════`);
 
-        let brandData;
+        // ══════════════════════════════════════════════════════════════════
+        // PHASE 1: GROUNDED DISCOVERY — Gemini searches live Google data
+        // ══════════════════════════════════════════════════════════════════
+        console.log(`  📡 Phase 1: Grounded Discovery via Gemini Search...`);
+
+        let discovery = {};
         try {
-            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-            brandData = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-            if (!brandData) throw new Error('Failed to parse AI output');
-        } catch (parseError) {
-            console.error('[scan-local] Parse error, raw output:', result.text);
-            return res.status(500).json({ success: false, error: 'Failed to synthesize business data properly.' });
+            const discoveryResult = await aiRouter.generateTextWithSearch({
+                systemPrompt: `You are a local business intelligence researcher. Search Google for the exact business provided and extract ALL available public information. Return ONLY valid JSON — no markdown, no explanation, no \`\`\`json blocks.`,
+                userPrompt: `Search for the local business: "${businessName}" located in/near "${location}".
+
+Find and return ALL of the following information by searching Google, Google Maps, and business directories:
+
+{
+  "officialName": "The exact registered business name as it appears on Google",
+  "websiteUrl": "Official website URL (empty string if none found)",
+  "googleMapsUrl": "Google Maps URL for this business",
+  "address": "Full street address",
+  "phone": "Phone number if listed",
+  "hours": "Operating hours summary (e.g., 'Mon-Sat 9am-9pm, Sun closed')",
+  "rating": "Google rating (e.g., '4.5/5')",
+  "reviewCount": "Number of Google reviews (e.g., '230')",
+  "category": "Google business category (e.g., 'Café', 'Salon', 'Boutique')",
+  "priceRange": "Price level (e.g., '₹₹' or '$$' or 'mid-range')",
+  "industry": "Specific industry (e.g., 'Specialty Coffee Shop', 'Hair Salon')",
+  "tagline": "Business tagline or slogan if found",
+  "description": "2-3 sentence description of what this business does and what makes it special",
+  "socialLinks": {
+    "instagram": "Instagram URL or empty string",
+    "facebook": "Facebook URL or empty string",
+    "twitter": "Twitter/X URL or empty string",
+    "linkedin": "LinkedIn URL or empty string",
+    "youtube": "YouTube URL or empty string"
+  },
+  "imageUrls": ["Up to 5 photo URLs found in search results — actual image URLs, not page URLs"],
+  "keyHighlights": ["3-5 things customers frequently mention positively"],
+  "commonConcerns": ["2-3 things customers mention as areas for improvement"]
+}
+
+IMPORTANT:
+- Search thoroughly — use the business name AND location together
+- Only include information you can actually find, use empty strings for unknown fields
+- websiteUrl must be a real, working URL — do NOT guess or fabricate
+- imageUrls should be actual direct image URLs if available from search results`,
+                temperature: 0.2,
+                maxTokens: 2000,
+            });
+
+            const text = discoveryResult?.text || '';
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                discovery = JSON.parse(jsonMatch[0]);
+                console.log(`  ✅ Phase 1 Complete:`);
+                console.log(`     Website: ${discovery.websiteUrl || '❌ Not found'}`);
+                console.log(`     Rating: ${discovery.rating || 'N/A'} (${discovery.reviewCount || '0'} reviews)`);
+                console.log(`     Social: ${Object.values(discovery.socialLinks || {}).filter(Boolean).length} profiles found`);
+                console.log(`     Images: ${(discovery.imageUrls || []).length} photos found`);
+            }
+        } catch (err) {
+            console.warn(`  ⚠️ Phase 1 grounded discovery failed:`, err.message);
+            // Continue with empty discovery — Phase 2b fallback will handle it
         }
 
-        // Clean values
-        const finalName = brandData.name && brandData.name !== "" ? brandData.name : businessName;
+        // ══════════════════════════════════════════════════════════════════
+        // PHASE 2: DEEP SCAN or AI SYNTHESIS
+        // ══════════════════════════════════════════════════════════════════
+        let scanResult = null;
+        let usedWebsiteScan = false;
+        const discoveredUrl = discovery.websiteUrl || '';
 
-        const dna = {
-            logo: { url: '', metadata: {} },
-            voice: {
-                personality: brandData.personality || 'Professional & Local',
-                description: brandData.voiceDescription || `A local business voice for ${finalName}.`,
-                tone: 60, clarity: 80, formality: 50, warmth: 80,
-                keywords: brandData.keyPhrases || [],
-            },
-            contentStyle: {
-                dos: brandData.dos || [],
-                donts: brandData.donts || [],
-                keyPhrases: brandData.keyPhrases || [],
-            },
-            colors: (brandData.colorSuggestions || []).map(c => ({
-                name: c.name || 'Primary', hex: c.hex || '#000000', usage: c.usage || 'primary',
-            })),
-            fonts: {
-                heading: { family: brandData.fontSuggestions?.heading || 'Inter', weight: '700' },
-                body: { family: brandData.fontSuggestions?.body || 'Inter', weight: '400' },
-            },
-            industry: brandData.industry || 'Local Business',
-            targetAudience: brandData.targetAudience || `Locals and visitors in ${location}`,
-            brandDescription: `Based in ${location}. ${brandData.tagline || ''}`,
-            country: 'India',
+        if (discoveredUrl && discoveredUrl.startsWith('http')) {
+            // ── PHASE 2a: Website found → Run full scanWebsite() pipeline ──
+            console.log(`  🌐 Phase 2a: Website discovered! Running full deep scan on ${discoveredUrl}...`);
+            try {
+                scanResult = await orchestrator.scanWebsite(discoveredUrl);
+                usedWebsiteScan = true;
+                console.log(`  ✅ Phase 2a: Full website scan complete — logo: ${scanResult.dna?.logo?.url ? '✅' : '❌'}, colors: ${scanResult.dna?.colors?.length || 0}, images: ${scanResult.dna?.brandImages?.length || 0}`);
+            } catch (scanErr) {
+                console.warn(`  ⚠️ Phase 2a: Website scan failed (${scanErr.message}), falling back to synthesis...`);
+                // Fall through to Phase 2b
+            }
+        }
+
+        if (!usedWebsiteScan) {
+            // ── PHASE 2b: No website → Deep AI synthesis from grounded data ──
+            console.log(`  🧠 Phase 2b: No website available, synthesizing brand identity from grounded data...`);
+            try {
+                const synthesisResult = await aiRouter.generateTextWithSearch({
+                    systemPrompt: `You are an expert brand strategist. Based on web search data about a local business, synthesize a comprehensive brand identity. Return ONLY valid JSON.`,
+                    userPrompt: `Research "${businessName}" in "${location}" deeply and create a full brand identity profile.
+
+Known data so far:
+- Category: ${discovery.category || 'unknown'}
+- Rating: ${discovery.rating || 'unknown'}
+- Description: ${discovery.description || 'not available'}
+- Highlights: ${(discovery.keyHighlights || []).join(', ') || 'none'}
+
+Return ONLY valid JSON:
+{
+  "personality": "2-3 word brand personality (e.g., 'Warm & Artisanal')",
+  "voiceDescription": "2-3 sentences describing how this brand should communicate",
+  "targetAudience": "Specific target audience description",
+  "dos": ["5-8 brand communication rules to follow"],
+  "donts": ["5-8 things to avoid in brand communication"],
+  "keyPhrases": ["5-10 signature phrases this type of business would use"],
+  "colorSuggestions": [
+    {"name": "Descriptive Name", "hex": "#HEXCODE", "usage": "primary"},
+    {"name": "Descriptive Name", "hex": "#HEXCODE", "usage": "secondary"},
+    {"name": "Descriptive Name", "hex": "#HEXCODE", "usage": "accent"},
+    {"name": "Descriptive Name", "hex": "#HEXCODE", "usage": "background"}
+  ],
+  "fontSuggestions": {"heading": "Font Family Name", "body": "Font Family Name"},
+  "photographyStyle": "flat lay / lifestyle / studio / mixed",
+  "writingStyle": "1-2 sentence description of writing style",
+  "brandValues": ["3-5 core values"],
+  "companyOverview": "1-2 sentence elevator pitch",
+  "servicesOffered": ["list of services/products"],
+  "uniqueSellingPoints": ["3-5 differentiators"]
+}
+
+Be specific to THIS business and location — not generic.`,
+                    temperature: 0.4,
+                    maxTokens: 2000,
+                });
+
+                const synthText = synthesisResult?.text || '';
+                const synthJson = synthText.match(/\{[\s\S]*\}/);
+                if (synthJson) {
+                    const synthesis = JSON.parse(synthJson[0]);
+
+                    // Build a scan-like result from synthesis
+                    scanResult = {
+                        name: discovery.officialName || businessName,
+                        website: '',
+                        dna: {
+                            logo: { url: '', metadata: {} },
+                            colors: (synthesis.colorSuggestions || []).map(c => ({
+                                name: c.name || 'Brand Color', hex: c.hex || '#000000', usage: c.usage || 'accent',
+                            })),
+                            fonts: {
+                                heading: { family: synthesis.fontSuggestions?.heading || 'Inter', weight: '700', style: 'normal' },
+                                body: { family: synthesis.fontSuggestions?.body || 'Inter', weight: '400', style: 'normal' },
+                            },
+                            voice: {
+                                personality: synthesis.personality || 'Professional & Local',
+                                description: synthesis.voiceDescription || `A local business voice for ${businessName}.`,
+                                tone: 60, clarity: 80, formality: 50, warmth: 80, wit: 25,
+                                sampleQuote: '',
+                                keywords: synthesis.keyPhrases || [],
+                            },
+                            contentStyle: {
+                                dos: synthesis.dos || [],
+                                donts: synthesis.donts || [],
+                                keyPhrases: synthesis.keyPhrases || [],
+                                writingStyle: synthesis.writingStyle || '',
+                                ctaStyle: '', emojiUsage: 'minimal', hashtagStyle: 'minimal',
+                                sentenceLength: 'mixed', captionLengthPreference: 'medium',
+                            },
+                            socialLinks: discovery.socialLinks || {},
+                            industry: discovery.industry || discovery.category || 'Local Business',
+                            targetAudience: synthesis.targetAudience || `Locals and visitors in ${location}`,
+                            brandDescription: discovery.description || `${businessName} — a local business based in ${location}.`,
+                            tagline: discovery.tagline || '',
+                            photographyStyle: synthesis.photographyStyle || 'lifestyle',
+                            companyOverview: synthesis.companyOverview || '',
+                            servicesOffered: synthesis.servicesOffered || [],
+                            uniqueSellingPoints: synthesis.uniqueSellingPoints || [],
+                            brandValues: synthesis.brandValues || [],
+                            brandImages: (discovery.imageUrls || []).map(url => ({
+                                url, source: 'google-search', alt: businessName,
+                            })),
+                            // Populate competitive intel and sentiment from Phase 1 discovery
+                            competitiveIntel: { competitors: [], marketPosition: '', differentiators: synthesis.uniqueSellingPoints || [], industryTrends: [], lastAnalyzedAt: new Date() },
+                            publicSentiment: {
+                                overallSentiment: discovery.rating ? 'positive' : '',
+                                rating: discovery.rating || '',
+                                reviewHighlights: discovery.keyHighlights || [],
+                                reviewConcerns: discovery.commonConcerns || [],
+                                sentimentSummary: discovery.rating ? `Rated ${discovery.rating} based on ${discovery.reviewCount || 'multiple'} reviews.` : '',
+                                lastAnalyzedAt: new Date(),
+                            },
+                            country: 'India',
+                        },
+                    };
+                    console.log(`  ✅ Phase 2b: AI synthesis complete — colors: ${scanResult.dna.colors.length}, services: ${(scanResult.dna.servicesOffered || []).length}`);
+                }
+            } catch (synthErr) {
+                console.error(`  ❌ Phase 2b synthesis failed:`, synthErr.message);
+            }
+        }
+
+        // If both phases failed, return a minimal fallback
+        if (!scanResult) {
+            return res.status(500).json({ success: false, error: 'Could not gather enough data about this business. Please try a different name or add more location details.' });
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // PHASE 3: MERGE & ENRICH — Combine grounded data with scan results
+        // ══════════════════════════════════════════════════════════════════
+        console.log(`  🔗 Phase 3: Merging grounded discovery with ${usedWebsiteScan ? 'website scan' : 'AI synthesis'} data...`);
+
+        const finalName = discovery.officialName || scanResult.name || businessName;
+        const dna = scanResult.dna || {};
+
+        // Inject Google-discovered social links if the scan didn't find them
+        if (discovery.socialLinks) {
+            if (!dna.socialLinks) dna.socialLinks = {};
+            for (const [platform, url] of Object.entries(discovery.socialLinks)) {
+                if (url && !dna.socialLinks[platform]) {
+                    dna.socialLinks[platform] = url;
+                }
+            }
+        }
+
+        // Inject Google-discovered images if scan found few
+        if (discovery.imageUrls?.length > 0) {
+            if (!dna.brandImages) dna.brandImages = [];
+            const existingUrls = new Set(dna.brandImages.map(i => i.url));
+            for (const imgUrl of discovery.imageUrls) {
+                if (imgUrl && !existingUrls.has(imgUrl)) {
+                    dna.brandImages.push({ url: imgUrl, source: 'google-search', alt: businessName });
+                }
+            }
+        }
+
+        // Inject sentiment from Phase 1 if scan didn't get it
+        if (discovery.rating && (!dna.publicSentiment?.rating || dna.publicSentiment?.overallSentiment === 'unknown')) {
+            dna.publicSentiment = {
+                ...(dna.publicSentiment || {}),
+                overallSentiment: 'positive',
+                rating: discovery.rating,
+                reviewHighlights: discovery.keyHighlights || dna.publicSentiment?.reviewHighlights || [],
+                reviewConcerns: discovery.commonConcerns || dna.publicSentiment?.reviewConcerns || [],
+                sentimentSummary: `Rated ${discovery.rating} based on ${discovery.reviewCount || 'multiple'} Google reviews.`,
+                lastAnalyzedAt: new Date(),
+            };
+        }
+
+        // Populate localBusiness sub-object (Google-specific fields)
+        dna.localBusiness = {
+            googleMapsUrl: discovery.googleMapsUrl || '',
+            address: discovery.address || '',
+            phone: discovery.phone || '',
+            hours: discovery.hours || '',
+            rating: discovery.rating || '',
+            reviewCount: discovery.reviewCount || '',
+            category: discovery.category || '',
+            priceRange: discovery.priceRange || '',
+            discoveredWebsite: discoveredUrl || '',
         };
 
+        // Ensure industry is populated
+        if (!dna.industry) dna.industry = discovery.industry || discovery.category || 'Local Business';
+        if (!dna.country) dna.country = 'India';
+
+        // ── Save to DB ──
         let brand = null;
         if (req.user) {
             const tempBrandId = crypto.randomUUID();
@@ -286,34 +490,49 @@ Infer their brand identity based on public knowledge of this entity, or if unkno
             brand = await Brand.create({
                 user: req.user._id,
                 name: finalName,
-                website: '',
+                website: discoveredUrl || '',
                 onboardingMethod: 'local-search',
                 dna,
-                rawScanData: JSON.stringify(brandData),
+                rawScanData: scanResult.rawScanData || JSON.stringify(discovery),
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
             });
 
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
-            
-            // Auto triggers (optional background jobs)
+
+            // Background jobs: Visual DNA + SEO baseline (fire-and-forget)
             import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
                 try {
                     const visualDNA = await analyzeVisualDNA(brand);
                     if (visualDNA) {
                         await Brand.findOneAndUpdate({ _id: brand._id }, { $set: { 'dna.visualDNA': visualDNA } });
+                        console.log(`✅ Visual DNA auto-analyzed for ${brand.name}`);
                     }
-                } catch (e) { }
+                } catch (e) { console.warn('⚠️ Background Visual DNA failed:', e.message); }
             });
+
+            if (discoveredUrl) {
+                import('../services/seoBaseline.js').then(async ({ runSEOBaseline }) => {
+                    try {
+                        const seoResults = await runSEOBaseline(brand);
+                        console.log(`✅ SEO Baseline complete for ${brand.name}: score=${seoResults.overallScore}`);
+                    } catch (e) { console.warn('⚠️ Background SEO Baseline failed:', e.message); }
+                });
+            }
         } else {
             brand = {
                 _id: 'preview',
                 name: finalName,
-                website: '',
+                website: discoveredUrl || '',
                 onboardingMethod: 'local-search',
                 dna,
                 status: 'preview',
+                onboardingScore: scanResult.onboardingScore || 0,
+                onboardingPhases: scanResult.onboardingPhases || {},
             };
         }
 
+        console.log(`  ✅ Local Business Scan COMPLETE: "${finalName}" — method: ${usedWebsiteScan ? 'website-scan' : 'ai-synthesis'}`);
         res.json({ success: true, brand });
     } catch (error) {
         console.error('Scan Local Business error:', error);

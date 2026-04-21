@@ -167,6 +167,19 @@ const brandSchema = new mongoose.Schema({
             sentimentSummary: { type: String, default: '' },    // AI-written 2-3 sentence summary
             lastAnalyzedAt: { type: Date },
         },
+
+        // Local Business Data — Google Maps / public listing details (local-search onboarding)
+        localBusiness: {
+            googleMapsUrl: { type: String, default: '' },
+            address: { type: String, default: '' },
+            phone: { type: String, default: '' },
+            hours: { type: String, default: '' },
+            rating: { type: String, default: '' },
+            reviewCount: { type: String, default: '' },
+            category: { type: String, default: '' },
+            priceRange: { type: String, default: '' },
+            discoveredWebsite: { type: String, default: '' },
+        },
     },
 
     // Onboarding completeness — tracks which intelligence phases completed

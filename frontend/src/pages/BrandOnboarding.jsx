@@ -321,13 +321,17 @@ function LocalBusinessScan({ onComplete, onBack }) {
         setError(null)
         
         try {
-            setCurrentStep('Searching local directories & maps...')
-            // Fake animation progression
+            setCurrentStep('Searching Google for your business...')
             const steps = [
-                'Searching public listings...',
-                'Extracting business categories...',
-                'Analyzing reviews and audience...',
-                'Synthesizing Brand DNA...'
+                'Checking Google Maps listing...',
+                'Extracting address, rating & reviews...',
+                'Discovering social media profiles...',
+                'Looking for official website...',
+                'Running deep brand scan...',
+                'Extracting logo, colors & images...',
+                'Analyzing brand voice & personality...',
+                'Discovering competitors...',
+                'Building your Brand DNA...',
             ];
             let stepIdx = 0;
             const timer = setInterval(() => {
@@ -335,7 +339,7 @@ function LocalBusinessScan({ onComplete, onBack }) {
                 if (stepIdx < steps.length) {
                     setCurrentStep(steps[stepIdx]);
                 }
-            }, 2500);
+            }, 3500);
 
             const data = await agents.scanLocalBusiness(businessName.trim(), location.trim())
             clearInterval(timer)
