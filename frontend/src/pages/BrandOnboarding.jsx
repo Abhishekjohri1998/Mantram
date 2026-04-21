@@ -1405,7 +1405,7 @@ function ReviewBrand({ brand, onFinish }) {
             {/* SECTION B.2 — Strategy & Positioning */}
             {/* ══════════════════════════════════════════════════════════════ */}
             {(dna.companyOverview || dna.uniqueSellingPoints?.length > 0 || dna.servicesOffered?.length > 0 || dna.missionStatement || dna.brandValues?.length > 0) && (
-                <div className="glass-panel rounded-3xl p-8 mb-6">
+                <div className="glass-panel rounded-3xl p-8 mb-6 overflow-hidden">
                     <h3 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight mb-6 flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">lightbulb</span> Strategy & Positioning
                     </h3>
@@ -1455,7 +1455,7 @@ function ReviewBrand({ brand, onFinish }) {
 
                         <div className="space-y-4">
                             {dna.uniqueSellingPoints?.length > 0 && (
-                                <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] h-full">
+                                <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                     <p className="text-xs font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">stars</span> Unique Selling Points
                                     </p>
