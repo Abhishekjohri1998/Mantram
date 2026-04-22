@@ -1700,107 +1700,91 @@ function QuickPostPanel({
 
             {qpError && <div style={{ marginTop: 10, color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>{qpError}</div>}
 
-            {/* Result */}
+            {/* Result — Complete Designed Graphic */}
             {qpResult && !qpLoading && (
                 <div style={{ marginTop: 20 }}>
-                    {/* Extracted Copy Preview */}
-                    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Extracted Copy</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                            <div>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: '#FFF', lineHeight: 1.1 }}>{copy.productName}</div>
-                                {copy.tagline && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{copy.tagline}</div>}
-                                {copy.heroSpec && (
-                                    <div style={{ marginTop: 8 }}>
-                                        <div style={{ fontSize: 32, fontWeight: 900, color: palette[1]?.hex || '#A78BFA', lineHeight: 1 }}>{copy.heroSpec}</div>
-                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.1em' }}>{copy.heroSpecLabel}</div>
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                {(copy.features || []).map((f, i) => (
-                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                                        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#A78BFA' }}>{f.icon}</span>
-                                        </div>
-                                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{f.text}</span>
-                                    </div>
-                                ))}
-                                {copy.boxQty && (
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                        <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>BOX QTY: {copy.boxQty}</span>
-                                        <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>{copy.cta}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        {/* Palette mini strip */}
-                        {palette.length > 0 && (
-                            <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
-                                {palette.map((c, i) => (
-                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ flex: 1, height: 8, borderRadius: 4, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Composite Image Preview — show all generated backgrounds */}
-                    {Object.keys(qpCompositeUrls).length > 0 || qpResult.backgroundUrl ? (
-                        <div style={{ marginBottom: 16 }}>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Generated Backgrounds</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Object.keys(qpCompositeUrls).length || 1, 2)}, 1fr)`, gap: 8 }}>
-                                {Object.keys(qpCompositeUrls).length > 0
-                                    ? Object.entries(qpCompositeUrls).map(([ratio, url]) => url && (
-                                        <div key={ratio} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-                                            <div style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, background: 'rgba(0,0,0,0.6)', color: '#FFF', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{ratio}</div>
-                                            <img src={url} alt={ratio} style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain', background: '#000' }} />
-                                        </div>
-                                    ))
-                                    : <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                        <img src={qpResult.backgroundUrl} alt="background" style={{ width: '100%', display: 'block', maxHeight: 500, objectFit: 'contain', background: '#000' }} />
-                                      </div>
-                                }
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {/* Download Panel */}
-                    {Object.values({ ...qpResult.backgrounds, ...qpCompositeUrls }).some(url => url) && (
-                        <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
-                            <div style={{ fontSize: 10, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                                Download Creative
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                                {Object.entries({ ...qpResult.backgrounds, ...qpCompositeUrls })
-                                    .filter(([, url]) => url)
-                                    .map(([size, url]) => (
-                                        <button key={size} onClick={() => handleDownload(url, size)} style={{
-                                            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
-                                            color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                            fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                                        }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-                                            Download {size}
-                                        </button>
-                                    ))}
-
-                                <button onClick={handleGenerate} style={{
-                                    background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
-                                    color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                    fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                                }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
-                                    Regenerate
-                                </button>
-                            </div>
+                    {/* Copy summary strip */}
+                    {qpResult.copy && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12, padding: '10px 12px', background: 'var(--sys-surface)', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
+                            {qpResult.copy.productName && (
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>{qpResult.copy.productName}</span>
+                            )}
+                            {qpResult.copy.heroSpec && (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)', background: 'rgba(255,77,0,0.08)', padding: '2px 8px', borderRadius: 5 }}>
+                                    {qpResult.copy.heroSpec} {qpResult.copy.heroSpecLabel && <span style={{ fontWeight: 400, opacity: 0.7 }}>{qpResult.copy.heroSpecLabel}</span>}
+                                </span>
+                            )}
+                            {[qpResult.copy.feature1, qpResult.copy.feature2, qpResult.copy.feature3].filter(Boolean).map((f, i) => (
+                                <span key={i} style={{ fontSize: 10, color: 'var(--sys-text-muted)', padding: '2px 8px', borderRadius: 5, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)' }}>· {f}</span>
+                            ))}
+                            {qpResult.copy.cta && (
+                                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: 'var(--sys-primary)' }}>{qpResult.copy.cta}</span>
+                            )}
                         </div>
                     )}
 
-                    {/* Hidden canvas for compositor */}
+                    {/* Generated graphics grid */}
+                    {(() => {
+                        // Collect all generated images: from backgrounds map (multi-size) or single backgroundUrl
+                        const allImages = Object.entries(qpResult.backgrounds || {}).filter(([, url]) => url)
+                        if (allImages.length === 0 && qpResult.backgroundUrl) {
+                            allImages.push([qpResult.aspectRatio || '1:1', qpResult.backgroundUrl])
+                        }
+                        if (allImages.length === 0) return null
+                        return (
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>auto_awesome</span>
+                                    Generated Creative{allImages.length > 1 ? `s (${allImages.length})` : ''}
+                                    <span style={{ color: 'var(--sys-text-muted)', fontSize: 9, fontWeight: 400 }}>· {qpResult.moodLabel} theme</span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allImages.length, 2)}, 1fr)`, gap: 10 }}>
+                                    {allImages.map(([ratio, url]) => url && (
+                                        <div key={ratio} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', position: 'relative', background: 'var(--sys-bg)' }}>
+                                            <div style={{ position: 'absolute', top: 7, left: 7, zIndex: 2, fontSize: 9, background: 'rgba(0,0,0,0.65)', color: '#FFF', padding: '2px 7px', borderRadius: 4, fontWeight: 700, backdropFilter: 'blur(4px)' }}>{ratio}</div>
+                                            <button
+                                                onClick={() => handleDownload(url, ratio)}
+                                                title="Download"
+                                                style={{ position: 'absolute', top: 7, right: 7, zIndex: 2, width: 28, height: 28, borderRadius: 7, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                            </button>
+                                            <img
+                                                src={url}
+                                                alt={`${qpResult.copy?.productName || 'post'} ${ratio}`}
+                                                style={{ width: '100%', display: 'block', objectFit: 'contain', background: 'var(--sys-bg)' }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })()}
+
+                    {/* Actions row */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={handleGenerate} style={{ flex: 1, padding: '10px 0', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', color: 'var(--sys-text-muted)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span>
+                            Regenerate
+                        </button>
+                        {(() => {
+                            const allImages = Object.entries(qpResult.backgrounds || {}).filter(([, url]) => url)
+                            if (allImages.length === 0 && qpResult.backgroundUrl) allImages.push([qpResult.aspectRatio || '1:1', qpResult.backgroundUrl])
+                            return allImages.map(([ratio, url]) => url && (
+                                <button key={ratio} onClick={() => handleDownload(url, ratio)} className="btn-primary" style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>download</span>
+                                    {allImages.length > 1 ? ratio : 'Download'}
+                                </button>
+                            ))
+                        })()}
+                    </div>
+
+                    {/* Hidden canvas (kept for compat, not used for compositor anymore) */}
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
                 </div>
             )}
+
         </div>
     )
 }
@@ -2911,72 +2895,73 @@ function ContextLibraryModal({ brandId, onActivate, onClose }) {
     }
 
     return createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <div style={{ background: '#0D0D14', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, width: '100%', maxWidth: 840, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 16, width: '100%', maxWidth: 840, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Header */}
-                <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 19, color: '#A78BFA' }}>library_books</span>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="glass-panel" style={{ width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--sys-primary)' }}>library_books</span>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#FFF' }}>Product Context Library</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Restore any saved product's palette, mood board, and DNA to use across all tools</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Product Context Library</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Restore any saved product's palette, mood board, and DNA to use across all tools</div>
                     </div>
                     <input
                         value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search products..."
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 14px', color: '#FFF', fontSize: 13, outline: 'none', width: 200 }}
+                        className="input-glass"
+                        style={{ width: 180, borderRadius: 8, fontSize: 13 }}
                     />
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>close</span>
+                    <button onClick={onClose} className="btn-ghost" style={{ width: 32, height: 32, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
                     </button>
                 </div>
                 {/* Grid */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
                     {loading ? (
-                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
-                            <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                        <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
+                            <div style={{ width: 28, height: 28, border: '2px solid var(--sys-border)', borderTop: '2px solid var(--sys-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
                             Loading library...
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>inventory_2</span>
+                        <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 10 }}>inventory_2</span>
                             {search ? 'No products match your search' : 'No saved contexts yet — analyze a product in A+ Listing, then click Save Context.'}
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
                             {filtered.map(ctx => (
-                                <div key={ctx._id} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.2s', background: '#0A0A0A' }}>
-                                    <div style={{ height: 110, background: '#111', position: 'relative', overflow: 'hidden' }}>
+                                <div key={ctx._id} style={{ borderRadius: 10, border: '1px solid var(--sys-border)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.2s', background: 'var(--sys-surface)' }}>
+                                    <div style={{ height: 100, background: 'var(--sys-bg)', position: 'relative', overflow: 'hidden' }}>
                                         {ctx.thumbnail ? (
                                             <img src={ctx.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
-                                            <div style={{ height: '100%', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'rgba(255,255,255,0.12)' }}>palette</span>
+                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--sys-text-muted)', opacity: 0.4 }}>palette</span>
                                             </div>
                                         )}
-                                        <button onClick={e => handleDelete(ctx._id, e)} style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 5, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+                                        <button onClick={e => handleDelete(ctx._id, e)} style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 5, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
                                         </button>
                                         {ctx.usedIn?.length > 0 && (
                                             <div style={{ position: 'absolute', bottom: 5, left: 5, display: 'flex', gap: 3 }}>
                                                 {ctx.usedIn.slice(0,3).map(t => (
-                                                    <span key={t} style={{ fontSize: 8, background: 'rgba(124,58,237,0.8)', color: '#FFF', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{t}</span>
+                                                    <span key={t} style={{ fontSize: 8, background: 'var(--sys-primary)', color: '#FFF', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{t}</span>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
                                     <div style={{ padding: '10px 12px' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctx.productName}</div>
-                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>{ctx.productCategory}{ctx.productBrand ? ` · ${ctx.productBrand}` : ''}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)' }}>{ctx.productName}</div>
+                                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginBottom: 7 }}>{ctx.productCategory}{ctx.productBrand ? ` · ${ctx.productBrand}` : ''}</div>
                                         <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
                                             {(ctx.palette || []).slice(0,7).map((c, i) => (
-                                                <div key={i} title={c.hex} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                <div key={i} title={c.hex} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                                             ))}
                                         </div>
-                                        <button onClick={() => handleActivate(ctx)} style={{ width: '100%', padding: '7px 0', borderRadius: 7, background: activating === ctx._id ? 'rgba(124,58,237,0.4)' : 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#A78BFA', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                        <button onClick={() => handleActivate(ctx)} className="btn-primary" style={{ width: '100%', padding: '7px 0', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'inherit', opacity: activating === ctx._id ? 0.7 : 1 }}>
                                             {activating === ctx._id ? (
-                                                <><div style={{ width: 11, height: 11, border: '2px solid rgba(167,139,250,0.3)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Loading...</>
+                                                <><div style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Loading...</>
                                             ) : (
                                                 <><span className="material-symbols-outlined" style={{ fontSize: 13 }}>bolt</span>Activate</>
                                             )}
@@ -3281,74 +3266,74 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
     return (
         <div>
             {/* ─── Header ─────────────────────────────── */}
-            <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,rgba(124,58,237,0.35),rgba(245,158,11,0.2))', border: '1px solid rgba(124,58,237,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#A78BFA' }}>search</span>
+            <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <div className="glass-panel" style={{ width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>search</span>
                     </div>
                     <div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#FFF', letterSpacing: '-0.01em' }}>Step 1 — Analyze Your Product</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>AI extracts your color palette, design DNA, and mood directions. Everything else flows from this.</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Step 1 — Analyze Your Product</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>AI extracts color palette, design DNA & mood directions. Everything flows from this.</div>
                     </div>
                 </div>
             </div>
 
             {/* ─── Input Row ──────────────────────────── */}
             {step !== 'ready' && (
-                <div style={{ background: '#0A0A0A', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 16, padding: 20, marginBottom: step === 'analyzing' ? 20 : 0 }}>
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                <div className="glass-panel" style={{ borderRadius: 12, padding: 16, marginBottom: step === 'analyzing' ? 12 : 0 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                         <div style={{ position: 'relative', flex: 1 }}>
-                            <span className="material-symbols-outlined" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>link</span>
+                            <span className="material-symbols-outlined" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--sys-text-muted)', pointerEvents: 'none' }}>link</span>
                             <input
                                 value={productUrl}
                                 onChange={e => setProductUrl(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
                                 placeholder="Paste Amazon, Flipkart, or any product URL..."
                                 disabled={step === 'analyzing'}
-                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px 12px 44px', color: '#FFF', fontSize: 14, outline: 'none', boxSizing: 'border-box', opacity: step === 'analyzing' ? 0.6 : 1 }}
+                                className="input-glass"
+                                style={{ paddingLeft: 38, opacity: step === 'analyzing' ? 0.6 : 1, borderRadius: 8 }}
                             />
                         </div>
                         <button
                             onClick={handleAnalyze}
                             disabled={!productUrl || step === 'analyzing'}
-                            style={{ padding: '12px 22px', borderRadius: 10, border: 'none', background: step === 'analyzing' ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#FFF', fontWeight: 800, fontSize: 14, cursor: (!productUrl || step === 'analyzing') ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, boxShadow: step !== 'analyzing' ? '0 4px 16px rgba(124,58,237,0.4)' : 'none', transition: 'all 0.2s', fontFamily: 'inherit' }}
+                            className="btn-primary"
+                            style={{ borderRadius: 8, gap: 6, flexShrink: 0, cursor: (!productUrl || step === 'analyzing') ? 'not-allowed' : 'pointer', opacity: (!productUrl || step === 'analyzing') ? 0.6 : 1 }}
                         >
                             {step === 'analyzing' ? (
-                                <><div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing...</>
+                                <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing...</>
                             ) : (
-                                <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Analyze + Design</>
+                                <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Analyze + Design</>
                             )}
                         </button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.07)' }} />
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>or upload product images</span>
-                        <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.07)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                        <div style={{ height: 1, flex: 1, background: 'var(--sys-border)' }} />
+                        <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', flexShrink: 0 }}>or upload product images</span>
+                        <div style={{ height: 1, flex: 1, background: 'var(--sys-border)' }} />
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer', padding: '9px 14px', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 9, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, transition: 'all 0.2s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,58,237,0.5)'; e.currentTarget.style.color = '#A78BFA' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add_photo_alternate</span>
+                    <label className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', border: '1px dashed var(--sys-border)', borderRadius: 8, fontSize: 13, fontWeight: 600, width: '100%' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
                         Upload Product Images (JPG, PNG — up to 8)
                         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
                     </label>
-                    {error && <div style={{ marginTop: 10, color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>{error}</div>}
+                    {error && <div style={{ marginTop: 10, color: 'var(--sys-primary)', fontSize: 12, padding: '8px 12px', background: 'var(--sys-primary-dim)', borderRadius: 8, border: '1px solid var(--sys-border)' }}>{error}</div>}
                 </div>
             )}
 
             {/* ─── Analyzing Progress ─────────────────── */}
             {step === 'analyzing' && (
-                <div style={{ background: '#0A0A0A', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 14, padding: '18px 20px', marginBottom: 20 }}>
+                <div className="glass-panel" style={{ borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
                     {[
                         { icon: 'search', text: 'Scraping product data & images...' },
-                        { icon: 'palette', text: 'AI vision extracting your color palette...' },
+                        { icon: 'palette', text: 'AI vision extracting color palette...' },
                         { icon: 'psychology', text: 'Building product design DNA...' },
                         { icon: 'style', text: 'Generating 4 custom mood directions...' },
                     ].map((s, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                            <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.2)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'rgba(124,58,237,0.6)' }}>{s.icon}</span>
-                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{s.text}</span>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < 3 ? '1px solid var(--sys-border)' : 'none' }}>
+                            <div style={{ width: 13, height: 13, border: '2px solid var(--sys-border)', borderTop: `2px solid var(--sys-primary)`, borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>{s.icon}</span>
+                            <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{s.text}</span>
                         </div>
                     ))}
                 </div>
@@ -3358,54 +3343,54 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
             {step === 'ready' && productDNA && (
                 <div>
                     {/* Product identity card */}
-                    <div style={{ background: '#0A0A0A', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 16, padding: 18, marginBottom: 16 }}>
-                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+                    <div className="glass-panel" style={{ borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                             {(productImages[0] || uploadedImages[0]) && (
-                                <img src={productImages[0] || uploadedImages[0]} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                                <img src={productImages[0] || uploadedImages[0]} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--sys-border)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
                             )}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14, fontWeight: 800, color: '#FFF', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)' }}>
                                     {analyzedProduct?.title || productDNA.productCategory || 'Product Analyzed'}
                                 </div>
-                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-                                    {productDNA.productCategory}{analyzedProduct?.brand ? ` · ${analyzedProduct.brand}` : ''} · {productImages.length} images analyzed
+                                <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginBottom: 6 }}>
+                                    {productDNA.productCategory}{analyzedProduct?.brand ? ` · ${analyzedProduct.brand}` : ''} · {productImages.length} images
                                 </div>
-                                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                                     {(productDNA.dominantColors || []).slice(0, 8).map((c, i) => (
-                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 16, height: 16, borderRadius: 4, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                                     ))}
-                                    <span style={{ fontSize: 10, color: '#22C55E', marginLeft: 6, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <span style={{ fontSize: 10, color: 'var(--sys-primary)', marginLeft: 5, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 11 }}>lock</span>Colors Locked
                                     </span>
                                 </div>
                             </div>
-                            <button onClick={() => { setStep('input'); resetState() }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>New Product
+                            <button onClick={() => { setStep('input'); resetState() }} className="btn-ghost" style={{ padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>refresh</span>Reset
                             </button>
                         </div>
 
                         {/* Mood board selector */}
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>style</span>
+                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>style</span>
                             Pick a Mood Direction
                             {Object.keys(moodImages).length > 0
-                                ? <span style={{ color: '#A78BFA', textTransform: 'none', letterSpacing: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>auto_awesome</span>AI mood boards ready</span>
-                                : <span style={{ color: 'rgba(124,58,237,0.5)', textTransform: 'none', letterSpacing: 0, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>hourglass_empty</span>Generating...</span>
+                                ? <span style={{ color: 'var(--sys-primary)', textTransform: 'none', letterSpacing: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>auto_awesome</span>AI ready</span>
+                                : <span style={{ color: 'var(--sys-text-muted)', textTransform: 'none', letterSpacing: 0, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>hourglass_empty</span>Generating...</span>
                             }
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
                             {Object.values(activeMoods).map(mood => {
                                 const aiImg = moodImages[mood.id]
                                 const isSelected = selectedMood === mood.id
                                 const swatches = moodSwatchMap[mood.id] || []
                                 return (
                                     <div key={mood.id} onClick={() => handleSelectMood(mood.id)} style={{
-                                        borderRadius: 12, border: `2px solid ${isSelected ? '#A78BFA' : 'rgba(255,255,255,0.07)'}`,
-                                        overflow: 'hidden', cursor: 'pointer', transition: 'all 0.25s',
-                                        boxShadow: isSelected ? '0 0 0 3px rgba(124,58,237,0.25),0 8px 24px rgba(124,58,237,0.15)' : '0 2px 8px rgba(0,0,0,0.3)',
-                                        background: '#0A0A0A', transform: isSelected ? 'scale(1.02)' : 'none', position: 'relative',
+                                        borderRadius: 10,
+                                        border: isSelected ? `2px solid var(--sys-primary)` : '1px solid var(--sys-border)',
+                                        overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s',
+                                        background: 'var(--sys-surface)', position: 'relative',
                                     }}>
-                                        <div style={{ height: 130, position: 'relative', overflow: 'hidden' }}>
+                                        <div style={{ height: 110, position: 'relative', overflow: 'hidden' }}>
                                             {aiImg ? (
                                                 <img src={aiImg} alt={mood.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                             ) : (
@@ -3414,38 +3399,38 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
                                                         {swatches.map((sw, si) => <div key={si} style={{ background: si === 3 ? sw + 'CC' : sw }} />)}
                                                     </div>
                                                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.2)' }}>{mood.icon}</span>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'rgba(255,255,255,0.25)' }}>{mood.icon}</span>
                                                     </div>
                                                 </div>
                                             )}
                                             {isSelected && (
-                                                <div style={{ position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#FFF' }}>check</span>
+                                                <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: '50%', background: 'var(--sys-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#FFF' }}>check</span>
                                                 </div>
                                             )}
-                                            <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, color: isSelected ? '#C4B5FD' : 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mood Board</div>
+                                            <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 5, padding: '2px 6px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mood</div>
                                         </div>
-                                        <div style={{ padding: '8px 10px', background: isSelected ? 'rgba(124,58,237,0.12)' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: isSelected ? '#A78BFA' : 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{mood.icon}</span>
+                                        <div style={{ padding: '7px 10px', background: isSelected ? 'var(--sys-primary-dim)' : 'transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: isSelected ? 'var(--sys-primary)' : 'var(--sys-text-muted)', flexShrink: 0 }}>{mood.icon}</span>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#A78BFA' : '#FFF', marginBottom: 1 }}>{mood.label}{productMoodDirections && <span style={{ marginLeft: 5, fontSize: 8, color: 'rgba(139,92,246,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>AI</span>}</div>
-                                                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
+                                                <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? 'var(--sys-primary)' : 'var(--sys-text)', marginBottom: 1 }}>{mood.label}{productMoodDirections && <span style={{ marginLeft: 5, fontSize: 8, color: 'var(--sys-primary)', background: 'var(--sys-primary-dim)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>AI</span>}</div>
+                                                <div style={{ fontSize: 9.5, color: 'var(--sys-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
                                             </div>
                                         </div>
                                     </div>
                                 )
                             })}
                         </div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: 7, padding: '7px 11px' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#22C55E' }}>lock</span>
-                            Product colors are locked — AI will never change the product color in any generated asset.
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-border)', borderRadius: 7, padding: '7px 10px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>lock</span>
+                            Product colors are locked — AI will never shift the product's color in any generated asset.
                         </div>
                     </div>
 
                     {selectedMood && (
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '8px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#22C55E' }}>arrow_downward</span>
-                            Mood locked — choose an asset type below
+                        <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', textAlign: 'center', padding: '8px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-primary)' }}>arrow_downward</span>
+                            Mood locked — choose an asset type on the right
                         </div>
                     )}
                 </div>
@@ -3464,35 +3449,35 @@ function ActionCard({ action, active, palette, onClick }) {
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
             style={{
-                borderRadius: 14, border: `1.5px solid ${active ? action.accent : hover ? `${action.accent}50` : 'rgba(255,255,255,0.08)'}`,
-                background: active ? `${action.accent}12` : hover ? `${action.accent}08` : 'rgba(255,255,255,0.02)',
-                padding: '16px 18px', cursor: 'pointer', transition: 'all 0.22s',
-                boxShadow: active ? `0 0 0 3px ${action.accent}22, 0 8px 24px ${action.accent}18` : hover ? `0 4px 16px ${action.accent}12` : 'none',
-                position: 'relative', display: 'flex', flexDirection: 'column', gap: 8,
+                borderRadius: 10,
+                border: active ? `1.5px solid var(--sys-primary)` : hover ? '1px solid var(--sys-border)' : '1px solid var(--sys-border)',
+                background: active ? 'var(--sys-primary-dim)' : hover ? 'var(--sys-surface)' : 'var(--sys-surface)',
+                padding: '13px 14px', cursor: 'pointer', transition: 'all 0.18s',
+                position: 'relative', display: 'flex', flexDirection: 'column', gap: 6,
             }}
         >
             {action.badge && (
-                <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 8, fontWeight: 800, color: action.accent, background: `${action.accent}18`, border: `1px solid ${action.accent}35`, borderRadius: 4, padding: '2px 6px', letterSpacing: '0.06em' }}>
+                <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700, color: 'var(--sys-primary)', background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-border)', borderRadius: 4, padding: '1px 5px', letterSpacing: '0.05em' }}>
                     {action.badge}
                 </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: `${action.accent}18`, border: `1px solid ${action.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s', ...(active ? { background: `${action.accent}30`, boxShadow: `0 0 12px ${action.accent}30` } : {}) }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: action.accent }}>{action.icon}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: active ? 'var(--sys-primary-dim)' : 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.18s' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 17, color: active ? 'var(--sys-primary)' : 'var(--sys-text-muted)' }}>{action.icon}</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#FFF' : 'rgba(255,255,255,0.9)', letterSpacing: '-0.01em' }}>{action.label}</div>
-                    <div style={{ fontSize: 9, color: `${action.accent}90`, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{action.tier} · {action.credits} cr</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--sys-primary)' : 'var(--sys-text)', letterSpacing: '-0.01em', fontFamily: 'var(--font-display)' }}>{action.label}</div>
+                    <div style={{ fontSize: 9, color: 'var(--sys-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{action.tier} · {action.credits} cr</div>
                 </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: active ? action.accent : 'rgba(255,255,255,0.2)', transition: 'all 0.2s', transform: active ? 'rotate(-90deg)' : 'rotate(0)' }}>expand_more</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: active ? 'var(--sys-primary)' : 'var(--sys-text-muted)', transition: 'all 0.18s', transform: active ? 'rotate(-90deg)' : 'rotate(0)' }}>expand_more</span>
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>{action.desc}</div>
+            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{action.desc}</div>
             {palette && palette.length > 0 && (
-                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                     {palette.slice(0, 6).map((c, i) => (
-                        <div key={i} title={c.name || c.hex} style={{ width: 11, height: 11, borderRadius: 3, background: c.hex || c, border: '1px solid rgba(255,255,255,0.1)' }} />
+                        <div key={i} title={c.name || c.hex} style={{ width: 10, height: 10, borderRadius: 3, background: c.hex || c, border: '1px solid var(--sys-border)' }} />
                     ))}
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 3, alignSelf: 'center' }}>palette applied</span>
+                    <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginLeft: 2 }}>palette applied</span>
                 </div>
             )}
         </div>
@@ -3586,19 +3571,19 @@ export default function PulseStudio() {
                 {/* ── Top Bar ── */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,rgba(124,58,237,0.3),rgba(245,158,11,0.2))', border: '1px solid rgba(124,58,237,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#A78BFA' }}>auto_awesome</span>
+                        <div className="glass-panel" style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-primary)' }}>auto_awesome</span>
                         </div>
                         <div>
-                            <div style={{ fontSize: 18, fontWeight: 900, color: '#FFF', letterSpacing: '-0.02em' }}>Pulse Studio</div>
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Product Intelligence → Marketing Assets</div>
+                            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--sys-text)', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>Pulse Studio</div>
+                            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Product Intelligence → Marketing Assets</div>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)', color: '#A78BFA', padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
+                        <button onClick={() => setShowLibrary(true)} className="btn-secondary" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Library
                         </button>
-                        <button onClick={() => setShowHistory(true)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
+                        <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer', border: '1px solid var(--sys-border)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>history</span>History
                         </button>
                     </div>
@@ -3631,27 +3616,26 @@ export default function PulseStudio() {
                     {phase === 'create' && activeProductContext && (
                         <div style={{ animation: 'slideDown 0.35s ease-out' }}>
                             {/* Step 2 header */}
-                            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,rgba(34,197,94,0.25),rgba(16,185,129,0.15))', border: '1px solid rgba(34,197,94,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22C55E' }}>rocket_launch</span>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 15, fontWeight: 800, color: '#FFF', letterSpacing: '-0.01em' }}>Step 2 — Create Marketing Assets</div>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                                        All assets use your locked palette{moodName ? ` · ${moodName}` : ''}
+                            <div className="glass-panel" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>rocket_launch</span>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Step 2 — Create Marketing Assets</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                        Palette locked{moodName ? ` · ${moodName}` : ''}
                                         {palette.length > 0 && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6 }}>
-                                                {palette.slice(0, 5).map((c, i) => (
-                                                    <span key={i} style={{ display: 'inline-block', width: 11, height: 11, borderRadius: 3, background: c.hex || c, border: '1px solid rgba(255,255,255,0.12)' }} />
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                                {palette.slice(0, 6).map((c, i) => (
+                                                    <span key={i} title={c.name} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: c.hex || c, border: '1px solid var(--sys-border)' }} />
                                                 ))}
                                             </span>
                                         )}
                                     </div>
                                 </div>
+                                {productName && <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 6, padding: '3px 9px', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{productName}</span>}
                             </div>
 
                             {/* Action card grid — 2×3 */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
                                 {ACTIONS.map(action => (
                                     <ActionCard
                                         key={action.id}
@@ -3664,67 +3648,66 @@ export default function PulseStudio() {
                             </div>
 
                             {/* ── Inline expanded tool panel ── */}
-                            {activeAction && (
-                                <div style={{ animation: 'slideDown 0.28s ease-out', border: `1px solid ${ACTIONS.find(a => a.id === activeAction)?.accent || '#7c3aed'}30`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
-                                    {/* Tool header strip */}
-                                    <div style={{ padding: '12px 18px', background: `${ACTIONS.find(a => a.id === activeAction)?.accent || '#7c3aed'}10`, borderBottom: `1px solid ${ACTIONS.find(a => a.id === activeAction)?.accent || '#7c3aed'}20`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 17, color: ACTIONS.find(a => a.id === activeAction)?.accent }}>
-                                            {ACTIONS.find(a => a.id === activeAction)?.icon}
-                                        </span>
-                                        <span style={{ fontSize: 13, fontWeight: 800, color: '#FFF' }}>{ACTIONS.find(a => a.id === activeAction)?.label}</span>
-                                        <span style={{ marginLeft: 'auto', fontSize: 10, color: ACTIONS.find(a => a.id === activeAction)?.accent, background: `${ACTIONS.find(a => a.id === activeAction)?.accent}18`, border: `1px solid ${ACTIONS.find(a => a.id === activeAction)?.accent}30`, padding: '3px 9px', borderRadius: 5, fontWeight: 700 }}>
-                                            {ACTIONS.find(a => a.id === activeAction)?.credits} credits
-                                        </span>
-                                        <button onClick={() => setActiveAction(null)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', width: 28, height: 28, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
-                                        </button>
+                            {activeAction && (() => {
+                                const act = ACTIONS.find(a => a.id === activeAction)
+                                return (
+                                    <div className="glass-panel" style={{ animation: 'slideDown 0.28s ease-out', borderRadius: 12, overflow: 'hidden', marginBottom: 12, borderColor: `${act?.accent}30` }}>
+                                        {/* Tool header strip */}
+                                        <div style={{ padding: '10px 16px', background: `${act?.accent}0C`, borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: act?.accent }}>{act?.icon}</span>
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)', flex: 1 }}>{act?.label}</span>
+                                            <span style={{ fontSize: 10, color: act?.accent, background: `${act?.accent}15`, border: `1px solid ${act?.accent}25`, padding: '2px 8px', borderRadius: 5, fontWeight: 700 }}>{act?.credits} credits</span>
+                                            <button onClick={() => setActiveAction(null)} className="btn-ghost" style={{ width: 26, height: 26, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                            </button>
+                                        </div>
+                                        {/* Tool body */}
+                                        <div style={{ padding: 16 }}>
+                                            {(activeAction === 'aplus' || activeAction === 'aptwo') && (
+                                                <APlusTool
+                                                    brandId={brandId}
+                                                    onContextReady={() => {}}
+                                                    externalContext={activeProductContext}
+                                                    forceTier={activeAction === 'aptwo' ? 'premium' : 'standard'}
+                                                />
+                                            )}
+                                            {activeAction === 'quick_post' && (
+                                                <QuickPostPanel
+                                                    productDNA={activeProductContext?.productDNA}
+                                                    productData={activeProductContext?.productData}
+                                                    selectedMoodId={activeProductContext?.selectedMood}
+                                                    productMoodDirections={activeProductContext?.productMoodDirections}
+                                                    brandId={brandId}
+                                                    brand={null}
+                                                    qpType={qpType} setQpType={setQpType}
+                                                    qpRatios={qpRatios} toggleQpRatio={toggleQpRatio}
+                                                    qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
+                                                    qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
+                                                    qpLoading={qpLoading} setQpLoading={setQpLoading}
+                                                    qpResult={qpResult} setQpResult={setQpResult}
+                                                    qpError={qpError} setQpError={setQpError}
+                                                    qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
+                                                    canvasRef={canvasRef}
+                                                />
+                                            )}
+                                            {activeAction === 'deck' && (
+                                                <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                            {activeAction === 'mail' && (
+                                                <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                            {activeAction === 'page' && (
+                                                <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                        </div>
                                     </div>
-                                    {/* Tool body */}
-                                    <div style={{ padding: 18 }}>
-                                        {(activeAction === 'aplus' || activeAction === 'aptwo') && (
-                                            <APlusTool
-                                                brandId={brandId}
-                                                onContextReady={() => {}}
-                                                externalContext={activeProductContext}
-                                                forceTier={activeAction === 'aptwo' ? 'premium' : 'standard'}
-                                            />
-                                        )}
-                                        {activeAction === 'quick_post' && (
-                                            <QuickPostPanel
-                                                productDNA={activeProductContext?.productDNA}
-                                                productData={activeProductContext?.productData}
-                                                selectedMoodId={activeProductContext?.selectedMood}
-                                                productMoodDirections={activeProductContext?.productMoodDirections}
-                                                brandId={brandId}
-                                                brand={null}
-                                                qpType={qpType} setQpType={setQpType}
-                                                qpRatios={qpRatios} toggleQpRatio={toggleQpRatio}
-                                                qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
-                                                qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
-                                                qpLoading={qpLoading} setQpLoading={setQpLoading}
-                                                qpResult={qpResult} setQpResult={setQpResult}
-                                                qpError={qpError} setQpError={setQpError}
-                                                qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
-                                                canvasRef={canvasRef}
-                                            />
-                                        )}
-                                        {activeAction === 'deck' && (
-                                            <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
-                                        )}
-                                        {activeAction === 'mail' && (
-                                            <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
-                                        )}
-                                        {activeAction === 'page' && (
-                                            <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                                )
+                            })()}
 
                             {!activeAction && (
-                                <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>touch_app</span>
-                                    Click any card above to start generating
+                                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--sys-text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>touch_app</span>
+                                    Select a card above to start creating
                                 </div>
                             )}
                         </div>
@@ -3742,13 +3725,13 @@ export default function PulseStudio() {
 
                 {/* ── History Modal (slide-in panel) ── */}
                 {showHistory && createPortal(
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 9998, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
-                        <div style={{ width: '100%', maxWidth: 760, background: '#0D0D14', borderLeft: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', overflowY: 'auto', animation: 'slideDown 0.3s ease-out' }}>
-                            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'rgba(255,255,255,0.5)' }}>history</span>
-                                <span style={{ fontSize: 15, fontWeight: 800, color: '#FFF', flex: 1 }}>Generation History</span>
-                                <button onClick={() => setShowHistory(false)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', zIndex: 9998, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
+                        <div style={{ width: '100%', maxWidth: 760, background: 'var(--sys-bg)', borderLeft: '1px solid var(--sys-border)', display: 'flex', flexDirection: 'column', overflowY: 'auto', animation: 'slideDown 0.3s ease-out' }}>
+                            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-text-muted)' }}>history</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', flex: 1, fontFamily: 'var(--font-display)' }}>Generation History</span>
+                                <button onClick={() => setShowHistory(false)} className="btn-ghost" style={{ width: 30, height: 30, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
                                 </button>
                             </div>
                             <div style={{ flex: 1 }}>

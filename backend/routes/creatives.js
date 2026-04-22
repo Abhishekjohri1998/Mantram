@@ -905,6 +905,24 @@ const IMAGE_MODEL_CONFIG = {
         name: 'Grok Imagen',
         supportsRefImages: false,
     },
+    // GPT Image 1 — OpenAI (opt-in, no ref image support)
+    'gpt-image-1': {
+        provider: 'openai',
+        modelId: 'gpt-image-1',
+        name: 'GPT Image 1',
+        supportsRefImages: false,
+        supportsTransparent: false,
+    },
+    // GPT Image 2 — OpenAI's latest (April 2026). Near-perfect text rendering,
+    // transparent backgrounds, 2K output. Opt-in only — no ref image support.
+    'gpt-image-2': {
+        provider: 'openai',
+        modelId: 'gpt-image-2',
+        name: 'GPT Image 2',
+        supportsRefImages: false,
+        supportsTransparent: true,
+        supportsTextRendering: true,
+    },
 };
 
 // ── fal.ai Image Generation (queue-based async) ─────────────────────────
@@ -1087,6 +1105,110 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
     };
 }
 
+// ── OpenAI GPT-image-1 / GPT-image-2 generation ──────────────────────────────
+// Routes through Direct OpenAI API. Falls back to LaoZhang proxy if env var
+// OPENAI_USE_LZ=true — useful when direct API has quota issues.
+// NOTE: These models do NOT support reference images / inpainting.
+async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
+    // ── Choose API endpoint ──
+    // Primary: Direct OpenAI API
+    // Fallback: LaoZhang proxy (OpenAI-compatible)
+    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+    const apiKey = useLaoZhang
+        ? (process.env.LAOZHANG_API_KEY)
+        : (process.env.OPENAI_API_KEY);
+    const baseUrl = useLaoZhang
+        ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1')
+        : 'https://api.openai.com/v1';
+
+    if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
+
+    // ── Map aspect ratio → supported OpenAI image sizes ──
+    // GPT-image-1/2 supports: 1024x1024, 1024x1536 (portrait 2:3), 1536x1024 (landscape 3:2)
+    const sizeMap = {
+        '1:1':  '1024x1024',
+        '4:5':  '1024x1024',  // closest square
+        '2:3':  '1024x1536',
+        '9:16': '1024x1536',  // portrait → 2:3 native
+        '3:4':  '1024x1536',  // portrait → 2:3 native
+        '3:2':  '1536x1024',
+        '16:9': '1536x1024',  // landscape → 3:2 native
+        '4:3':  '1536x1024',
+    };
+    const imageSize = sizeMap[aspectRatio] || '1024x1024';
+
+    // transparent background only works with PNG output
+    const finalFormat = background === 'transparent' ? 'png' : outputFormat;
+
+    console.log(`\n══════ OPENAI IMAGE GENERATION (${modelId}) ══════`);
+    console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
+    console.log(`🌐 Endpoint: ${baseUrl} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
+    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
+
+    const body = {
+        model: modelId,
+        prompt: promptText,
+        n: 1,
+        size: imageSize,
+        quality,
+        output_format: finalFormat,
+        background,
+    };
+    // output_compression only applies to jpeg/webp
+    if (finalFormat === 'webp' || finalFormat === 'jpeg') {
+        body.output_compression = 85;
+    }
+
+    const response = await fetch(`${baseUrl}/images/generations`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(180000),
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        console.error(`❌ OpenAI Image (${modelId}) error (${response.status}):`, errText);
+        if (response.status === 429) throw new Error(`BUSY: OpenAI rate limit hit. Please try again in a moment.`);
+        if (response.status === 402) throw new Error(`QUOTA_EXHAUSTED: OpenAI billing issue. Please check your account.`);
+        if (response.status === 400) {
+            const parsed = (() => { try { return JSON.parse(errText); } catch { return {}; } })();
+            throw new Error(`OpenAI rejected the request: ${parsed?.error?.message || errText.substring(0, 200)}`);
+        }
+        throw new Error(`OpenAI Image generation failed (${response.status}): ${errText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const imageData = data.data?.[0];
+    if (!imageData) throw new Error('OpenAI Image API returned no image data');
+
+    let imageUrl;
+    if (imageData.b64_json) {
+        const mimeType = finalFormat === 'png' ? 'image/png' : finalFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
+        imageUrl = `data:${mimeType};base64,${imageData.b64_json}`;
+    } else if (imageData.url) {
+        imageUrl = imageData.url;
+    } else {
+        throw new Error('OpenAI Image API: no image in response');
+    }
+
+    const revisedPrompt = imageData.revised_prompt || '';
+    if (revisedPrompt) console.log(`📝 OpenAI revised prompt: ${revisedPrompt.substring(0, 120)}...`);
+    console.log(`✅ OpenAI Image generated successfully via ${modelId}`);
+    console.log(`══════ END OPENAI IMAGE GENERATION ══════\n`);
+
+    return {
+        imageUrl,
+        model: modelId,
+        provider: 'openai',
+        textResponse: revisedPrompt,
+        warnings: [],
+    };
+}
+
 // ── Gemini image generation via REST API ────────────────────────────────
 // Used for NanoBanana 2 and NanoBanana Pro. NO auto-fallback chain.
 // If the model is busy (503), returns modelBusy flag so frontend can notify user.
@@ -1183,15 +1305,68 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     return { imageUrl, model: usedModel, textResponse, warnings };
 }
 
-// ── Unified Image Generate — Gemini-only, NO fallbacks ──
-// All image generation routes exclusively through gemini-3.1-flash-image-preview.
-// If Gemini is busy or unavailable, returns a clear error — no silent model switching.
+// ── Unified Image Generate — routes by selectedModel, NO auto-fallbacks ──
+// NanoBanana 2 is the default. Other models are strictly opt-in.
+// If any model is busy/unavailable, returns a clear error — no silent model switching.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
     const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
     const router = getRouter();
-
-    console.log(`🎯 Image Generation: All models → ${GEMINI_MODEL} (Gemini-only, no fallbacks)`);
+    const modelKey = selectedModel; // normalize: selectedModel IS the routing key
+    console.log(`🎯 Image Generation: model=${modelKey}`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
+
+    // ── Route: Grok Imagen (xAI direct) ─────────────────────────────────────
+    if (modelKey === 'grok-imagen') {
+        const TIMEOUT_MS = 120_000;
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Grok Imagen timed out. Please try again.')), TIMEOUT_MS)
+        );
+        try {
+            const result = await Promise.race([
+                grokImageGenerate(promptText, aspectRatio),
+                timeoutPromise,
+            ]);
+            return { ...result, model: selectedModel };
+        } catch (error) {
+            console.error(`❌ Grok Imagen failed:`, error.message);
+            return {
+                imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
+                modelBusy: true, busyModel: 'grok-imagen',
+                errorMessage: error.message || 'Grok Imagen is unavailable. Please try again.',
+                errorType: error.message?.startsWith('BUSY') ? 'busy' : 'error',
+            };
+        }
+    }
+
+    // ── Route: OpenAI GPT-image-1 / GPT-image-2 (direct OpenAI API) ─────────
+    // These models do NOT support reference images — text-to-image only.
+    if (modelKey === 'gpt-image-1' || modelKey === 'gpt-image-2') {
+        const TIMEOUT_MS = 180_000;
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`${modelKey} timed out after 3 minutes. Please try again.`)), TIMEOUT_MS)
+        );
+        // Warn if caller passed reference images (silently dropped — model doesn't support them)
+        if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
+            console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
+        }
+        // GPT-image-2 defaults to high quality for richer detail; gpt-image-1 uses medium
+        const quality = modelKey === 'gpt-image-2' ? 'medium' : 'medium';
+        try {
+            const result = await Promise.race([
+                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'webp', 'opaque'),
+                timeoutPromise,
+            ]);
+            return { ...result, model: selectedModel };
+        } catch (error) {
+            console.error(`❌ ${modelKey} failed:`, error.message);
+            return {
+                imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
+                modelBusy: true, busyModel: modelKey,
+                errorMessage: error.message || `${modelKey} is unavailable. Please try again.`,
+                errorType: error.message?.startsWith('BUSY') || error.message?.startsWith('QUOTA') ? 'busy' : 'error',
+            };
+        }
+    }
 
     // ── HARD TIMEOUT: 180 seconds max ──
     const TIMEOUT_MS = 180_000;

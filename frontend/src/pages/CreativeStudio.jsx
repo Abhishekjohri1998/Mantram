@@ -490,13 +490,15 @@ export default function CreativeStudio() {
 
 
     const IMAGE_MODELS = [
-        { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default • Fast • Best with references', provider: 'LaoZhang', badge: 'bolt', color: 'var(--sys-text)' },
-        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality • Better details', provider: 'LaoZhang', badge: 'diamond', color: '#ec4899' },
-        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic • Great anatomy', provider: 'LaoZhang', badge: 'local_fire_department', color: '#f97316' },
-        { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux • Premium photorealism', provider: 'LaoZhang', badge: 'auto_awesome', color: '#eab308' },
-        { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative • Artistic style', provider: 'LaoZhang', badge: 'eco', color: '#22c55e' },
-        { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'LaoZhang', badge: 'palette', color: '#06b6d4' },
-        { id: 'grok-imagen', name: 'Grok Imagen', icon: 'smart_toy', desc: 'xAI • High quality generation', provider: 'xAI', badge: 'smart_toy', color: '#ef4444' },
+        { id: 'nanobanana-2',  name: 'NanoBanana 2',   icon: 'auto_awesome',  desc: 'Default • Fast • Best with references',       provider: 'LaoZhang', badge: 'bolt',                 color: 'var(--sys-text)' },
+        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond',      desc: 'Premium quality • Better details',             provider: 'LaoZhang', badge: 'diamond',              color: '#ec4899' },
+        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt',          desc: 'Photorealistic • Great anatomy',               provider: 'LaoZhang', badge: 'local_fire_department', color: '#f97316' },
+        { id: 'flux-2-pro',   name: 'Flux 2 Pro',     icon: 'stars',         desc: 'Latest Flux • Premium photorealism',          provider: 'LaoZhang', badge: 'auto_awesome',         color: '#eab308' },
+        { id: 'seedream-5',   name: 'Seedream 5',     icon: 'park',          desc: 'Creative • Artistic style',                   provider: 'LaoZhang', badge: 'eco',                  color: '#22c55e' },
+        { id: 'ideogram',     name: 'Ideogram v3',    icon: 'text_fields',   desc: 'Best for text in images',                     provider: 'LaoZhang', badge: 'palette',              color: '#06b6d4' },
+        { id: 'grok-imagen',  name: 'Grok Imagen',    icon: 'smart_toy',     desc: 'xAI • High quality generation',               provider: 'xAI',      badge: 'smart_toy',            color: '#ef4444' },
+        { id: 'gpt-image-2',  name: 'GPT Image 2',    icon: 'text_rotate_vertical', desc: 'Near-perfect text • Complex layouts • No ref images', provider: 'OpenAI', badge: 'new_releases', color: '#10a37f', isNew: true },
+        { id: 'gpt-image-1',  name: 'GPT Image 1',    icon: 'auto_fix_high', desc: 'Instruction following • Clean renders • No ref images', provider: 'OpenAI', badge: 'star',         color: '#0ea5e9' },
     ]
 
     // ── Animate State ──
@@ -3698,7 +3700,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                    {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
+                                                                </div>
+                                                                <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
                                                             </div>
                                                             {imageModel === m.id && (
                                                                 <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
@@ -3946,7 +3952,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                    {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
+                                                                </div>
+                                                                <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
                                                             </div>
                                                             {imageModel === m.id && <span className="material-symbols-outlined text-[secondary] text-[11px]">check</span>}
                                                         </button>
@@ -5398,7 +5408,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="text-[11px] font-bold truncate">{m.name}</div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
+                                                            </div>
+                                                            <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
                                                         </div>
                                                         {imageModel === m.id && (
                                                             <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
