@@ -13,7 +13,7 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Current pipeline status ──
     status: {
         type: String,
-        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed', 'advanced-generating'],
+        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'image-review', 'generating', 'multi-generating', 'critique', 'editing', 'done', 'completed', 'failed', 'advanced-generating'],
         default: 'brainstorm',
     },
     checkpoint: { type: Number, default: 0 }, // for resumability
