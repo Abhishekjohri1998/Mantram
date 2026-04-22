@@ -1177,6 +1177,14 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         const errText = await response.text();
         console.error(`❌ OpenAI Image (${modelId}) error (${response.status}):`, errText);
         if (response.status === 429) throw new Error(`BUSY: OpenAI rate limit hit. Please try again in a moment.`);
+        if (response.status === 403) {
+            const parsed = (() => { try { return JSON.parse(errText); } catch { return {}; } })();
+            const msg = parsed?.error?.message || '';
+            if (msg.includes('verified')) {
+                throw new Error(`QUOTA_EXHAUSTED: OpenAI organization not verified for ${modelId}. Please verify at https://platform.openai.com/settings/organization/general`);
+            }
+            throw new Error(`BUSY: OpenAI access denied for ${modelId}: ${msg || errText.substring(0, 200)}`);
+        }
         if (response.status === 402) throw new Error(`QUOTA_EXHAUSTED: OpenAI billing issue. Please check your account.`);
         if (response.status === 400) {
             const parsed = (() => { try { return JSON.parse(errText); } catch { return {}; } })();
@@ -1353,7 +1361,6 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
             console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
         }
-        // GPT-image-2 defaults to high quality for richer detail; gpt-image-1 uses medium
         const quality = modelKey === 'gpt-image-2' ? 'medium' : 'medium';
         try {
             const result = await Promise.race([
@@ -1363,6 +1370,25 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             return { ...result, model: selectedModel };
         } catch (error) {
             console.error(`❌ ${modelKey} failed:`, error.message);
+
+            // ── Auto-fallback: gpt-image-2 → gpt-image-1 on 403/verification errors ──
+            if (modelKey === 'gpt-image-2' && (error.message?.includes('verified') || error.message?.includes('403') || error.message?.includes('access denied'))) {
+                console.log(`🔄 Auto-fallback: ${modelKey} → gpt-image-1 (verification required for gpt-image-2)`);
+                try {
+                    const fallbackResult = await Promise.race([
+                        openaiImageGenerate(promptText, aspectRatio, 'medium', 'gpt-image-1', 'webp', 'opaque'),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('gpt-image-1 fallback timed out')), TIMEOUT_MS)),
+                    ]);
+                    return {
+                        ...fallbackResult,
+                        model: 'gpt-image-1',
+                        warnings: ['gpt-image-2 requires OpenAI organization verification. Used gpt-image-1 as fallback.'],
+                    };
+                } catch (fallbackErr) {
+                    console.error(`❌ gpt-image-1 fallback also failed:`, fallbackErr.message);
+                }
+            }
+
             return {
                 imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
                 modelBusy: true, busyModel: modelKey,
