@@ -1115,10 +1115,9 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // NOTE: These models do NOT support reference images / inpainting.
 async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
     // ── Choose API endpoint ──
-    // gpt-image-2: Always use LaoZhang (their org is verified for this model)
-    // gpt-image-1: Direct OpenAI by default, or LaoZhang if OPENAI_USE_LZ=true
-    const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
-    const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
+    // Primary: Direct OpenAI API (org must be verified for gpt-image-2)
+    // Override: LaoZhang proxy if OPENAI_USE_LZ=true
+    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
@@ -1362,10 +1361,10 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
             console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
         }
-        const quality = modelKey === 'gpt-image-2' ? 'medium' : 'medium';
+        const quality = modelKey === 'gpt-image-2' ? 'high' : 'medium';
         try {
             const result = await Promise.race([
-                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'webp', 'opaque'),
+                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque'),
                 timeoutPromise,
             ]);
             return { ...result, model: selectedModel };
