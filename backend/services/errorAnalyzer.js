@@ -18,7 +18,6 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const BLOCKED_FILE_PATTERNS = [
     /\.env/,
     /config\//,
-    /models\//,            // DB schemas — too risky
     /deploy\//,
     /scripts\//,
     /index\.js$/,          // Main entry point
@@ -40,12 +39,23 @@ const ALLOWED_DIRS = [
     '/backend/ai/',
     '/backend/mcp/',
     '/backend/middleware/',
+    '/backend/models/',    // Allowed with guardrails (max 10 lines, enum/default changes only)
 ];
+
+// ── Restricted files: allowed but with stricter limits ────────────────────
+const RESTRICTED_FILE_PATTERNS = [
+    /models\//,            // DB schemas — allow only small, safe changes (enum additions, defaults)
+];
+const RESTRICTED_MAX_LINES = 10; // Max lines a restricted file change can modify
 
 function isFileAllowed(filePath) {
     if (BLOCKED_FILE_PATTERNS.some(p => p.test(filePath))) return false;
     if (ALLOWED_DIRS.some(dir => filePath.includes(dir))) return true;
     return false;
+}
+
+function isFileRestricted(filePath) {
+    return RESTRICTED_FILE_PATTERNS.some(p => p.test(filePath));
 }
 
 /**
@@ -167,7 +177,8 @@ Your job is to:
 
 RULES — FOLLOW STRICTLY:
 - Only fix the specific bug. Do NOT refactor, rename, or improve unrelated code.
-- Never modify .env, config, database schemas (models/), deployment scripts, or index.js.
+- Never modify .env, config, deployment scripts, or index.js.
+- For model/schema files (models/): ONLY add missing enum values, add missing fields with defaults, or fix type definitions. Changes must be ≤10 lines. Never remove fields, rename fields, or change existing defaults.
 - Always add proper null/undefined guards when the error involves missing properties.
 - Use try/catch for operations that could throw (JSON.parse, API calls, etc.).
 - Match the existing code style EXACTLY (ES modules, arrow functions, template literals).
@@ -362,7 +373,14 @@ export async function analyzeError(errorEvent, options = {}) {
             // Count changed lines
             const searchLines = change.search.split('\n').length;
             const replaceLines = change.replace.split('\n').length;
-            totalLinesChanged += Math.abs(replaceLines - searchLines) + Math.min(searchLines, replaceLines);
+            const changeLinesCount = Math.abs(replaceLines - searchLines) + Math.min(searchLines, replaceLines);
+            totalLinesChanged += changeLinesCount;
+
+            // Restricted file guardrail: enforce strict line limit for model files
+            if (isFileRestricted(change.file) && changeLinesCount > RESTRICTED_MAX_LINES) {
+                console.warn(`⚠️ AutoFix: Change to restricted file ${change.file} too large (${changeLinesCount} lines, max ${RESTRICTED_MAX_LINES}) — skipping`);
+                continue;
+            }
 
             validatedChanges.push(change);
         } catch (readErr) {

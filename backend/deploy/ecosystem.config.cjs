@@ -41,5 +41,21 @@ module.exports = {
       wait_ready: false,
       listen_timeout: 30000,
     },
+    {
+      name: `${appName}-autofix`,
+      script: path.resolve(__dirname, '../services/logWatcher.js'),
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '256M',
+      env: {
+        NODE_ENV: nodeEnv,
+        ...envVars,
+      },
+      error_file: path.join(logDir, 'autofix-error.log'),
+      out_file:   path.join(logDir, 'autofix-out.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      kill_timeout: 10000,
+    },
   ],
 };
