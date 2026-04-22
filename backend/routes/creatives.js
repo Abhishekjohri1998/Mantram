@@ -412,11 +412,47 @@ Generate the adapted creative now.`;
                 if (targetW > 0 && targetH > 0) {
                     console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
                     const sharp = (await import('sharp')).default;
-                    const imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    let imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    if (imgBuffer) {
+                        // Diagnostic: log buffer format info
+                        const hexHeader = imgBuffer.slice(0, 16).toString('hex');
+                        console.log(`🔍 Crop buffer: ${imgBuffer.length} bytes, header: ${hexHeader}`);
+
+                        // Try Sharp metadata first to see if it can detect the format
+                        try {
+                            const meta = await sharp(imgBuffer, { failOn: 'none' }).metadata();
+                            console.log(`🔍 Sharp detected format: ${meta.format}, ${meta.width}x${meta.height}`);
+                        } catch (metaErr) {
+                            console.warn(`⚠️ Sharp can't read buffer: ${metaErr.message}`);
+                            // If Sharp can't read it at all, try re-fetching as URL
+                            if (rawImageUrl.startsWith('data:')) {
+                                console.log(`🔄 Attempting raw decode workaround...`);
+                                // The data URI might have wrong mime type — try stripping and re-parsing
+                                const commaIdx = rawImageUrl.indexOf(',');
+                                if (commaIdx > -1) {
+                                    const rawB64 = rawImageUrl.substring(commaIdx + 1);
+                                    imgBuffer = Buffer.from(rawB64, 'base64');
+                                    const hexRetry = imgBuffer.slice(0, 16).toString('hex');
+                                    console.log(`🔍 Re-decoded buffer: ${imgBuffer.length} bytes, header: ${hexRetry}`);
+                                }
+                            }
+                        }
+
+                        // Detect webp and convert to PNG
+                        if (imgBuffer.length > 12 && imgBuffer.toString('ascii', 8, 12) === 'WEBP') {
+                            console.log(`🔄 Crop: Detected webp, converting to PNG first...`);
+                            try {
+                                imgBuffer = await sharp(imgBuffer, { failOn: 'none' }).toFormat('png').toBuffer();
+                            } catch (webpErr) {
+                                console.warn(`⚠️ webp→png pre-conversion failed: ${webpErr.message}`);
+                                imgBuffer = null;
+                            }
+                        }
+                    }
                     if (imgBuffer) {
                         // Step 1: Normalize — re-encode through PNG to strip corrupt metadata,
                         // fix channel mismatches, and guarantee a clean pixel buffer.
-                        const normalizedBuffer = await sharp(imgBuffer, { limitInputPixels: false })
+                        const normalizedBuffer = await sharp(imgBuffer, { limitInputPixels: false, failOn: 'none' })
                             .toColourspace('srgb')  // force consistent color space
                             .png()
                             .toBuffer();
