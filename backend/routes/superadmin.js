@@ -3125,7 +3125,7 @@ router.get('/pricing-monitor', async (req, res) => {
                 let costLabel = '';
                 if (model.type === 'text') {
                     costUSD = model.inputPer1M ?? null;
-                    costLabel = `$${model.inputPer1M}/1M in · $${model.outputPer1M}/1M out`;
+                    costLabel = `$${model.inputPer1M ?? '?'}/1M in · $${model.outputPer1M ?? '?'}/1M out`;
                 } else if (model.type === 'image') {
                     costUSD = model.flatCostUSD ?? null;
                     costLabel = `$${model.flatCostUSD}/image`;
