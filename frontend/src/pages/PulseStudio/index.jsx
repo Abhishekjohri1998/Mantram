@@ -1700,112 +1700,96 @@ function QuickPostPanel({
 
             {qpError && <div style={{ marginTop: 10, color: '#EF4444', fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>{qpError}</div>}
 
-            {/* Result */}
+            {/* Result — Complete Designed Graphic */}
             {qpResult && !qpLoading && (
                 <div style={{ marginTop: 20 }}>
-                    {/* Extracted Copy Preview */}
-                    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Extracted Copy</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                            <div>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: '#FFF', lineHeight: 1.1 }}>{copy.productName}</div>
-                                {copy.tagline && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{copy.tagline}</div>}
-                                {copy.heroSpec && (
-                                    <div style={{ marginTop: 8 }}>
-                                        <div style={{ fontSize: 32, fontWeight: 900, color: palette[1]?.hex || '#A78BFA', lineHeight: 1 }}>{copy.heroSpec}</div>
-                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.1em' }}>{copy.heroSpecLabel}</div>
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                {(copy.features || []).map((f, i) => (
-                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                                        <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#A78BFA' }}>{f.icon}</span>
-                                        </div>
-                                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{f.text}</span>
-                                    </div>
-                                ))}
-                                {copy.boxQty && (
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                                        <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>BOX QTY: {copy.boxQty}</span>
-                                        <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '4px 10px', borderRadius: 6, fontWeight: 700 }}>{copy.cta}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        {/* Palette mini strip */}
-                        {palette.length > 0 && (
-                            <div style={{ display: 'flex', gap: 4, marginTop: 10 }}>
-                                {palette.map((c, i) => (
-                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ flex: 1, height: 8, borderRadius: 4, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Composite Image Preview — show all generated backgrounds */}
-                    {Object.keys(qpCompositeUrls).length > 0 || qpResult.backgroundUrl ? (
-                        <div style={{ marginBottom: 16 }}>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Generated Backgrounds</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Object.keys(qpCompositeUrls).length || 1, 2)}, 1fr)`, gap: 8 }}>
-                                {Object.keys(qpCompositeUrls).length > 0
-                                    ? Object.entries(qpCompositeUrls).map(([ratio, url]) => url && (
-                                        <div key={ratio} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-                                            <div style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, background: 'rgba(0,0,0,0.6)', color: '#FFF', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{ratio}</div>
-                                            <img src={url} alt={ratio} style={{ width: '100%', display: 'block', maxHeight: 400, objectFit: 'contain', background: '#000' }} />
-                                        </div>
-                                    ))
-                                    : <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                        <img src={qpResult.backgroundUrl} alt="background" style={{ width: '100%', display: 'block', maxHeight: 500, objectFit: 'contain', background: '#000' }} />
-                                      </div>
-                                }
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {/* Download Panel */}
-                    {Object.values({ ...qpResult.backgrounds, ...qpCompositeUrls }).some(url => url) && (
-                        <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: 16 }}>
-                            <div style={{ fontSize: 10, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-                                Download Creative
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                                {Object.entries({ ...qpResult.backgrounds, ...qpCompositeUrls })
-                                    .filter(([, url]) => url)
-                                    .map(([size, url]) => (
-                                        <button key={size} onClick={() => handleDownload(url, size)} style={{
-                                            background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
-                                            color: '#22C55E', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                            fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                                        }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-                                            Download {size}
-                                        </button>
-                                    ))}
-
-                                <button onClick={handleGenerate} style={{
-                                    background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
-                                    color: '#A78BFA', padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                                    fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-                                }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
-                                    Regenerate
-                                </button>
-                            </div>
+                    {/* Copy summary strip */}
+                    {qpResult.copy && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12, padding: '10px 12px', background: 'var(--sys-surface)', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
+                            {qpResult.copy.productName && (
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>{qpResult.copy.productName}</span>
+                            )}
+                            {qpResult.copy.heroSpec && (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)', background: 'rgba(255,77,0,0.08)', padding: '2px 8px', borderRadius: 5 }}>
+                                    {qpResult.copy.heroSpec} {qpResult.copy.heroSpecLabel && <span style={{ fontWeight: 400, opacity: 0.7 }}>{qpResult.copy.heroSpecLabel}</span>}
+                                </span>
+                            )}
+                            {[qpResult.copy.feature1, qpResult.copy.feature2, qpResult.copy.feature3].filter(Boolean).map((f, i) => (
+                                <span key={i} style={{ fontSize: 10, color: 'var(--sys-text-muted)', padding: '2px 8px', borderRadius: 5, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)' }}>· {f}</span>
+                            ))}
+                            {qpResult.copy.cta && (
+                                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: 'var(--sys-primary)' }}>{qpResult.copy.cta}</span>
+                            )}
                         </div>
                     )}
 
-                    {/* Hidden canvas for compositor */}
+                    {/* Generated graphics grid */}
+                    {(() => {
+                        // Collect all generated images: from backgrounds map (multi-size) or single backgroundUrl
+                        const allImages = Object.entries(qpResult.backgrounds || {}).filter(([, url]) => url)
+                        if (allImages.length === 0 && qpResult.backgroundUrl) {
+                            allImages.push([qpResult.aspectRatio || '1:1', qpResult.backgroundUrl])
+                        }
+                        if (allImages.length === 0) return null
+                        return (
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>auto_awesome</span>
+                                    Generated Creative{allImages.length > 1 ? `s (${allImages.length})` : ''}
+                                    <span style={{ color: 'var(--sys-text-muted)', fontSize: 9, fontWeight: 400 }}>· {qpResult.moodLabel} theme</span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(allImages.length, 2)}, 1fr)`, gap: 10 }}>
+                                    {allImages.map(([ratio, url]) => url && (
+                                        <div key={ratio} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', position: 'relative', background: 'var(--sys-bg)' }}>
+                                            <div style={{ position: 'absolute', top: 7, left: 7, zIndex: 2, fontSize: 9, background: 'rgba(0,0,0,0.65)', color: '#FFF', padding: '2px 7px', borderRadius: 4, fontWeight: 700, backdropFilter: 'blur(4px)' }}>{ratio}</div>
+                                            <button
+                                                onClick={() => handleDownload(url, ratio)}
+                                                title="Download"
+                                                style={{ position: 'absolute', top: 7, right: 7, zIndex: 2, width: 28, height: 28, borderRadius: 7, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                            </button>
+                                            <img
+                                                src={url}
+                                                alt={`${qpResult.copy?.productName || 'post'} ${ratio}`}
+                                                style={{ width: '100%', display: 'block', objectFit: 'contain', background: 'var(--sys-bg)' }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })()}
+
+                    {/* Actions row */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={handleGenerate} style={{ flex: 1, padding: '10px 0', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', color: 'var(--sys-text-muted)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span>
+                            Regenerate
+                        </button>
+                        {(() => {
+                            const allImages = Object.entries(qpResult.backgrounds || {}).filter(([, url]) => url)
+                            if (allImages.length === 0 && qpResult.backgroundUrl) allImages.push([qpResult.aspectRatio || '1:1', qpResult.backgroundUrl])
+                            return allImages.map(([ratio, url]) => url && (
+                                <button key={ratio} onClick={() => handleDownload(url, ratio)} className="btn-primary" style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>download</span>
+                                    {allImages.length > 1 ? ratio : 'Download'}
+                                </button>
+                            ))
+                        })()}
+                    </div>
+
+                    {/* Hidden canvas (kept for compat, not used for compositor anymore) */}
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
                 </div>
             )}
+
         </div>
     )
 }
 
-function APlusTool({ brandId, onContextReady, externalContext }) {
+function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
     const [inputMode, setInputMode] = useState('url') // url | catalog | sample
     const [productUrl, setProductUrl] = useState('')
     const [analyzedProduct, setAnalyzedProduct] = useState(null)
@@ -1813,7 +1797,7 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
     const [brief, setBrief] = useState('')
     const [referenceImages, setReferenceImages] = useState([])
     const [moduleCount, setModuleCount] = useState(7)
-    const [listingTier, setListingTier] = useState('standard')  // 'standard' | 'premium'
+    const [listingTier, setListingTier] = useState(forceTier || 'standard')  // 'standard' | 'premium'
 
     const gen = useGenerate(APLUS_STAGES)
     const [editedModules, setEditedModules] = useState([])
@@ -2392,24 +2376,6 @@ function APlusTool({ brandId, onContextReady, externalContext }) {
                     </div>
                 </div>
 
-                {/* ── Quick Posts Section ── */}
-                <QuickPostPanel
-                    productDNA={productDNA}
-                    productData={analyzedProduct}
-                    selectedMoodId={selectedMood}
-                    productMoodDirections={productMoodDirections}
-                    brandId={brandId}
-                    brand={null}
-                    qpType={qpType} setQpType={setQpType}
-                    qpRatios={qpRatios} toggleQpRatio={toggleQpRatio}
-                    qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
-                    qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
-                    qpLoading={qpLoading} setQpLoading={setQpLoading}
-                    qpResult={qpResult} setQpResult={setQpResult}
-                    qpError={qpError} setQpError={setQpError}
-                    qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
-                    canvasRef={canvasRef}
-                />
 
                 {/* Brief */}
                 <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
@@ -2929,72 +2895,73 @@ function ContextLibraryModal({ brandId, onActivate, onClose }) {
     }
 
     return createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <div style={{ background: '#0D0D14', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, width: '100%', maxWidth: 840, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 16, width: '100%', maxWidth: 840, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Header */}
-                <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 19, color: '#A78BFA' }}>library_books</span>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="glass-panel" style={{ width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--sys-primary)' }}>library_books</span>
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#FFF' }}>Product Context Library</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Restore any saved product's palette, mood board, and DNA to use across all tools</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Product Context Library</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Restore any saved product's palette, mood board, and DNA to use across all tools</div>
                     </div>
                     <input
                         value={search} onChange={e => setSearch(e.target.value)}
                         placeholder="Search products..."
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 14px', color: '#FFF', fontSize: 13, outline: 'none', width: 200 }}
+                        className="input-glass"
+                        style={{ width: 180, borderRadius: 8, fontSize: 13 }}
                     />
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 17 }}>close</span>
+                    <button onClick={onClose} className="btn-ghost" style={{ width: 32, height: 32, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
                     </button>
                 </div>
                 {/* Grid */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
                     {loading ? (
-                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
-                            <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                        <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
+                            <div style={{ width: 28, height: 28, border: '2px solid var(--sys-border)', borderTop: '2px solid var(--sys-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
                             Loading library...
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>inventory_2</span>
+                        <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 40, display: 'block', marginBottom: 10 }}>inventory_2</span>
                             {search ? 'No products match your search' : 'No saved contexts yet — analyze a product in A+ Listing, then click Save Context.'}
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
                             {filtered.map(ctx => (
-                                <div key={ctx._id} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.2s', background: '#0A0A0A' }}>
-                                    <div style={{ height: 110, background: '#111', position: 'relative', overflow: 'hidden' }}>
+                                <div key={ctx._id} style={{ borderRadius: 10, border: '1px solid var(--sys-border)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.2s', background: 'var(--sys-surface)' }}>
+                                    <div style={{ height: 100, background: 'var(--sys-bg)', position: 'relative', overflow: 'hidden' }}>
                                         {ctx.thumbnail ? (
                                             <img src={ctx.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
-                                            <div style={{ height: '100%', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'rgba(255,255,255,0.12)' }}>palette</span>
+                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--sys-text-muted)', opacity: 0.4 }}>palette</span>
                                             </div>
                                         )}
-                                        <button onClick={e => handleDelete(ctx._id, e)} style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 5, background: 'rgba(0,0,0,0.65)', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+                                        <button onClick={e => handleDelete(ctx._id, e)} style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 5, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
                                         </button>
                                         {ctx.usedIn?.length > 0 && (
                                             <div style={{ position: 'absolute', bottom: 5, left: 5, display: 'flex', gap: 3 }}>
                                                 {ctx.usedIn.slice(0,3).map(t => (
-                                                    <span key={t} style={{ fontSize: 8, background: 'rgba(124,58,237,0.8)', color: '#FFF', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{t}</span>
+                                                    <span key={t} style={{ fontSize: 8, background: 'var(--sys-primary)', color: '#FFF', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{t}</span>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
                                     <div style={{ padding: '10px 12px' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctx.productName}</div>
-                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 7 }}>{ctx.productCategory}{ctx.productBrand ? ` · ${ctx.productBrand}` : ''}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)' }}>{ctx.productName}</div>
+                                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginBottom: 7 }}>{ctx.productCategory}{ctx.productBrand ? ` · ${ctx.productBrand}` : ''}</div>
                                         <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
                                             {(ctx.palette || []).slice(0,7).map((c, i) => (
-                                                <div key={i} title={c.hex} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                <div key={i} title={c.hex} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                                             ))}
                                         </div>
-                                        <button onClick={() => handleActivate(ctx)} style={{ width: '100%', padding: '7px 0', borderRadius: 7, background: activating === ctx._id ? 'rgba(124,58,237,0.4)' : 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#A78BFA', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                        <button onClick={() => handleActivate(ctx)} className="btn-primary" style={{ width: '100%', padding: '7px 0', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontFamily: 'inherit', opacity: activating === ctx._id ? 0.7 : 1 }}>
                                             {activating === ctx._id ? (
-                                                <><div style={{ width: 11, height: 11, border: '2px solid rgba(167,139,250,0.3)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Loading...</>
+                                                <><div style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Loading...</>
                                             ) : (
                                                 <><span className="material-symbols-outlined" style={{ fontSize: 13 }}>bolt</span>Activate</>
                                             )}
@@ -3122,93 +3089,658 @@ function ProductContextBar({ brandId, activeContext, onContextChange }) {
     )
 }
 
-// ── Main Page Framework ───────────────────────────────────────────────────────
+// ── Action Cards Config ───────────────────────────────────────────────────────
 
-const TAB_DATA = [
-    { id: 'aplus',   icon: 'stars',        label: 'A+ & Posts'  },
-    { id: 'deck',    icon: 'slideshow',    label: 'Pulse Deck'  },
-    { id: 'mail',    icon: 'mail',         label: 'Pulse Mail'  },
-    { id: 'page',    icon: 'web',          label: 'Pulse Page'  },
-    { id: 'history', icon: 'history',      label: 'History'     },
+const ACTIONS = [
+    {
+        id: 'aplus', icon: 'stars', label: 'A+ Listing',
+        desc: 'Amazon Enhanced Content — up to 7 modules with AI images',
+        credits: '10', accent: '#7c3aed', tier: 'Amazon',
+        badge: null,
+    },
+    {
+        id: 'aptwo', icon: 'diamond', label: 'A++ Premium',
+        desc: 'Full-bleed carousels, hotspots, Q&A panels',
+        credits: '20', accent: '#F59E0B', tier: 'Amazon',
+        badge: 'PREMIUM',
+    },
+    {
+        id: 'quick_post', icon: 'campaign', label: 'Quick Posts',
+        desc: 'Promo, order & feature posts in any size, in one click',
+        credits: '8–12', accent: '#EC4899', tier: 'Social',
+        badge: 'MULTI-SIZE',
+    },
+    {
+        id: 'page', icon: 'web', label: 'Landing Page',
+        desc: 'AI-built interactive landing page, hosted on CDN',
+        credits: '12', accent: '#10B981', tier: 'Web',
+        badge: null,
+    },
+    {
+        id: 'deck', icon: 'slideshow', label: 'Pitch Deck',
+        desc: 'Brand presentation — investor or sales deck',
+        credits: '15', accent: '#6366F1', tier: 'Sales',
+        badge: null,
+    },
+    {
+        id: 'mail', icon: 'mail', label: 'Email Campaign',
+        desc: 'Responsive HTML email with AI copy + visuals',
+        credits: '10', accent: '#0EA5E9', tier: 'Email',
+        badge: null,
+    },
 ]
+
+// ── ProductDiscoverySection ────────────────────────────────────────────────────
+// Self-contained analysis entry point. Fires onContextReady when mood is picked.
+
+function ProductDiscoverySection({ brandId, onContextReady }) {
+    const [productUrl, setProductUrl] = useState('')
+    const [step, setStep]             = useState('input')   // 'input' | 'analyzing' | 'ready'
+    const [error, setError]           = useState('')
+    const [analyzedProduct, setAnalyzedProduct] = useState(null)
+    const [productImages, setProductImages]     = useState([])
+    const [productDNA, setProductDNA]           = useState(null)
+    const [selectedMood, setSelectedMood]       = useState(null)
+    const [moodImages, setMoodImages]           = useState({})
+    const [productMoodDirections, setProductMoodDirections] = useState(null)
+    const [designContext, setDesignContext]     = useState(null)
+    const [uploadedImages, setUploadedImages]   = useState([])
+    const fileRef = useRef()
+
+    const MOOD_STATIC = {
+        editorial: { id:'editorial', label:'Editorial Clean',    icon:'straighten',            desc:'Clean, precise, studio-perfect',  bg:'linear-gradient(135deg,#f0f0f0,#e8e8e8)' },
+        bold:      { id:'bold',      label:'Bold Ambient',       icon:'local_fire_department',  desc:'Dark, dramatic, cinematic',       bg:'linear-gradient(135deg,#0d0d1a,#1a0d2e)' },
+        lifestyle: { id:'lifestyle', label:'Lifestyle Vibrant',  icon:'wb_sunny',               desc:'Real-world, warm, relatable',     bg:'linear-gradient(135deg,#fef3c7,#fde68a)' },
+        luxury:    { id:'luxury',    label:'Premium Minimal',    icon:'diamond',                desc:'Luxury, spacious, refined',       bg:'linear-gradient(135deg,#f5f5f0,#e8e4dc)' },
+    }
+
+    const activeMoods = productMoodDirections
+        ? Object.fromEntries(Object.values(productMoodDirections).map((m, i) => {
+            const bgs = ['linear-gradient(135deg,#0d0d1a,#1a0d2e)','linear-gradient(135deg,#1a0a0a,#2e0d0d)','linear-gradient(135deg,#fef3c7,#fde68a)','linear-gradient(135deg,#f5f5f0,#e8e4dc)']
+            const p = m.colorPalette || []
+            return [m.id, { ...m, icon: m.icon || 'style', desc: m.description || '', bg: p.length >= 2 ? `linear-gradient(135deg,${p[0]},${p[1]})` : bgs[i % bgs.length] }]
+          }))
+        : MOOD_STATIC
+
+    const resetState = () => {
+        setProductDNA(null); setMoodImages({}); setProductMoodDirections(null)
+        setSelectedMood(null); setDesignContext(null); setAnalyzedProduct(null); setProductImages([])
+    }
+
+    const runPDI = async (images, product) => {
+        try {
+            const data = await apiFetch('/brand-studio/product-intelligence', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brandId })
+            })
+            if (data.success && data.productDNA) {
+                setProductDNA(data.productDNA)
+                const def = data.productDNA.defaultMoodDirection || 'editorial'
+                setSelectedMood(def)
+                // Build design context in background
+                apiFetch('/brand-studio/design-context', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productDNA: data.productDNA, selectedMoodId: def })
+                }).then(dc => { if (dc.success) setDesignContext(dc.designContext) }).catch(() => {})
+                // Generate mood board in background
+                apiFetch('/brand-studio/mood-board', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productDNA: data.productDNA, productData: product, brandId })
+                }).then(mb => {
+                    if (mb.success) {
+                        if (mb.moodDirections && Object.keys(mb.moodDirections).length >= 2) {
+                            setProductMoodDirections(mb.moodDirections)
+                            const first = Object.keys(mb.moodDirections)[0]
+                            setSelectedMood(first)
+                        }
+                        if (mb.moods) {
+                            const imgs = {}; mb.moods.forEach(m => { if (m.imageUrl) imgs[m.id] = m.imageUrl })
+                            setMoodImages(imgs)
+                        }
+                    }
+                }).catch(() => {})
+            }
+        } catch (e) { console.warn('PDI failed:', e.message) }
+        setStep('ready')
+    }
+
+    const handleAnalyze = async () => {
+        if (!productUrl) return
+        resetState(); setStep('analyzing'); setError('')
+        try {
+            const data = await apiFetch('/brand-studio/aplus/analyze-product', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: productUrl })
+            })
+            if (data.success) {
+                setAnalyzedProduct(data.product)
+                const imgs = data.product.images || []
+                setProductImages(imgs)
+                await runPDI(imgs, data.product)
+            } else { setError(data.error || 'Failed to analyze'); setStep('input') }
+        } catch (e) { setError(e.message); setStep('input') }
+    }
+
+    const handleImageUpload = async (e) => {
+        const files = Array.from(e.target.files)
+        if (!files.length) return
+        resetState(); setStep('analyzing'); setError('')
+        const urls = await Promise.all(files.map(f => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f) })))
+        setUploadedImages(urls); setProductImages(urls)
+        await runPDI(urls, {})
+    }
+
+    const handleSelectMood = async (moodId) => {
+        setSelectedMood(moodId)
+        // Rebuild design context for chosen mood
+        let dc = designContext
+        try {
+            const res = await apiFetch('/brand-studio/design-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productDNA, selectedMoodId: moodId, customMoodDirections: productMoodDirections || null })
+            })
+            if (res.success) { dc = res.designContext; setDesignContext(dc) }
+        } catch (e) {}
+        // Propagate full context upward to the hub
+        onContextReady({
+            productData: analyzedProduct,
+            productDNA,
+            productImages,
+            productUrl,
+            selectedMood: moodId,
+            productMoodDirections,
+            moodImages,
+            designContext: dc,
+        })
+    }
+
+    const moodSwatchMap = {
+        editorial: ['#FFFFFF','#F5F0EA','#E8E4DF','#D0C8BF'],
+        bold:      ['#0D0D0D','#1A0D2E','#7B2FFF','#2A1A5A'],
+        lifestyle: ['#C97B5A','#8FA888','#E8D5B7','#6B8C6B'],
+        luxury:    ['#F8F4EF','#C9A96E','#2A2A2A','#8B7355'],
+    }
+
+    const SP = { fontFamily: 'inherit' }
+
+    return (
+        <div>
+            {/* ─── Header ─────────────────────────────── */}
+            <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <div className="glass-panel" style={{ width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>search</span>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Step 1 — Analyze Your Product</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>AI extracts color palette, design DNA & mood directions. Everything flows from this.</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── Input Row ──────────────────────────── */}
+            {step !== 'ready' && (
+                <div className="glass-panel" style={{ borderRadius: 12, padding: 16, marginBottom: step === 'analyzing' ? 12 : 0 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <span className="material-symbols-outlined" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--sys-text-muted)', pointerEvents: 'none' }}>link</span>
+                            <input
+                                value={productUrl}
+                                onChange={e => setProductUrl(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
+                                placeholder="Paste Amazon, Flipkart, or any product URL..."
+                                disabled={step === 'analyzing'}
+                                className="input-glass"
+                                style={{ paddingLeft: 38, opacity: step === 'analyzing' ? 0.6 : 1, borderRadius: 8 }}
+                            />
+                        </div>
+                        <button
+                            onClick={handleAnalyze}
+                            disabled={!productUrl || step === 'analyzing'}
+                            className="btn-primary"
+                            style={{ borderRadius: 8, gap: 6, flexShrink: 0, cursor: (!productUrl || step === 'analyzing') ? 'not-allowed' : 'pointer', opacity: (!productUrl || step === 'analyzing') ? 0.6 : 1 }}
+                        >
+                            {step === 'analyzing' ? (
+                                <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing...</>
+                            ) : (
+                                <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Analyze + Design</>
+                            )}
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                        <div style={{ height: 1, flex: 1, background: 'var(--sys-border)' }} />
+                        <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', flexShrink: 0 }}>or upload product images</span>
+                        <div style={{ height: 1, flex: 1, background: 'var(--sys-border)' }} />
+                    </div>
+                    <label className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', border: '1px dashed var(--sys-border)', borderRadius: 8, fontSize: 13, fontWeight: 600, width: '100%' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
+                        Upload Product Images (JPG, PNG — up to 8)
+                        <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
+                    </label>
+                    {error && <div style={{ marginTop: 10, color: 'var(--sys-primary)', fontSize: 12, padding: '8px 12px', background: 'var(--sys-primary-dim)', borderRadius: 8, border: '1px solid var(--sys-border)' }}>{error}</div>}
+                </div>
+            )}
+
+            {/* ─── Analyzing Progress ─────────────────── */}
+            {step === 'analyzing' && (
+                <div className="glass-panel" style={{ borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                    {[
+                        { icon: 'search', text: 'Scraping product data & images...' },
+                        { icon: 'palette', text: 'AI vision extracting color palette...' },
+                        { icon: 'psychology', text: 'Building product design DNA...' },
+                        { icon: 'style', text: 'Generating 4 custom mood directions...' },
+                    ].map((s, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: i < 3 ? '1px solid var(--sys-border)' : 'none' }}>
+                            <div style={{ width: 13, height: 13, border: '2px solid var(--sys-border)', borderTop: `2px solid var(--sys-primary)`, borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>{s.icon}</span>
+                            <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{s.text}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ─── Analysis Result + Mood Selection ───── */}
+            {step === 'ready' && productDNA && (
+                <div>
+                    {/* Product identity card */}
+                    <div className="glass-panel" style={{ borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                            {(productImages[0] || uploadedImages[0]) && (
+                                <img src={productImages[0] || uploadedImages[0]} alt="" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--sys-border)', flexShrink: 0 }} onError={e => e.target.style.display='none'} />
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)' }}>
+                                    {analyzedProduct?.title || productDNA.productCategory || 'Product Analyzed'}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginBottom: 6 }}>
+                                    {productDNA.productCategory}{analyzedProduct?.brand ? ` · ${analyzedProduct.brand}` : ''} · {productImages.length} images
+                                </div>
+                                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {(productDNA.dominantColors || []).slice(0, 8).map((c, i) => (
+                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
+                                    ))}
+                                    <span style={{ fontSize: 10, color: 'var(--sys-primary)', marginLeft: 5, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>lock</span>Colors Locked
+                                    </span>
+                                </div>
+                            </div>
+                            <button onClick={() => { setStep('input'); resetState() }} className="btn-ghost" style={{ padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>refresh</span>Reset
+                            </button>
+                        </div>
+
+                        {/* Mood board selector */}
+                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>style</span>
+                            Pick a Mood Direction
+                            {Object.keys(moodImages).length > 0
+                                ? <span style={{ color: 'var(--sys-primary)', textTransform: 'none', letterSpacing: 0, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>auto_awesome</span>AI ready</span>
+                                : <span style={{ color: 'var(--sys-text-muted)', textTransform: 'none', letterSpacing: 0, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>hourglass_empty</span>Generating...</span>
+                            }
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                            {Object.values(activeMoods).map(mood => {
+                                const aiImg = moodImages[mood.id]
+                                const isSelected = selectedMood === mood.id
+                                const swatches = moodSwatchMap[mood.id] || []
+                                return (
+                                    <div key={mood.id} onClick={() => handleSelectMood(mood.id)} style={{
+                                        borderRadius: 10,
+                                        border: isSelected ? `2px solid var(--sys-primary)` : '1px solid var(--sys-border)',
+                                        overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s',
+                                        background: 'var(--sys-surface)', position: 'relative',
+                                    }}>
+                                        <div style={{ height: 110, position: 'relative', overflow: 'hidden' }}>
+                                            {aiImg ? (
+                                                <img src={aiImg} alt={mood.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                            ) : (
+                                                <div style={{ height: '100%', background: mood.bg, position: 'relative' }}>
+                                                    <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 1 }}>
+                                                        {swatches.map((sw, si) => <div key={si} style={{ background: si === 3 ? sw + 'CC' : sw }} />)}
+                                                    </div>
+                                                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'rgba(255,255,255,0.25)' }}>{mood.icon}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {isSelected && (
+                                                <div style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: '50%', background: 'var(--sys-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#FFF' }}>check</span>
+                                                </div>
+                                            )}
+                                            <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 5, padding: '2px 6px', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mood</div>
+                                        </div>
+                                        <div style={{ padding: '7px 10px', background: isSelected ? 'var(--sys-primary-dim)' : 'transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: isSelected ? 'var(--sys-primary)' : 'var(--sys-text-muted)', flexShrink: 0 }}>{mood.icon}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? 'var(--sys-primary)' : 'var(--sys-text)', marginBottom: 1 }}>{mood.label}{productMoodDirections && <span style={{ marginLeft: 5, fontSize: 8, color: 'var(--sys-primary)', background: 'var(--sys-primary-dim)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>AI</span>}</div>
+                                                <div style={{ fontSize: 9.5, color: 'var(--sys-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6, background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-border)', borderRadius: 7, padding: '7px 10px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary)' }}>lock</span>
+                            Product colors are locked — AI will never shift the product's color in any generated asset.
+                        </div>
+                    </div>
+
+                    {selectedMood && (
+                        <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', textAlign: 'center', padding: '8px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-primary)' }}>arrow_downward</span>
+                            Mood locked — choose an asset type on the right
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── ActionCard ────────────────────────────────────────────────────────────────
+
+function ActionCard({ action, active, palette, onClick }) {
+    const [hover, setHover] = useState(false)
+    return (
+        <div
+            onClick={onClick}
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            style={{
+                borderRadius: 10,
+                border: active ? `1.5px solid var(--sys-primary)` : hover ? '1px solid var(--sys-border)' : '1px solid var(--sys-border)',
+                background: active ? 'var(--sys-primary-dim)' : hover ? 'var(--sys-surface)' : 'var(--sys-surface)',
+                padding: '13px 14px', cursor: 'pointer', transition: 'all 0.18s',
+                position: 'relative', display: 'flex', flexDirection: 'column', gap: 6,
+            }}
+        >
+            {action.badge && (
+                <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700, color: 'var(--sys-primary)', background: 'var(--sys-primary-dim)', border: '1px solid var(--sys-border)', borderRadius: 4, padding: '1px 5px', letterSpacing: '0.05em' }}>
+                    {action.badge}
+                </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: active ? 'var(--sys-primary-dim)' : 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.18s' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 17, color: active ? 'var(--sys-primary)' : 'var(--sys-text-muted)' }}>{action.icon}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--sys-primary)' : 'var(--sys-text)', letterSpacing: '-0.01em', fontFamily: 'var(--font-display)' }}>{action.label}</div>
+                    <div style={{ fontSize: 9, color: 'var(--sys-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{action.tier} · {action.credits} cr</div>
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: active ? 'var(--sys-primary)' : 'var(--sys-text-muted)', transition: 'all 0.18s', transform: active ? 'rotate(-90deg)' : 'rotate(0)' }}>expand_more</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{action.desc}</div>
+            {palette && palette.length > 0 && (
+                <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {palette.slice(0, 6).map((c, i) => (
+                        <div key={i} title={c.name || c.hex} style={{ width: 10, height: 10, borderRadius: 3, background: c.hex || c, border: '1px solid var(--sys-border)' }} />
+                    ))}
+                    <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginLeft: 2 }}>palette applied</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Main Page Framework ───────────────────────────────────────────────────────
 
 export default function PulseStudio() {
     const { activeBrand } = useBrand()
     const brandId = activeBrand?._id
-    const [activeTab, setActiveTab]   = useState('aplus')
-    const [urlContext, setUrlContext] = useState('')
-    const [referenceImage, setReferenceImage] = useState(null)
 
-    // ── Shared Product Creative Context (lives here — all tools inherit it) ──
+    // Phase: 'discover' → 'create' | History modal
+    const [phase, setPhase]                         = useState('discover')
     const [activeProductContext, setActiveProductContext] = useState(null)
+    const [activeAction, setActiveAction]           = useState(null)   // which card is expanded
+    const [showHistory, setShowHistory]             = useState(false)
+    const [showLibrary, setShowLibrary]             = useState(false)
 
-    // Called from APlusTool when PDI runs + user selects a mood
+    // Shared state passed into tools
+    const [urlContext, setUrlContext]               = useState('')
+    const [referenceImage, setReferenceImage]       = useState(null)
+
+    // QP state lives here so it persists when switching cards
+    const [qpType, setQpType]     = useState('promo')
+    const [qpRatios, setQpRatios] = useState(new Set(['1:1']))
+    const [qpLogoOn, setQpLogoOn] = useState(false)
+    const [qpLogoPos, setQpLogoPos] = useState('top-left')
+    const [qpLoading, setQpLoading] = useState(false)
+    const [qpResult, setQpResult]   = useState(null)
+    const [qpError, setQpError]     = useState('')
+    const [qpCompositeUrls, setQpCompositeUrls] = useState({})
+    const canvasRef = useRef()
+
+    const toggleQpRatio = (id) => {
+        setQpRatios(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) { if (next.size > 1) next.delete(id) } else next.add(id)
+            return next
+        })
+    }
+
+    // Context ready callback from ProductDiscoverySection
     const handleContextReady = useCallback((ctx) => {
         setActiveProductContext(ctx)
-    }, [])
+        if (!activeAction) setActiveAction(null)   // don't force a card open
+        setPhase('create')
+    }, [activeAction])
 
-    // Derived context object passed into each tool
-    const sharedProductContext = activeProductContext ? {
+    // Load saved context from library
+    const handleLibraryActivate = (ctx) => {
+        const mapped = {
+            productData:           { title: ctx.productName, brand: ctx.productBrand },
+            productDNA:            ctx.productDNA,
+            productImages:         ctx.productImages || [],
+            productUrl:            ctx.productUrl,
+            palette:               ctx.palette,
+            selectedMood:          ctx.selectedMoodId,
+            productMoodDirections: ctx.moodDirections,
+            moodImages:            ctx.moodImages,
+            designContext:         ctx.designContext,
+            savedContextId:        ctx._id,
+        }
+        setActiveProductContext(mapped)
+        setPhase('create')
+        setShowLibrary(false)
+    }
+
+    const sharedContext = activeProductContext ? {
         productDNA:    activeProductContext.productDNA,
         designContext: activeProductContext.designContext,
         productImages: activeProductContext.productImages || [],
-        palette:       activeProductContext.palette || activeProductContext.productDNA?.dominantColors || [],
-        moodLabel:     activeProductContext.productMoodDirections?.[activeProductContext.selectedMood]?.label || '',
+        palette:       activeProductContext.productDNA?.dominantColors || activeProductContext.palette || [],
+        moodLabel:     activeProductContext.productMoodDirections?.[activeProductContext.selectedMood]?.label || activeProductContext.selectedMood || '',
         productName:   activeProductContext.productData?.title || '',
     } : null
 
+    const palette = activeProductContext?.productDNA?.dominantColors || activeProductContext?.palette || []
+    const productName = activeProductContext?.productData?.title || activeProductContext?.productDNA?.productCategory || ''
+    const moodName = activeProductContext?.productMoodDirections?.[activeProductContext?.selectedMood]?.label || activeProductContext?.selectedMood || ''
+
     return (
         <DashboardLayout title="Pulse Studio">
+            <style>{`
+                @keyframes spin { to { transform: rotate(360deg) } }
+                @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
+            `}</style>
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
-                {/* ── Shared Product Context Bar (above all tabs) ── */}
-                <ProductContextBar
-                    brandId={brandId}
-                    activeContext={activeProductContext}
-                    onContextChange={setActiveProductContext}
-                />
 
-                {/* ── Tab Navigation ── */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--sys-border)', paddingBottom: 12 }}>
-                    {TAB_DATA.map(t => (
-                        <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-                            background: activeTab === t.id ? 'color-mix(in srgb, var(--sys-text) 10%, var(--sys-surface))' : 'transparent',
-                            color: activeTab === t.id ? 'var(--sys-text)' : 'var(--sys-text-muted)',
-                            border: activeTab === t.id ? '1px solid var(--sys-border)' : '1px solid transparent',
-                            padding: '9px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 7,
-                            fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
-                        }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{t.icon}</span>
-                            {t.label}
-                            {sharedProductContext && ['deck','mail','page'].includes(t.id) && (
-                                <div title="Product context active" style={{ width: 5, height: 5, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 5px #22C55E', flexShrink: 0 }} />
-                            )}
+                {/* ── Top Bar ── */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="glass-panel" style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-primary)' }}>auto_awesome</span>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--sys-text)', letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>Pulse Studio</div>
+                            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Product Intelligence → Marketing Assets</div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setShowLibrary(true)} className="btn-secondary" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Library
                         </button>
-                    ))}
+                        <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer', border: '1px solid var(--sys-border)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>history</span>History
+                        </button>
+                    </div>
                 </div>
 
-                {/* ── Context active banner for Deck/Mail/Page tabs ── */}
-                {sharedProductContext && ['deck','mail','page'].includes(activeTab) && (
-                    <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 10, padding: '9px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E', flexShrink: 0 }}>bolt</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#22C55E' }}>Product Intelligence Active</span>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{sharedProductContext.productName}{sharedProductContext.moodLabel ? ` · ${sharedProductContext.moodLabel}` : ''}</span>
-                        <div style={{ display: 'flex', gap: 3 }}>
-                            {(sharedProductContext.palette || []).slice(0,6).map((c, i) => (
-                                <div key={i} style={{ width: 11, height: 11, borderRadius: 2, background: c.hex || c, border: '1px solid rgba(255,255,255,0.1)' }} />
-                            ))}
-                        </div>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>Palette auto-injected into generation prompts</span>
+                {/* ── Two-column layout: discovery left, actions right ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: phase === 'discover' ? '1fr' : '420px 1fr', gap: 24, alignItems: 'start', transition: 'all 0.3s' }}>
+
+                    {/* ── LEFT: Product Discovery ── */}
+                    <div>
+                        <ProductDiscoverySection
+                            brandId={brandId}
+                            onContextReady={handleContextReady}
+                        />
+
+                        {/* ProductContextBar for saving / clearing */}
+                        {activeProductContext && (
+                            <ProductContextBar
+                                brandId={brandId}
+                                activeContext={activeProductContext}
+                                onContextChange={ctx => {
+                                    setActiveProductContext(ctx)
+                                    if (!ctx) { setPhase('discover'); setActiveAction(null) }
+                                }}
+                            />
+                        )}
                     </div>
+
+                    {/* ── RIGHT: Creative Hub — Action Cards + Inline Tool ── */}
+                    {phase === 'create' && activeProductContext && (
+                        <div style={{ animation: 'slideDown 0.35s ease-out' }}>
+                            {/* Step 2 header */}
+                            <div className="glass-panel" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>rocket_launch</span>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)' }}>Step 2 — Create Marketing Assets</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                        Palette locked{moodName ? ` · ${moodName}` : ''}
+                                        {palette.length > 0 && (
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                                {palette.slice(0, 6).map((c, i) => (
+                                                    <span key={i} title={c.name} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: c.hex || c, border: '1px solid var(--sys-border)' }} />
+                                                ))}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {productName && <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 6, padding: '3px 9px', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{productName}</span>}
+                            </div>
+
+                            {/* Action card grid — 2×3 */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                                {ACTIONS.map(action => (
+                                    <ActionCard
+                                        key={action.id}
+                                        action={action}
+                                        active={activeAction === action.id}
+                                        palette={palette}
+                                        onClick={() => setActiveAction(prev => prev === action.id ? null : action.id)}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* ── Inline expanded tool panel ── */}
+                            {activeAction && (() => {
+                                const act = ACTIONS.find(a => a.id === activeAction)
+                                return (
+                                    <div className="glass-panel" style={{ animation: 'slideDown 0.28s ease-out', borderRadius: 12, overflow: 'hidden', marginBottom: 12, borderColor: `${act?.accent}30` }}>
+                                        {/* Tool header strip */}
+                                        <div style={{ padding: '10px 16px', background: `${act?.accent}0C`, borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: act?.accent }}>{act?.icon}</span>
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', fontFamily: 'var(--font-display)', flex: 1 }}>{act?.label}</span>
+                                            <span style={{ fontSize: 10, color: act?.accent, background: `${act?.accent}15`, border: `1px solid ${act?.accent}25`, padding: '2px 8px', borderRadius: 5, fontWeight: 700 }}>{act?.credits} credits</span>
+                                            <button onClick={() => setActiveAction(null)} className="btn-ghost" style={{ width: 26, height: 26, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                                            </button>
+                                        </div>
+                                        {/* Tool body */}
+                                        <div style={{ padding: 16 }}>
+                                            {(activeAction === 'aplus' || activeAction === 'aptwo') && (
+                                                <APlusTool
+                                                    brandId={brandId}
+                                                    onContextReady={() => {}}
+                                                    externalContext={activeProductContext}
+                                                    forceTier={activeAction === 'aptwo' ? 'premium' : 'standard'}
+                                                />
+                                            )}
+                                            {activeAction === 'quick_post' && (
+                                                <QuickPostPanel
+                                                    productDNA={activeProductContext?.productDNA}
+                                                    productData={activeProductContext?.productData}
+                                                    selectedMoodId={activeProductContext?.selectedMood}
+                                                    productMoodDirections={activeProductContext?.productMoodDirections}
+                                                    brandId={brandId}
+                                                    brand={null}
+                                                    qpType={qpType} setQpType={setQpType}
+                                                    qpRatios={qpRatios} toggleQpRatio={toggleQpRatio}
+                                                    qpLogoOn={qpLogoOn} setQpLogoOn={setQpLogoOn}
+                                                    qpLogoPos={qpLogoPos} setQpLogoPos={setQpLogoPos}
+                                                    qpLoading={qpLoading} setQpLoading={setQpLoading}
+                                                    qpResult={qpResult} setQpResult={setQpResult}
+                                                    qpError={qpError} setQpError={setQpError}
+                                                    qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
+                                                    canvasRef={canvasRef}
+                                                />
+                                            )}
+                                            {activeAction === 'deck' && (
+                                                <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                            {activeAction === 'mail' && (
+                                                <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                            {activeAction === 'page' && (
+                                                <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {!activeAction && (
+                                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--sys-text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>touch_app</span>
+                                    Select a card above to start creating
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Library Modal ── */}
+                {showLibrary && (
+                    <ContextLibraryModal
+                        brandId={brandId}
+                        onActivate={handleLibraryActivate}
+                        onClose={() => setShowLibrary(false)}
+                    />
                 )}
 
-                {/* ── Tool Views ── */}
-                <div style={{ minHeight: 600 }}>
-                    {activeTab === 'aplus'   && <APlusTool   brandId={brandId} onContextReady={handleContextReady} externalContext={activeProductContext} />}
-                    {activeTab === 'deck'    && <DeckTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
-                    {activeTab === 'mail'    && <MailTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
-                    {activeTab === 'page'    && <PageTool    brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedProductContext} />}
-                    {activeTab === 'history' && <HistoryTab  brandId={brandId} />}
-                </div>
+                {/* ── History Modal (slide-in panel) ── */}
+                {showHistory && createPortal(
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', zIndex: 9998, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
+                        <div style={{ width: '100%', maxWidth: 760, background: 'var(--sys-bg)', borderLeft: '1px solid var(--sys-border)', display: 'flex', flexDirection: 'column', overflowY: 'auto', animation: 'slideDown 0.3s ease-out' }}>
+                            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-text-muted)' }}>history</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', flex: 1, fontFamily: 'var(--font-display)' }}>Generation History</span>
+                                <button onClick={() => setShowHistory(false)} className="btn-ghost" style={{ width: 30, height: 30, borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: '1px solid var(--sys-border)', fontFamily: 'inherit' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                                </button>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <HistoryTab brandId={brandId} />
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
         </DashboardLayout>
     )

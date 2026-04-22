@@ -217,16 +217,12 @@ router.post('/quick-post', protect, async (req, res) => {
 
         console.log(`🎯 [QuickPost] type=${postType} ratios=${ratioList.join(',')} mood="${selectedMoodDir.label}"`);
 
-        // Step 1: Claude extracts structured copy ONCE (shared across all sizes)
-        // Step 2: NanoBanana generates background for each ratio IN PARALLEL
-        const { generateQuickPostCopy, generateQuickPostBackground } = await import('../agents/shared/productDesignAgent.js').then(m => ({
-            generateQuickPostCopy:       m.generateQuickPost,      // we'll call it for first ratio to get copy
-            generateQuickPostBackground: m.generateQuickPost,      // for additional ratios
-        }));
+        // Import the agent — each ratio generates a COMPLETE designed graphic in parallel
+        const { generateQuickPost } = await import('../agents/shared/productDesignAgent.js');
 
-        // Call once to get copy + first background, then parallel for rest
-        const [firstResult, ...extraResults] = await Promise.all(
-            ratioList.map((ratio, i) =>
+        // Run all ratios in parallel — each call does copy extraction + full image generation
+        const results = await Promise.all(
+            ratioList.map(ratio =>
                 generateQuickPost(
                     productDNA,
                     productData,
@@ -234,30 +230,35 @@ router.post('/quick-post', protect, async (req, res) => {
                     postType || 'promo',
                     ratio,
                     brandContext,
-                    i === 0,   // only extract copy on first call
                 )
             )
         );
 
-        // Merge: use copy from first, collect all backgrounds by ratio
+        // Use copy/palette from first result (all ratios share the same product)
+        const firstResult = results[0];
+
+        // Collect all generated graphic images keyed by ratio
         const backgrounds = {};
         ratioList.forEach((ratio, i) => {
-            backgrounds[ratio] = (i === 0 ? firstResult : extraResults[i - 1])?.backgroundUrl || null;
+            backgrounds[ratio] = results[i]?.postImageUrl || results[i]?.backgroundUrl || null;
         });
 
         await deductCredits(req.user._id, QUICK_POST_CREDITS, 'quick_post');
         res.json({
-            success: true,
-            copy:       firstResult.copy,
-            palette:    firstResult.palette,
-            backgrounds,                      // { '1:1': url, '9:16': url, ... }
-            backgroundUrl: backgrounds[ratioList[0]],  // compat: first ratio
+            success:       true,
+            copy:          firstResult.copy,
+            palette:       firstResult.palette,
+            moodLabel:     firstResult.moodLabel,
+            postType:      postType || 'promo',
+            backgrounds,                                     // { '1:1': url, '9:16': url, … }
+            backgroundUrl: backgrounds[ratioList[0]] || null,  // compat alias
         });
     } catch (err) {
         console.error('❌ [QuickPost]:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
 
 // ── POST /api/brand-studio/mood-board ─────────────────────────
 // Generate 4 mood direction images using ProductDNA as creative anchor

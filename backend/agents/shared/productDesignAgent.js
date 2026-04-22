@@ -647,149 +647,258 @@ export function injectDesignContext(basePrompt, designContext) {
     return `${designContext.systemDirective}\n\n---\nIMAGE TASK:\n${basePrompt}`;
 }
 
-// ── Quick Post Generator — 2-Step Pipeline ────────────────────────────────────
+// ── Quick Post Generator — Complete Designed Graphic Pipeline ──────────────────
 /**
- * Generates a promotional/order post via 2-step architecture:
- *   Step 1 (Claude): Extract structured post copy from product data
- *   Step 2 (NanoBanana): Generate background world image (NO text in image)
+ * Generates a complete, fully-designed promotional graphic as a single image.
  *
- * The generated backgroundUrl + structured copy are returned to the frontend,
- * where a canvas compositor overlays the text, palette swatches, and optional logo.
+ * Architecture:
+ *   Step 1 (Claude): Extract structured copy — headline, hero spec, 3 features, CTA
+ *   Step 2 (Gemini): Generate the COMPLETE DESIGNED GRAPHIC with all text, layout,
+ *                    typography, product image, and visual elements baked IN.
+ *
+ * Key design philosophy:
+ *   - Mood board = creative DIRECTION and THEME INSPIRATION, not the literal image
+ *   - The AI creates a brand-new design themed around the mood's aesthetic
+ *   - All copy is rendered INTO the image as part of the graphic design
+ *   - Output = a ready-to-post promotional graphic, not a background for overlay
  *
  * @param {object} productDNA         — from analyzeProductDesign
- * @param {object} productData        — scraped product data (title, bulletPoints, description)
- * @param {object} selectedMoodDir    — the specific mood direction object (with moodBoardDirective)
+ * @param {object} productData        — scraped product data
+ * @param {object} selectedMoodDir    — the mood direction object (for design inspiration)
  * @param {string} postType           — 'promo' | 'order' | 'feature'
- * @param {string} aspectRatio        — '1:1' | '9:16' | '16:9' | '4:5'
+ * @param {string} aspectRatio        — '1:1' | '9:16' | '16:9' | '4:5' | etc.
  * @param {string} brandContext       — brand DNA string
- * @returns {{ backgroundUrl, copy, palette }}
+ * @returns {{ postImageUrl, backgroundUrl, copy, palette }}
  */
 export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '') {
     console.log(`🎯 QuickPost: type=${postType} | ratio=${aspectRatio} | product="${productData?.title || 'unknown'}"`);
 
-    const productTitle    = productData?.title || productDNA?.productCategory || 'Product';
-    const bullets         = productData?.bulletPoints || [];
-    const description     = productData?.description || '';
-    const category        = productDNA?.productCategory || 'consumer product';
-    const colorPalette    = (productDNA?.dominantColors || []).filter(c => c.role !== 'background_suggestion').slice(0, 5);
-    const colorHexStr     = colorPalette.map(c => c.hex).filter(Boolean).join(', ');
-    const brandName       = productData?.brand || '';
+    const productTitle = productData?.title || productDNA?.productCategory || 'Product';
+    const bullets      = productData?.bulletPoints || [];
+    const description  = productData?.description || '';
+    const category     = productDNA?.productCategory || 'consumer product';
+    const colorPalette = (productDNA?.dominantColors || []).filter(c => c.role !== 'background_suggestion').slice(0, 5);
+    const colorHexStr  = colorPalette.map(c => c.hex).filter(Boolean).join(', ');
+    const brandName    = productData?.brand || '';
 
-    // ── Step 1: Claude extracts structured post copy ─────────────────────────
+    // ── Step 1: Claude extracts structured post copy ───────────────────────────
     const { callAgent: callClaudeAgent } = await import('./agentUtils.js');
 
-    const copySystemPrompt = `You are a senior product marketing copywriter specializing in Indian consumer electronics and FMCG brands.
-You write punchy, benefit-led product post copy that converts. You extract the single most impactful spec from a product listing and make it the hero.
-Return ONLY valid JSON. No markdown.`;
+    const copySystemPrompt = `You are a senior product marketing copywriter specialising in Indian consumer brands (D2C, electronics, FMCG).
+You write punchy, benefit-led copy that converts. Extract the single most impactful spec and make it the visual hero.
+Return ONLY valid JSON. No markdown fences, no explanation.`;
+
+    const postTypeInstruction = {
+        order:   'ORDER POST — for distributors/retailers. CTA = "ORDER NOW". Tone: trade/B2B.',
+        feature: 'FEATURE SPOTLIGHT — deep-dive ONE key feature as the hero. Tone: educational + aspirational.',
+        promo:   'PROMO POST — consumer-facing social media. CTA = "Shop Now". Tone: exciting, punchy.',
+    }[postType] || 'PROMO POST';
 
     const copyUserPrompt = `PRODUCT: "${productTitle}"
 CATEGORY: ${category}
 BRAND: ${brandName}
-BULLETS: ${bullets.slice(0, 6).join(' | ')}
+KEY BULLETS: ${bullets.slice(0, 6).join(' | ')}
 DESCRIPTION: ${description.substring(0, 400)}
-POST TYPE: ${postType === 'order' ? 'ORDER POST (for distributors/retailers — include box qty, ORDER NOW CTA)' : postType === 'feature' ? 'FEATURE SPOTLIGHT (highlight one key feature in depth)' : 'PROMOTIONAL POST (social media, consumer-facing)'}
+POST TYPE: ${postTypeInstruction}
 BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 200) : 'none'}
 
-Extract and return:
+Return this JSON:
 {
-  "productName": "short punchy name without brand prefix, e.g. MPOWER 111",
-  "brandName": "${brandName}",
-  "tagline": "1-line product subtitle, max 6 words",
-  "heroSpec": "the single most impressive spec/stat from the bullets — e.g. '10000mAh', '22.5W', '120W', 'ANC + ENC', '65Hr Battery'. Must be a SHORT, PUNCHY VALUE not a sentence.",
-  "heroSpecLabel": "what the heroSpec refers to — e.g. 'RAPID CHARGE', 'BATTERY LIFE', 'POWER DELIVERY'",
-  "features": [
-    { "icon": "bolt", "text": "Feature 1 — short, max 4 words" },
-    { "icon": "wifi", "text": "Feature 2 — short, max 4 words" },
-    { "icon": "security", "text": "Feature 3 — short, max 4 words" }
-  ],
-  "colorVariants": ["White", "Black"] or [] if no color variants,
-  "boxQty": "100" or null if not an order post or not mentioned,
-  "cta": "${postType === 'order' ? 'ORDER NOW' : 'Shop Now'}",
-  "techBadges": ["Type-C", "Lightning"] or [] — only include if product has specific port/connector compatibility labels
-}
-
-For icons, use Material Symbols names like: bolt, battery_full, wifi, bluetooth, headphones, security, speed, star, verified, workspace_premium, flash_on, cable`;
+  "productName": "short punchy model name (no brand prefix), e.g. ZING or MPOWER 111",
+  "brandName": "${brandName || 'Brand'}",
+  "tagline": "1-line aspiration subtitle, max 6 words",
+  "heroSpec": "the single most impressive spec/number — e.g. '80Hr Battery', 'ANC + ENC', '65W Fast Charge'. MUST be SHORT and punchy, NOT a sentence.",
+  "heroSpecLabel": "what the heroSpec IS — e.g. 'PLAYTIME', 'RAPID CHARGE', 'NOISE CANCELLATION'",
+  "feature1": "Feature bullet 1 — max 4 words, lead with number/stat",
+  "feature2": "Feature bullet 2 — max 4 words",
+  "feature3": "Feature bullet 3 — max 4 words",
+  "colorVariantLabel": "e.g. 'Available in 4 Colors' or empty string",
+  "boxQty": ${postType === 'order' ? '"box quantity from bullets, or null"' : 'null'},
+  "priceHint": "e.g. \u20b91,499 or empty string — only if clearly stated",
+  "cta": "${postType === 'order' ? 'ORDER NOW' : postType === 'feature' ? 'Discover More' : 'Shop Now'}"
+}`;
 
     let copy = {};
     try {
         const copyResult = await callClaudeAgent(
             copySystemPrompt,
             copyUserPrompt,
-            { temperature: 0.3, maxTokens: 800 }
+            0.3,
+            700,
+            { provider: 'anthropic', model: 'claude-sonnet-4-6' }
         );
         copy = copyResult || {};
-        console.log(`✅ QuickPost: Copy extracted — heroSpec="${copy.heroSpec}", features=${copy.features?.length || 0}`);
+        console.log(`\u2705 QuickPost: Copy \u2192 heroSpec="${copy.heroSpec}" | f1="${copy.feature1}" | f2="${copy.feature2}" | f3="${copy.feature3}"`);
     } catch (e) {
-        console.warn(`⚠️ QuickPost: Copy extraction failed: ${e.message}. Using title fallback.`);
+        console.warn(`\u26a0\ufe0f QuickPost: Copy extraction failed: ${e.message}`);
         copy = {
             productName: productTitle.split(' ').slice(-2).join(' '),
             brandName,
             tagline: category,
-            heroSpec: '',
-            heroSpecLabel: '',
-            features: bullets.slice(0, 3).map(b => ({ icon: 'check_circle', text: b.substring(0, 30) })),
+            heroSpec: bullets[0]?.substring(0, 20) || '',
+            heroSpecLabel: 'KEY FEATURE',
+            feature1: bullets[0]?.substring(0, 25) || 'Premium Quality',
+            feature2: bullets[1]?.substring(0, 25) || 'Advanced Technology',
+            feature3: bullets[2]?.substring(0, 25) || 'Superior Performance',
+            colorVariantLabel: '',
+            boxQty: null,
+            priceHint: '',
             cta: postType === 'order' ? 'ORDER NOW' : 'Shop Now',
-            techBadges: [],
         };
     }
 
-    // ── Step 2: NanoBanana generates background world image (NO text) ─────────
-    const { laozhangMultimodalImageGenerate } = await import('../videoStudio/laozhangClient.js');
+    // ── Size map (pixels) ──────────────────────────────────────────────────────
+    const sizeMap = {
+        '1:1':      '1024x1024',
+        '4:5':      '896x1120',
+        '9:16':     '832x1216',
+        '16:9':     '1344x768',
+        '750x750':  '1024x1024',
+        '1200x628': '1344x768',
+        '1080x566': '1344x768',
+    };
+    let imageSize = sizeMap[aspectRatio];
+    if (!imageSize) {
+        const m = aspectRatio.match(/^(\d+):(\d+)$/);
+        if (m) {
+            const scale = Math.min(1344 / Math.max(parseInt(m[1]), parseInt(m[2])), 1);
+            imageSize = `${Math.round(parseInt(m[1]) * scale)}x${Math.round(parseInt(m[2]) * scale)}`;
+        } else {
+            imageSize = '1024x1024';
+        }
+    }
 
-    // Determine aspect ratio pixel sizes for image generation
-    const sizeMap = { '1:1': '1024x1024', '9:16': '832x1216', '16:9': '1344x768', '4:5': '896x1120' };
-    const imageSize = sizeMap[aspectRatio] || '1024x1024';
+    // ── Step 2: Generate the COMPLETE DESIGNED GRAPHIC ────────────────────────
+    const { laozhangMultimodalImageGenerate, laozhangImageGenerate } = await import('../videoStudio/laozhangClient.js');
 
-    // Reference product images for the background generation
+    // Product reference images (used for product rendering in the graphic)
     const refImages = [
         productDNA?.heroImageUrl,
         ...(productDNA?.productRefImages || []).slice(0, 2),
     ].filter(Boolean);
 
-    const moodDescription = selectedMoodDir?.moodBoardDirective || selectedMoodDir?.description || 'Professional product photography scene';
-    const shootStyle      = selectedMoodDir?.shootDirective || '';
+    // Mood-driven design theme — the mood INSPIRES the aesthetic, it doesn't become the image
+    const moodLabel       = selectedMoodDir?.label || 'Professional';
+    const moodDescription = selectedMoodDir?.description || 'Clean professional aesthetic';
+    const moodColorHints  = (selectedMoodDir?.colorPalette || []).join(', ');
+    const moodCreativeDir = selectedMoodDir?.shootDirective || selectedMoodDir?.moodBoardDirective || '';
 
-    const bgPrompt = [
-        `PROFESSIONAL PRODUCT BACKGROUND — for ${category} promotional post.`,
+    const bgColorHint = moodColorHints
+        ? `Background / design palette (mood-inspired, NOT product): ${moodColorHints}`
+        : `Background palette (mood-themed from product colors): ${colorHexStr || '#0d0d1a, #1a1a2e'}`;
+
+    // ── Layout templates per post type ────────────────────────────────────────
+    const layoutTemplates = {
+        promo: `LAYOUT — PROMOTIONAL POST (premium mobile ad format):
+- TOP ZONE: Brand name "${copy.brandName || brandName}" — small, top-left or top-center
+- MIDDLE-LEFT: Product name "${copy.productName || productTitle}" in large bold type, tagline "${copy.tagline || ''}" below it
+- CENTER-RIGHT: The ${category} product image, dominant and prominent (largest element)
+- BELOW PRODUCT: The hero spec "${copy.heroSpec || ''}" in a MASSIVE bold display number (the visual anchor), with "${copy.heroSpecLabel || ''}" in small caps below
+- FEATURE ROW: Three short feature bullets arranged cleanly — "${copy.feature1 || ''}" · "${copy.feature2 || ''}" · "${copy.feature3 || ''}"
+- BOTTOM: A styled CTA button "${copy.cta || 'Shop Now'}" — high contrast, pill or rectangle shape${copy.colorVariantLabel ? `\n- COLOR STRIP: Small colored circles or "Available in X colors" text — "${copy.colorVariantLabel}"` : ''}`,
+
+        order: `LAYOUT — ORDER / TRADE POST (B2B distributor format):
+- TOP: Brand name "${copy.brandName || brandName}" prominent
+- HEADLINE: Product name "${copy.productName || productTitle}" bold center or left-aligned
+- CENTER: ${category} product image, large and clean
+- BOX QTY BADGE: Large bold badge "${copy.boxQty ? `BOX QTY: ${copy.boxQty}` : 'WHOLESALE AVAILABLE'}" — this should visually stand out
+- FEATURES: Three checkmark bullets — "\u2713 ${copy.feature1 || ''}" / "\u2713 ${copy.feature2 || ''}" / "\u2713 ${copy.feature3 || ''}"
+- BOTTOM: Large CTA button "ORDER NOW" — dominant and prominent`,
+
+        feature: `LAYOUT — FEATURE SPOTLIGHT (one-feature hero):
+- TOP: Brand name "${copy.brandName || brandName}" small
+- HERO NUMBER: "${copy.heroSpec || ''}" in an extremely large, dominant display typeface — the most attention-grabbing element on the page
+- HERO LABEL: "${copy.heroSpecLabel || ''}" in clean small caps below the number
+- PRODUCT IMAGE: ${category} placed prominently, slightly offset to balance the number
+- SUPPORTING TEXT: Short benefit statement about this feature in context, followed by "${copy.feature1 || ''}" and "${copy.feature2 || ''}" as small supporting bullets
+- BOTTOM: Subtle CTA "Discover More"`,
+    };
+
+    const layoutSpec = layoutTemplates[postType] || layoutTemplates.promo;
+
+    // ── The master graphic design prompt ──────────────────────────────────────
+    const designPrompt = [
+        `TASK: Create a COMPLETE, READY-TO-POST promotional graphic for ${category}.`,
+        `This is a FINISHED ADVERTISEMENT — not a background. ALL text, ALL typography, ALL layout elements, and the product photo are rendered as part of the final image.`,
         ``,
-        `VISUAL WORLD: ${moodDescription}`,
-        shootStyle ? `PHOTOGRAPHY STYLE: ${shootStyle}` : '',
+        `━━━ COPY TO RENDER (render ALL of this in the design) ━━━`,
+        `Brand: ${copy.brandName || brandName}`,
+        `Product Name: ${copy.productName || productTitle}`,
+        copy.tagline ? `Tagline: ${copy.tagline}` : '',
+        `HERO SPEC VALUE (render VERY LARGE — this is the visual statement): ${copy.heroSpec || ''}`,
+        `HERO SPEC LABEL (small caps under the value): ${copy.heroSpecLabel || ''}`,
+        `Feature 1: ${copy.feature1 || ''}`,
+        `Feature 2: ${copy.feature2 || ''}`,
+        `Feature 3: ${copy.feature3 || ''}`,
+        copy.colorVariantLabel ? `Color availability text: ${copy.colorVariantLabel}` : '',
+        copy.boxQty ? `Box Quantity: ${copy.boxQty}` : '',
+        copy.priceHint ? `Price: ${copy.priceHint}` : '',
+        `CTA Button text: "${copy.cta || 'Shop Now'}"`,
         ``,
-        `COMPOSITION REQUIREMENTS:`,
-        `• This is a BACKGROUND IMAGE for a product post — design it as a split layout:`,
-        `  LEFT SIDE (40-45% of image): Clean, minimal area with a solid or softly blurred background tone from the product's color palette [${colorHexStr || 'brand-appropriate tones'}]. This zone will have promotional text overlaid on top — so keep it clean, NO detailed textures here.`,
-        `  RIGHT SIDE (55-60% of image): The ${category} placed naturally in the creative world. Product must be clearly visible, well-lit, true to its actual colors.`,
-        `• TOP-LEFT corner: Leave a 15% empty zone (reserved for brand logo placement)`,
-        `• BOTTOM BAR: A subtle darkened band at the very bottom 12% of the image (reserved for CTA bar)`,
+        `━━━ LAYOUT SPECIFICATION ━━━`,
+        layoutSpec,
         ``,
-        `PRODUCT: ${category}. Colors: ${colorHexStr || 'as in product images'}. Do NOT change the product's colors.`,
-        `DO NOT render any text, typography, or numbers in this image — text is added separately.`,
-        `DO NOT add any brand logos — logos are added separately.`,
-        `Image dimensions: ${imageSize}. Fill the entire frame edge-to-edge, NO white borders.`,
-        `Quality: Professional advertising photography, sharp, premium.`,
+        `━━━ VISUAL DESIGN THEME ━━━`,
+        `The design visual style is inspired by the "${moodLabel}" creative territory.`,
+        `This means: ${moodDescription}`,
+        moodCreativeDir ? `Creative direction for this aesthetic: ${moodCreativeDir}` : '',
+        bgColorHint,
+        ``,
+        `IMPORTANT: The mood is a CREATIVE DIRECTION — build a BRAND NEW design that captures the feeling and aesthetic of "${moodLabel}".`,
+        `Do NOT reproduce any mood board image. Create an original graphic design for THIS product using that aesthetic as inspiration.`,
+        `The background treatment, color palette, typography mood, and graphic elements should feel native to "${moodLabel}".`,
+        ``,
+        `━━━ PRODUCT RENDERING ━━━`,
+        refImages.length > 0
+            ? `REFERENCE IMAGES ATTACHED: These show the actual ${category} product.
+Render the product accurately in the design — matching the exact colors (${colorHexStr || 'as shown'}), form factor, and materials visible in the reference images.
+The product should be cleanly composited with professional studio-quality lighting appropriate to the "${moodLabel}" aesthetic.
+IMPORTANT: Do NOT recolor, stylize, cartoon-ize, or distort the product. It must look photorealistic.`
+            : `No product reference images — illustrate a clean, photorealistic ${category} as the main visual element.`,
+        ``,
+        `━━━ TYPOGRAPHY & DESIGN RULES ━━━`,
+        `• HIERARCHY: Brand name=smallest | Product name=medium | Tagline=supporting | HERO SPEC VALUE=LARGEST and most dominant`,
+        `• The hero spec "${copy.heroSpec || 'KEY VALUE'}" MUST be rendered in an oversized, bold, attention-commanding display typeface`,
+        `• All text must be legible with strong contrast against its background`,
+        `• CTA button must look like an actual button — styled shape, contrasting fill, visible text`,
+        `• Typography style should match the "${moodLabel}" aesthetic (e.g. clean sans-serif for minimal, heavy slab for bold, elegant serif for luxury)`,
+        `• Use the product's color palette (${colorHexStr || 'brand colors'}) for accent elements, text highlights, and graphic details`,
+        ``,
+        `━━━ PRODUCTION SPECS ━━━`,
+        `Output size: ${imageSize}. Fill the ENTIRE frame edge-to-edge. No white margins, no padding, no watermarks, no lorem ipsum.`,
+        `Quality: Premium advertising grade — photorealistic product, crisp typography, polished graphic design. Think: Samsung, OnePlus, boAt campaign creative.`,
     ].filter(Boolean).join('\n');
 
-    let backgroundUrl = null;
+    let postImageUrl = null;
     try {
-        const bgResult = await laozhangMultimodalImageGenerate(bgPrompt, refImages, {
-            model: 'gemini-3.1-flash-image-preview',
-            size: imageSize,
-        });
-        backgroundUrl = bgResult;
-        console.log(`✅ QuickPost: Background generated — ${backgroundUrl?.substring(0, 60)}...`);
+        let result;
+        if (refImages.length > 0) {
+            result = await laozhangMultimodalImageGenerate(designPrompt, refImages, {
+                model: 'gemini-3.1-flash-image-preview',
+                size: imageSize,
+            });
+        } else {
+            result = await laozhangImageGenerate(designPrompt, {
+                model: 'gemini-3.1-flash-image-preview',
+                size: imageSize,
+            });
+        }
+        postImageUrl = result?.imageUrl || null;
+        console.log(`\u2705 QuickPost: Complete graphic generated \u2014 ${postImageUrl?.substring(0, 60)}...`);
     } catch (e) {
-        console.error(`❌ QuickPost: Background generation failed: ${e.message}`);
-        // Return without image — frontend will show error state
+        console.error(`\u274c QuickPost: Graphic generation failed: ${e.message}`);
     }
 
     return {
-        backgroundUrl,
+        postImageUrl,
+        backgroundUrl: postImageUrl,          // compat alias (some frontend reads backgroundUrl)
+        backgrounds: { [aspectRatio]: postImageUrl },
         copy,
         palette: colorPalette,
         aspectRatio,
         postType,
         productTitle,
-        moodLabel: selectedMoodDir?.label || 'Creative',
+        moodLabel,
     };
 }
 
