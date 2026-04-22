@@ -80,7 +80,12 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 }
 
 function parseJSON(text) {
-  return extractJSON(text);
+  try {
+    return extractJSON(text);
+  } catch (e) {
+    console.error(`⚠️ SEO parseJSON fallback: ${e.message}`);
+    return { _parseError: true, _errorMessage: e.message };
+  }
 }
 
 // buildBrandContext imported from agents/shared/agentUtils.js above
@@ -1183,9 +1188,24 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
       + 'Generate 5-8 keyword clusters. Use VERIFIED volumes where available. Add confidenceStars (1-5) based on how many data layers support each cluster.';
 
     const userPrompt = 'Find traffic opportunities for: ' + website;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
-    if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
-    const parsed = parseJSON(result);
+    let parsed;
+    try {
+      const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+      if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
+      parsed = parseJSON(result);
+    } catch (aiErr) {
+      console.warn(`⚠️ Traffic AI analysis failed (${aiErr.message}) — returning deterministic data only`);
+      parsed = {
+        keywordClusters: [],
+        existingContentStrengths: [],
+        risingKeywords: [],
+        contentGaps: [],
+        quickWins: [],
+        thirtyDayPlan: [],
+        summary: 'AI analysis could not complete — the data below is from real crawl and keyword intelligence.',
+        _aiTimedOut: true,
+      };
+    }
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
 
     // Attach real intelligence metadata
