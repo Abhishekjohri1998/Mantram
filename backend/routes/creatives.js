@@ -1236,8 +1236,18 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     let imageUrl;
     if (imageData.b64_json) {
-        // Detect actual format from magic bytes (LaoZhang may ignore output_format)
-        const rawBuf = Buffer.from(imageData.b64_json, 'base64');
+        // LaoZhang proxy returns b64_json as a full data URI ("data:image/webp;base64,...")
+        // instead of raw base64. Strip the prefix before decoding.
+        let b64 = imageData.b64_json;
+        if (b64.startsWith('data:')) {
+            const commaIdx = b64.indexOf(',');
+            if (commaIdx > -1) {
+                console.log(`🔄 Stripping data URI prefix from b64_json: ${b64.substring(0, commaIdx + 1).substring(0, 60)}...`);
+                b64 = b64.substring(commaIdx + 1);
+            }
+        }
+
+        const rawBuf = Buffer.from(b64, 'base64');
         let mimeType = 'image/png'; // default
         let outputBuf = rawBuf;
 
