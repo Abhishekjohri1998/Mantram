@@ -1115,9 +1115,10 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // NOTE: These models do NOT support reference images / inpainting.
 async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
     // ── Choose API endpoint ──
-    // Primary: Direct OpenAI API (org must be verified for gpt-image-2)
-    // Override: LaoZhang proxy if OPENAI_USE_LZ=true
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+    // gpt-image-2: Route through LaoZhang (direct OpenAI requires org verification)
+    // gpt-image-1: Direct OpenAI, or LaoZhang if OPENAI_USE_LZ=true
+    const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
+    const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
