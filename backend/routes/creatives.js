@@ -1200,8 +1200,30 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     let imageUrl;
     if (imageData.b64_json) {
-        const mimeType = finalFormat === 'png' ? 'image/png' : finalFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
-        imageUrl = `data:${mimeType};base64,${imageData.b64_json}`;
+        // Detect actual format from magic bytes (LaoZhang may ignore output_format)
+        const rawBuf = Buffer.from(imageData.b64_json, 'base64');
+        let mimeType = 'image/png'; // default
+        let outputBuf = rawBuf;
+
+        // Check magic bytes: PNG=\x89PNG, JPEG=\xFF\xD8, WEBP=RIFF....WEBP
+        if (rawBuf[0] === 0x89 && rawBuf[1] === 0x50) {
+            mimeType = 'image/png';
+        } else if (rawBuf[0] === 0xFF && rawBuf[1] === 0xD8) {
+            mimeType = 'image/jpeg';
+        } else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') {
+            // WebP detected — convert to PNG so Sharp and Gemini can process it
+            console.log(`🔄 Converting webp → png for Sharp/Gemini compatibility`);
+            try {
+                const sharp = (await import('sharp')).default;
+                outputBuf = await sharp(rawBuf).png().toBuffer();
+                mimeType = 'image/png';
+            } catch (convErr) {
+                console.warn(`⚠️ webp→png conversion failed (${convErr.message}), using raw webp`);
+                mimeType = 'image/webp';
+            }
+        }
+
+        imageUrl = `data:${mimeType};base64,${outputBuf.toString('base64')}`;
     } else if (imageData.url) {
         imageUrl = imageData.url;
     } else {
