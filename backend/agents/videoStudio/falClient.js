@@ -252,21 +252,27 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
         } catch (e) {
             console.warn(`⚠️ [Cascade] Step 1 LZ seedance-2.0 failed: ${e.message?.substring(0, 100)}`);
         }
-        try {
-            const r = await submitLaozhangVideoGeneration({
-                model: 'veo-3.1-fast', prompt, imageUrl: null,
-                duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
-                generateAudio: generateAudio !== false,
-                referenceImages: referenceImages || [],
-            });
-            if (r?.videoUrl) {
-                console.log('✅ [Cascade] Step 2 done: LaoZhang veo-3.1-fast');
-                return { videoUrl: r.videoUrl, provider: 'laozhang' };
-            }
-        } catch (e) {
-            console.warn(`⚠️ [Cascade] Step 2 LZ veo-3.1-fast failed: ${e.message?.substring(0, 100)}`);
+    }
+    // Step 2: Try Atlas Cloud (supports image_url for I2V) BEFORE switching models
+    try {
+        const atlasResult = await submitAtlasCloudVideoGeneration({
+            prompt, imageUrl: imageUrl || null, duration,
+            aspectRatio: aspectRatio || '16:9',
+            generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
+            refAudio, refVideo,
+        });
+        if (atlasResult?.taskId) {
+            console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
+            return { taskId: atlasResult.taskId, provider: 'atlascloud', async: true, _atlasCloudPayload: atlasResult._payload };
+        }
+    } catch (atlasErr) {
+        if (atlasErr.message.includes('INSUFFICIENT_CREDITS')) {
+            console.warn(`⚠️ [Cascade] Step 2 Atlas Cloud exhausted: ${atlasErr.message?.substring(0, 100)}`);
+        } else {
+            console.warn(`⚠️ [Cascade] Step 2 Atlas Cloud failed: ${atlasErr.message?.substring(0, 100)}`);
         }
     }
+    // Step 3: Try KIE (supports imageUrl for I2V)
     try {
         const kieResult = await submitKieVideoGeneration({
             model: 'seedance-2.0', prompt,
@@ -282,24 +288,24 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     } catch (e) {
         console.warn(`⚠️ [Cascade] Step 3 kie.ai failed: ${e.message?.substring(0, 100)}`);
     }
-    try {
-        const atlasResult = await submitAtlasCloudVideoGeneration({
-            prompt, imageUrl: null, duration,
-            aspectRatio: aspectRatio || '16:9',
-            generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
-            refAudio, refVideo,
-        });
-        if (atlasResult?.taskId) {
-            console.log('✅ [Cascade] Step 4 done: Atlas Cloud');
-            return { taskId: atlasResult.taskId, provider: 'atlascloud', async: true, _atlasCloudPayload: atlasResult._payload };
+    // Step 4: Last resort — LaoZhang veo-3.1-fast (pass imageUrl + refs for multimodal I2V)
+    if (isLaozhangAvailable()) {
+        try {
+            const r = await submitLaozhangVideoGeneration({
+                model: 'veo-3.1-fast', prompt, imageUrl: imageUrl || null,
+                duration: Math.min(duration || 5, 8), aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+                referenceImages: referenceImages || [],
+            });
+            if (r?.videoUrl) {
+                console.log('✅ [Cascade] Step 4 done: LaoZhang veo-3.1-fast');
+                return { videoUrl: r.videoUrl, provider: 'laozhang' };
+            }
+        } catch (e) {
+            console.warn(`⚠️ [Cascade] Step 4 LZ veo-3.1-fast failed: ${e.message?.substring(0, 100)}`);
         }
-    } catch (atlasErr) {
-        if (atlasErr.message.includes('INSUFFICIENT_CREDITS')) {
-            throw new Error('All video providers exhausted: The primary provider (MuAPI) and all fallbacks (LaoZhang, Kie.ai, Atlas Cloud) are currently unavailable or out of credits. Please try again in 30 minutes.');
-        }
-        throw atlasErr;
     }
-    throw new Error('All video providers exhausted.');
+    throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
 export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {

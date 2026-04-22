@@ -210,6 +210,70 @@ function ConfigDropdown({ value, onChange, options, label }) {
     )
 }
 
+// ── Lazy Video Thumbnail ──
+// ── Smart Thumbnail: poster-first when available, video-frame fallback when not ──
+// Videos WITH poster: show image instantly, load video only on hover (saves bandwidth)
+// Videos WITHOUT poster: load video with preload=metadata to grab frame 1
+const PosterThumbnail = ({ src, poster }) => {
+    const ref = useRef()
+    const videoRef = useRef()
+    const [isVisible, setIsVisible] = useState(false)
+    const [isHovered, setIsHovered] = useState(false)
+
+    const posterUrl = poster || ''
+    const hasPoster = !!posterUrl
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+                setIsVisible(true)
+                observer.disconnect()
+            }
+        }, { rootMargin: '200px' })
+        if (ref.current) observer.observe(ref.current)
+        return () => observer.disconnect()
+    }, [])
+
+    useEffect(() => {
+        if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
+        else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
+    }, [isHovered])
+
+    return (
+        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {/* Layer 1: Poster image (fades out on hover) */}
+            {isVisible && hasPoster && (
+                <img src={posterUrl} loading="lazy" alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none',
+                        opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'absolute', inset: 0, zIndex: 2 }} />
+            )}
+
+            {/* Layer 2: Video element
+                 - Has poster: only mount on hover
+                 - No poster: always mount with preload=metadata to grab a frame */}
+            {isVisible && src && (hasPoster ? isHovered : true) && (
+                <video ref={videoRef} src={src}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                    muted loop playsInline
+                    preload={hasPoster ? 'auto' : 'metadata'}
+                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
+                />
+            )}
+
+            {/* Layer 3: Loading skeleton */}
+            {!isVisible && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
+            )}
+        </div>
+    )
+}
+
+// Keep old name as alias for backward compatibility
+const LazyVideoThumbnail = PosterThumbnail
+
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const [gridVideos, setGridVideos] = useState(() => {
@@ -865,11 +929,15 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     </div>
                 ))}
 
-                {/* Completed videos */}
+                {/* Completed videos — uses CDN URLs directly (no proxy DB queries) */}
                 {gridVideos.slice(0, Math.max(0, 16 - jobs.length)).map((p, i) => {
-                    const videoSrc = `${API_BASE}/video-studio/${p._id}/video`
+                    // Use CDN URL directly from API response — eliminates N+1 DB proxy queries
+                    const cdnUrl = p.generation?.videoUrl || ''
+                    const proxyUrl = p._id ? `${API_BASE}/video-studio/${p._id}/video` : ''
+                    const videoSrc = cdnUrl || proxyUrl
                     const ac = p.advancedConfig || {}
                     const promptText = ac.enhancedPrompt || ac.prompt || p.input?.brief || p.title || ''
+                    const posterUrl = p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''
                     const viewData = {
                         url: videoSrc,
                         prompt: promptText,
@@ -881,14 +949,10 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         refImages: ac.referenceImages || [],
                     }
                     return (
-                        <div key={p._id || i} className="vm-bg-item"
-                            onMouseEnter={e => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
-                            onMouseLeave={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 1; } }}
-                        >
-                            <video
-                                src={`${videoSrc}#t=1`}
-                                poster={p.generation?.thumbnailUrl || p.thumbUrl || ''}
-                                muted loop autoPlay={false} playsInline preload="auto"
+                        <div key={p._id || i} className="vm-bg-item">
+                            <PosterThumbnail
+                                src={videoSrc}
+                                poster={posterUrl}
                             />
                             {/* pointer-events: none on overlay, auto on buttons only */}
                             <div className="vm-bg-overlay">

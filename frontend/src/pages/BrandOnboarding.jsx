@@ -32,6 +32,7 @@ function ProgressIndicator({ step, total }) {
 function ChoosePath({ onSelect }) {
     const paths = [
         { id: 'website', icon: 'language', title: 'Scan My Website', desc: 'We\'ll analyze your website and extract everything — logo, colors, fonts, voice, content style.', badge: 'RECOMMENDED' },
+        { id: 'local', icon: 'storefront', title: 'Search Local Business', desc: 'Find your business on Google Maps. We\'ll extract brand details from public listings and reviews.' },
         { id: 'upload', icon: 'upload_file', title: 'Upload Brand Assets', desc: 'Upload your logo, brand guidelines, or any brand-related documents and images.' },
         { id: 'brainstorm', icon: 'psychology', title: 'AI Brainstorming', desc: 'Don\'t have existing brand assets? Let AI help you build a brand identity from scratch.' },
     ]
@@ -297,6 +298,260 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                                     </span>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============= Step 2a-2: Local Business Search =============
+function LocalBusinessScan({ onComplete, onBack }) {
+    const [businessName, setBusinessName] = useState('')
+    const [location, setLocation] = useState('')
+    const [scanning, setScanning] = useState(false)
+    const [currentStep, setCurrentStep] = useState('')
+    const [progress, setProgress] = useState(0)
+    const [error, setError] = useState(null)
+    const [discoveryData, setDiscoveryData] = useState(null) // Live discovery chips
+    const [completedSteps, setCompletedSteps] = useState([]) // Log of completed steps
+
+    const handleSearch = async () => {
+        if (!businessName.trim() || !location.trim()) return
+        
+        setScanning(true)
+        setError(null)
+        setProgress(0)
+        setCurrentStep('Initializing scan...')
+        setDiscoveryData(null)
+        setCompletedSteps([])
+        
+        try {
+            const streamUrl = agents.getLocalScanStreamUrl(businessName.trim(), location.trim())
+            const response = await fetch(streamUrl)
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({ error: 'Connection failed' }))
+                throw new Error(errData.error || `Server error: ${response.status}`)
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let finalBrand = null
+            let currentEventType = null  // Persists across read chunks — critical for large payloads
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        currentEventType = line.slice(7).trim()
+                        continue
+                    }
+                    if (!line.startsWith('data: ')) continue
+                    const raw = line.slice(6).trim()
+                    if (!raw) continue
+
+                    try {
+                        const evt = JSON.parse(raw)
+
+                        if (currentEventType === 'progress') {
+                            setCurrentStep(evt.message)
+                            if (evt.percent != null) setProgress(evt.percent)
+                            // Track completed major steps for the log
+                            if (evt.step && (evt.step.endsWith('-done') || evt.step === 'merge' || evt.step === 'saving')) {
+                                setCompletedSteps(prev => {
+                                    const exists = prev.some(s => s.step === evt.step)
+                                    return exists ? prev : [...prev, { step: evt.step, message: evt.message, time: new Date() }]
+                                })
+                            }
+                        } else if (currentEventType === 'discovery') {
+                            setDiscoveryData(evt)
+                        } else if (currentEventType === 'complete') {
+                            finalBrand = evt.brand
+                        } else if (currentEventType === 'error') {
+                            throw new Error(evt.error)
+                        }
+                    } catch (parseErr) {
+                        if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
+                    }
+                }
+            }
+
+            if (finalBrand) {
+                setCurrentStep('Brand DNA built successfully!')
+                setProgress(100)
+                setTimeout(() => onComplete(finalBrand), 800)
+            } else {
+                throw new Error('Scan completed but no brand data was received. Please try again.')
+            }
+        } catch (err) {
+            setScanning(false)
+            setProgress(0)
+            setError({
+                message: err.message || 'Failed to find or analyze local business. Please try again.',
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto animate-fade-in">
+            {!scanning ? (
+                <div className="text-center">
+                    <button onClick={onBack} className="text-[var(--sys-text-muted)] text-sm flex items-center gap-1 mb-8 hover:text-[var(--sys-text)] transition-colors cursor-pointer mx-auto">
+                        <span className="material-symbols-outlined text-sm">arrow_back</span> Back
+                    </button>
+
+                    <div className="glass-panel rounded-3xl p-10 max-w-lg mx-auto relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] pointer-events-none" />
+                        <div className="relative">
+                            <h2 className="text-3xl font-extrabold mb-2 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                                Locate your business
+                            </h2>
+                            <p className="text-[var(--sys-text-muted)] text-sm mb-8">Enter your shop or local business details to extract data from public listings.</p>
+
+                            <div className="space-y-4 mb-6 text-left">
+                                <div>
+                                    <label className="text-xs uppercase tracking-widest font-bold text-[var(--sys-text-muted)] block mb-1">Business Name</label>
+                                    <input
+                                        value={businessName}
+                                        onChange={e => setBusinessName(e.target.value)}
+                                        placeholder="e.g., Aosa Coffee"
+                                        className="w-full py-4 px-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-[var(--sys-surface)] transition-all"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs uppercase tracking-widest font-bold text-[var(--sys-text-muted)] block mb-1">City / Location</label>
+                                    <input
+                                        value={location}
+                                        onChange={e => setLocation(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                        placeholder="e.g., Udaipur, Rajasthan"
+                                        className="w-full py-4 px-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-lg placeholder-slate-600 focus:outline-none focus:border-primary/40 focus:bg-[var(--sys-surface)] transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <button onClick={handleSearch} disabled={!businessName.trim() || !location.trim()}
+                                className="btn-primary w-full py-4 rounded-2xl text-lg disabled:opacity-30">
+                                Search & Add Business
+                            </button>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="mt-6 p-4 rounded-xl border bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-orange-500 text-sm flex items-center gap-2 max-w-lg mx-auto">
+                            <span className="material-symbols-outlined text-lg">error</span>
+                            <div className="flex-1 text-left">{error.message}</div>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center min-h-[70vh] animate-fade-in">
+                    <div className="fixed inset-0 pointer-events-none" style={{
+                        background: 'radial-gradient(ellipse 60% 40% at 50% 50%, rgba(var(--primary-rgb, 255, 77, 0), 0.08) 0%, transparent 70%)',
+                    }} />
+
+                    <div className="glass-panel rounded-3xl p-10 max-w-lg w-full text-center relative overflow-hidden">
+                        <div className="absolute inset-0 rounded-3xl pointer-events-none" style={{
+                            background: 'linear-gradient(to right, rgba(255, 77, 0, 0.1), transparent 40%, transparent 60%, rgba(255, 77, 0, 0.08))',
+                        }} />
+
+                        <div className="relative">
+                            <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-3xl mx-auto mb-4 animate-pulse">
+                                <span className="material-symbols-outlined">map</span>
+                            </div>
+                            <h2 className="text-3xl font-extrabold mb-3 tracking-tight" style={{ fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                                Locating {businessName}
+                            </h2>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-4" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div className="h-full rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--primary), #ff9040)' }} />
+                            </div>
+
+                            {/* Current step */}
+                            <div className="inline-flex flex-col gap-2 p-4 rounded-2xl mb-4 transition-all duration-500 w-full"
+                                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                <div className="flex items-center justify-center gap-2 text-primary font-medium text-sm">
+                                    {progress < 100 ? (
+                                        <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
+                                    ) : (
+                                        <span className="material-symbols-outlined text-sm text-green-400">check_circle</span>
+                                    )}
+                                    {currentStep}
+                                </div>
+                                <div className="flex items-center justify-center gap-3 text-xs text-[var(--sys-text-muted)]">
+                                    <span className="flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">location_on</span>
+                                        {location}
+                                    </span>
+                                    <span className="text-primary font-bold">{progress}%</span>
+                                </div>
+                            </div>
+
+                            {/* Discovery Chips — appear live as data arrives */}
+                            {discoveryData && (
+                                <div className="flex flex-wrap justify-center gap-2 mb-4 animate-fade-in">
+                                    {discoveryData.rating && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(250, 204, 21, 0.15)', color: '#facc15', border: '1px solid rgba(250, 204, 21, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">star</span>
+                                            {discoveryData.rating}{discoveryData.reviewCount ? ` (${discoveryData.reviewCount})` : ''}
+                                        </span>
+                                    )}
+                                    {discoveryData.website && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">language</span>
+                                            Website found
+                                        </span>
+                                    )}
+                                    {!discoveryData.website && discoveryData.rating && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(251, 146, 60, 0.15)', color: '#fb923c', border: '1px solid rgba(251, 146, 60, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">public_off</span>
+                                            No website — AI synthesis
+                                        </span>
+                                    )}
+                                    {discoveryData.socialCount > 0 && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(147, 51, 234, 0.15)', color: '#a78bfa', border: '1px solid rgba(147, 51, 234, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">share</span>
+                                            {discoveryData.socialCount} social
+                                        </span>
+                                    )}
+                                    {discoveryData.category && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">category</span>
+                                            {discoveryData.category}
+                                        </span>
+                                    )}
+                                    {discoveryData.address && (
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                                            <span className="material-symbols-outlined text-xs">pin_drop</span>
+                                            Address found
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Completed steps log */}
+                            {completedSteps.length > 0 && (
+                                <div className="mt-3 max-h-28 overflow-y-auto text-left space-y-1 px-2" style={{ scrollBehavior: 'smooth' }}>
+                                    {completedSteps.map((s, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-xs text-[var(--sys-text-muted)] animate-fade-in">
+                                            <span className="text-green-500 text-[10px]">✓</span>
+                                            <span className="opacity-70">{s.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1051,14 +1306,158 @@ function ReviewBrand({ brand, onFinish }) {
                             )}
                         </div>
                     </div>
+
+                    {/* ═══ RIGHT: Description & Overview ═══ */}
+                    <div className="space-y-5">
+                        {/* Brand Description */}
+                        {dna.brandDescription && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">description</span> About
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.brandDescription}</p>
+                            </div>
+                        )}
+
+                        {/* Target Audience */}
+                        {dna.targetAudience && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">group</span> Target Audience
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] leading-relaxed">{dna.targetAudience}</p>
+                            </div>
+                        )}
+
+                        {/* Photography Style */}
+                        {dna.photographyStyle && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">photo_camera</span> Photography Style
+                                </p>
+                                <p className="text-sm text-[var(--sys-text)] capitalize">{dna.photographyStyle}</p>
+                            </div>
+                        )}
+
+                        {/* Brand Images Preview (inline) */}
+                        {brandImages.length > 0 && (
+                            <div className="p-5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                <p className="text-xs text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm text-primary">photo_library</span> Discovered Images
+                                    <span className="ml-auto text-[10px] font-normal">{brandImages.length} found</span>
+                                </p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {brandImages.filter(img => img.url).slice(0, 6).map((img, i) => (
+                                        <div key={i} className="aspect-square rounded-lg overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-bg)]">
+                                            <img src={img.url} alt={img.alt || `Image ${i+1}`}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                                onError={e => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B.1 — Local Business Details (Google Maps data) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {dna.localBusiness && (dna.localBusiness.address || dna.localBusiness.rating || dna.localBusiness.phone) && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-primary">location_on</span> Business Details
+                        {dna.localBusiness.googleMapsUrl && (
+                            <a href={dna.localBusiness.googleMapsUrl} target="_blank" rel="noopener"
+                                className="ml-auto text-xs text-primary hover:underline flex items-center gap-1">
+                                View on Google Maps <span className="material-symbols-outlined text-xs">open_in_new</span>
+                            </a>
+                        )}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {dna.localBusiness.rating && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center">
+                                <p className="text-2xl font-extrabold text-[var(--sys-text)]">⭐ {dna.localBusiness.rating}</p>
+                                {dna.localBusiness.reviewCount && (
+                                    <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">{dna.localBusiness.reviewCount} reviews</p>
+                                )}
+                            </div>
+                        )}
+                        {dna.localBusiness.category && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">storefront</span>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{dna.localBusiness.category}</p>
+                            </div>
+                        )}
+                        {dna.localBusiness.priceRange && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">payments</span>
+                                <p className="text-xs text-[var(--sys-text-muted)]">{dna.localBusiness.priceRange}</p>
+                            </div>
+                        )}
+                        {dna.localBusiness.hours && (
+                            <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center flex flex-col items-center justify-center">
+                                <span className="material-symbols-outlined text-primary text-lg mb-1">schedule</span>
+                                <p className="text-[10px] text-[var(--sys-text-muted)] leading-tight">{dna.localBusiness.hours}</p>
+                            </div>
+                        )}
+                    </div>
+                    {(dna.localBusiness.address || dna.localBusiness.phone) && (
+                        <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-[var(--sys-border)]">
+                            {dna.localBusiness.address && (
+                                <p className="text-xs text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-xs text-primary">pin_drop</span>
+                                    {dna.localBusiness.address}
+                                </p>
+                            )}
+                            {dna.localBusiness.phone && (
+                                <p className="text-xs text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-xs text-primary">call</span>
+                                    {dna.localBusiness.phone}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* SECTION B.1b — Brand Images Gallery */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {brandImages.length > 0 && (
+                <div className="glass-panel rounded-2xl p-6 mb-6">
+                    <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2 mb-4">
+                        <span className="material-symbols-outlined text-primary">photo_library</span> Brand Images
+                        <span className="text-xs font-normal text-[var(--sys-text-muted)] ml-auto">{brandImages.length} images found</span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {brandImages.filter(img => img.url && !img.url.startsWith('data:')).slice(0, 12).map((img, i) => (
+                            <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                <img
+                                    src={img.url}
+                                    alt={img.alt || `Brand image ${i + 1}`}
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    loading="lazy"
+                                    onError={e => { e.target.style.display = 'none'; e.target.parentElement.classList.add('hidden'); }}
+                                />
+                                {img.source && (
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <p className="text-[10px] text-white/80 truncate">{img.source}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ══════════════════════════════════════════════════════════════ */}
             {/* SECTION B.2 — Strategy & Positioning */}
             {/* ══════════════════════════════════════════════════════════════ */}
             {(dna.companyOverview || dna.uniqueSellingPoints?.length > 0 || dna.servicesOffered?.length > 0 || dna.missionStatement || dna.brandValues?.length > 0) && (
-                <div className="glass-panel rounded-3xl p-8 mb-6">
+                <div className="glass-panel rounded-3xl p-8 mb-6 overflow-hidden">
                     <h3 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight mb-6 flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary">lightbulb</span> Strategy & Positioning
                     </h3>
@@ -1108,7 +1507,7 @@ function ReviewBrand({ brand, onFinish }) {
 
                         <div className="space-y-4">
                             {dna.uniqueSellingPoints?.length > 0 && (
-                                <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] h-full">
+                                <div className="p-4 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]">
                                     <p className="text-xs font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">stars</span> Unique Selling Points
                                     </p>
@@ -1675,6 +2074,7 @@ export default function BrandOnboarding() {
 
                 {step === 0 && <ChoosePath onSelect={handlePathSelect} />}
                 {step === 1 && path === 'website' && <WebsiteScan onComplete={handleBrandCreated} onBack={() => setStep(0)} initialUrl={scanUrlParam} />}
+                {step === 1 && path === 'local' && <LocalBusinessScan onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 1 && path === 'upload' && <FileUpload onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 1 && path === 'brainstorm' && <Brainstorm onComplete={handleBrandCreated} onBack={() => setStep(0)} />}
                 {step === 2 && <ReviewBrand brand={brand} onFinish={handleFinish} />}

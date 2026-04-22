@@ -1230,7 +1230,7 @@ export default function FunnelStudio() {
                                     {stageEntries.length === 0 && (
                                         <div className="text-center py-6 text-[var(--sys-text-muted)]">
                                             <div className="size-10 rounded-xl bg-[var(--sys-surface)] flex items-center justify-center mx-auto mb-2">
-                                                <span className="material-symbols-outlined text-lg text-slate-700">person_add</span>
+                                                <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">person_add</span>
                                             </div>
                                             <p className="text-xs font-medium text-[var(--sys-text-muted)] mb-1">No leads here</p>
                                             <p className="text-[10px] text-[var(--sys-text-muted)]">Drag leads here or add new ones</p>
@@ -1338,7 +1338,8 @@ export default function FunnelStudio() {
             </div>
 
             {/* ── Intelligence Hero Banner ── */}
-            <div className="glass-panel rounded-2xl p-6 mb-6" style={{ background: 'var(--sys-primary)' }}>
+            <div className="glass-panel rounded-2xl p-6 mb-6 border border-[var(--sys-border)]" style={{ borderTop: '4px solid var(--sys-primary)' }}>
+                
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h2 className="text-[var(--sys-text)] font-bold text-xl flex items-center gap-2">
@@ -1377,16 +1378,15 @@ export default function FunnelStudio() {
             </div>
 
             {/* ── Quick Actions Bar ── */}
-            <div className="flex items-center gap-3 mb-6 overflow-x-auto pb-1">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
                 {[
                     { label: 'AI Generate', icon: 'auto_awesome', color: '#8b5cf6', onClick: () => setShowAIModal(true) },
                     { label: 'Marketplace', icon: 'storefront', color: '#6366f1', onClick: async () => { try { const r = await shareApi.browse(); setSharedTemplates(r.templates || []) } catch (err) { setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider }) } ; setView('sharing') } },
                     { label: 'How It Works', icon: 'menu_book', color: '#06b6d4', onClick: () => setView('help') },
                 ].map(a => (
                     <button key={a.label} onClick={a.onClick}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap hover:scale-[1.02]"
-                        style={{ color: a.color, backgroundColor: `${a.color}08`, borderColor: `${a.color}15` }}>
-                        <span className="material-symbols-outlined text-sm">{a.icon}</span> {a.label}
+                        className="flex flex-shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] transition-all cursor-pointer whitespace-nowrap shadow-sm hover:border-[var(--sys-primary)]">
+                        <span className="material-symbols-outlined text-base" style={{ color: a.color }}>{a.icon}</span> {a.label}
                     </button>
                 ))}
             </div>
@@ -1487,7 +1487,7 @@ export default function FunnelStudio() {
                                         {(f.stages || []).map((s, idx) => (
                                             <div key={idx} className="flex items-center gap-1">
                                                 <div className="h-1.5 rounded-full flex-1 min-w-[24px]" style={{ backgroundColor: `${s.color}60` }} />
-                                                {idx < (f.stages.length - 1) && <span className="text-slate-700 text-xs">›</span>}
+                                                {idx < (f.stages.length - 1) && <span className="text-[var(--sys-text-muted)] text-xs">›</span>}
                                             </div>
                                         ))}
                                     </div>
@@ -1600,7 +1600,7 @@ function AddEntryModal({ stages, onSubmit, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#1a1f35] rounded-2xl border border-[var(--sys-border)] w-[480px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--sys-surface)] rounded-2xl border border-[var(--sys-border)] w-[480px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
                     <div>
                         <h3 className="text-[var(--sys-text)] font-bold text-base flex items-center gap-2">
@@ -1683,7 +1683,7 @@ function AIGenerateModal({ brandId, onCreated, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#1a1f35] rounded-2xl border border-[var(--sys-border)] w-[520px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--sys-surface)] rounded-2xl border border-[var(--sys-border)] w-[520px] max-h-[85vh] overflow-auto shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-5 border-b border-[var(--sys-border)]">
                     <div>
                         <h3 className="text-[var(--sys-text)] font-bold text-base flex items-center gap-2">
@@ -1894,7 +1894,7 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                                         <div>
                                             <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-1">Type</label>
                                             <select value={stage.type} onChange={e => updateStage(idx, 'type', e.target.value)}
-                                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none' }}>
+                                                style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.5rem', color: 'var(--sys-text)', fontSize: '0.8rem', outline: 'none' }}>
                                                 {['awareness', 'interest', 'consideration', 'decision', 'retention', 'custom'].map(t =>
                                                     <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>
                                                 )}
@@ -1915,7 +1915,7 @@ function FunnelBuilderView({ funnel, onBack, saveStages }) {
                                         <label className="block text-xs text-[var(--sys-text-muted)] font-bold uppercase mb-1">Description</label>
                                         <textarea value={stage.description || ''} onChange={e => updateStage(idx, 'description', e.target.value)}
                                             rows={2} placeholder="What happens at this stage?"
-                                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.5rem', color: '#e2e8f0', fontSize: '0.8rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                                            style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.5rem', color: 'var(--sys-text)', fontSize: '0.8rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
                                     </div>
 
                                     {/* Studio Links */}
@@ -1970,40 +1970,40 @@ function ImportContactsModal({ stages, onImport, onClose }) {
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-            <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '460px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--sys-surface)', borderRadius: '16px', border: '1px solid var(--sys-border)', width: '460px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--sys-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}>📥 Import Contacts</h3>
-                        <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Pull existing CRM contacts into this funnel</p>
+                        <h3 style={{ margin: 0, color: 'var(--sys-text)', fontSize: '1rem', fontWeight: 700 }}>📥 Import Contacts</h3>
+                        <p style={{ color: 'var(--sys-text-muted)', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Pull existing CRM contacts into this funnel</p>
                     </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sys-text-muted)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
                 </div>
                 <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Lead Status</label>
+                        <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Lead Status</label>
                         <select value={leadStatus} onChange={e => setLeadStatus(e.target.value)}
-                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none' }}>
                             <option value="">All statuses</option>
                             {['new', 'warm', 'hot', 'cold', 'converted'].map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Platform</label>
+                        <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Filter by Platform</label>
                         <select value={platform} onChange={e => setPlatform(e.target.value)}
-                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none' }}>
                             <option value="">All platforms</option>
                             {['instagram', 'facebook', 'linkedin', 'whatsapp', 'email', 'website', 'telephonic', 'twitter', 'other'].map(p => <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Enter at Stage</label>
+                        <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Enter at Stage</label>
                         <select value={stage} onChange={e => setStage(e.target.value)}
-                            style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                            style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none' }}>
                             {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Max Contacts: {maxImport}</label>
+                        <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Max Contacts: {maxImport}</label>
                         <input type="range" min={10} max={200} step={10} value={maxImport} onChange={e => setMaxImport(parseInt(e.target.value))}
                             style={{ width: '100%', accentColor: '#6366f1' }} />
                     </div>
@@ -2314,20 +2314,20 @@ function NurtureView({ funnel, sequences, loading, onBack, onCreate, onAIGenerat
             {/* AI Generate Modal */}
             {aiGenStage && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setAiGenStage(null)}>
-                    <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '500px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
-                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Nurture Generator</h3>
-                            <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a complete nurture sequence for the <strong>{aiGenStage}</strong> stage</p>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: '16px', border: '1px solid var(--sys-border)', width: '500px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--sys-border)' }}>
+                            <h3 style={{ margin: 0, color: 'var(--sys-text)', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Nurture Generator</h3>
+                            <p style={{ color: 'var(--sys-text-muted)', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a complete nurture sequence for the <strong>{aiGenStage}</strong> stage</p>
                         </div>
                         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                             <div>
-                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
+                                <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
                                 <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3}
                                     placeholder="e.g. Focus on education, include a special offer in the last step, keep messages short..."
-                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                                    style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
                             </div>
                             <div>
-                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Channels</label>
+                                <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Channels</label>
                                 <div className="flex flex-wrap gap-2">
                                     {Object.entries(CHANNEL_META).map(([key, meta]) => (
                                         <button key={key}
@@ -2361,7 +2361,7 @@ const GRADE_COLORS = { A: '#10b981', B: '#6366f1', C: '#f59e0b', D: '#f97316', F
 const SEVERITY_STYLES = {
     high: { color: '#ef4444', bg: '#ef444410', icon: 'error' },
     medium: { color: '#f59e0b', bg: '#f59e0b10', icon: 'warning' },
-    low: { color: '#64748b', bg: '#64748b10', icon: 'info' },
+    low: { color: 'var(--sys-text-muted)', bg: '#64748b10', icon: 'info' },
 }
 
 function HealthDashboardView({ funnel, health, loading, scoringResult, scoringLoading, onBack, onRefresh, onRunScoring }) {
@@ -2667,24 +2667,24 @@ function LandingPagesView({ funnel, pages, loading, onBack, onRefresh, onCreate,
 
             {showAiGen && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAiGen(false)}>
-                    <div style={{ background: '#1e293b', borderRadius: '16px', border: '1px solid #334155', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ padding: '1.25rem', borderBottom: '1px solid #334155' }}>
-                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Landing Page Generator</h3>
-                            <p style={{ color: '#64748b', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a conversion-optimized landing page</p>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: '16px', border: '1px solid var(--sys-border)', width: '480px', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--sys-border)' }}>
+                            <h3 style={{ margin: 0, color: 'var(--sys-text)', fontSize: '1rem', fontWeight: 700 }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> AI Landing Page Generator</h3>
+                            <p style={{ color: 'var(--sys-text-muted)', margin: '0.2rem 0 0', fontSize: '0.7rem' }}>Generate a conversion-optimized landing page</p>
                         </div>
                         <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                             <div>
-                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Target Stage</label>
+                                <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Target Stage</label>
                                 <select value={aiStage} onChange={e => setAiStage(e.target.value)}
-                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none' }}>
+                                    style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none' }}>
                                     {stages.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
+                                <label style={{ display: 'block', color: 'var(--sys-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.3rem' }}>Instructions (optional)</label>
                                 <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={3}
                                     placeholder="e.g. Focus on social proof, include pricing table, use urgency..."
-                                    style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '0.55rem 0.7rem', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                                    style={{ width: '100%', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: '8px', padding: '0.55rem 0.7rem', color: 'var(--sys-text)', fontSize: '0.85rem', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
                             </div>
                             <button onClick={handleAiGenerate} disabled={generating}
                                 style={{ width: '100%', padding: '0.7rem', background: generating ? '#4b5563' : '#6366f1', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: generating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
@@ -2923,7 +2923,7 @@ function HelpDocumentationView({ onBack }) {
                                 <p className="text-xs text-[var(--sys-text-muted)] text-center leading-tight font-medium">{step.label}</p>
                             </div>
                             {idx < arr.length - 1 && (
-                                <span className="material-symbols-outlined text-slate-700 text-sm mx-1 shrink-0">chevron_right</span>
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm mx-1 shrink-0">chevron_right</span>
                             )}
                         </div>
                     ))}
@@ -3788,7 +3788,7 @@ function FidatoFunnelSidebar({ funnel, onClose, onScoreDecay, onPredictiveScore,
     }
 
     return (
-        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[#0a0e1a]/95 border-l border-[var(--sys-border)] z-50 flex flex-col shadow-2xl"
+        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[var(--sys-surface)]/95 border-l border-[var(--sys-border)] z-50 flex flex-col shadow-2xl"
             style={{ animation: 'slideInRight 0.3s ease' }}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-[var(--sys-border)]">

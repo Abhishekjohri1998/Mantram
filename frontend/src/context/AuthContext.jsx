@@ -18,6 +18,15 @@ export function AuthProvider({ children }) {
         } else {
             setLoading(false);
         }
+
+        // Global interceptor for 401 Unauthorized API responses
+        const handleUnauthorized = () => {
+            console.warn('[AuthContext] Session expired or invalid. Logging out securely.');
+            clearToken();
+            setUser(null);
+        };
+        window.addEventListener('mantram:unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('mantram:unauthorized', handleUnauthorized);
     }, []);
 
     const login = async (email, password) => {

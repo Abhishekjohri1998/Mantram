@@ -132,9 +132,9 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
     }
 
     return (
-        <div style={{ background: '#0A0A0A', borderRadius: 16, padding: 40, border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
-            <div style={{ marginBottom: 24, padding: 20, background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+        <div style={{ background: 'var(--sys-surface)', borderRadius: 16, padding: 40, border: '1px solid var(--sys-border)', position: 'relative' }}>
+            <div style={{ marginBottom: 24, padding: 20, background: 'color-mix(in srgb, var(--sys-text) 2%, var(--sys-surface))', borderRadius: 12, border: '1px solid var(--sys-border)' }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: buttonColor }}>link</span>
                     Product Data Source
                 </label>
@@ -143,14 +143,14 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                         value={urlInput} 
                         onChange={e => setUrlInput(e.target.value)} 
                         placeholder="Paste a product URL to scan..."
-                        style={{ flex: 1, background: '#000', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 16px', borderRadius: 8, color: '#FFF', fontSize: 13, outline: 'none' }}
+                        style={{ flex: 1, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', padding: '12px 16px', borderRadius: 8, color: 'var(--sys-text)', fontSize: 13, outline: 'none' }}
                         onFocus={e => e.target.style.borderColor = buttonColor}
-                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                        onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
                     />
                     <button 
                         onClick={handleFetchUrl} 
                         disabled={fetchingUrl || !urlInput}
-                        style={{ background: '#222', color: '#FFF', border: '1px solid rgba(255,255,255,0.1)', padding: '0 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: fetchingUrl ? 0.7 : 1, transition: 'all 0.2s' }}
+                        style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', color: 'var(--sys-text)', border: '1px solid var(--sys-border)', padding: '0 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: fetchingUrl ? 0.7 : 1, transition: 'all 0.2s' }}
                     >
                         {fetchingUrl ? 'Scanning...' : 'Scan URL'}
                     </button>
@@ -161,9 +161,9 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                         onChange={e => setUrlContext(e.target.value)}
                         placeholder="Or type product features, pricing, and details manually..."
                         rows={3}
-                        style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '12px 16px', color: '#FFFFFF', fontSize: 13, resize: 'vertical', outline: 'none' }}
+                        style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none' }}
                         onFocus={e => e.target.style.borderColor = buttonColor}
-                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                        onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
                     />
                 )}
                 {!urlContext && (
@@ -172,22 +172,22 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                     onChange={e => setUrlContext(e.target.value)}
                     placeholder="Or type product features, pricing, and details manually..."
                     rows={1}
-                    style={{ width: '100%', background: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '12px 16px', color: '#FFFFFF', fontSize: 13, resize: 'vertical', outline: 'none', marginTop: 12 }}
+                    style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none', marginTop: 12 }}
                     onFocus={e => e.target.style.borderColor = buttonColor}
-                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                    onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
                 />
                 )}
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-                    <label style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#FFF', transition: 'all 0.2s', fontWeight: 600 }} onMouseEnter={e => e.currentTarget.style.borderColor = buttonColor} onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'}>
+                    <label style={{ cursor: 'pointer', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px dashed var(--sys-border)', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--sys-text)', transition: 'all 0.2s', fontWeight: 600 }} onMouseEnter={e => e.currentTarget.style.borderColor = buttonColor} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
                         Upload Product Reference Image
                         <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                     </label>
                     {referenceImage && (
-                        <div style={{ position: 'relative', width: 40, height: 40, borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ position: 'relative', width: 40, height: 40, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--sys-border)' }}>
                             <img src={referenceImage} alt="Ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <button onClick={(e) => { e.preventDefault(); setReferenceImage(null); }} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#FFF', width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10 }}>×</button>
+                            <button onClick={(e) => { e.preventDefault(); setReferenceImage(null); }} style={{ position: 'absolute', top: 2, right: 2, background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', border: 'none', color: 'var(--sys-text)', width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10 }}>×</button>
                         </div>
                     )}
                 </div>
@@ -199,19 +199,19 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                 placeholder="Describe your campaign brief..."
                 rows={4}
                 style={{
-                    width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 12, padding: '16px 20px', color: '#FFFFFF', fontSize: 15, lineHeight: 1.7,
+                    width: '100%', background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)',
+                    borderRadius: 12, padding: '16px 20px', color: 'var(--sys-text)', fontSize: 15, lineHeight: 1.7,
                     outline: 'none', transition: 'all 0.2s', resize: 'vertical'
                 }}
                 onFocus={e => { e.target.style.borderColor = buttonColor; document.getElementById('brief-wrap').style.boxShadow = `0 0 0 3px ${buttonColor}20` }}
-                onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; document.getElementById('brief-wrap').style.boxShadow = 'none' }}
+                onBlur={e => { e.target.style.borderColor = 'var(--sys-border)'; document.getElementById('brief-wrap').style.boxShadow = 'none' }}
                 id="brief-wrap"
             />
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', textAlign: 'right', marginTop: 8 }}>
                 {brief.length} characters
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>
                     ✦ Mantram will apply both Brand DNA and Product context
                 </span>
             </div>
@@ -235,18 +235,18 @@ function GenerationOverlay({ loading, progress, stageText, icon }) {
     if (!loading) return null;
     return (
         <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)',
+            position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--sys-bg) 92%, transparent)', backdropFilter: 'blur(12px)',
             borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             zIndex: 10, minHeight: 400
         }}>
             <style>{`@keyframes pulse-icon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }`}</style>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#FFFFFF', animation: 'pulse-icon 2s ease-in-out infinite' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: 'var(--sys-text)', animation: 'pulse-icon 2s ease-in-out infinite' }}>
                 {icon}
             </span>
-            <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 24, minHeight: 24, transition: 'opacity 0.4s ease' }}>
+            <div style={{ fontSize: 16, color: 'var(--sys-text)', textAlign: 'center', marginTop: 24, minHeight: 24, transition: 'opacity 0.4s ease' }}>
                 {stageText}
             </div>
-            <div style={{ width: 280, height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginTop: 20, overflow: 'hidden' }}>
+            <div style={{ width: 280, height: 3, background: 'color-mix(in srgb, var(--sys-text) 10%, var(--sys-surface))', borderRadius: 2, marginTop: 20, overflow: 'hidden' }}>
                 <div style={{ width: `${progress}%`, height: '100%', background: '#FFFFFF', transition: 'width 0.5s ease-out' }}></div>
             </div>
         </div>
@@ -273,7 +273,7 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
                 onClick={() => onRephraseField(idx, field, value)}
                 disabled={rephrasing}
                 title="AI Rephrase"
-                style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: color, border: 'none', color: '#FFF', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.7, transition: 'opacity 0.2s' }}
+                style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: color, border: 'none', color: 'var(--sys-text)', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.7, transition: 'opacity 0.2s' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = 1}
                 onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
             >✦</button>
@@ -281,38 +281,38 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
     )
 
     return (
-        <div style={{ background: '#0A0A0A', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', transition: 'all 0.3s' }}>
+        <div style={{ background: 'var(--sys-surface)', borderRadius: 16, border: '1px solid var(--sys-border)', overflow: 'hidden', transition: 'all 0.3s' }}>
             {/* Slide Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: `${color}08` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--sys-border)', background: `${color}08` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 28, height: 28, borderRadius: 8, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: color, fontWeight: 800 }}>{idx + 1}</div>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>{slide.type}</span>
+                    <span style={{ fontSize: 12, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>{slide.type}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Click text to edit • ✦ to AI rephrase</div>
+                <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Click text to edit • ✦ to AI rephrase</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: image ? '1fr 1fr' : '1fr', gap: 0 }}>
                 {/* Content Side */}
                 <div style={{ padding: 24 }}>
-                    {slide.headline && <EditableText field="headline" value={slide.headline} tag="h3" style={{ fontSize: 22, fontWeight: 800, color: '#FFF', margin: '0 0 12px', lineHeight: 1.3 }} />}
-                    {slide.body && <EditableText field="body" value={slide.body} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, margin: '0 0 12px' }} />}
+                    {slide.headline && <EditableText field="headline" value={slide.headline} tag="h3" style={{ fontSize: 22, fontWeight: 800, color: 'var(--sys-text)', margin: '0 0 12px', lineHeight: 1.3 }} />}
+                    {slide.body && <EditableText field="body" value={slide.body} style={{ fontSize: 14, color: 'var(--sys-text)', lineHeight: 1.6, margin: '0 0 12px' }} />}
                     {slide.stat && (
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '12px 0' }}>
                             <EditableText field="stat.number" value={slide.stat.number} tag="span" style={{ fontSize: 40, fontWeight: 900, color: color }} />
-                            <EditableText field="stat.label" value={slide.stat.label} tag="span" style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }} />
+                            <EditableText field="stat.label" value={slide.stat.label} tag="span" style={{ fontSize: 14, color: 'var(--sys-text-muted)' }} />
                         </div>
                     )}
-                    {slide.quote && <EditableText field="quote" value={`"${slide.quote}"`} style={{ fontSize: 16, fontStyle: 'italic', color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, margin: '0 0 8px' }} />}
-                    {slide.author && <EditableText field="author" value={slide.author} style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }} />}
-                    {slide.role && <EditableText field="role" value={slide.role} style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }} />}
+                    {slide.quote && <EditableText field="quote" value={`"${slide.quote}"`} style={{ fontSize: 16, fontStyle: 'italic', color: 'var(--sys-text)', lineHeight: 1.5, margin: '0 0 8px' }} />}
+                    {slide.author && <EditableText field="author" value={slide.author} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }} />}
+                    {slide.role && <EditableText field="role" value={slide.role} style={{ fontSize: 12, color: 'var(--sys-text-muted)' }} />}
                     {slide.cta && <EditableText field="cta" value={slide.cta} style={{ display: 'inline-block', background: `${color}30`, color: color, padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 700, marginTop: 8 }} />}
                     {slide.ctaText && <EditableText field="ctaText" value={slide.ctaText} style={{ display: 'inline-block', background: `${color}30`, color: color, padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 700, marginTop: 8 }} />}
                     {slide.items && (
                         <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                             {slide.items.map((item, i) => (
-                                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                    <EditableText field={`items.${i}.title`} value={item.title} style={{ fontSize: 13, fontWeight: 700, color: '#FFF', margin: 0 }} />
-                                    <EditableText field={`items.${i}.description`} value={item.description} style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: '4px 0 0' }} />
+                                <div key={i} style={{ background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 8, padding: 12, border: '1px solid var(--sys-border)' }}>
+                                    <EditableText field={`items.${i}.title`} value={item.title} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', margin: 0 }} />
+                                    <EditableText field={`items.${i}.description`} value={item.description} style={{ fontSize: 12, color: 'var(--sys-text-muted)', margin: '4px 0 0' }} />
                                 </div>
                             ))}
                         </div>
@@ -320,8 +320,8 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
                     {slide.features && (
                         <div style={{ marginTop: 12 }}>
                             {slide.features.map((f, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <EditableText field={`features.${i}.name`} value={f.name} style={{ fontSize: 13, color: '#FFF', flex: 1 }} />
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--sys-border)' }}>
+                                    <EditableText field={`features.${i}.name`} value={f.name} style={{ fontSize: 13, color: 'var(--sys-text)', flex: 1 }} />
                                     <span style={{ fontSize: 14, color: '#22C55E', fontWeight: 700 }}>✓</span>
                                     <span style={{ fontSize: 14, color: f.theirs ? '#22C55E' : '#EF4444', fontWeight: 700 }}>{f.theirs ? '✓' : '✗'}</span>
                                 </div>
@@ -337,16 +337,16 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
                         <button
                             onClick={() => onRegenImage(idx)}
                             disabled={regenning}
-                            style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                            style={{ position: 'absolute', bottom: 12, right: 12, background: 'color-mix(in srgb, var(--sys-bg) 80%, transparent)', backdropFilter: 'blur(8px)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                         >
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
                             {regenning ? 'Generating...' : 'Regenerate Image'}
                         </button>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, background: 'rgba(255,255,255,0.02)', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.15)' }}>image</span>
-                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', margin: '8px 0 12px' }}>No image generated</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, background: 'color-mix(in srgb, var(--sys-text) 2%, var(--sys-surface))', borderLeft: '1px solid var(--sys-border)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--sys-text-muted)' }}>image</span>
+                        <p style={{ fontSize: 12, color: 'var(--sys-text-muted)', margin: '8px 0 12px' }}>No image generated</p>
                         <button
                             onClick={() => onRegenImage(idx)}
                             disabled={regenning}
@@ -473,18 +473,18 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }}></div>
-                        <div style={{ fontSize: 16, color: '#FFF', fontWeight: 700 }}>
+                        <div style={{ fontSize: 16, color: 'var(--sys-text)', fontWeight: 700 }}>
                             {editedPlan.title || 'Your Deck'}
                             <span style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA', padding: '2px 10px', borderRadius: 10, fontSize: 12, marginLeft: 10, fontWeight: 600 }}>{editedPlan.slides?.length} slides</span>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                         <button onClick={openPresentation}
-                            style={{ background: 'linear-gradient(135deg, #7c3aed, #6D28D9)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>
+                            style={{ background: 'linear-gradient(135deg, #7c3aed, #6D28D9)', color: 'var(--sys-text)', border: 'none', padding: '10px 24px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>slideshow</span> Present Live
                         </button>
                         <button onClick={() => { navigator.clipboard.writeText(gen.result.hostedUrl); alert('Link copied!') }}
-                            style={{ background: 'rgba(255,255,255,0.08)', color: '#FFF', border: '1px solid rgba(255,255,255,0.15)', padding: '10px 20px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                            style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', color: 'var(--sys-text)', border: '1px solid var(--sys-border)', padding: '10px 20px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>link</span> Copy Link
                         </button>
                     </div>
@@ -493,8 +493,8 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
                 {/* Info Banner */}
                 <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>info</span>
-                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                        <strong style={{ color: '#FFF' }}>AI-Generated Content</strong> — Stats, testimonials, and quotes are AI-composed based on your brief and brand DNA. Click any text to edit, or press ✦ to AI-rephrase.
+                    <span style={{ fontSize: 13, color: 'var(--sys-text-muted)' }}>
+                        <strong style={{ color: 'var(--sys-text)' }}>AI-Generated Content</strong> — Stats, testimonials, and quotes are AI-composed based on your brief and brand DNA. Click any text to edit, or press ✦ to AI-rephrase.
                     </span>
                 </div>
 
@@ -515,10 +515,10 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
                 {/* Bottom Actions */}
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                    <button onClick={gen.reset} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                    <button onClick={gen.reset} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
                         ↻ Start Over
                     </button>
-                    <button onClick={openPresentation} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                    <button onClick={openPresentation} style={{ flex: 1, padding: 14, borderRadius: 10, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
                         📄 Present Full Screen
                     </button>
                 </div>
@@ -565,59 +565,59 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) 1fr', gap: 24 }}>
                 {/* Visual Preview */}
                 <div>
-                    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span className="material-symbols-outlined" style={{ fontSize: 16, color: '#A78BFA' }}>psychology</span> How Claude designed this page</div>
+                    <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+                        <div style={{ fontSize: 14, color: 'var(--sys-text)', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><span className="material-symbols-outlined" style={{ fontSize: 16, color: '#A78BFA' }}>psychology</span> How Claude designed this page</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             {Object.entries(gen.result.plan?.pageStrategy || {}).map(([k, v]) => (
                                 <div key={k}>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{k.replace(/([A-Z])/g, ' $1').trim()}</div>
-                                    <div style={{ fontSize: 14, color: '#FFF', marginTop: 4 }}>{v}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase' }}>{k.replace(/([A-Z])/g, ' $1').trim()}</div>
+                                    <div style={{ fontSize: 14, color: 'var(--sys-text)', marginTop: 4 }}>{v}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                     
-                    <div style={{ background: '#1E1E1E', borderRadius: 12, overflow: 'hidden' }}>
-                        <div style={{ height: 32, background: '#222', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 6 }}>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{ height: 32, background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 6 }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444' }}></div>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B' }}></div>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981' }}></div>
-                            <div style={{ flex: 1, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{gen.result.slug}</div>
+                            <div style={{ flex: 1, textAlign: 'center', fontSize: 11, color: 'var(--sys-text-muted)' }}>{gen.result.slug}</div>
                         </div>
                         <iframe srcDoc={gen.result.html} style={{ width: '100%', height: '65vh', border: 'none' }} sandbox="allow-scripts allow-same-origin"></iframe>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 12, color: 'var(--sys-text-muted)' }}>
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <span style={{ background: '#222', padding: '4px 10px', borderRadius: 100 }}>✦ GSAP Parallax</span>
-                            <span style={{ background: '#222', padding: '4px 10px', borderRadius: 100 }}>🌐 {gen.result.sectionCount} sections</span>
+                            <span style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', padding: '4px 10px', borderRadius: 100 }}>✦ GSAP Parallax</span>
+                            <span style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', padding: '4px 10px', borderRadius: 100 }}>🌐 {gen.result.sectionCount} sections</span>
                         </div>
                         <a href={gen.result.hostedUrl} target="_blank" rel="noreferrer" style={{ color: '#10B981', textDecoration: 'none' }}>Open in new tab ↗</a>
                     </div>
                 </div>
 
                 {/* Publish Panel */}
-                <div style={{ background: '#111', borderRadius: 16, padding: 32 }}>
-                    <h3 style={{ margin: '0 0 24px', color: '#FFF' }}>Publish your page</h3>
+                <div style={{ background: 'var(--sys-surface)', borderRadius: 16, padding: 32 }}>
+                    <h3 style={{ margin: '0 0 24px', color: 'var(--sys-text)' }}>Publish your page</h3>
                     
                     <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-                        <button style={{ flex: 1, background: '#222', border: '1px solid #333', color: '#FFF', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.html)}>⬇ Download</button>
-                        <button style={{ flex: 1, background: '#222', border: '1px solid #333', color: '#FFF', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.hostedUrl)}>📋 Copy URL</button>
-                        <button style={{ flex: 1, background: '#222', border: '1px solid #333', color: '#FFF', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.embedCode)}>&lt; /&gt; Embed</button>
+                        <button style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.html)}>⬇ Download</button>
+                        <button style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.hostedUrl)}>📋 Copy URL</button>
+                        <button style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={() => copyCode(gen.result.embedCode)}>&lt; /&gt; Embed</button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
-                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 24 }}>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 12, padding: 24 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#95BF47', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#FFF' }}>S</div>
-                                <div style={{ color: '#FFF', fontWeight: 600 }}>Publish to Shopify</div>
+                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#95BF47', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--sys-text)' }}>S</div>
+                                <div style={{ color: 'var(--sys-text)', fontWeight: 600 }}>Publish to Shopify</div>
                             </div>
-                            <input value={shopDomain} onChange={e => setShopDomain(e.target.value)} placeholder="yourstore.com" className="input-glass" style={{ width: '100%', marginBottom: 12, padding: 10, fontSize: 13, background: '#000', border: '1px solid #333', color: '#FFF' }} />
-                            <input type="password" value={shopToken} onChange={e => setShopToken(e.target.value)} placeholder="Admin API token" className="input-glass" style={{ width: '100%', marginBottom: 12, padding: 10, fontSize: 13, background: '#000', border: '1px solid #333', color: '#FFF' }} />
-                            <button style={{ width: '100%', background: '#95BF47', color: '#FFF', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Publish to Store</button>
+                            <input value={shopDomain} onChange={e => setShopDomain(e.target.value)} placeholder="yourstore.com" className="input-glass" style={{ width: '100%', marginBottom: 12, padding: 10, fontSize: 13, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)' }} />
+                            <input type="password" value={shopToken} onChange={e => setShopToken(e.target.value)} placeholder="Admin API token" className="input-glass" style={{ width: '100%', marginBottom: 12, padding: 10, fontSize: 13, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)' }} />
+                            <button style={{ width: '100%', background: '#95BF47', color: 'var(--sys-text)', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Publish to Store</button>
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 24, cursor: 'pointer' }} onClick={() => copyCode(gen.result.html)}>
-                            <div style={{ color: '#FFF', fontWeight: 600 }}>Add to WordPress</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Click to copy HTML. Paste into Custom HTML block.</div>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 12, padding: 24, cursor: 'pointer' }} onClick={() => copyCode(gen.result.html)}>
+                            <div style={{ color: 'var(--sys-text)', fontWeight: 600 }}>Add to WordPress</div>
+                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginTop: 4 }}>Click to copy HTML. Paste into Custom HTML block.</div>
                         </div>
                     </div>
 
@@ -668,38 +668,38 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
                         <iframe srcDoc={gen.result.html} style={{ width: viewMode === 'mobile' ? '100%' : '600px', height: '100%', border: 'none', background: '#FFF' }} sandbox="allow-scripts allow-top-navigation"></iframe>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 16 }}>
-                        <button onClick={() => setViewMode('mobile')} style={{ background: viewMode === 'mobile' ? '#333' : 'transparent', border: '1px solid #333', color: '#FFF', padding: '6px 16px', borderRadius: 20, cursor: 'pointer' }}>📱 Mobile</button>
-                        <button onClick={() => setViewMode('desktop')} style={{ background: viewMode === 'desktop' ? '#333' : 'transparent', border: '1px solid #333', color: '#FFF', padding: '6px 16px', borderRadius: 20, cursor: 'pointer' }}>💻 Desktop</button>
+                        <button onClick={() => setViewMode('mobile')} style={{ background: viewMode === 'mobile' ? '#333' : 'transparent', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '6px 16px', borderRadius: 20, cursor: 'pointer' }}>📱 Mobile</button>
+                        <button onClick={() => setViewMode('desktop')} style={{ background: viewMode === 'desktop' ? '#333' : 'transparent', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '6px 16px', borderRadius: 20, cursor: 'pointer' }}>💻 Desktop</button>
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                    <div style={{ background: '#111', borderRadius: 12, padding: 20 }}>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Subject</div>
-                        <div style={{ fontSize: 15, color: '#FFF', fontWeight: 600, marginTop: 4, marginBottom: 16 }}>{gen.result.subject}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Preview Text</div>
-                        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{gen.result.previewText}</div>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: 12, padding: 20 }}>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase' }}>Subject</div>
+                        <div style={{ fontSize: 15, color: 'var(--sys-text)', fontWeight: 600, marginTop: 4, marginBottom: 16 }}>{gen.result.subject}</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase' }}>Preview Text</div>
+                        <div style={{ fontSize: 14, color: 'var(--sys-text)', marginTop: 4 }}>{gen.result.previewText}</div>
                     </div>
 
-                    <div style={{ background: '#111', borderRadius: 12, padding: 20 }}>
-                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, marginBottom: 16 }}>Send it</div>
-                        <button style={{ width: '100%', background: '#EA4335', color: '#FFF', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer', marginBottom: 12 }} onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(gen.result.subject)}&body=${encodeURIComponent(gen.result.plainText)}`)}>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: 12, padding: 20 }}>
+                        <div style={{ fontSize: 14, color: 'var(--sys-text)', fontWeight: 600, marginBottom: 16 }}>Send it</div>
+                        <button style={{ width: '100%', background: '#EA4335', color: 'var(--sys-text)', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer', marginBottom: 12 }} onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(gen.result.subject)}&body=${encodeURIComponent(gen.result.plainText)}`)}>
                             📨 Open in Gmail
                         </button>
-                        <button style={{ width: '100%', background: '#3b82f6', color: '#FFF', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+                        <button style={{ width: '100%', background: '#3b82f6', color: 'var(--sys-text)', border: 'none', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
                             📩 Open in Mail app
                         </button>
                     </div>
 
-                    <div style={{ background: '#111', borderRadius: 12, padding: 20 }}>
-                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, marginBottom: 16 }}>Push to ESP</div>
-                        <select style={{ width: '100%', background: '#000', border: '1px solid #333', color: '#FFF', padding: 10, borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ background: 'var(--sys-surface)', borderRadius: 12, padding: 20 }}>
+                        <div style={{ fontSize: 14, color: 'var(--sys-text)', fontWeight: 600, marginBottom: 16 }}>Push to ESP</div>
+                        <select style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 10, borderRadius: 8, marginBottom: 12 }}>
                             <option>Mailchimp</option>
                             <option>Klaviyo</option>
                             <option>Brevo</option>
                         </select>
-                        <input type="password" placeholder="API Key" style={{ width: '100%', background: '#000', border: '1px solid #333', color: '#FFF', padding: 10, borderRadius: 8, marginBottom: 12, boxSizing: 'border-box' }} />
-                        <button style={{ width: '100%', background: '#222', border: '1px solid #333', color: '#FFF', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Push Template</button>
+                        <input type="password" placeholder="API Key" style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 10, borderRadius: 8, marginBottom: 12, boxSizing: 'border-box' }} />
+                        <button style={{ width: '100%', background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: 12, borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>Push Template</button>
                     </div>
 
                     <button className="btn-secondary" style={{ padding: 12, borderRadius: 8, cursor: 'pointer' }} onClick={gen.reset}>↺ Regenerate</button>
@@ -733,12 +733,12 @@ function ColorPaletteStrip({ colors }) {
     if (!colors?.length) return null
     return (
         <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 12 }}>palette</span>
                 Extracted Color Palette — Color Guard Active
             </div>
             {/* Full-width palette strip */}
-            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 10 }}>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', marginBottom: 10 }}>
                 <div style={{ display: 'flex', height: 56 }}>
                     {colors.map((c, i) => (
                         <div key={i} title={`${c.name} · ${c.hex}`} style={{
@@ -752,18 +752,18 @@ function ColorPaletteStrip({ colors }) {
                         >
                             {c.role === 'product_primary' && (
                                 <div style={{ position: 'absolute', top: 4, right: 4, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 10, color: '#fff' }}>star</span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 10, color: 'var(--sys-text)' }}>star</span>
                                 </div>
                             )}
                         </div>
                     ))}
                 </div>
                 {/* Labels row below strip */}
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.6)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', borderTop: '1px solid var(--sys-border)' }}>
                     {colors.map((c, i) => (
                         <div key={i} style={{ flex: 1, padding: '5px 6px', borderRight: i < colors.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', minWidth: 0 }}>
                             <div style={{ fontSize: 9, color: c.role === 'product_primary' ? '#A78BFA' : 'rgba(255,255,255,0.7)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>{c.hex}</div>
+                            <div style={{ fontSize: 8, color: 'var(--sys-text-muted)', fontFamily: 'monospace' }}>{c.hex}</div>
                         </div>
                     ))}
                 </div>
@@ -800,7 +800,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
 
     const Field = ({ field, value, label, multiline = false }) => (
         <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>{label}</span>
                 <button onClick={() => onRephrase(idx, field, value, module.type)}
                     disabled={rephrasing}
@@ -811,7 +811,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
             </div>
             <div contentEditable suppressContentEditableWarning
                 onBlur={e => onUpdate(idx, field, e.currentTarget.textContent)}
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', color: '#FFF', fontSize: 13, lineHeight: 1.6, outline: 'none', cursor: 'text', minHeight: multiline ? 60 : 36, whiteSpace: 'pre-wrap', transition: 'border 0.2s' }}
+                style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '10px 12px', color: 'var(--sys-text)', fontSize: 13, lineHeight: 1.6, outline: 'none', cursor: 'text', minHeight: multiline ? 60 : 36, whiteSpace: 'pre-wrap', transition: 'border 0.2s' }}
                 onFocus={e => e.currentTarget.style.borderColor = `${c}60`}
                 onBlurCapture={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
             >{value || ''}</div>
@@ -819,7 +819,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
     )
 
     return (
-        <div style={{ background: '#0A0A0A', borderRadius: 16, border: `1px solid ${expanded ? c + '30' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden', transition: 'all 0.3s' }}>
+        <div style={{ background: 'var(--sys-surface)', borderRadius: 16, border: `1px solid ${expanded ? c + '30' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden', transition: 'all 0.3s' }}>
             {/* Module Header — always visible */}
             <div onClick={() => setExpanded(e => !e)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', cursor: 'pointer', background: expanded ? `${c}08` : 'transparent', transition: 'background 0.2s' }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: `${c}15`, border: `1px solid ${c}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -827,20 +827,20 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                 </div>
                 <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>{idx + 1}. {cfg.label}</span>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4 }}>Amazon spec: {cfg.amazon}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>{idx + 1}. {cfg.label}</span>
+                        <span style={{ fontSize: 10, color: 'var(--sys-text-muted)', background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', padding: '2px 6px', borderRadius: 4 }}>Amazon spec: {cfg.amazon}</span>
                         {image && <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700 }}>✓ Image ready</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500 }}>
+                    <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500 }}>
                         {module.headline || module.story || '—'}
                     </div>
                 </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.3)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>expand_more</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-text-muted)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>expand_more</span>
             </div>
 
             {/* Module Content — collapsible */}
             {expanded && (
-                <div style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--sys-border)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: image ? '1fr 280px' : '1fr', gap: 20, paddingTop: 20 }}>
                         {/* Text Fields */}
                         <div>
@@ -854,13 +854,13 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                             {/* Bullets */}
                             {module.bullets?.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 8 }}>Bullets</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Bullets</div>
                                     {module.bullets.map((b, bi) => (
                                         <div key={bi} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                                             <span style={{ color: c, marginTop: 2 }}>•</span>
                                             <div contentEditable suppressContentEditableWarning
                                                 onBlur={e => onUpdate(idx, `bullets.${bi}`, e.currentTarget.textContent)}
-                                                style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: '#FFF', fontSize: 13, outline: 'none', cursor: 'text' }}
+                                                style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 6, padding: '8px 10px', color: 'var(--sys-text)', fontSize: 13, outline: 'none', cursor: 'text' }}
                                             >{b}</div>
                                         </div>
                                     ))}
@@ -870,18 +870,18 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                             {/* Grid Items */}
                             {module.items?.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 8 }}>Feature Items</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Feature Items</div>
                                     {module.items.map((item, ii) => (
-                                        <div key={ii} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', marginBottom: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                        <div key={ii} style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 8, padding: '10px 12px', marginBottom: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 22, width: 32, flexShrink: 0, color: '#A78BFA' }}>{item.icon && item.icon.length > 2 ? item.icon : 'auto_awesome'}</span>
                                             <div style={{ flex: 1 }}>
                                                 <div contentEditable suppressContentEditableWarning
                                                     onBlur={e => onUpdate(idx, `items.${ii}.title`, e.currentTarget.textContent)}
-                                                    style={{ color: '#FFF', fontSize: 13, fontWeight: 700, outline: 'none', cursor: 'text', marginBottom: 4 }}
+                                                    style={{ color: 'var(--sys-text)', fontSize: 13, fontWeight: 700, outline: 'none', cursor: 'text', marginBottom: 4 }}
                                                 >{item.title}</div>
                                                 <div contentEditable suppressContentEditableWarning
                                                     onBlur={e => onUpdate(idx, `items.${ii}.description`, e.currentTarget.textContent)}
-                                                    style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, outline: 'none', cursor: 'text' }}
+                                                    style={{ color: 'var(--sys-text-muted)', fontSize: 12, outline: 'none', cursor: 'text' }}
                                                 >{item.description}</div>
                                             </div>
                                         </div>
@@ -892,14 +892,14 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                             {/* Comparison Rows */}
                             {module.rows?.length > 0 && (
                                 <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: 8 }}>Comparison Rows</div>
-                                    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, overflow: 'hidden' }}>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', background: `${c}20`, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#FFF' }}>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Comparison Rows</div>
+                                    <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 8, overflow: 'hidden' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', background: `${c}20`, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--sys-text)' }}>
                                             <span>Feature</span><span style={{ textAlign: 'center' }}>Ours</span><span style={{ textAlign: 'center' }}>Others</span>
                                         </div>
                                         {module.rows.map((row, ri) => (
-                                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 12 }}>
-                                                <div contentEditable suppressContentEditableWarning onBlur={e => onUpdate(idx, `rows.${ri}.feature`, e.currentTarget.textContent)} style={{ color: '#FFF', outline: 'none', cursor: 'text' }}>{row.feature}</div>
+                                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', padding: '8px 12px', borderTop: '1px solid var(--sys-border)', fontSize: 12 }}>
+                                                <div contentEditable suppressContentEditableWarning onBlur={e => onUpdate(idx, `rows.${ri}.feature`, e.currentTarget.textContent)} style={{ color: 'var(--sys-text)', outline: 'none', cursor: 'text' }}>{row.feature}</div>
                                                 <div style={{ textAlign: 'center', color: '#22C55E', fontWeight: 700 }}>{row.model1Value || '✓'}</div>
                                                 <div style={{ textAlign: 'center', color: row.model2Value === '✓' ? '#22C55E' : '#EF4444', fontWeight: 700 }}>{row.model2Value || '✗'}</div>
                                             </div>
@@ -912,7 +912,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                         {/* Image Panel — aspect-ratio-aware preview */}
                         <div>
                             {image ? (
-                                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--sys-border)', position: 'relative' }}>
                                     {/* Aspect-ratio-preserving container */}
                                     <div style={{ position: 'relative', width: '100%', paddingBottom: `${(1 / aspectRatio) * 100}%`, overflow: 'hidden', maxHeight: aspectRatio < 1 ? 260 : 'none' }}>
                                         <img src={image} alt={module.altText || ''}
@@ -920,23 +920,23 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
                                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}></div>
                                         <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', gap: 6 }}>
                                             <button onClick={() => onRegenImage(idx)} disabled={regenning}
-                                                style={{ flex: 1, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                                style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-bg) 80%, transparent)', backdropFilter: 'blur(8px)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>autorenew</span>
                                                 {regenning ? 'Generating...' : 'Regenerate'}
                                             </button>
                                             <button
                                                 onClick={() => downloadImageFile(image, `module_${idx + 1}_${module.type}.jpg`)}
-                                                style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                style={{ background: 'color-mix(in srgb, var(--sys-bg) 80%, transparent)', backdropFilter: 'blur(8px)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '7px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
                                             </button>
                                         </div>
                                     </div>
-                                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.5)', fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Amazon spec: {cfg.amazon}</div>
+                                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.5)', fontSize: 10, color: 'var(--sys-text-muted)', textAlign: 'center' }}>Amazon spec: {cfg.amazon}</div>
                                 </div>
                             ) : (
                                 <div style={{ borderRadius: 12, border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 160, gap: 10 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.15)' }}>image</span>
-                                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', margin: 0 }}>No image generated</p>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--sys-text-muted)' }}>image</span>
+                                    <p style={{ fontSize: 12, color: 'var(--sys-text-muted)', margin: 0 }}>No image generated</p>
                                     <button onClick={() => onRegenImage(idx)} disabled={regenning}
                                         style={{ background: `${c}20`, border: `1px solid ${c}40`, color: c, padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                         {regenning ? 'Generating...' : '+ Generate Image'}
@@ -982,34 +982,34 @@ function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClos
         }}>
             <div onClick={e => e.stopPropagation()} style={{
                 width: '90vw', maxWidth: 960, borderRadius: 20,
-                background: '#111', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--sys-surface)', border: '1px solid var(--sys-border)',
                 overflow: 'hidden', boxShadow: '0 40px 120px rgba(0,0,0,0.8)',
             }}>
                 {/* Header */}
                 <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Mood Board</span>
+                        <span style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Mood Board</span>
                         <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.15)' }} />
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#FFF' }}>{current.label}</span>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{currentIdx + 1} / {moodList.length}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)' }}>{current.label}</span>
+                        <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{currentIdx + 1} / {moodList.length}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         {aiImg && (
                             <button
                                 onClick={() => downloadImageFile(aiImg, `moodboard_${current.id}.jpg`)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
                             >
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
                                 Download
                             </button>
                         )}
-                        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button onClick={onClose} style={{ background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--sys-text)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
                         </button>
                     </div>
                 </div>
                 {/* Image */}
-                <div style={{ position: 'relative', height: '55vh', background: '#000', overflow: 'hidden' }}>
+                <div style={{ position: 'relative', height: '55vh', background: 'var(--sys-bg)', overflow: 'hidden' }}>
                     {aiImg ? (
                         <>
                             <img src={aiImg} alt={current.label} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -1017,18 +1017,18 @@ function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClos
                     ) : (
                         <div style={{ width: '100%', height: '100%', background: current.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <div style={{ textAlign: 'center' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}>hourglass_empty</span>
-                                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Generating mood board...</div>
+                                <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--sys-text-muted)' }}>hourglass_empty</span>
+                                <div style={{ fontSize: 13, color: 'var(--sys-text-muted)', marginTop: 8 }}>Generating mood board...</div>
                             </div>
                         </div>
                     )}
                     {/* Navigation arrows */}
                     <button onClick={() => setCurrentIdx(i => (i - 1 + moodList.length) % moodList.length)}
-                        style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                        style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 22 }}>chevron_left</span>
                     </button>
                     <button onClick={() => setCurrentIdx(i => (i + 1) % moodList.length)}
-                        style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.2)', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                        style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 22 }}>chevron_right</span>
                     </button>
                     {/* Slide dots */}
@@ -1041,15 +1041,15 @@ function MoodBoardLightbox({ moods, moodImages, moodSwatches, openMoodId, onClos
                 {/* Footer: colors + desc */}
                 <div style={{ padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>{current.desc}</div>
+                        <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginBottom: 8 }}>{current.desc}</div>
                         {dnaColors.length > 0 && (
                             <div>
-                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Product Colors Locked</div>
+                                <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Product Colors Locked</div>
                                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                     {dnaColors.map((c, i) => (
-                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px' }}>
+                                        <div key={i} title={`${c.name} ${c.hex}`} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 6, padding: '4px 8px' }}>
                                             <div style={{ width: 14, height: 14, borderRadius: 3, background: c.hex, flexShrink: 0 }} />
-                                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{c.hex}</span>
+                                            <span style={{ fontSize: 10, color: 'var(--sys-text-muted)' }}>{c.hex}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1094,8 +1094,8 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
                         <img src={imageUrl} alt={module.altText || module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1a1a1a, #333)' }} />}
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: isMobile ? '12px 16px' : '24px 40px', background: 'linear-gradient(transparent, rgba(0,0,0,0.7))' }}>
-                        {module.headline && <div style={{ ...headline, color: '#FFF', fontSize: isMobile ? 18 : 28, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>{module.headline}</div>}
-                        {module.subheadline && <div style={{ ...body, color: 'rgba(255,255,255,0.85)', fontSize: isMobile ? 12 : 15 }}>{module.subheadline}</div>}
+                        {module.headline && <div style={{ ...headline, color: 'var(--sys-text)', fontSize: isMobile ? 18 : 28, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>{module.headline}</div>}
+                        {module.subheadline && <div style={{ ...body, color: 'var(--sys-text)', fontSize: isMobile ? 12 : 15 }}>{module.subheadline}</div>}
                     </div>
                 </div>
             )
@@ -1104,9 +1104,9 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
             const imgH = isMobile ? 120 : 180
             return (
                 <div style={{ width: '100%', position: 'relative', height: imgH, overflow: 'hidden' }}>
-                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#222' }} />}
+                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))' }} />}
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)' }}>
-                        {module.headline && <div style={{ ...headline, color: '#FFF', textAlign: 'center', fontSize: isMobile ? 15 : 22 }}>{module.headline}</div>}
+                        {module.headline && <div style={{ ...headline, color: 'var(--sys-text)', textAlign: 'center', fontSize: isMobile ? 15 : 22 }}>{module.headline}</div>}
                     </div>
                 </div>
             )
@@ -1236,7 +1236,7 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
                         {imageUrl ? <img src={imageUrl} alt={module.altText} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: '#e8e8e8' }} />}
                         {hotspots.slice(0, 4).map((h, i) => (
                             <div key={i} style={{ position: 'absolute', left: `${h.x || (20 + i * 20)}%`, top: `${h.y || (30 + i * 15)}%`, transform: 'translate(-50%, -50%)', zIndex: 2 }}>
-                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#c45500', border: '2px solid #FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontSize: 12, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.4)', cursor: 'pointer', fontFamily: 'Arial' }}>{h.number || i+1}</div>
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#c45500', border: '2px solid #FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sys-text)', fontSize: 12, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.4)', cursor: 'pointer', fontFamily: 'Arial' }}>{h.number || i+1}</div>
                             </div>
                         ))}
                     </div>
@@ -1244,7 +1244,7 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
                         <div style={{ padding: isMobile ? '10px 12px' : '12px 20px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8, background: '#f8f8f8', borderTop: '1px solid #eee' }}>
                             {hotspots.slice(0, 4).map((h, i) => (
                                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#c45500', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, fontFamily: 'Arial' }}>{h.number || i+1}</div>
+                                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#c45500', color: 'var(--sys-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, fontFamily: 'Arial' }}>{h.number || i+1}</div>
                                     <div style={{ fontSize: 11, color: '#333', fontFamily: 'Arial' }}><strong>{h.title}</strong> — {h.description}</div>
                                 </div>
                             ))}
@@ -1275,14 +1275,14 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
         }
         case 'video_module': {
             return (
-                <div style={{ width: '100%', position: 'relative', height: isMobile ? 200 : (isPremium ? 484 : 350), background: '#000', overflow: 'hidden' }}>
-                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} /> : <div style={{ width: '100%', height: '100%', background: '#111' }} />}
+                <div style={{ width: '100%', position: 'relative', height: isMobile ? 200 : (isPremium ? 484 : 350), background: 'var(--sys-bg)', overflow: 'hidden' }}>
+                    {imageUrl ? <img src={imageUrl} alt={module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} /> : <div style={{ width: '100%', height: '100%', background: 'var(--sys-surface)' }} />}
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{ width: isMobile ? 48 : 64, height: isMobile ? 48 : 64, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: isMobile ? 30 : 38, color: '#c45500', marginLeft: 4 }}>play_arrow</span>
                         </div>
-                        {module.headline && <div style={{ color: '#FFF', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 13 : 16, marginTop: 14, textShadow: '0 2px 8px rgba(0,0,0,0.7)', textAlign: 'center', padding: '0 20px' }}>{module.headline}</div>}
-                        {module.videoCaption && <div style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'Arial', fontSize: isMobile ? 11 : 13, marginTop: 6, textAlign: 'center' }}>{module.videoCaption}</div>}
+                        {module.headline && <div style={{ color: 'var(--sys-text)', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 13 : 16, marginTop: 14, textShadow: '0 2px 8px rgba(0,0,0,0.7)', textAlign: 'center', padding: '0 20px' }}>{module.headline}</div>}
+                        {module.videoCaption && <div style={{ color: 'var(--sys-text)', fontFamily: 'Arial', fontSize: isMobile ? 11 : 13, marginTop: 6, textAlign: 'center' }}>{module.videoCaption}</div>}
                     </div>
                 </div>
             )
@@ -1294,9 +1294,9 @@ function renderAplusModulePreview(module, imageUrl, isMobile, isPremium) {
                         <img src={imageUrl} alt={module.tagline || module.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
                     ) : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #1a1a1a, #0d0d0d)' }} />}
                     <div style={{ position: 'relative', zIndex: 1, padding: isMobile ? '32px 20px' : '60px 80px', background: 'linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%)' }}>
-                        {module.brandName && <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Arial', fontSize: isMobile ? 10 : 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>{module.brandName}</div>}
-                        {(module.tagline || module.headline) && <div style={{ color: '#FFF', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 20 : 30, marginBottom: 16, lineHeight: 1.25 }}>{module.tagline || module.headline}</div>}
-                        {module.story && <div style={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Arial', fontSize: isMobile ? 12 : 15, lineHeight: 1.7, maxWidth: 560 }}>{module.story}</div>}
+                        {module.brandName && <div style={{ color: 'var(--sys-text-muted)', fontFamily: 'Arial', fontSize: isMobile ? 10 : 12, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 10 }}>{module.brandName}</div>}
+                        {(module.tagline || module.headline) && <div style={{ color: 'var(--sys-text)', fontFamily: 'Arial', fontWeight: 700, fontSize: isMobile ? 20 : 30, marginBottom: 16, lineHeight: 1.25 }}>{module.tagline || module.headline}</div>}
+                        {module.story && <div style={{ color: 'var(--sys-text)', fontFamily: 'Arial', fontSize: isMobile ? 12 : 15, lineHeight: 1.7, maxWidth: 560 }}>{module.story}</div>}
                     </div>
                 </div>
             )
@@ -1319,22 +1319,22 @@ function AmazonListingPreview({ modules, images, isPremium, onClose, productName
     const containerScale = Math.min(1, (window.innerWidth - 80) / previewWidth)
 
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'color-mix(in srgb, var(--sys-bg) 92%, transparent)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Toolbar */}
-            <div style={{ background: '#1a1a1a', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+            <div style={{ background: 'var(--sys-surface)', borderBottom: '1px solid var(--sys-border)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {/* Faint Amazon logo */}
                     <div style={{ fontSize: 18, fontWeight: 900, color: '#FF9900', fontFamily: 'Arial' }}>amazon</div>
                     <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.15)' }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>Listing Preview</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Listing Preview</span>
                     {isPremium && (
                         <span style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid rgba(245,158,11,0.3)' }}>Premium A++</span>
                     )}
-                    {productName && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{productName}</span>}
+                    {productName && <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{productName}</span>}
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                     {/* View toggle */}
-                    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 3, border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ display: 'flex', background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', borderRadius: 8, padding: 3, border: '1px solid var(--sys-border)' }}>
                         {[{id:'desktop',icon:'monitor'},{id:'mobile',icon:'smartphone'}].map(v => (
                             <button key={v.id} onClick={() => setViewMode(v.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: 'none', background: viewMode === v.id ? 'rgba(255,255,255,0.15)' : 'transparent', color: viewMode === v.id ? '#FFF' : 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{v.icon}</span>
@@ -1342,8 +1342,8 @@ function AmazonListingPreview({ modules, images, isPremium, onClose, productName
                             </button>
                         ))}
                     </div>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{previewWidth}px{isMobile ? '' : (containerScale < 1 ? ` · scaled ${Math.round(containerScale * 100)}%` : '')}</span>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#FFF', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>{previewWidth}px{isMobile ? '' : (containerScale < 1 ? ` · scaled ${Math.round(containerScale * 100)}%` : '')}</span>
+                    <button onClick={onClose} style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text)', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
                     </button>
                 </div>
@@ -2095,12 +2095,12 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     <div style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.1), rgba(245,158,11,0.08))', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 12, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>palette</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#A78BFA' }}>Product Design Intelligence Active</span>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>
                             {resultMood && `${resultMood}`}{productDNA?.dominantColors?.length > 0 && ` · ${productDNA.dominantColors.length} colors locked`} · Color Guard enabled
                         </span>
                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
                             {productDNA?.dominantColors?.slice(0, 6).map((c, i) => (
-                                <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 16, height: 16, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.15)' }} />
+                                <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 16, height: 16, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                             ))}
                         </div>
                     </div>
@@ -2109,7 +2109,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px #22C55E' }}></div>
-                            <span style={{ fontSize: 16, fontWeight: 700, color: '#FFF' }}>{plan.productName || 'A+ Listing'}</span>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--sys-text)' }}>{plan.productName || 'A+ Listing'}</span>
                             {isPremiumResult ? (
                                 <span style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,179,8,0.2))', color: '#F59E0B', padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: 12 }}>diamond</span>
@@ -2121,7 +2121,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             <span style={{ background: 'rgba(124,58,237,0.15)', color: '#C4B5FD', padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>{editedModules.length} modules</span>
                             <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600 }}>{imageCount} images</span>
                         </div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{plan.contentStrategy}</div>
+                        <div style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{plan.contentStrategy}</div>
                     </div>
                      <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={handleCopyExportText} style={{ background: exportCopied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)', border: '1px solid ' + (exportCopied ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.15)'), color: exportCopied ? '#22C55E' : '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -2132,17 +2132,17 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>preview</span>
                             Preview on Amazon
                         </button>
-                        <button onClick={gen.reset} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>↻ Start Over</button>
+                        <button onClick={gen.reset} style={{ background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--sys-text)', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>↻ Start Over</button>
                     </div>
                 </div>
                 {/* Amazon compliance + tier notice */}
                 <div style={{ background: isPremiumResult ? 'rgba(245,158,11,0.07)' : 'rgba(245,158,11,0.07)', border: `1px solid ${isPremiumResult ? 'rgba(245,158,11,0.25)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B', flexShrink: 0, marginTop: 1 }}>{isPremiumResult ? 'diamond' : 'warning'}</span>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+                    <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', lineHeight: 1.6 }}>
                         {isPremiumResult ? (
                             <><strong style={{ color: '#F59E0B' }}>Premium A++ Content (1464px)</strong> — Full-bleed immersive layout with Carousel, Hotspot, and Q&A modules. Upload to Seller Central → A+ Content Manager → Premium A+. Images must be &lt;2MB each, RGB, JPG/PNG only.</>
                         ) : (
-                            <><strong style={{ color: '#FFF' }}>Standard A+ Content (970px)</strong> — Amazon rules applied. No pricing, competitor mentions, or unverified claims. All images are text-free. Review each module before uploading to Seller Central.</>
+                            <><strong style={{ color: 'var(--sys-text)' }}>Standard A+ Content (970px)</strong> — Amazon rules applied. No pricing, competitor mentions, or unverified claims. All images are text-free. Review each module before uploading to Seller Central.</>
                         )}
                     </div>
                 </div>
@@ -2153,29 +2153,29 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             rephrasing={rephrasing} regenning={regenning} productImages={productImages} brandColors={brandColors} />
                     ))}
                 </div>
-                <div style={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 24 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#FFF', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 14, padding: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B' }}>upload</span>
                         Upload to Amazon Seller Central
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 10, padding: 16, border: '1px solid var(--sys-border)' }}>
                             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#F59E0B' }}>content_copy</span>
                             </div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Copy Text</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Copy all module headlines, body, and alt-text for Seller Central</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 4 }}>Copy Text</div>
+                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginBottom: 10 }}>Copy all module headlines, body, and alt-text for Seller Central</div>
                             <button onClick={handleCopyExportText} style={{ width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{exportCopied ? 'check' : 'content_copy'}</span>
                                 {exportCopied ? 'Copied!' : 'Copy All Text'}
                             </button>
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 10, padding: 16, border: '1px solid var(--sys-border)' }}>
                             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22C55E' }}>download</span>
                             </div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Download Images</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Download each module image named by module type</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 4 }}>Download Images</div>
+                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginBottom: 10 }}>Download each module image named by module type</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                 {Object.entries(editedImages).map(([moduleId, imgUrl], i) => {
                                     const m = editedModules.find(m => m.id === moduleId); const cfg = MODULE_TYPE_CONFIG[m?.type] || { label: m?.type }
@@ -2185,12 +2185,12 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                 })}
                             </div>
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 16, border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 10, padding: 16, border: '1px solid var(--sys-border)' }}>
                             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#F59E0B' }}>open_in_new</span>
                             </div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 4 }}>Upload to Amazon</div>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Go to Seller Central → A+ Content Manager and paste module by module</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 4 }}>Upload to Amazon</div>
+                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', marginBottom: 10 }}>Go to Seller Central → A+ Content Manager and paste module by module</div>
                             <a href="https://sellercentral.amazon.com/enhanced-content/overview" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>Open Seller Central
                             </a>
@@ -2219,17 +2219,17 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
         return (
             <div style={{ position: 'relative' }}>
                 {/* ProductDNA Card */}
-                <div style={{ background: '#0A0A0A', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+                <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                         <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#A78BFA' }}>palette</span>
                         </div>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#A78BFA' }}>auto_awesome</span>
                                 Product Design Intelligence
                             </div>
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{productDNA.productCategory} · {productDNA.materials} · {productDNA.surfaceFinish}</div>
+                            <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>{productDNA.productCategory} · {productDNA.materials} · {productDNA.surfaceFinish}</div>
                         </div>
                         <span style={{ fontSize: 11, color: '#22C55E', fontWeight: 700, background: 'rgba(34,197,94,0.1)', padding: '4px 10px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span> Colors Locked
@@ -2241,8 +2241,8 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E', flexShrink: 0 }}>inventory_2</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, color: '#FFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{analyzedProduct.title}</div>
-                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{analyzedProduct.title}</div>
+                                <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 1 }}>
                                     {productDNA.productCategory}
                                     {analyzedProduct.brand ? ` · ${analyzedProduct.brand}` : ''}
                                     {` · ${productImages.length} images analysed`}
@@ -2250,7 +2250,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             </div>
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                 {productImages.slice(0, 3).map((img, i) => (
-                                    <img key={i} src={img} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} onError={e => e.target.style.display='none'} />
+                                    <img key={i} src={img} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--sys-border)' }} onError={e => e.target.style.display='none'} />
                                 ))}
                             </div>
                         </div>
@@ -2263,7 +2263,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
 
 
                     {/* Mood Board Selector */}
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 13 }}>style</span>
                         Visual Mood Direction — Designer Mood Boards
                         {Object.keys(moodImages).length > 0 ? (
@@ -2298,7 +2298,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                         borderRadius: 14, border: `2px solid ${isSelected ? '#A78BFA' : 'rgba(255,255,255,0.08)'}`,
                                         overflow: 'hidden', cursor: 'pointer', transition: 'all 0.25s',
                                         boxShadow: isSelected ? '0 0 0 3px rgba(124,58,237,0.25), 0 8px 32px rgba(124,58,237,0.2)' : '0 2px 8px rgba(0,0,0,0.3)',
-                                        background: '#0A0A0A', transform: isSelected ? 'scale(1.02)' : 'none', position: 'relative',
+                                        background: 'var(--sys-surface)', transform: isSelected ? 'scale(1.02)' : 'none', position: 'relative',
                                     }}>
                                     {/* Main mood board image */}
                                     <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
@@ -2325,14 +2325,14 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s' }}>
                                                 <button
                                                     onClick={e => { e.stopPropagation(); setLightboxMood(mood.id) }}
-                                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#FFF', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'var(--sys-text)', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: 22, marginTop: 10 }}>zoom_in</span>
                                                     <span style={{ fontSize: 9, fontWeight: 600 }}>View</span>
                                                 </button>
                                                 {aiImg && (
                                                     <a href={aiImg} download={`moodboard_${mood.id}.jpg`} target="_blank" rel="noreferrer"
                                                         onClick={e => e.stopPropagation()}
-                                                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#FFF', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', textDecoration: 'none', backdropFilter: 'blur(8px)' }}>
+                                                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'var(--sys-text)', width: 60, height: 60, borderRadius: 12, cursor: 'pointer', textDecoration: 'none', backdropFilter: 'blur(8px)' }}>
                                                         <span className="material-symbols-outlined" style={{ fontSize: 22, marginTop: 10 }}>download</span>
                                                         <span style={{ fontSize: 9, fontWeight: 600 }}>Save</span>
                                                     </a>
@@ -2342,7 +2342,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                         {/* Selection check */}
                                         {isSelected && (
                                             <div style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(124,58,237,0.5)' }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>check</span>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-text)' }}>check</span>
                                             </div>
                                         )}
                                         {/* Mood board label */}
@@ -2356,12 +2356,12 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                                 <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? '#A78BFA' : '#FFF', lineHeight: 1.3 }}>{mood.label}</div>
                                                 {productMoodDirections && <span style={{ fontSize: 8, color: 'rgba(139,92,246,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 3, padding: '1px 4px', fontWeight: 700, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>AI</span>}
                                             </div>
-                                            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
+                                            <div style={{ fontSize: 9.5, color: 'var(--sys-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mood.desc || mood.description || ''}</div>
                                         </div>
                                         {/* Swatch strip */}
                                         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                                             {swatches.slice(0, 3).map((sw, si) => (
-                                                <div key={si} style={{ width: 10, height: 10, borderRadius: 2, background: sw, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                                <div key={si} style={{ width: 10, height: 10, borderRadius: 2, background: sw, border: '1px solid var(--sys-border)' }} />
                                             ))}
                                         </div>
                                     </div>
@@ -2370,7 +2370,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         })}
                     </div>
 
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 8, padding: '8px 12px' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22C55E' }}>lock</span>
                         Product colors are locked. AI will NOT change product color under any circumstances.
                     </div>
@@ -2378,23 +2378,23 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
 
 
                 {/* Brief */}
-                <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
+                <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
                     <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={3}
                         placeholder="Key USPs, target audience, tone. E.g. 'Indian millennials, 65hr battery, ANC, emphasize music clarity.'"
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#FFF', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                        style={{ width: '100%', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 10, padding: '12px 14px', color: 'var(--sys-text)', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
                     />
                     <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-                        <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Modules:</label>
+                        <label style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>Modules:</label>
                         {[5, 6, 7, 8].map(n => (
                             <button key={n} onClick={() => setModuleCount(n)} style={{ width: 36, height: 36, borderRadius: 8, background: moduleCount === n ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (moduleCount === n ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), color: moduleCount === n ? '#A78BFA' : 'rgba(255,255,255,0.5)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{n}</button>
                         ))}
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>25 credits · ~90s</span>
+                        <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginLeft: 'auto' }}>25 credits · ~90s</span>
                     </div>
                 </div>
 
                 <button onClick={handleGenerate} disabled={gen.loading} style={{
-                    width: '100%', padding: '15px 32px', borderRadius: 12, border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800,
+                    width: '100%', padding: '15px 32px', borderRadius: 12, border: 'none', color: 'var(--sys-text)', fontSize: 16, fontWeight: 800,
                     background: 'linear-gradient(135deg, #7c3aed 0%, #F59E0B 150%)',
                     cursor: gen.loading ? 'not-allowed' : 'pointer', opacity: gen.loading ? 0.6 : 1,
                     boxShadow: '0 8px 32px rgba(124,58,237,0.4)', transition: 'all 0.2s',
@@ -2425,19 +2425,19 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
         <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
                 {[{ id: 'url', label: 'Product URL', icon: 'link' }, { id: 'catalog', label: 'Brand Catalog', icon: 'inventory_2' }, { id: 'sample', label: 'Upload Sample', icon: 'upload' }].map(m => (
-                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', color: inputMode === m.id ? '#A78BFA' : 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button key={m.id} onClick={() => setInputMode(m.id)} style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid ' + (inputMode === m.id ? 'rgba(124,58,237,0.4)' : 'var(--sys-border)'), background: inputMode === m.id ? 'rgba(124,58,237,0.15)' : 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', color: inputMode === m.id ? '#A78BFA' : 'var(--sys-text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{m.icon}</span>{m.label}
                     </button>
                 ))}
             </div>
 
             {inputMode === 'url' && (
-                <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Product URL (Amazon, Shopify, or any website)</label>
+                <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Product URL (Amazon, Shopify, or any website)</label>
                     <div style={{ display: 'flex', gap: 10 }}>
                         <input value={productUrl} onChange={e => setProductUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAnalyzeUrl()}
                             placeholder="https://www.amazon.in/dp/XXXXXXXXXX or any product link..."
-                            style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: '#FFF', fontSize: 14, outline: 'none' }} />
+                            style={{ flex: 1, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 10, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 14, outline: 'none' }} />
                         <button onClick={handleAnalyzeUrl} disabled={pdiStep === 'analyzing' || !productUrl}
                             style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)', color: '#A78BFA', padding: '12px 20px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{pdiStep === 'analyzing' ? 'hourglass_empty' : 'palette'}</span>
@@ -2451,7 +2451,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                                 { icon: 'palette', text: 'Extracting color palette via AI vision...' },
                                 { icon: 'psychology', text: 'Building design intelligence...' }
                             ].map((s, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--sys-text-muted)' }}>
                                     <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.2)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                                     <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{s.icon}</span>
                                     {s.text}
@@ -2464,7 +2464,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 {analyzedProduct.images?.[0] && <img src={analyzedProduct.images[0]} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>{analyzedProduct.title}</div>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>{analyzedProduct.title}</div>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                                         {analyzedProduct.price && <span style={{ fontSize: 11, background: 'rgba(34,197,94,0.15)', color: '#22C55E', padding: '2px 7px', borderRadius: 4 }}>{analyzedProduct.price}</span>}
                                         {analyzedProduct.rating && <span style={{ fontSize: 11, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', padding: '2px 7px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>star</span> {analyzedProduct.rating}</span>}
@@ -2479,8 +2479,8 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
             )}
 
             {inputMode === 'catalog' && (
-                <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--sys-text-muted)', fontSize: 13 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>inventory_2</span>
                         Brand products will be loaded automatically from your catalog. Add your brief below to focus on specific products.
                     </div>
@@ -2488,25 +2488,25 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
             )}
 
             {inputMode === 'sample' && (
-                <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Upload Product Images or Reference A+ Screenshots</label>
+                <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>Upload Product Images or Reference A+ Screenshots</label>
                     <div style={{ border: '2px dashed rgba(255,255,255,0.15)', borderRadius: 10, padding: '28px 20px', textAlign: 'center', cursor: 'pointer' }}
                         onClick={() => document.getElementById('aplus-ref-upload').click()}>
                         <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.2)', display: 'block', marginBottom: 8 }}>upload_file</span>
-                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Drop product images or A+ reference screenshots</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>PDI will extract color palette + design DNA automatically</div>
+                        <div style={{ fontSize: 13, color: 'var(--sys-text-muted)' }}>Drop product images or A+ reference screenshots</div>
+                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginTop: 4 }}>PDI will extract color palette + design DNA automatically</div>
                         <input id="aplus-ref-upload" type="file" accept="image/*" multiple style={{ display: 'none' }}
                             onChange={async e => await handleUploadAndAnalyzeImages(Array.from(e.target.files || []))} />
                     </div>
-                    {referenceImages.length > 0 && <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>{referenceImages.map((img, i) => <img key={i} src={img} alt="" style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }} />)}</div>}
+                    {referenceImages.length > 0 && <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>{referenceImages.map((img, i) => <img key={i} src={img} alt="" style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--sys-border)' }} />)}</div>}
                     {pdiStep === 'analyzing' && <div style={{ marginTop: 10, fontSize: 12, color: '#A78BFA', display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.2)', borderTop: '2px solid #A78BFA', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing product design...</div>}
                 </div>
             )}
 
-            <div style={{ background: '#0A0A0A', borderRadius: 14, padding: 20, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--sys-surface)', borderRadius: 14, padding: 20, border: '1px solid var(--sys-border)', marginBottom: 20 }}>
                 {/* Listing Tier Selector */}
                 <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 13 }}>workspace_premium</span>
                         Listing Tier
                     </div>
@@ -2524,7 +2524,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                                 {['970px wide', 'Up to 5 modules', 'Image + Text', 'Hero Banner', 'Comparison'].map(f => (
-                                    <span key={f} style={{ fontSize: 10, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)', padding: '2px 7px', borderRadius: 4 }}>{f}</span>
+                                    <span key={f} style={{ fontSize: 10, background: 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', color: 'var(--sys-text-muted)', padding: '2px 7px', borderRadius: 4 }}>{f}</span>
                                 ))}
                             </div>
                             <div style={{ fontSize: 12, color: listingTier === 'standard' ? '#A78BFA' : 'rgba(255,255,255,0.3)', fontWeight: 700 }}>15 credits</div>
@@ -2554,17 +2554,17 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     </div>
                 </div>
 
-                <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
+                <label style={{ fontSize: 12, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>A+ Content Brief</label>
                 <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={4}
                     placeholder="Describe your product, target audience, key USPs, tone, and any specific messaging goals. E.g. 'Premium wireless earbuds targeting Indian millennials. USPs: 65hr battery, ANC, IPX5. Emphasize music clarity + durability.'"
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#FFF', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 10, padding: '12px 14px', color: 'var(--sys-text)', fontSize: 14, lineHeight: 1.6, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
                 />
                 <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-                    <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Modules:</label>
+                    <label style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>Modules:</label>
                     {(listingTier === 'premium' ? [5, 6, 7] : [3, 4, 5]).map(n => (
                         <button key={n} onClick={() => setModuleCount(n)} style={{ width: 36, height: 36, borderRadius: 8, background: moduleCount === n ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (moduleCount === n ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'), color: moduleCount === n ? '#A78BFA' : 'rgba(255,255,255,0.5)', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>{n}</button>
                     ))}
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>
+                    <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginLeft: 'auto' }}>
                         {listingTier === 'premium' ? '25 credits · 1464px · ~2min' : '15 credits · 970px · ~90s'}
                     </span>
                 </div>
@@ -2578,7 +2578,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         background: listingTier === 'premium'
                             ? 'linear-gradient(135deg, #F59E0B, #D97706)'
                             : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                        border: 'none', color: '#FFF', fontSize: 16, fontWeight: 800,
+                        border: 'none', color: 'var(--sys-text)', fontSize: 16, fontWeight: 800,
                         cursor: gen.loading || (!brief && !analyzedProduct) ? 'not-allowed' : 'pointer',
                         opacity: gen.loading || (!brief && !analyzedProduct) ? 0.6 : 1,
                         boxShadow: listingTier === 'premium' ? '0 8px 24px rgba(245,158,11,0.3)' : '0 8px 24px rgba(124,58,237,0.3)',
@@ -2590,7 +2590,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
             )}
 
             {pdiStep === 'input' && !brief && (
-                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: 'var(--sys-text-muted)' }}>
                     Enter a product URL above to analyze &amp; auto-build design intelligence, or add a brief to generate directly
                 </div>
             )}
@@ -2698,15 +2698,15 @@ function HistoryTab({ brandId }) {
             </div>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 60, color: 'rgba(255,255,255,0.3)' }}>
+                <div style={{ textAlign: 'center', padding: 60, color: 'var(--sys-text-muted)' }}>
                     <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid #7c3aed', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
                     Loading history...
                 </div>
             ) : items.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 80 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'rgba(255,255,255,0.1)', display: 'block', marginBottom: 16 }}>history</span>
-                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>No generations yet</p>
-                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 4 }}>Create your first deck, email, or landing page to see history here</p>
+                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 15 }}>No generations yet</p>
+                    <p style={{ color: 'var(--sys-text-muted)', fontSize: 13, marginTop: 4 }}>Create your first deck, email, or landing page to see history here</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2734,12 +2734,12 @@ function HistoryTab({ brandId }) {
                                             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color, fontWeight: 700, background: `${color}15`, padding: '2px 8px', borderRadius: 4 }}>
                                                 {toolLabels[item.tool]}
                                             </span>
-                                            {item.subType && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>· {item.subType}</span>}
+                                            {item.subType && <span style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>· {item.subType}</span>}
                                         </div>
-                                        <div style={{ fontSize: 14, color: '#FFF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <div style={{ fontSize: 14, color: 'var(--sys-text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {item.brief}
                                         </div>
-                                        <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                                        <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'var(--sys-text-muted)' }}>
                                             <span>{formatDate(item.createdAt)}</span>
                                             {item.slideCount && <span>· {item.slideCount} slides</span>}
                                             {item.aplusModuleCount && <span>· {item.aplusModuleCount} modules</span>}
@@ -2749,7 +2749,7 @@ function HistoryTab({ brandId }) {
 
                                     {/* Thumbnail */}
                                     {item.thumbnailUrl && (
-                                        <div style={{ width: 80, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <div style={{ width: 80, height: 52, borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid var(--sys-border)' }}>
                                             <img src={item.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         </div>
                                     )}
@@ -2785,13 +2785,13 @@ function HistoryTab({ brandId }) {
 
                                 {/* A+ Expanded Panel */}
                                 {item.tool === 'aplus' && expandedId === item._id && (
-                                    <div style={{ borderTop: `1px solid ${color}20`, padding: '20px 20px 24px', background: 'rgba(0,0,0,0.3)' }}>
+                                    <div style={{ borderTop: `1px solid ${color}20`, padding: '20px 20px 24px', background: 'color-mix(in srgb, var(--sys-bg) 40%, transparent)' }}>
                                         {/* Header action bar */}
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                                             <div style={{ fontSize: 12, fontWeight: 700, color: '#A78BFA', display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>stars</span>
                                                 A+ Listing — {item.aplusModuleCount || (item.aplusModules?.length) || 0} Modules
-                                                {item.aplusProductData?.title && <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.35)' }}>· {item.aplusProductData.title}</span>}
+                                                {item.aplusProductData?.title && <span style={{ fontWeight: 400, color: 'var(--sys-text-muted)' }}>· {item.aplusProductData.title}</span>}
                                             </div>
                                             <button onClick={() => handleCopyAplusText(item)} style={{
                                                 background: copiedId === item._id ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.12)',
@@ -2811,10 +2811,10 @@ function HistoryTab({ brandId }) {
                                                 {Object.entries(item.aplusImages).map(([moduleId, imgUrl], i) => {
                                                     const mod = (item.aplusModules || []).find(m => m.id === moduleId)
                                                     return (
-                                                        <div key={moduleId} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                                                        <div key={moduleId} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--sys-border)', position: 'relative' }}>
                                                             <img src={imgUrl} alt={mod?.type || `Module ${i+1}`} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
-                                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.7)', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mod?.type?.replace(/_/g,' ') || `Module ${i+1}`}</span>
+                                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'color-mix(in srgb, var(--sys-bg) 80%, transparent)', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mod?.type?.replace(/_/g,' ') || `Module ${i+1}`}</span>
                                                                 <a href={imgUrl} download={`aplus_${i+1}_${mod?.type || 'module'}.jpg`} target="_blank" rel="noreferrer"
                                                                     onClick={e => e.stopPropagation()}
                                                                     style={{ color: '#A78BFA', display: 'flex' }}>
@@ -2826,7 +2826,7 @@ function HistoryTab({ brandId }) {
                                                 })}
                                             </div>
                                         ) : (
-                                            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13, border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 16 }}>
+                                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--sys-text-muted)', fontSize: 13, border: '1px dashed var(--sys-border)', borderRadius: 8, marginBottom: 16 }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: 28, display: 'block', marginBottom: 8 }}>image_not_supported</span>
                                                 Images not available in this history item
                                             </div>
@@ -2836,14 +2836,14 @@ function HistoryTab({ brandId }) {
                                         {(item.aplusModules || []).length > 0 && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                 {item.aplusModules.slice(0, 4).map((m, i) => (
-                                                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                                    <div key={i} style={{ background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--sys-border)' }}>
                                                         <div style={{ fontSize: 10, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{m.type?.replace(/_/g,' ') || `Module ${i+1}`}</div>
-                                                        {m.headline && <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', marginBottom: 2 }}>{m.headline}</div>}
-                                                        {m.body && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>{m.body.substring(0, 120)}{m.body.length > 120 ? '...' : ''}</div>}
+                                                        {m.headline && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2 }}>{m.headline}</div>}
+                                                        {m.body && <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{m.body.substring(0, 120)}{m.body.length > 120 ? '...' : ''}</div>}
                                                     </div>
                                                 ))}
                                                 {item.aplusModules.length > 4 && (
-                                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', textAlign: 'center', paddingTop: 4 }}>+{item.aplusModules.length - 4} more modules in full listing</div>
+                                                    <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', textAlign: 'center', paddingTop: 4 }}>+{item.aplusModules.length - 4} more modules in full listing</div>
                                                 )}
                                             </div>
                                         )}
@@ -3020,45 +3020,45 @@ function ProductContextBar({ brandId, activeContext, onContextChange }) {
             <div style={{
                 background: activeContext
                     ? 'linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(245,158,11,0.05) 100%)'
-                    : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${activeContext ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.08)'}`,
+                    : 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))',
+                border: `1px solid ${activeContext ? 'rgba(124,58,237,0.22)' : 'var(--sys-border)'}`,
                 borderRadius: 14, padding: '13px 18px', marginBottom: 18,
                 display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: activeContext ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${activeContext ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: activeContext ? '#A78BFA' : 'rgba(255,255,255,0.4)' }}>palette</span>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: activeContext ? 'rgba(124,58,237,0.18)' : 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: `1px solid ${activeContext ? 'rgba(124,58,237,0.3)' : 'var(--sys-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: activeContext ? '#A78BFA' : 'var(--sys-text-muted)' }}>palette</span>
                 </div>
 
                 {activeContext ? (
                     <>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#22C55E' }}>check_circle</span>
                                 {productName || 'Active Product'}
-                                {moodName && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>· {moodName}</span>}
+                                {moodName && <span style={{ fontSize: 10, color: 'var(--sys-text-muted)', fontWeight: 400 }}>· {moodName}</span>}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
                                 {palette.slice(0,8).map((c, i) => (
-                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                    <div key={i} title={`${c.name} ${c.hex}`} style={{ width: 13, height: 13, borderRadius: 3, background: c.hex, border: '1px solid var(--sys-border)' }} />
                                 ))}
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
+                                <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
                             </div>
                         </div>
-                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.12)'}`, color: saved ? '#22C55E' : '#FFF', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
+                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'var(--sys-border)'}`, color: saved ? '#22C55E' : 'var(--sys-text)', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{saved ? 'check' : saving ? 'hourglass_empty' : 'bookmark'}</span>
                             {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Context'}
                         </button>
                         <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', color: '#A78BFA', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>library_books</span>Library
                         </button>
-                        <button onClick={() => onContextChange(null)} title="Clear active context" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <button onClick={() => onContextChange(null)} title="Clear active context" style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', color: 'var(--sys-text-muted)', padding: '6px 8px', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
                         </button>
                     </>
                 ) : (
                     <>
-                        <div style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                            <strong style={{ color: 'rgba(255,255,255,0.8)' }}>No active product context.</strong> Analyze a product in A+ Listing to lock its palette + mood — or load a saved context from your library.
+                        <div style={{ flex: 1, fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                            <strong style={{ color: 'var(--sys-text)' }}>No active product context.</strong> Analyze a product in A+ Listing to lock its palette + mood — or load a saved context from your library.
                         </div>
                         <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)', color: '#A78BFA', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Load Saved Context
@@ -3582,7 +3582,6 @@ export default function PulseStudio() {
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => setShowLibrary(true)} className="btn-secondary" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Library
-                        </button>
                         <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer', border: '1px solid var(--sys-border)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>history</span>History
                         </button>

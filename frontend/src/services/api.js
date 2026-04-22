@@ -116,6 +116,11 @@ export async function apiFetch(endpoint, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
+        // Broadcast global unauthorized event if token is invalid or expired
+        if (response.status === 401 && token) {
+            window.dispatchEvent(new CustomEvent('mantram:unauthorized', { detail: { message: data.error || 'Session expired' } }));
+        }
+
         const err = new Error(data.error || 'API request failed');
         // Attach domain-specific metadata for specialized error UI (e.g. SEO Audit Guard)
         if (data.diagnosis) err.diagnosis = data.diagnosis;
@@ -258,6 +263,7 @@ export const creatives = {
 // ============ Agent API ============
 export const agents = {
     scanWebsite: (url) => apiFetch('/agents/scan-website', { method: 'POST', body: JSON.stringify({ url }) }),
+    scanLocalBusiness: (businessName, location) => apiFetch('/agents/scan-local-business', { method: 'POST', body: JSON.stringify({ businessName, location }) }),
     // SSE streaming version — returns EventSource URL for real-time progress
     getScanStreamUrl: (url) => {
         const token = localStorage.getItem('mantram_token') || '';
@@ -265,6 +271,13 @@ export const agents = {
         const encodedUrl = encodeURIComponent(url);
         // EventSource doesn't support custom headers, so we pass token as query param
         return `${API_BASE}/agents/scan-website/stream?url=${encodedUrl}${token ? `&token=${token}` : ''}`;
+    },
+    // SSE streaming for local business scan — returns URL for fetch + ReadableStream
+    getLocalScanStreamUrl: (businessName, location) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const params = new URLSearchParams({ businessName, location });
+        if (token) params.set('token', token);
+        return `${API_BASE}/agents/scan-local-business/stream?${params.toString()}`;
     },
     brainstorm: (data) => apiFetch('/agents/brainstorm', { method: 'POST', body: JSON.stringify(data) }),
     saveBrainstorm: (brandData) => apiFetch('/agents/brainstorm/save', { method: 'POST', body: JSON.stringify({ brandData }) }),

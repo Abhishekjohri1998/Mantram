@@ -4,7 +4,7 @@ const brandSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     name: { type: String, required: true, trim: true },
     website: { type: String, default: '' },
-    onboardingMethod: { type: String, enum: ['website', 'upload', 'brainstorm'], default: 'website' },
+    onboardingMethod: { type: String, enum: ['website', 'upload', 'brainstorm', 'local-search'], default: 'website' },
     status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
 
     // Brand DNA — the knowledge bank
@@ -166,6 +166,19 @@ const brandSchema = new mongoose.Schema({
             reviewConcerns: [String],                           // What customers complain about
             sentimentSummary: { type: String, default: '' },    // AI-written 2-3 sentence summary
             lastAnalyzedAt: { type: Date },
+        },
+
+        // Local Business Data — Google Maps / public listing details (local-search onboarding)
+        localBusiness: {
+            googleMapsUrl: { type: String, default: '' },
+            address: { type: String, default: '' },
+            phone: { type: String, default: '' },
+            hours: { type: String, default: '' },
+            rating: { type: String, default: '' },
+            reviewCount: { type: String, default: '' },
+            category: { type: String, default: '' },
+            priceRange: { type: String, default: '' },
+            discoveredWebsite: { type: String, default: '' },
         },
     },
 

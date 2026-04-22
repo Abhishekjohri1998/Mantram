@@ -504,6 +504,7 @@ router.get('/me', protect, async (req, res) => {
         success: true, 
         user: { 
             ...user, 
+            completedWalkthroughs: user.completedWalkthroughs || [],
             planDetails, 
             brandCount,
             isTeamMember: ownedCount === 0 && sharedCount > 0 
@@ -808,7 +809,8 @@ router.get('/google/callback', async (req, res) => {
             organization: user.organization || null,
             isTeamMember: ownedCount === 0 && sharedCount > 0,
             planDetails: await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean(),
-            brandCount
+            brandCount,
+            completedWalkthroughs: user.completedWalkthroughs || []
         };
 
         if (flow === 'redirect') {
