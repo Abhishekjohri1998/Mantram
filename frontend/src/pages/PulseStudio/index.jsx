@@ -3582,6 +3582,7 @@ export default function PulseStudio() {
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => setShowLibrary(true)} className="btn-secondary" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>library_books</span>Library
+                        </button>
                         <button onClick={() => setShowHistory(true)} className="btn-ghost" style={{ gap: 6, fontSize: 12, padding: '7px 14px', borderRadius: 8, fontFamily: 'inherit', display: 'flex', alignItems: 'center', cursor: 'pointer', border: '1px solid var(--sys-border)' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>history</span>History
                         </button>
