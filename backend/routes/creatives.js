@@ -393,7 +393,7 @@ Generate the adapted creative now.`;
         );
 
         if (result.modelBusy) {
-            throw new Error('AI model servers are busy. Please try again soon.');
+            throw new Error(result.errorMessage || 'AI model servers are busy. Please try again soon.');
         }
 
         let rawImageUrl = result.imageUrl || '';
@@ -1397,29 +1397,40 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
     // ── Route: OpenAI GPT-image-1 / GPT-image-2 (direct OpenAI API) ─────────
     // These models do NOT support reference images — text-to-image only.
     if (modelKey === 'gpt-image-1' || modelKey === 'gpt-image-2') {
-        const TIMEOUT_MS = 180_000;
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`${modelKey} timed out after 3 minutes. Please try again.`)), TIMEOUT_MS)
-        );
+        const TIMEOUT_MS = 300_000; // 5 minutes (LaoZhang proxy adds latency)
         // Warn if caller passed reference images (silently dropped — model doesn't support them)
         if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
             console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
         }
         const quality = modelKey === 'gpt-image-2' ? 'high' : 'medium';
-        try {
-            const result = await Promise.race([
-                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque'),
-                timeoutPromise,
-            ]);
-            return { ...result, model: selectedModel };
-        } catch (error) {
-            console.error(`❌ ${modelKey} failed:`, error.message);
-            return {
-                imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
-                modelBusy: true, busyModel: modelKey,
-                errorMessage: error.message || `${modelKey} is unavailable. Please try again.`,
-                errorType: error.message?.startsWith('BUSY') || error.message?.startsWith('QUOTA') ? 'busy' : 'error',
-            };
+
+        // Attempt with one retry on timeout
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`TIMEOUT`)), TIMEOUT_MS)
+                );
+                const result = await Promise.race([
+                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque'),
+                    timeoutPromise,
+                ]);
+                return { ...result, model: selectedModel };
+            } catch (error) {
+                if (error.message === 'TIMEOUT' && attempt === 1) {
+                    console.warn(`⏱️ ${modelKey} timed out (attempt 1/2) — retrying...`);
+                    continue;
+                }
+                const errMsg = error.message === 'TIMEOUT'
+                    ? `${modelKey} timed out after ${Math.round(TIMEOUT_MS/1000)}s. The image was too complex — try a simpler prompt or try again.`
+                    : error.message;
+                console.error(`❌ ${modelKey} failed (attempt ${attempt}):`, errMsg);
+                return {
+                    imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
+                    modelBusy: true, busyModel: modelKey,
+                    errorMessage: errMsg,
+                    errorType: error.message?.startsWith('BUSY') || error.message?.startsWith('QUOTA') ? 'busy' : 'error',
+                };
+            }
         }
     }
 
