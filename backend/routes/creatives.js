@@ -1585,8 +1585,25 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
 router.get('/', protect, async (req, res) => {
     try {
         const { brandId, type, limit = 20, page = 1 } = req.query;
-        const filter = { user: req.user._id };
-        if (brandId) filter.brand = brandId;
+        const filter = {};
+        
+        if (req.user.role === 'superadmin') {
+            if (brandId) filter.brand = brandId;
+        } else {
+            if (brandId) {
+                const brand = await Brand.findOne({ 
+                    _id: brandId, 
+                    $or: [{ user: req.user._id }, { sharedWith: req.user._id }] 
+                });
+                if (!brand) {
+                    return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
+                }
+                filter.brand = brandId;
+            } else {
+                filter.user = req.user._id;
+            }
+        }
+
         if (type) filter.type = type;
 
         const creatives = await Creative.find(filter)

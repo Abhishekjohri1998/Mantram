@@ -183,7 +183,15 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
             });
             if (result._laozhangVideoUrl) {
                 const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
-                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+                mirrorUrlToS3(result._laozhangVideoUrl, targetKey)
+                    .then(s3Url => {
+                        VideoProject.findByIdAndUpdate(project._id, {
+                            finalVideoUrl: s3Url,
+                            'generation.videoUrl': s3Url
+                        }).exec();
+                        console.log(`✅ [LaoZhang/I2V] Mirrored video to S3: ${s3Url}`);
+                    })
+                    .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
             console.error('I2V generate background error:', error);
@@ -285,7 +293,15 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
             if (result._laozhangVideoUrl) {
                 const targetKey = `video-studio/generations/${extended._id}-${Date.now()}.mp4`;
                 const { mirrorUrlToS3 } = await import('../utils/s3.js');
-                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+                mirrorUrlToS3(result._laozhangVideoUrl, targetKey)
+                    .then(s3Url => {
+                        VideoProject.findByIdAndUpdate(extended._id, {
+                            finalVideoUrl: s3Url,
+                            'generation.videoUrl': s3Url
+                        }).exec();
+                        console.log(`✅ [LaoZhang/Extend] Mirrored video to S3: ${s3Url}`);
+                    })
+                    .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
             console.error('Video extend background error:', error);
@@ -426,6 +442,13 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             if (projectStatus === 'completed' && state.generation?.videoUrl) {
                 const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
                 mirrorUrlToS3(state.generation.videoUrl, targetKey)
+                    .then(s3Url => {
+                        VideoProject.findByIdAndUpdate(project._id, {
+                            finalVideoUrl: s3Url,
+                            'generation.videoUrl': s3Url
+                        }).exec();
+                        console.log(`✅ [LaoZhang/Generate] Mirrored video to S3: ${s3Url}`);
+                    })
                     .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
@@ -4427,12 +4450,20 @@ router.get('/:id/status', protect, async (req, res) => {
 
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic (if needed)
                 if (updated.status === 'critique' || updated.status === 'completed') {
-                    // Fire-and-forget: upload video to S3
+                    // Upload video to S3 and save to DB
                     let finalVideoUrl = updated.generation?.videoUrl;
                     if (finalVideoUrl) {
                         try {
                             const s3Url = await downloadAndUploadVideoToS3(project._id.toString(), finalVideoUrl);
-                            if (s3Url) finalVideoUrl = s3Url;
+                            if (s3Url) {
+                                finalVideoUrl = s3Url;
+                                updated.generation.videoUrl = s3Url;
+                                await VideoProject.findByIdAndUpdate(project._id, {
+                                    'generation.videoUrl': s3Url,
+                                    finalVideoUrl: s3Url
+                                });
+                                console.log(`✅ [Polling] Uploaded and saved S3 URL: ${s3Url}`);
+                            }
                         } catch (e) {
                             console.warn('⚠️ Video S3 upload failed:', e.message);
                         }
@@ -4667,8 +4698,25 @@ router.post('/:id/finalize', protect, async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         const { brandId, status, mode, limit = 50, page = 1 } = req.query;
-        const filter = { user: req.user._id };
-        if (brandId) filter.brand = brandId;
+        const filter = {};
+        
+        if (req.user.role === 'superadmin') {
+            if (brandId) filter.brand = brandId;
+        } else {
+            if (brandId) {
+                const brand = await Brand.findOne({ 
+                    _id: brandId, 
+                    $or: [{ user: req.user._id }, { sharedWith: req.user._id }] 
+                });
+                if (!brand) {
+                    return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
+                }
+                filter.brand = brandId;
+            } else {
+                filter.user = req.user._id;
+            }
+        }
+
         if (status) filter.status = status;
         if (mode) filter.mode = mode;
 
