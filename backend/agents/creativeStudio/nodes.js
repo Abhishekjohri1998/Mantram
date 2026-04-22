@@ -1085,21 +1085,20 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // ── STEP 1: Parallel Node Execution (MCP Intel + Visual Grounding + Art Director + Copywriter) ──
+    // ── STEP 1: Parallel Node Execution (Visual Grounding + Art Director + Copywriter) ──
     // ALL agents that don't depend on each other run in parallel to minimize wall-clock latency.
-    // mcpMarketIntelNode moved INTO this block (was sequential before — added 3–12s unnecessarily).
     const nodePromises = [];
 
-    // Promise 0: MCP Market Intelligence — live trends for art director (non-blocking, from cache most of the time)
-    const mcpMarketTask = (async () => {
-        emit('brand-intel', 'Fetching live visual trends (MCP)...', 'working');
-        const updatedState = await mcpMarketIntelNode(state);
+    // ⚡ PERF: MCP Market Intelligence — fire-and-forget (non-blocking)
+    // Previously this was inside Promise.all, meaning a slow 6s MCP timeout would delay
+    // the ENTIRE parallel block. Now it runs independently — if data arrives in time,
+    // the art director benefits; if not, no delay.
+    mcpMarketIntelNode(state).then(updatedState => {
         state.marketIntel = updatedState.marketIntel;
         if (state.marketIntel) {
             emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
         }
-    })();
-    nodePromises.push(mcpMarketTask);
+    }).catch(() => { /* non-critical — pipeline continues without live trends */ });
 
     // Promise 1: Visual Grounding (Multimodal MCoT)
     const visualGroundingTask = (async () => {
@@ -1134,10 +1133,10 @@ export async function runCreativePipeline(params) {
     }
     nodePromises.push(creativeVisionTask);
 
-    // Promise 3: Copywriter (AI vs Custom)
+    // Promise 3: Copywriter (AI vs Custom) — ⚡ only included when generateCopy is true
     let copyResult = null;
-    const copywriterPromise = (async () => {
-        if (generateCopy) {
+    if (generateCopy) {
+        const copywriterPromise = (async () => {
             if (hasCustomCopy) {
                 copyResult = {
                     headline: customCopy.headline || '',
@@ -1160,11 +1159,11 @@ export async function runCreativePipeline(params) {
                     emit('copywriter', 'Copy generation skipped', 'done');
                 }
             }
-        }
-    })();
-    nodePromises.push(copywriterPromise);
+        })();
+        nodePromises.push(copywriterPromise);
+    }
 
-    // Wait for the parallel initial block to finish
+    // Wait for the parallel initial block to finish (critical agents only)
     await Promise.all(nodePromises);
 
     // ── STEP 2: Sequential Refinement (Quality Mode Only) ──
