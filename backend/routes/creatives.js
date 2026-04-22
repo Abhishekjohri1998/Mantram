@@ -1115,9 +1115,10 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // NOTE: These models do NOT support reference images / inpainting.
 async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
     // ── Choose API endpoint ──
-    // Primary: Direct OpenAI API
-    // Fallback: LaoZhang proxy (OpenAI-compatible)
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+    // gpt-image-2: Always use LaoZhang (their org is verified for this model)
+    // gpt-image-1: Direct OpenAI by default, or LaoZhang if OPENAI_USE_LZ=true
+    const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
+    const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
@@ -1370,25 +1371,6 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             return { ...result, model: selectedModel };
         } catch (error) {
             console.error(`❌ ${modelKey} failed:`, error.message);
-
-            // ── Auto-fallback: gpt-image-2 → gpt-image-1 on 403/verification errors ──
-            if (modelKey === 'gpt-image-2' && (error.message?.includes('verified') || error.message?.includes('403') || error.message?.includes('access denied'))) {
-                console.log(`🔄 Auto-fallback: ${modelKey} → gpt-image-1 (verification required for gpt-image-2)`);
-                try {
-                    const fallbackResult = await Promise.race([
-                        openaiImageGenerate(promptText, aspectRatio, 'medium', 'gpt-image-1', 'webp', 'opaque'),
-                        new Promise((_, rej) => setTimeout(() => rej(new Error('gpt-image-1 fallback timed out')), TIMEOUT_MS)),
-                    ]);
-                    return {
-                        ...fallbackResult,
-                        model: 'gpt-image-1',
-                        warnings: ['gpt-image-2 requires OpenAI organization verification. Used gpt-image-1 as fallback.'],
-                    };
-                } catch (fallbackErr) {
-                    console.error(`❌ gpt-image-1 fallback also failed:`, fallbackErr.message);
-                }
-            }
-
             return {
                 imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
                 modelBusy: true, busyModel: modelKey,
