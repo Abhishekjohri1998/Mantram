@@ -3049,6 +3049,8 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
 
         // ── Step 5: Save Initial State to DB & Return Job ID ──
         let creative = null;
+        let jobRecord = null;
+        const genJobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         if (brandId) {
             creative = await Creative.create({
                 user: req.user._id,
@@ -3070,9 +3072,19 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
                 tags: ['campaign-shot', 'cinematic', 'product', moodPreset || 'dark-botanical'],
                 status: 'draft',
             });
+            const GenerationJob = (await import('../models/GenerationJob.js')).default;
+            jobRecord = await GenerationJob.create({
+                jobId: genJobId,
+                user: req.user._id,
+                brand: brandId,
+                type: 'campaign-shot',
+                prompt: masterPrompt,
+                format: 'campaign-shot',
+                status: 'processing'
+            });
         }
 
-        res.json({ success: true, jobId: creative ? creative._id : null, status: 'processing' });
+        res.json({ success: true, jobId: jobRecord ? genJobId : null, status: 'processing' });
 
         // ── Step 6: Background Process ──
         (async () => {
@@ -3124,6 +3136,10 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
                         $set: { 'aiMeta.processingStatus': 'failed', errorMessage: errorMsg, status: 'failed' }
                     });
                 }
+                if (jobRecord) {
+                    const GenerationJob = (await import('../models/GenerationJob.js')).default;
+                    await GenerationJob.updateOne({ jobId: genJobId }, { status: 'failed', errorMessage: errorMsg });
+                }
                 if (req.creditsDeducted > 0) {
                     await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${errorMsg})`, 'creative').catch(() => {});
                 }
@@ -3171,18 +3187,39 @@ Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury b
                         await Creative.updateOne({ _id: creative._id }, {
                             $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy }
                         });
+                        creative.imageUrl = s3Url;
+                        creative.thumbnailUrl = s3Url;
                     }
                     console.log(`[BG-S3] Campaign Shot uploaded: ${s3Url}`);
                 } else if (creative) {
                     await Creative.updateOne({ _id: creative._id }, { $set: { imageUrl: finalSignedUrl, thumbnailUrl: finalSignedUrl, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy } });
+                    creative.imageUrl = finalSignedUrl;
+                    creative.thumbnailUrl = finalSignedUrl;
+                }
+                if (jobRecord && creative) {
+                    const GenerationJob = (await import('../models/GenerationJob.js')).default;
+                    await GenerationJob.updateOne({ jobId: genJobId }, {
+                        status: 'completed',
+                        creativeId: creative._id,
+                        imageUrl: creative.thumbnailUrl || creative.imageUrl,
+                        result: { creative }
+                    });
                 }
             } catch (bgErr) {
                 console.error('[BG] Campaign Shot post-processing error:', bgErr.message);
                 if (creative) await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'failed', status: 'failed', errorMessage: bgErr.message } });
+                if (jobRecord) {
+                    const GenerationJob = (await import('../models/GenerationJob.js')).default;
+                    await GenerationJob.updateOne({ jobId: genJobId }, { status: 'failed', errorMessage: bgErr.message });
+                }
             }
         })().catch(async error => {
             console.error('❌ Campaign Shot FATAL error:', error?.message);
             if (creative) await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'failed', status: 'failed', errorMessage: error?.message } });
+            if (jobRecord) {
+                const GenerationJob = (await import('../models/GenerationJob.js')).default;
+                await GenerationJob.updateOne({ jobId: genJobId }, { status: 'failed', errorMessage: error?.message });
+            }
             if (req.creditsDeducted > 0) {
                 await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative').catch(() => {});
             }
