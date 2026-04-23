@@ -799,9 +799,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [csPrimaryTagline, setCsPrimaryTagline] = useState('')
     const [csSecondaryTagline, setCsSecondaryTagline] = useState('')
     const [csGenerating, setCsGenerating] = useState(false)
-    const [csResult, setCsResult] = useState(null)                   // { imageUrl, taglines, productName, prompt }
+    const [csResult, setCsResult] = useState(null)                   // { imageUrl, taglines, productName, prompt, copy }
     const [csError, setCsError] = useState(null)
     const [showCsModelMenu, setShowCsModelMenu] = useState(false)    // Dropdown state for model picker
+    const [csCopyEnabled, setCsCopyEnabled] = useState(false)        // Copy toggle — generate cinematic ad copy alongside image
 
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
@@ -2326,10 +2327,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 brief: csBrief || undefined,
                 primaryTagline: csPrimaryTagline || undefined,
                 secondaryTagline: csSecondaryTagline || undefined,
+                generateCopy: csCopyEnabled,
             }
-            const result = await creatives.campaignShot(payload)
+            const result = await creativesAPI.campaignShot(payload)
             if (result.success) {
-                setCsResult({ imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model })
+                setCsResult({ imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null })
             } else {
                 setCsError(result.error || 'Generation failed')
             }
@@ -10044,12 +10046,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 <div className="relative">
                                     <select value={csMoodPreset} onChange={e => setCsMoodPreset(e.target.value)}
                                         className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="dark-botanical">🌿 Dark Botanical — Deep greens, moody forest</option>
-                                        <option value="aqua-mist">💧 Aqua Mist — Dark aqua, water droplets</option>
-                                        <option value="charcoal-industrial">🏭 Charcoal Industrial — Raw black, sharp edges</option>
-                                        <option value="warm-glow">🔆 Warm Glow — Amber, bokeh, candlelight</option>
-                                        <option value="luxury-noir">💎 Luxury Noir — Black marble, editorial</option>
-                                        <option value="custom">✏️ Custom — Write your own brief</option>
+                                        <option value="dark-botanical">Dark Botanical — Deep greens, moody forest</option>
+                                        <option value="aqua-mist">Aqua Mist — Dark aqua, water droplets</option>
+                                        <option value="charcoal-industrial">Charcoal Industrial — Raw black, sharp edges</option>
+                                        <option value="warm-glow">Warm Glow — Amber, bokeh, candlelight</option>
+                                        <option value="luxury-noir">Luxury Noir — Black marble, editorial</option>
+                                        <option value="custom">Custom — Write your own brief</option>
                                     </select>
                                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
                                 </div>
@@ -10160,8 +10162,18 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         </div>{/* /scrollable body */}
 
-                        {/* ── Sticky Footer: Generate ── */}
+                        {/* ── Sticky Footer: Copy Toggle + Generate ── */}
                         <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-2 z-10 border-t border-[var(--sys-border)]">
+                            {/* Copy toggle */}
+                            <button onClick={() => setCsCopyEnabled(v => !v)}
+                                className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all cursor-pointer " + (csCopyEnabled ? 'border-primary/40 bg-primary/5' : 'border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-primary/20')}>
+                                <span className="material-symbols-outlined text-[18px]" style={{ color: csCopyEnabled ? 'var(--primary)' : 'var(--sys-text-muted)' }}>{csCopyEnabled ? 'toggle_on' : 'toggle_off'}</span>
+                                <div className="flex-1 text-left">
+                                    <div className="text-[11px] font-bold" style={{ color: csCopyEnabled ? 'var(--primary)' : 'var(--sys-text)' }}>Generate Ad Copy</div>
+                                    <div className="text-[9px] text-[var(--sys-text-muted)]">AI Copywriter writes cinematic poster text alongside image</div>
+                                </div>
+                                <span className="material-symbols-outlined text-[14px]" style={{ color: csCopyEnabled ? 'var(--primary)' : 'var(--sys-text-muted)' }}>edit_note</span>
+                            </button>
                             {csError && (
                                 <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[14px]">error</span>{csError}
@@ -10237,8 +10249,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </a>
                                             <button onClick={async () => {
                                                 try {
-                                                    await creatives.saveToBank({ imageUrl: csResult.imageUrl, brandId: activeBrand?._id, label: `Campaign Shot — ${csResult.productName || ''}` });
-                                                    toast?.('Saved to Image Bank');
+                                                    await creativesAPI.uploadToBank({ imageUrl: csResult.imageUrl, brandId: activeBrand?._id, title: `Campaign Shot — ${csResult.productName || ''}` });
+                                                    setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500);
                                                 } catch { }
                                             }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/90 text-black text-[11px] font-bold hover:bg-white transition-colors">
                                                 <span className="material-symbols-outlined text-[14px]">bookmark</span> Save
@@ -10269,7 +10281,22 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </div>
                                 )}
 
-                                {/* Regenerate */}
+                                {/* ── AI Ad Copy ── */}
+                                {csResult.copy && (
+                                    <div className="studio-card p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-[13px]">edit_note</span> AI Ad Copy
+                                            </p>
+                                            <button onClick={() => navigator.clipboard.writeText(csResult.copy)}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[10px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
+                                                <span className="material-symbols-outlined text-[12px]">content_copy</span> Copy
+                                            </button>
+                                        </div>
+                                        <p className="text-[12px] text-[var(--sys-text)] leading-relaxed whitespace-pre-wrap">{csResult.copy}</p>
+                                    </div>
+                                )}
+
                                 <div className="flex gap-2">
                                     <button onClick={handleCampaignShot}
                                         className="flex-1 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"

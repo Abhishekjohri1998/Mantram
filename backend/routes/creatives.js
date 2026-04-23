@@ -2797,6 +2797,7 @@ router.post('/campaign-shot', protect, requireStudio('creativeStudio'), requireC
             imageModel = 'nanobanana-2',
             primaryTagline,   // Optional override tagline 1
             secondaryTagline, // Optional override tagline 2
+            generateCopy = false, // When true: generate cinematic ad copy alongside the image
         } = req.body;
 
         if (!productImage) {
@@ -3078,6 +3079,34 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
 
         console.log(`✅ Campaign Shot generated — responding immediately`);
         const finalSignedUrl = await getSignedUrlIfNeeded(generatedImageUrl);
+
+        // ── Optional: Generate Cinematic Ad Copy (if toggle enabled) ──
+        let adCopy = null;
+        if (generateCopy) {
+            try {
+                const copyRouter = getRouter();
+                const copyResult = await copyRouter.generateText({
+                    systemPrompt: 'You are a world-class advertising copywriter. Write only the ad copy — no explanations, no JSON, no markdown. Pure cinematic poster copy.',
+                    userPrompt: `Write cinematic, emotionally compelling ad copy for this campaign poster:
+
+Brand: ${brandName}
+Product: ${detectedProductName}
+Mood: ${moodPreset || 'dark-botanical'} — ${mood.env}
+Primary Tagline: ${tagline1}
+Secondary Tagline: ${tagline2}
+Brief: ${brief || 'premium brand campaign'}
+
+Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury brand campaign. Think Cannes Lions. Use the taglines as anchors. The copy should feel like it belongs on a billboard or a magazine spread. Bold. Minimal. Evocative.`,
+                    temperature: 0.8,
+                    maxTokens: 300,
+                });
+                adCopy = (copyResult.text || '').trim();
+                console.log(`   ✎️ Ad Copy generated (${adCopy.length} chars)`);
+            } catch (copyErr) {
+                console.warn('⚠️ Ad copy generation failed:', copyErr.message);
+            }
+        }
+
         res.json({
             success: true,
             imageUrl: finalSignedUrl,
@@ -3085,6 +3114,7 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             productName: detectedProductName,
             taglines: [tagline1, tagline2].filter(Boolean),
             prompt: masterPrompt,
+            copy: adCopy,
             creativeId: creative?._id,
         });
 
