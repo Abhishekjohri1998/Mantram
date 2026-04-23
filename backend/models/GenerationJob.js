@@ -26,7 +26,7 @@ const GenerationJobSchema = new mongoose.Schema(
         // Job source
         type: {
             type: String,
-            enum: ['ai-create', 'photoshoot'],
+            enum: ['ai-create', 'photoshoot', 'campaign-shot'],
             default: 'ai-create',
         },
 
