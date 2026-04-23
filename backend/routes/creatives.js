@@ -3109,7 +3109,7 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
                         aspectRatio,
                         imageSize: '1K',
                         temperature: variation.tempOverride ?? 0.3,
-                        generateCopy: false, // we handle copy separately
+                        generateCopy: generateCopy, // ✅ Pass through user's toggle
                     },
                 },
                 user: req.user,
@@ -3185,16 +3185,18 @@ Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury b
                     const s3Url = await uploadToS3(generatedImageUrl, `campaign-shots/${brandId || 'default'}/${Date.now()}.png`);
                     if (creative) {
                         await Creative.updateOne({ _id: creative._id }, {
-                            $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy }
+                            $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy || null }
                         });
                         creative.imageUrl = s3Url;
                         creative.thumbnailUrl = s3Url;
+                        if (adCopy) creative.copy = { headline: adCopy }; // ✅ Keep in-memory doc in sync
                     }
                     console.log(`[BG-S3] Campaign Shot uploaded: ${s3Url}`);
                 } else if (creative) {
-                    await Creative.updateOne({ _id: creative._id }, { $set: { imageUrl: finalSignedUrl, thumbnailUrl: finalSignedUrl, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy } });
+                    await Creative.updateOne({ _id: creative._id }, { $set: { imageUrl: finalSignedUrl, thumbnailUrl: finalSignedUrl, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy || null } });
                     creative.imageUrl = finalSignedUrl;
                     creative.thumbnailUrl = finalSignedUrl;
+                    if (adCopy) creative.copy = { headline: adCopy }; // ✅ Keep in-memory doc in sync
                 }
                 if (jobRecord && creative) {
                     const GenerationJob = (await import('../models/GenerationJob.js')).default;
