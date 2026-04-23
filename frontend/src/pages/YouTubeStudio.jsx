@@ -869,23 +869,25 @@ export default function YouTubeStudio() {
     function startPolling(id) {
         if (pollRef.current[id]) return
         let attempts = 0
-        pollRef.current[id] = setInterval(async () => {
+        const poll = async () => {
             attempts++
-            if (attempts > 45) { clearInterval(pollRef.current[id]); delete pollRef.current[id]; return }
+            if (attempts > 45) { delete pollRef.current[id]; return }
             try {
                 const d = await api(`/youtube-studio/${id}`)
                 const proj = d.project
                 setActiveProject(proj)
                 setProjects(prev => prev.map(p => p._id === id ? { ...p, status: proj.status, metadata: proj.metadata, generatedThumbnailUrl: proj.generatedThumbnailUrl } : p))
                 if (proj.status === 'done' || proj.status === 'failed') {
-                    clearInterval(pollRef.current[id])
                     delete pollRef.current[id]
+                    return
                 }
             } catch { }
-        }, 4000)
+            pollRef.current[id] = setTimeout(poll, 4000)
+        }
+        pollRef.current[id] = setTimeout(poll, 4000)
     }
 
-    useEffect(() => () => Object.values(pollRef.current).forEach(clearInterval), [])
+    useEffect(() => () => Object.values(pollRef.current).forEach(clearTimeout), [])
 
     async function handleAnalyse() {
         const rawUrls = urlInput.split('\n').map(u => u.trim()).filter(Boolean)
