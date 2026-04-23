@@ -25,8 +25,72 @@ import redis from '../utils/redisClient.js';
 import User from '../models/User.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../utils/brandLanguage.js';
+import multer from 'multer';
+import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { internalGenerateCreative } from './creatives.js';
 
 const router = Router();
+
+// ============================================================================
+// MULTER — in-memory for nexus image uploads (→ S3)
+// ============================================================================
+const nexusUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed'), false);
+    },
+});
+
+// ============================================================================
+// HELPER — Parse [SIGNAL: CREATE_IMAGE | prompt: ...] and generate inline
+// Returns { cleanReply, imageUrl } — imageUrl is null if no signal / gen failed
+// ============================================================================
+async function parseAndExecuteImageSignal(fullReply, userId, brandId, user) {
+    const signalRegex = /\[SIGNAL:\s*CREATE_IMAGE\s*\|\s*prompt:\s*(.+?)\]/i;
+    const match = fullReply.match(signalRegex);
+    if (!match) return { cleanReply: fullReply, imageUrl: null };
+
+    const imagePrompt = match[1].trim();
+    const cleanReply = fullReply.replace(match[0], '').trim();
+
+    try {
+        console.log(`🎨 [Nexus] Image signal detected — generating: "${imagePrompt.slice(0, 80)}..."`);
+        const genResult = await internalGenerateCreative({
+            body: {
+                brandId,
+                prompt: imagePrompt,
+                type: 'instagram-post',
+                refImageUrls: [],
+                options: { imageModel: 'nanobanana-2', aspectRatio: '1:1', imageSize: '1K' },
+            },
+            user,
+        });
+
+        // creative.imageUrl may still be base64 at this point (S3 upload is async background)
+        // Mirror it to Nexus S3 path so we always return a stable public URL
+        let imageUrl = genResult?.creative?.imageUrl || null;
+        if (imageUrl) {
+            const s3Key = `users/${userId}/brands/${brandId || 'default'}/nexus/generated/${Date.now()}.png`;
+            try {
+                if (imageUrl.startsWith('data:')) {
+                    imageUrl = await uploadToS3(imageUrl, s3Key, 'image/png');
+                } else if (imageUrl.startsWith('http')) {
+                    imageUrl = await mirrorUrlToS3(imageUrl, s3Key) || imageUrl;
+                }
+                console.log(`✅ [Nexus] Image saved to S3: ${s3Key}`);
+            } catch (s3Err) {
+                console.warn(`⚠️ [Nexus] S3 save failed (using raw URL): ${s3Err.message}`);
+            }
+        }
+
+        return { cleanReply, imageUrl, imagePrompt };
+    } catch (err) {
+        console.error(`❌ [Nexus] Image signal generation failed: ${err.message}`);
+        return { cleanReply, imageUrl: null, imagePrompt };
+    }
+}
 
 // ============================================================================
 // MCoT: VISUAL ANALYSIS PROMPT — for rich image understanding in chat
@@ -692,19 +756,30 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         history.push({ role: 'assistant', content: reply });
         await saveNexusHistory(userId, history);
 
+        // ── Image Signal: parse [SIGNAL: CREATE_IMAGE | prompt: ...] ──
+        let chatImageUrl = null;
+        let chatImagePrompt = null;
+        const { cleanReply: chatCleanReply, imageUrl: chatImg, imagePrompt: chatImgPrompt } =
+            await parseAndExecuteImageSignal(reply, userId, brandId, req.user);
+        if (chatImg) {
+            chatImageUrl = chatImg;
+            chatImagePrompt = chatImgPrompt;
+        }
+
         // TTS if voice mode active — Sarvam handles ALL languages including English
         let ttsData = null;
         if (voiceMode) {
-            ttsData = await generateTTS(reply, language);
+            ttsData = await generateTTS(chatCleanReply, language);
         }
 
         res.json({
-            reply,
+            reply: chatCleanReply,
             intent: 'chat',
             language,
             name: 'Fidato',
             tts: ttsData,
             mcotAnalysis: mcotAnalysis || undefined,
+            ...(chatImageUrl ? { imageUrl: chatImageUrl, imagePrompt: chatImagePrompt } : {}),
         });
 
     } catch (error) {
@@ -993,12 +1068,20 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         history.push({ role: 'assistant', content: fullReply });
         await saveNexusHistory(userId, history);
 
+        // ── Image Signal: parse [SIGNAL: CREATE_IMAGE | prompt: ...] from full reply ──
+        // Must run AFTER markdown strip so the signal tag survives the regex passes above
+        const { cleanReply: streamCleanReply, imageUrl: streamImageUrl, imagePrompt: streamImagePrompt } =
+            await parseAndExecuteImageSignal(fullReply, userId, brandId, req.user);
+        if (streamImageUrl) {
+            sendSSE('image_generated', { imageUrl: streamImageUrl, prompt: streamImagePrompt });
+        }
+
         // DO NOT send TTS through SSE (200KB+ base64 breaks stream parsing)
         // Frontend calls /api/nexus/tts separately
 
         // Send final done event
         sendSSE('done', {
-            reply: fullReply,
+            reply: streamCleanReply,
             language,
             voiceReady: voiceMode, // tells frontend to call /tts
             mcotAnalysis: streamMcotAnalysis || undefined,
@@ -1010,6 +1093,31 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
     }
 
     res.end();
+});
+
+// ============================================================================
+// POST /api/nexus/upload-image — Upload user image to S3 (user/brand scoped)
+// Accepts multipart/form-data: field "image" (file) + "brandId" (body)
+// Returns: { success, imageUrl, key }
+// ============================================================================
+router.post('/upload-image', protect, nexusUpload.single('image'), async (req, res) => {
+    try {
+        const file = req.file;
+        if (!file) return res.status(400).json({ success: false, error: 'No image file provided' });
+
+        const userId = String(req.user._id);
+        const brandId = req.body.brandId || 'default';
+        const ext = file.mimetype.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+        const s3Key = `users/${userId}/brands/${brandId}/nexus/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+
+        console.log(`📤 [Nexus Upload] ${userId} → S3: ${s3Key} (${(file.size / 1024).toFixed(1)}KB)`);
+        const imageUrl = await uploadToS3(file.buffer, s3Key, file.mimetype);
+
+        res.json({ success: true, imageUrl, key: s3Key });
+    } catch (err) {
+        console.error('Nexus upload-image error:', err.message);
+        res.status(500).json({ success: false, error: 'Image upload failed. Please try again.' });
+    }
 });
 
 // ============================================================================

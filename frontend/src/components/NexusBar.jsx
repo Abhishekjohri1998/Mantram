@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { nexus as nexusAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 
+// Detect mobile viewport
+const getIsMobile = () => typeof window !== 'undefined' && window.innerWidth < 640
+
 const BRIEFING_SESSION_KEY = 'nexus_briefing_shown'
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -35,10 +38,25 @@ export default function NexusBar() {
     const [notifications, setNotifications] = useState([])
     const [intelAlertCount, setIntelAlertCount] = useState(0)
 
+    // Image upload state (S3 URLs only — no base64)
+    const [pendingImageUrls, setPendingImageUrls] = useState([])
+    const [uploading, setUploading] = useState(false)
+    const [shareMenuIdx, setShareMenuIdx] = useState(null) // index of message with open share menu
+
+    // Mobile detection (responsive)
+    const [isMobile, setIsMobile] = useState(getIsMobile)
+    useEffect(() => {
+        const onResize = () => setIsMobile(getIsMobile())
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
+    }, [])
+
     // Refs
     const inputRef = useRef(null)
     const chatEndRef = useRef(null)
     const dropdownRef = useRef(null)
+    const galleryInputRef = useRef(null)   // gallery / file picker
+    const cameraInputRef = useRef(null)    // camera capture (mobile)
 
     // ── Auto-scroll chat ──
     useEffect(() => {
@@ -289,7 +307,13 @@ export default function NexusBar() {
         if (!msg || loading) return
         setInput('')
         setOpen(true)
-        setMessages(prev => [...prev, { role: 'user', content: msg }])
+        const imageUrlsToSend = [...pendingImageUrls]
+        setPendingImageUrls([])  // clear pending before send
+        if (imageUrlsToSend.length > 0) {
+            setMessages(prev => [...prev, { role: 'user', content: msg, attachedImages: imageUrlsToSend }])
+        } else {
+            setMessages(prev => [...prev, { role: 'user', content: msg }])
+        }
         setLoading(true)
         setStreamingText('')
         setStreamingAction(null)
@@ -309,7 +333,7 @@ export default function NexusBar() {
                     'Content-Type': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ message: msg, brandId }),
+                body: JSON.stringify({ message: msg, brandId, images: imageUrlsToSend }),
             })
 
             if (!resp.ok) {
@@ -320,7 +344,7 @@ export default function NexusBar() {
                         'Content-Type': 'application/json',
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                     },
-                    body: JSON.stringify({ message: msg, brandId }),
+                    body: JSON.stringify({ message: msg, brandId, images: imageUrlsToSend }),
                 })
                 const fallbackData = await fallbackResp.json()
                 const cleanReply = stripThink(fallbackData.reply) || 'hmm, try again? 😊'
@@ -329,6 +353,13 @@ export default function NexusBar() {
                     content: cleanReply,
                     action: fallbackData.action,
                 }])
+                if (fallbackData.imageUrl) {
+                    setMessages(prev => [...prev, {
+                        role: 'image',
+                        imageUrl: fallbackData.imageUrl,
+                        prompt: fallbackData.imagePrompt || '',
+                    }])
+                }
                 if (fallbackData.action?.route) {
                     setTimeout(() => { navigate(fallbackData.action.route); setOpen(false) }, 800)
                 }
@@ -403,6 +434,16 @@ export default function NexusBar() {
                                     }])
                                     break
 
+                                case 'image_generated': {
+                                    // Fidato generated an image inline — show preview card
+                                    setMessages(prev => [...prev, {
+                                        role: 'image',
+                                        imageUrl: data.imageUrl,
+                                        prompt: data.prompt,
+                                    }])
+                                    break
+                                }
+
                                 case 'status':
                                     // Show search/research status
                                     setStreamingText(data.message || '🔍 Researching...')
@@ -426,7 +467,7 @@ export default function NexusBar() {
                         'Content-Type': 'application/json',
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                     },
-                    body: JSON.stringify({ message: msg, brandId }),
+                    body: JSON.stringify({ message: msg, brandId, images: imageUrlsToSend }),
                 })
                 const data = await fallbackResp.json()
                 const cleanReply = stripThink(data.reply) || 'oops, try again? 😊'
@@ -435,6 +476,13 @@ export default function NexusBar() {
                     content: cleanReply,
                     action: data.action,
                 }])
+                if (data.imageUrl) {
+                    setMessages(prev => [...prev, {
+                        role: 'image',
+                        imageUrl: data.imageUrl,
+                        prompt: data.imagePrompt || '',
+                    }])
+                }
             } catch {
                 setMessages(prev => [...prev, {
                     role: 'assistant',
@@ -484,6 +532,124 @@ export default function NexusBar() {
         'Go to Brand DNA',
         'What can you help me with?',
     ]
+
+    // ══════════════════════════════════════════════
+    // IMAGE UPLOAD — multipart → backend → S3 (no base64)
+    // ══════════════════════════════════════════════
+
+    const uploadImageToS3 = async (file) => {
+        const formData = new FormData()
+        formData.append('image', file)
+        if (brandId) formData.append('brandId', brandId)
+        const token = localStorage.getItem('mantram_token')
+        const resp = await fetch(`${API_BASE}/nexus/upload-image`, {
+            method: 'POST',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+            body: formData,
+        })
+        const data = await resp.json()
+        if (!data.success) throw new Error(data.error || 'Upload failed')
+        return data.imageUrl
+    }
+
+    const handleFileSelect = async (files) => {
+        if (!files?.length) return
+        setUploading(true)
+        try {
+            const urls = await Promise.all(Array.from(files).map(uploadImageToS3))
+            setPendingImageUrls(prev => [...prev, ...urls])
+        } catch (err) {
+            console.error('Image upload failed:', err)
+        }
+        setUploading(false)
+    }
+
+    const handlePaste = async (e) => {
+        const items = Array.from(e.clipboardData?.items || [])
+        const imageItems = items.filter(i => i.type.startsWith('image/'))
+        if (!imageItems.length) return
+        e.preventDefault()
+        setUploading(true)
+        try {
+            const files = imageItems.map(i => i.getAsFile()).filter(Boolean)
+            const urls = await Promise.all(files.map(uploadImageToS3))
+            setPendingImageUrls(prev => [...prev, ...urls])
+        } catch (err) {
+            console.error('Paste upload failed:', err)
+        }
+        setUploading(false)
+    }
+
+    // ══════════════════════════════════════════════
+    // SHARE — WhatsApp (Web Share API on mobile, wa.me on desktop)
+    // ══════════════════════════════════════════════
+
+    const shareViaWhatsApp = async (imageUrl, text) => {
+        const isMob = /Android|iPhone|iPad/i.test(navigator.userAgent)
+        if (isMob && navigator.share) {
+            try {
+                if (imageUrl) {
+                    const blob = await fetch(imageUrl).then(r => r.blob())
+                    const file = new File([blob], 'mantram-creative.png', { type: blob.type })
+                    await navigator.share({ title: 'Mantram AI', text: text || 'Created with Mantram AI', files: [file] })
+                } else {
+                    await navigator.share({ title: 'Mantram AI', text: text || '' })
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    const encoded = encodeURIComponent(imageUrl ? `Check this out: ${imageUrl}` : (text || ''))
+                    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener')
+                }
+            }
+        } else {
+            const encoded = encodeURIComponent(imageUrl ? `Check this out: ${imageUrl}` : (text || ''))
+            window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener')
+        }
+        setShareMenuIdx(null)
+    }
+
+    const copyContent = async (text) => {
+        try { await navigator.clipboard.writeText(text) } catch { /* noop */ }
+        setShareMenuIdx(null)
+    }
+
+    // ShareMenu component (inline)
+    const ShareMenu = ({ idx, imageUrl, text }) => {
+        const isOpen = shareMenuIdx === idx
+        return (
+            <div className="relative inline-block">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShareMenuIdx(isOpen ? null : idx) }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-[#FF4D00] hover:bg-[#FF4D00]/10 transition-all cursor-pointer"
+                >
+                    <span className="material-symbols-outlined text-xs">share</span>
+                    Share
+                </button>
+                {isOpen && (
+                    <div className="absolute bottom-8 left-0 z-50 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-1.5 min-w-[150px] shadow-2xl animate-fade-in">
+                        <button onClick={() => shareViaWhatsApp(imageUrl, text)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--sys-bg)] text-xs text-left transition-all cursor-pointer">
+                            <span style={{ fontSize: 15 }}>💬</span>
+                            <span className="text-[var(--sys-text)]">WhatsApp</span>
+                        </button>
+                        <button onClick={() => copyContent(imageUrl || text || '')}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--sys-bg)] text-xs text-left transition-all cursor-pointer">
+                            <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">content_copy</span>
+                            <span className="text-[var(--sys-text)]">Copy Link</span>
+                        </button>
+                        {imageUrl && (
+                            <a href={imageUrl} download target="_blank" rel="noreferrer"
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--sys-bg)] text-xs transition-all">
+                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)]">download</span>
+                                <span className="text-[var(--sys-text)]">Download</span>
+                            </a>
+                        )}
+                    </div>
+                )}
+            </div>
+        )
+    }
+
 
     return (
         <>
@@ -562,29 +728,39 @@ export default function NexusBar() {
                 </div>
             )}
 
-            {/* ═══════════ FLOATING FIDATO BUBBLE ═══════════ */}
+            {/* ═══════════ FLOATING FIDATO BUBBLE + CHAT PANEL ═══════════ */}
+            {/* On mobile: full-screen overlay. On desktop: popup above bubble */}
             <div className="fixed bottom-6 right-4 sm:right-6 z-[9999]" ref={dropdownRef}>
-                {/* Chat Panel (opens upward from bubble) */}
+
+                {/* ── CHAT PANEL ── */}
                 {open && (
-                    <div className={`absolute bottom-16 right-0 rounded-2xl overflow-hidden animate-fade-in
-                        ${expanded ? 'w-[calc(100vw-48px)] sm:w-[450px] lg:w-[520px]' : 'w-[calc(100vw-48px)] sm:w-[380px]'}`}
-                        style={{
-                            background: 'var(--sys-primary), rgba(10,10,26,0.98))',
+                    <div
+                        className={`animate-fade-in ${
+                            isMobile
+                                ? 'fixed inset-0 z-[10000] flex flex-col'
+                                : `absolute bottom-16 right-0 rounded-2xl overflow-hidden ${expanded ? 'w-[calc(100vw-48px)] sm:w-[450px] lg:w-[520px]' : 'w-[calc(100vw-48px)] sm:w-[380px]'}`
+                        }`}
+                        style={isMobile ? {
+                            background: 'rgba(10,10,26,0.99)',
+                            backdropFilter: 'blur(24px)',
+                        } : {
+                            background: 'rgba(10,10,26,0.98)',
                             border: '1px solid rgba(255, 77, 0, 0.25)',
                             boxShadow: '0 -8px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255, 77, 0, 0.1)',
                             backdropFilter: 'blur(24px)',
                             maxHeight: expanded ? '85vh' : 'min(500px, 70vh)',
-                        }}>
-
+                        }}
+                        onClick={() => setShareMenuIdx(null)}
+                    >
                         {/* Panel Header */}
-                        <div className="px-4 py-3 flex items-center gap-3 border-b border-[var(--sys-border)]"
-                            style={{ background: 'var(--sys-primary), rgba(236,72,153,0.04))' }}>
+                        <div className="px-4 py-3 flex items-center gap-3 border-b border-[var(--sys-border)] shrink-0"
+                            style={{ paddingTop: isMobile ? 'max(12px, env(safe-area-inset-top))' : undefined }}>
                             <div className="relative">
                                 <div className="size-8 rounded-full flex items-center justify-center text-[var(--sys-text)] text-sm"
                                     style={{ background: 'var(--sys-primary)' }}>
                                     <span className="material-symbols-outlined text-sm">support_agent</span>
                                 </div>
-                                <span className="absolute bottom-0 right-0 size-2.5 rounded-full border border-[#0f0f1e] bg-[var(--sys-surface)]" />
+                                <span className="absolute bottom-0 right-0 size-2.5 rounded-full border border-[#0f0f1e] bg-emerald-500" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold text-[var(--sys-text)]">Fidato</p>
@@ -592,11 +768,13 @@ export default function NexusBar() {
                                     {activeBrand?.name ? `Brand Manager • ${activeBrand.name}` : 'Your Brand Manager'}
                                 </p>
                             </div>
-                            <button onClick={() => setExpanded(!expanded)}
-                                className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
-                                title={expanded ? 'Collapse' : 'Expand'}>
-                                <span className="material-symbols-outlined text-xs">{expanded ? 'collapse_content' : 'expand_content'}</span>
-                            </button>
+                            {!isMobile && (
+                                <button onClick={() => setExpanded(!expanded)}
+                                    className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
+                                    title={expanded ? 'Collapse' : 'Expand'}>
+                                    <span className="material-symbols-outlined text-xs">{expanded ? 'collapse_content' : 'expand_content'}</span>
+                                </button>
+                            )}
                             <button onClick={clearChat}
                                 className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
                                 title="Clear chat">
@@ -604,45 +782,79 @@ export default function NexusBar() {
                             </button>
                             <button onClick={() => { setOpen(false); setExpanded(false) }}
                                 className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all">
-                                <span className="material-symbols-outlined text-xs">close</span>
+                                <span className="material-symbols-outlined text-xs">{isMobile ? 'arrow_back' : 'close'}</span>
                             </button>
                         </div>
 
                         {/* Messages */}
-                        <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: expanded ? 'calc(75vh - 180px)' : 320 }}>
+                        <div className={`overflow-y-auto p-4 space-y-3 ${isMobile ? 'flex-1' : ''}`}
+                            style={isMobile ? undefined : { maxHeight: expanded ? 'calc(75vh - 180px)' : 320 }}>
                             {messages.map((m, i) => (
-                                <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                    {m.role === 'assistant' && (
-                                        <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
-                                            style={{ background: 'var(--sys-primary)' }}>
-                                            <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                <div key={i}>
+                                    {/* ── Image card (Fidato-generated) ── */}
+                                    {m.role === 'image' ? (
+                                        <div className="flex gap-2.5">
+                                            <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
+                                                style={{ background: 'var(--sys-primary)' }}>
+                                                <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                            </div>
+                                            <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] max-w-[240px]"
+                                                style={{ background: 'var(--sys-surface)' }}>
+                                                <img src={m.imageUrl} alt={m.prompt}
+                                                    className="w-full object-cover"
+                                                    style={{ maxHeight: 200 }} />
+                                                <div className="px-2 py-1.5 flex items-center gap-1">
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] flex-1 truncate">{m.prompt?.slice(0, 35)}…</p>
+                                                    <ShareMenu idx={`img-${i}`} imageUrl={m.imageUrl} text={`Created with Mantram AI: ${m.imageUrl}`} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* ── Regular message (user / assistant) ── */
+                                        <div className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                            {m.role === 'assistant' && (
+                                                <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
+                                                    style={{ background: 'var(--sys-primary)' }}>
+                                                    <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                                </div>
+                                            )}
+                                            <div>
+                                                {/* Attached image thumbnails in user messages */}
+                                                {m.attachedImages?.length > 0 && (
+                                                    <div className="flex gap-1 mb-1 flex-wrap">
+                                                        {m.attachedImages.map((url, j) => (
+                                                            <img key={j} src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-[var(--sys-border)]" />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${m.role === 'user'
+                                                    ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
+                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-sm border border-[var(--sys-border)]'
+                                                    }`}
+                                                    style={{ whiteSpace: 'pre-wrap' }}>
+                                                    {m.content}
+                                                </div>
+                                                {/* Action button */}
+                                                {m.action?.route && (
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        <button
+                                                            onClick={() => { navigate(m.action.route); setOpen(false) }}
+                                                            className="px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer transition-all hover:scale-[1.02] flex items-center gap-1"
+                                                            style={{ background: 'rgba(255, 77, 0,0.12)', border: '1px solid rgba(255, 77, 0,0.2)', color: '#c4b5fd' }}>
+                                                            <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                                            Open {m.action.label}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {/* Share on assistant messages */}
+                                                {m.role === 'assistant' && m.content?.length > 30 && (
+                                                    <div className="mt-1">
+                                                        <ShareMenu idx={`msg-${i}`} text={m.content} />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
-                                    <div>
-                                        <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${m.role === 'user'
-                                            ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] rounded-br-sm border border-[var(--sys-border)]'
-                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-bl-sm border border-[var(--sys-border)]'
-                                            }`}
-                                            style={{ whiteSpace: 'pre-wrap' }}>
-                                            {m.content}
-                                        </div>
-                                        {/* Action button */}
-                                        {m.action?.route && (
-                                            <div className="flex items-center gap-1.5 mt-1">
-                                                <button
-                                                    onClick={() => { navigate(m.action.route); setOpen(false) }}
-                                                    className="px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer transition-all hover:scale-[1.02] flex items-center gap-1"
-                                                    style={{
-                                                        background: 'rgba(255, 77, 0,0.12)',
-                                                        border: '1px solid rgba(255, 77, 0,0.2)',
-                                                        color: '#c4b5fd',
-                                                    }}>
-                                                    <span className="material-symbols-outlined text-xs">open_in_new</span>
-                                                    Open {m.action.label}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                             ))}
 
@@ -682,7 +894,7 @@ export default function NexusBar() {
 
                         {/* Quick suggestions (when few messages) */}
                         {messages.length <= 1 && !loading && (
-                            <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-[var(--sys-border)] pt-2.5">
+                            <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-[var(--sys-border)] pt-2.5 shrink-0">
                                 {suggestions.map((q, i) => (
                                     <button key={i} onClick={() => sendMessage(q)}
                                         className="px-2.5 py-1.5 rounded-lg bg-[#FF4D00]/8 text-[#FF7A00] text-[11px] border border-[#FF4D00]/12 hover:bg-[#FF4D00]/15 cursor-pointer transition-all">
@@ -692,89 +904,186 @@ export default function NexusBar() {
                             </div>
                         )}
 
+                        {/* Pending image thumbnails strip */}
+                        {(pendingImageUrls.length > 0 || uploading) && (
+                            <div className="px-3 pt-2 flex gap-2 flex-wrap border-t border-[var(--sys-border)] shrink-0">
+                                {pendingImageUrls.map((url, i) => (
+                                    <div key={i} className="relative">
+                                        <img src={url} alt="" className="w-12 h-12 rounded-lg object-cover border border-[var(--sys-border)]" />
+                                        <button
+                                            onClick={() => setPendingImageUrls(prev => prev.filter((_, j) => j !== i))}
+                                            className="absolute -top-1 -right-1 size-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center cursor-pointer">
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                                {uploading && (
+                                    <div className="w-12 h-12 rounded-lg border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-sm text-[#FF4D00] animate-spin">progress_activity</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Recording indicator */}
                         {(recording || transcribing) && (
-                            <div className="px-4 pb-1 flex items-center gap-2">
-                                <span className={`size-2 rounded-full ${recording ? 'bg-[var(--sys-surface)] animate-pulse' : 'bg-[var(--sys-surface)] animate-pulse'}`} />
+                            <div className="px-4 pb-1 flex items-center gap-2 shrink-0">
+                                <span className="size-2 rounded-full bg-red-500 animate-pulse" />
                                 <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">
                                     {recording ? '🎤 Listening...' : '🧠 Transcribing...'}
                                 </span>
                             </div>
                         )}
 
-                        {/* Input Bar (inside panel) */}
-                        <div className="px-3 py-2.5 border-t border-[var(--sys-border)] flex items-center gap-2">
-                            <input
-                                ref={inputRef}
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
-                                }}
-                                placeholder="Ask Fidato anything..."
-                                className="flex-1 bg-[var(--sys-surface)] rounded-xl px-3 py-2 text-sm text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none border border-[var(--sys-border)] focus:border-[#FF4D00]/30 transition-all"
-                                aria-label="Message to Fidato AI agent"
-                            />
-                            {/* Mic */}
-                            <button
-                                onClick={recording ? stopRecording : startRecording}
-                                disabled={transcribing}
-                                className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${recording
-                                    ? 'text-primary bg-[var(--sys-primary-dim)] animate-pulse'
-                                    : transcribing
-                                        ? 'text-primary opacity-60'
-                                        : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'
-                                    }`}
-                                title={recording ? 'Stop recording' : 'Speak to Fidato'}
-                                aria-label={recording ? 'Stop voice recording' : 'Start voice input'}
-                            >
-                                <span className="material-symbols-outlined text-sm">
-                                    {recording ? 'stop_circle' : transcribing ? 'hourglass_top' : 'mic'}
-                                </span>
-                            </button>
-                            {/* Send */}
-                            <button
-                                onClick={() => sendMessage()}
-                                disabled={loading || !input.trim()}
-                                className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${input.trim()
-                                    ? 'text-[#FF4D00] hover:text-white hover:bg-[#FF4D00]/15'
-                                    : 'text-[var(--sys-text-muted)] cursor-not-allowed'
-                                    }`}
-                                title="Send message"
-                                aria-label="Send message to Fidato"
-                            >
-                                <span className="material-symbols-outlined text-sm">send</span>
-                            </button>
-                        </div>
+                        {/* ── INPUT AREA ── */}
+                        {isMobile ? (
+                            /* ── MOBILE: centered mic + input row ── */
+                            <div className="border-t border-[var(--sys-border)] px-4 pt-3 pb-4 shrink-0 space-y-3"
+                                style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+                                {/* Big centered mic button when input is empty and not loading */}
+                                {!input && !loading && (
+                                    <div className="flex justify-center">
+                                        <button
+                                            onClick={recording ? stopRecording : startRecording}
+                                            disabled={transcribing}
+                                            className="flex items-center justify-center transition-all duration-200 cursor-pointer"
+                                            style={{
+                                                width: 64, height: 64, borderRadius: '50%',
+                                                background: recording ? '#ef4444' : 'var(--sys-primary)',
+                                                boxShadow: recording
+                                                    ? '0 0 0 8px rgba(239,68,68,0.15), 0 0 30px rgba(239,68,68,0.4)'
+                                                    : '0 0 0 8px rgba(255,77,0,0.12), 0 0 30px rgba(255,77,0,0.3)',
+                                                animation: recording ? 'pulse 1s infinite' : undefined,
+                                            }}
+                                            aria-label={recording ? 'Stop recording' : 'Speak to Fidato'}>
+                                            <span className="material-symbols-outlined text-white text-2xl">
+                                                {recording ? 'stop' : transcribing ? 'hourglass_top' : 'mic'}
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
+                                {/* Input row */}
+                                <div className="flex items-center gap-2">
+                                    {/* Gallery */}
+                                    <button onClick={() => galleryInputRef.current?.click()}
+                                        disabled={uploading}
+                                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0"
+                                        title="Upload from gallery">
+                                        <span className="material-symbols-outlined text-sm">photo_library</span>
+                                    </button>
+                                    {/* Camera */}
+                                    <button onClick={() => cameraInputRef.current?.click()}
+                                        disabled={uploading}
+                                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0"
+                                        title="Take a photo">
+                                        <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                    </button>
+                                    <input
+                                        ref={inputRef}
+                                        value={input}
+                                        onChange={e => setInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                                        onPaste={handlePaste}
+                                        placeholder="Type or tap mic..."
+                                        className="flex-1 bg-[var(--sys-surface)] rounded-xl px-3 py-2 text-sm text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none border border-[var(--sys-border)] focus:border-[#FF4D00]/30 transition-all"
+                                        aria-label="Message to Fidato"
+                                    />
+                                    {/* Mic icon (compact) when typing */}
+                                    {input && (
+                                        <button onClick={recording ? stopRecording : startRecording}
+                                            className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${recording ? 'text-red-500 animate-pulse' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                                            <span className="material-symbols-outlined text-sm">{recording ? 'stop_circle' : 'mic'}</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => sendMessage()}
+                                        disabled={loading || (!input.trim() && pendingImageUrls.length === 0)}
+                                        className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${(input.trim() || pendingImageUrls.length > 0) ? 'text-[#FF4D00] hover:bg-[#FF4D00]/15' : 'text-[var(--sys-text-muted)] cursor-not-allowed'}`}
+                                        aria-label="Send message">
+                                        <span className="material-symbols-outlined text-sm">send</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* ── DESKTOP: single input row with paperclip ── */
+                            <div className="px-3 py-2.5 border-t border-[var(--sys-border)] flex items-center gap-2 shrink-0">
+                                {/* Paperclip */}
+                                <button onClick={() => galleryInputRef.current?.click()}
+                                    disabled={uploading}
+                                    className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0"
+                                    title="Attach image">
+                                    <span className="material-symbols-outlined text-sm">attach_file</span>
+                                </button>
+                                <input
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                                    onPaste={handlePaste}
+                                    placeholder="Ask Fidato anything..."
+                                    className="flex-1 bg-[var(--sys-surface)] rounded-xl px-3 py-2 text-sm text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none border border-[var(--sys-border)] focus:border-[#FF4D00]/30 transition-all"
+                                    aria-label="Message to Fidato AI agent"
+                                />
+                                {/* Mic */}
+                                <button
+                                    onClick={recording ? stopRecording : startRecording}
+                                    disabled={transcribing}
+                                    className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${recording ? 'text-red-500 animate-pulse' : transcribing ? 'text-primary opacity-60' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
+                                    title={recording ? 'Stop recording' : 'Speak to Fidato'}
+                                    aria-label={recording ? 'Stop voice recording' : 'Start voice input'}>
+                                    <span className="material-symbols-outlined text-sm">
+                                        {recording ? 'stop_circle' : transcribing ? 'hourglass_top' : 'mic'}
+                                    </span>
+                                </button>
+                                {/* Send */}
+                                <button
+                                    onClick={() => sendMessage()}
+                                    disabled={loading || (!input.trim() && pendingImageUrls.length === 0)}
+                                    className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${(input.trim() || pendingImageUrls.length > 0) ? 'text-[#FF4D00] hover:text-white hover:bg-[#FF4D00]/15' : 'text-[var(--sys-text-muted)] cursor-not-allowed'}`}
+                                    title="Send message"
+                                    aria-label="Send message to Fidato">
+                                    <span className="material-symbols-outlined text-sm">send</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Hidden file inputs */}
+                        <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden"
+                            onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }} />
+                        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+                            onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }} />
                     </div>
                 )}
 
-                {/* Floating Bubble Button */}
-                <button
-                    onClick={() => { setOpen(!open); if (!open) setTimeout(() => inputRef.current?.focus(), 100) }}
-                    className={`size-14 rounded-full flex items-center justify-center text-[var(--sys-text)] shadow-2xl cursor-pointer transition-all duration-300 hover:scale-110 ${open ? 'rotate-0' : 'animate-bounce-slow'}`}
-                    aria-label={open ? 'Close Fidato chat' : 'Open Fidato AI assistant'}
-                    style={{
-                        background: 'var(--sys-primary)',
-                        boxShadow: '0 8px 32px rgba(255, 77, 0, 0.4), 0 0 20px rgba(255, 77, 0, 0.15)',
-                    }}
-                    title="Chat with Fidato"
-                >
-                    <span className="material-symbols-outlined text-2xl">
-                        {open ? 'close' : 'support_agent'}
-                    </span>
-                    {/* Notification dot */}
-                    {!open && notifications.length > 0 && (
-                        <span className="absolute top-0 right-0 size-3.5 rounded-full bg-[var(--sys-surface)] border border-[#0a0a1a] animate-pulse" />
-                    )}
-                    {/* Intel alert badge */}
-                    {!open && intelAlertCount > 0 && (
-                        <span className="absolute -top-1 -left-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[var(--sys-surface)] text-black border border-[var(--sys-border)] shadow-lg animate-pulse">
-                            📡 {intelAlertCount}
+                {/* Floating Bubble Button (hidden on mobile when chat is open) */}
+                {(!isMobile || !open) && (
+                    <button
+                        onClick={() => { setOpen(!open); if (!open) setTimeout(() => inputRef.current?.focus(), 100) }}
+                        className={`size-14 rounded-full flex items-center justify-center text-[var(--sys-text)] shadow-2xl cursor-pointer transition-all duration-300 hover:scale-110 ${open ? 'rotate-0' : 'animate-bounce-slow'}`}
+                        aria-label={open ? 'Close Fidato chat' : 'Open Fidato AI assistant'}
+                        style={{
+                            background: 'var(--sys-primary)',
+                            boxShadow: '0 8px 32px rgba(255, 77, 0, 0.4), 0 0 20px rgba(255, 77, 0, 0.15)',
+                        }}
+                        title="Chat with Fidato"
+                    >
+                        <span className="material-symbols-outlined text-2xl">
+                            {open ? 'close' : 'support_agent'}
                         </span>
-                    )}
-                </button>
+                        {/* Notification dot */}
+                        {!open && notifications.length > 0 && (
+                            <span className="absolute top-0 right-0 size-3.5 rounded-full bg-[var(--sys-surface)] border border-[#0a0a1a] animate-pulse" />
+                        )}
+                        {/* Intel alert badge */}
+                        {!open && intelAlertCount > 0 && (
+                            <span className="absolute -top-1 -left-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[var(--sys-surface)] text-black border border-[var(--sys-border)] shadow-lg animate-pulse">
+                                📡 {intelAlertCount}
+                            </span>
+                        )}
+                    </button>
+                )}
             </div>
         </>
     )
 }
+
