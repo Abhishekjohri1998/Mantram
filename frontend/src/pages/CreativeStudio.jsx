@@ -497,8 +497,8 @@ export default function CreativeStudio() {
         { id: 'seedream-5',   name: 'Seedream 5',     icon: 'park',          desc: 'Creative • Artistic style',                   provider: 'LaoZhang', badge: 'eco',                  color: '#22c55e' },
         { id: 'ideogram',     name: 'Ideogram v3',    icon: 'text_fields',   desc: 'Best for text in images',                     provider: 'LaoZhang', badge: 'palette',              color: '#06b6d4' },
         { id: 'grok-imagen',  name: 'Grok Imagen',    icon: 'smart_toy',     desc: 'xAI • High quality generation',               provider: 'xAI',      badge: 'smart_toy',            color: '#ef4444' },
-        { id: 'gpt-image-2',  name: 'GPT Image 2',    icon: 'text_rotate_vertical', desc: 'Near-perfect text • Complex layouts • No ref images', provider: 'OpenAI', badge: 'new_releases', color: '#10a37f', isNew: true },
-        { id: 'gpt-image-1',  name: 'GPT Image 1',    icon: 'auto_fix_high', desc: 'Instruction following • Clean renders • No ref images', provider: 'OpenAI', badge: 'star',         color: '#0ea5e9' },
+        { id: 'gpt-image-2',  name: 'GPT Image 2',    icon: 'text_rotate_vertical', desc: 'Near-perfect text • Complex layouts • Ref images supported', provider: 'OpenAI', badge: 'new_releases', color: '#10a37f', isNew: true },
+        { id: 'gpt-image-1',  name: 'GPT Image 1',    icon: 'auto_fix_high', desc: 'Instruction following • Clean renders • Ref images supported', provider: 'OpenAI', badge: 'star',         color: '#0ea5e9' },
     ]
 
     // ── Animate State ──

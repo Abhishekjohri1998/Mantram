@@ -97,8 +97,9 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                 <video ref={videoRef} src={src}
                     className="w-full h-full object-cover block"
                     muted loop playsInline
-                    preload={hasPoster ? 'auto' : 'metadata'}
-                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
+                    preload="auto"
+                    onLoadedData={e => { e.target.currentTime = 1 }}
+                    onError={e => { e.target.style.display = 'none' }}
                 />
             )}
 
@@ -842,11 +843,18 @@ export default function VideoStudio() {
                                 {filteredProjects.map(p => {
                                     // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl > s3VideoUrl > videoUrl)
                                     // finalVideoUrl is set after S3 upload, so it never expires.
-                                    // Fall back to generation.videoUrl (CDN) only as a last resort.
                                     const rawVideoUrl = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl || '';
-                                    // Use CDN URL directly — eliminates DB proxy query per video
-                                    const videoUrl = rawVideoUrl || '';
-                                    const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
+                                    // S3 URLs must go through our proxy (avoids 403 on private bucket).
+                                    // CDN URLs (fal.media, muapi.ai) are used directly.
+                                    // Unknown/expired CDN URLs (r2cdn, etc.) fallback to proxy which retries.
+                                    const isS3 = rawVideoUrl.includes('amazonaws.com');
+                                    const isKnownCdn = rawVideoUrl && (rawVideoUrl.includes('fal.media') || rawVideoUrl.includes('muapi.ai') || rawVideoUrl.includes('fal.run'));
+                                    const videoUrl = isS3
+                                        ? `${API_BASE}/video-studio/${p._id}/video`
+                                        : isKnownCdn
+                                            ? rawVideoUrl
+                                            : (rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '');
+                                    const isDone = p.status === 'done' || p.status === 'critique' || p.status === 'completed' || !!rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
                                     const modelName = p.routing?.selectedModel || '';
@@ -941,9 +949,15 @@ export default function VideoStudio() {
                                 {filteredProjects.map(p => {
                                     // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl > s3VideoUrl > videoUrl)
                                     const rawVideoUrl = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl || '';
-                                    // Use CDN URL directly — eliminates DB proxy query per video
-                                    const videoUrl = rawVideoUrl || '';
-                                    const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
+                                    // S3 → proxy, known CDN → direct, other/expired → proxy fallback
+                                    const isS3 = rawVideoUrl.includes('amazonaws.com');
+                                    const isKnownCdn = rawVideoUrl && (rawVideoUrl.includes('fal.media') || rawVideoUrl.includes('muapi.ai') || rawVideoUrl.includes('fal.run'));
+                                    const videoUrl = isS3
+                                        ? `${API_BASE}/video-studio/${p._id}/video`
+                                        : isKnownCdn
+                                            ? rawVideoUrl
+                                            : (rawVideoUrl ? `${API_BASE}/video-studio/${p._id}/video` : '');
+                                    const isDone = p.status === 'done' || p.status === 'critique' || p.status === 'completed' || !!rawVideoUrl;
                                     const isFailed = p.status === 'failed' || p.generation?.status === 'FAILED';
                                     const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
                                     const modelName = p.routing?.selectedModel || '';

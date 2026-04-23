@@ -5166,10 +5166,30 @@ router.get('/:id/video', async (req, res) => {
             return res.redirect(302, signed);
         }
 
-        // Use CDN URL (original provider link) if S3 copy not yet available
-        const cdnUrl = project.generation?.videoUrl;
+        // CDN URL fallback — but verify it's still alive before redirecting
+        const cdnUrl = project.generation?.videoUrl || project.finalVideoUrl;
         if (cdnUrl) {
-            return res.redirect(302, cdnUrl);
+            // Known long-lived CDNs (fal.media, muapi.ai, fal.run) → redirect directly
+            const isLongLivedCdn = cdnUrl.includes('fal.media') || cdnUrl.includes('muapi.ai') || cdnUrl.includes('fal.run');
+            if (isLongLivedCdn) {
+                // Trigger async S3 mirror so next load is permanent
+                downloadAndUploadVideoToS3(req.params.id, cdnUrl).catch(e => console.warn('⚠️ Async S3 mirror failed:', e.message));
+                return res.redirect(302, cdnUrl);
+            }
+
+            // For other CDNs (r2cdn, copilotbase, etc.) — check if still alive before redirecting
+            try {
+                const check = await fetch(cdnUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                if (check.ok) {
+                    // URL is alive — mirror to S3 async, serve directly for now
+                    downloadAndUploadVideoToS3(req.params.id, cdnUrl).catch(e => console.warn('⚠️ Async S3 mirror failed:', e.message));
+                    return res.redirect(302, cdnUrl);
+                }
+                // URL is dead (404/403) — fall through to try re-download
+                console.warn(`⚠️ [Proxy] CDN URL is dead (${check.status}) for project ${req.params.id}: ${cdnUrl.substring(0, 80)}`);
+            } catch (headErr) {
+                console.warn(`⚠️ [Proxy] CDN HEAD check failed: ${headErr.message}`);
+            }
         }
 
         // No usable URL — try to trigger S3 upload from the provider URL

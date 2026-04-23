@@ -389,7 +389,7 @@ Generate the adapted creative now.`;
         );
 
         if (result.modelBusy) {
-            throw new Error('AI model servers are busy. Please try again soon.');
+            throw new Error(result.errorMessage || 'AI model servers are busy. Please try again soon.');
         }
 
         let rawImageUrl = result.imageUrl || '';
@@ -905,21 +905,21 @@ const IMAGE_MODEL_CONFIG = {
         name: 'Grok Imagen',
         supportsRefImages: false,
     },
-    // GPT Image 1 — OpenAI (opt-in, no ref image support)
+    // GPT Image 1 — OpenAI (supports ref images via /images/edits endpoint)
     'gpt-image-1': {
         provider: 'openai',
         modelId: 'gpt-image-1',
         name: 'GPT Image 1',
-        supportsRefImages: false,
+        supportsRefImages: true,
         supportsTransparent: false,
     },
     // GPT Image 2 — OpenAI's latest (April 2026). Near-perfect text rendering,
-    // transparent backgrounds, 2K output. Opt-in only — no ref image support.
+    // transparent backgrounds, 2K output. Supports ref images via /images/edits.
     'gpt-image-2': {
         provider: 'openai',
         modelId: 'gpt-image-2',
         name: 'GPT Image 2',
-        supportsRefImages: false,
+        supportsRefImages: true,
         supportsTransparent: true,
         supportsTextRendering: true,
     },
@@ -1108,8 +1108,9 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // ── OpenAI GPT-image-1 / GPT-image-2 generation ──────────────────────────────
 // Routes through Direct OpenAI API. Falls back to LaoZhang proxy if env var
 // OPENAI_USE_LZ=true — useful when direct API has quota issues.
-// NOTE: These models do NOT support reference images / inpainting.
-async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
+// Supports reference images via /images/edits multipart endpoint.
+// Uses size="auto" for flexible aspect ratio support (no forced cropping).
+async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
     // Primary: Direct OpenAI API
     // Fallback: LaoZhang proxy (OpenAI-compatible)
@@ -1123,51 +1124,143 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
-    // ── Map aspect ratio → supported OpenAI image sizes ──
-    // GPT-image-1/2 supports: 1024x1024, 1024x1536 (portrait 2:3), 1536x1024 (landscape 3:2)
-    const sizeMap = {
+    // ── Aspect ratio → size strategy ──
+    // GPT Image models support size="auto" which lets the model pick the best
+    // native dimensions. For standard ratios we use the known fixed sizes for
+    // predictability; for everything else we use "auto" + prompt injection.
+    const standardSizeMap = {
         '1:1':  '1024x1024',
-        '4:5':  '1024x1024',  // closest square
         '2:3':  '1024x1536',
-        '9:16': '1024x1536',  // portrait → 2:3 native
-        '3:4':  '1024x1536',  // portrait → 2:3 native
         '3:2':  '1536x1024',
-        '16:9': '1536x1024',  // landscape → 3:2 native
-        '4:3':  '1536x1024',
     };
-    const imageSize = sizeMap[aspectRatio] || '1024x1024';
+    const imageSize = standardSizeMap[aspectRatio] || 'auto';
+
+    // When using size="auto", inject the exact aspect ratio into the prompt so
+    // the model generates natively at the correct dimensions instead of cropping.
+    let finalPrompt = promptText;
+    if (imageSize === 'auto' && aspectRatio && aspectRatio !== '1:1') {
+        const ratioLabel = aspectRatio === '9:16' ? 'portrait/vertical'
+            : aspectRatio === '16:9' ? 'landscape/horizontal'
+            : aspectRatio === '4:5' ? 'tall portrait (4:5)'
+            : aspectRatio === '3:4' ? 'portrait (3:4)'
+            : aspectRatio === '4:3' ? 'landscape (4:3)'
+            : aspectRatio;
+        finalPrompt = `[ASPECT RATIO: Generate this image in ${aspectRatio} ${ratioLabel} format.]\n\n${promptText}`;
+    }
 
     // transparent background only works with PNG output
     const finalFormat = background === 'transparent' ? 'png' : outputFormat;
 
+    // ── Collect valid reference image URLs ──
+    const validRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:')));
+    const hasRefImages = validRefUrls.length > 0;
+
     console.log(`\n══════ OPENAI IMAGE GENERATION (${modelId}) ══════`);
     console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
+    console.log(`🖼️  Reference images: ${validRefUrls.length} ${hasRefImages ? '→ using /images/edits' : '→ using /images/generations'}`);
     console.log(`🌐 Endpoint: ${baseUrl} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
-    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
+    console.log(`📝 Prompt (first 200 chars): ${(finalPrompt || '').substring(0, 200)}...`);
 
-    const body = {
-        model: modelId,
-        prompt: promptText,
-        n: 1,
-        size: imageSize,
-        quality,
-        output_format: finalFormat,
-        background,
-    };
-    // output_compression only applies to jpeg/webp
-    if (finalFormat === 'webp' || finalFormat === 'jpeg') {
-        body.output_compression = 85;
+    let response;
+
+    if (hasRefImages) {
+        // ═══ PATH A: Reference images → use /images/edits (multipart/form-data) ═══
+        // Download reference images and attach as image[] fields
+        const form = new FormData();
+        form.append('model', modelId);
+        form.append('prompt', finalPrompt);
+        form.append('n', '1');
+        form.append('size', imageSize);
+        form.append('quality', quality);
+
+        // Download and attach each ref image as image[] field
+        let loadedCount = 0;
+        for (const refUrl of validRefUrls.slice(0, 8)) { // max 8 images to stay safe
+            try {
+                let imgBuffer;
+                if (refUrl.startsWith('data:')) {
+                    // Base64 data URI → extract buffer
+                    const commaIdx = refUrl.indexOf(',');
+                    imgBuffer = Buffer.from(refUrl.substring(commaIdx + 1), 'base64');
+                } else {
+                    // HTTP URL → download
+                    imgBuffer = await fetchImageBuffer(refUrl);
+                }
+                if (imgBuffer && imgBuffer.length > 0) {
+                    // Detect mime type from buffer magic bytes
+                    const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50;
+                    const isWebp = imgBuffer[8] === 0x57 && imgBuffer[9] === 0x45;
+                    const ext = isPng ? 'png' : isWebp ? 'webp' : 'png';
+                    const mime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/png';
+
+                    // If image is not PNG/WebP, convert to PNG via sharp for compatibility
+                    let finalBuffer = imgBuffer;
+                    if (!isPng && !isWebp) {
+                        try {
+                            const sharp = (await import('sharp')).default;
+                            finalBuffer = await sharp(imgBuffer).png().toBuffer();
+                        } catch (convErr) {
+                            console.warn(`⚠️ Could not convert ref image to PNG: ${convErr.message}`);
+                            finalBuffer = imgBuffer; // use as-is
+                        }
+                    }
+
+                    form.append('image[]', finalBuffer, {
+                        filename: `ref_${loadedCount}.${ext}`,
+                        contentType: mime,
+                    });
+                    loadedCount++;
+                    console.log(`✅ Attached ref image ${loadedCount} (${Math.round(finalBuffer.length / 1024)}KB)`);
+                }
+            } catch (dlErr) {
+                console.warn(`⚠️ Failed to download ref image: ${dlErr.message}`);
+            }
+        }
+
+        if (loadedCount === 0) {
+            console.warn(`⚠️ All ref images failed to load — falling back to text-to-image generation`);
+            // Fall through to PATH B below
+        } else {
+            console.log(`📎 Attached ${loadedCount} reference images to /images/edits request`);
+
+            response = await fetch(`${baseUrl}/images/edits`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    ...form.getHeaders(),
+                },
+                body: form,
+                signal: AbortSignal.timeout(180000),
+            });
+        }
     }
 
-    const response = await fetch(`${baseUrl}/images/generations`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(180000),
-    });
+    if (!response) {
+        // ═══ PATH B: No ref images (or ref download failed) → /images/generations (JSON) ═══
+        const body = {
+            model: modelId,
+            prompt: finalPrompt,
+            n: 1,
+            size: imageSize,
+            quality,
+            output_format: finalFormat,
+            background,
+        };
+        // output_compression only applies to jpeg/webp
+        if (finalFormat === 'webp' || finalFormat === 'jpeg') {
+            body.output_compression = 85;
+        }
+
+        response = await fetch(`${baseUrl}/images/generations`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(180000),
+        });
+    }
 
     if (!response.ok) {
         const errText = await response.text();
@@ -1329,41 +1422,51 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             return { ...result, model: selectedModel };
         } catch (error) {
             console.error(`❌ Grok Imagen failed:`, error.message);
+            const isBusy = error.message?.startsWith('BUSY') || error.message?.includes('rate limit');
             return {
                 imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
                 modelBusy: true, busyModel: 'grok-imagen',
                 errorMessage: error.message || 'Grok Imagen is unavailable. Please try again.',
-                errorType: error.message?.startsWith('BUSY') ? 'busy' : 'error',
+                errorType: isBusy ? 'busy' : 'error',
             };
         }
     }
 
     // ── Route: OpenAI GPT-image-1 / GPT-image-2 (direct OpenAI API) ─────────
-    // These models do NOT support reference images — text-to-image only.
+    // Supports reference images via /images/edits endpoint. Uses size="auto" for
+    // flexible aspect ratios. Falls back to /images/generations for text-only.
     if (modelKey === 'gpt-image-1' || modelKey === 'gpt-image-2') {
         const TIMEOUT_MS = 180_000;
         const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error(`${modelKey} timed out after 3 minutes. Please try again.`)), TIMEOUT_MS)
         );
-        // Warn if caller passed reference images (silently dropped — model doesn't support them)
-        if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
-            console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
+        // Collect all reference image URLs (from both refImageUrls and imageParts)
+        const allRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
+        // Also extract URLs from imageParts if they contain base64 data
+        const base64Refs = (imageParts || [])
+            .filter(p => p?.inlineData?.data)
+            .map(p => `data:${p.inlineData.mimeType || 'image/png'};base64,${p.inlineData.data}`);
+        const combinedRefUrls = [...allRefUrls, ...base64Refs];
+        if (combinedRefUrls.length > 0) {
+            console.log(`🖼️ [${modelKey}] ${combinedRefUrls.length} reference images will be sent via /images/edits`);
         }
-        // GPT-image-2 defaults to high quality for richer detail; gpt-image-1 uses medium
+        // GPT-image-2 defaults to medium quality; gpt-image-1 uses medium
         const quality = modelKey === 'gpt-image-2' ? 'medium' : 'medium';
         try {
             const result = await Promise.race([
-                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'webp', 'opaque'),
+                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'webp', 'opaque', combinedRefUrls),
                 timeoutPromise,
             ]);
             return { ...result, model: selectedModel };
         } catch (error) {
             console.error(`❌ ${modelKey} failed:`, error.message);
+            const isBusy = error.message?.startsWith('BUSY') || error.message?.includes('rate limit');
+            const isQuota = error.message?.startsWith('QUOTA') || error.message?.includes('billing');
             return {
                 imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
                 modelBusy: true, busyModel: modelKey,
                 errorMessage: error.message || `${modelKey} is unavailable. Please try again.`,
-                errorType: error.message?.startsWith('BUSY') || error.message?.startsWith('QUOTA') ? 'busy' : 'error',
+                errorType: isBusy ? 'busy' : isQuota ? 'quota' : 'error',
             };
         }
     }
