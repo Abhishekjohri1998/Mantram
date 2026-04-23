@@ -1,5 +1,6 @@
 import { getSmartRouter } from '../ai/smartRouter.js';
 import { getPromptOptimizer } from '../ai/rlhf/promptOptimizer.js';
+import { scanWebsite as scanWebsiteFn } from './brandScanner.js';
 
 /**
  * Agent Orchestrator — The brain of the agentic system.
@@ -141,8 +142,7 @@ class Orchestrator {
      */
     async scanWebsite(url, onProgress) {
         // Delegate to brand scanner agent
-        const { scanWebsite } = await import('./brandScanner.js');
-        return scanWebsite(url, this.smartRouter.modelRouter, onProgress);
+        return scanWebsiteFn(url, this.smartRouter.modelRouter, onProgress);
     }
 
     /**
