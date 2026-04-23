@@ -10227,44 +10227,50 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     </div>
 
                     {/* ── RIGHT PANEL: Canvas / Result ── */}
-                    <div className="creative-canvas-panel relative flex flex-col items-center justify-center min-h-[60vh] p-4 sm:p-6">
-                        {!csResult && !csGenerating && (
+                    <div className="creative-canvas-panel flex flex-col items-center justify-center p-6 sm:p-10">
+                        {/* Empty state */}
+                        {!csGenerating && csSlots.every(s => !s) && (
                             <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
-                                <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.1), rgba(255,154,0,0.1))' }}>
-                                    <span className="material-symbols-outlined text-5xl" style={{ color: '#FF4D00' }}>movie_filter</span>
+                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">movie_filter</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">Campaign Shot</h3>
-                                    <p className="text-[12px] text-[var(--sys-text-muted)] leading-relaxed">
-                                        Upload your product photo, choose a cinematic mood, and let the AI Art Director create a Cannes-level campaign poster for your brand.
-                                    </p>
+                                    <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">Campaign Shot Studio</h3>
+                                    <p className="text-[12px] text-[var(--sys-text-muted)] leading-relaxed max-w-xs">Upload your product photo, pick a cinematic mood, and get 3 AI-generated campaign posters — each with a different creative direction.</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2 justify-center">
-                                    {['Dark Botanical', 'Aqua Mist', 'Luxury Noir', 'Warm Glow'].map(m => (
-                                        <span key={m} className="text-[10px] px-2.5 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{m}</span>
+                                    {['Hero Shot', 'Lifestyle', 'Detail Close-up'].map(m => (
+                                        <span key={m} className="text-[10px] px-2.5 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-bold">{m}</span>
                                     ))}
                                 </div>
                             </div>
                         )}
 
+                        {/* Loading: 3-slot skeletons */}
                         {csGenerating && (
-                            <div className="flex flex-col items-center justify-center gap-6">
-                                <div className="relative w-24 h-24">
-                                    <div className="absolute inset-0 rounded-3xl animate-pulse" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.2), rgba(255,154,0,0.2))' }} />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-5xl animate-spin" style={{ color: '#FF4D00', animationDuration: '3s' }}>movie_filter</span>
-                                    </div>
+                            <div className="w-full">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-[16px] animate-spin text-[var(--sys-text-muted)]">progress_activity</span>
+                                    <p className="text-[12px] font-bold text-[var(--sys-text)]">Art Director generating 3 variations...</p>
                                 </div>
-                                <div className="text-center space-y-2">
-                                    <p className="text-[14px] font-bold text-[var(--sys-text)]">AI Art Director at work...</p>
-                                    <div className="flex flex-col gap-1.5">
-                                        {['Analysing brand DNA', 'Writing copy & taglines', 'Building cinematic prompt', 'Generating poster'].map((step, i) => (
-                                            <div key={step} className="flex items-center gap-2 text-[11px] text-[var(--sys-text-muted)]">
-                                                <span className="material-symbols-outlined text-[14px]" style={{ color: '#FF4D00' }}>check_circle</span>
-                                                {step}
-                                            </div>
-                                        ))}
-                                    </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {csSlots.map((slot, i) => (
+                                        <div key={i} className="flex flex-col gap-2">
+                                            {slot?.imageUrl ? (
+                                                <img src={slot.imageUrl} alt={`Variation ${i+1}`} className="w-full rounded-xl border border-[var(--sys-border)] object-contain" />
+                                            ) : slot?.error ? (
+                                                <div className="aspect-square rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center p-3 text-center">
+                                                    <p className="text-[9px] text-[var(--sys-text-muted)]">{slot.error.includes('timed out') ? 'Still processing...' : 'Failed'}</p>
+                                                </div>
+                                            ) : (
+                                                <div className="aspect-square rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex flex-col items-center justify-center gap-2">
+                                                    <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] animate-spin" style={{ animationDuration: `${3 + i}s` }}>progress_activity</span>
+                                                    <p className="text-[9px] font-bold text-[var(--sys-text-muted)] text-center">{['Hero Shot', 'Lifestyle', 'Close-up'][i]}</p>
+                                                </div>
+                                            )}
+                                            <p className="text-[9px] text-center text-[var(--sys-text-muted)] font-bold">{['Hero Shot', 'Lifestyle', 'Detail'][i]}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

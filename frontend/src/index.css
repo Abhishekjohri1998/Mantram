@@ -365,9 +365,9 @@
   /* ═══════════ Creative Studio — Split Layout ═══════════ */
   .creative-split {
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row;
     align-items: flex-start;
-    gap: 1.5rem;
+    gap: 0;
     position: relative;
     padding-bottom: 2rem;
   }
@@ -407,6 +407,14 @@
   }
 
   .creative-gallery { flex-grow: 1; min-width: 0; padding: 0; }
+  .creative-canvas-panel {
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: calc(100vh - 11.75rem);
+    border-left: 1px solid var(--sys-border);
+    overflow-y: auto;
+    background: var(--sys-bg);
+  }
 
   .floating-prompt-row {
     display: flex;
@@ -570,7 +578,7 @@
   /* Mobile + Tablet: stack vertically */
   @media (max-width: 1024px) {
     .creative-split {
-      flex-direction: column-reverse; /* tools on top */
+      flex-direction: column; /* tools on top, canvas below */
     }
     .creative-tools-panel {
       width: 100%;
