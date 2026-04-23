@@ -4061,7 +4061,23 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     const [refineInput, setRefineInput] = useState('')
     const [refining, setRefining] = useState(false)
     const [showPublish, setShowPublish] = useState(false)
+    const [visualElapsed, setVisualElapsed] = useState(0)
     const refineRef = useRef(null)
+
+    useEffect(() => {
+        let interval;
+        if (generatingVisualPrompt) {
+            setVisualElapsed(0);
+            interval = setInterval(() => {
+                setVisualElapsed(prev => prev + 1);
+            }, 1000);
+        } else {
+            setVisualElapsed(0);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        }
+    }, [generatingVisualPrompt])
 
     // Keep editContent in sync when result changes
     useEffect(() => { setEditContent(result?.content || '') }, [result?.content])
@@ -4146,7 +4162,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                                     <div className="h-full bg-primary transition-all duration-300" style={{ width: `${inlineVisualProgress}%` }}></div>
                                 </div>
                                 <h4 className="text-sm font-bold mt-4">Generating Visual...</h4>
-                                <p className="text-[10px] opacity-70 mt-1">This usually takes 15-30s</p>
+                                <p className="text-[10px] opacity-70 mt-1">Elapsed time: {visualElapsed}s</p>
                             </div>
                         )}
                     </div>
