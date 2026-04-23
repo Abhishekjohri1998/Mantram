@@ -13,6 +13,7 @@ import { gatherIntelligence } from './tools.js';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
+import { resolveTargetMarkets, getRelevantFestivals } from '../../utils/globalCalendar.js';
 import {
     RESEARCH_PROMPT,
     WRITER_PROMPT,
@@ -98,6 +99,18 @@ export async function researchNode(state) {
     // Build enriched research prompt with real data
     const intelligenceContext = buildIntelligenceContext(intelligence);
 
+    // ── Festival calendar: ONLY inject when brief is explicitly festival-related
+    //    OR when a festival is within 7 days (unavoidable context).
+    //    This prevents the AI from defaulting to Mother's Day / nearest holiday
+    //    for ALL content regardless of the user's actual intent.
+    const targetMarkets = brand ? resolveTargetMarkets(brand) : ['IN'];
+    const festivalCtx = getRelevantFestivals(state.brief, targetMarkets, 5);
+    // Only surface the festival block if the user mentioned a festival keyword,
+    // OR if the brief contains time-sensitive words like 'upcoming', 'seasonal', 'trending'
+    const SEASONAL_KEYWORDS = /festival|celebration|occasion|holiday|seasonal|upcoming|cultural moment|cultural|festive/i;
+    const isFestivalBrief = SEASONAL_KEYWORDS.test(state.brief);
+    const festivalContext = isFestivalBrief ? festivalCtx : '';
+
     const userPrompt = [
         `CONTENT BRIEF: ${state.brief}`,
         `CONTENT TYPE: ${state.contentType || 'social'}`,
@@ -105,6 +118,7 @@ export async function researchNode(state) {
         `TARGET AUDIENCE: ${state.targetAudience || 'general'}`,
         state.tone ? `PREFERRED TONE: ${state.tone}` : '',
         state.language ? `LANGUAGE: ${state.language}` : '',
+        festivalContext || '',
         '',
         intelligenceContext,
     ].filter(Boolean).join('\n');
@@ -675,9 +689,9 @@ function buildIntelligenceContext(intelligence) {
         if (t.keywords?.length) {
             parts.push(`Real Keywords: ${t.keywords.slice(0, 8).map(k => k.keyword).join(', ')}`);
         }
-        if (t.calendarHooks?.length) {
-            parts.push(`Calendar Hooks: ${t.calendarHooks.slice(0, 3).join(', ')}`);
-        }
+        // NOTE: calendarHooks deliberately NOT included here — Grok returns the nearest upcoming
+        // occasion (e.g. "Mother's Day") regardless of user intent, which biased ALL content.
+        // Festival dates are surfaced contextually only when the user's brief requests them.
         if (t.viralFormats?.length) {
             parts.push(`Viral Formats: ${t.viralFormats.slice(0, 3).join(', ')}`);
         }

@@ -256,9 +256,11 @@ export function buildBrandContext(brand, products = []) {
     const marketCtx = getMarketContext(targetMarkets);
     if (marketCtx) parts.push(marketCtx);
 
-    // Inject verified festival dates filtered by target markets
-    const festivalCtx = getRelevantFestivals('', targetMarkets, 8);
-    if (festivalCtx) parts.push(festivalCtx);
+    // ⚠️ NOTE: Festival calendar is intentionally NOT injected here.
+    // It is injected per-request in researchNode() using the actual user brief,
+    // so the AI only sees festivals that are relevant to what the user asked for.
+    // Injecting it here (into cached brand context) caused all content to be
+    // about the nearest upcoming festival (e.g. Mother's Day) regardless of brief.
 
     // Language directive
     if (dna.defaultLanguage && dna.defaultLanguage !== 'english') {

@@ -17,6 +17,8 @@ CRITICAL RULES:
 3. Your keywords MUST be based on real SEO data and web research, not made-up terms.
 4. Your competitor insights MUST reference real findings from web research, not generic advice.
 5. If the intelligence data is empty for a category, say so honestly — don't fake it.
+6. ANTI-HALLUCINATION — FESTIVALS: Do NOT inject seasonal, holiday, or festival themes (e.g. Mother's Day, Diwali, Eid) into a brief that doesn't explicitly request them. The user's CONTENT BRIEF is the ONLY signal for topic. Only use festival calendar data if a festival was explicitly mentioned in the brief OR if the festival context block is provided below. NEVER default to "the nearest upcoming occasion" unprompted.
+
 
 RESPONSIBILITIES:
 1. Analyze the content brief and identify 3-5 data-backed key angles
@@ -79,6 +81,7 @@ DATA INTEGRATION RULES:
 3. If SEO keywords are provided, integrate them naturally (never force)
 4. MARKET ADAPTATION: Adapt language, cultural references, idioms, currency, and examples for the brand's target markets
 5. If the brand targets non-English markets, write in the appropriate language or blend
+6. TOPIC FIDELITY: The user's CONTENT BRIEF is your ONLY creative directive. Do NOT pivot to festivals, cultural moments, or seasonal themes UNLESS the brief or research explicitly asks for it. Writing a product post? Write a product post. Writing about a service? Write about that service — not about Mother's Day just because it's coming up.
 
 RESPONSE FORMAT — valid JSON only:
 {
