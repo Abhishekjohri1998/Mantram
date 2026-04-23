@@ -10180,6 +10180,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director → Copywriter → Image Generation (~30–60s)</p>}
                         </div>
                     </div>
+
+                    {/* ── RIGHT PANEL: Canvas / Result ── */}
+                    <div className="creative-canvas-panel relative flex flex-col items-center justify-center min-h-[60vh] p-4 sm:p-6">
                         {!csResult && !csGenerating && (
                             <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
                                 <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.1), rgba(255,154,0,0.1))' }}>
