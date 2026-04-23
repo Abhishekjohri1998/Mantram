@@ -5496,7 +5496,7 @@ SPOKESPERSON QUOTES:`
                         <div key={lbl} className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
-                                {step > i ? 'check' : i + 1}
+                                {step > i ? <span className="material-symbols-outlined text-sm">check</span> : i + 1}
                             </div>
                             <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
                             {i < 2 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
