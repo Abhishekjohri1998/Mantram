@@ -840,7 +840,10 @@ export default function VideoStudio() {
                         ) : historyView === 'list' ? (
                             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {filteredProjects.map(p => {
-                                    const rawVideoUrl = p.generation?.videoUrl || '';
+                                    // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl > s3VideoUrl > videoUrl)
+                                    // finalVideoUrl is set after S3 upload, so it never expires.
+                                    // Fall back to generation.videoUrl (CDN) only as a last resort.
+                                    const rawVideoUrl = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl || '';
                                     // Use CDN URL directly — eliminates DB proxy query per video
                                     const videoUrl = rawVideoUrl || '';
                                     const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;
@@ -936,7 +939,8 @@ export default function VideoStudio() {
                             /* ── GRID VIEW ── */
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {filteredProjects.map(p => {
-                                    const rawVideoUrl = p.generation?.videoUrl || '';
+                                    // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl > s3VideoUrl > videoUrl)
+                                    const rawVideoUrl = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl || '';
                                     // Use CDN URL directly — eliminates DB proxy query per video
                                     const videoUrl = rawVideoUrl || '';
                                     const isDone = p.status === 'done' || p.status === 'critique' || rawVideoUrl;

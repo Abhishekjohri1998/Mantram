@@ -182,8 +182,9 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
                 ...(result._laozhangVideoUrl ? { finalVideoUrl: result._laozhangVideoUrl } : {})
             });
             if (result._laozhangVideoUrl) {
-                const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
-                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+                // Use downloadAndUploadVideoToS3 — structured S3 key + DB update
+                downloadAndUploadVideoToS3(project._id.toString(), result._laozhangVideoUrl)
+                    .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
             console.error('I2V generate background error:', error);
@@ -283,9 +284,9 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
                 ...(result._laozhangVideoUrl ? { finalVideoUrl: result._laozhangVideoUrl } : {})
             });
             if (result._laozhangVideoUrl) {
-                const targetKey = `video-studio/generations/${extended._id}-${Date.now()}.mp4`;
-                const { mirrorUrlToS3 } = await import('../utils/s3.js');
-                mirrorUrlToS3(result._laozhangVideoUrl, targetKey).catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
+                // Use downloadAndUploadVideoToS3 — structured S3 key + DB update
+                downloadAndUploadVideoToS3(extended._id.toString(), result._laozhangVideoUrl)
+                    .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
             console.error('Video extend background error:', error);
@@ -424,8 +425,8 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             // LaoZhang sync: video is already generated — upload to S3 before CDN expires
             // This normally happens in the polling loop, but LZ projects skip polling
             if (projectStatus === 'completed' && state.generation?.videoUrl) {
-                const targetKey = `video-studio/generations/${project._id}-${Date.now()}.mp4`;
-                mirrorUrlToS3(state.generation.videoUrl, targetKey)
+                // Use downloadAndUploadVideoToS3 — structured S3 key + DB update
+                downloadAndUploadVideoToS3(project._id.toString(), state.generation.videoUrl)
                     .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
@@ -4234,9 +4235,11 @@ router.get('/:id/status', protect, async (req, res) => {
                     console.log(`   🔧 FFmpeg compile: ${clipPaths.length} clips + ${voiceoverPath ? 'VO' : 'no VO'}`);
                     execSync(ffCmd, { stdio: 'pipe', timeout: 180000 });
 
-                    // Upload compiled video to S3
+                    // Upload compiled video to S3 with structured user/brand path
                     const compiledBuffer = fs.readFileSync(outputPath);
-                    const s3Key = `videos/${project._id}-compiled.mp4`;
+                    const compiledUserId = project.user?.toString() || 'unknown';
+                    const compiledBrandId = project.brand?.toString() || 'unbranded';
+                    const s3Key = `users/${compiledUserId}/brands/${compiledBrandId}/videos/${project._id}-compiled.mp4`;
                     const finalUrl = await uploadToS3(compiledBuffer, s3Key, 'video/mp4');
                     console.log(`   ✅ Compiled video: ${finalUrl.substring(0, 60)}`);
 
@@ -4481,9 +4484,11 @@ router.get('/:id/status', protect, async (req, res) => {
                             }
                             execSync(ffCmd, { stdio: 'pipe', timeout: 60000 });
 
-                            // Upload mixed video to S3
+                            // Upload mixed video to S3 with structured user/brand path
                             const mixedBuffer = fs.readFileSync(outputPath);
-                            const s3Key = `videos/${project._id}-mixed.mp4`;
+                            const mixUserId = project.user?.toString() || 'unknown';
+                            const mixBrandId = project.brand?.toString() || 'unbranded';
+                            const s3Key = `users/${mixUserId}/brands/${mixBrandId}/videos/${project._id}-mixed.mp4`;
                             finalVideoUrl = await uploadToS3(mixedBuffer, s3Key, 'video/mp4');
                             console.log(`✅ Voiceover mixed into final video: ${finalVideoUrl.substring(0, 60)}`);
 
@@ -4633,10 +4638,10 @@ router.post('/:id/finalize', protect, async (req, res) => {
             critique: project.critique,
         });
 
-        // Mark as done
+        // Mark as done — prefer permanent S3 URL for finalVideoUrl so it doesn't expire
         await VideoProject.findByIdAndUpdate(project._id, {
             status: 'done',
-            finalVideoUrl: project.generation?.videoUrl || '',
+            finalVideoUrl: project.generation?.s3VideoUrl || project.generation?.videoUrl || '',
         });
 
         // Save learnings for self-improvement (fire-and-forget)
@@ -4668,7 +4673,10 @@ router.get('/', protect, async (req, res) => {
     try {
         const { brandId, status, mode, limit = 50, page = 1 } = req.query;
         const filter = { user: req.user._id };
-        if (brandId) filter.brand = brandId;
+        // ✅ FIX: Include unbranded projects when a brandId filter is active.
+        // Previously projects created without an active brand were silently excluded
+        // when any brand was selected — making them "disappear" from history.
+        if (brandId) filter.$or = [{ brand: brandId }, { brand: null }, { brand: { $exists: false } }];
         if (status) filter.status = status;
         if (mode) filter.mode = mode;
 
@@ -4678,7 +4686,7 @@ router.get('/', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
-                .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation createdAt updatedAt')
+                .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt')
                 .populate('brand', 'name dna.logo.url')
                 .lean(),
             VideoProject.countDocuments(filter),
@@ -5079,7 +5087,8 @@ router.delete('/:id', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Download a video from an ephemeral CDN URL and upload to S3.
+ * Download a video from an ephemeral CDN URL and upload to S3 with structured path.
+ * S3 key: users/{userId}/brands/{brandId}/videos/{projectId}.mp4
  * Updates the project in DB with the permanent S3 URL.
  * Returns the S3 URL if successful, null otherwise.
  */
@@ -5102,17 +5111,22 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
             return null;
         }
 
-        // Upload to S3
-        const s3Key = `videos/${projectId}.mp4`;
+        // Load the project to get user/brand context for structured S3 path
+        const project = await VideoProject.findById(projectId).select('user brand').lean();
+        const userId = project?.user?.toString() || 'unknown';
+        const brandId = project?.brand?.toString() || 'unbranded';
+
+        // Structured S3 key: users/{userId}/brands/{brandId}/videos/{projectId}.mp4
+        const s3Key = `users/${userId}/brands/${brandId}/videos/${projectId}.mp4`;
         console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
         const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
         console.log(`✅ Video uploaded to S3: ${s3Url}`);
 
-        // Update DB with permanent S3 URL — overwrite the ephemeral one
+        // Save permanent S3 URL — write to s3VideoUrl + finalVideoUrl
+        // DO NOT overwrite generation.videoUrl (keep original CDN URL as backup)
         await VideoProject.findByIdAndUpdate(projectId, {
-            'generation.videoUrl': s3Url,
             'generation.s3VideoUrl': s3Url,
-            finalVideoUrl: s3Url
+            finalVideoUrl: s3Url,
         });
 
         return s3Url;
@@ -5120,7 +5134,7 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
         console.warn(`⚠️ Video S3 upload error:`, e.message);
         // S3 failed — keep the original provider video URL (xAI/PiAPI CDN)
         console.log(`📎 Keeping original video URL: ${videoUrl.substring(0, 80)}...`);
-        return videoUrl;
+        return null; // Return null so caller knows S3 failed (not the CDN URL)
     }
 }
 
@@ -5131,24 +5145,34 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
 router.get('/:id/video', async (req, res) => {
     try {
         const project = await VideoProject.findById(req.params.id)
-            .select('generation.videoUrl generation.s3VideoUrl')
+            .select('generation.videoUrl generation.s3VideoUrl finalVideoUrl')
             .lean();
-        if (!project?.generation?.videoUrl && !project?.generation?.s3VideoUrl) {
+        const hasCdnUrl = !!project?.generation?.videoUrl;
+        const hasS3Url = !!project?.generation?.s3VideoUrl;
+        const hasFinalUrl = !!project?.finalVideoUrl;
+
+        if (!hasCdnUrl && !hasS3Url && !hasFinalUrl) {
             return res.status(404).send('Video not found');
         }
 
-        // Always bypass S3 and use the original AI CDN URL because AWS keys are invalid.
-        // This instantly restores older videos that S3 is blocking with 403 Forbidden.
-        if (project.generation.videoUrl) {
-            return res.redirect(302, project.generation.videoUrl);
+        // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl or s3VideoUrl) over expiring CDN URL.
+        // S3 URLs don't expire (they're stored as public-path URLs, not presigned).
+        // Fall back to CDN URL only when no S3 copy exists yet.
+        const finalUrl = project.finalVideoUrl || project.generation?.s3VideoUrl;
+        if (finalUrl && finalUrl.includes('amazonaws.com')) {
+            // It's an S3 URL — generate a fresh presigned URL (7-day TTL)
+            const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+            const signed = await getSignedUrlIfNeeded(finalUrl).catch(() => finalUrl);
+            return res.redirect(302, signed);
         }
 
-        // If for some reason we ONLY have S3 (very rare), we will try it as a last resort.
-        if (project.generation.s3VideoUrl) {
-            return res.redirect(302, project.generation.s3VideoUrl);
+        // Use CDN URL (original provider link) if S3 copy not yet available
+        const cdnUrl = project.generation?.videoUrl;
+        if (cdnUrl) {
+            return res.redirect(302, cdnUrl);
         }
 
-        // Not on S3 yet — try to download from CDN and upload to S3
+        // No usable URL — try to trigger S3 upload from the provider URL
         const videoUrl = project.generation.videoUrl;
         if (!videoUrl) return res.status(404).send('Video URL not available');
 

@@ -154,7 +154,7 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
  * @param {number} expiresIn - Expiration time in seconds (default: 3600 / 1 hour)
  * @returns {Promise<string>} - The signed URL
  */
-export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => {
+export const getSignedUrlForPath = async (urlOrKey, expiresIn = 604800) => { // 7 days default
     if (!urlOrKey) return urlOrKey;
     
     try {
