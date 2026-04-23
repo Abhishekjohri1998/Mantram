@@ -3115,9 +3115,9 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
                 user: req.user,
                 creditsDeducted: req.creditsDeducted,
             });
-            if (genResult?.imageUrl) {
-                generatedImageUrl = genResult.imageUrl;
-                usedModel = genResult.model || imageModel;
+            if (genResult?.creative?.imageUrl) {
+                generatedImageUrl = genResult.creative.imageUrl;
+                usedModel = genResult.creative.aiMeta?.model || imageModel;
                 console.log(`   ✅ Campaign Shot generated with ${usedModel}`);
             } else {
                 genError = genResult?.errorMessage || 'No image returned';

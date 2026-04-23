@@ -389,9 +389,11 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         return resultJson.models;
     } catch (e) {
         if (e.message?.includes('503') || e.message?.includes('overloaded')) {
-             console.warn(`📊 [Pricing Monitor] Gemini overloaded (503) for ${providerName}. Skipping extraction.`);
+             console.log(`📊 [Pricing Monitor] Gemini overloaded (503) for ${providerName}. Skipping.`);
+        } else if (e.message?.includes('403') || e.message?.includes('redirects exceeded')) {
+             console.log(`📊 [Pricing Monitor] Web scraper blocked by ${providerName} (${e.message}). Skipping.`);
         } else {
-             console.warn(`⚠️ Failed to extract live pricing for ${providerName}:`, e.message);
+             console.log(`📊 [Pricing Monitor] Failed to extract live pricing for ${providerName}:`, e.message);
         }
         return null;
     }
