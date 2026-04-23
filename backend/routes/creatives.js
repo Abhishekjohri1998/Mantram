@@ -3,7 +3,15 @@ import { randomUUID } from 'crypto';
 import express from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
-import sharp from 'sharp';
+
+// ⚡ PERF: Lazy singleton for sharp — imported once on first use, cached thereafter.
+// Avoids static import crash if native binary isn't compiled for the platform,
+// while eliminating the ~200ms overhead of repeated dynamic imports.
+let _sharp = null;
+async function getSharp() {
+    if (!_sharp) _sharp = (await import('sharp')).default;
+    return _sharp;
+}
 
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
@@ -412,6 +420,7 @@ Generate the adapted creative now.`;
                 const targetH = parseInt(customSize.height, 10);
                 if (targetW > 0 && targetH > 0) {
                     console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
+                    const sharp = await getSharp();
                     // ⚡ PERF: Decode data: URIs directly instead of re-fetching via network
                     let imgBuffer;
                     if (rawImageUrl.startsWith('data:')) {
@@ -1304,7 +1313,7 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         } else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') {
             console.log(`🔄 Converting webp → png for Sharp/Gemini compatibility`);
             try {
-                // sharp already imported at top of file
+                const sharp = await getSharp();
                 outputBuf = await sharp(rawBuf).png().toBuffer();
                 mimeType = 'image/png';
             } catch (convErr) {
@@ -2641,7 +2650,7 @@ router.post('/upscale', protect, async (req, res) => {
 
         if (scale === '2k') {
             // ══════ 2K: Sharp Lanczos upscale (FREE, ~1s) ══════
-            // sharp already imported at top of file
+            const sharp = await getSharp();
             const metadata = await sharp(imgBuffer).metadata();
             const targetWidth = Math.max(metadata.width * 2, 2048);
             const targetHeight = Math.max(metadata.height * 2, 2048);
@@ -3240,7 +3249,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         // ── Async: Split panoramic, composite products, upload ──
         (async () => {
             try {
-                // sharp already imported at top of file
+                const sharp = await getSharp();
                 const geminiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
                 // Utility: URL/dataURI → Buffer with retry
