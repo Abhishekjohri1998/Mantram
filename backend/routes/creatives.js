@@ -2798,6 +2798,7 @@ router.post('/campaign-shot', protect, requireStudio('creativeStudio'), requireC
             primaryTagline,   // Optional override tagline 1
             secondaryTagline, // Optional override tagline 2
             generateCopy = false, // When true: generate cinematic ad copy alongside the image
+            variationIndex = 0,   // 0=Hero Shot | 1=Lifestyle | 2=Detail — drives distinct creative direction
         } = req.body;
 
         if (!productImage) {
@@ -2931,7 +2932,34 @@ Return ONLY valid JSON:
             tagline2 = secondaryTagline || 'Crafted for Excellence';
         }
 
-        // ── Step 3: Build the Master Cinematic Prompt (The Formula) ──
+        // ── Variation Profiles: each index produces a distinct creative direction ──
+        const VARIATION_PROFILES = [
+            {
+                label: 'Hero Shot',
+                arrangementOverride: `HERO SHOT: single product upright, centred, occupying 60-70% of frame. Bold, iconic composition — pure product confidence. No clutter. Strong rim light sculpting every edge.`,
+                compositionNote: `Composition: centred, monumental, symmetrical. Think Chanel No.5 campaign.`,
+                tempOverride: 0.25, // Lower = more faithful/crisp
+                copyVoice: 'Bold. Declarative. One strong statement.',
+            },
+            {
+                label: 'Lifestyle',
+                arrangementOverride: `LIFESTYLE COMPOSITION: product placed slightly off-centre, integrated into its environment — surrounded by botanical/atmospheric scene elements that reinforce the mood. Feel lived-in and aspirational, not sterile.`,
+                compositionNote: `Composition: rule-of-thirds, environmental context, storytelling. Think Aesop or Diptyque editorial.`,
+                tempOverride: 0.45,
+                copyVoice: 'Evocative. Poetic. Sensory language. Short lines.',
+            },
+            {
+                label: 'Detail Close-up',
+                arrangementOverride: `DETAIL CLOSE-UP: extreme macro focus on the product's most distinctive feature — texture, label typography, cap/nozzle, ingredients visible, material quality. Fill the frame. Make the craft impossible to ignore.`,
+                compositionNote: `Composition: tight crop, shallow DOF blur, cinematic vignette. Think luxury fragrance macro editorial.`,
+                tempOverride: 0.35,
+                copyVoice: 'Precise. Ingredient-led. Craftsmanship language.',
+            },
+        ];
+        const variation = VARIATION_PROFILES[variationIndex] || VARIATION_PROFILES[0];
+        console.log(`   🎨 Variation ${variationIndex}: ${variation.label}`);
+
+
         const canvasSize = aspectRatio === '1:1' ? '1:1 square format'
             : aspectRatio === '9:16' ? '9:16 portrait, story format'
             : aspectRatio === '16:9' ? '16:9 cinematic widescreen'
@@ -2944,7 +2972,9 @@ Return ONLY valid JSON:
 
         const masterPrompt = `Cinematic moody ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
-PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside a person/model. Keep the character authentic and aspirational. ` : `One upright product + one open or angled version with contents visible, product box placed behind at slight angle. `}Show both products clearly with their labels and branding fully visible.
+PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside a person/model. Keep the character authentic and aspirational.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
+
+${variation.compositionNote}
 
 BRANDING (top center): ${brandName} logo area, product name "${detectedProductName}" in clean brand typography${brandFont !== 'modern sans-serif' ? `, using ${brandFont} font family` : ''}
 
@@ -2969,7 +2999,7 @@ OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no fram
 ${brief ? `CREATIVE BRIEF: ${brief}` : ''}
 ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel of the provided reference image while keeping the product as the hero.' : ''}`;
 
-        console.log(`   📝 Campaign prompt: ${masterPrompt.substring(0, 120)}...`);
+        console.log(`   📝 Campaign prompt [${variation.label}]: ${masterPrompt.substring(0, 120)}...`);
 
         // ── Step 4: Prepare image parts ──
         const imageParts = [];
@@ -3031,8 +3061,8 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             });
             generatedImageUrl = genResult.imageUrl;
         } else if (imageParts.length > 0) {
-            // NanoBanana2 / other multimodal — use Gemini pipeline with ref images
-            const genResult = await geminiImageGenerate(masterPrompt, imageParts, 0.3, aspectRatio);
+            // NanoBanana2 / other multimodal — use variation temperature for distinct outputs
+            const genResult = await geminiImageGenerate(masterPrompt, imageParts, variation.tempOverride ?? 0.3, aspectRatio);
             generatedImageUrl = genResult?.imageUrl;
             usedModel = genResult?.model || imageModel;
         } else {
@@ -3091,6 +3121,7 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
 
 Brand: ${brandName}
 Product: ${detectedProductName}
+Variation Style: ${variation.label} — ${variation.copyVoice}
 Mood: ${moodPreset || 'dark-botanical'} — ${mood.env}
 Primary Tagline: ${tagline1}
 Secondary Tagline: ${tagline2}
@@ -3115,6 +3146,7 @@ Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury b
             taglines: [tagline1, tagline2].filter(Boolean),
             prompt: masterPrompt,
             copy: adCopy,
+            variationLabel: variation.label,
             creativeId: creative?._id,
         });
 

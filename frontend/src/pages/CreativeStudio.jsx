@@ -2313,16 +2313,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
     // ── Smart format detection from prompt ──
-    // ══ Campaign Shot: 3-concurrent cinematic poster generator ══
+    // ══ Campaign Shot: 3 DIFFERENT concurrent variations ══
     async function handleCampaignShot() {
         if (!csProductImage) { setCsError('Please upload a product image first'); return }
         setCsGenerating(true); setCsError(null)
-        // Reset all 3 slots to loading state
         setCsSlots([null, null, null]); setCsResult(null)
         const effectiveRatio = csAspectRatio === 'custom'
             ? `${csCustomW}:${csCustomH}`
             : csAspectRatio
-        const payload = {
+        const basePayload = {
             brandId: activeBrand?._id,
             productImage: csProductImage,
             refImage: csRefImage || undefined,
@@ -2336,14 +2335,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             secondaryTagline: csSecondaryTagline || undefined,
             generateCopy: csCopyEnabled,
         }
-        // Fire all 3 concurrently — each settles independently
+        // Each slot gets a different variationIndex → backend produces distinct creative directions
         const run = async (slotIdx) => {
             try {
-                const result = await creativesAPI.campaignShot(payload)
+                const result = await creativesAPI.campaignShot({ ...basePayload, variationIndex: slotIdx })
                 if (result.success) {
-                    const slotResult = { imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null }
+                    const slotResult = { imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null, variationLabel: result.variationLabel || `Variation ${slotIdx + 1}` }
                     setCsSlots(prev => { const next = [...prev]; next[slotIdx] = slotResult; return next })
-                    if (slotIdx === 0) setCsResult(slotResult) // primary result
+                    if (slotIdx === 0) setCsResult(slotResult)
                 } else {
                     setCsSlots(prev => { const next = [...prev]; next[slotIdx] = { error: result.error || 'Failed' }; return next })
                 }
@@ -10291,7 +10290,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] text-center">Variation {i+1}</p>
+                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] text-center">{slot.variationLabel || `Variation ${i+1}`}</p>
                                         </div>
                                     ) : slot?.error ? (
                                         <div key={i} className="aspect-square rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center p-4 text-center">
