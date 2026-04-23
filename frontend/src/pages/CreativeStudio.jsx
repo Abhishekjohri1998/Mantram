@@ -801,6 +801,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [csGenerating, setCsGenerating] = useState(false)
     const [csResult, setCsResult] = useState(null)                   // { imageUrl, taglines, productName, prompt }
     const [csError, setCsError] = useState(null)
+    const [showCsModelMenu, setShowCsModelMenu] = useState(false)    // Dropdown state for model picker
 
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
@@ -9956,7 +9957,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     {/* ── LEFT PANEL: Controls ── */}
                     <div data-wt="cs-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[var(--sys-border)]">
                             <div className="flex items-center gap-2">
                                 <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)' }}>
                                     <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>movie_filter</span>
@@ -9966,149 +9967,162 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)' }}>AI ART DIRECTOR</span>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
-                            {/* ── Product Image ── */}
-                            <div className="px-5 pb-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product Image <span className="text-red-400">*</span>
-                                </p>
-                                <div className="p-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative">
-                                    {csProductImage ? (
-                                        <div className="relative rounded-lg overflow-hidden border border-[var(--sys-border)] h-28 group">
-                                            <img loading="lazy" src={csProductImage} className="w-full h-full object-contain bg-[var(--sys-bg)] transition-transform group-hover:scale-105" />
-                                            <button onClick={() => { setCsProductImage(null); setCsProductFile(null) }} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all">
-                                                <span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span>
-                                            </button>
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+
+                            {/* ── 1. Model Selector (same dropdown pattern as AI Create) ── */}
+                            <div className="px-5 mt-4 pb-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                <div className="relative">
+                                    <button onClick={() => setShowCsModelMenu(!showCsModelMenu)}
+                                        className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === csModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
+                                                {IMAGE_MODELS.find(m => m.id === csModel)?.icon || 'auto_awesome'}
+                                            </span>
+                                            <span className="text-[13px] font-bold text-[var(--sys-text)]">{IMAGE_MODELS.find(m => m.id === csModel)?.name || 'Select Model'}</span>
                                         </div>
-                                    ) : (
-                                        <label className="flex flex-col items-center justify-center h-28 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50 cursor-pointer group">
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[22px] mb-1 group-hover:text-primary transition-colors">upload</span>
-                                            <span className="text-[11px] text-[var(--sys-text-muted)]">Upload product photo</span>
-                                            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                                                const file = e.target.files?.[0]; if (!file) return;
-                                                setCsProductFile(file);
-                                                const reader = new FileReader();
-                                                reader.onload = async (ev) => {
-                                                    try { const url = await uploadToS3(ev.target.result, 'products'); setCsProductImage(url); }
-                                                    catch { setCsProductImage(ev.target.result); }
-                                                };
-                                                reader.readAsDataURL(file);
-                                            }} />
-                                        </label>
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '18px' }}>expand_more</span>
+                                    </button>
+                                    {showCsModelMenu && (
+                                        <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
+                                            <div className="p-1.5 space-y-0.5 max-h-[260px] overflow-y-auto">
+                                                {IMAGE_MODELS.map(m => (
+                                                    <button key={m.id} onClick={() => { setCsModel(m.id); setShowCsModelMenu(false) }}
+                                                        className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (csModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
+                                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f' }}>NEW</span>}
+                                                            </div>
+                                                            <div className="text-[9px] opacity-50 truncate">{m.provider} · {m.desc}</div>
+                                                        </div>
+                                                        {csModel === m.id && <span className="material-symbols-outlined text-[14px]" style={{ color: m.color }}>check</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* ── Mood Preset ── */}
+                            {/* ── 2. Product Image Upload ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[14px]">palette</span> Mood Preset
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product Image <span className="text-red-400 text-[10px]">required</span>
                                 </p>
-                                <div className="space-y-1.5">
-                                    {[
-                                        { id: 'dark-botanical', label: 'Dark Botanical', desc: 'Deep greens, moody forest', icon: 'forest', color: '#1a4a2e' },
-                                        { id: 'aqua-mist', label: 'Aqua Mist', desc: 'Dark aqua, water droplets', icon: 'water_drop', color: '#0d3a5c' },
-                                        { id: 'charcoal-industrial', label: 'Charcoal Industrial', desc: 'Raw black, sharp edges', icon: 'factory', color: '#1a1a1a' },
-                                        { id: 'warm-glow', label: 'Warm Glow', desc: 'Amber, bokeh, candlelight', icon: 'wb_sunny', color: '#7a3800' },
-                                        { id: 'luxury-noir', label: 'Luxury Noir', desc: 'Black marble, editorial', icon: 'diamond', color: '#0d0d1a' },
-                                        { id: 'custom', label: 'Custom Brief', desc: 'Your own direction', icon: 'edit', color: '#2a2a2a' },
-                                    ].map(m => (
-                                        <button key={m.id} onClick={() => setCsMoodPreset(m.id)}
-                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-all cursor-pointer border ${csMoodPreset === m.id ? 'border-[var(--sys-text)] bg-[var(--sys-surface)]' : 'border-[var(--sys-border)] hover:border-[var(--sys-text)]/30'}`}>
-                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color }}>
-                                                <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>{m.icon}</span>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[11px] font-bold text-[var(--sys-text)]">{m.label}</div>
-                                                <div className="text-[9px] text-[var(--sys-text-muted)]">{m.desc}</div>
-                                            </div>
-                                            {csMoodPreset === m.id && <span className="material-symbols-outlined text-[var(--sys-text)] text-[14px]">check_circle</span>}
+                                {csProductImage ? (
+                                    <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] h-28 group">
+                                        <img loading="lazy" src={csProductImage} className="w-full h-full object-contain bg-[var(--sys-bg)] transition-transform group-hover:scale-105" />
+                                        <button onClick={() => { setCsProductImage(null); setCsProductFile(null) }} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all">
+                                            <span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span>
                                         </button>
-                                    ))}
+                                    </div>
+                                ) : (
+                                    <label className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50 cursor-pointer group">
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[22px] mb-1 group-hover:text-primary transition-colors">upload</span>
+                                        <span className="text-[11px] text-[var(--sys-text-muted)]">Upload product photo</span>
+                                        <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                            const file = e.target.files?.[0]; if (!file) return;
+                                            setCsProductFile(file);
+                                            const reader = new FileReader();
+                                            reader.onload = async (ev) => {
+                                                try { const url = await creativesAPI.uploadToBank({ imageData: ev.target.result }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                catch { setCsProductImage(ev.target.result); }
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }} />
+                                    </label>
+                                )}
+                            </div>
+
+                            {/* ── 3. Mood Preset — dropdown ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Cinematic Mood</p>
+                                <div className="relative">
+                                    <select value={csMoodPreset} onChange={e => setCsMoodPreset(e.target.value)}
+                                        className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
+                                        <option value="dark-botanical">🌿 Dark Botanical — Deep greens, moody forest</option>
+                                        <option value="aqua-mist">💧 Aqua Mist — Dark aqua, water droplets</option>
+                                        <option value="charcoal-industrial">🏭 Charcoal Industrial — Raw black, sharp edges</option>
+                                        <option value="warm-glow">🔆 Warm Glow — Amber, bokeh, candlelight</option>
+                                        <option value="luxury-noir">💎 Luxury Noir — Black marble, editorial</option>
+                                        <option value="custom">✏️ Custom — Write your own brief</option>
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
+                                </div>
+                                {csMoodPreset === 'custom' && (
+                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
+                                        placeholder="Describe your scene, mood, colors... e.g. 'Monsoon rain, deep blue tones, bokeh'"
+                                        className="mt-2 w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />
+                                )}
+                            </div>
+
+                            {/* ── 4. Canvas Size — dropdown ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Canvas Size</p>
+                                <div className="relative">
+                                    <select value={csAspectRatio} onChange={e => setCsAspectRatio(e.target.value)}
+                                        className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
+                                        <option value="1:1">1:1 — Square (Instagram Feed)</option>
+                                        <option value="4:5">4:5 — Portrait (Instagram Feed)</option>
+                                        <option value="9:16">9:16 — Story / Reel</option>
+                                        <option value="16:9">16:9 — Cinematic Widescreen</option>
+                                        <option value="2:3">2:3 — Poster / Print</option>
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
                                 </div>
                             </div>
 
-                            {/* ── Custom Brief (shown when custom mood) ── */}
-                            {csMoodPreset === 'custom' && (
-                                <div className="px-5 pb-4">
+                            {/* ── 5. Optional Brief (non-custom moods) ── */}
+                            {csMoodPreset !== 'custom' && (
+                                <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[13px]">edit_note</span> Additional Brief <span className="text-[9px] opacity-50 ml-1">optional</span>
+                                    </p>
                                     <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
-                                        placeholder="Describe your scene, mood, colors... e.g. 'Monsoon rainy backdrop, deep blue tones'"
-                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-[var(--sys-text)]" />
+                                        placeholder="e.g. 'Feature the product with morning dew drops' or 'Add Diwali festive feel'"
+                                        className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[60px] focus:border-primary/40 transition-all" />
                                 </div>
                             )}
 
-                            {/* ── Canvas Size ── */}
-                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[14px]">aspect_ratio</span> Canvas Size
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {[
-                                        { r: '1:1', label: '1:1', sub: 'Square' },
-                                        { r: '4:5', label: '4:5', sub: 'Portrait' },
-                                        { r: '9:16', label: '9:16', sub: 'Story' },
-                                        { r: '16:9', label: '16:9', sub: 'Wide' },
-                                        { r: '2:3', label: '2:3', sub: 'Poster' },
-                                    ].map(s => (
-                                        <button key={s.r} onClick={() => setCsAspectRatio(s.r)}
-                                            className="flex flex-col items-center px-3 py-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer"
-                                            style={csAspectRatio === s.r ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'var(--sys-text)' } : { background: 'var(--sys-surface)', color: 'var(--sys-text-muted)', borderColor: 'var(--sys-border)' }}>
-                                            {s.label}
-                                            <span className="text-[8px] font-normal opacity-60">{s.sub}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* ── Model ── */}
-                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {IMAGE_MODELS.slice(0, 5).map(m => (
-                                        <button key={m.id} onClick={() => setCsModel(m.id)}
-                                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold border transition-all cursor-pointer"
-                                            style={csModel === m.id ? { background: m.color + '20', color: m.color, borderColor: m.color + '40' } : { background: 'var(--sys-surface)', color: 'var(--sys-text-muted)', borderColor: 'var(--sys-border)' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '12px', color: m.color }}>{m.icon}</span>
-                                            {m.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* ── Optional: Taglines Override ── */}
+                            {/* ── 6. Taglines — optional override ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[13px]">title</span> Taglines <span className="text-[9px] font-normal opacity-50 ml-1">optional — AI auto-generates</span>
+                                    <span className="material-symbols-outlined text-[13px]">title</span> Taglines
+                                    <span className="text-[9px] font-normal opacity-40 ml-1">AI auto-writes if left blank</span>
                                 </p>
                                 <div className="space-y-2">
                                     <input type="text" value={csPrimaryTagline} onChange={e => setCsPrimaryTagline(e.target.value)}
-                                        placeholder="Primary (e.g. PURE HERBAL CARE)"
-                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-text)]" />
+                                        placeholder="Primary — e.g. PURE HERBAL CARE"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-primary/40 transition-all" />
                                     <input type="text" value={csSecondaryTagline} onChange={e => setCsSecondaryTagline(e.target.value)}
-                                        placeholder="Secondary (e.g. Neem Powered Clean)"
-                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-text)]" />
+                                        placeholder="Secondary — e.g. Neem Powered Clean"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-primary/40 transition-all" />
                                 </div>
                             </div>
 
-                            {/* ── Optional: Reference Images ── */}
-                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[13px]">image_search</span> Reference Images <span className="text-[9px] opacity-50 ml-1">optional</span>
+                            {/* ── 7. Reference Images ── */}
+                            <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">image_search</span> References
+                                    <span className="text-[9px] opacity-40 ml-1">optional</span>
                                 </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {/* Style Reference */}
-                                    <div>
-                                        <p className="text-[9px] text-[var(--sys-text-muted)] mb-1">Style Ref</p>
+                                <div className="flex items-center gap-2">
+                                    {/* Style Ref */}
+                                    <div className="flex flex-col items-center gap-1 flex-1">
                                         {csRefImage ? (
-                                            <div className="relative rounded-lg overflow-hidden h-16 border border-[var(--sys-border)] group">
+                                            <div className="relative w-full h-16 rounded-xl overflow-hidden border border-[var(--sys-border)] group">
                                                 <img src={csRefImage} className="w-full h-full object-cover" />
                                                 <button onClick={() => setCsRefImage(null)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center cursor-pointer">
                                                     <span className="material-symbols-outlined text-white text-[10px]">close</span>
                                                 </button>
                                             </div>
                                         ) : (
-                                            <label className="flex flex-col items-center justify-center h-16 rounded-lg border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors">
-                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px]">add_photo_alternate</span>
+                                            <label className="w-full h-16 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors bg-[var(--sys-bg)]/50 group">
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px] group-hover:text-primary transition-colors">add_photo_alternate</span>
                                                 <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
                                                     const file = e.target.files?.[0]; if (!file) return;
                                                     const reader = new FileReader();
@@ -10117,20 +10131,20 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 }} />
                                             </label>
                                         )}
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">Style Ref</span>
                                     </div>
-                                    {/* Character Reference */}
-                                    <div>
-                                        <p className="text-[9px] text-[var(--sys-text-muted)] mb-1">Character / Model</p>
+                                    {/* Character Ref */}
+                                    <div className="flex flex-col items-center gap-1 flex-1">
                                         {csCharacterImage ? (
-                                            <div className="relative rounded-lg overflow-hidden h-16 border border-[var(--sys-border)] group">
+                                            <div className="relative w-full h-16 rounded-xl overflow-hidden border border-[var(--sys-border)] group">
                                                 <img src={csCharacterImage} className="w-full h-full object-cover" />
                                                 <button onClick={() => setCsCharacterImage(null)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center cursor-pointer">
                                                     <span className="material-symbols-outlined text-white text-[10px]">close</span>
                                                 </button>
                                             </div>
                                         ) : (
-                                            <label className="flex flex-col items-center justify-center h-16 rounded-lg border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors">
-                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px]">person_add</span>
+                                            <label className="w-full h-16 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors bg-[var(--sys-bg)]/50 group">
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px] group-hover:text-primary transition-colors">person_add</span>
                                                 <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
                                                     const file = e.target.files?.[0]; if (!file) return;
                                                     const reader = new FileReader();
@@ -10139,41 +10153,33 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 }} />
                                             </label>
                                         )}
+                                        <span className="text-[9px] text-[var(--sys-text-muted)]">Character</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* ── Generate Button ── */}
-                            <div className="px-5 pb-6 mt-auto pt-2">
-                                {csError && (
-                                    <div className="mb-3 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-400">{csError}</div>
+                        </div>{/* /scrollable body */}
+
+                        {/* ── Sticky Footer: Generate ── */}
+                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-2 z-10 border-t border-[var(--sys-border)]">
+                            {csError && (
+                                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px]">error</span>{csError}
+                                </div>
+                            )}
+                            <button onClick={handleCampaignShot} disabled={csGenerating || !csProductImage || !activeBrand}
+                                className="w-full py-3.5 rounded-2xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                style={{ background: (csGenerating || !csProductImage) ? 'var(--sys-surface)' : 'linear-gradient(135deg, #FF4D00 0%, #FF9A00 100%)', color: (csGenerating || !csProductImage) ? 'var(--sys-text)' : '#fff', boxShadow: (csGenerating || !csProductImage) ? 'none' : '0 4px 20px rgba(255,77,0,0.35)' }}>
+                                {csGenerating ? (
+                                    <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Generating Campaign Shot...</>
+                                ) : (
+                                    <><span className="material-symbols-outlined text-[18px]">movie_filter</span> Generate Campaign Shot</>
                                 )}
-                                <button onClick={handleCampaignShot} disabled={csGenerating || !csProductImage}
-                                    className="w-full py-3.5 rounded-2xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                    style={{ background: csGenerating ? 'var(--sys-surface)' : 'linear-gradient(135deg, #FF4D00 0%, #FF9A00 100%)', color: csGenerating ? 'var(--sys-text)' : '#fff', boxShadow: csGenerating ? 'none' : '0 4px 20px rgba(255,77,0,0.35)' }}>
-                                    {csGenerating ? (
-                                        <>
-                                            <span className="material-symbols-outlined animate-spin text-[18px]">movie_filter</span>
-                                            AI Art Director Working...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-symbols-outlined text-[18px]">movie_filter</span>
-                                            Generate Campaign Shot
-                                        </>
-                                    )}
-                                </button>
-                                {csGenerating && (
-                                    <p className="text-center text-[10px] text-[var(--sys-text-muted)] mt-2">
-                                        AI Art Director → Copywriter → Image Generation (~30–60s)
-                                    </p>
-                                )}
-                            </div>
+                            </button>
+                            {!activeBrand && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Select a brand first to generate</p>}
+                            {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director → Copywriter → Image Generation (~30–60s)</p>}
                         </div>
                     </div>
-
-                    {/* ── RIGHT PANEL: Canvas / Result ── */}
-                    <div className="creative-canvas-panel relative flex flex-col items-center justify-center min-h-[60vh] p-4 sm:p-6">
                         {!csResult && !csGenerating && (
                             <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
                                 <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.1), rgba(255,154,0,0.1))' }}>
