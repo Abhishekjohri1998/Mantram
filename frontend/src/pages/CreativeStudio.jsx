@@ -786,6 +786,22 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [mockupTemplateImage, setMockupTemplateImage] = useState(null)
     const [mockupHarmonize, setMockupHarmonize] = useState(false)
 
+    // ══ Campaign Shot State ══
+    const [csProductImage, setCsProductImage] = useState(null)       // Product image URL
+    const [csProductFile, setCsProductFile] = useState(null)         // Product image File object
+    const [csRefImage, setCsRefImage] = useState(null)               // Style reference image
+    const [csCharacterImage, setCsCharacterImage] = useState(null)   // Character/model image
+    const [csMoodPreset, setCsMoodPreset] = useState('dark-botanical') // Mood preset
+    const [csAspectRatio, setCsAspectRatio] = useState('1:1')
+    const [csModel, setCsModel] = useState('nanobanana-2')
+    const [csProductName, setCsProductName] = useState('')
+    const [csBrief, setCsBrief] = useState('')
+    const [csPrimaryTagline, setCsPrimaryTagline] = useState('')
+    const [csSecondaryTagline, setCsSecondaryTagline] = useState('')
+    const [csGenerating, setCsGenerating] = useState(false)
+    const [csResult, setCsResult] = useState(null)                   // { imageUrl, taglines, productName, prompt }
+    const [csError, setCsError] = useState(null)
+
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
     const [logoUrl, setLogoUrl] = useState('')
@@ -2292,7 +2308,39 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
     // ── Smart format detection from prompt ──
+    // ══ Campaign Shot: 1-click cinematic poster generator ══
+    async function handleCampaignShot() {
+        if (!csProductImage) { setCsError('Please upload a product image first'); return }
+        setCsGenerating(true); setCsError(null); setCsResult(null)
+        try {
+            const payload = {
+                brandId: activeBrand?._id,
+                productImage: csProductImage,
+                refImage: csRefImage || undefined,
+                characterImage: csCharacterImage || undefined,
+                moodPreset: csMoodPreset,
+                aspectRatio: csAspectRatio,
+                imageModel: csModel,
+                productName: csProductName || undefined,
+                brief: csBrief || undefined,
+                primaryTagline: csPrimaryTagline || undefined,
+                secondaryTagline: csSecondaryTagline || undefined,
+            }
+            const result = await creatives.campaignShot(payload)
+            if (result.success) {
+                setCsResult({ imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model })
+            } else {
+                setCsError(result.error || 'Generation failed')
+            }
+        } catch (err) {
+            setCsError(err.message || 'Campaign Shot generation failed')
+        } finally {
+            setCsGenerating(false)
+        }
+    }
+
     function detectFormatFromPrompt(text) {
+
         const lower = text.toLowerCase()
         if (/instagram\s*(post|feed|grid)/i.test(lower)) return 'instagram-post'
         if (/story|stories|reel/i.test(lower)) return 'instagram-story'
@@ -2317,6 +2365,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             <Walkthrough studioId="creativeStudio" />
             {studioMode === 'create' && <Walkthrough studioId="creativeCreate" dependsOn="creativeStudio" />}
             {studioMode === 'photoshoot' && <Walkthrough studioId="creativePhotoshoot" dependsOn="creativeStudio" />}
+            {studioMode === 'campaignshot' && <Walkthrough studioId="creativeCampaignShot" dependsOn="creativeStudio" />}
             {studioMode === 'carousel' && <Walkthrough studioId="creativeCarousel" dependsOn="creativeStudio" />}
             {studioMode === 'campaigns' && <Walkthrough studioId="creativeCampaigns" dependsOn="creativeStudio" />}
             {studioMode === 'campaignlogo' && <Walkthrough studioId="creativeCampaignlogo" dependsOn="creativeStudio" />}
@@ -2332,6 +2381,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 {[
                     { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
                     { id: 'photoshoot', icon: 'photo_camera', label: 'Photoshoot' },
+                    { id: 'campaignshot', icon: 'movie_filter', label: 'Campaign Shot', badge: 'NEW' },
                     { id: 'tryon', icon: 'checkroom', label: 'Try-On' },
                     { id: 'mockups', icon: 'landscape', label: 'Mockups' },
                     { id: 'campaigns', icon: 'campaign', label: 'Campaigns' },
@@ -2359,7 +2409,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     >
                         <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                         <span>{tab.label}</span>
-                        {tab.badge && <span className="bg-primary-fixed/15 text-primary-fixed text-[11px] font-bold px-1.5 py-0.5 rounded-full">{tab.badge}</span>}
+                        {tab.badge && tab.id === 'campaignshot' && <span style={{ fontSize: '8px', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: 'linear-gradient(135deg, #FF4D00, #FF9A00)', color: '#fff', letterSpacing: '0.08em', marginLeft: 2 }}>NEW</span>}
+                        {tab.badge && tab.id !== 'campaignshot' && <span className="bg-primary-fixed/15 text-primary-fixed text-[11px] font-bold px-1.5 py-0.5 rounded-full">{tab.badge}</span>}
                     </button>
                 ))}
                 </div>
@@ -9893,6 +9944,338 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <span className="h-1 w-1 rounded-full bg-[var(--sys-surface)]" />
                             Mantram AI Premium Intelligence
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════════ */}
+            {/* CAMPAIGN SHOT — 1-Click Cinematic Poster Studio */}
+            {/* ══════════════════════════════════════════════════════════════════ */}
+            {studioMode === 'campaignshot' && (
+                <div className="creative-split fade-up">
+                    {/* ── LEFT PANEL: Controls ── */}
+                    <div data-wt="cs-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)' }}>
+                                    <span className="material-symbols-outlined text-white" style={{ fontSize: '12px' }}>movie_filter</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-[var(--sys-text)] uppercase tracking-widest">Campaign Shot</span>
+                            </div>
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)' }}>AI ART DIRECTOR</span>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                            {/* ── Product Image ── */}
+                            <div className="px-5 pb-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product Image <span className="text-red-400">*</span>
+                                </p>
+                                <div className="p-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative">
+                                    {csProductImage ? (
+                                        <div className="relative rounded-lg overflow-hidden border border-[var(--sys-border)] h-28 group">
+                                            <img loading="lazy" src={csProductImage} className="w-full h-full object-contain bg-[var(--sys-bg)] transition-transform group-hover:scale-105" />
+                                            <button onClick={() => { setCsProductImage(null); setCsProductFile(null) }} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all">
+                                                <span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <label className="flex flex-col items-center justify-center h-28 rounded-lg border border-dashed border-[var(--sys-border)] hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50 cursor-pointer group">
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[22px] mb-1 group-hover:text-primary transition-colors">upload</span>
+                                            <span className="text-[11px] text-[var(--sys-text-muted)]">Upload product photo</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                                const file = e.target.files?.[0]; if (!file) return;
+                                                setCsProductFile(file);
+                                                const reader = new FileReader();
+                                                reader.onload = async (ev) => {
+                                                    try { const url = await uploadToS3(ev.target.result, 'products'); setCsProductImage(url); }
+                                                    catch { setCsProductImage(ev.target.result); }
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }} />
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── Mood Preset ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">palette</span> Mood Preset
+                                </p>
+                                <div className="space-y-1.5">
+                                    {[
+                                        { id: 'dark-botanical', label: 'Dark Botanical', desc: 'Deep greens, moody forest', icon: 'forest', color: '#1a4a2e' },
+                                        { id: 'aqua-mist', label: 'Aqua Mist', desc: 'Dark aqua, water droplets', icon: 'water_drop', color: '#0d3a5c' },
+                                        { id: 'charcoal-industrial', label: 'Charcoal Industrial', desc: 'Raw black, sharp edges', icon: 'factory', color: '#1a1a1a' },
+                                        { id: 'warm-glow', label: 'Warm Glow', desc: 'Amber, bokeh, candlelight', icon: 'wb_sunny', color: '#7a3800' },
+                                        { id: 'luxury-noir', label: 'Luxury Noir', desc: 'Black marble, editorial', icon: 'diamond', color: '#0d0d1a' },
+                                        { id: 'custom', label: 'Custom Brief', desc: 'Your own direction', icon: 'edit', color: '#2a2a2a' },
+                                    ].map(m => (
+                                        <button key={m.id} onClick={() => setCsMoodPreset(m.id)}
+                                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-all cursor-pointer border ${csMoodPreset === m.id ? 'border-[var(--sys-text)] bg-[var(--sys-surface)]' : 'border-[var(--sys-border)] hover:border-[var(--sys-text)]/30'}`}>
+                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color }}>
+                                                <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>{m.icon}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[11px] font-bold text-[var(--sys-text)]">{m.label}</div>
+                                                <div className="text-[9px] text-[var(--sys-text-muted)]">{m.desc}</div>
+                                            </div>
+                                            {csMoodPreset === m.id && <span className="material-symbols-outlined text-[var(--sys-text)] text-[14px]">check_circle</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Custom Brief (shown when custom mood) ── */}
+                            {csMoodPreset === 'custom' && (
+                                <div className="px-5 pb-4">
+                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
+                                        placeholder="Describe your scene, mood, colors... e.g. 'Monsoon rainy backdrop, deep blue tones'"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-[var(--sys-text)]" />
+                                </div>
+                            )}
+
+                            {/* ── Canvas Size ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">aspect_ratio</span> Canvas Size
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        { r: '1:1', label: '1:1', sub: 'Square' },
+                                        { r: '4:5', label: '4:5', sub: 'Portrait' },
+                                        { r: '9:16', label: '9:16', sub: 'Story' },
+                                        { r: '16:9', label: '16:9', sub: 'Wide' },
+                                        { r: '2:3', label: '2:3', sub: 'Poster' },
+                                    ].map(s => (
+                                        <button key={s.r} onClick={() => setCsAspectRatio(s.r)}
+                                            className="flex flex-col items-center px-3 py-2 rounded-xl text-[10px] font-bold border transition-all cursor-pointer"
+                                            style={csAspectRatio === s.r ? { background: 'var(--sys-text)', color: 'var(--sys-bg)', borderColor: 'var(--sys-text)' } : { background: 'var(--sys-surface)', color: 'var(--sys-text-muted)', borderColor: 'var(--sys-border)' }}>
+                                            {s.label}
+                                            <span className="text-[8px] font-normal opacity-60">{s.sub}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Model ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {IMAGE_MODELS.slice(0, 5).map(m => (
+                                        <button key={m.id} onClick={() => setCsModel(m.id)}
+                                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold border transition-all cursor-pointer"
+                                            style={csModel === m.id ? { background: m.color + '20', color: m.color, borderColor: m.color + '40' } : { background: 'var(--sys-surface)', color: 'var(--sys-text-muted)', borderColor: 'var(--sys-border)' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '12px', color: m.color }}>{m.icon}</span>
+                                            {m.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Optional: Taglines Override ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">title</span> Taglines <span className="text-[9px] font-normal opacity-50 ml-1">optional — AI auto-generates</span>
+                                </p>
+                                <div className="space-y-2">
+                                    <input type="text" value={csPrimaryTagline} onChange={e => setCsPrimaryTagline(e.target.value)}
+                                        placeholder="Primary (e.g. PURE HERBAL CARE)"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-text)]" />
+                                    <input type="text" value={csSecondaryTagline} onChange={e => setCsSecondaryTagline(e.target.value)}
+                                        placeholder="Secondary (e.g. Neem Powered Clean)"
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-[var(--sys-text)]" />
+                                </div>
+                            </div>
+
+                            {/* ── Optional: Reference Images ── */}
+                            <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">image_search</span> Reference Images <span className="text-[9px] opacity-50 ml-1">optional</span>
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {/* Style Reference */}
+                                    <div>
+                                        <p className="text-[9px] text-[var(--sys-text-muted)] mb-1">Style Ref</p>
+                                        {csRefImage ? (
+                                            <div className="relative rounded-lg overflow-hidden h-16 border border-[var(--sys-border)] group">
+                                                <img src={csRefImage} className="w-full h-full object-cover" />
+                                                <button onClick={() => setCsRefImage(null)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center cursor-pointer">
+                                                    <span className="material-symbols-outlined text-white text-[10px]">close</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="flex flex-col items-center justify-center h-16 rounded-lg border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors">
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px]">add_photo_alternate</span>
+                                                <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                                    const file = e.target.files?.[0]; if (!file) return;
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => setCsRefImage(ev.target.result);
+                                                    reader.readAsDataURL(file);
+                                                }} />
+                                            </label>
+                                        )}
+                                    </div>
+                                    {/* Character Reference */}
+                                    <div>
+                                        <p className="text-[9px] text-[var(--sys-text-muted)] mb-1">Character / Model</p>
+                                        {csCharacterImage ? (
+                                            <div className="relative rounded-lg overflow-hidden h-16 border border-[var(--sys-border)] group">
+                                                <img src={csCharacterImage} className="w-full h-full object-cover" />
+                                                <button onClick={() => setCsCharacterImage(null)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center cursor-pointer">
+                                                    <span className="material-symbols-outlined text-white text-[10px]">close</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="flex flex-col items-center justify-center h-16 rounded-lg border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors">
+                                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px]">person_add</span>
+                                                <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                                    const file = e.target.files?.[0]; if (!file) return;
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => setCsCharacterImage(ev.target.result);
+                                                    reader.readAsDataURL(file);
+                                                }} />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Generate Button ── */}
+                            <div className="px-5 pb-6 mt-auto pt-2">
+                                {csError && (
+                                    <div className="mb-3 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[11px] text-red-400">{csError}</div>
+                                )}
+                                <button onClick={handleCampaignShot} disabled={csGenerating || !csProductImage}
+                                    className="w-full py-3.5 rounded-2xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    style={{ background: csGenerating ? 'var(--sys-surface)' : 'linear-gradient(135deg, #FF4D00 0%, #FF9A00 100%)', color: csGenerating ? 'var(--sys-text)' : '#fff', boxShadow: csGenerating ? 'none' : '0 4px 20px rgba(255,77,0,0.35)' }}>
+                                    {csGenerating ? (
+                                        <>
+                                            <span className="material-symbols-outlined animate-spin text-[18px]">movie_filter</span>
+                                            AI Art Director Working...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined text-[18px]">movie_filter</span>
+                                            Generate Campaign Shot
+                                        </>
+                                    )}
+                                </button>
+                                {csGenerating && (
+                                    <p className="text-center text-[10px] text-[var(--sys-text-muted)] mt-2">
+                                        AI Art Director → Copywriter → Image Generation (~30–60s)
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── RIGHT PANEL: Canvas / Result ── */}
+                    <div className="creative-canvas-panel relative flex flex-col items-center justify-center min-h-[60vh] p-4 sm:p-6">
+                        {!csResult && !csGenerating && (
+                            <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
+                                <div className="w-20 h-20 rounded-3xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.1), rgba(255,154,0,0.1))' }}>
+                                    <span className="material-symbols-outlined text-5xl" style={{ color: '#FF4D00' }}>movie_filter</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-[var(--sys-text)] mb-1">Campaign Shot</h3>
+                                    <p className="text-[12px] text-[var(--sys-text-muted)] leading-relaxed">
+                                        Upload your product photo, choose a cinematic mood, and let the AI Art Director create a Cannes-level campaign poster for your brand.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                    {['Dark Botanical', 'Aqua Mist', 'Luxury Noir', 'Warm Glow'].map(m => (
+                                        <span key={m} className="text-[10px] px-2.5 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text-muted)]">{m}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {csGenerating && (
+                            <div className="flex flex-col items-center justify-center gap-6">
+                                <div className="relative w-24 h-24">
+                                    <div className="absolute inset-0 rounded-3xl animate-pulse" style={{ background: 'linear-gradient(135deg, rgba(255,77,0,0.2), rgba(255,154,0,0.2))' }} />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-5xl animate-spin" style={{ color: '#FF4D00', animationDuration: '3s' }}>movie_filter</span>
+                                    </div>
+                                </div>
+                                <div className="text-center space-y-2">
+                                    <p className="text-[14px] font-bold text-[var(--sys-text)]">AI Art Director at work...</p>
+                                    <div className="flex flex-col gap-1.5">
+                                        {['Analysing brand DNA', 'Writing copy & taglines', 'Building cinematic prompt', 'Generating poster'].map((step, i) => (
+                                            <div key={step} className="flex items-center gap-2 text-[11px] text-[var(--sys-text-muted)]">
+                                                <span className="material-symbols-outlined text-[14px]" style={{ color: '#FF4D00' }}>check_circle</span>
+                                                {step}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {csResult && !csGenerating && (
+                            <div className="w-full max-w-2xl mx-auto flex flex-col gap-4">
+                                {/* Result Image */}
+                                <div className="relative rounded-2xl overflow-hidden border border-[var(--sys-border)] shadow-2xl group">
+                                    <img src={csResult.imageUrl} alt="Campaign Shot" className="w-full h-auto object-contain" style={{ maxHeight: '65vh' }} />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                                        <div className="flex gap-2 ml-auto">
+                                            <a href={csResult.imageUrl} download={`campaign-shot-${Date.now()}.png`} target="_blank" rel="noreferrer"
+                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/90 text-black text-[11px] font-bold hover:bg-white transition-colors">
+                                                <span className="material-symbols-outlined text-[14px]">download</span> Download
+                                            </a>
+                                            <button onClick={async () => {
+                                                try {
+                                                    await creatives.saveToBank({ imageUrl: csResult.imageUrl, brandId: activeBrand?._id, label: `Campaign Shot — ${csResult.productName || ''}` });
+                                                    toast?.('Saved to Image Bank');
+                                                } catch { }
+                                            }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/90 text-black text-[11px] font-bold hover:bg-white transition-colors">
+                                                <span className="material-symbols-outlined text-[14px]">bookmark</span> Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Metadata */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="studio-card p-3">
+                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Product</p>
+                                        <p className="text-[12px] font-bold text-[var(--sys-text)]">{csResult.productName || '—'}</p>
+                                    </div>
+                                    <div className="studio-card p-3">
+                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Model Used</p>
+                                        <p className="text-[12px] font-bold text-[var(--sys-text)]">{csResult.model || csModel}</p>
+                                    </div>
+                                </div>
+                                {csResult.taglines?.length > 0 && (
+                                    <div className="studio-card p-3">
+                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1.5">AI Copywriter Taglines</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {csResult.taglines.map((t, i) => (
+                                                <span key={i} className="text-[11px] font-bold px-3 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text)] bg-[var(--sys-surface)]">{t}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Regenerate */}
+                                <div className="flex gap-2">
+                                    <button onClick={handleCampaignShot}
+                                        className="flex-1 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                        style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)', color: '#fff', boxShadow: '0 4px 16px rgba(255,77,0,0.3)' }}>
+                                        <span className="material-symbols-outlined text-[16px]">refresh</span>
+                                        Regenerate
+                                    </button>
+                                    <button onClick={() => setCsResult(null)}
+                                        className="px-4 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all">
+                                        <span className="material-symbols-outlined text-[16px]">add</span>
+                                        New
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

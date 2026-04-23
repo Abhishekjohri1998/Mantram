@@ -2779,6 +2779,344 @@ router.post('/upscale', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/campaign-shot — 1-Click Cinematic Campaign Poster
+// Premium product poster generator with art direction + copywriting AI
+// Formula: Cinematic moody [category] ad + mood_preset + brand typography
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/campaign-shot', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+    try {
+        const {
+            brandId,
+            productImage,     // Uploaded product image (required)
+            refImage,         // Optional style reference image
+            characterImage,   // Optional character/model image
+            productName,      // Optional override for product name
+            brief,            // Optional user brief / custom direction
+            moodPreset,       // dark-botanical | aqua-mist | charcoal-industrial | warm-glow | luxury-noir | custom
+            aspectRatio = '1:1',
+            imageModel = 'nanobanana-2',
+            primaryTagline,   // Optional override tagline 1
+            secondaryTagline, // Optional override tagline 2
+        } = req.body;
+
+        if (!productImage) {
+            return res.status(400).json({ success: false, error: 'Product image is required' });
+        }
+
+        console.log(`\n██████ CAMPAIGN SHOT ██████`);
+        console.log(`   Brand: ${brandId || 'none'} | Model: ${imageModel} | Mood: ${moodPreset || 'auto'}`);
+        console.log(`   Product: ${productName || '(auto-detect)'} | Brief: ${(brief || '').substring(0, 60)}`);
+
+        // ── Step 1: Load Brand DNA ──
+        let brand = null;
+        let brandName = 'Brand';
+        let brandCategory = 'product';
+        let brandColors = [];
+        let brandFont = 'modern sans-serif';
+        let brandTagline = '';
+        let brandDescription = '';
+
+        if (brandId) {
+            brand = await Brand.findById(brandId).lean();
+            if (brand) {
+                brandName = brand.name || 'Brand';
+                brandCategory = brand.dna?.industry || 'FMCG';
+                brandColors = (brand.dna?.colors || []).slice(0, 4);
+                brandFont = brand.dna?.fonts?.heading?.family || brand.dna?.fonts?.body?.family || 'modern sans-serif';
+                brandTagline = brand.dna?.tagline || brand.dna?.voice?.sampleQuote || '';
+                brandDescription = brand.dna?.brandDescription || '';
+            }
+        }
+
+        // ── Step 2: AI Art Director — Build the campaign shot prompt ──
+        // This is the "Creative Director" brain that uses the formula
+        const MOOD_PRESETS = {
+            'dark-botanical': {
+                env: 'dark botanical setting, deep green leaves fading into shadow, subtle mist, rich foliage',
+                lighting: 'low-key cinematic, soft top light with green rim highlights, deep shadows',
+                surface: 'dark wet stone with subtle reflections',
+                palette: 'deep green, black, emerald',
+            },
+            'aqua-mist': {
+                env: 'dark aqua atmosphere, floating water droplets, light mist, deep underwater mood',
+                lighting: 'cold cinematic, blue rim highlights, deep contrast, iceberg tones',
+                surface: 'reflective wet base, glossy dark blue',
+                palette: 'deep blue, cyan, black, aqua',
+            },
+            'charcoal-industrial': {
+                env: 'deep black charcoal setting, minimal industrial haze, raw texture background',
+                lighting: 'sharp directional light, strong highlights on product edges, deep dramatic shadows',
+                surface: 'matte black with subtle brushed metal reflection',
+                palette: 'black, dark grey, deep charcoal blue',
+            },
+            'warm-glow': {
+                env: 'dark backdrop with soft warm amber/orange glow diffusion, bokeh light orbs',
+                lighting: 'soft warm cinematic highlights, candle-warm tones, gentle rim light',
+                surface: 'glossy dark base with warm golden reflection',
+                palette: 'black, warm orange, gold, cream white',
+            },
+            'luxury-noir': {
+                env: 'deep noir atmosphere, soft studio smoke, ultra-dark background with controlled light spill',
+                lighting: 'high-fashion editorial: single hard key light + soft fill, strong shadows with detail',
+                surface: 'black marble or lacquered obsidian surface, mirror reflection',
+                palette: 'black, silver, deep navy, platinum',
+            },
+            'custom': {
+                env: brief || 'premium product setting, cinematic atmosphere',
+                lighting: 'cinematic, professional studio',
+                surface: 'premium dark surface',
+                palette: brandColors.map(c => c.name || c.hex || 'brand color').join(', ') || 'brand palette',
+            },
+        };
+
+        const mood = MOOD_PRESETS[moodPreset] || MOOD_PRESETS['dark-botanical'];
+
+        // Auto-detect color palette from brand if not custom
+        const paletteStr = moodPreset !== 'custom' && brandColors.length > 0
+            ? `${mood.palette}, accented by ${brandColors.slice(0, 2).map(c => c.name || c.hex).join(', ')}`
+            : mood.palette;
+
+        // ── AI Agent: Extract product identity + generate taglines ──
+        let detectedProductName = productName || '';
+        let tagline1 = primaryTagline || '';
+        let tagline2 = secondaryTagline || '';
+        let detectedCategory = brandCategory;
+
+        try {
+            const aiRouter = getRouter();
+            const agentPrompt = `You are a world-class Creative Director and Copywriter for premium brand advertising.
+
+Brand: ${brandName}
+Industry/Category: ${brandCategory}
+Brand Description: ${brandDescription}
+Brand Tagline: ${brandTagline}
+Product Name (if known): ${detectedProductName || 'detect from context'}
+User Brief: ${brief || 'cinematic product poster, brand campaign'}
+
+Your task: Generate the PERFECT art direction elements for a cinematic product advertisement poster.
+
+Return ONLY valid JSON:
+{
+  "productName": "detected or refined product name (e.g. 'Neem Face Wash')",
+  "category": "product category in CAPS (e.g. 'FMCG', 'SKINCARE', 'BEVERAGE', 'ELECTRONICS')",
+  "tagline1": "primary brand tagline (4-6 words max, powerful, e.g. 'PURE HERBAL CARE')",
+  "tagline2": "secondary descriptive line (3-5 words, e.g. 'Neem Powered Clean')",
+  "perspectiveTypo": "single brand word for large perspective typography (usually brand name in CAPS)",
+  "productDescription": "one sentence description of the product for prompt context (for the AI image model)",
+  "arrangementNote": "how to arrange the products: upright + open/angled for maximum visual impact"
+}`;
+
+            const aiResult = await aiRouter.generateText({
+                systemPrompt: 'You are a creative director. Output valid JSON only. No markdown, no explanation.',
+                userPrompt: agentPrompt,
+                temperature: 0.5,
+                maxTokens: 512,
+            });
+
+            const aiText = (aiResult.text || '').replace(/```json|```/gi, '').trim();
+            const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                detectedProductName = parsed.productName || detectedProductName || brandName;
+                tagline1 = primaryTagline || parsed.tagline1 || brandTagline || 'PREMIUM QUALITY';
+                tagline2 = secondaryTagline || parsed.tagline2 || '';
+                detectedCategory = parsed.category || brandCategory;
+                console.log(`   🎯 AI Art Director: ${detectedProductName} | ${tagline1} | ${tagline2}`);
+            }
+        } catch (agentErr) {
+            console.warn('⚠️ Campaign Shot AI agent failed, using fallbacks:', agentErr.message);
+            detectedProductName = productName || brandName;
+            tagline1 = primaryTagline || brandTagline || 'PREMIUM QUALITY';
+            tagline2 = secondaryTagline || 'Crafted for Excellence';
+        }
+
+        // ── Step 3: Build the Master Cinematic Prompt (The Formula) ──
+        const canvasSize = aspectRatio === '1:1' ? '1:1 square format'
+            : aspectRatio === '9:16' ? '9:16 portrait, story format'
+            : aspectRatio === '16:9' ? '16:9 cinematic widescreen'
+            : aspectRatio === '4:5' ? '4:5 social portrait'
+            : aspectRatio === '2:3' ? '2:3 portrait poster'
+            : `${aspectRatio} format`;
+
+        const hasCharacter = !!characterImage;
+        const hasRef = !!refImage;
+
+        const masterPrompt = `Cinematic moody ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+
+PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside a person/model. Keep the character authentic and aspirational. ` : `One upright product + one open or angled version with contents visible, product box placed behind at slight angle. `}Show both products clearly with their labels and branding fully visible.
+
+BRANDING (top center): ${brandName} logo area, product name "${detectedProductName}" in clean brand typography${brandFont !== 'modern sans-serif' ? `, using ${brandFont} font family` : ''}
+
+ENVIRONMENT: ${mood.env}
+
+LIGHTING: ${mood.lighting}
+
+PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth
+
+SECONDARY TYPOGRAPHY (clean brand font):
+"${tagline1}"
+"${tagline2}"
+
+SURFACE: ${mood.surface}
+
+COLOR PALETTE: ${paletteStr}
+
+TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp product detail, ${canvasSize}
+STYLE: magazine-grade product photography, Cannes Lions advertising quality, cinematic color grade
+OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no frames
+
+${brief ? `CREATIVE BRIEF: ${brief}` : ''}
+${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel of the provided reference image while keeping the product as the hero.' : ''}`;
+
+        console.log(`   📝 Campaign prompt: ${masterPrompt.substring(0, 120)}...`);
+
+        // ── Step 4: Prepare image parts ──
+        const imageParts = [];
+
+        // Helper to fetch URL → base64 imagePart
+        async function urlToImagePart(url) {
+            if (!url) return null;
+            try {
+                if (url.startsWith('data:image/')) {
+                    return { inlineData: extractBase64(url) };
+                }
+                const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+                if (!resp.ok) return null;
+                const buf = await resp.arrayBuffer();
+                const ct = (resp.headers.get('content-type') || 'image/jpeg').split(';')[0];
+                return { inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } };
+            } catch (e) {
+                console.warn(`⚠️ Could not fetch image: ${e.message}`);
+                return null;
+            }
+        }
+
+        // Product image — always first
+        const productPart = await urlToImagePart(productImage);
+        if (productPart) imageParts.push(productPart);
+
+        // Character image — second (if provided)
+        if (hasCharacter) {
+            const charPart = await urlToImagePart(characterImage);
+            if (charPart) imageParts.push(charPart);
+        }
+
+        // Style reference — last (if provided)
+        if (hasRef) {
+            const refPart = await urlToImagePart(refImage);
+            if (refPart) imageParts.push(refPart);
+        }
+
+        // ── Step 5: Generate with selected model ──
+        let generatedImageUrl = null;
+        let usedModel = imageModel;
+
+        console.log(`   🖼️ Generating with ${imageModel} (${imageParts.length} reference images)`);
+
+        if (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1') {
+            // OpenAI GPT-Image models — use the existing internalGenerateCreative pipeline
+            const genResult = await internalGenerateCreative({
+                body: {
+                    brandId,
+                    prompt: masterPrompt,
+                    aspectRatio,
+                    imageModel,
+                    refImageUrl: refImage || productImage, // Pass product as reference
+                    type: 'campaign-shot',
+                    style: 'photorealistic',
+                },
+                user: req.user,
+                creditsDeducted: req.creditsDeducted,
+            });
+            generatedImageUrl = genResult.imageUrl;
+        } else if (imageParts.length > 0) {
+            // NanoBanana2 / other multimodal — use Gemini pipeline with ref images
+            const genResult = await geminiImageGenerate(masterPrompt, imageParts, 0.3, aspectRatio);
+            generatedImageUrl = genResult?.imageUrl;
+            usedModel = genResult?.model || imageModel;
+        } else {
+            // Fallback: text-only generation via LaoZhang
+            const genResult = await laozhangImageGenerate(masterPrompt, {
+                model: imageModel,
+                aspectRatio,
+                quality: 'ultra',
+            });
+            generatedImageUrl = genResult?.imageUrl;
+            usedModel = genResult?.model || imageModel;
+        }
+
+        if (!generatedImageUrl) {
+            return res.status(500).json({ success: false, error: 'Campaign Shot generation failed — no image returned' });
+        }
+
+        // ── Step 6: Save to Creative DB ──
+        let creative = null;
+        if (brandId) {
+            creative = await Creative.create({
+                user: req.user._id,
+                brand: brandId,
+                type: 'campaign-shot',
+                title: `Campaign Shot — ${detectedProductName}`,
+                prompt: masterPrompt,
+                imageUrl: generatedImageUrl,
+                thumbnailUrl: generatedImageUrl,
+                aiMeta: {
+                    provider: imageModel.startsWith('gpt') ? 'openai' : 'gemini',
+                    model: usedModel,
+                    method: 'campaign-shot',
+                    moodPreset,
+                    productName: detectedProductName,
+                    taglines: [tagline1, tagline2].filter(Boolean),
+                    processingStatus: 'uploading',
+                },
+                tags: ['campaign-shot', 'cinematic', 'product', moodPreset || 'dark-botanical'],
+                status: 'draft',
+            });
+        }
+
+        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+
+        console.log(`✅ Campaign Shot generated — responding immediately`);
+        const finalSignedUrl = await getSignedUrlIfNeeded(generatedImageUrl);
+        res.json({
+            success: true,
+            imageUrl: finalSignedUrl,
+            model: usedModel,
+            productName: detectedProductName,
+            taglines: [tagline1, tagline2].filter(Boolean),
+            prompt: masterPrompt,
+            creativeId: creative?._id,
+        });
+
+        // Background S3 upload + DB update
+        (async () => {
+            try {
+                if (generatedImageUrl.startsWith('data:image/')) {
+                    const s3Url = await uploadToS3(generatedImageUrl, `campaign-shots/${brandId || 'default'}/${Date.now()}.png`);
+                    if (creative) {
+                        await Creative.updateOne({ _id: creative._id }, {
+                            $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready' },
+                        });
+                    }
+                    console.log(`[BG-S3] Campaign Shot uploaded: ${s3Url}`);
+                } else if (creative) {
+                    await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'ready' } });
+                }
+            } catch (bgErr) {
+                console.error('[BG] Campaign Shot post-processing error:', bgErr.message);
+            }
+        })();
+
+    } catch (error) {
+        console.error('❌ Campaign Shot error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/lifestyle-mockup — Product Lifestyle Mockup (Gemini Flash)
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {

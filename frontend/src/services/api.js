@@ -258,6 +258,8 @@ export const creatives = {
     suggestCopy: (data) => apiFetch('/creatives/suggest-copy', { method: 'POST', body: JSON.stringify(data) }),
     // AI Image Editing (Gemini Nano Banana 2)
     editImage: (data) => apiFetch('/creatives/edit-image', { method: 'POST', body: JSON.stringify(data), timeout: 200000 }),
+    // Campaign Shot — 1-click cinematic product poster
+    campaignShot: (data) => apiFetch('/creatives/campaign-shot', { method: 'POST', body: JSON.stringify(data), timeout: 200000 }),
 };
 
 // ============ Agent API ============
