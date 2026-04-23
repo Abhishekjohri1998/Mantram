@@ -4,7 +4,7 @@ const creativeSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', required: true },
 
-    type: { type: String, enum: ['instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'video', 'photoshoot', 'ai-photoshoot', 'virtual-tryon', 'lifestyle-mockup', 'logo-mockup', 'campaign', 'campaign-logo', 'uploaded', 'product', 'sales', 'offer', 'promo', 'festival', 'testimonial', 'meme', 'infographic', 'announcement', 'quote', 'comparison', 'carousel', 'film-poster', 'hd-16-9', 'a4-portrait', 'square-hd', 'custom-size', 'other'], required: true },
+    type: { type: String, enum: ['instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'video', 'photoshoot', 'ai-photoshoot', 'virtual-tryon', 'lifestyle-mockup', 'logo-mockup', 'campaign', 'campaign-shot', 'campaign-logo', 'uploaded', 'product', 'sales', 'offer', 'promo', 'festival', 'testimonial', 'meme', 'infographic', 'announcement', 'quote', 'comparison', 'carousel', 'film-poster', 'hd-16-9', 'a4-portrait', 'square-hd', 'custom-size', 'other'], required: true },
     title: { type: String, default: '' },
     prompt: { type: String, default: '' },
     imageUrl: { type: String, default: '' },

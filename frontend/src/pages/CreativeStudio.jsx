@@ -2337,14 +2337,59 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 generateCopy: csCopyEnabled,
             }
             const result = await creativesAPI.campaignShot(payload)
-            if (result.success) {
-                setCsResult({ imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null })
+            if (result.success && result.jobId) {
+                // Polling logic for background job
+                const jobId = result.jobId;
+                let attempts = 0;
+                const maxAttempts = 120; // 120 * 5s = 10 minutes max
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    if (attempts > maxAttempts) {
+                        clearInterval(pollInterval);
+                        setCsError('Generation timed out. Please try again.');
+                        setCsGenerating(false);
+                        return;
+                    }
+                    try {
+                        const pollData = await creativesAPI.pollJob(jobId);
+                        if (!pollData?.success) return;
+                        const job = pollData.job;
+                        
+                        if (job.status === 'ready' || job.status === 'completed') {
+                            clearInterval(pollInterval);
+                            const creative = job.result?.creative || job;
+                            const imageUrl = creative.imageUrl || job.imageUrl;
+                            
+                            if (!imageUrl) {
+                                setCsError('Failed to retrieve generated image.');
+                                setCsGenerating(false);
+                                return;
+                            }
+                            
+                            setCsResult({ 
+                                imageUrl, 
+                                taglines: creative.aiMeta?.taglines || [], 
+                                productName: creative.aiMeta?.productName || '', 
+                                prompt: creative.prompt, 
+                                model: creative.aiMeta?.model || csModel, 
+                                copy: creative.copy?.headline || null 
+                            });
+                            setCsGenerating(false);
+                        } else if (job.status === 'failed') {
+                            clearInterval(pollInterval);
+                            setCsError(job.errorMessage || 'Campaign Shot generation failed');
+                            setCsGenerating(false);
+                        }
+                    } catch (pollErr) {
+                        console.error('Polling error:', pollErr);
+                    }
+                }, 5000);
             } else {
-                setCsError(result.error || 'Generation failed')
+                setCsError(result.error || 'Generation failed to start')
+                setCsGenerating(false)
             }
         } catch (err) {
             setCsError(err.message || 'Campaign Shot generation failed')
-        } finally {
             setCsGenerating(false)
         }
     }
@@ -10038,7 +10083,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             setCsProductFile(file);
                                             const reader = new FileReader();
                                             reader.onload = async (ev) => {
-                                                try { const url = await creativesAPI.uploadToBank({ imageData: ev.target.result }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
                                                 catch { setCsProductImage(ev.target.result); }
                                             };
                                             reader.readAsDataURL(file);
