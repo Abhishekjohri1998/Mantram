@@ -1641,7 +1641,7 @@ function sseEvent(res, data) {
   try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
 }
 
-async function streamWords(res, text, delayMs = 18) {
+async function streamWords(res, text, delayMs = 5) {
   const words = text.split(' ');
   for (const word of words) {
     sseEvent(res, { type: 'token', text: word + ' ' });
@@ -2082,7 +2082,7 @@ Return ONLY this JSON:
       // Emit the AI's reasoning to frontend
       if (parsed.reasoning) {
         emitStep(parsed.reasoning, '🧠');
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 10));
       }
 
       // ── DEDUP GUARD: Check if this question was already asked ─────────────
@@ -2613,7 +2613,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, { type: 'thinking' });
 
       sseEmit({ type: 'reasoning_step', step: 'Building creative strategy framework...', icon: '🏗️' });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Generating campaign concepts with scoring...', icon: '✨' });
 
       const reinforcedAnswers = { ...newSessionState.collectedAnswers };
@@ -2649,9 +2649,9 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, { type: 'thinking' });
 
       sseEmit({ type: 'reasoning_step', step: `Researching competitive landscape for "${idea.title}"...`, icon: '🌐' });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Building execution playbook...', icon: '📋' });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Drafting content brief and budget breakdown...', icon: '💰' });
 
       const deepDive = await generateDeepDiveInline(idea, brand, intent);
@@ -2684,9 +2684,9 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, { type: 'thinking' });
 
       sseEmit({ type: 'reasoning_step', step: 'Mapping 4-week content timeline...', icon: '📅' });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Assigning platform-specific posts...', icon: '📱' });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Writing copy hooks and hashtags...', icon: '✍️' });
 
       const calendar = await generateCalendarInline(idea, deepDiveCtx, brand, intent);
@@ -2749,9 +2749,9 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       sseEvent(res, { type: 'thinking' });
 
       sseEmit({ type: 'reasoning_step', step: 'Researching market landscape...', icon: '🌐' });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Allocating budget across channels...', icon: '📊' });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 10));
       sseEmit({ type: 'reasoning_step', step: 'Calculating target KPIs...', icon: '🎯' });
 
       const strategy = await generateStrategyInline(newSessionState.collectedAnswers, brand);
