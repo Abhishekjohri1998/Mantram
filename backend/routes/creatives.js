@@ -3047,35 +3047,46 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             return res.status(400).json({ success: false, error: 'Could not load the product image — it may have expired. Please re-upload and try again.' });
         }
 
-        // ── Step 5: Generate via routedImageGenerate — same path as AI Create ──
+        // ── Step 5: Generate via internalGenerateCreative — same path as AI Create ──
+        // This correctly routes nanobanana-2 → LaoZhang, gpt-image-1/2 → OpenAI, etc.
         let generatedImageUrl = null;
         let usedModel = imageModel;
         let genError = null;
 
-        console.log(`   🖼️ routedImageGenerate: model=${imageModel} | variation=${variation.label} | refs=${imageParts.length}`);
+        console.log(`   🖼️ internalGenerateCreative: model=${imageModel} | variation=${variation.label}`);
 
         try {
-            const refUrls = [productImage, characterImage, refImage].filter(Boolean);
-            const genResult = await routedImageGenerate(
-                masterPrompt,
-                imageParts,          // pre-fetched inline image parts
-                variation.tempOverride ?? 0.3,
-                aspectRatio,
-                '1K',
-                imageModel,
-                refUrls,             // raw URL list for models that prefer URL-based refs
-            );
+            // Build refImageUrls — productImage first, then character + style ref
+            const refImageUrls = [productImage, characterImage, refImage].filter(Boolean);
+
+            const genResult = await internalGenerateCreative({
+                body: {
+                    brandId,
+                    prompt: masterPrompt,
+                    type: 'campaign-shot',
+                    refImageUrls,
+                    options: {
+                        imageModel,
+                        aspectRatio,
+                        imageSize: '1K',
+                        temperature: variation.tempOverride ?? 0.3,
+                        generateCopy: false, // we handle copy separately
+                    },
+                },
+                user: req.user,
+                creditsDeducted: req.creditsDeducted,
+            });
             if (genResult?.imageUrl) {
                 generatedImageUrl = genResult.imageUrl;
                 usedModel = genResult.model || imageModel;
                 console.log(`   ✅ Campaign Shot generated with ${usedModel}`);
-            } else if (genResult?.errorMessage) {
-                genError = genResult.errorMessage;
-                console.warn(`   ⚠️ routedImageGenerate returned no image: ${genError}`);
+            } else {
+                genError = genResult?.errorMessage || 'No image returned';
+                console.warn(`   ⚠️ internalGenerateCreative returned no image: ${genError}`);
             }
         } catch (e) {
             genError = e.message;
-            console.error(`   ❌ routedImageGenerate error:`, e.message);
+            console.error(`   ❌ internalGenerateCreative error:`, e.message);
         }
 
         if (!generatedImageUrl) {
@@ -3173,11 +3184,15 @@ Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury b
         })();
 
     } catch (error) {
-        console.error('❌ Campaign Shot error:', error);
+        console.error('❌ Campaign Shot FATAL error:', error?.message);
+        console.error('   Stack:', error?.stack?.split('\n').slice(0, 5).join('\n   '));
         if (req.creditsDeducted > 0) {
-            await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative');
+            await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative').catch(() => {});
         }
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        // Return real error message so user sees what actually failed
+        const errorMsg = error?.message || safeErrorMessage(error);
+        res.status(500).json({ success: false, error: errorMsg });
+
     }
 });
 
