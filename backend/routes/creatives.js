@@ -3047,13 +3047,40 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             return res.status(400).json({ success: false, error: 'Could not load the product image — it may have expired. Please re-upload and try again.' });
         }
 
-        // ── Step 5: Generate via internalGenerateCreative — same path as AI Create ──
-        // This correctly routes nanobanana-2 → LaoZhang, gpt-image-1/2 → OpenAI, etc.
-        let generatedImageUrl = null;
-        let usedModel = imageModel;
-        let genError = null;
+        // ── Step 5: Save Initial State to DB & Return Job ID ──
+        let creative = null;
+        if (brandId) {
+            creative = await Creative.create({
+                user: req.user._id,
+                brand: brandId,
+                type: 'campaign-shot',
+                title: `Campaign Shot — ${detectedProductName}`,
+                prompt: masterPrompt,
+                imageUrl: '',
+                thumbnailUrl: '',
+                aiMeta: {
+                    provider: imageModel.startsWith('gpt') ? 'openai' : 'gemini',
+                    model: imageModel,
+                    method: 'campaign-shot',
+                    moodPreset,
+                    productName: detectedProductName,
+                    taglines: [tagline1, tagline2].filter(Boolean),
+                    processingStatus: 'processing',
+                },
+                tags: ['campaign-shot', 'cinematic', 'product', moodPreset || 'dark-botanical'],
+                status: 'draft',
+            });
+        }
 
-        console.log(`   🖼️ internalGenerateCreative: model=${imageModel} | variation=${variation.label}`);
+        res.json({ success: true, jobId: creative ? creative._id : null, status: 'processing' });
+
+        // ── Step 6: Background Process ──
+        (async () => {
+            let generatedImageUrl = null;
+            let usedModel = imageModel;
+            let genError = null;
+
+            console.log(`   🖼️ internalGenerateCreative: model=${imageModel} | variation=${variation.label}`);
 
         try {
             // Build refImageUrls — productImage first, then character + style ref
@@ -3089,49 +3116,33 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             console.error(`   ❌ internalGenerateCreative error:`, e.message);
         }
 
-        if (!generatedImageUrl) {
-            const errorMsg = genError || 'Image generation failed — model may be busy, please try again';
-            return res.status(500).json({ success: false, error: errorMsg });
-        }
+            if (!generatedImageUrl) {
+                const errorMsg = genError || 'Image generation failed — model may be busy, please try again';
+                console.error(`   ❌ Campaign Shot failed: ${errorMsg}`);
+                if (creative) {
+                    await Creative.updateOne({ _id: creative._id }, {
+                        $set: { 'aiMeta.processingStatus': 'failed', errorMessage: errorMsg, status: 'failed' }
+                    });
+                }
+                if (req.creditsDeducted > 0) {
+                    await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${errorMsg})`, 'creative').catch(() => {});
+                }
+                return; // Background process ends
+            }
 
-        // ── Step 6: Save to Creative DB ──
-        let creative = null;
-        if (brandId) {
-            creative = await Creative.create({
-                user: req.user._id,
-                brand: brandId,
-                type: 'campaign-shot',
-                title: `Campaign Shot — ${detectedProductName}`,
-                prompt: masterPrompt,
-                imageUrl: generatedImageUrl,
-                thumbnailUrl: generatedImageUrl,
-                aiMeta: {
-                    provider: imageModel.startsWith('gpt') ? 'openai' : 'gemini',
-                    model: usedModel,
-                    method: 'campaign-shot',
-                    moodPreset,
-                    productName: detectedProductName,
-                    taglines: [tagline1, tagline2].filter(Boolean),
-                    processingStatus: 'uploading',
-                },
-                tags: ['campaign-shot', 'cinematic', 'product', moodPreset || 'dark-botanical'],
-                status: 'draft',
-            });
-        }
+            req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
 
-        req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => {});
+            console.log(`✅ Campaign Shot generated`);
+            const finalSignedUrl = await getSignedUrlIfNeeded(generatedImageUrl);
 
-        console.log(`✅ Campaign Shot generated — responding immediately`);
-        const finalSignedUrl = await getSignedUrlIfNeeded(generatedImageUrl);
-
-        // ── Optional: Generate Cinematic Ad Copy (if toggle enabled) ──
-        let adCopy = null;
-        if (generateCopy) {
-            try {
-                const copyRouter = getRouter();
-                const copyResult = await copyRouter.generateText({
-                    systemPrompt: 'You are a world-class advertising copywriter. Write only the ad copy — no explanations, no JSON, no markdown. Pure cinematic poster copy.',
-                    userPrompt: `Write cinematic, emotionally compelling ad copy for this campaign poster:
+            // ── Optional: Generate Cinematic Ad Copy (if toggle enabled) ──
+            let adCopy = null;
+            if (generateCopy) {
+                try {
+                    const copyRouter = getRouter();
+                    const copyResult = await copyRouter.generateText({
+                        systemPrompt: 'You are a world-class advertising copywriter. Write only the ad copy — no explanations, no JSON, no markdown. Pure cinematic poster copy.',
+                        userPrompt: `Write cinematic, emotionally compelling ad copy for this campaign poster:
 
 Brand: ${brandName}
 Product: ${detectedProductName}
@@ -3142,57 +3153,48 @@ Secondary Tagline: ${tagline2}
 Brief: ${brief || 'premium brand campaign'}
 
 Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury brand campaign. Think Cannes Lions. Use the taglines as anchors. The copy should feel like it belongs on a billboard or a magazine spread. Bold. Minimal. Evocative.`,
-                    temperature: 0.8,
-                    maxTokens: 300,
-                });
-                adCopy = (copyResult.text || '').trim();
-                console.log(`   ✎️ Ad Copy generated (${adCopy.length} chars)`);
-            } catch (copyErr) {
-                console.warn('⚠️ Ad copy generation failed:', copyErr.message);
+                        temperature: 0.8,
+                        maxTokens: 300,
+                    });
+                    adCopy = (copyResult.text || '').trim();
+                    console.log(`   ✎️ Ad Copy generated (${adCopy.length} chars)`);
+                } catch (copyErr) {
+                    console.warn('⚠️ Ad copy generation failed:', copyErr.message);
+                }
             }
-        }
 
-        res.json({
-            success: true,
-            imageUrl: finalSignedUrl,
-            model: usedModel,
-            productName: detectedProductName,
-            taglines: [tagline1, tagline2].filter(Boolean),
-            prompt: masterPrompt,
-            copy: adCopy,
-            variationLabel: variation.label,
-            creativeId: creative?._id,
-        });
-
-        // Background S3 upload + DB update
-        (async () => {
+            // Update DB with generated image immediately (if base64) or wait for S3
             try {
                 if (generatedImageUrl.startsWith('data:image/')) {
                     const s3Url = await uploadToS3(generatedImageUrl, `campaign-shots/${brandId || 'default'}/${Date.now()}.png`);
                     if (creative) {
                         await Creative.updateOne({ _id: creative._id }, {
-                            $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready' },
+                            $set: { imageUrl: s3Url, thumbnailUrl: s3Url, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy }
                         });
                     }
                     console.log(`[BG-S3] Campaign Shot uploaded: ${s3Url}`);
                 } else if (creative) {
-                    await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'ready' } });
+                    await Creative.updateOne({ _id: creative._id }, { $set: { imageUrl: finalSignedUrl, thumbnailUrl: finalSignedUrl, 'aiMeta.processingStatus': 'ready', status: 'ready', prompt: masterPrompt, 'copy.headline': adCopy } });
                 }
             } catch (bgErr) {
                 console.error('[BG] Campaign Shot post-processing error:', bgErr.message);
+                if (creative) await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'failed', status: 'failed', errorMessage: bgErr.message } });
             }
-        })();
+        })().catch(async error => {
+            console.error('❌ Campaign Shot FATAL error:', error?.message);
+            if (creative) await Creative.updateOne({ _id: creative._id }, { $set: { 'aiMeta.processingStatus': 'failed', status: 'failed', errorMessage: error?.message } });
+            if (req.creditsDeducted > 0) {
+                await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative').catch(() => {});
+            }
+        });
 
     } catch (error) {
-        console.error('❌ Campaign Shot FATAL error:', error?.message);
-        console.error('   Stack:', error?.stack?.split('\n').slice(0, 5).join('\n   '));
+        console.error('❌ Campaign Shot Setup FATAL error:', error?.message);
         if (req.creditsDeducted > 0) {
-            await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Failure (${safeErrorMessage(error)})`, 'creative').catch(() => {});
+            await refundCredits(req.user._id, req.creditsDeducted, 'campaignShot', `Refund: Campaign Shot Setup Failure (${safeErrorMessage(error)})`, 'creative').catch(() => {});
         }
-        // Return real error message so user sees what actually failed
         const errorMsg = error?.message || safeErrorMessage(error);
         res.status(500).json({ success: false, error: errorMsg });
-
     }
 });
 
