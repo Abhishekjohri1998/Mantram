@@ -4061,7 +4061,23 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
     const [refineInput, setRefineInput] = useState('')
     const [refining, setRefining] = useState(false)
     const [showPublish, setShowPublish] = useState(false)
+    const [visualElapsed, setVisualElapsed] = useState(0)
     const refineRef = useRef(null)
+
+    useEffect(() => {
+        let interval;
+        if (generatingVisualPrompt) {
+            setVisualElapsed(0);
+            interval = setInterval(() => {
+                setVisualElapsed(prev => prev + 1);
+            }, 1000);
+        } else {
+            setVisualElapsed(0);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        }
+    }, [generatingVisualPrompt])
 
     // Keep editContent in sync when result changes
     useEffect(() => { setEditContent(result?.content || '') }, [result?.content])
@@ -4146,7 +4162,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                                     <div className="h-full bg-primary transition-all duration-300" style={{ width: `${inlineVisualProgress}%` }}></div>
                                 </div>
                                 <h4 className="text-sm font-bold mt-4">Generating Visual...</h4>
-                                <p className="text-[10px] opacity-70 mt-1">This usually takes 15-30s</p>
+                                <p className="text-[10px] opacity-70 mt-1">Elapsed time: {visualElapsed}s</p>
                             </div>
                         )}
                     </div>
@@ -5192,6 +5208,7 @@ export default function ContentStudio() {
                             console.error('Inline visual job failed');
                             setGeneratingVisualPrompt(false);
                             setInlineVisualActive(false);
+                            setError({ message: job.errorMessage || 'Visual generation failed. The AI provider may be busy. Please try again.', isProviderError: true });
                         }
                     } catch (e) {
                          console.error('Inline Visual Poll error:', e);
@@ -5200,11 +5217,13 @@ export default function ContentStudio() {
             } else {
                 setGeneratingVisualPrompt(false);
                 setInlineVisualActive(false);
+                setError({ message: jobData?.error || 'Failed to start visual generation.', isProviderError: true });
             }
         } catch (err) {
             console.error('Failed to generate visual inline:', err);
             setGeneratingVisualPrompt(false);
             setInlineVisualActive(false);
+            setError({ message: err.message || 'Failed to generate visual inline.', isProviderError: true });
         }
     }
 
@@ -5496,7 +5515,7 @@ SPOKESPERSON QUOTES:`
                         <div key={lbl} className="flex items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
                                 ${step > i ? 'bg-primary text-white' : step === i ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
-                                {step > i ? 'check' : i + 1}
+                                {step > i ? <span className="material-symbols-outlined text-sm">check</span> : i + 1}
                             </div>
                             <span className={`text-xs font-bold ${step >= i ? 'text-[var(--sys-text-muted)]' : 'text-[var(--sys-text-muted)]'}`}>{lbl}</span>
                             {i < 2 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
@@ -5617,27 +5636,37 @@ SPOKESPERSON QUOTES:`
             )}
 
             {step === 5 && result && (
-                <ResultView
-                    result={result}
-                    activeBrand={activeBrand}
-                    generating={generating}
-                    generatingVisualPrompt={generatingVisualPrompt}
-                    accepted={accepted}
-                    imageUrl={null}
-                    onRegenerate={handleRegenerate}
-                    onFeedback={handleFeedback}
-                    onNewContent={resetAll}
-                    onGenerateVisual={handleCreateVisual}
-                    onCreateVisual={handleCreateVisual}
-                    onRefine={handleRefine}
-                    contentFeedback={contentFeedback}
-                    onABTest={handleABTest}
-                    abTestData={abTestData}
-                    abTestLoading={abTestLoading}
-                    inlineVisualUrl={inlineVisualUrl}
-                    inlineVisualActive={inlineVisualActive}
-                    inlineVisualProgress={inlineVisualProgress}
-                />
+                <>
+                    <ResultView
+                        result={result}
+                        activeBrand={activeBrand}
+                        generating={generating}
+                        generatingVisualPrompt={generatingVisualPrompt}
+                        accepted={accepted}
+                        imageUrl={null}
+                        onRegenerate={handleRegenerate}
+                        onFeedback={handleFeedback}
+                        onNewContent={resetAll}
+                        onGenerateVisual={handleCreateVisual}
+                        onCreateVisual={handleCreateVisual}
+                        onRefine={handleRefine}
+                        contentFeedback={contentFeedback}
+                        onABTest={handleABTest}
+                        abTestData={abTestData}
+                        abTestLoading={abTestLoading}
+                        inlineVisualUrl={inlineVisualUrl}
+                        inlineVisualActive={inlineVisualActive}
+                        inlineVisualProgress={inlineVisualProgress}
+                    />
+                    {error && (
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.message}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* YouTube Wizard */}
