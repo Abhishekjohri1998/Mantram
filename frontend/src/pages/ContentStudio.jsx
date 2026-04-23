@@ -5192,6 +5192,7 @@ export default function ContentStudio() {
                             console.error('Inline visual job failed');
                             setGeneratingVisualPrompt(false);
                             setInlineVisualActive(false);
+                            setError({ message: job.errorMessage || 'Visual generation failed. The AI provider may be busy. Please try again.', isProviderError: true });
                         }
                     } catch (e) {
                          console.error('Inline Visual Poll error:', e);
@@ -5200,11 +5201,13 @@ export default function ContentStudio() {
             } else {
                 setGeneratingVisualPrompt(false);
                 setInlineVisualActive(false);
+                setError({ message: jobData?.error || 'Failed to start visual generation.', isProviderError: true });
             }
         } catch (err) {
             console.error('Failed to generate visual inline:', err);
             setGeneratingVisualPrompt(false);
             setInlineVisualActive(false);
+            setError({ message: err.message || 'Failed to generate visual inline.', isProviderError: true });
         }
     }
 
@@ -5617,27 +5620,37 @@ SPOKESPERSON QUOTES:`
             )}
 
             {step === 5 && result && (
-                <ResultView
-                    result={result}
-                    activeBrand={activeBrand}
-                    generating={generating}
-                    generatingVisualPrompt={generatingVisualPrompt}
-                    accepted={accepted}
-                    imageUrl={null}
-                    onRegenerate={handleRegenerate}
-                    onFeedback={handleFeedback}
-                    onNewContent={resetAll}
-                    onGenerateVisual={handleCreateVisual}
-                    onCreateVisual={handleCreateVisual}
-                    onRefine={handleRefine}
-                    contentFeedback={contentFeedback}
-                    onABTest={handleABTest}
-                    abTestData={abTestData}
-                    abTestLoading={abTestLoading}
-                    inlineVisualUrl={inlineVisualUrl}
-                    inlineVisualActive={inlineVisualActive}
-                    inlineVisualProgress={inlineVisualProgress}
-                />
+                <>
+                    <ResultView
+                        result={result}
+                        activeBrand={activeBrand}
+                        generating={generating}
+                        generatingVisualPrompt={generatingVisualPrompt}
+                        accepted={accepted}
+                        imageUrl={null}
+                        onRegenerate={handleRegenerate}
+                        onFeedback={handleFeedback}
+                        onNewContent={resetAll}
+                        onGenerateVisual={handleCreateVisual}
+                        onCreateVisual={handleCreateVisual}
+                        onRefine={handleRefine}
+                        contentFeedback={contentFeedback}
+                        onABTest={handleABTest}
+                        abTestData={abTestData}
+                        abTestLoading={abTestLoading}
+                        inlineVisualUrl={inlineVisualUrl}
+                        inlineVisualActive={inlineVisualActive}
+                        inlineVisualProgress={inlineVisualProgress}
+                    />
+                    {error && (
+                        <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
+                            <span className="material-symbols-outlined align-middle mr-1">
+                                {error.isProviderError ? 'warning' : 'error'}
+                            </span>
+                            {error.message}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* YouTube Wizard */}
