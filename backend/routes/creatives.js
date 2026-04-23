@@ -1172,6 +1172,25 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
     // ── Download reference images if provided ──
     const validRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
     let refBuffers = []; // Array of { buffer: Buffer, mimeType: string }
+
+    // ── Decode base64 data URI reference images directly (no download needed) ──
+    const dataUriRefsOai = (refImageUrls || []).filter(u => u && u.startsWith('data:image/'));
+    for (const dataUri of dataUriRefsOai) {
+        try {
+            const commaIdx = dataUri.indexOf(',');
+            if (commaIdx > -1) {
+                const mimeMatch = dataUri.match(/^data:(image\/[^;]+)/);
+                const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+                const b64Data = dataUri.substring(commaIdx + 1);
+                const buf = Buffer.from(b64Data, 'base64');
+                refBuffers.push({ buffer: buf, mimeType });
+                console.log(`  📎 Decoded base64 ref image (${Math.round(buf.length / 1024)}KB, ${mimeType})`);
+            }
+        } catch (e) {
+            console.warn(`  ⚠️ Failed to decode base64 ref image: ${e.message}`);
+        }
+    }
+
     if (validRefUrls.length > 0) {
         console.log(`📥 Downloading ${validRefUrls.length} reference images for OpenAI edit...`);
         const downloads = validRefUrls.slice(0, 16).map(async (url) => { // max 16 images
@@ -1189,8 +1208,11 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
             }
             return null;
         });
-        refBuffers = (await Promise.all(downloads)).filter(Boolean);
-        console.log(`📦 ${refBuffers.length}/${validRefUrls.length} reference images ready`);
+        const httpBuffers = (await Promise.all(downloads)).filter(Boolean);
+        refBuffers.push(...httpBuffers);
+        console.log(`📦 ${refBuffers.length} total reference images ready (${dataUriRefsOai.length} base64 + ${httpBuffers.length} HTTP)`);
+    } else if (refBuffers.length > 0) {
+        console.log(`📦 ${refBuffers.length} base64 reference images ready (no HTTP URLs)`);
     }
 
     const useEditsEndpoint = refBuffers.length > 0;
@@ -1548,7 +1570,26 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         let finalImageParts = imageParts || [];
         const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
-        if (finalImageParts.length === 0 && lzRefUrls.length > 0) {
+        // ── Decode base64 data URI reference images directly (no download needed) ──
+        const dataUriRefs = (refImageUrls || []).filter(u => u && u.startsWith('data:image/'));
+        if (dataUriRefs.length > 0) {
+            for (const dataUri of dataUriRefs) {
+                try {
+                    const commaIdx = dataUri.indexOf(',');
+                    if (commaIdx > -1) {
+                        const mimeMatch = dataUri.match(/^data:(image\/[^;]+)/);
+                        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+                        const b64Data = dataUri.substring(commaIdx + 1);
+                        finalImageParts.push({ inlineData: { mimeType, data: b64Data } });
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Failed to decode base64 ref image: ${e.message}`);
+                }
+            }
+            console.log(`📎 Decoded ${dataUriRefs.length} base64 data URI(s) as inline image parts for Gemini`);
+        }
+
+        if (lzRefUrls.length > 0) {
             // ⚡ PERF: Download ALL reference images in parallel (was sequential — saved 10-25s)
             console.log(`📥 Downloading ${lzRefUrls.length} reference images for Gemini in parallel...`);
             const refDownloads = lzRefUrls.map(async (url) => {
@@ -3096,7 +3137,27 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
 
         try {
             // Build refImageUrls — productImage first, then character + style ref
-            const refImageUrls = [productImage, characterImage, refImage].filter(Boolean);
+            // ── Upload base64 data URIs to S3 first so downstream filters don't drop them ──
+            // Both routedImageGenerate (Gemini) and openaiImageGenerate filter with startsWith('http').
+            // Campaign-shot images arrive as base64 from the frontend, so we upload them to S3
+            // to produce stable HTTP URLs that pass all downstream filters.
+            const rawRefImages = [productImage, characterImage, refImage].filter(Boolean);
+            const refImageUrls = await Promise.all(rawRefImages.map(async (img, idx) => {
+                if (img.startsWith('data:image/')) {
+                    try {
+                        const label = idx === 0 ? 'product' : idx === 1 ? 'character' : 'styleref';
+                        const s3Key = `campaign-shot/${brandId || 'unknown'}/${Date.now()}-${label}-${Math.random().toString(36).slice(2, 6)}.png`;
+                        const s3Url = await uploadToS3(img, s3Key);
+                        console.log(`   ✅ Uploaded ${label} base64 → S3: ${s3Url.substring(0, 80)}...`);
+                        return s3Url;
+                    } catch (s3Err) {
+                        console.warn(`   ⚠️ S3 upload failed for campaign-shot ref (falling back to base64): ${s3Err.message}`);
+                        return img; // fallback — routedImageGenerate now handles data URIs too
+                    }
+                }
+                return img; // already an HTTP URL
+            }));
+            console.log(`   🖼️ Campaign Shot ref images: ${refImageUrls.length} (${refImageUrls.filter(u => u.startsWith('http')).length} HTTP, ${refImageUrls.filter(u => u.startsWith('data:')).length} base64)`);
 
             const genResult = await internalGenerateCreative({
                 body: {
