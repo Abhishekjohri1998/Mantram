@@ -3047,83 +3047,39 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             return res.status(400).json({ success: false, error: 'Could not load the product image — it may have expired. Please re-upload and try again.' });
         }
 
-        // ── Step 5: Generate with selected model ──
+        // ── Step 5: Generate via routedImageGenerate — same path as AI Create ──
         let generatedImageUrl = null;
         let usedModel = imageModel;
         let genError = null;
 
-        console.log(`   🖼️ Generating with ${imageModel} (${imageParts.length} reference images) | Variation: ${variation.label}`);
+        console.log(`   🖼️ routedImageGenerate: model=${imageModel} | variation=${variation.label} | refs=${imageParts.length}`);
 
-        if (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1') {
-            // OpenAI GPT-Image models
-            try {
-                const genResult = await internalGenerateCreative({
-                    body: {
-                        brandId,
-                        prompt: masterPrompt,
-                        aspectRatio,
-                        imageModel,
-                        refImageUrl: refImage || productImage,
-                        type: 'campaign-shot',
-                        style: 'photorealistic',
-                    },
-                    user: req.user,
-                    creditsDeducted: req.creditsDeducted,
-                });
+        try {
+            const refUrls = [productImage, characterImage, refImage].filter(Boolean);
+            const genResult = await routedImageGenerate(
+                masterPrompt,
+                imageParts,          // pre-fetched inline image parts
+                variation.tempOverride ?? 0.3,
+                aspectRatio,
+                '1K',
+                imageModel,
+                refUrls,             // raw URL list for models that prefer URL-based refs
+            );
+            if (genResult?.imageUrl) {
                 generatedImageUrl = genResult.imageUrl;
-            } catch (e) {
-                genError = e.message;
-                console.error(`❌ GPT-Image generation failed:`, e.message);
+                usedModel = genResult.model || imageModel;
+                console.log(`   ✅ Campaign Shot generated with ${usedModel}`);
+            } else if (genResult?.errorMessage) {
+                genError = genResult.errorMessage;
+                console.warn(`   ⚠️ routedImageGenerate returned no image: ${genError}`);
             }
-        } else if (imageParts.length > 0) {
-            // NanoBanana2 (Gemini Flash Image) — try primary then fallback
-            const GEMINI_MODELS = [
-                'gemini-3.1-flash-image-preview',              // Primary (NanoBanana 2)
-                'gemini-2.0-flash-exp-image-generation',       // Fallback
-            ];
-            for (const geminiModel of GEMINI_MODELS) {
-                try {
-                    console.log(`   🤖 Trying ${geminiModel}...`);
-                    const genResult = await geminiImageGenerate(masterPrompt, imageParts, variation.tempOverride ?? 0.3, aspectRatio, '1K', geminiModel);
-                    if (genResult?.imageUrl) {
-                        generatedImageUrl = genResult.imageUrl;
-                        usedModel = genResult.model || geminiModel;
-                        console.log(`   ✅ Image from ${geminiModel}`);
-                        break;
-                    }
-                } catch (e) {
-                    genError = e.message;
-                    console.warn(`   ⚠️ ${geminiModel} failed: ${e.message}`);
-                }
-            }
-            // Last resort: laozhang text-to-image
-            if (!generatedImageUrl) {
-                try {
-                    console.log(`   🔄 Falling back to LaoZhang...`);
-                    const genResult = await laozhangImageGenerate(masterPrompt, { model: 'flux-pro', aspectRatio, quality: 'ultra' });
-                    generatedImageUrl = genResult?.imageUrl;
-                    usedModel = genResult?.model || 'flux-pro';
-                } catch (e) {
-                    genError = e.message;
-                    console.error(`❌ LaoZhang fallback failed:`, e.message);
-                }
-            }
-        } else {
-            // No reference images — pure text-to-image via LaoZhang
-            try {
-                const genResult = await laozhangImageGenerate(masterPrompt, { model: imageModel, aspectRatio, quality: 'ultra' });
-                generatedImageUrl = genResult?.imageUrl;
-                usedModel = genResult?.model || imageModel;
-            } catch (e) {
-                genError = e.message;
-                console.error(`❌ Text-to-image failed:`, e.message);
-            }
+        } catch (e) {
+            genError = e.message;
+            console.error(`   ❌ routedImageGenerate error:`, e.message);
         }
 
         if (!generatedImageUrl) {
-            const errorMsg = genError
-                ? `Image generation failed: ${genError}`
-                : 'No image returned — the AI model may be busy, please try again';
+            const errorMsg = genError || 'Image generation failed — model may be busy, please try again';
             return res.status(500).json({ success: false, error: errorMsg });
         }
 
