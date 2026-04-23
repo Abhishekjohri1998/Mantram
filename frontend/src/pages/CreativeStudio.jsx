@@ -799,10 +799,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [csPrimaryTagline, setCsPrimaryTagline] = useState('')
     const [csSecondaryTagline, setCsSecondaryTagline] = useState('')
     const [csGenerating, setCsGenerating] = useState(false)
-    const [csResult, setCsResult] = useState(null)                   // { imageUrl, taglines, productName, prompt, copy }
+    const [csSlots, setCsSlots] = useState([null, null, null])       // 3 concurrent result slots
+    const [csResult, setCsResult] = useState(null)                   // Legacy compat (primary result)
     const [csError, setCsError] = useState(null)
     const [showCsModelMenu, setShowCsModelMenu] = useState(false)    // Dropdown state for model picker
     const [csCopyEnabled, setCsCopyEnabled] = useState(false)        // Copy toggle — generate cinematic ad copy alongside image
+    const [csCustomW, setCsCustomW] = useState('1080')
+    const [csCustomH, setCsCustomH] = useState('1080')
 
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
@@ -2310,33 +2313,48 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
     // ── Smart format detection from prompt ──
-    // ══ Campaign Shot: 1-click cinematic poster generator ══
+    // ══ Campaign Shot: 3-concurrent cinematic poster generator ══
     async function handleCampaignShot() {
         if (!csProductImage) { setCsError('Please upload a product image first'); return }
-        setCsGenerating(true); setCsError(null); setCsResult(null)
+        setCsGenerating(true); setCsError(null)
+        // Reset all 3 slots to loading state
+        setCsSlots([null, null, null]); setCsResult(null)
+        const effectiveRatio = csAspectRatio === 'custom'
+            ? `${csCustomW}:${csCustomH}`
+            : csAspectRatio
+        const payload = {
+            brandId: activeBrand?._id,
+            productImage: csProductImage,
+            refImage: csRefImage || undefined,
+            characterImage: csCharacterImage || undefined,
+            moodPreset: csMoodPreset,
+            aspectRatio: effectiveRatio,
+            imageModel: csModel,
+            productName: csProductName || undefined,
+            brief: csBrief || undefined,
+            primaryTagline: csPrimaryTagline || undefined,
+            secondaryTagline: csSecondaryTagline || undefined,
+            generateCopy: csCopyEnabled,
+        }
+        // Fire all 3 concurrently — each settles independently
+        const run = async (slotIdx) => {
+            try {
+                const result = await creativesAPI.campaignShot(payload)
+                if (result.success) {
+                    const slotResult = { imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null }
+                    setCsSlots(prev => { const next = [...prev]; next[slotIdx] = slotResult; return next })
+                    if (slotIdx === 0) setCsResult(slotResult) // primary result
+                } else {
+                    setCsSlots(prev => { const next = [...prev]; next[slotIdx] = { error: result.error || 'Failed' }; return next })
+                }
+            } catch (err) {
+                const msg = err.message || 'Generation failed'
+                setCsSlots(prev => { const next = [...prev]; next[slotIdx] = { error: msg }; return next })
+                if (slotIdx === 0) setCsError(msg)
+            }
+        }
         try {
-            const payload = {
-                brandId: activeBrand?._id,
-                productImage: csProductImage,
-                refImage: csRefImage || undefined,
-                characterImage: csCharacterImage || undefined,
-                moodPreset: csMoodPreset,
-                aspectRatio: csAspectRatio,
-                imageModel: csModel,
-                productName: csProductName || undefined,
-                brief: csBrief || undefined,
-                primaryTagline: csPrimaryTagline || undefined,
-                secondaryTagline: csSecondaryTagline || undefined,
-                generateCopy: csCopyEnabled,
-            }
-            const result = await creativesAPI.campaignShot(payload)
-            if (result.success) {
-                setCsResult({ imageUrl: result.imageUrl, taglines: result.taglines || [], productName: result.productName, prompt: result.prompt, model: result.model, copy: result.copy || null })
-            } else {
-                setCsError(result.error || 'Generation failed')
-            }
-        } catch (err) {
-            setCsError(err.message || 'Campaign Shot generation failed')
+            await Promise.allSettled([run(0), run(1), run(2)])
         } finally {
             setCsGenerating(false)
         }
@@ -10068,12 +10086,28 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 <div className="relative">
                                     <select value={csAspectRatio} onChange={e => setCsAspectRatio(e.target.value)}
                                         className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="1:1">1:1 — Square (Instagram Feed)</option>
+                                        <option value="1:1">1:1 — Square (Instagram / Amazon)</option>
                                         <option value="4:5">4:5 — Portrait (Instagram Feed)</option>
-                                        <option value="9:16">9:16 — Story / Reel</option>
-                                        <option value="16:9">16:9 — Cinematic Widescreen</option>
+                                        <option value="9:16">9:16 — Story / Reel / TikTok</option>
+                                        <option value="16:9">16:9 — Cinematic Widescreen / YouTube</option>
                                         <option value="2:3">2:3 — Poster / Print</option>
+                                        <option value="3:4">3:4 — Pinterest / Tall Card</option>
+                                        <option value="4:3">4:3 — Landscape / Presentation</option>
+                                        <option value="21:9">21:9 — Ultra-wide Banner</option>
+                                        <option value="3:2">3:2 — Photography / DSLR</option>
+                                        <option value="custom">Custom — Enter dimensions</option>
                                     </select>
+                                    {csAspectRatio === 'custom' && (
+                                        <div className="flex gap-2 mt-2">
+                                            <input value={csCustomW} onChange={e => setCsCustomW(e.target.value.replace(/\D/g,''))}
+                                                className="flex-1 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[12px] text-[var(--sys-text)] outline-none focus:border-primary/40"
+                                                placeholder="Width px" maxLength={4} />
+                                            <span className="flex items-center text-[var(--sys-text-muted)] text-sm font-bold">×</span>
+                                            <input value={csCustomH} onChange={e => setCsCustomH(e.target.value.replace(/\D/g,''))}
+                                                className="flex-1 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[12px] text-[var(--sys-text)] outline-none focus:border-primary/40"
+                                                placeholder="Height px" maxLength={4} />
+                                        </div>
+                                    )}
                                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
                                 </div>
                             </div>
@@ -10180,16 +10214,16 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             )}
                             <button onClick={handleCampaignShot} disabled={csGenerating || !csProductImage || !activeBrand}
-                                className="w-full py-3.5 rounded-2xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                style={{ background: (csGenerating || !csProductImage) ? 'var(--sys-surface)' : 'linear-gradient(135deg, #FF4D00 0%, #FF9A00 100%)', color: (csGenerating || !csProductImage) ? 'var(--sys-text)' : '#fff', boxShadow: (csGenerating || !csProductImage) ? 'none' : '0 4px 20px rgba(255,77,0,0.35)' }}>
+                                className="w-full py-3.5 rounded-2xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-[var(--sys-text)] text-[var(--sys-bg)] hover:opacity-90"
+                            >
                                 {csGenerating ? (
-                                    <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Generating Campaign Shot...</>
+                                    <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Generating 3 variations...</>
                                 ) : (
-                                    <><span className="material-symbols-outlined text-[18px]">movie_filter</span> Generate Campaign Shot</>
+                                    <><span className="material-symbols-outlined text-[18px]">movie_filter</span> Generate 3 Campaign Shots</>
                                 )}
                             </button>
                             {!activeBrand && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Select a brand first to generate</p>}
-                            {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director → Copywriter → Image Generation (~30–60s)</p>}
+                            {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director → Copywriter → 3× Image (~45–90s)</p>}
                         </div>
                     </div>
 
@@ -10236,78 +10270,72 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         )}
 
-                        {csResult && !csGenerating && (
-                            <div className="w-full max-w-2xl mx-auto flex flex-col gap-4">
-                                {/* Result Image */}
-                                <div className="relative rounded-2xl overflow-hidden border border-[var(--sys-border)] shadow-2xl group">
-                                    <img src={csResult.imageUrl} alt="Campaign Shot" className="w-full h-auto object-contain" style={{ maxHeight: '65vh' }} />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                                        <div className="flex gap-2 ml-auto">
-                                            <a href={csResult.imageUrl} download={`campaign-shot-${Date.now()}.png`} target="_blank" rel="noreferrer"
-                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/90 text-black text-[11px] font-bold hover:bg-white transition-colors">
-                                                <span className="material-symbols-outlined text-[14px]">download</span> Download
-                                            </a>
-                                            <button onClick={async () => {
-                                                try {
-                                                    await creativesAPI.uploadToBank({ imageUrl: csResult.imageUrl, brandId: activeBrand?._id, title: `Campaign Shot — ${csResult.productName || ''}` });
-                                                    setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500);
-                                                } catch { }
-                                            }} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/90 text-black text-[11px] font-bold hover:bg-white transition-colors">
-                                                <span className="material-symbols-outlined text-[14px]">bookmark</span> Save
-                                            </button>
+                        {/* 3-slot Results Grid */}
+                        {!csGenerating && csSlots.some(s => s?.imageUrl) && (
+                            <div className="w-full space-y-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {csSlots.map((slot, i) => slot?.imageUrl ? (
+                                        <div key={i} className="flex flex-col gap-2 group">
+                                            <div className="relative rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                                <img src={slot.imageUrl} alt={`Variation ${i+1}`} className="w-full h-auto object-contain" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                                                    <div className="flex gap-1.5 ml-auto">
+                                                        <a href={slot.imageUrl} download={`campaign-${i+1}-${Date.now()}.png`} target="_blank" rel="noreferrer"
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/90 text-black text-[10px] font-bold hover:bg-white">
+                                                            <span className="material-symbols-outlined text-[13px]">download</span>
+                                                        </a>
+                                                        <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: slot.imageUrl, brandId: activeBrand?._id, title: `Campaign Shot V${i+1}` }); setFeedbackToast('Saved!'); setTimeout(() => setFeedbackToast(''), 2000); } catch {} }}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/90 text-black text-[10px] font-bold hover:bg-white cursor-pointer">
+                                                            <span className="material-symbols-outlined text-[13px]">bookmark</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] text-center">Variation {i+1}</p>
                                         </div>
-                                    </div>
+                                    ) : slot?.error ? (
+                                        <div key={i} className="aspect-square rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center p-4 text-center">
+                                            <div className="space-y-2">
+                                                <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)]">error_outline</span>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">{slot.error.includes('timed out') ? 'Server still processing — try again' : slot.error}</p>
+                                            </div>
+                                        </div>
+                                    ) : null)}
                                 </div>
 
-                                {/* Metadata */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="studio-card p-3">
-                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Product</p>
-                                        <p className="text-[12px] font-bold text-[var(--sys-text)]">{csResult.productName || '—'}</p>
-                                    </div>
-                                    <div className="studio-card p-3">
-                                        <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1">Model Used</p>
-                                        <p className="text-[12px] font-bold text-[var(--sys-text)]">{csResult.model || csModel}</p>
-                                    </div>
-                                </div>
-                                {csResult.taglines?.length > 0 && (
+                                {/* Copy + taglines from slot 0 */}
+                                {csSlots[0]?.taglines?.length > 0 && (
                                     <div className="studio-card p-3">
                                         <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-1.5">AI Copywriter Taglines</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {csResult.taglines.map((t, i) => (
+                                            {csSlots[0].taglines.map((t, i) => (
                                                 <span key={i} className="text-[11px] font-bold px-3 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text)] bg-[var(--sys-surface)]">{t}</span>
                                             ))}
                                         </div>
                                     </div>
                                 )}
-
-                                {/* ── AI Ad Copy ── */}
-                                {csResult.copy && (
-                                    <div className="studio-card p-4 space-y-3">
+                                {csSlots[0]?.copy && (
+                                    <div className="studio-card p-4 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest flex items-center gap-1.5">
                                                 <span className="material-symbols-outlined text-[13px]">edit_note</span> AI Ad Copy
                                             </p>
-                                            <button onClick={() => navigator.clipboard.writeText(csResult.copy)}
-                                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[10px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
+                                            <button onClick={() => navigator.clipboard.writeText(csSlots[0].copy)}
+                                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[10px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
                                                 <span className="material-symbols-outlined text-[12px]">content_copy</span> Copy
                                             </button>
                                         </div>
-                                        <p className="text-[12px] text-[var(--sys-text)] leading-relaxed whitespace-pre-wrap">{csResult.copy}</p>
+                                        <p className="text-[12px] text-[var(--sys-text)] leading-relaxed whitespace-pre-wrap">{csSlots[0].copy}</p>
                                     </div>
                                 )}
 
                                 <div className="flex gap-2">
-                                    <button onClick={handleCampaignShot}
-                                        className="flex-1 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
-                                        style={{ background: 'linear-gradient(135deg, #FF4D00, #FF9A00)', color: '#fff', boxShadow: '0 4px 16px rgba(255,77,0,0.3)' }}>
-                                        <span className="material-symbols-outlined text-[16px]">refresh</span>
-                                        Regenerate
+                                    <button onClick={handleCampaignShot} className="flex-1 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer transition-all bg-[var(--sys-text)] text-[var(--sys-bg)] hover:opacity-90">
+                                        <span className="material-symbols-outlined text-[16px]">refresh</span> Regenerate All
                                     </button>
-                                    <button onClick={() => setCsResult(null)}
+                                    <button onClick={() => { setCsSlots([null,null,null]); setCsResult(null); }}
                                         className="px-4 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all">
-                                        <span className="material-symbols-outlined text-[16px]">add</span>
-                                        New
+                                        <span className="material-symbols-outlined text-[16px]">add</span> New
                                     </button>
                                 </div>
                             </div>
