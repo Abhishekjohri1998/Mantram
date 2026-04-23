@@ -3011,9 +3011,29 @@ Return ONLY valid JSON:
         const hasCharacter = !!characterImage;
         const hasRef = !!refImage;
 
+        // ── Build explicit image reference instructions for the prompt ──
+        // AI models need explicit per-image labels to understand what each reference is for.
+        // IMAGE 1 is always the product. IMAGE 2+ are character or style refs.
+        let imageRefBlock = '';
+        let imgIdx = 1;
+        // Product image (always provided — it's required)
+        imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (PRODUCT): This is the hero product — "${detectedProductName}". Place this EXACT product (same bottle/packaging shape, same label, same colors) as the centrepiece of the advertisement. Reproduce its design faithfully.\n`;
+        imgIdx++;
+
+        if (hasCharacter) {
+            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (CHARACTER/MODEL — CRITICAL): This is the person/model to feature in the advertisement. You MUST replicate this person's EXACT face, skin tone, hair color, hair style, facial features, and overall appearance. Do NOT generate a different person. The model in the output must be clearly recognisable as the same individual from this reference photo. Pose them naturally alongside the product in a premium, aspirational way.\n`;
+            imgIdx++;
+        }
+
+        if (hasRef) {
+            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (STYLE REFERENCE): Match the mood, color palette, composition style, lighting approach, and cinematic feel of this reference image. Use it as the visual direction guide while keeping the product as the hero element.\n`;
+            imgIdx++;
+        }
+
         const masterPrompt = `Cinematic moody ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
-PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside a person/model. Keep the character authentic and aspirational.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
+${imageRefBlock}
+PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside the provided character/model (see CHARACTER reference image above). The person MUST match the reference — same face, same features. Position them elegantly with the product.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
 
 ${variation.compositionNote}
 
@@ -3037,8 +3057,7 @@ TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp p
 STYLE: magazine-grade product photography, Cannes Lions advertising quality, cinematic color grade
 OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no frames
 
-${brief ? `CREATIVE BRIEF: ${brief}` : ''}
-${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel of the provided reference image while keeping the product as the hero.' : ''}`;
+${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
 
         console.log(`   📝 Campaign prompt [${variation.label}]: ${masterPrompt.substring(0, 120)}...`);
 
@@ -3128,19 +3147,20 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
         res.json({ success: true, jobId: jobRecord ? genJobId : null, status: 'processing' });
 
         // ── Step 6: Background Process ──
+        // Campaign-shot calls routedImageGenerate DIRECTLY (not via internalGenerateCreative).
+        // Reason: internalGenerateCreative runs an agentic pipeline that overwrites the
+        // carefully art-directed masterPrompt, stripping out per-image reference labels
+        // (character face preservation, product matching, style reference instructions).
+        // Campaign-shot already handles its own Creative/Job records, so the pipeline is redundant.
         (async () => {
             let generatedImageUrl = null;
             let usedModel = imageModel;
             let genError = null;
 
-            console.log(`   🖼️ internalGenerateCreative: model=${imageModel} | variation=${variation.label}`);
+            console.log(`   🖼️ Campaign Shot DIRECT generation: model=${imageModel} | variation=${variation.label}`);
 
         try {
-            // Build refImageUrls — productImage first, then character + style ref
-            // ── Upload base64 data URIs to S3 first so downstream filters don't drop them ──
-            // Both routedImageGenerate (Gemini) and openaiImageGenerate filter with startsWith('http').
-            // Campaign-shot images arrive as base64 from the frontend, so we upload them to S3
-            // to produce stable HTTP URLs that pass all downstream filters.
+            // ── Upload base64 data URIs to S3 so routedImageGenerate can download them ──
             const rawRefImages = [productImage, characterImage, refImage].filter(Boolean);
             const refImageUrls = await Promise.all(rawRefImages.map(async (img, idx) => {
                 if (img.startsWith('data:image/')) {
@@ -3152,41 +3172,39 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
                         return s3Url;
                     } catch (s3Err) {
                         console.warn(`   ⚠️ S3 upload failed for campaign-shot ref (falling back to base64): ${s3Err.message}`);
-                        return img; // fallback — routedImageGenerate now handles data URIs too
+                        return img; // fallback — routedImageGenerate handles data URIs too
                     }
                 }
                 return img; // already an HTTP URL
             }));
-            console.log(`   🖼️ Campaign Shot ref images: ${refImageUrls.length} (${refImageUrls.filter(u => u.startsWith('http')).length} HTTP, ${refImageUrls.filter(u => u.startsWith('data:')).length} base64)`);
+            console.log(`   🖼️ Campaign Shot ref images: ${refImageUrls.length} total | prompt length: ${masterPrompt.length} chars`);
 
-            const genResult = await internalGenerateCreative({
-                body: {
-                    brandId,
-                    prompt: masterPrompt,
-                    type: 'campaign-shot',
-                    refImageUrls,
-                    options: {
-                        imageModel,
-                        aspectRatio,
-                        imageSize: '1K',
-                        temperature: variation.tempOverride ?? 0.3,
-                        generateCopy: generateCopy, // ✅ Pass through user's toggle
-                    },
-                },
-                user: req.user,
-                creditsDeducted: req.creditsDeducted,
-            });
-            if (genResult?.creative?.imageUrl) {
-                generatedImageUrl = genResult.creative.imageUrl;
-                usedModel = genResult.creative.aiMeta?.model || imageModel;
+            // ── Call routedImageGenerate directly with the full art-directed prompt + all ref images ──
+            const result = await routedImageGenerate(
+                masterPrompt,
+                [],  // imageParts — routedImageGenerate downloads from refImageUrls
+                variation.tempOverride ?? 0.3,
+                aspectRatio,
+                '1K',
+                imageModel,
+                refImageUrls,  // product + character + style ref (all HTTP URLs after S3 upload)
+                null           // customSize
+            );
+
+            if (result.modelBusy) {
+                genError = result.errorMessage || 'AI model servers are busy. Please try again soon.';
+                console.warn(`   ⚠️ Campaign Shot model busy: ${genError}`);
+            } else if (result.imageUrl) {
+                generatedImageUrl = result.imageUrl;
+                usedModel = result.model || imageModel;
                 console.log(`   ✅ Campaign Shot generated with ${usedModel}`);
             } else {
-                genError = genResult?.errorMessage || 'No image returned';
-                console.warn(`   ⚠️ internalGenerateCreative returned no image: ${genError}`);
+                genError = 'No image returned from generation model';
+                console.warn(`   ⚠️ Campaign Shot: ${genError}`);
             }
         } catch (e) {
             genError = e.message;
-            console.error(`   ❌ internalGenerateCreative error:`, e.message);
+            console.error(`   ❌ Campaign Shot generation error:`, e.message);
         }
 
             if (!generatedImageUrl) {
