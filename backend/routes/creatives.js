@@ -1120,14 +1120,12 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
     };
 }
 
-// ── OpenAI GPT-image-1 / GPT-image-2 generation ──────────────────────────────
-// Routes through Direct OpenAI API. Falls back to LaoZhang proxy if env var
-// OPENAI_USE_LZ=true — useful when direct API has quota issues.
-// NOTE: These models do NOT support reference images / inpainting.
-async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque') {
+// ── OpenAI GPT-image-1 / GPT-image-2 generation + editing ─────────────────────
+// Routes through LaoZhang proxy for gpt-image-2 (direct OpenAI requires org verification).
+// When reference images are provided, uses /images/edits (multipart/form-data).
+// Otherwise uses /images/generations (JSON body).
+async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
-    // gpt-image-2: Route through LaoZhang (direct OpenAI requires org verification)
-    // gpt-image-1: Direct OpenAI, or LaoZhang if OPENAI_USE_LZ=true
     const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
     const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
@@ -1140,50 +1138,113 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
     // ── Map aspect ratio → supported OpenAI image sizes ──
-    // GPT-image-1/2 supports: 1024x1024, 1024x1536 (portrait 2:3), 1536x1024 (landscape 3:2)
     const sizeMap = {
         '1:1':  '1024x1024',
-        '4:5':  '1024x1024',  // closest square
+        '4:5':  '1024x1024',
         '2:3':  '1024x1536',
-        '9:16': '1024x1536',  // portrait → 2:3 native
-        '3:4':  '1024x1536',  // portrait → 2:3 native
+        '9:16': '1024x1536',
+        '3:4':  '1024x1536',
         '3:2':  '1536x1024',
-        '16:9': '1536x1024',  // landscape → 3:2 native
+        '16:9': '1536x1024',
         '4:3':  '1536x1024',
     };
     const imageSize = sizeMap[aspectRatio] || '1024x1024';
-
-    // transparent background only works with PNG output
     const finalFormat = background === 'transparent' ? 'png' : outputFormat;
 
-    console.log(`\n══════ OPENAI IMAGE GENERATION (${modelId}) ══════`);
-    console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
-    console.log(`🌐 Endpoint: ${baseUrl} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
-    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
-
-    const body = {
-        model: modelId,
-        prompt: promptText,
-        n: 1,
-        size: imageSize,
-        quality,
-        output_format: finalFormat,
-        background,
-    };
-    // output_compression only applies to jpeg/webp
-    if (finalFormat === 'webp' || finalFormat === 'jpeg') {
-        body.output_compression = 85;
+    // ── Download reference images if provided ──
+    const validRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
+    let refBuffers = []; // Array of { buffer: Buffer, mimeType: string }
+    if (validRefUrls.length > 0) {
+        console.log(`📥 Downloading ${validRefUrls.length} reference images for OpenAI edit...`);
+        const downloads = validRefUrls.slice(0, 16).map(async (url) => { // max 16 images
+            try {
+                const resp = await presignedFetch(url, { signal: AbortSignal.timeout(15000) });
+                if (resp && resp.ok) {
+                    const buf = Buffer.from(await resp.arrayBuffer());
+                    const ct = resp.headers.get('content-type') || 'image/png';
+                    console.log(`  ✅ Ref image loaded (${Math.round(buf.length / 1024)}KB): ${url.substring(0, 80)}...`);
+                    return { buffer: buf, mimeType: ct };
+                }
+                console.warn(`  ⚠️ Ref image HTTP ${resp?.status}: ${url.substring(0, 80)}`);
+            } catch (e) {
+                console.warn(`  ⚠️ Ref image download failed: ${e.message}`);
+            }
+            return null;
+        });
+        refBuffers = (await Promise.all(downloads)).filter(Boolean);
+        console.log(`📦 ${refBuffers.length}/${validRefUrls.length} reference images ready`);
     }
 
-    const response = await fetch(`${baseUrl}/images/generations`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(180000),
-    });
+    const useEditsEndpoint = refBuffers.length > 0;
+    const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
+
+    console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId}) ══════`);
+    console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
+    console.log(`🌐 Endpoint: ${baseUrl}/${endpoint} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
+    if (useEditsEndpoint) console.log(`🖼️  Reference images: ${refBuffers.length}`);
+    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
+
+    let response;
+
+    if (useEditsEndpoint) {
+        // ── MULTIPART/FORM-DATA path: /images/edits ──
+        // Uses the 'form-data' package (imported at top) for multipart encoding
+        const formData = new FormData();
+
+        // Attach each reference image FIRST (best practice for multipart ordering)
+        for (let i = 0; i < refBuffers.length; i++) {
+            const ref = refBuffers[i];
+            const ext = ref.mimeType.includes('png') ? 'png' : ref.mimeType.includes('webp') ? 'webp' : 'jpg';
+            formData.append('image[]', ref.buffer, {
+                filename: `ref_${i}.${ext}`,
+                contentType: ref.mimeType,
+            });
+        }
+
+        formData.append('model', modelId);
+        formData.append('prompt', promptText);
+        formData.append('n', '1');
+        formData.append('size', imageSize);
+        formData.append('quality', quality);
+
+        // form-data produces a Node stream — convert to Buffer for native fetch
+        const formBuffer = formData.getBuffer();
+        const formHeaders = formData.getHeaders();
+
+        response = await fetch(`${baseUrl}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                ...formHeaders,
+            },
+            body: formBuffer,
+            signal: AbortSignal.timeout(240000), // 4 min for edits (heavier)
+        });
+    } else {
+        // ── JSON path: /images/generations (no ref images) ──
+        const body = {
+            model: modelId,
+            prompt: promptText,
+            n: 1,
+            size: imageSize,
+            quality,
+            output_format: finalFormat,
+            background,
+        };
+        if (finalFormat === 'webp' || finalFormat === 'jpeg') {
+            body.output_compression = 85;
+        }
+
+        response = await fetch(`${baseUrl}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(180000),
+        });
+    }
 
     if (!response.ok) {
         const errText = await response.text();
@@ -1223,16 +1284,15 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         }
 
         const rawBuf = Buffer.from(b64, 'base64');
-        let mimeType = 'image/png'; // default
+        let mimeType = 'image/png';
         let outputBuf = rawBuf;
 
-        // Check magic bytes: PNG=\x89PNG, JPEG=\xFF\xD8, WEBP=RIFF....WEBP
+        // Check magic bytes
         if (rawBuf[0] === 0x89 && rawBuf[1] === 0x50) {
             mimeType = 'image/png';
         } else if (rawBuf[0] === 0xFF && rawBuf[1] === 0xD8) {
             mimeType = 'image/jpeg';
         } else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') {
-            // WebP detected — convert to PNG so Sharp and Gemini can process it
             console.log(`🔄 Converting webp → png for Sharp/Gemini compatibility`);
             try {
                 const sharp = (await import('sharp')).default;
@@ -1253,8 +1313,8 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     const revisedPrompt = imageData.revised_prompt || '';
     if (revisedPrompt) console.log(`📝 OpenAI revised prompt: ${revisedPrompt.substring(0, 120)}...`);
-    console.log(`✅ OpenAI Image generated successfully via ${modelId}`);
-    console.log(`══════ END OPENAI IMAGE GENERATION ══════\n`);
+    console.log(`✅ OpenAI Image ${useEditsEndpoint ? 'edited' : 'generated'} successfully via ${modelId}${refBuffers.length > 0 ? ` (${refBuffers.length} ref images)` : ''}`);
+    console.log(`══════ END OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} ══════\n`);
 
     return {
         imageUrl,
@@ -1394,13 +1454,14 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    // ── Route: OpenAI GPT-image-1 / GPT-image-2 (direct OpenAI API) ─────────
-    // These models do NOT support reference images — text-to-image only.
+    // ── Route: OpenAI GPT-image-1 / GPT-image-2 ─────────────────────────────
+    // Supports reference images via /images/edits (multipart/form-data).
+    // Without ref images, uses /images/generations (JSON body).
     if (modelKey === 'gpt-image-1' || modelKey === 'gpt-image-2') {
         const TIMEOUT_MS = 300_000; // 5 minutes (LaoZhang proxy adds latency)
-        // Warn if caller passed reference images (silently dropped — model doesn't support them)
-        if ((refImageUrls || []).length > 0 || (imageParts || []).length > 0) {
-            console.warn(`⚠️ [${modelKey}] Reference images were passed but this model does not support them — generating text-to-image only.`);
+        const hasRefImages = (refImageUrls || []).filter(u => u && u.startsWith('http')).length > 0;
+        if (hasRefImages) {
+            console.log(`🖼️ [${modelKey}] ${refImageUrls.length} reference images detected — using /images/edits endpoint`);
         }
         const quality = modelKey === 'gpt-image-2' ? 'high' : 'medium';
 
@@ -1411,7 +1472,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     setTimeout(() => reject(new Error(`TIMEOUT`)), TIMEOUT_MS)
                 );
                 const result = await Promise.race([
-                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque'),
+                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque', refImageUrls),
                     timeoutPromise,
                 ]);
                 return { ...result, model: selectedModel };
