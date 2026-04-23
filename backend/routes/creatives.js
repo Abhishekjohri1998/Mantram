@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import express from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
+import sharp from 'sharp';
 
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
@@ -411,8 +412,16 @@ Generate the adapted creative now.`;
                 const targetH = parseInt(customSize.height, 10);
                 if (targetW > 0 && targetH > 0) {
                     console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
-                    const sharp = (await import('sharp')).default;
-                    let imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    // ⚡ PERF: Decode data: URIs directly instead of re-fetching via network
+                    let imgBuffer;
+                    if (rawImageUrl.startsWith('data:')) {
+                        const commaIdx = rawImageUrl.indexOf(',');
+                        if (commaIdx > -1) {
+                            imgBuffer = Buffer.from(rawImageUrl.substring(commaIdx + 1), 'base64');
+                        }
+                    } else {
+                        imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    }
                     if (imgBuffer) {
                         // Guard: convert webp to PNG if needed (Sharp on some EC2 builds lacks webp)
                         if (imgBuffer.length > 12 && imgBuffer.toString('ascii', 8, 12) === 'WEBP') {
@@ -600,7 +609,7 @@ Generate the adapted creative now.`;
                 // Saves quality verdict + score to aiMeta without blocking the user response
                 if (finalUrl && finalUrl.startsWith('http') && agenticMeta?.finalPrompt) {
                     try {
-                        const { postGenerationCriticNode } = await import('../agents/creativeStudio/nodes.js');
+                        // ⚡ PERF: Use the already-imported postGenerationCriticNode (line 45) — no dynamic re-import
                         const criticState = {
                             brief: prompt,
                             finalPrompt: agenticMeta.finalPrompt,
@@ -1295,7 +1304,7 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         } else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') {
             console.log(`🔄 Converting webp → png for Sharp/Gemini compatibility`);
             try {
-                const sharp = (await import('sharp')).default;
+                // sharp already imported at top of file
                 outputBuf = await sharp(rawBuf).png().toBuffer();
                 mimeType = 'image/png';
             } catch (convErr) {
@@ -2632,7 +2641,7 @@ router.post('/upscale', protect, async (req, res) => {
 
         if (scale === '2k') {
             // ══════ 2K: Sharp Lanczos upscale (FREE, ~1s) ══════
-            const sharp = (await import('sharp')).default;
+            // sharp already imported at top of file
             const metadata = await sharp(imgBuffer).metadata();
             const targetWidth = Math.max(metadata.width * 2, 2048);
             const targetHeight = Math.max(metadata.height * 2, 2048);
@@ -3231,7 +3240,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         // ── Async: Split panoramic, composite products, upload ──
         (async () => {
             try {
-                const sharp = (await import('sharp')).default;
+                // sharp already imported at top of file
                 const geminiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
                 // Utility: URL/dataURI → Buffer with retry
