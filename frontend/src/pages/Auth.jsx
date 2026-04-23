@@ -244,7 +244,8 @@ export default function Auth() {
                                             onChange={e => update('name', e.target.value)}
                                             placeholder="John Doe" 
                                             required
-                                            className="input-glass w-full pl-12 py-3"
+                                            className="input-glass w-full py-3"
+                                            style={{ paddingLeft: '2.75rem' }}
                                         />
                                     </div>
                                 </div>
@@ -259,7 +260,8 @@ export default function Auth() {
                                             value={form.company} 
                                             onChange={e => update('company', e.target.value)}
                                             placeholder="Your Company (optional)"
-                                            className="input-glass w-full pl-12 py-3"
+                                            className="input-glass w-full py-3"
+                                            style={{ paddingLeft: '2.75rem' }}
                                         />
                                     </div>
                                 </div>
@@ -279,7 +281,8 @@ export default function Auth() {
                                     placeholder="you@company.com" 
                                     required 
                                     autoFocus
-                                    className="input-glass w-full pl-12 py-3"
+                                    className="input-glass w-full py-3"
+                                    style={{ paddingLeft: '2.75rem' }}
                                 />
                             </div>
                         </div>
@@ -297,7 +300,8 @@ export default function Auth() {
                                     placeholder="••••••••" 
                                     required 
                                     minLength={6}
-                                    className="input-glass w-full pl-12 pr-10 py-3"
+                                    className="input-glass w-full pr-10 py-3"
+                                    style={{ paddingLeft: '2.75rem' }}
                                 />
                                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors cursor-pointer"
@@ -383,7 +387,8 @@ export default function Auth() {
                                         placeholder="you@company.com"
                                         required
                                         autoFocus
-                                        className="input-glass w-full pl-12 py-3"
+                                        className="input-glass w-full py-3"
+                                        style={{ paddingLeft: '2.75rem' }}
                                     />
                                 </div>
                                 <button type="submit" disabled={forgotLoading}
