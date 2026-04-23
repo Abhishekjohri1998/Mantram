@@ -274,11 +274,11 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                         overflow: 'hidden',
                     }}>
                         {/* Layered background */}
-                        <div style={{ position: 'absolute', inset: 0, background: 'var(--sys-primary)' }} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'var(--sys-surface)' }} />
                         {/* Grid overlay */}
                         <div style={{
-                            position: 'absolute', inset: 0, opacity: 0.03,
-                            backgroundImage: 'var(--sys-primary) 1px, transparent 1px), var(--sys-primary) 1px, transparent 1px)',
+                            position: 'absolute', inset: 0, opacity: 0.5,
+                            backgroundImage: 'radial-gradient(var(--sys-border) 1px, transparent 1px)',
                             backgroundSize: '24px 24px',
                         }} />
                         {/* Top glow */}
@@ -290,7 +290,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                         }} />
 
                         {/* ─────── HEADER ─────── */}
-                        <div style={{ position: 'relative', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255, 77, 0,0.12)' }}>
+                        <div style={{ position: 'relative', padding: '20px 24px 16px', borderBottom: '1px solid var(--sys-border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                     {/* Animated shield */}
@@ -305,15 +305,15 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                     </div>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 17, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.02em' }}>Agent Fidato</span>
+                                            <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--sys-text)', letterSpacing: '0.02em' }}>Agent Fidato</span>
                                             <span style={{
                                                 padding: '2px 8px', borderRadius: 6, fontSize: 9, fontWeight: 800,
                                                 letterSpacing: '0.18em', textTransform: 'uppercase',
-                                                background: 'var(--sys-primary), rgba(16,185,129,0.15))',
-                                                border: '1px solid rgba(255, 77, 0,0.3)', color: '#a78bfa',
+                                                background: 'var(--sys-primary-dim)',
+                                                border: '1px solid rgba(255, 77, 0,0.3)', color: '#FF4D00',
                                             }}>INTEL</span>
                                         </div>
-                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginTop: 2, letterSpacing: '0.06em' }}>
+                                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', fontWeight: 600, marginTop: 2, letterSpacing: '0.06em' }}>
                                             COMPETITIVE INTELLIGENCE CENTER
                                         </div>
                                     </div>
@@ -342,14 +342,14 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                 ].map((s, i) => (
                                     <div key={i} style={{
                                         flex: 1, padding: '10px 12px', borderRadius: 10,
-                                        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                                        background: 'var(--sys-bg)', border: '1px solid var(--sys-border)',
                                         textAlign: 'center',
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 2 }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: s.color }}>{s.icon}</span>
-                                            <span style={{ fontSize: 9, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</span>
+                                            <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</span>
                                         </div>
-                                        <div style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{s.value}</div>
+                                        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sys-text)' }}>{s.value}</div>
                                     </div>
                                 ))}
                             </div>
@@ -380,13 +380,13 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                             {/* ── Create Mission Form ── */}
                             {showCreate && (
                                 <div className="fidato-form-slide" style={{
-                                    background: 'var(--sys-primary), rgba(16,185,129,0.04))',
-                                    border: '1px solid rgba(255, 77, 0,0.15)', borderRadius: 14,
+                                    background: 'var(--sys-bg)',
+                                    border: '1px solid var(--sys-border)', borderRadius: 14,
                                     padding: 20, marginBottom: 20,
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#a78bfa' }}>target</span>
-                                        <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', letterSpacing: '0.04em' }}>NEW INTEL MISSION</span>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#FF4D00' }}>target</span>
+                                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--sys-text)', letterSpacing: '0.04em' }}>NEW INTEL MISSION</span>
                                     </div>
 
                                     <input
@@ -404,17 +404,17 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                 onClick={() => setForm(f => ({ ...f, type: mt.value }))}
                                                 style={{
                                                     padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8,
-                                                    background: form.type === mt.value ? `${mt.color}18` : 'rgba(255,255,255,0.02)',
-                                                    border: `1px solid ${form.type === mt.value ? `${mt.color}50` : 'rgba(255,255,255,0.06)'}`,
+                                                    background: form.type === mt.value ? `${mt.color}18` : 'var(--sys-bg)',
+                                                    border: `1px solid ${form.type === mt.value ? `${mt.color}50` : 'var(--sys-border)'}`,
                                                     borderRadius: 10, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
                                                 }}
                                             >
                                                 <span className="material-symbols-outlined" style={{
-                                                    fontSize: 16, color: form.type === mt.value ? mt.color : '#64748b',
+                                                    fontSize: 16, color: form.type === mt.value ? mt.color : 'var(--sys-text-muted)',
                                                 }}>{mt.icon}</span>
                                                 <div>
-                                                    <div style={{ fontSize: 11, fontWeight: 700, color: form.type === mt.value ? 'white' : '#94a3b8' }}>{mt.label}</div>
-                                                    <div style={{ fontSize: 9, color: '#475569', marginTop: 1 }}>{mt.desc}</div>
+                                                    <div style={{ fontSize: 11, fontWeight: 700, color: form.type === mt.value ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>{mt.label}</div>
+                                                    <div style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginTop: 1 }}>{mt.desc}</div>
                                                 </div>
                                             </button>
                                         ))}
@@ -433,9 +433,9 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                 onClick={() => setForm(f => ({ ...f, frequency: fo.value }))}
                                                 style={{
                                                     flex: 1, padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                                                    background: form.frequency === fo.value ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.02)',
-                                                    border: `1px solid ${form.frequency === fo.value ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.06)'}`,
-                                                    borderRadius: 8, color: form.frequency === fo.value ? '#10b981' : '#64748b',
+                                                    background: form.frequency === fo.value ? 'rgba(16,185,129,0.12)' : 'var(--sys-bg)',
+                                                    border: `1px solid ${form.frequency === fo.value ? 'rgba(16,185,129,0.35)' : 'var(--sys-border)'}`,
+                                                    borderRadius: 8, color: form.frequency === fo.value ? '#10b981' : 'var(--sys-text-muted)',
                                                     fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
                                                 }}
                                             >
@@ -452,7 +452,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                         className="fidato-deploy-btn"
                                         style={{
                                             width: '100%', padding: 12,
-                                            background: form.title && form.targetName ? 'var(--sys-primary)' : 'rgba(255,255,255,0.05)',
+                                            background: form.title && form.targetName ? 'var(--sys-primary)' : 'var(--sys-bg)',
                                             border: 'none', borderRadius: 10, color: 'white',
                                             fontSize: 13, fontWeight: 700, cursor: form.title && form.targetName ? 'pointer' : 'not-allowed',
                                             opacity: form.title && form.targetName ? 1 : 0.4,
@@ -485,11 +485,11 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
 
                                     <div style={{
                                         padding: 16, borderRadius: 12, marginBottom: 16,
-                                        background: 'var(--sys-primary), rgba(16,185,129,0.05))',
-                                        border: '1px solid rgba(255, 77, 0,0.15)',
+                                        background: 'var(--sys-bg)',
+                                        border: '1px solid var(--sys-border)',
                                     }}>
-                                        <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>{findings.title}</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#64748b' }}>
+                                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sys-text)', marginBottom: 4 }}>{findings.title}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--sys-text-muted)' }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#FF4D00' }}>target</span>
                                             {findings.target?.name}
                                             <span style={{ color: '#334155' }}>•</span>
@@ -500,9 +500,9 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                     {findings.findings?.length === 0 && (
                                         <div style={{ textAlign: 'center', padding: 40 }}>
                                             <div style={{ marginBottom: 12 }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#475569' }}>radar</span>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--sys-text-muted)' }}>radar</span>
                                             </div>
-                                            <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Agent monitoring... No insights yet</div>
+                                            <div style={{ fontSize: 13, color: 'var(--sys-text-muted)', fontWeight: 600 }}>Agent monitoring... No insights yet</div>
                                         </div>
                                     )}
 
@@ -520,11 +520,11 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                             {f.severity}
                                                         </span>
                                                     </div>
-                                                    <span style={{ fontSize: 10, color: '#475569' }}>
+                                                    <span style={{ fontSize: 10, color: 'var(--sys-text-muted)' }}>
                                                         {new Date(f.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                                                     </span>
                                                 </div>
-                                                <div style={{ fontSize: 13, color: '#e2e8f0', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                                                <div style={{ fontSize: 13, color: 'var(--sys-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                                                     {f.summary}
                                                 </div>
                                             </div>
@@ -543,7 +543,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                 border: '2px solid rgba(255, 77, 0,0.2)',
                                                 borderTopColor: '#FF4D00',
                                             }} />
-                                            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, letterSpacing: '0.08em' }}>SCANNING...</div>
+                                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', fontWeight: 600, letterSpacing: '0.08em' }}>SCANNING...</div>
                                         </div>
                                     )}
 
@@ -570,8 +570,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                     <line x1="60" y1="60" x2="60" y2="10" stroke="rgba(255, 77, 0,0.5)" strokeWidth="1" />
                                                 </svg>
                                             </div>
-                                            <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0', marginBottom: 6 }}>Deploy Your First Agent</div>
-                                            <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6, maxWidth: 280, margin: '0 auto 20px' }}>
+                                            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sys-text)', marginBottom: 6 }}>Deploy Your First Agent</div>
+                                            <div style={{ fontSize: 12, color: 'var(--sys-text-muted)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto 20px' }}>
                                                 Track competitor pricing, ad launches, strategy shifts, and product updates in real-time with AI-powered agents
                                             </div>
                                             <button
@@ -603,8 +603,8 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                 key={m._id}
                                                 className="fidato-mission-card"
                                                 style={{
-                                                    background: 'rgba(255,255,255,0.02)',
-                                                    border: `1px solid rgba(255,255,255,0.06)`,
+                                                    background: 'var(--sys-bg)',
+                                                    border: `1px solid var(--sys-border)`,
                                                     borderRadius: 14, padding: 16, marginBottom: 10,
                                                     cursor: 'pointer', transition: 'all 0.25s',
                                                     animationDelay: `${idx * 60}ms`,
@@ -614,7 +614,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                     loadFindings(m._id).then(() => setShowReport(true))
                                                 }}
                                                 onMouseOver={e => { e.currentTarget.style.borderColor = `${typeInfo.color}40`; e.currentTarget.style.background = `${typeInfo.color}08` }}
-                                                onMouseOut={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                                                onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--sys-border)'; e.currentTarget.style.background = 'var(--sys-bg)' }}
                                             >
                                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                                                     {/* Icon */}
@@ -629,7 +629,7 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                     {/* Content */}
                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                                            <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sys-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                                 {m.title}
                                                             </span>
                                                             {unread > 0 && (
@@ -639,11 +639,11 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                                 }}>{unread}</span>
                                                             )}
                                                         </div>
-                                                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                                             <span className="material-symbols-outlined" style={{ fontSize: 12 }}>target</span>
                                                             {m.target?.name}
                                                             {m.lastCheckedAt && (
-                                                                <span style={{ color: '#475569' }}>
+                                                                <span style={{ color: 'var(--sys-text-muted)' }}>
                                                                     • {new Date(m.lastCheckedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                                                                 </span>
                                                             )}
@@ -665,10 +665,10 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
                                                         <span style={{ width: 5, height: 5, borderRadius: 99, background: isActive ? '#10b981' : '#f59e0b' }} />
                                                         {isActive ? 'ACTIVE' : 'PAUSED'}
                                                     </span>
-                                                    <span style={{ fontSize: 9, color: '#475569', letterSpacing: '0.04em' }}>
+                                                    <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', letterSpacing: '0.04em' }}>
                                                         {FREQUENCY_OPTIONS.find(f => f.value === m.frequency)?.label || m.frequency}
                                                     </span>
-                                                    <span style={{ fontSize: 9, color: '#475569' }}>
+                                                    <span style={{ fontSize: 9, color: 'var(--sys-text-muted)' }}>
                                                         • {m.totalFindings || 0} insights
                                                     </span>
 
@@ -757,10 +757,10 @@ export default function AgentFidatoPanel({ studio = 'seo', panelOnly = false, on
 const inputStyle = {
     width: '100%',
     padding: '11px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--sys-bg)',
+    border: '1px solid var(--sys-border)',
     borderRadius: 10,
-    color: '#e2e8f0',
+    color: 'var(--sys-text)',
     fontSize: 13,
     outline: 'none',
     marginBottom: 10,
