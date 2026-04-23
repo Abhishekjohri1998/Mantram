@@ -3024,7 +3024,12 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
 
         // Product image — always first
         const productPart = await urlToImagePart(productImage);
-        if (productPart) imageParts.push(productPart);
+        if (productPart) {
+            imageParts.push(productPart);
+            console.log(`   ✅ Product image loaded (${productPart.inlineData?.mimeType || 'unknown'})`);
+        } else {
+            console.error(`   ❌ Product image could not be decoded — URL type: ${productImage?.substring(0, 30)}`);
+        }
 
         // Character image — second (if provided)
         if (hasCharacter) {
@@ -3038,46 +3043,88 @@ ${hasRef ? 'STYLE REFERENCE: Match the mood, color palette, and cinematic feel o
             if (refPart) imageParts.push(refPart);
         }
 
+        if (imageParts.length === 0) {
+            return res.status(400).json({ success: false, error: 'Could not load the product image — it may have expired. Please re-upload and try again.' });
+        }
+
         // ── Step 5: Generate with selected model ──
         let generatedImageUrl = null;
         let usedModel = imageModel;
+        let genError = null;
 
-        console.log(`   🖼️ Generating with ${imageModel} (${imageParts.length} reference images)`);
+        console.log(`   🖼️ Generating with ${imageModel} (${imageParts.length} reference images) | Variation: ${variation.label}`);
 
         if (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1') {
-            // OpenAI GPT-Image models — use the existing internalGenerateCreative pipeline
-            const genResult = await internalGenerateCreative({
-                body: {
-                    brandId,
-                    prompt: masterPrompt,
-                    aspectRatio,
-                    imageModel,
-                    refImageUrl: refImage || productImage, // Pass product as reference
-                    type: 'campaign-shot',
-                    style: 'photorealistic',
-                },
-                user: req.user,
-                creditsDeducted: req.creditsDeducted,
-            });
-            generatedImageUrl = genResult.imageUrl;
+            // OpenAI GPT-Image models
+            try {
+                const genResult = await internalGenerateCreative({
+                    body: {
+                        brandId,
+                        prompt: masterPrompt,
+                        aspectRatio,
+                        imageModel,
+                        refImageUrl: refImage || productImage,
+                        type: 'campaign-shot',
+                        style: 'photorealistic',
+                    },
+                    user: req.user,
+                    creditsDeducted: req.creditsDeducted,
+                });
+                generatedImageUrl = genResult.imageUrl;
+            } catch (e) {
+                genError = e.message;
+                console.error(`❌ GPT-Image generation failed:`, e.message);
+            }
         } else if (imageParts.length > 0) {
-            // NanoBanana2 / other multimodal — use variation temperature for distinct outputs
-            const genResult = await geminiImageGenerate(masterPrompt, imageParts, variation.tempOverride ?? 0.3, aspectRatio);
-            generatedImageUrl = genResult?.imageUrl;
-            usedModel = genResult?.model || imageModel;
+            // NanoBanana2 (Gemini Flash Image) — try primary then fallback
+            const GEMINI_MODELS = [
+                'gemini-3.1-flash-image-preview',              // Primary (NanoBanana 2)
+                'gemini-2.0-flash-exp-image-generation',       // Fallback
+            ];
+            for (const geminiModel of GEMINI_MODELS) {
+                try {
+                    console.log(`   🤖 Trying ${geminiModel}...`);
+                    const genResult = await geminiImageGenerate(masterPrompt, imageParts, variation.tempOverride ?? 0.3, aspectRatio, '1K', geminiModel);
+                    if (genResult?.imageUrl) {
+                        generatedImageUrl = genResult.imageUrl;
+                        usedModel = genResult.model || geminiModel;
+                        console.log(`   ✅ Image from ${geminiModel}`);
+                        break;
+                    }
+                } catch (e) {
+                    genError = e.message;
+                    console.warn(`   ⚠️ ${geminiModel} failed: ${e.message}`);
+                }
+            }
+            // Last resort: laozhang text-to-image
+            if (!generatedImageUrl) {
+                try {
+                    console.log(`   🔄 Falling back to LaoZhang...`);
+                    const genResult = await laozhangImageGenerate(masterPrompt, { model: 'flux-pro', aspectRatio, quality: 'ultra' });
+                    generatedImageUrl = genResult?.imageUrl;
+                    usedModel = genResult?.model || 'flux-pro';
+                } catch (e) {
+                    genError = e.message;
+                    console.error(`❌ LaoZhang fallback failed:`, e.message);
+                }
+            }
         } else {
-            // Fallback: text-only generation via LaoZhang
-            const genResult = await laozhangImageGenerate(masterPrompt, {
-                model: imageModel,
-                aspectRatio,
-                quality: 'ultra',
-            });
-            generatedImageUrl = genResult?.imageUrl;
-            usedModel = genResult?.model || imageModel;
+            // No reference images — pure text-to-image via LaoZhang
+            try {
+                const genResult = await laozhangImageGenerate(masterPrompt, { model: imageModel, aspectRatio, quality: 'ultra' });
+                generatedImageUrl = genResult?.imageUrl;
+                usedModel = genResult?.model || imageModel;
+            } catch (e) {
+                genError = e.message;
+                console.error(`❌ Text-to-image failed:`, e.message);
+            }
         }
 
         if (!generatedImageUrl) {
-            return res.status(500).json({ success: false, error: 'Campaign Shot generation failed — no image returned' });
+            const errorMsg = genError
+                ? `Image generation failed: ${genError}`
+                : 'No image returned — the AI model may be busy, please try again';
+            return res.status(500).json({ success: false, error: errorMsg });
         }
 
         // ── Step 6: Save to Creative DB ──
