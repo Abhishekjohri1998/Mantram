@@ -4,6 +4,15 @@ import express from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
 
+// ⚡ PERF: Lazy singleton for sharp — imported once on first use, cached thereafter.
+// Avoids static import crash if native binary isn't compiled for the platform,
+// while eliminating the ~200ms overhead of repeated dynamic imports.
+let _sharp = null;
+async function getSharp() {
+    if (!_sharp) _sharp = (await import('sharp')).default;
+    return _sharp;
+}
+
 import GenerationJob from '../models/GenerationJob.js';
 import { Router } from 'express';
 import Creative from '../models/Creative.js';
@@ -18,6 +27,7 @@ import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
 
 import { uploadToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
+import { getCachedImageBuffer, setCachedImageBuffer } from '../utils/imageCache.js';
 
 /**
  * Fetch any URL, pre-signing private S3 URLs with backend AWS credentials first.
@@ -195,8 +205,8 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             await addStep(progressId, { agent: 'intel', message: 'Analyzing brand DNA...', status: 'working' });
         }
 
-        const brand = await Brand.findById(brandId);
-        if (!brand) throw new Error('Brand not found');
+        // ⚡ PERF: Removed standalone Brand.findById — the pipeline's loadBrandContext
+        // already loads the brand from Redis cache or DB. Validated post-pipeline instead.
 
         // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
         // Previously this was defined after the pipeline call, so pipeline always got an empty array.
@@ -266,18 +276,18 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         // Templates send product photos, character images, and reference images
         // via options.baseImage, options.productImageUrl, options.characters, etc.
         // These MUST be forwarded to the image model as reference images.
+        // ⚡ PERF: All base64→S3 uploads now run in parallel via Promise.all
         const templateRefUrls = [];
+        const templateUploadPromises = [];
         if (options) {
-            // Product image (base64 → upload to S3 first, HTTP URL → use directly)
+            // Product image (base64 → queue S3 upload, HTTP URL → use directly)
             if (options.baseImage && typeof options.baseImage === 'string') {
                 if (options.baseImage.startsWith('data:image/')) {
-                    try {
-                        const s3Url = await uploadToS3(options.baseImage, `templates/${brandId}/${Date.now()}-product.png`);
-                        templateRefUrls.push(s3Url);
-                        console.log(`🖼️ [Template] Uploaded base64 product image to S3 for reference`);
-                    } catch (e) {
-                        console.warn(`⚠️ [Template] Failed to upload baseImage to S3:`, e.message);
-                    }
+                    templateUploadPromises.push(
+                        uploadToS3(options.baseImage, `templates/${brandId}/${Date.now()}-product.png`)
+                            .then(s3Url => { templateRefUrls.push(s3Url); console.log(`🖼️ [Template] Uploaded base64 product image to S3`); })
+                            .catch(e => console.warn(`⚠️ [Template] Failed to upload baseImage to S3:`, e.message))
+                    );
                 } else if (options.baseImage.startsWith('http')) {
                     templateRefUrls.push(options.baseImage);
                 }
@@ -291,13 +301,12 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 for (const char of options.characters) {
                     if (char.image && typeof char.image === 'string') {
                         if (char.image.startsWith('data:image/')) {
-                            try {
-                                const s3Url = await uploadToS3(char.image, `templates/${brandId}/${Date.now()}-char.png`);
-                                templateRefUrls.push(s3Url);
-                                console.log(`🖼️ [Template] Uploaded character image "${char.name}" to S3`);
-                            } catch (e) {
-                                console.warn(`⚠️ [Template] Failed to upload character image:`, e.message);
-                            }
+                            const charName = char.name || 'char';
+                            templateUploadPromises.push(
+                                uploadToS3(char.image, `templates/${brandId}/${Date.now()}-char-${charName}.png`)
+                                    .then(s3Url => { templateRefUrls.push(s3Url); console.log(`🖼️ [Template] Uploaded character image "${charName}" to S3`); })
+                                    .catch(e => console.warn(`⚠️ [Template] Failed to upload character image:`, e.message))
+                            );
                         } else if (char.image.startsWith('http')) {
                             templateRefUrls.push(char.image);
                         }
@@ -313,17 +322,21 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 for (const [key, val] of Object.entries(options.referenceImages)) {
                     if (val && typeof val === 'string') {
                         if (val.startsWith('data:image/')) {
-                            try {
-                                const s3Url = await uploadToS3(val, `templates/${brandId}/${Date.now()}-ref-${key}.png`);
-                                templateRefUrls.push(s3Url);
-                            } catch (e) {
-                                console.warn(`⚠️ [Template] Failed to upload reference image ${key}:`, e.message);
-                            }
+                            templateUploadPromises.push(
+                                uploadToS3(val, `templates/${brandId}/${Date.now()}-ref-${key}.png`)
+                                    .then(s3Url => { templateRefUrls.push(s3Url); })
+                                    .catch(e => console.warn(`⚠️ [Template] Failed to upload ref image ${key}:`, e.message))
+                            );
                         } else if (val.startsWith('http')) {
                             templateRefUrls.push(val);
                         }
                     }
                 }
+            }
+            // ⚡ Wait for all S3 uploads in parallel (was sequential before)
+            if (templateUploadPromises.length > 0) {
+                console.log(`⚡ [Template] Uploading ${templateUploadPromises.length} base64 images to S3 in parallel...`);
+                await Promise.all(templateUploadPromises);
             }
         }
 
@@ -407,12 +420,32 @@ Generate the adapted creative now.`;
                 const targetH = parseInt(customSize.height, 10);
                 if (targetW > 0 && targetH > 0) {
                     console.log(`✂️ Enforcing exact custom size crop: ${targetW}x${targetH} from AI generated ratio.`);
-                    const sharp = (await import('sharp')).default;
-                    const imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    const sharp = await getSharp();
+                    // ⚡ PERF: Decode data: URIs directly instead of re-fetching via network
+                    let imgBuffer;
+                    if (rawImageUrl.startsWith('data:')) {
+                        const commaIdx = rawImageUrl.indexOf(',');
+                        if (commaIdx > -1) {
+                            imgBuffer = Buffer.from(rawImageUrl.substring(commaIdx + 1), 'base64');
+                        }
+                    } else {
+                        imgBuffer = await fetchImageBuffer(rawImageUrl);
+                    }
+                    if (imgBuffer) {
+                        // Guard: convert webp to PNG if needed (Sharp on some EC2 builds lacks webp)
+                        if (imgBuffer.length > 12 && imgBuffer.toString('ascii', 8, 12) === 'WEBP') {
+                            try {
+                                imgBuffer = await sharp(imgBuffer, { failOn: 'none' }).toFormat('png').toBuffer();
+                            } catch (webpErr) {
+                                console.warn(`⚠️ webp→png crop conversion failed: ${webpErr.message}`);
+                                imgBuffer = null;
+                            }
+                        }
+                    }
                     if (imgBuffer) {
                         // Step 1: Normalize — re-encode through PNG to strip corrupt metadata,
                         // fix channel mismatches, and guarantee a clean pixel buffer.
-                        const normalizedBuffer = await sharp(imgBuffer, { limitInputPixels: false })
+                        const normalizedBuffer = await sharp(imgBuffer, { limitInputPixels: false, failOn: 'none' })
                             .toColourspace('srgb')  // force consistent color space
                             .png()
                             .toBuffer();
@@ -585,7 +618,7 @@ Generate the adapted creative now.`;
                 // Saves quality verdict + score to aiMeta without blocking the user response
                 if (finalUrl && finalUrl.startsWith('http') && agenticMeta?.finalPrompt) {
                     try {
-                        const { postGenerationCriticNode } = await import('../agents/creativeStudio/nodes.js');
+                        // ⚡ PERF: Use the already-imported postGenerationCriticNode (line 45) — no dynamic re-import
                         const criticState = {
                             brief: prompt,
                             finalPrompt: agenticMeta.finalPrompt,
@@ -905,21 +938,21 @@ const IMAGE_MODEL_CONFIG = {
         name: 'Grok Imagen',
         supportsRefImages: false,
     },
-    // GPT Image 1 — OpenAI (supports ref images via /images/edits endpoint)
+    // GPT Image 1 — OpenAI (opt-in, no ref image support)
     'gpt-image-1': {
         provider: 'openai',
         modelId: 'gpt-image-1',
         name: 'GPT Image 1',
-        supportsRefImages: true,
+        supportsRefImages: false,
         supportsTransparent: false,
     },
     // GPT Image 2 — OpenAI's latest (April 2026). Near-perfect text rendering,
-    // transparent backgrounds, 2K output. Supports ref images via /images/edits.
+    // transparent backgrounds, 2K output. Opt-in only — no ref image support.
     'gpt-image-2': {
         provider: 'openai',
         modelId: 'gpt-image-2',
         name: 'GPT Image 2',
-        supportsRefImages: true,
+        supportsRefImages: false,
         supportsTransparent: true,
         supportsTextRendering: true,
     },
@@ -1105,16 +1138,14 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
     };
 }
 
-// ── OpenAI GPT-image-1 / GPT-image-2 generation ──────────────────────────────
-// Routes through Direct OpenAI API. Falls back to LaoZhang proxy if env var
-// OPENAI_USE_LZ=true — useful when direct API has quota issues.
-// Supports reference images via /images/edits multipart endpoint.
-// Uses size="auto" for flexible aspect ratio support (no forced cropping).
+// ── OpenAI GPT-image-1 / GPT-image-2 generation + editing ─────────────────────
+// Routes through LaoZhang proxy for gpt-image-2 (direct OpenAI requires org verification).
+// When reference images are provided, uses /images/edits (multipart/form-data).
+// Otherwise uses /images/generations (JSON body).
 async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
-    // Primary: Direct OpenAI API
-    // Fallback: LaoZhang proxy (OpenAI-compatible)
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+    const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
+    const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
@@ -1124,134 +1155,105 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
-    // ── Aspect ratio → size strategy ──
-    // GPT Image models support size="auto" which lets the model pick the best
-    // native dimensions. For standard ratios we use the known fixed sizes for
-    // predictability; for everything else we use "auto" + prompt injection.
-    const standardSizeMap = {
+    // ── Map aspect ratio → supported OpenAI image sizes ──
+    const sizeMap = {
         '1:1':  '1024x1024',
+        '4:5':  '1024x1024',
         '2:3':  '1024x1536',
+        '9:16': '1024x1536',
+        '3:4':  '1024x1536',
         '3:2':  '1536x1024',
+        '16:9': '1536x1024',
+        '4:3':  '1536x1024',
     };
-    const imageSize = standardSizeMap[aspectRatio] || 'auto';
-
-    // When using size="auto", inject the exact aspect ratio into the prompt so
-    // the model generates natively at the correct dimensions instead of cropping.
-    let finalPrompt = promptText;
-    if (imageSize === 'auto' && aspectRatio && aspectRatio !== '1:1') {
-        const ratioLabel = aspectRatio === '9:16' ? 'portrait/vertical'
-            : aspectRatio === '16:9' ? 'landscape/horizontal'
-            : aspectRatio === '4:5' ? 'tall portrait (4:5)'
-            : aspectRatio === '3:4' ? 'portrait (3:4)'
-            : aspectRatio === '4:3' ? 'landscape (4:3)'
-            : aspectRatio;
-        finalPrompt = `[ASPECT RATIO: Generate this image in ${aspectRatio} ${ratioLabel} format.]\n\n${promptText}`;
-    }
-
-    // transparent background only works with PNG output
+    const imageSize = sizeMap[aspectRatio] || '1024x1024';
     const finalFormat = background === 'transparent' ? 'png' : outputFormat;
 
-    // ── Collect valid reference image URLs ──
-    const validRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:')));
-    const hasRefImages = validRefUrls.length > 0;
+    // ── Download reference images if provided ──
+    const validRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
+    let refBuffers = []; // Array of { buffer: Buffer, mimeType: string }
+    if (validRefUrls.length > 0) {
+        console.log(`📥 Downloading ${validRefUrls.length} reference images for OpenAI edit...`);
+        const downloads = validRefUrls.slice(0, 16).map(async (url) => { // max 16 images
+            try {
+                const resp = await presignedFetch(url, { signal: AbortSignal.timeout(15000) });
+                if (resp && resp.ok) {
+                    const buf = Buffer.from(await resp.arrayBuffer());
+                    const ct = resp.headers.get('content-type') || 'image/png';
+                    console.log(`  ✅ Ref image loaded (${Math.round(buf.length / 1024)}KB): ${url.substring(0, 80)}...`);
+                    return { buffer: buf, mimeType: ct };
+                }
+                console.warn(`  ⚠️ Ref image HTTP ${resp?.status}: ${url.substring(0, 80)}`);
+            } catch (e) {
+                console.warn(`  ⚠️ Ref image download failed: ${e.message}`);
+            }
+            return null;
+        });
+        refBuffers = (await Promise.all(downloads)).filter(Boolean);
+        console.log(`📦 ${refBuffers.length}/${validRefUrls.length} reference images ready`);
+    }
 
-    console.log(`\n══════ OPENAI IMAGE GENERATION (${modelId}) ══════`);
+    const useEditsEndpoint = refBuffers.length > 0;
+    const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
+
+    console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId}) ══════`);
     console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
-    console.log(`🖼️  Reference images: ${validRefUrls.length} ${hasRefImages ? '→ using /images/edits' : '→ using /images/generations'}`);
-    console.log(`🌐 Endpoint: ${baseUrl} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
-    console.log(`📝 Prompt (first 200 chars): ${(finalPrompt || '').substring(0, 200)}...`);
+    console.log(`🌐 Endpoint: ${baseUrl}/${endpoint} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
+    if (useEditsEndpoint) console.log(`🖼️  Reference images: ${refBuffers.length}`);
+    console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
 
     let response;
 
-    if (hasRefImages) {
-        // ═══ PATH A: Reference images → use /images/edits (multipart/form-data) ═══
-        // Download reference images and attach as image[] fields
-        const form = new FormData();
-        form.append('model', modelId);
-        form.append('prompt', finalPrompt);
-        form.append('n', '1');
-        form.append('size', imageSize);
-        form.append('quality', quality);
+    if (useEditsEndpoint) {
+        // ── MULTIPART/FORM-DATA path: /images/edits ──
+        // Uses the 'form-data' package (imported at top) for multipart encoding
+        const formData = new FormData();
 
-        // Download and attach each ref image as image[] field
-        let loadedCount = 0;
-        for (const refUrl of validRefUrls.slice(0, 8)) { // max 8 images to stay safe
-            try {
-                let imgBuffer;
-                if (refUrl.startsWith('data:')) {
-                    // Base64 data URI → extract buffer
-                    const commaIdx = refUrl.indexOf(',');
-                    imgBuffer = Buffer.from(refUrl.substring(commaIdx + 1), 'base64');
-                } else {
-                    // HTTP URL → download
-                    imgBuffer = await fetchImageBuffer(refUrl);
-                }
-                if (imgBuffer && imgBuffer.length > 0) {
-                    // Detect mime type from buffer magic bytes
-                    const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50;
-                    const isWebp = imgBuffer[8] === 0x57 && imgBuffer[9] === 0x45;
-                    const ext = isPng ? 'png' : isWebp ? 'webp' : 'png';
-                    const mime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/png';
-
-                    // If image is not PNG/WebP, convert to PNG via sharp for compatibility
-                    let finalBuffer = imgBuffer;
-                    if (!isPng && !isWebp) {
-                        try {
-                            const sharp = (await import('sharp')).default;
-                            finalBuffer = await sharp(imgBuffer).png().toBuffer();
-                        } catch (convErr) {
-                            console.warn(`⚠️ Could not convert ref image to PNG: ${convErr.message}`);
-                            finalBuffer = imgBuffer; // use as-is
-                        }
-                    }
-
-                    form.append('image[]', finalBuffer, {
-                        filename: `ref_${loadedCount}.${ext}`,
-                        contentType: mime,
-                    });
-                    loadedCount++;
-                    console.log(`✅ Attached ref image ${loadedCount} (${Math.round(finalBuffer.length / 1024)}KB)`);
-                }
-            } catch (dlErr) {
-                console.warn(`⚠️ Failed to download ref image: ${dlErr.message}`);
-            }
-        }
-
-        if (loadedCount === 0) {
-            console.warn(`⚠️ All ref images failed to load — falling back to text-to-image generation`);
-            // Fall through to PATH B below
-        } else {
-            console.log(`📎 Attached ${loadedCount} reference images to /images/edits request`);
-
-            response = await fetch(`${baseUrl}/images/edits`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    ...form.getHeaders(),
-                },
-                body: form,
-                signal: AbortSignal.timeout(180000),
+        // Attach each reference image FIRST (best practice for multipart ordering)
+        for (let i = 0; i < refBuffers.length; i++) {
+            const ref = refBuffers[i];
+            const ext = ref.mimeType.includes('png') ? 'png' : ref.mimeType.includes('webp') ? 'webp' : 'jpg';
+            formData.append('image[]', ref.buffer, {
+                filename: `ref_${i}.${ext}`,
+                contentType: ref.mimeType,
             });
         }
-    }
 
-    if (!response) {
-        // ═══ PATH B: No ref images (or ref download failed) → /images/generations (JSON) ═══
+        formData.append('model', modelId);
+        formData.append('prompt', promptText);
+        formData.append('n', '1');
+        formData.append('size', imageSize);
+        formData.append('quality', quality);
+
+        // form-data produces a Node stream — convert to Buffer for native fetch
+        const formBuffer = formData.getBuffer();
+        const formHeaders = formData.getHeaders();
+
+        response = await fetch(`${baseUrl}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                ...formHeaders,
+            },
+            body: formBuffer,
+            signal: AbortSignal.timeout(240000), // 4 min for edits (heavier)
+        });
+    } else {
+        // ── JSON path: /images/generations (no ref images) ──
         const body = {
             model: modelId,
-            prompt: finalPrompt,
+            prompt: promptText,
             n: 1,
             size: imageSize,
             quality,
             output_format: finalFormat,
             background,
         };
-        // output_compression only applies to jpeg/webp
         if (finalFormat === 'webp' || finalFormat === 'jpeg') {
             body.output_compression = 85;
         }
 
-        response = await fetch(`${baseUrl}/images/generations`, {
+        response = await fetch(`${baseUrl}/${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1266,6 +1268,14 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         const errText = await response.text();
         console.error(`❌ OpenAI Image (${modelId}) error (${response.status}):`, errText);
         if (response.status === 429) throw new Error(`BUSY: OpenAI rate limit hit. Please try again in a moment.`);
+        if (response.status === 403) {
+            const parsed = (() => { try { return JSON.parse(errText); } catch { return {}; } })();
+            const msg = parsed?.error?.message || '';
+            if (msg.includes('verified')) {
+                throw new Error(`QUOTA_EXHAUSTED: OpenAI organization not verified for ${modelId}. Please verify at https://platform.openai.com/settings/organization/general`);
+            }
+            throw new Error(`BUSY: OpenAI access denied for ${modelId}: ${msg || errText.substring(0, 200)}`);
+        }
         if (response.status === 402) throw new Error(`QUOTA_EXHAUSTED: OpenAI billing issue. Please check your account.`);
         if (response.status === 400) {
             const parsed = (() => { try { return JSON.parse(errText); } catch { return {}; } })();
@@ -1280,8 +1290,39 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     let imageUrl;
     if (imageData.b64_json) {
-        const mimeType = finalFormat === 'png' ? 'image/png' : finalFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
-        imageUrl = `data:${mimeType};base64,${imageData.b64_json}`;
+        // LaoZhang proxy returns b64_json as a full data URI ("data:image/webp;base64,...")
+        // instead of raw base64. Strip the prefix before decoding.
+        let b64 = imageData.b64_json;
+        if (b64.startsWith('data:')) {
+            const commaIdx = b64.indexOf(',');
+            if (commaIdx > -1) {
+                console.log(`🔄 Stripping data URI prefix from b64_json: ${b64.substring(0, commaIdx + 1).substring(0, 60)}...`);
+                b64 = b64.substring(commaIdx + 1);
+            }
+        }
+
+        const rawBuf = Buffer.from(b64, 'base64');
+        let mimeType = 'image/png';
+        let outputBuf = rawBuf;
+
+        // Check magic bytes
+        if (rawBuf[0] === 0x89 && rawBuf[1] === 0x50) {
+            mimeType = 'image/png';
+        } else if (rawBuf[0] === 0xFF && rawBuf[1] === 0xD8) {
+            mimeType = 'image/jpeg';
+        } else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') {
+            console.log(`🔄 Converting webp → png for Sharp/Gemini compatibility`);
+            try {
+                const sharp = await getSharp();
+                outputBuf = await sharp(rawBuf).png().toBuffer();
+                mimeType = 'image/png';
+            } catch (convErr) {
+                console.warn(`⚠️ webp→png conversion failed (${convErr.message}), using raw webp`);
+                mimeType = 'image/webp';
+            }
+        }
+
+        imageUrl = `data:${mimeType};base64,${outputBuf.toString('base64')}`;
     } else if (imageData.url) {
         imageUrl = imageData.url;
     } else {
@@ -1290,8 +1331,8 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     const revisedPrompt = imageData.revised_prompt || '';
     if (revisedPrompt) console.log(`📝 OpenAI revised prompt: ${revisedPrompt.substring(0, 120)}...`);
-    console.log(`✅ OpenAI Image generated successfully via ${modelId}`);
-    console.log(`══════ END OPENAI IMAGE GENERATION ══════\n`);
+    console.log(`✅ OpenAI Image ${useEditsEndpoint ? 'edited' : 'generated'} successfully via ${modelId}${refBuffers.length > 0 ? ` (${refBuffers.length} ref images)` : ''}`);
+    console.log(`══════ END OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} ══════\n`);
 
     return {
         imageUrl,
@@ -1422,59 +1463,60 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             return { ...result, model: selectedModel };
         } catch (error) {
             console.error(`❌ Grok Imagen failed:`, error.message);
-            const isBusy = error.message?.startsWith('BUSY') || error.message?.includes('rate limit');
             return {
                 imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
                 modelBusy: true, busyModel: 'grok-imagen',
                 errorMessage: error.message || 'Grok Imagen is unavailable. Please try again.',
-                errorType: isBusy ? 'busy' : 'error',
+                errorType: error.message?.startsWith('BUSY') ? 'busy' : 'error',
             };
         }
     }
 
-    // ── Route: OpenAI GPT-image-1 / GPT-image-2 (direct OpenAI API) ─────────
-    // Supports reference images via /images/edits endpoint. Uses size="auto" for
-    // flexible aspect ratios. Falls back to /images/generations for text-only.
+    // ── Route: OpenAI GPT-image-1 / GPT-image-2 ─────────────────────────────
+    // Supports reference images via /images/edits (multipart/form-data).
+    // Without ref images, uses /images/generations (JSON body).
     if (modelKey === 'gpt-image-1' || modelKey === 'gpt-image-2') {
-        const TIMEOUT_MS = 180_000;
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`${modelKey} timed out after 3 minutes. Please try again.`)), TIMEOUT_MS)
-        );
-        // Collect all reference image URLs (from both refImageUrls and imageParts)
-        const allRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
-        // Also extract URLs from imageParts if they contain base64 data
-        const base64Refs = (imageParts || [])
-            .filter(p => p?.inlineData?.data)
-            .map(p => `data:${p.inlineData.mimeType || 'image/png'};base64,${p.inlineData.data}`);
-        const combinedRefUrls = [...allRefUrls, ...base64Refs];
-        if (combinedRefUrls.length > 0) {
-            console.log(`🖼️ [${modelKey}] ${combinedRefUrls.length} reference images will be sent via /images/edits`);
+        const TIMEOUT_MS = 300_000; // 5 minutes (LaoZhang proxy adds latency)
+        const hasRefImages = (refImageUrls || []).filter(u => u && u.startsWith('http')).length > 0;
+        if (hasRefImages) {
+            console.log(`🖼️ [${modelKey}] ${refImageUrls.length} reference images detected — using /images/edits endpoint`);
         }
-        // GPT-image-2 defaults to medium quality; gpt-image-1 uses medium
-        const quality = modelKey === 'gpt-image-2' ? 'medium' : 'medium';
-        try {
-            const result = await Promise.race([
-                openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'webp', 'opaque', combinedRefUrls),
-                timeoutPromise,
-            ]);
-            return { ...result, model: selectedModel };
-        } catch (error) {
-            console.error(`❌ ${modelKey} failed:`, error.message);
-            const isBusy = error.message?.startsWith('BUSY') || error.message?.includes('rate limit');
-            const isQuota = error.message?.startsWith('QUOTA') || error.message?.includes('billing');
-            return {
-                imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
-                modelBusy: true, busyModel: modelKey,
-                errorMessage: error.message || `${modelKey} is unavailable. Please try again.`,
-                errorType: isBusy ? 'busy' : isQuota ? 'quota' : 'error',
-            };
+        const quality = modelKey === 'gpt-image-2' ? 'high' : 'medium';
+
+        // Attempt with one retry on timeout
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`TIMEOUT`)), TIMEOUT_MS)
+                );
+                const result = await Promise.race([
+                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque', refImageUrls),
+                    timeoutPromise,
+                ]);
+                return { ...result, model: selectedModel };
+            } catch (error) {
+                if (error.message === 'TIMEOUT' && attempt === 1) {
+                    console.warn(`⏱️ ${modelKey} timed out (attempt 1/2) — retrying...`);
+                    continue;
+                }
+                const errMsg = error.message === 'TIMEOUT'
+                    ? `${modelKey} timed out after ${Math.round(TIMEOUT_MS/1000)}s. The image was too complex — try a simpler prompt or try again.`
+                    : error.message;
+                console.error(`❌ ${modelKey} failed (attempt ${attempt}):`, errMsg);
+                return {
+                    imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
+                    modelBusy: true, busyModel: modelKey,
+                    errorMessage: errMsg,
+                    errorType: error.message?.startsWith('BUSY') || error.message?.startsWith('QUOTA') ? 'busy' : 'error',
+                };
+            }
         }
     }
 
-    // ── HARD TIMEOUT: 180 seconds max ──
-    const TIMEOUT_MS = 180_000;
+    // ── HARD TIMEOUT: 90 seconds max (reduced from 180s — if Gemini hasn't finished in 90s, it won't) ──
+    const TIMEOUT_MS = 90_000;
     const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Image generation timed out after 180 seconds. Please try again.')), TIMEOUT_MS)
+        setTimeout(() => reject(new Error('Image generation timed out after 90 seconds. Please try again.')), TIMEOUT_MS)
     );
 
     const generatePromise = (async () => {
@@ -1507,22 +1549,36 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         const lzRefUrls = (refImageUrls || []).filter(u => u && u.startsWith('http'));
 
         if (finalImageParts.length === 0 && lzRefUrls.length > 0) {
-            console.log(`📥 Downloading ${lzRefUrls.length} reference images for Gemini...`);
-            for (const url of lzRefUrls) {
+            // ⚡ PERF: Download ALL reference images in parallel (was sequential — saved 10-25s)
+            console.log(`📥 Downloading ${lzRefUrls.length} reference images for Gemini in parallel...`);
+            const refDownloads = lzRefUrls.map(async (url) => {
                 try {
-                    const resp = await presignedFetch(url, { signal: AbortSignal.timeout(35000) });
+                    const cached = getCachedImageBuffer(url);
+                    if (cached) {
+                        console.log(`⚡ Cache HIT for image reference generation: ${url.substring(0, 80)}...`);
+                        return { inlineData: { mimeType: cached.mimeType, data: cached.buffer } };
+                    }
+                    
+                    const resp = await presignedFetch(url, { signal: AbortSignal.timeout(15000) }); // 15s timeout (was 35s)
                     if (resp && resp.ok) {
                         const buf = await resp.arrayBuffer();
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
-                        finalImageParts.push({ inlineData: { mimeType: ct, data: Buffer.from(buf).toString('base64') } });
                         console.log(`✅ Loaded ref image (${Math.round(buf.byteLength / 1024)}KB)`);
+                        
+                        const b64Data = Buffer.from(buf).toString('base64');
+                        setCachedImageBuffer(url, b64Data, ct);
+                        
+                        return { inlineData: { mimeType: ct, data: b64Data } };
                     } else {
                         console.warn(`⚠️ Ref image fetch returned HTTP ${resp?.status} — skipping`);
                     }
                 } catch (e) {
                     console.warn(`⚠️ Could not load ref image: ${e.message}`);
                 }
-            }
+                return null;
+            });
+            const downloadedParts = (await Promise.all(refDownloads)).filter(Boolean);
+            finalImageParts.push(...downloadedParts);
         }
 
         // ── Generate via native Gemini router ──
@@ -1845,8 +1901,25 @@ router.post('/generate', protect, requireStudio('creativeStudio'), requireCredit
 router.get('/', protect, async (req, res) => {
     try {
         const { brandId, type, limit = 20, page = 1 } = req.query;
-        const filter = { user: req.user._id };
-        if (brandId) filter.brand = brandId;
+        const filter = {};
+        
+        if (req.user.role === 'superadmin') {
+            if (brandId) filter.brand = brandId;
+        } else {
+            if (brandId) {
+                const brand = await Brand.findOne({ 
+                    _id: brandId, 
+                    $or: [{ user: req.user._id }, { sharedWith: req.user._id }] 
+                });
+                if (!brand) {
+                    return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
+                }
+                filter.brand = brandId;
+            } else {
+                filter.user = req.user._id;
+            }
+        }
+
         if (type) filter.type = type;
 
         const creatives = await Creative.find(filter)
@@ -2577,7 +2650,7 @@ router.post('/upscale', protect, async (req, res) => {
 
         if (scale === '2k') {
             // ══════ 2K: Sharp Lanczos upscale (FREE, ~1s) ══════
-            const sharp = (await import('sharp')).default;
+            const sharp = await getSharp();
             const metadata = await sharp(imgBuffer).metadata();
             const targetWidth = Math.max(metadata.width * 2, 2048);
             const targetHeight = Math.max(metadata.height * 2, 2048);
@@ -3176,7 +3249,7 @@ STRICT RULES: No text, no people, no faces, no products, no logos, no watermarks
         // ── Async: Split panoramic, composite products, upload ──
         (async () => {
             try {
-                const sharp = (await import('sharp')).default;
+                const sharp = await getSharp();
                 const geminiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
                 // Utility: URL/dataURI → Buffer with retry

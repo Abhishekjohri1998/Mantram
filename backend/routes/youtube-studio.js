@@ -113,6 +113,7 @@ router.get('/projects', protect, async (req, res) => {
             .select('-transcript.fullText -transcript.segments')
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
+            .allowDiskUse(true)
             .lean();
 
         res.json({ success: true, projects });

@@ -7,16 +7,18 @@ import { ShopifyProvider } from './context/ShopifyContext'
 import { UIProvider } from './context/UIContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlanGatedRoute from './components/PlanGatedRoute'
-import AgentFidatoPanel from './components/AgentFidatoPanel'
-import NexusBar from './components/NexusBar'
-import BackgroundJobsPanel from './components/BackgroundJobsPanel'
 import { BackgroundJobsContext, useBackgroundJobs } from './hooks/useBackgroundJobs'
 
-// ── Static Imports (Critical/Fast) ──
-import Auth from './pages/Auth'
-import Landing from './pages/Landing'
-import VerifyEmail from './pages/VerifyEmail'
-import ResetPassword from './pages/ResetPassword'
+// ── Global overlays — lazy-loaded (not needed for first paint) ──
+const AgentFidatoPanel = lazy(() => import('./components/AgentFidatoPanel'))
+const NexusBar = lazy(() => import('./components/NexusBar'))
+const BackgroundJobsPanel = lazy(() => import('./components/BackgroundJobsPanel'))
+
+// ── Public pages — lazy-loaded (only load when route matches) ──
+const Auth = lazy(() => import('./pages/Auth'))
+const Landing = lazy(() => import('./pages/Landing'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 // ── Lazy Imports (Heavy/Studio Pages) ──
 const About = lazy(() => import('./pages/About'))
@@ -91,9 +93,11 @@ function AppInner() {
 
   return (
     <BackgroundJobsContext.Provider value={backgroundJobs}>
-      <AgentFidatoPanel studio="global" panelOnly />
-      <NexusBar />
-      <BackgroundJobsPanel />
+      <Suspense fallback={null}>
+        <AgentFidatoPanel studio="global" panelOnly />
+        <NexusBar />
+        <BackgroundJobsPanel />
+      </Suspense>
     </BackgroundJobsContext.Provider>
   );
 }

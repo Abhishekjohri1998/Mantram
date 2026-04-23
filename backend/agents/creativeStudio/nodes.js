@@ -12,6 +12,8 @@ import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 import { callMcpToolsParallel } from '../../mcp/registry.js';
+import { getCachedImageBuffer, setCachedImageBuffer } from '../../utils/imageCache.js';
+import { getSignedUrlForPath } from '../../utils/s3.js';
 import {
     ART_DIRECTOR_PROMPT,
     FAST_CREATIVE_DIRECTOR_PROMPT,
@@ -514,7 +516,8 @@ export async function artDirectorNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
-    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 4096, { preferFast: true });
+    // ⚡ PERF: maxTokens reduced from 4096→2048 — art direction JSON output is typically 500-800 tokens
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 2048, { preferFast: true });
     console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms`);
 
     return {
@@ -667,7 +670,8 @@ export async function promptEngineerNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Prompt engineering is technical transformation: Gemini sufficient
-    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 4096, { preferFast: true });
+    // ⚡ PERF: maxTokens reduced from 4096→2048 — prompt output is typically 400-600 tokens
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 2048, { preferFast: true });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms`);
 
     return {
@@ -698,7 +702,8 @@ export async function styleCriticNode(state) {
     ].join('\n');
 
     // ⚡ preferFast — Style critic is evaluation/scoring: Gemini sufficient
-    const result = await agentUtils.callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 4096, { preferFast: true });
+    // ⚡ PERF: maxTokens reduced from 4096→1024 — critic returns short JSON verdict/score
+    const result = await agentUtils.callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 1024, { preferFast: true });
     console.log(`🔍 Critique complete in ${Date.now() - startMs}ms — verdict: ${result.verdict}`);
 
     // If critic says improve-first, use the improved prompt (immutable — create new object)
@@ -738,7 +743,8 @@ export async function variationGeneratorNode(state) {
     ].join('\n');
 
     // ⚡ preferFast — Variation is JSON structure generation: Gemini sufficient
-    const result = await agentUtils.callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8, 4096, { preferFast: true });
+    // ⚡ PERF: maxTokens reduced from 4096→2048 — variation JSON is typically 800-1200 tokens
+    const result = await agentUtils.callAgent(VARIATION_PROMPT(brandContext), userPrompt, 0.8, 2048, { preferFast: true });
     console.log(`🔀 ${(result.variations || []).length} variations generated in ${Date.now() - startMs}ms`);
 
     return {
@@ -874,7 +880,8 @@ export async function copywriterNode(state) {
         : COPYWRITER_PROMPT(resolvedBrandContext);
 
     // ⚡ preferFast — Copywriter produces structured JSON copy: Gemini 2.5 Flash handles well
-    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.75, 8192, { preferFast: true });
+    // ⚡ PERF: maxTokens reduced from 8192→2048 — copy output is very short (headline + subtext + CTA)
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.75, 2048, { preferFast: true });
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
@@ -1085,21 +1092,20 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // ── STEP 1: Parallel Node Execution (MCP Intel + Visual Grounding + Art Director + Copywriter) ──
+    // ── STEP 1: Parallel Node Execution (Visual Grounding + Art Director + Copywriter) ──
     // ALL agents that don't depend on each other run in parallel to minimize wall-clock latency.
-    // mcpMarketIntelNode moved INTO this block (was sequential before — added 3–12s unnecessarily).
     const nodePromises = [];
 
-    // Promise 0: MCP Market Intelligence — live trends for art director (non-blocking, from cache most of the time)
-    const mcpMarketTask = (async () => {
-        emit('brand-intel', 'Fetching live visual trends (MCP)...', 'working');
-        const updatedState = await mcpMarketIntelNode(state);
+    // ⚡ PERF: MCP Market Intelligence — fire-and-forget (non-blocking)
+    // Previously this was inside Promise.all, meaning a slow 6s MCP timeout would delay
+    // the ENTIRE parallel block. Now it runs independently — if data arrives in time,
+    // the art director benefits; if not, no delay.
+    mcpMarketIntelNode(state).then(updatedState => {
         state.marketIntel = updatedState.marketIntel;
         if (state.marketIntel) {
             emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
         }
-    })();
-    nodePromises.push(mcpMarketTask);
+    }).catch(() => { /* non-critical — pipeline continues without live trends */ });
 
     // Promise 1: Visual Grounding (Multimodal MCoT)
     const visualGroundingTask = (async () => {
@@ -1134,10 +1140,10 @@ export async function runCreativePipeline(params) {
     }
     nodePromises.push(creativeVisionTask);
 
-    // Promise 3: Copywriter (AI vs Custom)
+    // Promise 3: Copywriter (AI vs Custom) — ⚡ only included when generateCopy is true
     let copyResult = null;
-    const copywriterPromise = (async () => {
-        if (generateCopy) {
+    if (generateCopy) {
+        const copywriterPromise = (async () => {
             if (hasCustomCopy) {
                 copyResult = {
                     headline: customCopy.headline || '',
@@ -1160,11 +1166,53 @@ export async function runCreativePipeline(params) {
                     emit('copywriter', 'Copy generation skipped', 'done');
                 }
             }
-        }
-    })();
-    nodePromises.push(copywriterPromise);
+        })();
+        nodePromises.push(copywriterPromise);
+    }
 
-    // Wait for the parallel initial block to finish
+    // Promise 4: Pre-download reference images for cache (avoids redundant downloads in routedImageGenerate)
+    // Runs in parallel with all other tasks — near-zero added latency
+    const refUrls = (state.refImageUrls || []).filter(u => u && u.startsWith('http'));
+    if (refUrls.length > 0) {
+        const imagePredownloadTask = (async () => {
+            emit('predownload', `Pre-caching ${refUrls.length} reference image(s)...`, 'working');
+            const downloadStartMs = Date.now();
+            await Promise.all(refUrls.map(async (url) => {
+                // Skip if already cached
+                if (getCachedImageBuffer(url)) return;
+                try {
+                    // Pre-sign private S3 URLs before downloading
+                    let fetchUrl = url;
+                    const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
+                    if (isOurS3 && !url.includes('X-Amz-Signature')) {
+                        try {
+                            fetchUrl = await getSignedUrlForPath(url, 300);
+                        } catch (e) {
+                            // Non-critical — continue with unsigned URL
+                        }
+                    }
+                    const resp = await fetch(fetchUrl, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' },
+                        signal: AbortSignal.timeout(12000),
+                    });
+                    if (resp && resp.ok) {
+                        const buf = await resp.arrayBuffer();
+                        const ct = resp.headers.get('content-type') || 'image/jpeg';
+                        const b64Data = Buffer.from(buf).toString('base64');
+                        setCachedImageBuffer(url, b64Data, ct);
+                        console.log(`⚡ Pre-cached ref image (${Math.round(buf.byteLength / 1024)}KB): ${url.substring(0, 80)}...`);
+                    }
+                } catch (e) {
+                    // Non-critical — routedImageGenerate will download as fallback
+                    console.warn(`⚠️ Ref image pre-download skipped: ${e.message}`);
+                }
+            }));
+            emit('predownload', `Reference images cached (${Date.now() - downloadStartMs}ms)`, 'done');
+        })();
+        nodePromises.push(imagePredownloadTask);
+    }
+
+    // Wait for the parallel initial block to finish (critical agents only)
     await Promise.all(nodePromises);
 
     // ── STEP 2: Sequential Refinement (Quality Mode Only) ──

@@ -63,9 +63,6 @@ router.get('/scan-website/stream', optionalAuth, async (req, res) => {
         // If user is authenticated, save brand to DB
         let brand = null;
         if (req.user) {
-            const tempBrandId = crypto.randomUUID();
-            await mirrorBrandAssets(scanResult.dna, tempBrandId);
-
             brand = await Brand.create({
                 user: req.user._id,
                 name: scanResult.name || parsedUrl.hostname.replace(/^www\./, ''),
@@ -80,6 +77,14 @@ router.get('/scan-website/stream', optionalAuth, async (req, res) => {
                 onboardingPhases: scanResult.onboardingPhases || {},
             });
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
+
+            // Fire-and-forget: mirror assets to S3, then update brand record
+            mirrorBrandAssets(scanResult.dna, brand._id.toString()).then(async (mirroredDna) => {
+                try {
+                    await Brand.findByIdAndUpdate(brand._id, { $set: { dna: mirroredDna } });
+                    console.log(`✅ Asset mirroring complete for ${brand.name}`);
+                } catch (e) { console.warn('⚠️ Background asset mirror DB update failed:', e.message); }
+            }).catch(e => console.warn('⚠️ Background asset mirror failed:', e.message));
 
             // Auto-trigger Visual DNA analysis in background (fire-and-forget)
             import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
@@ -153,12 +158,6 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
         // If user is authenticated, save brand to DB
         let brand = null;
         if (req.user) {
-            // Placeholder ID for keying assets before creation
-            const tempBrandId = crypto.randomUUID();
-            
-            // Mirror assets to S3 before DB save
-            await mirrorBrandAssets(scanResult.dna, tempBrandId);
-
             brand = await Brand.create({
                 user: req.user._id,
                 name: scanResult.name || parsedUrl.hostname.replace(/^www\./, ''),
@@ -170,6 +169,14 @@ router.post('/scan-website', optionalAuth, async (req, res) => {
                 onboardingPhases: scanResult.onboardingPhases || {},
             });
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
+
+            // Fire-and-forget: mirror assets to S3, then update brand record
+            mirrorBrandAssets(scanResult.dna, brand._id.toString()).then(async (mirroredDna) => {
+                try {
+                    await Brand.findByIdAndUpdate(brand._id, { $set: { dna: mirroredDna } });
+                    console.log(`✅ Asset mirroring complete for ${brand.name}`);
+                } catch (e) { console.warn('⚠️ Background asset mirror DB update failed:', e.message); }
+            }).catch(e => console.warn('⚠️ Background asset mirror failed:', e.message));
 
             // Auto-trigger Visual DNA analysis in background (fire-and-forget)
             import('../services/visualDNA.js').then(async ({ analyzeVisualDNA }) => {
@@ -529,9 +536,6 @@ Be specific to THIS business and location — not generic.`,
 
         let brand = null;
         if (req.user) {
-            const tempBrandId = crypto.randomUUID();
-            await mirrorBrandAssets(dna, tempBrandId);
-
             brand = await Brand.create({
                 user: req.user._id,
                 name: finalName,
@@ -542,6 +546,14 @@ Be specific to THIS business and location — not generic.`,
                 onboardingScore: scanResult.onboardingScore || 0,
                 onboardingPhases: scanResult.onboardingPhases || {},
             });
+
+            // Fire-and-forget: mirror assets to S3, then update brand record
+            mirrorBrandAssets(dna, brand._id.toString()).then(async (mirroredDna) => {
+                try {
+                    await Brand.findByIdAndUpdate(brand._id, { $set: { dna: mirroredDna } });
+                    console.log(`✅ Asset mirroring complete for ${finalName}`);
+                } catch (e) { console.warn('⚠️ Background asset mirror DB update failed:', e.message); }
+            }).catch(e => console.warn('⚠️ Background asset mirror failed:', e.message));
 
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
 
@@ -860,9 +872,6 @@ Be specific to THIS business and location — not generic.`,
         // ── Save to DB ──
         let brand = null;
         if (req.user) {
-            const tempBrandId = crypto.randomUUID();
-            await mirrorBrandAssets(dna, tempBrandId);
-
             brand = await Brand.create({
                 user: req.user._id,
                 name: finalName,
@@ -873,6 +882,14 @@ Be specific to THIS business and location — not generic.`,
                 onboardingScore: scanResult.onboardingScore || 0,
                 onboardingPhases: scanResult.onboardingPhases || {},
             });
+
+            // Fire-and-forget: mirror assets to S3, then update brand record
+            mirrorBrandAssets(dna, brand._id.toString()).then(async (mirroredDna) => {
+                try {
+                    await Brand.findByIdAndUpdate(brand._id, { $set: { dna: mirroredDna } });
+                    console.log(`✅ Asset mirroring complete for ${finalName}`);
+                } catch (e) { console.warn('⚠️ Background asset mirror DB update failed:', e.message); }
+            }).catch(e => console.warn('⚠️ Background asset mirror failed:', e.message));
 
             await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
 
@@ -970,14 +987,20 @@ router.post('/brainstorm/save', protect, async (req, res) => {
             country: brandData.country || 'India',
         };
 
-        await mirrorBrandAssets(dna, tempBrandId);
-
         const brand = await Brand.create({
             user: req.user._id,
             name: brandData.name || 'New Brand',
             onboardingMethod: 'brainstorm',
             dna
         });
+
+        // Fire-and-forget: mirror assets to S3, then update brand record
+        mirrorBrandAssets(dna, brand._id.toString()).then(async (mirroredDna) => {
+            try {
+                await Brand.findByIdAndUpdate(brand._id, { $set: { dna: mirroredDna } });
+                console.log(`✅ Asset mirroring complete for ${brand.name}`);
+            } catch (e) { console.warn('⚠️ Background asset mirror DB update failed:', e.message); }
+        }).catch(e => console.warn('⚠️ Background asset mirror failed:', e.message));
 
         await req.user.updateOne({ $inc: { 'usage.brandsCreated': 1 } });
         res.status(201).json({ success: true, brand });

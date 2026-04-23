@@ -13,7 +13,7 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Current pipeline status ──
     status: {
         type: String,
-        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'generating', 'critique', 'editing', 'done', 'failed', 'advanced-generating'],
+        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'image-review', 'generating', 'multi-generating', 'critique', 'editing', 'done', 'completed', 'failed', 'advanced-generating'],
         default: 'brainstorm',
     },
     checkpoint: { type: Number, default: 0 }, // for resumability
@@ -108,7 +108,7 @@ const videoProjectSchema = new mongoose.Schema({
 
     // ── Step 5: Model Router Output ──
     routing: {
-        selectedModel: { type: String, enum: ['veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'seedance-2.0', 'seedance-1.0', 'grok-imagine', 'heygen', 'heygen-photo-avatar', 'heygen-product-placement', 'heygen-audio-avatar', 'heygen-video-agent'], default: 'kling-3.0' },
+        selectedModel: { type: String, enum: ['veo-3.1', 'veo-3.1-fast', 'kling-3.0', 'kling-3.0-o', 'seedance-2.0', 'seedance-1.0', 'grok-imagine', 'hunyuan', 'sora-2', 'heygen', 'heygen-photo-avatar', 'heygen-product-placement', 'heygen-audio-avatar', 'heygen-video-agent'], default: 'kling-3.0' },
         resolution: { type: String, enum: ['720p', '1080p', '4k'], default: '1080p' },
         mode: { type: String, enum: ['fast', 'quality'], default: 'fast' },
         reasoning: { type: String, default: '' },
@@ -125,7 +125,7 @@ const videoProjectSchema = new mongoose.Schema({
         falEndpoint: { type: String, default: '' },
         falStatusUrl: { type: String, default: '' },
         falResultUrl: { type: String, default: '' },
-        provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi', 'muapi', 'laozhang'], default: 'fal' },
+        provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi', 'muapi', 'laozhang', 'atlascloud'], default: 'fal' },
         videoUrl: { type: String, default: '' },
         s3VideoUrl: { type: String, default: '' },
         thumbnailUrl: { type: String, default: '' },

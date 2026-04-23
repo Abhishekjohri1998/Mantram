@@ -4430,12 +4430,20 @@ router.get('/:id/status', protect, async (req, res) => {
 
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic (if needed)
                 if (updated.status === 'critique' || updated.status === 'completed') {
-                    // Fire-and-forget: upload video to S3
+                    // Upload video to S3 and save to DB
                     let finalVideoUrl = updated.generation?.videoUrl;
                     if (finalVideoUrl) {
                         try {
                             const s3Url = await downloadAndUploadVideoToS3(project._id.toString(), finalVideoUrl);
-                            if (s3Url) finalVideoUrl = s3Url;
+                            if (s3Url) {
+                                finalVideoUrl = s3Url;
+                                updated.generation.videoUrl = s3Url;
+                                await VideoProject.findByIdAndUpdate(project._id, {
+                                    'generation.videoUrl': s3Url,
+                                    finalVideoUrl: s3Url
+                                });
+                                console.log(`✅ [Polling] Uploaded and saved S3 URL: ${s3Url}`);
+                            }
                         } catch (e) {
                             console.warn('⚠️ Video S3 upload failed:', e.message);
                         }
@@ -4672,11 +4680,27 @@ router.post('/:id/finalize', protect, async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         const { brandId, status, mode, limit = 50, page = 1 } = req.query;
-        const filter = { user: req.user._id };
-        // ✅ FIX: Include unbranded projects when a brandId filter is active.
-        // Previously projects created without an active brand were silently excluded
-        // when any brand was selected — making them "disappear" from history.
-        if (brandId) filter.$or = [{ brand: brandId }, { brand: null }, { brand: { $exists: false } }];
+        const filter = {};
+
+        if (req.user.role === 'superadmin') {
+            if (brandId) filter.brand = brandId;
+        } else {
+            if (brandId) {
+                const brand = await Brand.findOne({
+                    _id: brandId,
+                    $or: [{ user: req.user._id }, { sharedWith: req.user._id }]
+                });
+                if (!brand) {
+                    return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
+                }
+                // ✅ Include unbranded projects alongside brand-filtered ones
+                // so videos created without an active brand don't disappear from history.
+                filter.$or = [{ brand: brandId }, { brand: null, user: req.user._id }, { brand: { $exists: false }, user: req.user._id }];
+            } else {
+                filter.user = req.user._id;
+            }
+        }
+
         if (status) filter.status = status;
         if (mode) filter.mode = mode;
 
@@ -4693,114 +4717,126 @@ router.get('/', protect, async (req, res) => {
         ]);
 
         // ── STEP 0: Auto-expire truly stale generating projects ──
-        // Projects stuck in generating without a request ID for >30min are dead.
-        // Projects with a request ID but older than 2 hours are also expired.
-        const STALE_NO_ID_MS = 30 * 60 * 1000;       // 30 minutes
-        const STALE_WITH_ID_MS = 2 * 60 * 60 * 1000;  // 2 hours
-        const now = Date.now();
-        let expiredCount = 0;
+        // Wrapped in try-catch so it never crashes the main response
+        try {
+            const STALE_NO_ID_MS = 30 * 60 * 1000;       // 30 minutes
+            const STALE_WITH_ID_MS = 2 * 60 * 60 * 1000;  // 2 hours
+            const now = Date.now();
+            let expiredCount = 0;
 
-        for (const p of projects) {
-            if (p.status !== 'generating' && p.status !== 'advanced-generating') continue;
-            const age = now - new Date(p.updatedAt || p.createdAt).getTime();
-            const hasRequestId = !!(p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId);
+            for (const p of projects) {
+                if (p.status !== 'generating' && p.status !== 'advanced-generating') continue;
+                const age = now - new Date(p.updatedAt || p.createdAt).getTime();
+                const hasRequestId = !!(p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId);
 
-            if ((!hasRequestId && age > STALE_NO_ID_MS) || age > STALE_WITH_ID_MS) {
-                // Mark as failed in the response object (immediate UI fix)
-                p.status = 'failed';
-                p.generation = {
-                    ...(p.generation || {}),
-                    status: 'FAILED',
-                    error: 'Generation timed out — auto-expired',
-                };
-                // Persist to DB (fire-and-forget)
-                VideoProject.findByIdAndUpdate(p._id, {
-                    status: 'failed',
-                    'generation.status': 'FAILED',
-                    'generation.error': 'Generation timed out — auto-expired',
-                }).exec().catch(err => console.warn(`⚠️ Failed to expire project ${p._id}:`, err.message));
-                expiredCount++;
+                if ((!hasRequestId && age > STALE_NO_ID_MS) || age > STALE_WITH_ID_MS) {
+                    p.status = 'failed';
+                    p.generation = {
+                        ...(p.generation || {}),
+                        status: 'FAILED',
+                        error: 'Generation timed out — auto-expired',
+                    };
+                    VideoProject.findByIdAndUpdate(p._id, {
+                        status: 'failed',
+                        'generation.status': 'FAILED',
+                        'generation.error': 'Generation timed out — auto-expired',
+                    }).exec().catch(err => console.warn(`⚠️ Failed to expire project ${p._id}:`, err.message));
+                    expiredCount++;
+                }
             }
+            if (expiredCount > 0) {
+                console.log(`🧹 Auto-expired ${expiredCount} stale generating project(s)`);
+            }
+        } catch (autoExpireErr) {
+            console.warn('⚠️ Auto-expire phase failed (non-fatal):', autoExpireErr.message);
         }
-        if (expiredCount > 0) {
-            console.log(`🧹 Auto-expired ${expiredCount} stale generating project(s)`);
-        }
-
-        // ── Auto-sync stuck generating projects ──
-        // If any projects are still "generating"/"advanced-generating" (not expired above), re-check their status
-        // This catches cases where the user closed the tab before polling completed
-        const stuckProjects = projects.filter(p =>
-            (p.status === 'generating' || p.status === 'advanced-generating') && (p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId)
-        );
 
         // ── Auto-sync stuck generating projects (NON-BLOCKING) ──
-        // Fire-and-forget: frontend will pick up real status via its own polling
-        if (stuckProjects.length > 0) {
-            console.log(`🔄 Auto-syncing ${stuckProjects.length} stuck generating project(s) in background...`);
-            Promise.allSettled(stuckProjects.map(async (p) => {
-                try {
-                    const model = p.routing?.selectedModel || '';
-                    let provider = p.generation?.provider || '';
-                    if (!provider) {
-                        if (model === 'veo-3.1-fast') provider = 'kie';
-                        else if (model === 'seedance-2.0') provider = 'atlascloud';
-                        else if (model === 'grok-imagine') provider = 'grok';
-                        else if (model === 'sora-2') provider = 'laozhang';
-                        else if (model.startsWith('heygen')) provider = 'heygen';
-                        else provider = 'fal';
-                    }
+        // Wrapped in try-catch so it never crashes the main response
+        try {
+            const stuckProjects = projects.filter(p =>
+                (p.status === 'generating' || p.status === 'advanced-generating') && (p.generation?.falRequestId || p.generation?.taskId || p.generation?.requestId)
+            );
 
-                    if (provider === 'heygen') {
-                        const hStatus = await getHeyGenVideoStatus(p.generation.falRequestId);
-                        if (hStatus.status === 'COMPLETED') {
-                            await VideoProject.findByIdAndUpdate(p._id, {
-                                status: 'completed',
-                                generation: { ...p.generation, videoUrl: hStatus.videoUrl, thumbnailUrl: hStatus.thumbnailUrl || '', progress: 100, completedAt: new Date() },
-                                finalVideoUrl: hStatus.videoUrl,
-                            });
-                            if (hStatus.videoUrl) downloadAndUploadVideoToS3(p._id.toString(), hStatus.videoUrl).catch(() => {});
-                            console.log(`✅ HeyGen synced ${p._id}: completed`);
-                        } else if (hStatus.status === 'FAILED') {
-                            await VideoProject.findByIdAndUpdate(p._id, { status: 'failed', 'generation.error': hStatus.error });
-                            if (p.creditsUsed > 0) {
-                                await refundCredits(p.user, p.creditsUsed, 'videoGenerateRefund', `Refund: Stuck HeyGen Video Generation Failed`, 'video', { projectId: p._id });
-                                await VideoProject.findByIdAndUpdate(p._id, { creditsUsed: 0 });
-                            }
+            if (stuckProjects.length > 0) {
+                console.log(`🔄 Auto-syncing ${stuckProjects.length} stuck generating project(s) in background...`);
+                Promise.allSettled(stuckProjects.map(async (p) => {
+                    try {
+                        const model = p.routing?.selectedModel || '';
+                        let provider = p.generation?.provider || '';
+                        if (!provider) {
+                            if (model === 'veo-3.1-fast') provider = 'kie';
+                            else if (model === 'seedance-2.0') provider = 'atlascloud';
+                            else if (model === 'grok-imagine') provider = 'grok';
+                            else if (model === 'sora-2') provider = 'laozhang';
+                            else if (model.startsWith('heygen')) provider = 'heygen';
+                            else provider = 'fal';
                         }
-                        return;
+
+                        if (provider === 'heygen') {
+                            const hStatus = await getHeyGenVideoStatus(p.generation.falRequestId);
+                            if (hStatus.status === 'COMPLETED') {
+                                await VideoProject.findByIdAndUpdate(p._id, {
+                                    status: 'completed',
+                                    'generation.videoUrl': hStatus.videoUrl,
+                                    'generation.thumbnailUrl': hStatus.thumbnailUrl || '',
+                                    'generation.progress': 100,
+                                    'generation.completedAt': new Date(),
+                                    finalVideoUrl: hStatus.videoUrl,
+                                });
+                                if (hStatus.videoUrl) {
+                                    const s3Key = `video-studio/generations/${p._id}-${Date.now()}.mp4`;
+                                    mirrorUrlToS3(hStatus.videoUrl, s3Key).then(s3Url => {
+                                        VideoProject.findByIdAndUpdate(p._id, { finalVideoUrl: s3Url, 'generation.videoUrl': s3Url }).exec();
+                                    }).catch(() => {});
+                                }
+                                console.log(`✅ HeyGen synced ${p._id}: completed`);
+                            } else if (hStatus.status === 'FAILED') {
+                                await VideoProject.findByIdAndUpdate(p._id, { status: 'failed', 'generation.error': hStatus.error });
+                                if (p.creditsUsed > 0) {
+                                    await refundCredits(p.user, p.creditsUsed, 'videoGenerateRefund', `Refund: Stuck HeyGen Video Generation Failed`, 'video', { projectId: p._id });
+                                    await VideoProject.findByIdAndUpdate(p._id, { creditsUsed: 0 });
+                                }
+                            }
+                            return;
+                        }
+
+                        console.log(`🔍 Syncing ${p._id}: model=${model}, provider=${provider}, reqId=${p.generation?.falRequestId?.substring(0, 20)}...`);
+
+                        const state = {
+                            generation: { ...p.generation, provider },
+                            routing: { selectedModel: model },
+                            mode: p.mode,
+                            status: p.status,
+                        };
+                        const updated = await pollGenerationStatus(state);
+
+                        if (updated.generation?.status === 'COMPLETED' || updated.generation?.status === 'FAILED') {
+                            const newStatus = updated.generation.status === 'COMPLETED' ? (p.mode === 'image-to-video' ? 'completed' : 'critique') : 'failed';
+                            await VideoProject.findByIdAndUpdate(p._id, {
+                                status: newStatus,
+                                'generation.videoUrl': updated.generation.videoUrl || '',
+                                'generation.status': updated.generation.status,
+                                'generation.progress': updated.generation.progress || 100,
+                                'generation.provider': provider,
+                            });
+                            console.log(`✅ Synced project ${p._id}: ${newStatus} — videoUrl: ${updated.generation.videoUrl ? 'YES' : 'no'}`);
+                        } else {
+                            console.log(`⏳ Project ${p._id} still ${updated.generation?.status || 'unknown'}`);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ Failed to sync project ${p._id}:`, e.message);
                     }
-
-                    console.log(`🔍 Syncing ${p._id}: model=${model}, provider=${provider}, reqId=${p.generation?.falRequestId?.substring(0, 20)}...`);
-
-                    const state = {
-                        generation: { ...p.generation, provider },
-                        routing: { selectedModel: model },
-                        mode: p.mode,
-                        status: p.status,
-                    };
-                    const updated = await pollGenerationStatus(state);
-
-                    if (updated.generation?.status === 'COMPLETED' || updated.generation?.status === 'FAILED') {
-                        const newStatus = updated.generation.status === 'COMPLETED' ? (p.mode === 'image-to-video' ? 'completed' : 'critique') : 'failed';
-                        await VideoProject.findByIdAndUpdate(p._id, {
-                            status: newStatus,
-                            generation: { ...updated.generation, provider },
-                        });
-                        console.log(`✅ Synced project ${p._id}: ${newStatus} — videoUrl: ${updated.generation.videoUrl ? 'YES' : 'no'}`);
-                    } else {
-                        console.log(`⏳ Project ${p._id} still ${updated.generation?.status || 'unknown'}`);
-                    }
-                } catch (e) {
-                    console.warn(`⚠️ Failed to sync project ${p._id}:`, e.message);
-                }
-            })).catch(() => {});
+                })).catch(() => {});
+            }
+        } catch (autoSyncErr) {
+            console.warn('⚠️ Auto-sync phase failed (non-fatal):', autoSyncErr.message);
         }
 
         // Return projects directly — video URLs are CDN/Atlas links that don't need S3 signing.
-        // The /:id/video proxy endpoint remains as a fallback for expired URLs.
-        // Removing signVideoProjectAssets() eliminates ~200+ async S3 signing operations per request.
         res.json({ success: true, projects, total });
     } catch (error) {
+        console.error('❌ GET /api/video-studio failed:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

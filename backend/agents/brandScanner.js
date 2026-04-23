@@ -74,7 +74,7 @@ export async function scanWebsite(url, aiRouter, onProgress) {
 
     const [visionResult, subPageResult, socialResult] = await Promise.allSettled([
         // Vision analysis (Puppeteer screenshot → Gemini)
-        (!isSPA ? captureAndAnalyze(url, allImages, selectorLogos).catch(err => {
+        (!isSPA ? captureAndAnalyze(url, allImages, selectorLogos, sharedBrowser).catch(err => {
             console.warn('  ⚠️ Vision analysis failed:', err.message);
             return null;
         }) : Promise.resolve(null)),
@@ -334,7 +334,7 @@ Rules:
                 systemPrompt: 'You are a brand intelligence analyst. Always return ONLY valid JSON — no markdown, no explanation, no ```json blocks.',
                 userPrompt: prompt,
                 temperature: 0.2,
-                maxTokens: 2000,
+                maxTokens: 1200,
             });
             const text = result?.text || '';
             const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -543,17 +543,17 @@ async function puppeteerExtractContent(url) {
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
         
         // Wait for SPA content to render (reduced from 3s)
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 800));
         
         // Scroll down to trigger lazy-loaded content
         await page.evaluate(() => {
             window.scrollTo(0, document.body.scrollHeight / 2);
         });
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 400));
         await page.evaluate(() => {
             window.scrollTo(0, document.body.scrollHeight);
         });
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 400));
         await page.evaluate(() => {
             window.scrollTo(0, 0);
         });
@@ -700,14 +700,21 @@ function repairAndParseJSON(text) {
  * Take a headless browser screenshot → send to Gemini Vision → identify logo, colors, style
  * Cross-reference with DOM images to find the actual logo URL
  */
-async function captureAndAnalyze(url, allImages, selectorLogos) {
-    const puppeteer = await import('puppeteer');
+async function captureAndAnalyze(url, allImages, selectorLogos, existingBrowser = null) {
+    let browser = existingBrowser;
+    let ownsBrowser = false;
 
-    console.log('  🌐 Launching Puppeteer for screenshot...');
-    const browser = await puppeteer.default.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
-    });
+    if (!browser) {
+        const puppeteer = await import('puppeteer');
+        console.log('  🌐 Launching Puppeteer for screenshot...');
+        browser = await puppeteer.default.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+        });
+        ownsBrowser = true;
+    } else {
+        console.log('  🌐 Reusing shared Puppeteer browser for screenshot...');
+    }
 
     try {
         const page = await browser.newPage();
@@ -716,8 +723,8 @@ async function captureAndAnalyze(url, allImages, selectorLogos) {
 
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 25000 });
 
-        // Wait a moment for lazy-loaded images and animations
-        await new Promise(r => setTimeout(r, 2000));
+        // Wait a moment for lazy-loaded images and animations (reduced from 2000ms)
+        await new Promise(r => setTimeout(r, 1000));
 
         // Take full-page screenshot
         const fullScreenshot = await page.screenshot({ type: 'jpeg', quality: 80, fullPage: false });
@@ -730,7 +737,8 @@ async function captureAndAnalyze(url, allImages, selectorLogos) {
         });
         console.log(`  📸 Header crop captured: ${Math.round(headerScreenshot.length / 1024)}KB`);
 
-        await browser.close();
+        await page.close();
+        if (ownsBrowser) await browser.close();
 
         // ── Send to Gemini Vision ─────────────────────────────────────────
         const apiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
@@ -811,7 +819,7 @@ Return ONLY valid JSON:
                             }],
                             generationConfig: {
                                 temperature: 0.2,
-                                maxOutputTokens: 4096,
+                                maxOutputTokens: 1500,
                                 responseMimeType: 'application/json',
                             },
                         }),
@@ -916,7 +924,7 @@ Return ONLY valid JSON:
 
         return result;
     } catch (err) {
-        await browser.close().catch(() => {});
+        if (ownsBrowser) await browser.close().catch(() => {});
         throw err;
     }
 }
@@ -1146,106 +1154,120 @@ async function crawlSubPages($, baseUrl, isSPA = false, sharedBrowser = null) {
 
     // SPA sites: limit to 5 pages (Puppeteer is slower), non-SPA: 8 pages
     const maxPages = isSPA ? 5 : 8;
-    console.log(`    🔗 Found ${importantPaths.length} important sub-pages, crawling up to ${maxPages}`);
+    const pagesToCrawl = importantPaths.slice(0, maxPages);
+    console.log(`    🔗 Found ${importantPaths.length} important sub-pages, crawling up to ${maxPages} (parallel)`);
 
-    // ── Crawl up to 8 sub-pages ──────────────────────────────────────────
-    for (const { url: pageUrl, label, linkText } of importantPaths.slice(0, maxPages)) {
-        try {
-            console.log(`    📄 Crawling [${label}]: ${linkText} (${pageUrl.substring(0, 70)}...)`);
-            
-            let pageHtml = '';
-            
-            if (isSPA && sharedBrowser) {
-                // Use Puppeteer for SPA sub-pages
-                try {
-                    const page = await sharedBrowser.newPage();
-                    await page.setViewport({ width: 1440, height: 900 });
-                    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 15000 });
-                    await new Promise(r => setTimeout(r, 1000)); // wait for SPA render
-                    
-                    // Scroll to trigger lazy content
-                    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-                    await new Promise(r => setTimeout(r, 500));
-                    
-                    pageHtml = await page.content();
-                    await page.close();
-                } catch (puppErr) {
-                    console.warn(`    ⚠️ Puppeteer sub-page failed, falling back to fetch: ${puppErr.message}`);
-                }
-            }
-            
-            // Fallback to fetch for non-SPA or if Puppeteer failed
-            if (!pageHtml) {
-                const controller = new AbortController();
-                try { setMaxListeners(30, controller.signal); } catch (e) {}
-                const timeout = setTimeout(() => controller.abort(), 15000);
-                const resp = await fetch(pageUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                        'Accept': 'text/html',
-                    },
-                    signal: controller.signal,
-                });
-                clearTimeout(timeout);
+    // ── Helper: crawl a single sub-page ──────────────────────────────────
+    async function crawlSinglePage(pageUrl, label, linkText) {
+        const pieces = [];
+        console.log(`    📄 Crawling [${label}]: ${linkText} (${pageUrl.substring(0, 70)}...)`);
+        
+        let pageHtml = '';
+        
+        if (isSPA && sharedBrowser) {
+            // Use Puppeteer for SPA sub-pages
+            try {
+                const page = await sharedBrowser.newPage();
+                await page.setViewport({ width: 1440, height: 900 });
+                await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+                await new Promise(r => setTimeout(r, 600)); // wait for SPA render (reduced from 1000)
                 
-                if (resp.ok) {
-                    pageHtml = await resp.text();
-                }
+                // Scroll to trigger lazy content
+                await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+                await new Promise(r => setTimeout(r, 300));
+                
+                pageHtml = await page.content();
+                await page.close();
+            } catch (puppErr) {
+                console.warn(`    ⚠️ Puppeteer sub-page failed, falling back to fetch: ${puppErr.message}`);
             }
+        }
+        
+        // Fallback to fetch for non-SPA or if Puppeteer failed
+        if (!pageHtml) {
+            const controller = new AbortController();
+            try { setMaxListeners(30, controller.signal); } catch (e) {}
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            const resp = await fetch(pageUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    'Accept': 'text/html',
+                },
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
             
-            if (!pageHtml) continue;
-            
-            const sub$ = cheerio.load(pageHtml);
-            
-            // Extract META description
-            const metaDesc = sub$('meta[name="description"]').attr('content') || '';
-            if (metaDesc && metaDesc.length > 20) {
-                subPageContent.push(`[${label} - Meta] ${metaDesc}`);
+            if (resp.ok) {
+                pageHtml = await resp.text();
             }
-            
-            // Extract headings, paragraphs, lists, blockquotes
-            sub$('h1, h2, h3, h4, p, li, blockquote, figcaption, dd, [class*="description"], [class*="bio"], [class*="intro"], [class*="summary"]').each((_, el) => {
-                const text = sub$(el).text().trim();
-                if (text.length > 15 && text.length < 1000) {
-                    // Deduplicate
-                    const entry = `[${label}] ${text}`;
-                    if (!subPageContent.includes(entry)) {
-                        subPageContent.push(entry);
+        }
+        
+        if (!pageHtml) return pieces;
+        
+        const sub$ = cheerio.load(pageHtml);
+        
+        // Extract META description
+        const metaDesc = sub$('meta[name="description"]').attr('content') || '';
+        if (metaDesc && metaDesc.length > 20) {
+            pieces.push(`[${label} - Meta] ${metaDesc}`);
+        }
+        
+        // Extract headings, paragraphs, lists, blockquotes
+        sub$('h1, h2, h3, h4, p, li, blockquote, figcaption, dd, [class*="description"], [class*="bio"], [class*="intro"], [class*="summary"]').each((_, el) => {
+            const text = sub$(el).text().trim();
+            if (text.length > 15 && text.length < 1000) {
+                pieces.push(`[${label}] ${text}`);
+            }
+        });
+        
+        // Extract JSON-LD structured data
+        sub$('script[type="application/ld+json"]').each((_, el) => {
+            try {
+                const data = JSON.parse(sub$(el).text());
+                if (data.description) pieces.push(`[${label} - Schema] ${data.description}`);
+                if (data.name && data['@type']) pieces.push(`[${label} - Schema] ${data['@type']}: ${data.name}`);
+                // Extract team members from Person schema
+                if (data['@type'] === 'Person') {
+                    pieces.push(`[Team Member] ${data.name}${data.jobTitle ? ' — ' + data.jobTitle : ''}`);
+                }
+                // Extract organization info
+                if (data['@type'] === 'Organization') {
+                    if (data.description) pieces.push(`[Company] ${data.description}`);
+                    if (data.slogan) pieces.push(`[Tagline] ${data.slogan}`);
+                    if (data.foundingDate) pieces.push(`[Founded] ${data.foundingDate}`);
+                }
+                // Handle arrays (e.g. ItemList, FAQ)
+                if (Array.isArray(data['@graph'])) {
+                    for (const item of data['@graph'].slice(0, 10)) {
+                        if (item.description) pieces.push(`[${label} - Schema] ${item.description}`);
                     }
                 }
-            });
-            
-            // Extract JSON-LD structured data
-            sub$('script[type="application/ld+json"]').each((_, el) => {
-                try {
-                    const data = JSON.parse(sub$(el).text());
-                    if (data.description) subPageContent.push(`[${label} - Schema] ${data.description}`);
-                    if (data.name && data['@type']) subPageContent.push(`[${label} - Schema] ${data['@type']}: ${data.name}`);
-                    // Extract team members from Person schema
-                    if (data['@type'] === 'Person') {
-                        subPageContent.push(`[Team Member] ${data.name}${data.jobTitle ? ' — ' + data.jobTitle : ''}`);
-                    }
-                    // Extract organization info
-                    if (data['@type'] === 'Organization') {
-                        if (data.description) subPageContent.push(`[Company] ${data.description}`);
-                        if (data.slogan) subPageContent.push(`[Tagline] ${data.slogan}`);
-                        if (data.foundingDate) subPageContent.push(`[Founded] ${data.foundingDate}`);
-                    }
-                    // Handle arrays (e.g. ItemList, FAQ)
-                    if (Array.isArray(data['@graph'])) {
-                        for (const item of data['@graph'].slice(0, 10)) {
-                            if (item.description) subPageContent.push(`[${label} - Schema] ${item.description}`);
-                        }
-                    }
-                } catch { /* ignore malformed JSON-LD */ }
-            });
-            
-        } catch (err) {
-            console.warn(`    ⚠️ Sub-page crawl failed for ${label}:`, err.message);
+            } catch { /* ignore malformed JSON-LD */ }
+        });
+        
+        return pieces;
+    }
+
+    // ── Parallel crawl with concurrency cap of 3 ─────────────────────────
+    const CONCURRENCY = 3;
+    for (let i = 0; i < pagesToCrawl.length; i += CONCURRENCY) {
+        const batch = pagesToCrawl.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.allSettled(
+            batch.map(({ url: pageUrl, label, linkText }) =>
+                crawlSinglePage(pageUrl, label, linkText).catch(err => {
+                    console.warn(`    ⚠️ Sub-page crawl failed for ${label}:`, err.message);
+                    return [];
+                })
+            )
+        );
+        for (const r of batchResults) {
+            if (r.status === 'fulfilled' && r.value) subPageContent.push(...r.value);
         }
     }
 
-    return subPageContent.slice(0, 80); // Cap at 80 content pieces (was 30)
+    // Deduplicate content
+    const uniqueContent = [...new Set(subPageContent)];
+    return uniqueContent.slice(0, 80); // Cap at 80 content pieces
 }
 
 // ============================================================================

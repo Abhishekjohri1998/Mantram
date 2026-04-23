@@ -1,5 +1,6 @@
 import { BaseProvider } from './base.js';
 import { fetchOptions } from '../../utils/network.js';
+import { getCachedImageBuffer, setCachedImageBuffer } from '../../utils/imageCache.js';
 
 /**
  * Google Gemini Provider
@@ -31,7 +32,7 @@ export class GeminiProvider extends BaseProvider {
 
         // Attach base64 or URL images to Gemini payload
         if (images && images.length > 0) {
-            for (const img of images) {
+            const processImage = async (img) => {
                 let mimeType = 'image/jpeg';
                 let b64Data = '';
                 
@@ -43,33 +44,46 @@ export class GeminiProvider extends BaseProvider {
                     }
                 } else if (img.startsWith('http')) {
                     try {
-                        console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
-                        const r = await fetch(img, {
-                            headers: {
-                                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+                        const cached = getCachedImageBuffer(img);
+                        if (cached) {
+                            console.log(`⚡ Cache HIT for Gemini Vision image: ${img.substring(0, 100)}...`);
+                            b64Data = cached.buffer;
+                            mimeType = cached.mimeType;
+                        } else {
+                            console.log(`📥 Fetching image URL for Gemini Vision: ${img.substring(0, 100)}...`);
+                            const r = await fetch(img, {
+                                headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                                    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+                                }
+                            });
+                            
+                            if (!r.ok) {
+                                throw new Error(`HTTP ${r.status} ${r.statusText}`);
                             }
-                        });
-                        
-                        if (!r.ok) {
-                            throw new Error(`HTTP ${r.status} ${r.statusText}`);
-                        }
-                        
-                        const arr = await r.arrayBuffer();
-                        b64Data = Buffer.from(arr).toString('base64');
-                        mimeType = r.headers.get('content-type') || 'image/jpeg';
-                        
-                        // Guard against CDNs returning HTML CAPTCHAs disguised as images
-                        if (mimeType.includes('text/html')) {
-                            throw new Error('Received HTML page instead of image (likely CAPTCHA blocked)');
+                            
+                            const arr = await r.arrayBuffer();
+                            b64Data = Buffer.from(arr).toString('base64');
+                            mimeType = r.headers.get('content-type') || 'image/jpeg';
+                            
+                            // Guard against CDNs returning HTML CAPTCHAs disguised as images
+                            if (mimeType.includes('text/html')) {
+                                throw new Error('Received HTML page instead of image (likely CAPTCHA blocked)');
+                            }
+                            
+                            setCachedImageBuffer(img, b64Data, mimeType);
                         }
                     } catch(e) { console.warn(`⚠️ Failed to fetch image URL for Gemini (${img.substring(0,60)}...):`, e.message); }
                 }
                 
                 if (b64Data) {
-                    parts.push({ inlineData: { mimeType, data: b64Data } });
+                    return { inlineData: { mimeType, data: b64Data } };
                 }
-            }
+                return null;
+            };
+
+            const imageParts = await Promise.all(images.map(processImage));
+            parts.push(...imageParts.filter(p => p !== null));
         }
 
         const startTime = Date.now();
@@ -234,7 +248,7 @@ export class GeminiProvider extends BaseProvider {
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60s timeout per attempt
+                    const timeoutId = setTimeout(() => controller.abort(), 45_000); // 45s timeout per attempt (reduced from 60s)
                     try {
                         response = await fetch(url, fetchOptions({
                             method: 'POST',
@@ -276,13 +290,13 @@ export class GeminiProvider extends BaseProvider {
                         const isBusy = attemptErr.message && attemptErr.message.includes('BUSY:');
                         
                         if ((isTimeout || isBusy) && attempt === 1) {
-                            console.warn(`⚠️ Gemini Image attempt 1 failed (${isTimeout ? 'Timeout' : '503 Busy'}). Retrying in 2s...`);
-                            await new Promise(r => setTimeout(r, 2000));
+                            console.warn(`⚠️ Gemini Image attempt 1 failed (${isTimeout ? 'Timeout' : '503 Busy'}). Retrying in 500ms...`);
+                            await new Promise(r => setTimeout(r, 500)); // ⚡ Reduced from 2s to 500ms
                             continue;
                         }
                         
                         // If it's not a retryable error or we exhausted attempts
-                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 60 seconds. Google servers are likely overloaded.');
+                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 45 seconds. Google servers are likely overloaded.');
                         throw attemptErr;
                     } finally {
                         clearTimeout(timeoutId);
