@@ -728,22 +728,214 @@ export default function NexusBar() {
                 </div>
             )}
 
-            {/* ═══════════ FLOATING FIDATO BUBBLE + CHAT PANEL ═══════════ */}
-            {/* On mobile: full-screen overlay. On desktop: popup above bubble */}
+            {/* ═══════════ MOBILE FULL-SCREEN CHAT (top-level, outside bubble wrapper) ═══════════ */}
+            {isMobile && open && (
+                <div
+                    className="fixed inset-0 z-[10001] flex flex-col"
+                    style={{ background: 'var(--sys-bg, #0a0a1a)' }}
+                    onClick={() => setShareMenuIdx(null)}
+                >
+                    {/* ── Header ── */}
+                    <div className="flex items-center gap-3 px-4 border-b border-[var(--sys-border)] shrink-0"
+                        style={{ paddingTop: 'max(14px, env(safe-area-inset-top))', paddingBottom: 14 }}>
+                        <button onClick={() => setOpen(false)}
+                            className="size-9 rounded-full flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all shrink-0">
+                            <span className="material-symbols-outlined text-xl">arrow_back</span>
+                        </button>
+                        <div className="size-9 rounded-full flex items-center justify-center shrink-0"
+                            style={{ background: 'var(--sys-primary)' }}>
+                            <span className="material-symbols-outlined text-base text-white">support_agent</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-[var(--sys-text)]">Fidato</p>
+                            <p className="text-[11px] text-emerald-400">● online</p>
+                        </div>
+                        <button onClick={clearChat}
+                            className="size-9 rounded-full flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all shrink-0">
+                            <span className="material-symbols-outlined text-base">refresh</span>
+                        </button>
+                    </div>
+
+                    {/* ── Messages (scrollable middle) ── */}
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                        {messages.map((m, i) => (
+                            <div key={i}>
+                                {m.role === 'image' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
+                                        </div>
+                                        <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] max-w-[72vw]" style={{ background: 'var(--sys-surface)' }}>
+                                            <img src={m.imageUrl} alt={m.prompt} className="w-full object-cover" style={{ maxHeight: 220 }} />
+                                            <div className="px-3 py-1.5 flex items-center gap-1">
+                                                <p className="text-[11px] text-[var(--sys-text-muted)] flex-1 truncate">{m.prompt?.slice(0, 40)}…</p>
+                                                <ShareMenu idx={`img-${i}`} imageUrl={m.imageUrl} text={`Created with Mantram AI: ${m.imageUrl}`} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                        {m.role === 'assistant' && (
+                                            <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                                <span className="material-symbols-outlined text-xs">support_agent</span>
+                                            </div>
+                                        )}
+                                        <div className="max-w-[78vw]">
+                                            {m.attachedImages?.length > 0 && (
+                                                <div className="flex gap-1 mb-1 flex-wrap">
+                                                    {m.attachedImages.map((url, j) => (
+                                                        <img key={j} src={url} alt="" className="w-14 h-14 rounded-xl object-cover border border-[var(--sys-border)]" />
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${m.role === 'user'
+                                                ? 'bg-[#FF4D00] text-white rounded-tr-sm'
+                                                : 'bg-[var(--sys-surface)] text-[var(--sys-text)] rounded-tl-sm border border-[var(--sys-border)]'
+                                            }`} style={{ whiteSpace: 'pre-wrap' }}>
+                                                {m.content}
+                                            </div>
+                                            {m.action?.route && (
+                                                <button onClick={() => { navigate(m.action.route); setOpen(false) }}
+                                                    className="mt-1 px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1 cursor-pointer"
+                                                    style={{ background: 'rgba(255,77,0,0.12)', border: '1px solid rgba(255,77,0,0.2)', color: '#c4b5fd' }}>
+                                                    <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                                    Open {m.action.label}
+                                                </button>
+                                            )}
+                                            {m.role === 'assistant' && m.content?.length > 30 && (
+                                                <div className="mt-1"><ShareMenu idx={`msg-${i}`} text={m.content} /></div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Streaming */}
+                        {streamingText && (
+                            <div className="flex gap-2.5">
+                                <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                    <span className="material-symbols-outlined text-xs">support_agent</span>
+                                </div>
+                                <div className="max-w-[78vw] px-4 py-2.5 rounded-2xl rounded-tl-sm bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[14px] text-[var(--sys-text)] leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
+                                    {streamingText}<span className="inline-block w-1.5 h-4 bg-[#FF4D00] ml-0.5 rounded-sm animate-pulse" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Loading dots */}
+                        {loading && !streamingText && (
+                            <div className="flex gap-2.5">
+                                <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                    <span className="material-symbols-outlined text-xs">support_agent</span>
+                                </div>
+                                <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <div className="flex gap-1.5">
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="size-2 rounded-full bg-[#FF4D00] animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    {/* ── Quick suggestions ── */}
+                    {messages.length <= 1 && !loading && (
+                        <div className="px-4 py-2 flex flex-wrap gap-2 border-t border-[var(--sys-border)] shrink-0">
+                            {suggestions.map((q, i) => (
+                                <button key={i} onClick={() => sendMessage(q)}
+                                    className="px-3 py-1.5 rounded-full text-[12px] cursor-pointer transition-all"
+                                    style={{ background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.15)', color: '#FF7A00' }}>
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* ── Pending images strip ── */}
+                    {(pendingImageUrls.length > 0 || uploading) && (
+                        <div className="px-4 pt-2 pb-1 flex gap-2 overflow-x-auto shrink-0 border-t border-[var(--sys-border)]">
+                            {pendingImageUrls.map((url, i) => (
+                                <div key={i} className="relative shrink-0">
+                                    <img src={url} alt="" className="w-14 h-14 rounded-xl object-cover border border-[var(--sys-border)]" />
+                                    <button onClick={() => setPendingImageUrls(prev => prev.filter((_, j) => j !== i))}
+                                        className="absolute -top-1 -right-1 size-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center cursor-pointer">×</button>
+                                </div>
+                            ))}
+                            {uploading && (
+                                <div className="w-14 h-14 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-base text-[#FF4D00] animate-spin">progress_activity</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Recording indicator ── */}
+                    {(recording || transcribing) && (
+                        <div className="px-4 py-1 flex items-center gap-2 shrink-0">
+                            <span className="size-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-[11px] text-[var(--sys-text-muted)]">{recording ? '🎤 Listening...' : '🧠 Transcribing...'}</span>
+                        </div>
+                    )}
+
+                    {/* ── Bottom input bar (always visible) ── */}
+                    <div className="px-3 py-2 border-t border-[var(--sys-border)] shrink-0 flex items-center gap-2"
+                        style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
+                        {/* Gallery */}
+                        <button onClick={() => galleryInputRef.current?.click()} disabled={uploading}
+                            className="size-10 rounded-full flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0">
+                            <span className="material-symbols-outlined text-xl">photo_library</span>
+                        </button>
+                        {/* Camera */}
+                        <button onClick={() => cameraInputRef.current?.click()} disabled={uploading}
+                            className="size-10 rounded-full flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0">
+                            <span className="material-symbols-outlined text-xl">photo_camera</span>
+                        </button>
+                        {/* Text input */}
+                        <input
+                            ref={inputRef}
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                            onPaste={handlePaste}
+                            placeholder="Message Fidato..."
+                            className="flex-1 rounded-full px-4 py-2.5 text-[14px] text-[var(--sys-text)] outline-none transition-all"
+                            style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)' }}
+                            aria-label="Message to Fidato"
+                        />
+                        {/* Mic */}
+                        <button onClick={recording ? stopRecording : startRecording} disabled={transcribing}
+                            className={`size-10 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${recording ? 'bg-red-500 text-white animate-pulse' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
+                            <span className="material-symbols-outlined text-xl">{recording ? 'stop' : transcribing ? 'hourglass_top' : 'mic'}</span>
+                        </button>
+                        {/* Send */}
+                        <button onClick={() => sendMessage()}
+                            disabled={loading || (!input.trim() && pendingImageUrls.length === 0)}
+                            className="size-10 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0"
+                            style={{ background: (input.trim() || pendingImageUrls.length > 0) ? 'var(--sys-primary)' : 'var(--sys-surface)' }}>
+                            <span className={`material-symbols-outlined text-xl ${(input.trim() || pendingImageUrls.length > 0) ? 'text-white' : 'text-[var(--sys-text-muted)]'}`}>send</span>
+                        </button>
+                    </div>
+
+                    {/* Hidden file inputs */}
+                    <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden"
+                        onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }} />
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+                        onChange={e => { handleFileSelect(e.target.files); e.target.value = '' }} />
+                </div>
+            )}
+
+            {/* ═══════════ FLOATING FIDATO BUBBLE (desktop popup) ═══════════ */}
             <div className="fixed bottom-6 right-4 sm:right-6 z-[9999]" ref={dropdownRef}>
 
-                {/* ── CHAT PANEL ── */}
-                {open && (
+
+                {/* ── DESKTOP CHAT PANEL (popup above bubble) ── */}
+                {open && !isMobile && (
                     <div
-                        className={`animate-fade-in ${
-                            isMobile
-                                ? 'fixed inset-0 z-[10000] flex flex-col'
-                                : `absolute bottom-16 right-0 rounded-2xl overflow-hidden ${expanded ? 'w-[calc(100vw-48px)] sm:w-[450px] lg:w-[520px]' : 'w-[calc(100vw-48px)] sm:w-[380px]'}`
-                        }`}
-                        style={isMobile ? {
-                            background: 'rgba(10,10,26,0.99)',
-                            backdropFilter: 'blur(24px)',
-                        } : {
+                        className={`animate-fade-in absolute bottom-16 right-0 rounded-2xl overflow-hidden ${expanded ? 'w-[calc(100vw-48px)] sm:w-[450px] lg:w-[520px]' : 'w-[calc(100vw-48px)] sm:w-[380px]'}`}
+                        style={{
                             background: 'rgba(10,10,26,0.98)',
                             border: '1px solid rgba(255, 77, 0, 0.25)',
                             boxShadow: '0 -8px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255, 77, 0, 0.1)',
@@ -753,8 +945,7 @@ export default function NexusBar() {
                         onClick={() => setShareMenuIdx(null)}
                     >
                         {/* Panel Header */}
-                        <div className="px-4 py-3 flex items-center gap-3 border-b border-[var(--sys-border)] shrink-0"
-                            style={{ paddingTop: isMobile ? 'max(12px, env(safe-area-inset-top))' : undefined }}>
+                        <div className="px-4 py-3 flex items-center gap-3 border-b border-[var(--sys-border)] shrink-0">
                             <div className="relative">
                                 <div className="size-8 rounded-full flex items-center justify-center text-[var(--sys-text)] text-sm"
                                     style={{ background: 'var(--sys-primary)' }}>
@@ -768,13 +959,11 @@ export default function NexusBar() {
                                     {activeBrand?.name ? `Brand Manager • ${activeBrand.name}` : 'Your Brand Manager'}
                                 </p>
                             </div>
-                            {!isMobile && (
-                                <button onClick={() => setExpanded(!expanded)}
+                            <button onClick={() => setExpanded(!expanded)}
                                     className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
                                     title={expanded ? 'Collapse' : 'Expand'}>
                                     <span className="material-symbols-outlined text-xs">{expanded ? 'collapse_content' : 'expand_content'}</span>
                                 </button>
-                            )}
                             <button onClick={clearChat}
                                 className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
                                 title="Clear chat">
@@ -782,13 +971,13 @@ export default function NexusBar() {
                             </button>
                             <button onClick={() => { setOpen(false); setExpanded(false) }}
                                 className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all">
-                                <span className="material-symbols-outlined text-xs">{isMobile ? 'arrow_back' : 'close'}</span>
+                                <span className="material-symbols-outlined text-xs">close</span>
                             </button>
                         </div>
 
                         {/* Messages */}
-                        <div className={`overflow-y-auto p-4 space-y-3 ${isMobile ? 'flex-1' : ''}`}
-                            style={isMobile ? undefined : { maxHeight: expanded ? 'calc(75vh - 180px)' : 320 }}>
+                        <div className="overflow-y-auto p-4 space-y-3"
+                            style={{ maxHeight: expanded ? 'calc(75vh - 180px)' : 320 }}>
                             {messages.map((m, i) => (
                                 <div key={i}>
                                     {/* ── Image card (Fidato-generated) ── */}
@@ -936,77 +1125,8 @@ export default function NexusBar() {
                         )}
 
                         {/* ── INPUT AREA ── */}
-                        {isMobile ? (
-                            /* ── MOBILE: centered mic + input row ── */
-                            <div className="border-t border-[var(--sys-border)] px-4 pt-3 pb-4 shrink-0 space-y-3"
-                                style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
-                                {/* Big centered mic button when input is empty and not loading */}
-                                {!input && !loading && (
-                                    <div className="flex justify-center">
-                                        <button
-                                            onClick={recording ? stopRecording : startRecording}
-                                            disabled={transcribing}
-                                            className="flex items-center justify-center transition-all duration-200 cursor-pointer"
-                                            style={{
-                                                width: 64, height: 64, borderRadius: '50%',
-                                                background: recording ? '#ef4444' : 'var(--sys-primary)',
-                                                boxShadow: recording
-                                                    ? '0 0 0 8px rgba(239,68,68,0.15), 0 0 30px rgba(239,68,68,0.4)'
-                                                    : '0 0 0 8px rgba(255,77,0,0.12), 0 0 30px rgba(255,77,0,0.3)',
-                                                animation: recording ? 'pulse 1s infinite' : undefined,
-                                            }}
-                                            aria-label={recording ? 'Stop recording' : 'Speak to Fidato'}>
-                                            <span className="material-symbols-outlined text-white text-2xl">
-                                                {recording ? 'stop' : transcribing ? 'hourglass_top' : 'mic'}
-                                            </span>
-                                        </button>
-                                    </div>
-                                )}
-                                {/* Input row */}
-                                <div className="flex items-center gap-2">
-                                    {/* Gallery */}
-                                    <button onClick={() => galleryInputRef.current?.click()}
-                                        disabled={uploading}
-                                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0"
-                                        title="Upload from gallery">
-                                        <span className="material-symbols-outlined text-sm">photo_library</span>
-                                    </button>
-                                    {/* Camera */}
-                                    <button onClick={() => cameraInputRef.current?.click()}
-                                        disabled={uploading}
-                                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer shrink-0"
-                                        title="Take a photo">
-                                        <span className="material-symbols-outlined text-sm">photo_camera</span>
-                                    </button>
-                                    <input
-                                        ref={inputRef}
-                                        value={input}
-                                        onChange={e => setInput(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                                        onPaste={handlePaste}
-                                        placeholder="Type or tap mic..."
-                                        className="flex-1 bg-[var(--sys-surface)] rounded-xl px-3 py-2 text-sm text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none border border-[var(--sys-border)] focus:border-[#FF4D00]/30 transition-all"
-                                        aria-label="Message to Fidato"
-                                    />
-                                    {/* Mic icon (compact) when typing */}
-                                    {input && (
-                                        <button onClick={recording ? stopRecording : startRecording}
-                                            className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${recording ? 'text-red-500 animate-pulse' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}>
-                                            <span className="material-symbols-outlined text-sm">{recording ? 'stop_circle' : 'mic'}</span>
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => sendMessage()}
-                                        disabled={loading || (!input.trim() && pendingImageUrls.length === 0)}
-                                        className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${(input.trim() || pendingImageUrls.length > 0) ? 'text-[#FF4D00] hover:bg-[#FF4D00]/15' : 'text-[var(--sys-text-muted)] cursor-not-allowed'}`}
-                                        aria-label="Send message">
-                                        <span className="material-symbols-outlined text-sm">send</span>
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            /* ── DESKTOP: single input row with paperclip ── */
-                            <div className="px-3 py-2.5 border-t border-[var(--sys-border)] flex items-center gap-2 shrink-0">
+                        {/* ── DESKTOP INPUT BAR ── */}
+                        <div className="px-3 py-2.5 border-t border-[var(--sys-border)] flex items-center gap-2 shrink-0">
                                 {/* Paperclip */}
                                 <button onClick={() => galleryInputRef.current?.click()}
                                     disabled={uploading}
@@ -1045,7 +1165,7 @@ export default function NexusBar() {
                                     <span className="material-symbols-outlined text-sm">send</span>
                                 </button>
                             </div>
-                        )}
+
 
                         {/* Hidden file inputs */}
                         <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden"
