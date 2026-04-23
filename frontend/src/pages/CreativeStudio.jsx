@@ -10083,7 +10083,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             setCsProductFile(file);
                                             const reader = new FileReader();
                                             reader.onload = async (ev) => {
-                                                try { const url = await creativesAPI.uploadToBank({ imageData: ev.target.result }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
                                                 catch { setCsProductImage(ev.target.result); }
                                             };
                                             reader.readAsDataURL(file);

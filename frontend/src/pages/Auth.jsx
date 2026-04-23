@@ -281,6 +281,7 @@ export default function Auth() {
                                     placeholder="you@company.com" 
                                     required 
                                     autoFocus
+                                    autoComplete="username"
                                     className="input-glass w-full py-3"
                                     style={{ paddingLeft: '2.75rem' }}
                                 />
@@ -300,6 +301,7 @@ export default function Auth() {
                                     placeholder="••••••••" 
                                     required 
                                     minLength={6}
+                                    autoComplete={isLogin ? 'current-password' : 'new-password'}
                                     className="input-glass w-full pr-10 py-3"
                                     style={{ paddingLeft: '2.75rem' }}
                                 />
