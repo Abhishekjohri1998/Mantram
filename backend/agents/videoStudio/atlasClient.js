@@ -507,7 +507,8 @@ export async function getAtlasCloudGenerationStatus(taskId) {
             safetyTriggered = true;
         }
         console.warn(`⚠️ [Atlas] Task ${taskId} failed: ${errorMsg}`);
-        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: safetyTriggered, safetyTriggered };
+        // All Atlas failures are retryable; safetyTriggered routes to Kling fallback, others retry same model
+        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: true, safetyTriggered };
     }
 
     if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') {

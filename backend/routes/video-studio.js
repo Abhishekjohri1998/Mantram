@@ -4447,11 +4447,28 @@ router.get('/:id/status', protect, async (req, res) => {
 
             // Update project if status or progress changed
             const progressChanged = updated.generation?.progress !== project.generation?.progress;
-            if (updated.status !== project.status || progressChanged) {
-                await VideoProject.findByIdAndUpdate(project._id, {
-                    status: updated.status,
-                    generation: updated.generation,
-                });
+            const taskIdChanged = updated.generation?.falRequestId !== project.generation?.falRequestId;
+            if (updated.status !== project.status || progressChanged || taskIdChanged) {
+                // ATOMIC GUARD: If the task ID changed (retry happened), use findOneAndUpdate
+                // with a condition on the OLD task ID to prevent duplicate retries from concurrent polls.
+                if (taskIdChanged) {
+                    const guardResult = await VideoProject.findOneAndUpdate(
+                        { _id: project._id, 'generation.falRequestId': project.generation.falRequestId },
+                        { status: updated.status, generation: updated.generation, ...(updated.routing ? { routing: updated.routing } : {}) },
+                        { new: true }
+                    );
+                    if (!guardResult) {
+                        // Another poll already updated the task ID — skip this one
+                        console.log(`⚡ [Poll Guard] Skipping duplicate retry — another poll already claimed this task.`);
+                        const freshProject = await VideoProject.findById(project._id).lean();
+                        return res.json({ success: true, project: await signVideoProjectAssets(freshProject) });
+                    }
+                } else {
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        status: updated.status,
+                        generation: updated.generation,
+                    });
+                }
 
                 if (updated.status === 'failed' && project.creditsUsed > 0) {
                     await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'})`, 'video', { projectId: project._id });
