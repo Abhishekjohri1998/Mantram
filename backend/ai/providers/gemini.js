@@ -248,7 +248,7 @@ export class GeminiProvider extends BaseProvider {
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 45_000); // 45s timeout per attempt (reduced from 60s)
+                    const timeoutId = setTimeout(() => controller.abort(), 120_000); // 120s timeout per attempt
                     try {
                         response = await fetch(url, fetchOptions({
                             method: 'POST',
@@ -296,7 +296,7 @@ export class GeminiProvider extends BaseProvider {
                         }
                         
                         // If it's not a retryable error or we exhausted attempts
-                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 45 seconds. Google servers are likely overloaded.');
+                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 120 seconds. Google servers are likely overloaded.');
                         throw attemptErr;
                     } finally {
                         clearTimeout(timeoutId);
@@ -353,8 +353,8 @@ export class GeminiProvider extends BaseProvider {
         } catch (err) {
             const isTimeout = err.name === 'AbortError' || (err.message && err.message.toLowerCase().includes('aborted'));
             if (isTimeout) {
-                console.warn(`⏳ Gemini Image generation timed out after 90s (${modelId})`);
-                throw new Error('BUSY: Gemini API timed out after 90 seconds. Google servers are likely overloaded.');
+                console.warn(`⏳ Gemini Image generation timed out after 240s (${modelId})`);
+                throw new Error('BUSY: Gemini API timed out after 240 seconds. Google servers are likely overloaded.');
             }
             console.error(`❌ Gemini Image generation failed (${modelId}):`, err.message);
             throw err;
