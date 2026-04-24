@@ -327,6 +327,7 @@ export async function submitAtlasCloudVideoGeneration({
     if (firstFrameUrls.length === 1 && faceS3Urls.length === 0) {
         console.log(`🛡️ Promoting first frame to Face Asset to bypass Seedance I2V real-person safety filter...`);
         faceS3Urls.push(firstFrameUrls[0]);
+        firstFrameUrls.pop(); // Remove it from firstFrameUrls so it's not sent as a raw URL which triggers the filter
     }
 
     // Step 3 — KEY: Convert face S3 URLs → asset:// URIs via Atlas Asset Library
