@@ -30,6 +30,7 @@ const ACTION_LABELS = {
     seoGenerateFix: 'SEO Content Fix (AI)',
     brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine',
     brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay Generation',
+    research: 'Research Intelligence',  // ← Research Studio — separate from Brainstorm
     trendRefresh: 'Trend Refresh',
     videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generation', videoEdit: 'Video Edit',
     socialMedia: 'Social Media Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Account Audit',
@@ -75,6 +76,7 @@ const DEFAULT_CREDIT_COSTS = {
     brainstormRefine: 1,           // ↓ from 2 (lightweight)
     brainstormChat: 1,             // ↓ from 2 (single short response)
     brainstormScreenplay: 5,
+    research: 3,                   // Research Studio — web search + AI synthesis
     trendRefresh: 1,
     videoBrainstorm: 2,
     videoGenerate: 'dynamic',      // DYNAMIC — calculated per request
@@ -241,7 +243,7 @@ export const requireCredits = (actionOrCost = 1) => {
             const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
             CreditUsage.create({

@@ -212,6 +212,71 @@ export class GeminiProvider extends BaseProvider {
     }
 
     /**
+     * Stream text generation using Gemini's streamGenerateContent endpoint.
+     * Returns an async generator that yields token chunks in real-time.
+     * Use for SSE endpoints where the frontend needs progressive rendering.
+     * 
+     * @yields {string} Each chunk of text as it arrives from the API
+     */
+    async *generateTextStream({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
+        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
+        const url = `${this.baseUrl}/models/${modelId}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+                ],
+                generationConfig: {
+                    temperature,
+                    maxOutputTokens: maxTokens,
+                },
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Gemini Stream API Error [${response.status}]: ${errData.error?.message || response.statusText}`);
+        }
+
+        // Parse the SSE stream from Gemini
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const jsonStr = line.slice(6).trim();
+                    if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                    try {
+                        const chunk = JSON.parse(jsonStr);
+                        const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (text) {
+                            // Strip <think>...</think> tags from streaming chunks
+                            const cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                            if (cleaned) yield cleaned;
+                        }
+                    } catch { /* skip malformed chunks */ }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+    }
+
+    /**
      * Generate image using modern Gemini models (Flash/Pro) or older Imagen models.
      * Supports gemini-3.1-flash-image-preview, imagen-3, etc.
      */

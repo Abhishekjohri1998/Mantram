@@ -41,6 +41,7 @@ async function getAllPackages() {
  */
 export const STUDIO_KEYS = [
     'brainstormStudio',
+    'researchStudio',      // ← independent studio — NOT part of Brainstorm
     'contentStudio',
     'creativeStudio',
     'videoStudio',
@@ -55,6 +56,7 @@ export const STUDIO_KEYS = [
 
 export const STUDIO_LABELS = {
     brainstormStudio: 'Brainstorm Studio',
+    researchStudio:   'Research Studio',   // ← independent label
     contentStudio: 'Content Studio',
     creativeStudio: 'Creative Studio',
     videoStudio: 'Video Studio',
@@ -78,6 +80,7 @@ const STUDIO_MAP = {
     'seo-studio': 'seoStudio',
     'brainstorm-studio': 'brainstormStudio',
     'brainstorm': 'brainstormStudio',
+    'research-studio': 'researchStudio',   // ← own route mapping
     'video-studio': 'videoStudio',
     'd2c-analytics': 'd2cAnalytics',
     'shopify-analytics': 'd2cAnalytics',

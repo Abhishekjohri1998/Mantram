@@ -203,6 +203,30 @@ class ModelRouter {
         }
     }
 
+    /**
+     * Stream text generation — returns an async generator of text chunks.
+     * Uses Gemini's streamGenerateContent endpoint (fastest, real-time tokens).
+     * Falls back to regular generateText if streaming is unavailable.
+     * 
+     * @param {object} params - { systemPrompt, userPrompt, temperature, maxTokens }
+     * @yields {string} Token chunks as they arrive
+     */
+    async *generateTextStream(params) {
+        try {
+            const gemini = this.providers.gemini;
+            if (!gemini?.isAvailable() || typeof gemini.generateTextStream !== 'function') {
+                throw new Error('Gemini streaming not available');
+            }
+            this._logUsage('stream', 'gemini', 0);
+            yield* gemini.generateTextStream(params);
+        } catch (error) {
+            console.warn('⚠️ Streaming generation failed, emitting buffered fallback:', error.message);
+            // Fallback: run regular generateText and emit the full result as one chunk
+            const result = await this.generateText(params);
+            if (result.text) yield result.text;
+        }
+    }
+
     async analyzeText(params, preferences = {}) {
         const provider = this.getTextProvider(preferences);
         try {

@@ -63,6 +63,10 @@ const STUDIO_ICONS = {
   creative: 'auto_fix_high',
   content: 'edit_note',
   video: 'movie',
+  social: 'share',
+  performance: 'monitoring',
+  ads: 'monitoring',
+  seo: 'travel_explore',
 }
 
 export default function ResearchStudio() {
@@ -80,7 +84,13 @@ export default function ResearchStudio() {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // Streaming state (Phase 2)
+  const [streamStatus, setStreamStatus] = useState('')
+  const [toolProgress, setToolProgress] = useState([]) // [{label, done}]
+  const [tokenCount, setTokenCount] = useState(0)
+
   const inputRef = useRef(null)
+  const abortRef = useRef(null)
 
   // Fetch history when brand changes or history drawer is opened
   const fetchHistory = async () => {
@@ -120,24 +130,97 @@ export default function ResearchStudio() {
     setResult(null)
     setSaved(false)
     setLoadingStep(0)
+    setStreamStatus('🧠 Initialising research...')
+    setToolProgress([])
+    setTokenCount(0)
 
-    const stepInterval = setInterval(() => {
-      setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
-    }, 2800)
+    // Get auth token for fetch (EventSource doesn't support headers)
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
     try {
-      const res = await researchStudio[activeModule.id]({ brand: activeBrand, query })
-      clearInterval(stepInterval)
-      if (res?.success && res?.data) {
-        setResult(res.data)
-      } else {
-        setError(res?.error || 'Research failed. Please try again.')
+      const response = await fetch(`${API_BASE}/api/research-studio/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          brand: activeBrand,
+          module: activeModule.id,
+          query,
+        }),
+        signal: AbortSignal.timeout(120000), // 2min hard timeout
+      })
+
+      if (!response.ok) {
+        throw new Error(`Research failed: ${response.statusText}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let localTokens = 0
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+
+            if (event.type === 'status') {
+              setStreamStatus(event.message)
+              setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
+            } else if (event.type === 'tool_progress') {
+              setToolProgress(prev => [
+                ...prev.filter(t => t.label !== event.label),
+                { label: event.label, done: true },
+              ])
+              setStreamStatus(`✅ ${event.label}`)
+            } else if (event.type === 'token') {
+              localTokens += (event.chunk || '').length
+              setTokenCount(localTokens)
+              setStreamStatus('✍️ Generating insights...')
+            } else if (event.type === 'cached') {
+              setResult(event.data)
+              setStreamStatus('⚡ Served from cache')
+            } else if (event.type === 'done') {
+              if (event.data) {
+                setResult(event.data)
+              } else if (event.raw) {
+                setError('Research completed but response had a formatting issue. Raw output available below.')
+                setResult({ raw: event.raw })
+              }
+            } else if (event.type === 'error') {
+              setError(event.message || 'Research failed. Please try again.')
+            }
+          } catch { /* skip malformed events */ }
+        }
       }
     } catch (e) {
-      clearInterval(stepInterval)
-      setError(e.message || 'Something went wrong.')
+      if (e.name !== 'AbortError') {
+        // Fallback: try the regular (non-streaming) endpoint
+        try {
+          const res = await researchStudio[activeModule.id]({ brand: activeBrand, query })
+          if (res?.success && res?.data) {
+            setResult(res.data)
+          } else {
+            setError(res?.error || 'Research failed. Please try again.')
+          }
+        } catch (fallbackErr) {
+          setError(fallbackErr.message || 'Something went wrong.')
+        }
+      }
     } finally {
       setLoading(false)
+      setStreamStatus('')
     }
   }
 
@@ -165,8 +248,26 @@ export default function ResearchStudio() {
       creative: '/creative-studio',
       content: '/content-studio',
       video: '/video-studio',
+      social: '/social-media-studio',
+      performance: '/performance-marketing',
+      ads: '/performance-marketing',
+      seo: '/seo-studio',
     }
-    const basePath = paths[action.studio] || '/brainstorm'
+    let targetStudio = action.studio?.toLowerCase()
+    
+    // Smart routing for older cached data or hallucinations
+    const label = (action.label || '').toLowerCase()
+    if (label.includes('ad ') || label.includes('ads') || label.includes('meta') || label.includes('funnel')) {
+      targetStudio = 'performance'
+    } else if (label.includes('reel') || label.includes('video') || label.includes('tiktok')) {
+      targetStudio = 'video'
+    } else if (label.includes('influencer') || label.includes('brief')) {
+      targetStudio = 'brainstorm'
+    } else if (label.includes('seo') || label.includes('keyword')) {
+      targetStudio = 'seo'
+    }
+
+    const basePath = paths[targetStudio] || paths[action.studio] || '/creative-studio'
     // Pass strategy mode as query param so target studio can pre-select it
     const modeParam = action.mode ? `?mode=${encodeURIComponent(action.mode)}` : ''
     navigate(`${basePath}${modeParam}`)
@@ -316,10 +417,37 @@ export default function ResearchStudio() {
               </div>
             )}
 
-            {/* Loading */}
+            {/* Loading — Real-time streaming progress */}
             {loading && (
               <div className="rs-loading">
                 <div className="rs-loading-spinner" />
+
+                {/* Live status message */}
+                {streamStatus && (
+                  <p className="rs-stream-status">{streamStatus}</p>
+                )}
+
+                {/* Tool progress chips — appear as each tool finishes */}
+                {toolProgress.length > 0 && (
+                  <div className="rs-tool-chips">
+                    {toolProgress.map((t, i) => (
+                      <span key={i} className="rs-tool-chip rs-tool-chip--done">
+                        <span className="material-symbols-outlined">check_circle</span>
+                        {t.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Token counter — shows generation is happening */}
+                {tokenCount > 0 && (
+                  <p className="rs-token-counter">
+                    <span className="material-symbols-outlined">edit</span>
+                    {Math.round(tokenCount / 4)} words generated...
+                  </p>
+                )}
+
+                {/* Classic step indicators (fallback visual progress) */}
                 <div className="rs-loading-steps">
                   {LOADING_STEPS.map((step, i) => (
                     <div
@@ -335,7 +463,7 @@ export default function ResearchStudio() {
                     </div>
                   ))}
                 </div>
-                <p className="rs-loading-note">Deep research takes 30–60 seconds. Please wait.</p>
+                <p className="rs-loading-note">Live results will appear as they're generated.</p>
               </div>
             )}
 

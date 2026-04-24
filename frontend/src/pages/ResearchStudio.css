@@ -475,6 +475,76 @@
   text-align: center;
 }
 
+/* ── Streaming Progress UI ────────────────────────────────────────────────── */
+.rs-stream-status {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--sys-text);
+  text-align: center;
+  margin: 0;
+  animation: rs-fade-in 0.3s ease;
+  min-height: 1.4em;
+}
+
+.rs-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  max-width: 380px;
+}
+
+.rs-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 5px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  animation: rs-chip-pop 0.25s ease;
+  border: 1px solid transparent;
+}
+
+.rs-tool-chip--done {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #22c55e;
+}
+.rs-tool-chip--done .material-symbols-outlined {
+  font-size: 13px;
+}
+
+.rs-token-counter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--sys-primary);
+  font-weight: 600;
+  animation: rs-fade-in 0.3s ease;
+  margin: 0;
+}
+.rs-token-counter .material-symbols-outlined {
+  font-size: 14px;
+  animation: rs-pulse 1s ease infinite;
+}
+
+@keyframes rs-chip-pop {
+  from { opacity: 0; transform: scale(0.85) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes rs-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes rs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ── Error ────────────────────────────────────────────────────────────────── */
 .rs-error {
   display: flex;

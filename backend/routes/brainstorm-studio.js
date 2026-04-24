@@ -2889,6 +2889,235 @@ const STRATEGY_MODES = {
   },
 };
 
+// ════════════════════════════════════════════════════════════════════════════════
+// POST /strategy-mode/stream — SSE streaming strategy generation (Phase 4)
+// Emits: tool_progress (MCP research), text_delta (live Gemini tokens), done (JSON)
+// Frontend: live research chips + token accumulator → StrategyModeResult render
+// ════════════════════════════════════════════════════════════════════════════════
+router.post('/strategy-mode/stream', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+  const { mode, brand, inputs = {} } = req.body;
+  if (!mode) return res.status(400).json({ success: false, error: 'mode is required' });
+  if (!STRATEGY_MODES[mode]) return res.status(400).json({ success: false, error: `Unknown mode: ${mode}` });
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const emit = (obj) => {
+    try { if (!res.writableEnded) res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch { /* disconnected */ }
+  };
+
+  try {
+    const modeConfig = STRATEGY_MODES[mode];
+
+    // ── Phase A: Load Brand DNA ─────────────────────────────────────────────
+    emit({ type: 'tool_progress', tool: 'brand_dna', label: 'Loading Brand DNA', status: 'working' });
+    let brandContext = '';
+    let brandDoc = brand;
+    try {
+      const brandId = brand?._id || brand?.id;
+      if (brandId) {
+        const ctx = await loadBrandContext(brandId);
+        brandContext = ctx.brandContext || '';
+        brandDoc = ctx.brand || brand;
+      } else if (brand?.name) {
+        const dna = brand?.dna || {};
+        brandContext = `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}.`;
+      }
+    } catch (ctxErr) { console.warn('[strategy-stream] Brand context error:', ctxErr.message); }
+    emit({ type: 'tool_progress', tool: 'brand_dna', label: 'Brand DNA loaded', status: 'done' });
+
+    const dna = brandDoc?.dna || brand?.dna || {};
+    const brandName = brandDoc?.name || brand?.name || 'Your Brand';
+    const brandId = brand?._id || brand?.id;
+
+    // ── Phase B: MCP Research (parallel) ──────────────────────────────────
+    const searchQuery = modeConfig.searchQuery(brandName, dna);
+    const mcpCalls = [];
+    if (modeConfig.mcpTools.some(t => t.startsWith('web_search'))) {
+      mcpCalls.push({ tool: 'web_search', args: { query: searchQuery, mode: 'quick' } });
+    }
+    if (modeConfig.mcpTools.includes('fetch_trending')) mcpCalls.push({ tool: 'fetch_trending', args: { brandId } });
+    if (modeConfig.mcpTools.includes('scrape_competitor')) mcpCalls.push({ tool: 'scrape_competitor', args: { brandId } });
+    if (modeConfig.mcpTools.includes('fetch_seo_audit')) mcpCalls.push({ tool: 'fetch_seo_audit', args: { brandId } });
+    if (modeConfig.mcpTools.includes('fetch_performance_learnings')) mcpCalls.push({ tool: 'fetch_performance_learnings', args: { brandId } });
+    if (modeConfig.mcpTools.includes('fetch_content_history')) mcpCalls.push({ tool: 'fetch_content_history', args: { brandId, platform: '', limit: 20 } });
+
+    // Emit individual tool chips as they start
+    const toolLabels = {
+      web_search: 'Web Research', fetch_trending: 'Trending Signals',
+      scrape_competitor: 'Competitor Intel', fetch_seo_audit: 'SEO Audit',
+      fetch_performance_learnings: 'Performance Data', fetch_content_history: 'Content History',
+    };
+    for (const call of mcpCalls) {
+      emit({ type: 'tool_progress', tool: call.tool, label: toolLabels[call.tool] || call.tool, status: 'working' });
+    }
+
+    const mcpResults = await callMcpToolsParallel(mcpCalls);
+
+    // Mark all MCP tools done
+    for (const call of mcpCalls) {
+      emit({ type: 'tool_progress', tool: call.tool, label: toolLabels[call.tool] || call.tool, status: 'done' });
+    }
+
+    // ── Phase C: Build prompts (same as blocking endpoint) ────────────────
+    const researchParts = [];
+    if (mcpResults.web_search?.data) researchParts.push(`LIVE WEB RESEARCH:\n${mcpResults.web_search.data.substring(0, 2500)}`);
+    if (mcpResults.fetch_trending?.data) {
+      const t = mcpResults.fetch_trending.data;
+      if (t.trending?.length) researchParts.push(`TRENDING NOW: ${t.trending.slice(0, 5).map(x => `${x.topic} (${x.urgency})`).join(' | ')}`);
+      if (t.calendarHooks?.length) researchParts.push(`UPCOMING HOOKS: ${t.calendarHooks.slice(0, 5).join(' | ')}`);
+    }
+    if (mcpResults.scrape_competitor?.data?.analysis) researchParts.push(`COMPETITOR INTEL:\n${mcpResults.scrape_competitor.data.analysis}`);
+    if (mcpResults.fetch_seo_audit?.data?.topKeywords?.length) researchParts.push(`SEO KEYWORDS: ${mcpResults.fetch_seo_audit.data.topKeywords.slice(0, 10).join(', ')}`);
+    if (mcpResults.fetch_performance_learnings?.data?.topRated?.length) {
+      researchParts.push(`PAST TOP CONTENT: ${mcpResults.fetch_performance_learnings.data.topRated.map(x => x.title).join(', ')}`);
+    }
+    const researchContext = researchParts.join('\n\n') || 'No live research data — proceeding with brand knowledge and AI training data.';
+
+    const modeInstructions = {
+      'new-product-launch': `Focus on: pre-launch buzz building, launch day execution, post-launch amplification. Include channel-by-channel plan for first 90 days. Emphasise: influencer seeding, PR outreach, performance ads, social proof collection.`,
+      'sales-acceleration': `Focus on: conversion rate improvements, offer architecture, urgency mechanics, retargeting strategy, abandoned cart recovery. Include specific discount structures, bundle ideas, FOMO tactics. Make it a 30-day sprint plan.`,
+      'marketplace-growth': `Focus on: Amazon/Flipkart/Nykaa listing optimisation, keyword-rich A+ content, review generation strategy, sponsored ads, category ranking tactics. Include specific keyword recommendations.`,
+      'meta-google-ads': `This is an AD BRIEF. Focus on: hook formulas, creative concepts, copy frameworks, audience targeting parameters, budget allocation between Meta/Google, bid strategy, and landing page recommendations. Include 3-5 specific ad concepts with hooks and CTAs.`,
+      'retention': `Focus on: Win-back sequences, loyalty rewards, repeat purchase triggers, LTV improvement, WhatsApp/Email/SMS flows. Include day-by-day retention flow for 90 days post first purchase.`,
+      'festive-seasonal': `Focus on: Pre-festive content calendar, offer strategy, limited edition packaging ideas, festive ad creative direction, affiliate/influencer amplification during peak season.`,
+      'brand-awareness': `Focus on: Share of voice strategy, PR hooks, organic social virality, UGC campaigns, brand partnership opportunities, community building. Make it a 90-day brand building plan.`,
+      'influencer-campaign': `Focus on: Creator tier selection (mega/macro/micro/nano), brief framework, seeding strategy, content format mix (Reels/YouTube/Blog), compensation models, content approval process, measurement. Include creator profile criteria.`,
+    };
+
+    const userInputsText = Object.keys(inputs).length
+      ? `\nUSER INPUTS:\n${Object.entries(inputs).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+      : '';
+
+    const systemPrompt = `You are a world-class Chief Marketing Officer and strategic consultant specialising in D2C brands in India.
+You are running the "${modeConfig.label}" strategy mode for a brand.
+
+${brandContext}
+
+LIVE MARKET RESEARCH DATA:
+${researchContext}
+
+YOUR STRATEGY FOCUS FOR THIS MODE:
+${modeInstructions[mode]}
+
+RULES:
+1. Every recommendation must be brand-specific — use the brand's name, category, audience, and products
+2. Every number (budget, ROAS, CPL, timeline) must have a rationale
+3. No generic advice — all outputs must be actionable this week
+4. Channel breakdown must cover specific platforms with tactics, not just platform names
+5. Content calendar must have specific content themes/hooks for each phase, not just "create content"
+6. Studio Actions must map to specific capabilities (Creative Studio for images, Content Studio for copy, Video Studio for reels)
+7. CRITICAL: Output ONLY valid, parsable JSON. Do not include unescaped quotes inside strings. Do not include trailing commas. Ensure all braces and brackets are properly closed. Do not output markdown code blocks, just the raw JSON object.
+8. BE DENSE AND WOW-WORTHY: Every sentence must be a sharp insight, not a filler. Make the user feel like they just got a ₹50,000 strategy session for free. Use specific numbers, channel names, hook examples, and timelines.
+
+Respond in STRICT JSON:
+{
+  "mode": "${mode}",
+  "modeLabel": "${modeConfig.label}",
+  "brand": "${brandName}",
+  "strategicSummary": "4-5 sentence thesis: why THIS strategy at THIS moment will work for THIS brand, grounded in research",
+  "marketContext": {
+    "keyFindings": ["Specific finding 1 with data", "Finding 2", "Finding 3", "Finding 4"],
+    "competitorGaps": ["Gap 1 — what competitors aren't doing", "Gap 2", "Gap 3"],
+    "trendingAngles": ["Trending angle 1 brand can leverage", "Angle 2", "Angle 3"]
+  },
+  "recommendedActions": [
+    { "priority": "high", "action": "Specific action", "rationale": "Why this, why now", "timeline": "e.g. Week 1", "owner": "Founder/Marketing team/Agency" }
+  ],
+  "channelBreakdown": [
+    {
+      "channel": "Meta Ads",
+      "strategy": "2-3 sentence channel strategy",
+      "contentTypes": ["Specific content type 1", "Type 2"],
+      "hooks": ["Winning hook formula 1", "Hook 2"],
+      "budget": "Suggested budget range or %",
+      "kpi": "Primary KPI with target",
+      "timeline": "When to start and scale"
+    }
+  ],
+  "contentCalendar": {
+    "duration": "e.g. 30 days / 90 days",
+    "phases": [
+      { "name": "Phase name", "duration": "Week 1-2", "theme": "Campaign theme", "actions": ["Specific action 1", "Action 2", "Action 3"] }
+    ]
+  },
+  "studioActions": [
+    { "label": "Generate Campaign Creative", "studio": "creative", "payload": { "brief": "1 sentence creative brief" } },
+    { "label": "Write Campaign Copy", "studio": "content", "payload": { "type": "social", "platform": "instagram" } },
+    { "label": "Create Reel Concepts", "studio": "video", "payload": { "format": "reel" } }
+  ]
+}`;
+
+    const userPrompt = `Generate the "${modeConfig.label}" strategy for "${brandName}".
+${userInputsText}
+Use all available brand data and research intel to build the most specific, actionable plan possible.`;
+
+    // ── Phase D: Stream Gemini tokens ─────────────────────────────────────
+    emit({ type: 'tool_progress', tool: 'ai_synthesis', label: 'AI Strategy Synthesis', status: 'working' });
+
+    const aiRouter = getRouter();
+    let fullText = '';
+    let tokenCount = 0;
+
+    try {
+      for await (const chunk of aiRouter.generateTextStream({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.5,
+        maxTokens: 4000,
+      })) {
+        fullText += chunk;
+        tokenCount += chunk.length;
+        // Emit text delta — frontend accumulates this for display
+        emit({ type: 'text_delta', text: chunk, tokenCount });
+      }
+    } catch (streamErr) {
+      // Streaming failed — run blocking fallback and emit as single chunk
+      console.warn('[strategy-stream] Stream failed, running blocking fallback:', streamErr.message);
+      const fallbackResult = await aiRouter.generateText({ systemPrompt, userPrompt, temperature: 0.5, maxTokens: 4000 }, { provider: 'gemini' });
+      fullText = fallbackResult.text || '';
+      emit({ type: 'text_delta', text: fullText, tokenCount: fullText.length });
+    }
+
+    emit({ type: 'tool_progress', tool: 'ai_synthesis', label: 'AI Strategy Synthesis', status: 'done' });
+
+    // ── Phase E: Parse JSON + emit done ───────────────────────────────────
+    let text = fullText;
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const lastThink = text.lastIndexOf('<think>');
+    if (lastThink !== -1) { const before = text.substring(0, lastThink).trim(); text = before.length > 0 ? before : ''; }
+    text = text.replace(/```(?:json)?\s*\n?/gi, '').trim();
+
+    let parsed;
+    try {
+      if (text.startsWith('{')) parsed = JSON.parse(text);
+      else { const m = text.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+    } catch (parseError) {
+      console.error('[strategy-stream] JSON Parse Error:', parseError.message);
+      parsed = { raw: text, error: `JSON parse failed: ${parseError.message}` };
+    }
+
+    parsed = parsed || {};
+    parsed.mode = mode;
+    parsed.modeLabel = modeConfig.label;
+    parsed.brand = brandName;
+    parsed.generatedAt = new Date().toISOString();
+    parsed.researchUsed = mcpCalls.length > 0;
+
+    emit({ type: 'done', data: parsed });
+
+  } catch (error) {
+    console.error('[strategy-stream] error:', error);
+    emit({ type: 'error', message: safeErrorMessage(error) });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+});
+
 router.post('/strategy-mode', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
   try {
     const { mode, brand, inputs = {} } = req.body;
@@ -2993,6 +3222,8 @@ RULES:
 4. Channel breakdown must cover specific platforms with tactics, not just platform names
 5. Content calendar must have specific content themes/hooks for each phase, not just "create content"
 6. Studio Actions must map to specific capabilities (Creative Studio for images, Content Studio for copy, Video Studio for reels)
+7. CRITICAL: Output ONLY valid, parsable JSON. Do not include unescaped quotes inside strings. Do not include trailing commas. Ensure all braces and brackets are properly closed. Do not output markdown code blocks, just the raw JSON object.
+8. BE DENSE AND WOW-WORTHY: Every sentence must be a sharp insight, not a filler. Make the user feel like they just got a ₹50,000 strategy session for free. Use specific numbers, channel names, hook examples, and timelines.
 
 Respond in STRICT JSON:
 {
@@ -3037,12 +3268,15 @@ ${userInputsText}
 Use all available brand data and research intel to build the most specific, actionable plan possible.`;
 
     const aiRouter = getRouter();
+    // ⚡ Gemini 2.5 Pro: quality-speed balance for strategy synthesis
+    // Claude Sonnet at 6000 tokens = 30-60s. Gemini Pro at 4000 tokens = 8-15s.
+    // 4000 tokens is sufficient for a dense, wow-factor strategy — verbose doesn't mean better.
     const aiResult = await aiRouter.generateText({
       systemPrompt,
       userPrompt,
       temperature: 0.5,
-      maxTokens: 6000,
-    });
+      maxTokens: 4000,
+    }, { provider: 'gemini' });
 
     let text = aiResult.text || '';
     text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -3060,8 +3294,10 @@ Use all available brand data and research intel to build the most specific, acti
         const m = text.match(/\{[\s\S]*\}/);
         if (m) parsed = JSON.parse(m[0]);
       }
-    } catch (_) {
-      parsed = { raw: text.substring(0, 1000), error: 'JSON parse failed' };
+    } catch (parseError) {
+      console.error('[strategy-mode] JSON Parse Error:', parseError.message);
+      console.error('[strategy-mode] Raw output:', text);
+      parsed = { raw: text, error: `JSON parse failed: ${parseError.message}` };
     }
 
     parsed = parsed || {};

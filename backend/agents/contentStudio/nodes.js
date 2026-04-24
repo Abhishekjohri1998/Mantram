@@ -441,8 +441,12 @@ export async function qualityCriticNode(state) {
     // ── AUTO-LOOP: If score < 8 and we haven't hit the rewrite cap, send back to Writer ──
     // maxRewriteLoops defaults to 2 (full quality mode), but callers can set it to 1 for
     // fast-path social content to prevent double-rewrite latency spikes.
-    const maxLoops = state.maxRewriteLoops ?? 2;
-    if (overallScore < 8 && rewriteCount < maxLoops) {
+    // Default cap: 1 rewrite loop (was 2). One rewrite is sufficient quality improvement;
+    // a second loop adds 25-40s latency with diminishing returns on most content types.
+    const maxLoops = state.maxRewriteLoops ?? 1;
+    // Threshold lowered 8→7: Most first-pass content is good quality. Only catastrophically bad
+    // content (score ≤6) justifies a full rewrite loop which adds 20-30s latency.
+    if (overallScore < 7 && rewriteCount < maxLoops) {
         console.log(`   ⚠️ Score ${overallScore}/10 — below threshold. Sending back to Writer (loop ${rewriteCount + 1}/${maxLoops})...`);
 
         const fixInstructions = [
@@ -507,7 +511,8 @@ export async function contentABTestNode(state) {
         ? `${languageDirective}\n\n${CONTENT_AB_TEST_PROMPT(brandContext)}`
         : CONTENT_AB_TEST_PROMPT(brandContext);
 
-    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.7);
+    // ⚡ preferFast: A/B variant generation is pattern-based differentiation — Gemini Flash sufficient
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.7, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -553,7 +558,8 @@ export async function youtubeResearchNode(state) {
         ? `${languageDirective}\n\n${YOUTUBE_RESEARCH_PROMPT(brandContext)}`
         : YOUTUBE_RESEARCH_PROMPT(brandContext);
 
-    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.6);
+    // ⚡ preferFast: YouTube Research is analytical keyword/trend analysis — Gemini Flash is fast enough
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.6, 4096, { preferFast: true });
 
     return {
         ...state,
@@ -630,7 +636,8 @@ export async function youtubeSeoNode(state) {
         ? `${languageDirective}\n\n${YOUTUBE_SEO_PROMPT(brandContext)}`
         : YOUTUBE_SEO_PROMPT(brandContext);
 
-    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.5, 4096);
+    // ⚡ preferFast: YouTube SEO Optimizer is metadata/keyword analysis — Gemini Flash sufficient
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.5, 4096, { preferFast: true });
 
     return {
         ...state,

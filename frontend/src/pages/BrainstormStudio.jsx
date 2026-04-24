@@ -10,14 +10,86 @@ import './BrainstormStudio.css'
 
 // ── Strategy Modes (8 goal-oriented research-backed modes) ───────────────────
 const STRATEGY_MODES_LIST = [
-  { id: 'new-product-launch', icon: 'rocket_launch', label: 'New Product Launch', desc: 'Pre-launch buzz, launch-day plan, 90-day amplification.', color: '#6366f1' },
-  { id: 'sales-acceleration', icon: 'trending_up', label: 'Sales Acceleration', desc: 'Conversion boosts, offer architecture, 30-day sprint.', color: '#f59e0b' },
-  { id: 'marketplace-growth', icon: 'storefront', label: 'Marketplace Growth', desc: 'Amazon/Flipkart/Nykaa SEO, listings, sponsored ads.', color: '#10b981' },
-  { id: 'meta-google-ads', icon: 'ads_click', label: 'Meta & Google Ads Brief', desc: 'Winning hooks, creative brief, targeting, budget split.', color: '#3b82f6' },
-  { id: 'retention', icon: 'loyalty', label: 'Retention & Loyalty', desc: 'Win-back flows, repeat purchase triggers, LTV plan.', color: '#ec4899' },
-  { id: 'festive-seasonal', icon: 'celebration', label: 'Festive & Seasonal', desc: 'Seasonal calendar, offer strategy, festive creative brief.', color: '#f97316' },
-  { id: 'brand-awareness', icon: 'record_voice_over', label: 'Brand Awareness', desc: '90-day share-of-voice, PR, UGC, community plan.', color: '#8b5cf6' },
-  { id: 'influencer-campaign', icon: 'person_pin', label: 'Influencer Campaign', desc: 'Creator brief, tier mix, seeding, measurement plan.', color: '#14b8a6' },
+  { 
+    id: 'influencer-campaign', icon: 'person_pin', label: 'Influencer Campaign', desc: 'Creator brief & seeding', color: '#14b8a6',
+    buildSteps: [
+      { title: 'Competitor creator scan', desc: 'which influencer tiers are working in your category' },
+      { title: 'Trending content formats', desc: 'what hooks and styles are performing on TikTok & Reels right now' },
+      { title: 'Creator brief', desc: 'hook scripts, visual direction, talking points, hashtag strategy' },
+      { title: 'Seeding & measurement plan', desc: 'tier mix, gifting strategy, KPIs, timeline' }
+    ],
+    researchModules: ['Trending Intel', 'Competitor Scanner', 'Audience Intelligence']
+  },
+  { 
+    id: 'new-product-launch', icon: 'rocket_launch', label: 'New Product Launch', desc: 'Pre-launch to amplification', color: '#6366f1',
+    buildSteps: [
+      { title: 'Market whitespace scan', desc: 'identifying gaps in competitor product lines' },
+      { title: 'Launch messaging matrix', desc: 'core value props, taglines, and feature highlights' },
+      { title: 'Pre-launch hype plan', desc: 'teaser calendar, waitlist strategy, PR hooks' },
+      { title: 'Launch week execution', desc: 'daily activation plan, offer structures, amplification' }
+    ],
+    researchModules: ['Competitor Scanner', 'Audience Intelligence']
+  },
+  { 
+    id: 'sales-acceleration', icon: 'trending_up', label: 'Sales Acceleration', desc: 'Offers & conversion', color: '#f59e0b',
+    buildSteps: [
+      { title: 'Offer architecture', desc: 'bundling, discounting, and FOMO triggers' },
+      { title: 'Conversion copywriting', desc: 'high-urgency headlines, email hooks, landing page copy' },
+      { title: 'Cart abandonment flows', desc: 'multi-step recovery emails and retargeting ads' },
+      { title: 'Upsell & Cross-sell map', desc: 'post-purchase bumps and AOV increasers' }
+    ],
+    researchModules: ['Ad Intelligence', 'Audience Intelligence']
+  },
+  { 
+    id: 'marketplace-growth', icon: 'storefront', label: 'Marketplace Growth', desc: 'Listings & sponsored ads', color: '#10b981',
+    buildSteps: [
+      { title: 'Keyword optimization', desc: 'high-volume search terms for Amazon/Flipkart' },
+      { title: 'A+ Content strategy', desc: 'visual module planning and lifestyle imagery' },
+      { title: 'Review mining', desc: 'extracting customer pain points to address in copy' },
+      { title: 'Sponsored ad targeting', desc: 'bidding strategy, competitor targeting, and budget' }
+    ],
+    researchModules: ['Competitor Scanner', 'Trending Intel']
+  },
+  { 
+    id: 'meta-google-ads', icon: 'ads_click', label: 'Meta & Google Ads', desc: 'Hooks & targeting brief', color: '#3b82f6',
+    buildSteps: [
+      { title: 'Winning ad frameworks', desc: 'problem/solution, UGC, USPs, and founder story' },
+      { title: 'Creative brief', desc: 'visual directions, text overlays, and 3-second hooks' },
+      { title: 'Audience targeting', desc: 'lookalikes, interests, and retargeting segments' },
+      { title: 'Budget allocation', desc: 'testing phase, scaling, and platform split' }
+    ],
+    researchModules: ['Ad Intelligence', 'Competitor Scanner', 'Trending Intel']
+  },
+  { 
+    id: 'retention', icon: 'loyalty', label: 'Retention & Loyalty', desc: 'Win-back & LTV', color: '#ec4899',
+    buildSteps: [
+      { title: 'Customer journey mapping', desc: 'identifying drop-off points and churn risks' },
+      { title: 'Loyalty program structure', desc: 'points, tiers, VIP perks, and referral incentives' },
+      { title: 'Win-back campaigns', desc: 'email/SMS sequences for lapsed customers' },
+      { title: 'Subscription model', desc: 'subscribe & save strategy, unboxing experience' }
+    ],
+    researchModules: ['Audience Intelligence']
+  },
+  { 
+    id: 'festive-seasonal', icon: 'celebration', label: 'Festive & Seasonal', desc: 'Calendar & creative brief', color: '#f97316',
+    buildSteps: [
+      { title: 'Seasonal calendar map', desc: 'key dates, teaser periods, and peak sale days' },
+      { title: 'Festive offer strategy', desc: 'flash sales, limited editions, and gifting guides' },
+      { title: 'Creative & visual direction', desc: 'moodboard, color palettes, and thematic elements' },
+      { title: 'Media buying plan', desc: 'budget scaling before, during, and after the event' }
+    ],
+    researchModules: ['Trending Intel', 'Ad Intelligence']
+  },
+  { 
+    id: 'brand-awareness', icon: 'record_voice_over', label: 'Brand Awareness', desc: 'PR, UGC, community', color: '#8b5cf6',
+    buildSteps: [
+      { title: 'Brand narrative', desc: 'core story, mission, and unique market positioning' },
+      { title: 'PR & Media angles', desc: 'founder stories, industry thought leadership, press releases' },
+      { title: 'Community building', desc: 'user-generated content campaigns, Facebook groups' },
+      { title: 'Partnerships & Collabs', desc: 'co-marketing opportunities and brand alliances' }
+    ],
+    researchModules: ['Audience Intelligence', 'Trending Intel']
+  }
 ]
 
 // ── Strategy Mode Result Renderer ─────────────────────────────────────────────
@@ -37,6 +109,24 @@ function StrategyModeResult({ data, onClose, navigate }) {
         <div className="sm-result-title">{data.modeLabel} — {data.brand}</div>
         <button className="sm-close-btn" onClick={onClose}><span className="material-symbols-outlined">close</span></button>
       </div>
+
+      {data.error && (
+        <div className="sm-block" style={{ padding: '1rem', color: 'var(--sys-primary)' }}>
+          <div className="sm-block-title"><span className="material-symbols-outlined">warning</span>Error Parsing Response</div>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', marginTop: '0.5rem', background: 'var(--sys-surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--sys-border)' }}>
+            {data.raw || 'Unknown error'}
+          </pre>
+        </div>
+      )}
+
+      {!data.strategicSummary && !data.error && (
+        <div className="sm-block" style={{ padding: '1rem' }}>
+          <div className="sm-block-title"><span className="material-symbols-outlined">data_object</span>Raw Strategy Data</div>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', marginTop: '0.5rem', background: 'var(--sys-surface)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--sys-border)' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {data.strategicSummary && (
         <div className="sm-thesis">{data.strategicSummary}</div>
@@ -967,11 +1057,15 @@ export default function BrainstormStudio() {
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
   // ── Strategy Mode state ───────────────────────────────────────────────────
-  const [smActiveMode, setSmActiveMode] = useState(null)
+  const [smActiveMode, setSmActiveMode] = useState(STRATEGY_MODES_LIST[0])
   const [smInputs, setSmInputs] = useState({})
   const [smLoading, setSmLoading] = useState(false)
   const [smError, setSmError] = useState(null)
   const [smResult, setSmResult] = useState(null)
+  // Phase 4: live streaming state
+  const [smStreamTools, setSmStreamTools] = useState([])   // [{ tool, label, status }]
+  const [smTokenCount, setSmTokenCount] = useState(0)       // live char/word count
+  const [smStreamPhase, setSmStreamPhase] = useState('')    // 'research' | 'writing' | ''
 
   // Pre-select Strategy Mode from ?mode= query param (set by Research Studio)
   useEffect(() => {
@@ -987,21 +1081,80 @@ export default function BrainstormStudio() {
     setSmLoading(true)
     setSmError(null)
     setSmResult(null)
+    setSmStreamTools([])
+    setSmTokenCount(0)
+    setSmStreamPhase('research')
+
     try {
-      const res = await bsAPI.strategyMode({
+      // ── Phase 4: SSE streaming ──
+      const response = await bsAPI.strategyModeStream({
         mode: smActiveMode.id,
         brand: activeBrand,
         inputs: smInputs.context ? { context: smInputs.context } : {},
       })
-      if (res?.success && res?.data) {
-        setSmResult(res.data)
-      } else {
-        setSmError(res?.error || 'Strategy generation failed. Please try again.')
+
+      if (!response.ok) throw new Error(`Stream failed: ${response.statusText}`)
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+
+            if (event.type === 'tool_progress') {
+              // Update research chip list — dedupe by tool key
+              setSmStreamTools(prev => {
+                const filtered = prev.filter(t => t.tool !== event.tool)
+                return [...filtered, { tool: event.tool, label: event.label, status: event.status }]
+              })
+              // Switch phase label
+              if (event.tool === 'ai_synthesis' && event.status === 'working') {
+                setSmStreamPhase('writing')
+              }
+            } else if (event.type === 'text_delta') {
+              // Accumulate token count (chars / ~5 = approx words)
+              setSmTokenCount(Math.round((event.tokenCount || 0) / 5))
+            } else if (event.type === 'done') {
+              setSmResult(event.data)
+              setSmStreamPhase('')
+            } else if (event.type === 'error') {
+              throw new Error(event.message || 'Strategy generation failed')
+            }
+          } catch (parseErr) {
+            if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
+          }
+        }
       }
-    } catch (e) {
-      setSmError(e.message || 'Something went wrong.')
+    } catch (streamErr) {
+      // ── Fallback: blocking strategyMode ──
+      console.warn('[BrainstormStudio] SSE stream failed, falling back:', streamErr.message)
+      try {
+        const res = await bsAPI.strategyMode({
+          mode: smActiveMode.id,
+          brand: activeBrand,
+          inputs: smInputs.context ? { context: smInputs.context } : {},
+        })
+        if (res?.success && res?.data) {
+          setSmResult(res.data)
+        } else {
+          setSmError(res?.error || 'Strategy generation failed. Please try again.')
+        }
+      } catch (e) {
+        setSmError(e.message || 'Something went wrong.')
+      }
     } finally {
       setSmLoading(false)
+      setSmStreamPhase('')
     }
   }
 
@@ -1054,11 +1207,11 @@ export default function BrainstormStudio() {
     ].filter(Boolean).join(', ')
 
     const greeting = insights
-      ? `Hey ${firstName}! 👋 I'm Fidato — your brand strategist for ${activeBrand.name}. I've studied your brand deeply — you're a ${insights}.${langInfo ? ` All campaign copy, taglines & scripts will be in **${langInfo.label}** — the language of your audience. 🌍` : ''} Let's brainstorm something brilliant together. What are we building today? `
-      : `Hey ${firstName}! 👋 Fidato here — let’s brainstorm for **${activeBrand.name}** today. What are we working on?`
+      ? `Hey ${firstName}! 👋 I've loaded ${activeBrand.name}'s Brand DNA — ${insights}.${langInfo ? ` All copy & scripts will be generated in **${langInfo.label}**.` : ''} Let's build your **${smActiveMode?.label || 'Campaign'}** strategy.`
+      : `Hey ${firstName}! 👋 Fidato here. Let’s build your **${smActiveMode?.label || 'Campaign'}** strategy for **${activeBrand.name}** today.`
 
     setMessages([{ id: 'welcome', role: 'fidato', content: greeting, timestamp: Date.now() }])
-  }, [firstName, activeBrand])
+  }, [firstName, activeBrand, smActiveMode])
 
   // Load session list on mount and when brand changes
   useEffect(() => {
@@ -1318,14 +1471,14 @@ export default function BrainstormStudio() {
   }, [brandName])
 
   const phaseInfo = PHASES[phase] || PHASES.explore
-  const showTopics = messages.length === 1 && !streaming
+  const isHeroScreen = messages.length === 1 && !streaming && !smResult
 
   return (
     <DashboardLayout title="Brainstorm Studio" subtitle="Powered by Fidato AI">
       <Walkthrough studioId="brainstormStudio" />
       <div className="bs-root">
-
-        {/* Session Sidebar */}
+        
+        {/* Hidden Legacy Session Sidebar (Triggered by mobile/history) */}
         <SessionSidebar
           sessions={sessionList}
           activeSessionId={activeSessionId}
@@ -1336,48 +1489,16 @@ export default function BrainstormStudio() {
           onToggle={() => setSidebarOpen(o => !o)}
         />
 
-        {/* Phase bar */}
-        <div data-wt="bs-phase" className="bs-phase-bar">
-          <button className="bs-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Session history">
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>menu</span>
-            {sessionList.length > 0 && <span className="bs-sidebar-count">{sessionList.length}</span>}
-          </button>
-          <div className="bs-phase-inner">
-            {Object.entries(PHASES).map(([key, p]) => (
-              <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
-                style={{ '--phase-color': p.color }}>
-                <span className="material-symbols-outlined text-[1em]">{p.icon}</span>
-                <span>{p.label}</span>
-              </div>
-            ))}
-          </div>
-          {langInfo && (
-            <div className="bs-lang-badge" title={`Generating creative copy in ${langInfo.label}`}>
-              {langInfo.flag} {langInfo.label}
-            </div>
-          )}
-          <button className="bs-new-session-btn" onClick={resetSession} title="Start new session">
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
-            New Session
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div className="bs-messages">
-
-          {/* Strategy Modes — goal-oriented research-backed strategies */}
-          {showTopics && (
-            <div className="sm-section">
-              <div className="sm-section-header">
-                <span className="material-symbols-outlined">auto_awesome</span>
-                <span>Strategy Modes — Research-Backed</span>
-                <span className="sm-badge">NEW</span>
-              </div>
-              <div className="sm-modes-grid">
+        <div className="bs-layout-split">
+          {/* Left Sidebar: Strategy Modes Navigation */}
+          <div className="bs-layout-sidebar">
+            <div className="bs-sidebar-section">
+              <div className="bs-sidebar-title">STRATEGY MODE</div>
+              <div className="bs-mode-list">
                 {STRATEGY_MODES_LIST.map(mode => (
                   <button
                     key={mode.id}
-                    className={`sm-mode-card ${smActiveMode?.id === mode.id ? 'sm-mode-card--active' : ''}`}
+                    className={`bs-mode-item ${smActiveMode?.id === mode.id ? 'active' : ''}`}
                     onClick={() => {
                       setSmActiveMode(mode)
                       setSmResult(null)
@@ -1385,135 +1506,294 @@ export default function BrainstormStudio() {
                       setSmInputs({})
                     }}
                   >
-                    <span className="material-symbols-outlined sm-mode-icon">{mode.icon}</span>
-                    <span className="sm-mode-label">{mode.label}</span>
-                    <span className="sm-mode-desc">{mode.desc}</span>
+                    <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: mode.color }}>{mode.icon}</span>
+                    <div className="bs-mode-item-text">
+                      <div className="bs-mode-item-label">{mode.label}</div>
+                      <div className="bs-mode-item-desc">{mode.desc}</div>
+                    </div>
                   </button>
                 ))}
               </div>
-
-              {smActiveMode && !smResult && (
-                <div className="sm-form">
-                  <div className="sm-form-title">
-                    <span className="material-symbols-outlined">{smActiveMode.icon}</span>
-                    {smActiveMode.label}
-                  </div>
-                  <div className="sm-form-fields">
-                    <textarea
-                      className="sm-form-input"
-                      placeholder={`Optional: any specific focus or context for ${smActiveMode.label} strategy…`}
-                      value={smInputs.context || ''}
-                      onChange={e => setSmInputs(p => ({ ...p, context: e.target.value }))}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="sm-form-actions">
-                    <button className="sm-run-btn" onClick={handleStrategyMode} disabled={smLoading}>
-                      {smLoading
-                        ? <><span className="material-symbols-outlined sm-spin">refresh</span>Researching…</>
-                        : <><span className="material-symbols-outlined">rocket_launch</span>Generate Strategy</>}
-                    </button>
-                    <button className="sm-cancel-btn" onClick={() => setSmActiveMode(null)}>Cancel</button>
-                  </div>
-                  {smError && <div className="sm-error">{smError}</div>}
-                </div>
-              )}
-
-              {smResult && (
-                <StrategyModeResult
-                  data={smResult}
-                  onClose={() => { setSmResult(null); setSmActiveMode(null) }}
-                  navigate={navigate}
-                />
-              )}
             </div>
-          )}
 
-          {/* Topic chips — shown only at start */}
-          {showTopics && (
-            <div data-wt="bs-topics" className="bs-topics-wrap">
-              <div className="bs-topics-label">Or start a brainstorm conversation:</div>
-              <div className="bs-topics-grid">
-                {TOPICS.map(t => (
-                  <button key={t.id} className="bs-topic-chip"
-                    onClick={() => sendMessage(t.hint)}>
-                    <span className="bs-topic-icon material-symbols-outlined">{t.icon}</span>
+            <div className="bs-sidebar-section bs-sidebar-section--quick">
+              <div className="bs-sidebar-title">QUICK START</div>
+              <div className="bs-quick-list">
+                {TOPICS.slice(0, 4).map(t => (
+                  <button key={t.id} className="bs-quick-item" onClick={() => sendMessage(t.hint)}>
+                    <span className="material-symbols-outlined bs-quick-icon">{t.icon}</span>
                     <span>{t.label}</span>
                   </button>
                 ))}
               </div>
             </div>
-          )}
-
-          {messages.map((msg, idx) => (
-            <Message
-              key={msg.id}
-              msg={msg}
-              onScreenplay={handleScreenplayRequest}
-              onFeedback={handleFeedback}
-              onDeepDive={handleDeepDiveRequest}
-              onSelectOption={sendMessage}
-              isLatest={idx === messages.length - 1}
-              streaming={streaming}
-            />
-          ))}
-
-          {/* Live Reasoning Panel — shows during MCoT thinking */}
-          <ReasoningPanel
-            steps={reasoningSteps}
-            citations={citations}
-            visible={showReasoning && reasoningSteps.length > 0}
-          />
-
-          {error && (
-            <div className="bs-error-banner"><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {error}</div>
-          )}
-
-          <div ref={bottomRef} style={{ height: 1 }} />
-        </div>
-
-        {/* Feedback toast */}
-        <FeedbackToast message={feedbackToast.message} visible={feedbackToast.visible} />
-
-        {/* Input */}
-        <div data-wt="bs-input" className="bs-input-area">
-          <button
-            className={`bs-mic-btn ${isListening ? 'listening' : ''}`}
-            onClick={toggleVoice}
-            title={isListening ? 'Stop listening' : 'Speak to Fidato'}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-              {isListening ? 'mic_off' : 'mic'}
-            </span>
-          </button>
-
-          <div className="bs-input-wrap">
-            <textarea
-              ref={inputRef}
-              className="bs-input"
-              placeholder={streaming ? 'Fidato is thinking...' : 'Tell Fidato what you\'re thinking...'}
-              value={input}
-              disabled={streaming}
-              rows={1}
-              onChange={e => {
-                setInput(e.target.value)
-                e.target.style.height = 'auto'
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
-              }}
-            />
           </div>
 
-          <button
-            className={`bs-send-btn ${streaming ? 'loading' : ''}`}
-            onClick={() => sendMessage()}
-            disabled={(!input.trim() && !streaming) || (streaming)}
-            title="Send">
-            {streaming
-              ? <span className="material-symbols-outlined" style={{ fontSize: 18 }}>hourglass_top</span>
-              : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>}
-          </button>
+          {/* Right Main Panel: Hero Preview or Result */}
+          <div className="bs-layout-main">
+            {/* Top Bar inside main panel */}
+            <div className="bs-main-topbar">
+              <div className="bs-topbar-left">
+                <span className="bs-topbar-brand">{activeBrand?.name || 'MANTRAM'}</span>
+                <span className="bs-topbar-slash">/</span>
+                <span className="bs-topbar-studio">Brainstorm Studio</span>
+              </div>
+              <div className="bs-topbar-right">
+                <button className="bs-topbar-btn" onClick={() => setSidebarOpen(o => !o)}>
+                  <span className="material-symbols-outlined">history</span>
+                  Sessions
+                </button>
+                <button className="bs-topbar-btn bs-topbar-btn--new" onClick={resetSession}>
+                  <span className="material-symbols-outlined">add</span>
+                  New
+                </button>
+              </div>
+            </div>
+
+            {isHeroScreen ? (
+              <>
+                {/* Hero Content */}
+                <div className="bs-hero-content">
+                  {/* Fidato Greeting Block */}
+                  <div className="bs-hero-greeting-block">
+                    <div className="bs-hero-avatar">F</div>
+                    <div className="bs-hero-greeting-text">
+                      <div className="bs-hero-greeting-meta">Fidato • {activeBrand?.name || 'AI'} • {smActiveMode?.label}</div>
+                      <div className="bs-hero-greeting-message">
+                        {messages[0]?.content}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* What I'll Build Box */}
+                  {smActiveMode && (
+                    <div className="bs-preview-box">
+                      <div className="bs-preview-title">WHAT I'LL BUILD FOR YOU</div>
+                      <div className="bs-preview-steps">
+                        {smActiveMode.buildSteps?.map((step, idx) => (
+                          <div key={idx} className="bs-preview-step">
+                            <div className="bs-step-num">{idx + 1}</div>
+                            <div className="bs-step-text">
+                              <span className="bs-step-title">{step.title}</span> — <span className="bs-step-desc">{step.desc}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Research Modules Box */}
+                  {smActiveMode && (
+                    <div className="bs-research-box">
+                      <div className="bs-preview-title">RESEARCH MODULES RUNNING</div>
+                      <div className="bs-research-chips">
+                        {['Trending Intel', 'Competitor Scanner', 'Audience Intelligence', 'Ad Intelligence'].map(mod => {
+                          const isActive = smActiveMode.researchModules?.includes(mod)
+                          return (
+                            <div key={mod} className={`bs-research-chip ${isActive ? 'active' : ''}`}>
+                              <span className="material-symbols-outlined bs-chip-icon">
+                                {isActive ? 'check_circle' : 'radio_button_unchecked'}
+                              </span>
+                              {mod}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom Action Bar */}
+                <div className="bs-hero-action-bar">
+                  {smError && <div className="bs-error-banner" style={{marginBottom: '1rem'}}><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {smError}</div>}
+                  
+                  {smLoading ? (
+                    <div className="bs-stream-loading">
+                      {/* Phase label */}
+                      <div className="bs-stream-phase-label">
+                        <span className="material-symbols-outlined bs-stream-spin">
+                          {smStreamPhase === 'writing' ? 'edit_note' : 'travel_explore'}
+                        </span>
+                        <span>
+                          {smStreamPhase === 'writing'
+                            ? `Writing strategy${smTokenCount > 0 ? ` — ${smTokenCount} words` : '...'}`
+                            : `Gathering market intelligence for ${activeBrand?.name || 'your brand'}...`}
+                        </span>
+                        {smStreamPhase === 'writing' && smTokenCount > 0 && (
+                          <span className="bs-stream-word-pulse">{smTokenCount} words</span>
+                        )}
+                      </div>
+
+                      {/* Live research tool chips */}
+                      {smStreamTools.length > 0 && (
+                        <div className="bs-stream-chips">
+                          {smStreamTools.map(t => (
+                            <div
+                              key={t.tool}
+                              className={`bs-stream-chip ${t.status === 'done' ? 'bs-stream-chip--done' : 'bs-stream-chip--active'}`}
+                            >
+                              <span className={`material-symbols-outlined bs-stream-chip-icon ${t.status === 'working' ? 'bs-stream-spin' : ''}`}>
+                                {t.status === 'done' ? 'check_circle' : 'progress_activity'}
+                              </span>
+                              {t.label}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Progress bar */}
+                      <div className="bs-stream-progress-track">
+                        <div
+                          className="bs-stream-progress-fill"
+                          style={{
+                            width: smStreamPhase === 'writing'
+                              ? `${Math.min(95, 60 + (smTokenCount / 8))}%`
+                              : smStreamTools.length > 0
+                                ? `${Math.min(55, (smStreamTools.filter(t => t.status === 'done').length / Math.max(1, smStreamTools.length)) * 55)}%`
+                                : '5%',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                  ) : (
+                    <div className="bs-action-buttons">
+                      <button className="bs-btn-customise" onClick={() => {
+                        const inputField = document.querySelector('.bs-input');
+                        if (inputField) inputField.focus();
+                        setInput(`I want to build a ${smActiveMode?.label} strategy, but let's customize it first. `)
+                      }}>
+                        Customise first
+                      </button>
+                      <button className="bs-btn-generate" onClick={handleStrategyMode}>
+                        Generate full strategy
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Hidden input for "Customise first" flow to transition to chat */}
+                  <div style={{ display: 'none' }}>
+                    <textarea className="bs-input" value={input} onChange={e => setInput(e.target.value)} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Legacy Chat / Result View (Appears after interaction) */
+              <div className="bs-layout-legacy">
+                {/* Phase bar */}
+                <div data-wt="bs-phase" className="bs-phase-bar">
+                  <button className="bs-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Session history">
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>menu</span>
+                    {sessionList.length > 0 && <span className="bs-sidebar-count">{sessionList.length}</span>}
+                  </button>
+                  <div className="bs-phase-inner">
+                    {Object.entries(PHASES).map(([key, p]) => (
+                      <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
+                        style={{ '--phase-color': p.color }}>
+                        <span className="material-symbols-outlined text-[1em]">{p.icon}</span>
+                        <span>{p.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {langInfo && (
+                    <div className="bs-lang-badge" title={`Generating creative copy in ${langInfo.label}`}>
+                      {langInfo.flag} {langInfo.label}
+                    </div>
+                  )}
+                  <button className="bs-new-session-btn" onClick={resetSession} title="Start new session">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                    New Session
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="bs-messages">
+                  {smResult ? (
+                    <StrategyModeResult
+                      data={smResult}
+                      onClose={() => { setSmResult(null); setSmActiveMode(STRATEGY_MODES_LIST[0]); resetSession(); }}
+                      navigate={navigate}
+                    />
+                  ) : (
+                    <>
+                      {messages.map((msg, idx) => (
+                        <Message
+                          key={msg.id}
+                          msg={msg}
+                          onScreenplay={handleScreenplayRequest}
+                          onFeedback={handleFeedback}
+                          onDeepDive={handleDeepDiveRequest}
+                          onSelectOption={sendMessage}
+                          isLatest={idx === messages.length - 1}
+                          streaming={streaming}
+                        />
+                      ))}
+
+                      {/* Live Reasoning Panel — shows during MCoT thinking */}
+                      <ReasoningPanel
+                        steps={reasoningSteps}
+                        citations={citations}
+                        visible={showReasoning && reasoningSteps.length > 0}
+                      />
+
+                      {error && (
+                        <div className="bs-error-banner"><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {error}</div>
+                      )}
+
+                      <div ref={bottomRef} style={{ height: 1 }} />
+                    </>
+                  )}
+                </div>
+
+                {/* Feedback toast */}
+                <FeedbackToast message={feedbackToast.message} visible={feedbackToast.visible} />
+
+                {/* Input - Hide if viewing smResult to force starting a new session or closing */}
+                {!smResult && (
+                  <div data-wt="bs-input" className="bs-input-area">
+                    <button
+                      className={`bs-mic-btn ${isListening ? 'listening' : ''}`}
+                      onClick={toggleVoice}
+                      title={isListening ? 'Speak to Fidato' : 'Speak to Fidato'}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                        {isListening ? 'mic_off' : 'mic'}
+                      </span>
+                    </button>
+
+                    <div className="bs-input-wrap">
+                      <textarea
+                        ref={inputRef}
+                        className="bs-input"
+                        placeholder={streaming ? 'Fidato is thinking...' : 'Tell Fidato what you\'re thinking...'}
+                        value={input}
+                        disabled={streaming}
+                        rows={1}
+                        onChange={e => {
+                          setInput(e.target.value)
+                          e.target.style.height = 'auto'
+                          e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      className={`bs-send-btn ${streaming ? 'loading' : ''}`}
+                      onClick={() => sendMessage()}
+                      disabled={(!input.trim() && !streaming) || (streaming)}
+                      title="Send">
+                      {streaming
+                        ? <span className="material-symbols-outlined" style={{ fontSize: 18 }}>hourglass_top</span>
+                        : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
         </div>
 
       </div>

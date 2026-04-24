@@ -738,6 +738,17 @@ export const brainstormStudio = {
     strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
     // ── NEW: 8-Mode Research-Backed Strategy Generator ──
     strategyMode: (data) => apiFetch('/brainstorm-studio/strategy-mode', { method: 'POST', body: JSON.stringify(data) }),
+    // Phase 4: SSE streaming version — returns raw fetch Response for caller to stream
+    strategyModeStream: (data) => {
+        const base = typeof window !== 'undefined' ? (window.__API_BASE__ || import.meta?.env?.VITE_API_URL || 'http://localhost:5001') : 'http://localhost:5001';
+        const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : null;
+        return fetch(`${base}/api/brainstorm-studio/strategy-mode/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+            body: JSON.stringify(data),
+            signal: AbortSignal.timeout(180000),
+        });
+    },
     listStrategies: () => apiFetch('/brainstorm-studio/strategies'),
     getStrategy: (id) => apiFetch(`/brainstorm-studio/strategies/${id}`),
     updateKpi: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/kpi`, { method: 'PATCH', body: JSON.stringify(data) }),

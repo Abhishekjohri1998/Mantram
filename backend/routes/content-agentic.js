@@ -36,6 +36,141 @@ import {
 const router = Router();
 
 // ════════════════════════════════════════════════════════════════════════════════
+// POST /api/content/agentic/stream — SSE streaming pipeline (Phase 3)
+// Runs the same pipeline as /start but emits real-time step events over SSE.
+// Frontend feeds events into GlobalLoader.pipelineSteps for live progress UX.
+// ════════════════════════════════════════════════════════════════════════════════
+router.post('/stream', protect, requireCredits('content'), async (req, res) => {
+    const { brandId, brief, contentType, platform, tone, language, targetAudience, researchDepth } = req.body;
+    if (!brief) return res.status(400).json({ success: false, error: 'Brief is required' });
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+    res.flushHeaders();
+
+    // Helper: emit a typed SSE event
+    const emit = (obj) => {
+        try {
+            if (!res.writableEnded) res.write(`data: ${JSON.stringify(obj)}\n\n`);
+        } catch { /* client disconnected */ }
+    };
+
+    // Helper: wrap a pipeline node with timing + SSE events
+    const tracked = async (agent, message, fn) => {
+        emit({ type: 'pipeline_step', agent, message, status: 'working' });
+        const t0 = Date.now();
+        try {
+            const result = await fn();
+            emit({ type: 'pipeline_step', agent, message, status: 'done', durationMs: Date.now() - t0 });
+            return result;
+        } catch (err) {
+            emit({ type: 'pipeline_step', agent, message: `${message} (failed)`, status: 'done', durationMs: Date.now() - t0 });
+            throw err;
+        }
+    };
+
+    try {
+        const DEEP_CONTENT = ['blog', 'seo_blog', 'long_form', 'listicle', 'case_study', 'comparison', 'pillar_content', 'youtube_content', 'youtube_seo', 'press_release'];
+        const isSocialFastPath = !DEEP_CONTENT.includes(contentType) && (researchDepth || 'quick') !== 'deep';
+
+        let state = {
+            userId: req.user._id.toString(),
+            brandId: brandId || null,
+            brief,
+            contentType: contentType || 'social',
+            platform: platform || 'instagram',
+            tone: tone || '',
+            language: language || '',
+            targetAudience: targetAudience || '',
+            researchDepth: researchDepth || 'quick',
+        };
+
+        // Step 1: Research (always runs)
+        state = await tracked('brand-intel', 'Gathering market intelligence & brand DNA', () => researchNode(state));
+
+        // Step 1.5 + 2: MCoT + Strategist (parallel, conditional)
+        const runMcoT = brandId && !isSocialFastPath;
+        emit({ type: 'pipeline_step', agent: 'visual-grounding', message: runMcoT ? 'Running visual brand grounding (MCoT)' : 'Skipping MCoT (social fast-path)', status: 'working' });
+        emit({ type: 'pipeline_step', agent: 'prompt-engineer', message: isSocialFastPath ? 'Skipping strategist (social fast-path)' : 'Building content strategy', status: 'working' });
+
+        const t1 = Date.now();
+        const [mcotResult, strategyResult] = await Promise.allSettled([
+            runMcoT ? contentVisualGroundingNode(state).catch(e => { console.warn('[Stream MCoT] non-critical:', e.message); return state; }) : Promise.resolve(state),
+            isSocialFastPath ? Promise.resolve(state) : contentStrategistNode(state),
+        ]);
+        const elapsed1 = Date.now() - t1;
+
+        emit({ type: 'pipeline_step', agent: 'visual-grounding', message: runMcoT ? 'Visual brand grounding complete' : 'MCoT skipped (social fast-path)', status: 'done', durationMs: elapsed1 });
+        emit({ type: 'pipeline_step', agent: 'prompt-engineer', message: isSocialFastPath ? 'Strategy skipped' : 'Content strategy ready', status: 'done', durationMs: elapsed1 });
+
+        const mcotState = mcotResult.status === 'fulfilled' ? mcotResult.value : state;
+        const stratState = strategyResult.status === 'fulfilled' ? strategyResult.value : state;
+        state = { ...state, ...mcotState, ...stratState };
+
+        // Step 3: Writer (main generation)
+        state = await tracked('copywriter', 'Writing your content with brand voice', () => writerNode(state));
+
+        // Save to DB
+        const content = await Content.create({
+            user: req.user._id,
+            brand: brandId || undefined,
+            type: contentType || 'social',
+            title: state.draft?.title || '',
+            content: state.draft?.content || '',
+            prompt: brief,
+            platform: platform || 'instagram',
+            originalContent: state.draft?.content || '',
+            aiMeta: {
+                provider: 'router',
+                model: 'auto',
+                agenticPipeline: true,
+                pipelineStep: 'draft',
+                research: state.research,
+                researchDepth: researchDepth || 'quick',
+                brandAlignmentScore: 70,
+            },
+        });
+
+        await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
+
+        // Emit final result
+        emit({
+            type: 'done',
+            content: {
+                ...content.toObject(),
+                agenticData: {
+                    research: state.research,
+                    draft: state.draft,
+                    intelligence: {
+                        sourcesUsed: [
+                            state.intelligence?.web?.success ? `Web(${state.intelligence.web.source})` : null,
+                            state.intelligence?.seo?.success ? 'SEO Audit' : null,
+                            state.intelligence?.contentHistory?.success ? 'Content History' : null,
+                            state.intelligence?.trending?.success ? 'Trending' : null,
+                        ].filter(Boolean),
+                        researchDepth: state.researchDepth,
+                    },
+                    pipelineProgress: 100,
+                    nextStep: 'refine',
+                },
+            },
+        });
+
+    } catch (error) {
+        console.error('[Content SSE Stream] error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'contentGenerate', `Refund: Agentic Stream Failure`, 'content').catch(() => {});
+        }
+        emit({ type: 'error', message: safeErrorMessage(error) });
+    } finally {
+        if (!res.writableEnded) res.end();
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // POST /api/content/agentic/assist — Smart writing assist for Custom Blog Writer
 // ⚡ Ultra-fast: uses grok-3-mini-fast with 4s timeout
 // Supports: synonyms | grammar | rephrase | expand
@@ -291,9 +426,13 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
         state = await researchNode(state);
 
         // Step 1.5 + Step 2: MCoT Visual Grounding AND Content Strategist run in PARALLEL
-        // ⚡ For social fast-path: skip Strategist (saves 8-12s — unnecessary for short posts)
+        // ⚡ MCoT: Only run for deep content (blog/YouTube/press release) where brand visual
+        //    consistency matters. Social posts don't benefit enough to justify the 5-15s overhead
+        //    (image downloads + Gemini vision call). Skip MCoT for social fast-path.
+        // ⚡ Strategist: Skip for social fast-path (saves 8-12s — unnecessary for short posts)
+        const runMcoT = brandId && !isSocialFastPath;
         const [mcotResult, strategyResult] = await Promise.allSettled([
-            brandId ? contentVisualGroundingNode(state).catch(gErr => {
+            runMcoT ? contentVisualGroundingNode(state).catch(gErr => {
                 console.warn('[Content MCoT] Visual grounding failed (non-critical):', gErr.message);
                 return state; // return state unchanged on failure
             }) : Promise.resolve(state),

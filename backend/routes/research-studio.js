@@ -18,7 +18,7 @@ import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext } from '../agents/shared/agentUtils.js';
-import { callMcpToolsParallel } from '../mcp/registry.js';
+import { callMcpTool, callMcpToolsParallel } from '../mcp/registry.js';
 import BrandStrategy from '../models/BrandStrategy.js';
 import redis from '../utils/redisClient.js';
 
@@ -38,15 +38,20 @@ function resultCacheKey(module, brandId, query) {
 }
 
 // ── Shared AI call helper ─────────────────────────────────────────────────────
+// ⚡ Research Studio analysis is structured/analytical — Gemini 2.5 Flash is fast and accurate.
+// Claude is only needed for highly creative tasks (copywriting, long-form prose).
+// Default provider: gemini — saves 12-20s per module call vs Claude Sonnet.
 async function aiCall(systemPrompt, userPrompt, opts = {}) {
     const { getRouter } = await import('../ai/router.js');
     const router = getRouter();
+    // ⚡ Default to Gemini for all Research Studio analytical calls. Override with opts.provider if needed.
+    const routingPrefs = opts.provider ? { provider: opts.provider } : { provider: 'gemini' };
     const result = await router.generateText({
         systemPrompt,
         userPrompt,
         temperature: opts.temperature ?? 0.3,
         maxTokens: opts.maxTokens ?? 6000,
-    });
+    }, routingPrefs);
     const text = result.text || '';
     // Strip think tags
     let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
@@ -123,7 +128,7 @@ Return STRICT JSON:
   "quickWins": ["Actionable quick win 1", "Quick win 2", "Quick win 3"],
   "sources": ["Source 1 (tool/URL)", "Source 2"],
   "studioActions": [
-    { "label": "Action label (e.g. Build Ad Brief from This)", "studio": "brainstorm|creative|content|video", "mode": "strategy-mode-id or null" }
+    { "label": "Action label (e.g. Build Ad Brief from This)", "studio": "brainstorm|creative|content|video|social|performance|seo", "mode": "strategy-mode-id or null" }
   ]
 }`;
 
@@ -131,7 +136,7 @@ Return STRICT JSON:
 // MODULE 1: COMPETITOR INTELLIGENCE
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/competitor', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/competitor', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -194,7 +199,7 @@ Analyse all available competitor data and return structured insights.`;
 // MODULE 2: MARKET TRENDS
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/trends', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/trends', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -255,7 +260,7 @@ Return the most actionable trends right now.`;
 // MODULE 3: KEYWORD & SEO INTELLIGENCE
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/keywords', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/keywords', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -317,7 +322,7 @@ Find the most valuable keyword opportunities to capture right now.`;
 // MODULE 4: AD INTELLIGENCE
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/ads', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/ads', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -380,7 +385,7 @@ Find winning ad strategies and hooks we can adapt right now.`;
 // MODULE 5: AUDIENCE INTELLIGENCE
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/audience', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/audience', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -442,7 +447,7 @@ Mine real customer language, pain points, desires, and objections from online co
 // MODULE 6: CAMPAIGN STRATEGY SYNTHESIS (All-in-One)
 // ══════════════════════════════════════════════════════════════════════════════
 
-router.post('/synthesis', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+router.post('/synthesis', protect, requireStudio('researchStudio'), requireCredits('research'), async (req, res) => {
     try {
         const { brand, query, goal } = req.body;
         const { brandDoc, brandContext } = await loadBrand(brand);
@@ -492,9 +497,10 @@ OUTPUT FORMAT — return STRICT JSON:
   "quickWins": ["Actionable quick win 1 (do this week)", "Quick win 2", "Quick win 3"],
   "sources": ["Source 1", "Source 2"],
   "studioActions": [
-    { "label": "Build Full Strategy in Brainstorm", "studio": "brainstorm", "mode": "new-product-launch" },
+    { "label": "Build Full-Funnel Ad Brief", "studio": "performance", "mode": "new-product-launch" },
     { "label": "Generate Campaign Creative", "studio": "creative", "mode": null },
-    { "label": "Write Campaign Copy", "studio": "content", "mode": null }
+    { "label": "Create Social Media Content", "studio": "social", "mode": null },
+    { "label": "Write Campaign SEO Copy", "studio": "seo", "mode": null }
   ]
 }`;
 
@@ -514,6 +520,182 @@ Use ALL available research data and produce the most actionable, specific strate
     } catch (error) {
         console.error('Research: synthesis error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SSE STREAMING — Universal progressive-render endpoint for all modules
+// POST /api/research-studio/stream
+// Emits: tool_progress, token, done — user sees content appear in real time
+// ══════════════════════════════════════════════════════════════════════════════
+
+router.post('/stream', protect, requireStudio('researchStudio'), async (req, res) => {
+    const { brand, module: moduleName, query, goal } = req.body;
+
+    // ── SSE headers ──────────────────────────────────────────────────────────
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders();
+
+    const emit = (type, data) => {
+        try {
+            res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+        } catch { /* client disconnected */ }
+    };
+
+    const brandId = brand?._id || brand?.id;
+
+    try {
+        const { brandDoc, brandContext } = await loadBrand(brand);
+        const dna = brandDoc?.dna || brand?.dna || {};
+        const brandName = brandDoc?.name || brand?.name || 'Your Brand';
+        const industry = dna.industry || 'D2C brand';
+
+        // ── Check cache first — if hit, emit instantly ─────────────────────
+        const cacheKey = resultCacheKey(moduleName, brandId, query || goal);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) {
+            emit('cached', { data: cached.data });
+            emit('done', { cached: true });
+            res.end();
+            return;
+        }
+
+        // ── Module-specific MCP tool config ───────────────────────────────
+        const MODULE_TOOLS = {
+            competitor: [
+                { tool: 'scrape_competitor', args: { brandId }, label: '🔍 Scanning competitors...' },
+                { tool: 'web_search', args: { query: `${brandName} competitors ${industry} India pricing strategy 2025`, mode: 'quick' }, label: '🌐 Web research...' },
+            ],
+            trends: [
+                { tool: 'fetch_trending', args: { brandId }, label: '📈 Fetching live trends...' },
+                { tool: 'web_search', args: { query: `${industry} market trends India 2025 ${new Date().toLocaleString('en', { month: 'long' })}`, mode: 'quick' }, label: '🌐 Web research...' },
+            ],
+            keywords: [
+                { tool: 'fetch_seo_audit', args: { brandId }, label: '🔑 Loading SEO audit data...' },
+                { tool: 'web_search', args: { query: `${industry} India keywords search terms buy 2025`, mode: 'quick' }, label: '🌐 Keyword research...' },
+            ],
+            audience: [
+                { tool: 'web_search', args: { query: `${industry} India consumer insights audience profile psychographics 2025`, mode: 'quick' }, label: '👥 Audience research...' },
+                { tool: 'fetch_performance_learnings', args: { brandId }, label: '📊 Loading performance data...' },
+            ],
+            ads: [
+                { tool: 'web_search', args: { query: `${industry} India Meta Google ads creative strategy winning campaigns 2025`, mode: 'quick' }, label: '📣 Ad intelligence research...' },
+                { tool: 'fetch_performance_learnings', args: { brandId }, label: '📊 Loading ad performance...' },
+            ],
+            synthesis: [
+                { tool: 'fetch_trending', args: { brandId }, label: '📈 Live trends...' },
+                { tool: 'scrape_competitor', args: { brandId }, label: '🔍 Competitor scan...' },
+                { tool: 'web_search', args: { query: `${industry} India ${goal || 'marketing'} strategy 2025`, mode: 'quick' }, label: '🌐 Web research...' },
+                { tool: 'fetch_performance_learnings', args: { brandId }, label: '📊 Performance learnings...' },
+            ],
+        };
+
+        const toolCalls = MODULE_TOOLS[moduleName] || MODULE_TOOLS.trends;
+
+        // ── Run MCP tools and emit progress as each one completes ─────────
+        emit('status', { message: '🧠 Gathering intelligence...', step: 0, total: toolCalls.length });
+
+        const toolResults = {};
+        let completedTools = 0;
+        await Promise.allSettled(
+            toolCalls.map(async ({ tool, args, label }) => {
+                try {
+                    const result = await callMcpTool(tool, args);
+                    toolResults[tool] = result;
+                } catch { /* non-fatal */ }
+                completedTools++;
+                emit('tool_progress', { label, step: completedTools, total: toolCalls.length });
+            })
+        );
+
+        const researchContext = summariseMcp(toolResults);
+
+        // ── Build system prompt for this module (reuse existing logic) ────
+        emit('status', { message: '✍️ Generating insights...', step: toolCalls.length, total: toolCalls.length + 1 });
+
+        const MODULE_PROMPTS = {
+            competitor: `You are a world-class competitive intelligence analyst for D2C brands. Every finding must be specific, data-driven, and directly useful. ${brandContext}\n\nLIVE RESEARCH DATA:\n${researchContext || 'No live research available.'}\n\nSections: What They're Doing Well | Pricing & Offer Strategy | Messaging & Positioning | Channel & Content Gaps | Your Differentiation Opportunity\n${OUTPUT_FORMAT}`,
+            trends: `You are a consumer trends analyst specialising in D2C and e-commerce in India. Only report trends actionable in the NEXT 30-90 days. ${brandContext}\n\nLIVE TREND DATA:\n${researchContext || 'Use training knowledge.'}\n\nSections: Rising Trends | Declining Trends | Seasonal Opportunities | Consumer Behaviour Shifts | Format & Platform Trends\n${OUTPUT_FORMAT}`,
+            keywords: `You are a keyword and SEO strategist for D2C brands in India. Focus on COMMERCIAL INTENT keywords that drive purchases. ${brandContext}\n\nSEO & SEARCH DATA:\n${researchContext || 'Use training knowledge.'}\n\nSections: Purchase-Intent Gaps | Competitor Keyword Opportunities | Content Calendar Keywords | Category Discovery Keywords | Quick SEO Wins\n${OUTPUT_FORMAT}`,
+            audience: `You are a consumer insights specialist for D2C brands in India. Build deep psychographic profiles, not demographic demographics. ${brandContext}\n\nAUDIENCE RESEARCH:\n${researchContext || 'Use training knowledge.'}\n\nSections: Primary Buyer Profile | Secondary Segments | Emotional Triggers | Content Consumption Habits | Purchase Barriers to Break Down\n${OUTPUT_FORMAT}`,
+            ads: `You are a paid media strategist specialising in Meta and Google Ads for D2C brands in India. ${brandContext}\n\nAD INTELLIGENCE:\n${researchContext || 'Use training knowledge.'}\n\nSections: Winning Ad Formats | Audience Targeting Opportunities | Creative Angles That Convert | Budget Allocation Strategy | Immediate Test Recommendations\n${OUTPUT_FORMAT}`,
+            synthesis: `You are a CMO-level strategist synthesising all market intelligence into a campaign strategy. ${brandContext}\n\nSYNTHESISED RESEARCH:\n${researchContext || 'Use training knowledge.'}\n\nReturn JSON with: module, brand, campaignTitle, strategicThesis, sections (5 sections), executionPlan, keyMetrics, quickWins, studioActions`,
+        };
+
+        const systemPrompt = MODULE_PROMPTS[moduleName] || MODULE_PROMPTS.trends;
+        const userPrompt = `Run ${moduleName} intelligence for "${brandName}" in "${industry}". ${query ? `Focus: ${query}` : ''} ${goal ? `Goal: ${goal}` : ''} Return complete structured JSON.`;
+
+        // ── Stream token-by-token via Gemini ──────────────────────────────
+        const { getRouter: getAiRouter } = await import('../ai/router.js');
+        const aiRouter = getAiRouter();
+
+        let fullText = '';
+        let tokenBuffer = '';
+
+        // Batch token emissions every ~100ms for smooth rendering without too many events
+        let flushTimer = null;
+        const flushBuffer = () => {
+            if (tokenBuffer) {
+                emit('token', { chunk: tokenBuffer });
+                tokenBuffer = '';
+            }
+        };
+
+        for await (const chunk of aiRouter.generateTextStream({
+            systemPrompt,
+            userPrompt,
+            temperature: 0.3,
+            maxTokens: 5000,
+        })) {
+            fullText += chunk;
+            tokenBuffer += chunk;
+
+            // Batch-emit: flush every ~150ms or when buffer exceeds 200 chars
+            if (tokenBuffer.length >= 200) {
+                clearTimeout(flushTimer);
+                flushBuffer();
+            } else {
+                clearTimeout(flushTimer);
+                flushTimer = setTimeout(flushBuffer, 150);
+            }
+        }
+
+        // Flush remaining buffer
+        clearTimeout(flushTimer);
+        flushBuffer();
+
+        // ── Parse final JSON and emit complete result ─────────────────────
+        let parsed = null;
+        try {
+            let cleaned = fullText.replace(/```(?:json)?\s*\n?/gi, '').trim();
+            if (cleaned.startsWith('{')) parsed = JSON.parse(cleaned);
+            else {
+                const m = cleaned.match(/\{[\s\S]*\}/);
+                if (m) parsed = JSON.parse(m[0]);
+            }
+        } catch { /* if streaming gave malformed JSON, keep raw */ }
+
+        if (parsed) {
+            parsed.module = moduleName;
+            parsed.brand = brandName;
+            parsed.generatedAt = new Date().toISOString();
+            if (!parsed.studioActions) parsed.studioActions = [];
+
+            // Cache the result for 5 minutes
+            await setCachedResult(cacheKey, { success: true, data: parsed });
+            emit('done', { data: parsed });
+        } else {
+            // Send raw text if JSON parsing failed — better than nothing
+            emit('done', { raw: fullText.substring(0, 2000), parseError: true });
+        }
+    } catch (error) {
+        console.error('Research SSE stream error:', error);
+        emit('error', { message: error.message });
+    } finally {
+        res.end();
     }
 });
 

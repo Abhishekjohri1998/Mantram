@@ -4756,6 +4756,9 @@ export default function ContentStudio() {
 
     const abortControllerRef = useRef(null)
     const activeBrandIdRef = useRef(activeBrand?._id)
+    // Phase 3: SSE pipeline step state fed into GlobalLoader
+    const [pipelineSteps, setPipelineSteps] = useState([])
+    const [generatingStartedAt, setGeneratingStartedAt] = useState(null)
 
     const getSignal = useCallback(() => {
         if (abortControllerRef.current) abortControllerRef.current.abort()
@@ -5006,61 +5009,131 @@ export default function ContentStudio() {
         if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
         setError('')
+        setPipelineSteps([])
+        setGeneratingStartedAt(Date.now())
 
-        // Build structured prompt — pass settings directly (setState is async!)
         const prompt = buildPrompt(settings)
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
         try {
-            // Use agentic pipeline (v2) — with real intelligence gathering
-            const data = await contentAPI.agenticStart({
-                brandId: activeBrand._id,
-                brief: prompt,
-                contentType: goal,
-                platform: Array.isArray(channel) ? channel.join(',') : channel,
-                tone: settings.tone || 'bold',
-                language: settings.language || 'english',
-                targetAudience: activeBrand?.dna?.targetAudience || '',
-                researchDepth: settings.researchDepth || 'quick',
+            // ── Phase 3: SSE streaming pipeline ──
+            const response = await fetch(`${API_BASE}/api/content/agentic/stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    brandId: activeBrand._id,
+                    brief: prompt,
+                    contentType: goal,
+                    platform: Array.isArray(channel) ? channel.join(',') : channel,
+                    tone: settings.tone || 'bold',
+                    language: settings.language || 'english',
+                    targetAudience: activeBrand?.dna?.targetAudience || '',
+                    researchDepth: settings.researchDepth || 'quick',
+                }),
+                signal: AbortSignal.timeout(180000), // 3min hard cap
             })
 
-            // Map agentic response to our result format
-            const agenticContent = data.content
-            setResult({
-                _id: agenticContent._id,
-                content: agenticContent.agenticData?.draft?.content || agenticContent.content,
-                title: agenticContent.agenticData?.draft?.title || agenticContent.title,
-                hookLine: agenticContent.agenticData?.draft?.hookLine || '',
-                cta: agenticContent.agenticData?.draft?.cta || '',
-                hashtags: agenticContent.agenticData?.draft?.hashtags || [],
-                agenticData: agenticContent.agenticData,
-            })
-            setStep(5)
-        } catch (err) {
-            // Fallback to single-shot if agentic pipeline fails
-            console.warn('Agentic pipeline failed, falling back to single-shot:', err.message)
+            if (!response.ok) throw new Error(`Stream failed: ${response.statusText}`)
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue
+                    try {
+                        const event = JSON.parse(line.slice(6))
+
+                        if (event.type === 'pipeline_step') {
+                            // Feed GlobalLoader — deduplicate by agent key
+                            setPipelineSteps(prev => {
+                                const next = prev.filter(s => s.agent !== event.agent)
+                                return [...next, { agent: event.agent, message: event.message, status: event.status, durationMs: event.durationMs }]
+                            })
+                        } else if (event.type === 'done') {
+                            const agenticContent = event.content
+                            setResult({
+                                _id: agenticContent._id,
+                                content: agenticContent.agenticData?.draft?.content || agenticContent.content,
+                                title: agenticContent.agenticData?.draft?.title || agenticContent.title,
+                                hookLine: agenticContent.agenticData?.draft?.hookLine || '',
+                                cta: agenticContent.agenticData?.draft?.cta || '',
+                                hashtags: agenticContent.agenticData?.draft?.hashtags || [],
+                                agenticData: agenticContent.agenticData,
+                            })
+                            setStep(5)
+                        } else if (event.type === 'error') {
+                            throw new Error(event.message || 'Generation failed')
+                        }
+                    } catch (parseErr) {
+                        if (parseErr.message?.includes('Generation failed') || parseErr.message?.includes('failed')) throw parseErr
+                        // else skip malformed SSE line
+                    }
+                }
+            }
+        } catch (streamErr) {
+            // ── Fallback 1: blocking agenticStart ──
+            console.warn('[ContentStudio] SSE stream failed, falling back to /start:', streamErr.message)
             try {
-                const data = await contentAPI.generate({
+                const data = await contentAPI.agenticStart({
                     brandId: activeBrand._id,
-                    type: goal,
-                    subType,
+                    brief: prompt,
+                    contentType: goal,
                     platform: Array.isArray(channel) ? channel.join(',') : channel,
-                    prompt,
-                    toneSettings: settings,
-                    options: modelOverride !== 'auto' ? { modelOverride } : {},
+                    tone: settings.tone || 'bold',
+                    language: settings.language || 'english',
+                    targetAudience: activeBrand?.dna?.targetAudience || '',
+                    researchDepth: settings.researchDepth || 'quick',
                 })
-                setResult(data.content)
+                const agenticContent = data.content
+                setResult({
+                    _id: agenticContent._id,
+                    content: agenticContent.agenticData?.draft?.content || agenticContent.content,
+                    title: agenticContent.agenticData?.draft?.title || agenticContent.title,
+                    hookLine: agenticContent.agenticData?.draft?.hookLine || '',
+                    cta: agenticContent.agenticData?.draft?.cta || '',
+                    hashtags: agenticContent.agenticData?.draft?.hashtags || [],
+                    agenticData: agenticContent.agenticData,
+                })
                 setStep(5)
             } catch (fallbackErr) {
-                setError({ 
-                    message: fallbackErr.message || 'Generation failed.', 
-                    isProviderError: fallbackErr.isProviderError, 
-                    provider: fallbackErr.provider 
-                })
+                // ── Fallback 2: single-shot generate ──
+                try {
+                    const data = await contentAPI.generate({
+                        brandId: activeBrand._id,
+                        type: goal,
+                        subType,
+                        platform: Array.isArray(channel) ? channel.join(',') : channel,
+                        prompt,
+                        toneSettings: settings,
+                        options: modelOverride !== 'auto' ? { modelOverride } : {},
+                    })
+                    setResult(data.content)
+                    setStep(5)
+                } catch (singleShotErr) {
+                    setError({
+                        message: singleShotErr.message || 'Generation failed.',
+                        isProviderError: singleShotErr.isProviderError,
+                        provider: singleShotErr.provider,
+                    })
+                }
             }
         } finally {
             setGenerating(false)
         }
     }
+
 
     const handleRegenerate = async () => {
         if (!result?._id) return
@@ -5569,6 +5642,8 @@ SPOKESPERSON QUOTES:`
                         currentStage={`Using ${activeBrand?.name}'s voice DNA for human-authentic output`}
                         icon="auto_awesome"
                         estimatedDuration={45}
+                        pipelineSteps={pipelineSteps}
+                        startedAt={generatingStartedAt}
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
