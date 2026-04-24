@@ -430,9 +430,19 @@ export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, durati
 
 // ── Public: Resubmit ─────────────────────────────────────────────────────────
 
-export async function resubmitAtlasCloudTask(storedPayload) {
+export async function resubmitAtlasCloudTask(storedPayload, safetyTriggered = false) {
     console.log(`🔄 [Atlas] Auto-retry resubmit...`);
-    const taskId = await submitAtlasCloudPayload(storedPayload);
+    let payloadToSubmit = storedPayload;
+
+    if (safetyTriggered && payloadToSubmit?.input?.prompt) {
+        console.log(`🛡️ [Atlas] Safe Mode: Removing Face-lock strictures from prompt to bypass safety filter...`);
+        // Remove the Face-lock sentence injected during initial submission
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/@Image\d+(?: and @Image\d+)* (?:is|are) the real person who must appear in this video\. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame\./gi, '');
+        // Also clean up any extra whitespace
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/\s{2,}/g, ' ').trim();
+    }
+
+    const taskId = await submitAtlasCloudPayload(payloadToSubmit);
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0' };
 }
 

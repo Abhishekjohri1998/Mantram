@@ -614,21 +614,10 @@ export async function pollGenerationStatus(state) {
 
                     // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
                     if (statusResult.safetyTriggered) {
-                        console.log(`🛡️ Safe Mode Pivot: Bytedance blocked real-person faces. Auto-rerouting to Wan-2.7 which accepts real faces!`);
-                        
-                        // Switch model to Alibaba Wan-2.7 which bypasses the strict face filter
-                        if (retryPayload.task_type) {
-                            if (retryPayload.task_type.includes('reference-to-video')) {
-                                retryPayload.task_type = 'alibaba/wan-2.7/reference-to-video';
-                            } else if (retryPayload.task_type.includes('image-to-video')) {
-                                retryPayload.task_type = 'alibaba/wan-2.7/image-to-video';
-                            } else {
-                                retryPayload.task_type = 'alibaba/wan-2.7/text-to-video';
-                            }
-                        }
+                        console.log(`🛡️ Safe Mode Pivot: Bytedance blocked real-person faces. Auto-retrying with Face-lock constraints removed.`);
                     }
 
-                    const retryResult = await resubmitAtlasCloudTask(retryPayload);
+                    const retryResult = await resubmitAtlasCloudTask(retryPayload, statusResult.safetyTriggered);
                     return {
                         ...state,
                         generation: {

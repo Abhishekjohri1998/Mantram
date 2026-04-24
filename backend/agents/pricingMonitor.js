@@ -331,36 +331,54 @@ async function extractPricingFromWeb(url, modelsList, providerName) {
         
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `You are an automated pricing extractor for Mantram AI. Extract the current pricing for these models:\n\n${modelsList.map(m => `- ${m.name}`).join('\n')}\n\nHere is the pricing page text from ${providerName}:\n\n${textContent}`,
-            config: {
-                temperature: 0,
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    description: "Extracted pricing per model",
-                    properties: {
-                        models: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    modelName: { type: Type.STRING },
-                                    inputPer1M: { type: Type.NUMBER, description: "Cost per 1M input tokens in USD. Null if not text." },
-                                    outputPer1M: { type: Type.NUMBER, description: "Cost per 1M output tokens in USD. Null if not text." },
-                                    flatCostUSD: { type: Type.NUMBER, description: "Cost per image in USD. Null if not fixed." },
-                                    costPerSecFast: { type: Type.NUMBER, description: "Cost per second for fast video generation in USD." },
-                                    costPerSecQuality: { type: Type.NUMBER, description: "Cost per second for quality video generation in USD." },
-                                    costPerMinute: { type: Type.NUMBER, description: "Cost per minute in USD." },
-                                    costPerSecond: { type: Type.NUMBER, description: "Cost per second in USD." }
+        let response;
+        let retries = 3;
+        let delayMs = 2000;
+        
+        while (retries > 0) {
+            try {
+                response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: `You are an automated pricing extractor for Mantram AI. Extract the current pricing for these models:\n\n${modelsList.map(m => `- ${m.name}`).join('\n')}\n\nHere is the pricing page text from ${providerName}:\n\n${textContent}`,
+                    config: {
+                        temperature: 0,
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            description: "Extracted pricing per model",
+                            properties: {
+                                models: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            modelName: { type: Type.STRING },
+                                            inputPer1M: { type: Type.NUMBER, description: "Cost per 1M input tokens in USD. Null if not text." },
+                                            outputPer1M: { type: Type.NUMBER, description: "Cost per 1M output tokens in USD. Null if not text." },
+                                            flatCostUSD: { type: Type.NUMBER, description: "Cost per image in USD. Null if not fixed." },
+                                            costPerSecFast: { type: Type.NUMBER, description: "Cost per second for fast video generation in USD." },
+                                            costPerSecQuality: { type: Type.NUMBER, description: "Cost per second for quality video generation in USD." },
+                                            costPerMinute: { type: Type.NUMBER, description: "Cost per minute in USD." },
+                                            costPerSecond: { type: Type.NUMBER, description: "Cost per second in USD." }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                });
+                break; // Success, exit retry loop
+            } catch (err) {
+                if ((err.message?.includes('503') || err.message?.includes('429') || err.message?.includes('overloaded')) && retries > 1) {
+                    retries--;
+                    console.log(`📊 [Pricing Monitor] Gemini overloaded. Retrying in ${delayMs}ms... (${retries} retries left)`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    delayMs *= 2; // Exponential backoff
+                } else {
+                    throw err; // Throw if not retryable or out of retries
                 }
             }
-        });
+        }
 
         const result = await response.response;
         if (!result) return null;
