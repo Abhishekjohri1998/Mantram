@@ -289,15 +289,27 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
         setGridVideos(prev => {
             const incoming = projects.filter(isCompleted)
             const existingMap = new Map(prev.map(p => [p._id, p]))
-            // Update existing entries + add new ones
-            const newItems = []
-            incoming.forEach(p => {
-                if (!existingMap.has(p._id)) newItems.push(p)
-                existingMap.set(p._id, p) // Always update with latest data
+            
+            // We want to keep all incoming, AND any prev items that aren't in incoming (optimistic items)
+            const incomingMap = new Map(incoming.map(p => [p._id, p]))
+            
+            // Start with incoming (latest truth)
+            const nextGrid = [...incoming]
+            
+            // Add optimistic items from prev that haven't shown up in incoming yet
+            prev.forEach(p => {
+                if (!incomingMap.has(p._id)) {
+                    nextGrid.push(p)
+                }
             })
-            if (newItems.length === 0 && incoming.length === prev.length) return prev // No changes
-            // Prepend new items, update existing ones in place
-            return [...newItems, ...prev.map(p => existingMap.get(p._id) || p).filter(p => !newItems.some(n => n._id === p._id))]
+            
+            // Sort by creation time if needed, but since it's just prepending, it's mostly correct.
+            // If length and IDs are identical, avoid unnecessary re-renders.
+            if (nextGrid.length === prev.length && nextGrid.every((p, i) => p._id === prev[i]._id)) {
+                // To be perfectly safe about updates, we'll just return the nextGrid so it gets new data.
+            }
+            
+            return nextGrid
         })
     }, [projects])
 
@@ -335,9 +347,15 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
                     const videoUrl = `${API_BASE}/video-studio/${projectId}/video`
                     updateJob(jobId, { status: 'done', videoUrl, progress: 100 })
-                    // Prepend to grid
+                    // Prepend to grid, but avoid duplication
                     const syntheticProject = { _id: projectId, status: 'critique', generation: { videoUrl }, routing: {}, advancedConfig: {} }
-                    setGridVideos(prev => [syntheticProject, ...prev])
+                    setGridVideos(prev => {
+                        if (prev.some(p => p._id === projectId)) {
+                            // Update existing instead of prepending duplicate
+                            return prev.map(p => p._id === projectId ? { ...p, status: 'critique', generation: { videoUrl } } : p)
+                        }
+                        return [syntheticProject, ...prev]
+                    })
                     // Remove from active jobs after a short delay
                     setTimeout(() => setJobs(prev => prev.filter(j => j.id !== jobId)), 3000)
                 } else if (gen?.status === 'FAILED' || d.project.status === 'failed') {
