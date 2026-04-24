@@ -37,6 +37,7 @@ const Integrations = lazy(() => import('./pages/Integrations'))
 const SmartCalendar = lazy(() => import('./pages/SmartCalendar'))
 const PublishSchedule = lazy(() => import('./pages/PublishSchedule'))
 const BrainstormStudio = lazy(() => import('./pages/BrainstormStudio'))
+const ResearchStudio = lazy(() => import('./pages/ResearchStudio'))
 const SeoStudio = lazy(() => import('./pages/SeoStudio'))
 const ConversationStudio = lazy(() => import('./pages/ConversationStudio'))
 const Automations = lazy(() => import('./pages/Automations'))
@@ -150,6 +151,7 @@ function App() {
                     <Route path="/smart-calendar" element={<Navigate to="/social-media-studio" replace />} />
                     <Route path="/publish" element={<Navigate to="/social-media-studio" replace />} />
                     <Route path="/brainstorm" element={<ProtectedRoute><BrainstormStudio /></ProtectedRoute>} />
+                    <Route path="/research-studio" element={<ProtectedRoute><ResearchStudio /></ProtectedRoute>} />
                     <Route path="/seo-studio" element={<ProtectedRoute><SeoStudio /></ProtectedRoute>} />
                     <Route path="/conversations" element={<ProtectedRoute><ConversationStudio /></ProtectedRoute>} />
                     <Route path="/conversations/automations" element={<ProtectedRoute><Automations /></ProtectedRoute>} />

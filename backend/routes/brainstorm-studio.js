@@ -8,6 +8,8 @@ import BrandStrategy from '../models/BrandStrategy.js';
 import BrainstormSession from '../models/BrainstormSession.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
+import { loadBrandContext } from '../agents/shared/agentUtils.js';
+import { callMcpToolsParallel } from '../mcp/registry.js';
 
 const router = Router();
 
@@ -497,11 +499,23 @@ router.post('/generate', protect, requireStudio('brainstormStudio'), requireCred
     const { intent, answers, brand, refinementHint } = req.body;
     if (!intent || !answers) return res.status(400).json({ success: false, error: 'Intent and answers are required' });
 
-    const dna = brand?.dna || {};
+    // ── Load FULL Brand DNA via agentUtils (includes Products, Knowledge Bank, Competitors, Market Context) ──
     const langInfo = inferBrandLanguage(brand);
-    const brandContext = brand
-      ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}. Language: ${langInfo.lang} (${langInfo.detectedFrom || 'default'}).`
-      : '';
+    let brandContext = '';
+    try {
+      const brandId = brand?._id || brand?.id;
+      if (brandId) {
+        const { brandContext: fullContext } = await loadBrandContext(brandId);
+        brandContext = fullContext || '';
+      } else if (brand?.name) {
+        const dna = brand?.dna || {};
+        brandContext = `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}.`;
+      }
+    } catch (ctxErr) {
+      console.warn('[brainstorm/generate] Brand context load error:', ctxErr.message);
+      const dna = brand?.dna || {};
+      brandContext = brand ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}.` : '';
+    }
 
     const answersText = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
     const isAdFilm = intent === 'ad-film';
@@ -892,9 +906,20 @@ router.post('/strategy', protect, requireStudio('brainstormStudio'), requireCred
     const duration = (answers.duration || '').toLowerCase().includes('3') ? '3-month' : '1-month';
     const weeks = duration === '3-month' ? 12 : 4;
 
-    const brandContext = brand
-      ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Description: ${dna.brandDescription || 'N/A'}. Country: ${dna.country || 'India'}. Colors: ${dna.colors?.map(c => c.hex).join(', ') || 'N/A'}.`
-      : '';
+    // ── Load FULL Brand DNA via agentUtils (includes Products, Knowledge Bank, Competitors, Market Context) ──
+    let brandContext = '';
+    try {
+      const brandId = brand?._id || brand?.id;
+      if (brandId) {
+        const { brandContext: fullContext } = await loadBrandContext(brandId);
+        brandContext = fullContext || '';
+      } else if (brand?.name) {
+        brandContext = `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}. Country: ${dna.country || 'India'}.`;
+      }
+    } catch (ctxErr) {
+      console.warn('[brainstorm/strategy] Brand context load error:', ctxErr.message);
+      brandContext = brand ? `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}.` : '';
+    }
 
     const answersText = Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n');
 
@@ -2816,5 +2841,243 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// STRATEGY MODES — 8 Goal-Oriented Research-Backed Strategy Generators
+// POST /api/brainstorm-studio/strategy-mode
+// ══════════════════════════════════════════════════════════════════════════════
+
+const STRATEGY_MODES = {
+  'new-product-launch': {
+    label: 'New Product Launch',
+    mcpTools: ['web_search_launch', 'fetch_trending'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India new product launch strategy D2C ${new Date().getFullYear()} marketing playbook`,
+  },
+  'sales-acceleration': {
+    label: 'Sales Acceleration',
+    mcpTools: ['scrape_competitor', 'web_search_sales'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India sales acceleration conversion rate optimization offers discounts 2025`,
+  },
+  'marketplace-growth': {
+    label: 'Marketplace Growth',
+    mcpTools: ['web_search_marketplace', 'fetch_seo_audit'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} Amazon Flipkart Nykaa Meesho marketplace SEO listing strategy 2025`,
+  },
+  'meta-google-ads': {
+    label: 'Meta & Google Ads Brief',
+    mcpTools: ['web_search_ads', 'scrape_competitor'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India Meta Facebook Instagram Google Ads winning creative hooks ROAS CPL benchmarks 2025`,
+  },
+  'retention': {
+    label: 'Retention & Loyalty',
+    mcpTools: ['fetch_performance_learnings', 'fetch_content_history'],
+    searchQuery: (brand, dna) => `D2C India customer retention email SMS WhatsApp loyalty programme repeat purchase rate 2025`,
+  },
+  'festive-seasonal': {
+    label: 'Festive & Seasonal',
+    mcpTools: ['fetch_trending', 'web_search_festive'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India festive season campaign Diwali Holi summer ${new Date().toLocaleString('en', { month: 'long' })} marketing 2025`,
+  },
+  'brand-awareness': {
+    label: 'Brand Awareness',
+    mcpTools: ['web_search_awareness', 'scrape_competitor'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India brand awareness share of voice PR organic social strategy 2025`,
+  },
+  'influencer-campaign': {
+    label: 'Influencer Campaign',
+    mcpTools: ['web_search_influencer', 'fetch_trending'],
+    searchQuery: (brand, dna) => `${dna.industry || ''} India micro influencer campaign strategy Instagram Reels YouTube Shorts creator brief 2025`,
+  },
+};
+
+router.post('/strategy-mode', protect, requireStudio('brainstormStudio'), requireCredits('brainstorm'), async (req, res) => {
+  try {
+    const { mode, brand, inputs = {} } = req.body;
+    if (!mode) return res.status(400).json({ success: false, error: 'mode is required' });
+    if (!STRATEGY_MODES[mode]) return res.status(400).json({ success: false, error: `Unknown mode: ${mode}. Valid modes: ${Object.keys(STRATEGY_MODES).join(', ')}` });
+
+    const modeConfig = STRATEGY_MODES[mode];
+
+    // ── Load FULL Brand DNA ─────────────────────────────────────────────
+    let brandContext = '';
+    let brandDoc = brand;
+    try {
+      const brandId = brand?._id || brand?.id;
+      if (brandId) {
+        const ctx = await loadBrandContext(brandId);
+        brandContext = ctx.brandContext || '';
+        brandDoc = ctx.brand || brand;
+      } else if (brand?.name) {
+        const dna = brand?.dna || {};
+        brandContext = `Brand: ${brand.name}. Industry: ${dna.industry || 'N/A'}. Voice: ${dna.voice?.personality || 'professional'}. Target Audience: ${dna.targetAudience || 'N/A'}.`;
+      }
+    } catch (ctxErr) {
+      console.warn('[strategy-mode] Brand context error:', ctxErr.message);
+    }
+
+    const dna = brandDoc?.dna || brand?.dna || {};
+    const brandName = brandDoc?.name || brand?.name || 'Your Brand';
+    const brandId = brand?._id || brand?.id;
+
+    // ── Run relevant MCP tools in parallel ──────────────────────────────
+    const searchQuery = modeConfig.searchQuery(brandName, dna);
+    const mcpCalls = [];
+
+    if (modeConfig.mcpTools.some(t => t.startsWith('web_search'))) {
+      mcpCalls.push({ tool: 'web_search', args: { query: searchQuery, mode: 'deep' } });
+    }
+    if (modeConfig.mcpTools.includes('fetch_trending')) {
+      mcpCalls.push({ tool: 'fetch_trending', args: { brandId } });
+    }
+    if (modeConfig.mcpTools.includes('scrape_competitor')) {
+      mcpCalls.push({ tool: 'scrape_competitor', args: { brandId } });
+    }
+    if (modeConfig.mcpTools.includes('fetch_seo_audit')) {
+      mcpCalls.push({ tool: 'fetch_seo_audit', args: { brandId } });
+    }
+    if (modeConfig.mcpTools.includes('fetch_performance_learnings')) {
+      mcpCalls.push({ tool: 'fetch_performance_learnings', args: { brandId } });
+    }
+    if (modeConfig.mcpTools.includes('fetch_content_history')) {
+      mcpCalls.push({ tool: 'fetch_content_history', args: { brandId, platform: '', limit: 20 } });
+    }
+
+    const mcpResults = await callMcpToolsParallel(mcpCalls);
+
+    // Summarise MCP results for prompt
+    const researchParts = [];
+    if (mcpResults.web_search?.data) researchParts.push(`LIVE WEB RESEARCH:\n${mcpResults.web_search.data.substring(0, 2500)}`);
+    if (mcpResults.fetch_trending?.data) {
+      const t = mcpResults.fetch_trending.data;
+      if (t.trending?.length) researchParts.push(`TRENDING NOW: ${t.trending.slice(0, 5).map(x => `${x.topic} (${x.urgency})`).join(' | ')}`);
+      if (t.calendarHooks?.length) researchParts.push(`UPCOMING HOOKS: ${t.calendarHooks.slice(0, 5).join(' | ')}`);
+    }
+    if (mcpResults.scrape_competitor?.data?.analysis) researchParts.push(`COMPETITOR INTEL:\n${mcpResults.scrape_competitor.data.analysis}`);
+    if (mcpResults.fetch_seo_audit?.data?.topKeywords?.length) researchParts.push(`SEO KEYWORDS: ${mcpResults.fetch_seo_audit.data.topKeywords.slice(0, 10).join(', ')}`);
+    if (mcpResults.fetch_performance_learnings?.data?.topRated?.length) {
+      researchParts.push(`PAST TOP CONTENT: ${mcpResults.fetch_performance_learnings.data.topRated.map(x => x.title).join(', ')}`);
+    }
+
+    const researchContext = researchParts.join('\n\n') || 'No live research data — proceeding with brand knowledge and AI training data.';
+
+    // ── Mode-specific prompt instructions ───────────────────────────────
+    const modeInstructions = {
+      'new-product-launch': `Focus on: pre-launch buzz building, launch day execution, post-launch amplification. Include channel-by-channel plan for first 90 days. Emphasise: influencer seeding, PR outreach, performance ads, social proof collection.`,
+      'sales-acceleration': `Focus on: conversion rate improvements, offer architecture, urgency mechanics, retargeting strategy, abandoned cart recovery. Include specific discount structures, bundle ideas, FOMO tactics. Make it a 30-day sprint plan.`,
+      'marketplace-growth': `Focus on: Amazon/Flipkart/Nykaa listing optimisation, keyword-rich A+ content, review generation strategy, sponsored ads, category ranking tactics. Include specific keyword recommendations.`,
+      'meta-google-ads': `This is an AD BRIEF. Focus on: hook formulas, creative concepts, copy frameworks, audience targeting parameters, budget allocation between Meta/Google, bid strategy, and landing page recommendations. Include 3-5 specific ad concepts with hooks and CTAs.`,
+      'retention': `Focus on: Win-back sequences, loyalty rewards, repeat purchase triggers, LTV improvement, WhatsApp/Email/SMS flows. Include day-by-day retention flow for 90 days post first purchase.`,
+      'festive-seasonal': `Focus on: Pre-festive content calendar, offer strategy, limited edition packaging ideas, festive ad creative direction, affiliate/influencer amplification during peak season.`,
+      'brand-awareness': `Focus on: Share of voice strategy, PR hooks, organic social virality, UGC campaigns, brand partnership opportunities, community building. Make it a 90-day brand building plan.`,
+      'influencer-campaign': `Focus on: Creator tier selection (mega/macro/micro/nano), brief framework, seeding strategy, content format mix (Reels/YouTube/Blog), compensation models, content approval process, measurement. Include creator profile criteria.`,
+    };
+
+    const userInputsText = Object.keys(inputs).length
+      ? `\nUSER INPUTS:\n${Object.entries(inputs).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+      : '';
+
+    const systemPrompt = `You are a world-class Chief Marketing Officer and strategic consultant specialising in D2C brands in India.
+You are running the "${modeConfig.label}" strategy mode for a brand.
+
+${brandContext}
+
+LIVE MARKET RESEARCH DATA:
+${researchContext}
+
+YOUR STRATEGY FOCUS FOR THIS MODE:
+${modeInstructions[mode]}
+
+RULES:
+1. Every recommendation must be brand-specific — use the brand's name, category, audience, and products
+2. Every number (budget, ROAS, CPL, timeline) must have a rationale
+3. No generic advice — all outputs must be actionable this week
+4. Channel breakdown must cover specific platforms with tactics, not just platform names
+5. Content calendar must have specific content themes/hooks for each phase, not just "create content"
+6. Studio Actions must map to specific capabilities (Creative Studio for images, Content Studio for copy, Video Studio for reels)
+
+Respond in STRICT JSON:
+{
+  "mode": "${mode}",
+  "modeLabel": "${modeConfig.label}",
+  "brand": "${brandName}",
+  "strategicSummary": "4-5 sentence thesis: why THIS strategy at THIS moment will work for THIS brand, grounded in research",
+  "marketContext": {
+    "keyFindings": ["Specific finding 1 with data", "Finding 2", "Finding 3", "Finding 4"],
+    "competitorGaps": ["Gap 1 — what competitors aren't doing", "Gap 2", "Gap 3"],
+    "trendingAngles": ["Trending angle 1 brand can leverage", "Angle 2", "Angle 3"]
+  },
+  "recommendedActions": [
+    { "priority": "high", "action": "Specific action", "rationale": "Why this, why now", "timeline": "e.g. Week 1", "owner": "Founder/Marketing team/Agency" }
+  ],
+  "channelBreakdown": [
+    {
+      "channel": "Meta Ads",
+      "strategy": "2-3 sentence channel strategy",
+      "contentTypes": ["Specific content type 1", "Type 2"],
+      "hooks": ["Winning hook formula 1", "Hook 2"],
+      "budget": "Suggested budget range or %",
+      "kpi": "Primary KPI with target",
+      "timeline": "When to start and scale"
+    }
+  ],
+  "contentCalendar": {
+    "duration": "e.g. 30 days / 90 days",
+    "phases": [
+      { "name": "Phase name", "duration": "Week 1-2", "theme": "Campaign theme", "actions": ["Specific action 1", "Action 2", "Action 3"] }
+    ]
+  },
+  "studioActions": [
+    { "label": "Generate Campaign Creative", "studio": "creative", "payload": { "brief": "1 sentence creative brief" } },
+    { "label": "Write Campaign Copy", "studio": "content", "payload": { "type": "social", "platform": "instagram" } },
+    { "label": "Create Reel Concepts", "studio": "video", "payload": { "format": "reel" } }
+  ]
+}`;
+
+    const userPrompt = `Generate the "${modeConfig.label}" strategy for "${brandName}".
+${userInputsText}
+Use all available brand data and research intel to build the most specific, actionable plan possible.`;
+
+    const aiRouter = getRouter();
+    const aiResult = await aiRouter.generateText({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.5,
+      maxTokens: 6000,
+    });
+
+    let text = aiResult.text || '';
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const lastThink = text.lastIndexOf('<think>');
+    if (lastThink !== -1) {
+      const before = text.substring(0, lastThink).trim();
+      text = before.length > 0 ? before : '';
+    }
+    text = text.replace(/```(?:json)?\s*\n?/gi, '').trim();
+
+    let parsed;
+    try {
+      if (text.startsWith('{')) parsed = JSON.parse(text);
+      else {
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) parsed = JSON.parse(m[0]);
+      }
+    } catch (_) {
+      parsed = { raw: text.substring(0, 1000), error: 'JSON parse failed' };
+    }
+
+    parsed = parsed || {};
+    parsed.mode = mode;
+    parsed.modeLabel = modeConfig.label;
+    parsed.brand = brandName;
+    parsed.generatedAt = new Date().toISOString();
+    parsed.researchUsed = mcpCalls.length > 0;
+
+    res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('strategy-mode error:', error);
+    res.status(500).json({ success: false, error: safeErrorMessage(error) });
+  }
+});
+
 export default router;
+
 

@@ -736,6 +736,8 @@ export const brainstormStudio = {
     // Brand Strategy
     strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
     strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
+    // ── NEW: 8-Mode Research-Backed Strategy Generator ──
+    strategyMode: (data) => apiFetch('/brainstorm-studio/strategy-mode', { method: 'POST', body: JSON.stringify(data) }),
     listStrategies: () => apiFetch('/brainstorm-studio/strategies'),
     getStrategy: (id) => apiFetch(`/brainstorm-studio/strategies/${id}`),
     updateKpi: (id, data) => apiFetch(`/brainstorm-studio/strategies/${id}/kpi`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -795,6 +797,20 @@ export const brainstormStudio = {
             }
         }
     },
+};
+
+
+// ============ Research Studio API ============
+export const researchStudio = {
+    competitor: (data) => apiFetch('/research-studio/competitor', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    trends: (data) => apiFetch('/research-studio/trends', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    keywords: (data) => apiFetch('/research-studio/keywords', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    ads: (data) => apiFetch('/research-studio/ads', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    audience: (data) => apiFetch('/research-studio/audience', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    synthesis: (data) => apiFetch('/research-studio/synthesis', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    save: (data) => apiFetch('/research-studio/save', { method: 'POST', body: JSON.stringify(data) }),
+    reports: (brandId) => apiFetch(`/research-studio/reports${brandId ? `?brandId=${brandId}` : ''}`),
+    getReport: (id) => apiFetch(`/research-studio/reports/${id}`),
 };
 
 

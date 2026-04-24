@@ -6,6 +6,7 @@ import { useSidebar } from './DashboardLayout'
 const navItems = [
     { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
     { icon: 'psychology', label: 'Brainstorm Studio', to: '/brainstorm', studioKey: 'brainstormStudio' },
+    { icon: 'manage_search', label: 'Research Studio', to: '/research-studio', studioKey: 'brainstormStudio', badge: 'NEW' },
     { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'draw', label: 'AI Canvas', to: '/ai-canvas', studioKey: 'creativeStudio' },

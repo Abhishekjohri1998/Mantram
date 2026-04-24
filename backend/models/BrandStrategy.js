@@ -25,7 +25,9 @@ const brandStrategySchema = new mongoose.Schema({
 
     // Strategy metadata
     title: { type: String, required: true },
-    duration: { type: String, enum: ['1-month', '3-month'], default: '1-month' },
+    // 'strategy' = classic CMO plan, 'research' = Research Studio module report
+    type: { type: String, enum: ['strategy', 'research'], default: 'strategy' },
+    duration: { type: String, enum: ['1-month', '3-month', null], default: '1-month' },
     objective: { type: String, default: '' },
     status: { type: String, enum: ['active', 'completed', 'paused', 'draft'], default: 'active' },
 
@@ -43,6 +45,12 @@ const brandStrategySchema = new mongoose.Schema({
 
     // Progress (auto-calculated)
     overallProgress: { type: Number, default: 0 }, // 0-100
+
+    // Research Studio fields (only used when type === 'research')
+    researchModule: { type: String, default: null }, // competitor | trends | keywords | ads | audience | synthesis
+    researchData: { type: mongoose.Schema.Types.Mixed, default: null }, // full structured JSON from research engine
+    generatedAt: { type: String, default: null }, // ISO string of when AI generated it
+    aiMeta: { type: mongoose.Schema.Types.Mixed, default: null }, // source, module, etc.
 
     // Dates
     startDate: { type: Date, default: Date.now },

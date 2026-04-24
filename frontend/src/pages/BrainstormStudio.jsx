@@ -1,14 +1,152 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import FormattedText from '../components/FormattedText'
-import { brainstormStudio as bsAPI } from '../services/api'
+import { brainstormStudio as bsAPI, researchStudio } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import Walkthrough from '../components/Walkthrough'
 import './BrainstormStudio.css'
 
-// ── Topic quick-starts ────────────────────────────────────────────────────────
+// ── Strategy Modes (8 goal-oriented research-backed modes) ───────────────────
+const STRATEGY_MODES_LIST = [
+  { id: 'new-product-launch', icon: 'rocket_launch', label: 'New Product Launch', desc: 'Pre-launch buzz, launch-day plan, 90-day amplification.', color: '#6366f1' },
+  { id: 'sales-acceleration', icon: 'trending_up', label: 'Sales Acceleration', desc: 'Conversion boosts, offer architecture, 30-day sprint.', color: '#f59e0b' },
+  { id: 'marketplace-growth', icon: 'storefront', label: 'Marketplace Growth', desc: 'Amazon/Flipkart/Nykaa SEO, listings, sponsored ads.', color: '#10b981' },
+  { id: 'meta-google-ads', icon: 'ads_click', label: 'Meta & Google Ads Brief', desc: 'Winning hooks, creative brief, targeting, budget split.', color: '#3b82f6' },
+  { id: 'retention', icon: 'loyalty', label: 'Retention & Loyalty', desc: 'Win-back flows, repeat purchase triggers, LTV plan.', color: '#ec4899' },
+  { id: 'festive-seasonal', icon: 'celebration', label: 'Festive & Seasonal', desc: 'Seasonal calendar, offer strategy, festive creative brief.', color: '#f97316' },
+  { id: 'brand-awareness', icon: 'record_voice_over', label: 'Brand Awareness', desc: '90-day share-of-voice, PR, UGC, community plan.', color: '#8b5cf6' },
+  { id: 'influencer-campaign', icon: 'person_pin', label: 'Influencer Campaign', desc: 'Creator brief, tier mix, seeding, measurement plan.', color: '#14b8a6' },
+]
+
+// ── Strategy Mode Result Renderer ─────────────────────────────────────────────
+function StrategyModeResult({ data, onClose, navigate }) {
+  if (!data) return null
+  const priorityColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
+  const studioIcons = { creative: 'auto_fix_high', content: 'edit_note', video: 'movie', brainstorm: 'psychology' }
+
+  const handleStudioAction = (action) => {
+    const paths = { creative: '/creative-studio', content: '/content-studio', video: '/video-studio', brainstorm: '/brainstorm' }
+    navigate(paths[action.studio] || '/brainstorm')
+  }
+
+  return (
+    <div className="sm-result">
+      <div className="sm-result-hdr">
+        <div className="sm-result-title">{data.modeLabel} — {data.brand}</div>
+        <button className="sm-close-btn" onClick={onClose}><span className="material-symbols-outlined">close</span></button>
+      </div>
+
+      {data.strategicSummary && (
+        <div className="sm-thesis">{data.strategicSummary}</div>
+      )}
+
+      {data.marketContext && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-symbols-outlined">insights</span>Market Context</div>
+          <div className="sm-ctx-grid">
+            {data.marketContext.keyFindings?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Key Findings</div>
+                {data.marketContext.keyFindings.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+            {data.marketContext.competitorGaps?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Competitor Gaps</div>
+                {data.marketContext.competitorGaps.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+            {data.marketContext.trendingAngles?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Trending Angles</div>
+                {data.marketContext.trendingAngles.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {data.recommendedActions?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-symbols-outlined">checklist</span>Recommended Actions</div>
+          <div className="sm-actions-list">
+            {data.recommendedActions.map((a, i) => (
+              <div key={i} className="sm-action-item">
+                <span className="sm-priority" style={{ background: priorityColor[a.priority] || '#475569' }}>{a.priority}</span>
+                <div className="sm-action-body">
+                  <strong>{a.action}</strong>
+                  <span className="sm-action-meta">{a.timeline} · {a.owner}</span>
+                  <p>{a.rationale}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.channelBreakdown?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-symbols-outlined">hub</span>Channel Breakdown</div>
+          <div className="sm-channels">
+            {data.channelBreakdown.map((ch, i) => (
+              <div key={i} className="sm-channel-card">
+                <div className="sm-channel-name">{ch.channel}</div>
+                <p className="sm-channel-strategy">{ch.strategy}</p>
+                {ch.hooks?.length > 0 && (
+                  <div className="sm-hooks">
+                    <span className="sm-hooks-label">Winning hooks:</span>
+                    {ch.hooks.map((h, j) => <span key={j} className="sm-hook-chip">{h}</span>)}
+                  </div>
+                )}
+                <div className="sm-channel-meta">
+                  {ch.budget && <span><span className="material-symbols-outlined">paid</span>{ch.budget}</span>}
+                  {ch.kpi && <span><span className="material-symbols-outlined">flag</span>{ch.kpi}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.contentCalendar?.phases?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-symbols-outlined">calendar_month</span>Content Calendar — {data.contentCalendar.duration}</div>
+          <div className="sm-cal-phases">
+            {data.contentCalendar.phases.map((ph, i) => (
+              <div key={i} className="sm-cal-phase">
+                <div className="sm-cal-phase-hdr">
+                  <span className="sm-cal-phase-num">{i + 1}</span>
+                  <strong>{ph.name}</strong>
+                  <span className="sm-cal-phase-dur">{ph.duration}</span>
+                </div>
+                {ph.theme && <div className="sm-cal-theme"><span className="material-symbols-outlined" style={{ fontSize: '12px', verticalAlign: 'middle' }}>flag</span> {ph.theme}</div>}
+                <ul className="sm-cal-actions">
+                  {ph.actions?.map((a, j) => <li key={j}>{a}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.studioActions?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-symbols-outlined">open_in_new</span>Take Action in Studios</div>
+          <div className="sm-studio-actions">
+            {data.studioActions.map((a, i) => (
+              <button key={i} className="sm-studio-btn" onClick={() => handleStudioAction(a)}>
+                <span className="material-symbols-outlined">{studioIcons[a.studio] || 'launch'}</span>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 const TOPICS = [
   { id: 'ad-film',        icon: 'movie', label: 'Ad Film',        hint: "let's make an ad film" },
   { id: 'campaign',       icon: 'campaign', label: 'Campaign',       hint: "help me plan a marketing campaign" },
@@ -204,7 +342,7 @@ function ConceptCard({ concept, index, isFilm, onScreenplay, onFeedback, onDeepD
           {expanded ? 'Collapse ↑' : 'Expand ↓'}
         </button>
         <button className="bs-primary-btn bs-deepdive-btn" onClick={() => onDeepDive?.(concept)}>
-          🔬 Deep Dive
+          <span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>biotech</span> Deep Dive
         </button>
         {isFilm && (
           <button className="bs-primary-btn" onClick={() => onScreenplay?.(concept)}>
@@ -222,11 +360,11 @@ function DeepDivePanel({ deepDive }) {
   if (!deepDive?.ideaTitle && !deepDive?.summary) return null
 
   const tabs = [
-    { id: 'competitive', label: '🌐 Competitive', icon: 'groups' },
-    { id: 'playbook', label: '📋 Playbook', icon: 'assignment' },
-    { id: 'content', label: '📝 Content', icon: 'edit_note' },
-    { id: 'budget', label: '💰 Budget', icon: 'payments' },
-    { id: 'risks', label: '⚠️ Risks', icon: 'warning' },
+    { id: 'competitive', label: 'Competitive', icon: 'groups' },
+    { id: 'playbook', label: 'Playbook', icon: 'assignment' },
+    { id: 'content', label: 'Content', icon: 'edit_note' },
+    { id: 'budget', label: 'Budget', icon: 'payments' },
+    { id: 'risks', label: 'Risks', icon: 'warning' },
   ]
 
   return (
@@ -255,7 +393,7 @@ function DeepDivePanel({ deepDive }) {
             ))}
             {deepDive.competitiveAnalysis.whitespace && (
               <div className="bs-dd-whitespace">
-                <div className="bs-dd-whitespace-label">💡 Market Whitespace</div>
+                <div className="bs-dd-whitespace-label"><span className="material-symbols-outlined" style={{fontSize:'14px',verticalAlign:'middle'}}>space_dashboard</span> Market Whitespace</div>
                 <p>{deepDive.competitiveAnalysis.whitespace}</p>
               </div>
             )}
@@ -274,8 +412,8 @@ function DeepDivePanel({ deepDive }) {
                   <div key={j} className="bs-dd-action">
                     <div className="bs-dd-action-task">{a.task}</div>
                     <div className="bs-dd-action-meta">
-                      {a.owner && <span>👤 {a.owner}</span>}
-                      {a.channel && <span>📱 {a.channel}</span>}
+                      {a.owner && <span><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>person</span> {a.owner}</span>}
+                      {a.channel && <span><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>smartphone</span> {a.channel}</span>}
                     </div>
                   </div>
                 ))}
@@ -353,7 +491,7 @@ const PLATFORM_COLORS = {
 }
 const PLATFORM_ICONS = {
   instagram: '📸', linkedin: '💼', twitter: '𝕏', youtube: '▶️',
-  facebook: '👥', blog: '📝', newsletter: '📧'
+  facebook: 'groups', blog: 'article', newsletter: 'mail'
 }
 
 function CalendarView({ calendar, onPushToCalendar }) {
@@ -380,7 +518,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
                   <div key={pi} className="bs-cal-post"
                     style={{ borderLeftColor: PLATFORM_COLORS[post.platform] || '#8b5cf6' }}>
                     <div className="bs-cal-post-top">
-                      <span className="bs-cal-platform">{PLATFORM_ICONS[post.platform] || '📱'} {post.platform}</span>
+                      <span className="bs-cal-platform"><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>{PLATFORM_ICONS[post.platform] || 'smartphone'}</span> {post.platform}</span>
                       <span className="bs-cal-type">{post.type}</span>
                       <span className="bs-cal-time">{post.time}</span>
                     </div>
@@ -399,7 +537,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
 
       {calendar.targetKPIs?.length > 0 && (
         <div className="bs-cal-kpis">
-          <div className="bs-dd-sublabel">📊 Target KPIs</div>
+          <div className="bs-dd-sublabel"><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>monitoring</span> Target KPIs</div>
           {calendar.targetKPIs.map((k, i) => (
             <div key={i} className="bs-cal-kpi">{k.metric}: <strong>{k.target}</strong> <span>(measure after {k.measureAfter})</span></div>
           ))}
@@ -409,7 +547,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
       {onPushToCalendar && (
         <div className="bs-cal-actions">
           <button className="bs-primary-btn" onClick={onPushToCalendar}>
-            📅 Push to Smart Calendar
+            <span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>calendar_month</span> Push to Smart Calendar
           </button>
         </div>
       )}
@@ -441,7 +579,7 @@ function SessionSidebar({ sessions, activeSessionId, onSelect, onNew, onDelete, 
   return (
     <div className={`bs-sidebar ${visible ? 'open' : ''}`}>
       <div className="bs-sidebar-header">
-        <span>📋 Sessions</span>
+        <span><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>history</span> Sessions</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="bs-sidebar-new" onClick={onNew} title="New session"><span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span></button>
           <button className="bs-sidebar-close" onClick={onToggle}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span></button>
@@ -459,9 +597,9 @@ function SessionSidebar({ sessions, activeSessionId, onSelect, onNew, onDelete, 
                   <div className="bs-sidebar-item-title">{s.title || 'Untitled'}</div>
                   <div className="bs-sidebar-item-meta">
                     <span>{timeAgo(s.lastMessageAt || s.createdAt)}</span>
-                    {s.ideaCount > 0 && <span className="bs-sidebar-badge">💡{s.ideaCount}</span>}
-                    {s.hasDeepDive && <span className="bs-sidebar-badge">🔬</span>}
-                    {s.hasCalendar && <span className="bs-sidebar-badge">📅</span>}
+                    {s.ideaCount > 0 && <span className="bs-sidebar-badge">{s.ideaCount}</span>}
+                    {s.hasDeepDive && <span className="bs-sidebar-badge">Dive</span>}
+                    {s.hasCalendar && <span className="bs-sidebar-badge">Cal</span>}
                   </div>
                   <button className="bs-sidebar-del" onClick={e => { e.stopPropagation(); onDelete(s._id) }} title="Delete">
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
@@ -591,7 +729,7 @@ function StrategyView({ strategy }) {
           <div className="bs-strategy-section-title">Quick Wins</div>
           {strategy.quick_wins.map((w, i) => (
             <div key={i} className="bs-quickwin">
-              <span>⚡</span>
+              <span className="material-symbols-outlined" style={{fontSize:'14px',verticalAlign:'middle'}}>bolt</span>
               <span>{w.action}</span>
               <span className="bs-quickwin-meta">{w.timeline}</span>
             </div>
@@ -809,6 +947,7 @@ const LANG_DISPLAY = {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function BrainstormStudio() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { activeBrand } = useBrand()
   const { user } = useAuth()
 
@@ -826,6 +965,46 @@ export default function BrainstormStudio() {
   const [citations, setCitations] = useState([])
   const [showReasoning, setShowReasoning] = useState(false)
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
+
+  // ── Strategy Mode state ───────────────────────────────────────────────────
+  const [smActiveMode, setSmActiveMode] = useState(null)
+  const [smInputs, setSmInputs] = useState({})
+  const [smLoading, setSmLoading] = useState(false)
+  const [smError, setSmError] = useState(null)
+  const [smResult, setSmResult] = useState(null)
+
+  // Pre-select Strategy Mode from ?mode= query param (set by Research Studio)
+  useEffect(() => {
+    const modeId = searchParams.get('mode')
+    if (modeId && STRATEGY_MODES_LIST.length) {
+      const match = STRATEGY_MODES_LIST.find(m => m.id === modeId)
+      if (match) setSmActiveMode(match)
+    }
+  }, [searchParams])
+
+  const handleStrategyMode = async () => {
+    if (!smActiveMode || !activeBrand) return
+    setSmLoading(true)
+    setSmError(null)
+    setSmResult(null)
+    try {
+      const res = await bsAPI.strategyMode({
+        mode: smActiveMode.id,
+        brand: activeBrand,
+        inputs: smInputs.context ? { context: smInputs.context } : {},
+      })
+      if (res?.success && res?.data) {
+        setSmResult(res.data)
+      } else {
+        setSmError(res?.error || 'Strategy generation failed. Please try again.')
+      }
+    } catch (e) {
+      setSmError(e.message || 'Something went wrong.')
+    } finally {
+      setSmLoading(false)
+    }
+  }
+
 
   // Session history state
   const [activeSessionId, setActiveSessionId] = useState(null)
@@ -1186,10 +1365,74 @@ export default function BrainstormStudio() {
         {/* Messages */}
         <div className="bs-messages">
 
+          {/* Strategy Modes — goal-oriented research-backed strategies */}
+          {showTopics && (
+            <div className="sm-section">
+              <div className="sm-section-header">
+                <span className="material-symbols-outlined">auto_awesome</span>
+                <span>Strategy Modes — Research-Backed</span>
+                <span className="sm-badge">NEW</span>
+              </div>
+              <div className="sm-modes-grid">
+                {STRATEGY_MODES_LIST.map(mode => (
+                  <button
+                    key={mode.id}
+                    className={`sm-mode-card ${smActiveMode?.id === mode.id ? 'sm-mode-card--active' : ''}`}
+                    onClick={() => {
+                      setSmActiveMode(mode)
+                      setSmResult(null)
+                      setSmError(null)
+                      setSmInputs({})
+                    }}
+                  >
+                    <span className="material-symbols-outlined sm-mode-icon">{mode.icon}</span>
+                    <span className="sm-mode-label">{mode.label}</span>
+                    <span className="sm-mode-desc">{mode.desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {smActiveMode && !smResult && (
+                <div className="sm-form">
+                  <div className="sm-form-title">
+                    <span className="material-symbols-outlined">{smActiveMode.icon}</span>
+                    {smActiveMode.label}
+                  </div>
+                  <div className="sm-form-fields">
+                    <textarea
+                      className="sm-form-input"
+                      placeholder={`Optional: any specific focus or context for ${smActiveMode.label} strategy…`}
+                      value={smInputs.context || ''}
+                      onChange={e => setSmInputs(p => ({ ...p, context: e.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="sm-form-actions">
+                    <button className="sm-run-btn" onClick={handleStrategyMode} disabled={smLoading}>
+                      {smLoading
+                        ? <><span className="material-symbols-outlined sm-spin">refresh</span>Researching…</>
+                        : <><span className="material-symbols-outlined">rocket_launch</span>Generate Strategy</>}
+                    </button>
+                    <button className="sm-cancel-btn" onClick={() => setSmActiveMode(null)}>Cancel</button>
+                  </div>
+                  {smError && <div className="sm-error">{smError}</div>}
+                </div>
+              )}
+
+              {smResult && (
+                <StrategyModeResult
+                  data={smResult}
+                  onClose={() => { setSmResult(null); setSmActiveMode(null) }}
+                  navigate={navigate}
+                />
+              )}
+            </div>
+          )}
+
           {/* Topic chips — shown only at start */}
           {showTopics && (
             <div data-wt="bs-topics" className="bs-topics-wrap">
-              <div className="bs-topics-label">What do you want to brainstorm?</div>
+              <div className="bs-topics-label">Or start a brainstorm conversation:</div>
               <div className="bs-topics-grid">
                 {TOPICS.map(t => (
                   <button key={t.id} className="bs-topic-chip"
@@ -1223,7 +1466,7 @@ export default function BrainstormStudio() {
           />
 
           {error && (
-            <div className="bs-error-banner">⚠️ {error}</div>
+            <div className="bs-error-banner"><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {error}</div>
           )}
 
           <div ref={bottomRef} style={{ height: 1 }} />
