@@ -430,30 +430,9 @@ export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, durati
 
 // ── Public: Resubmit ─────────────────────────────────────────────────────────
 
-export async function resubmitAtlasCloudTask(storedPayload, safetyTriggered = false) {
+export async function resubmitAtlasCloudTask(storedPayload) {
     console.log(`🔄 [Atlas] Auto-retry resubmit...`);
-    let payloadToSubmit = storedPayload;
-
-    if (safetyTriggered && payloadToSubmit?.input?.prompt) {
-        console.log(`🛡️ [Atlas] Safe Mode: Removing Face-lock strictures from prompt to bypass safety filter...`);
-        // Remove the Face-lock sentence injected during initial submission
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/@Image\d+(?: and @Image\d+)* (?:is|are) the real person who must appear in this video\. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame\./gi, '');
-        // Aggressively strip user-provided or AI-generated character reference constraints
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/maintain exact facial features/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/exact facial geometry/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/real person/gi, 'person');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/as character reference/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/exact facial features/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/skin tone/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/eye shape/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/expression throughout/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/preserve their/gi, '');
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/(?:maintain|preserve)(?: exact)?(?: facial features| skin tone| eye shape| hair| expression)(?: throughout)?/gi, '');
-        // Clean up loose commas, hyphens, and whitespace
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/,\s*,/g, ',').replace(/\s*[—-]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
-    }
-
-    const taskId = await submitAtlasCloudPayload(payloadToSubmit);
+    const taskId = await submitAtlasCloudPayload(storedPayload);
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0' };
 }
 
@@ -507,8 +486,7 @@ export async function getAtlasCloudGenerationStatus(taskId) {
             safetyTriggered = true;
         }
         console.warn(`⚠️ [Atlas] Task ${taskId} failed: ${errorMsg}`);
-        // All Atlas failures are retryable; safetyTriggered routes to Kling fallback, others retry same model
-        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: true, safetyTriggered };
+        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: safetyTriggered, safetyTriggered };
     }
 
     if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') {

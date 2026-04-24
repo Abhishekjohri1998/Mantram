@@ -612,70 +612,36 @@ export async function pollGenerationStatus(state) {
                 try {
                     let retryPayload = JSON.parse(JSON.stringify(state.generation._atlasCloudPayload || state.generation._piApiPayload)); // Deep copy 
 
-                    // 🛡️ SAFE MODE PIVOT: If Bytedance blocked because the INPUT IMAGE contains a real person,
-                    // we CANNOT retry on Seedance — the same image will be rejected again.
-                    // Instead, fall back to Kling 3.0 (via fal.ai) which accepts real person images.
+                    // 🛡️ SAFE MODE PIVOT: If Bytedance blocked the generation due to a Real Person
                     if (statusResult.safetyTriggered) {
-                        console.log(`🛡️ Safe Mode Pivot: Bytedance rejected real-person image. Falling back to Kling 3.0 (fal.ai) which accepts real faces.`);
-                        try {
-                            const imageUrl = retryPayload.input?.image_urls?.[0] || null;
-                            const prompt = (retryPayload.input?.prompt || '').replace(/@Image\d+/gi, '').replace(/\s{2,}/g, ' ').trim();
-                            const duration = retryPayload.input?.duration || 5;
-                            const aspectRatio = retryPayload.input?.aspect_ratio || '16:9';
-
-                            const klingResult = await submitVideoGeneration({
-                                model: 'kling-3.0',
-                                prompt,
-                                imageUrl,
-                                duration: Math.min(duration, 10),
-                                resolution: '1080p',
-                                mode: 'fast',
-                                generateAudio: true,
-                                aspectRatio,
-                                referenceImages: [],
-                            });
-                            console.log(`✅ Safe Mode: Kling 3.0 task submitted: ${klingResult.requestId}`);
-                            return {
-                                ...state,
-                                generation: {
-                                    ...state.generation,
-                                    falRequestId: klingResult.requestId,
-                                    falEndpoint: klingResult.endpoint,
-                                    falStatusUrl: klingResult.statusUrl,
-                                    falResultUrl: klingResult.resultUrl,
-                                    provider: klingResult.provider || 'fal',
-                                    progress: 5,
-                                    startedAt: new Date(),
-                                    error: '',
-                                    _atlasCloudRetryCount: MAX_RETRIES, // Prevent further Atlas retries
-                                },
-                                routing: {
-                                    ...state.routing,
-                                    selectedModel: 'kling-3.0',
-                                },
-                                status: state.status,
-                            };
-                        } catch (klingErr) {
-                            console.error(`❌ Safe Mode Kling fallback also failed: ${klingErr.message}`);
-                            // Fall through to normal failure
+                        console.log(`🛡️ Safe Mode Pivot: Bytedance blocked real-person faces. Auto-rerouting to Wan-2.7 which accepts real faces!`);
+                        
+                        // Switch model to Alibaba Wan-2.7 which bypasses the strict face filter
+                        if (retryPayload.task_type) {
+                            if (retryPayload.task_type.includes('reference-to-video')) {
+                                retryPayload.task_type = 'alibaba/wan-2.7/reference-to-video';
+                            } else if (retryPayload.task_type.includes('image-to-video')) {
+                                retryPayload.task_type = 'alibaba/wan-2.7/image-to-video';
+                            } else {
+                                retryPayload.task_type = 'alibaba/wan-2.7/text-to-video';
+                            }
                         }
-                    } else {
-                        // Non-safety failure (e.g. "failed to process task") — retry same model
-                        const retryResult = await resubmitAtlasCloudTask(retryPayload);
-                        return {
-                            ...state,
-                            generation: {
-                                ...state.generation,
-                                falRequestId: retryResult.taskId,
-                                progress: 5,
-                                startedAt: new Date(),
-                                error: '',
-                                _atlasCloudRetryCount: retryCount + 1,
-                                _atlasCloudPayload: retryPayload,
-                            },
-                            status: state.status,
-                        };
                     }
+
+                    const retryResult = await resubmitAtlasCloudTask(retryPayload);
+                    return {
+                        ...state,
+                        generation: {
+                            ...state.generation,
+                            falRequestId: retryResult.taskId,
+                            progress: 5,
+                            startedAt: new Date(),
+                            error: '',
+                            _atlasCloudRetryCount: retryCount + 1,
+                            _atlasCloudPayload: retryPayload, // Update payload for potential 2nd retry
+                        },
+                        status: state.status, // Keep current status (generating/advanced-generating)
+                    };
                 } catch (retryErr) {
                     console.error(`❌ Atlas Cloud auto-retry failed: ${retryErr.message}`);
                     // Fall through to normal failure handling
