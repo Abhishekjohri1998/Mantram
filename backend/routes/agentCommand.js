@@ -331,6 +331,7 @@ RESPONSE FORMAT — respond in STRICT JSON:
             console.log(`🎨 Agent: Generating image (ratio: ${ratio} → ${imageSize}, brand: ${brand?.name || 'none'}, brandImages: ${brandImgs.length})`);
 
             try {
+                const aiRouter = getRouter();
                 const aiResult = await aiRouter.generateImage({
                     prompt: cleanPrompt,
                     size: imageSize,
