@@ -4453,9 +4453,85 @@ router.get('/:id/status', protect, async (req, res) => {
                     generation: updated.generation,
                 });
 
-                if (updated.status === 'failed' && project.creditsUsed > 0) {
-                    await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'})`, 'video', { projectId: project._id });
-                    await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
+                if (updated.status === 'failed') {
+                    // SAFE MODE PIVOT (Kling Fallback):
+                    // If the failure was due to Bytedance's real-person safety filter, and we haven't pivoted yet,
+                    // automatically reroute to Kling 3.0 which accepts real faces.
+                    const isSafetyError = updated.generation?.error?.includes('Safe Mode') || updated.generation?.error?.includes('safety');
+                    const currentModel = project.routing?.selectedModel || project.model;
+                    
+                    if (isSafetyError && currentModel !== 'kling-3.0') {
+                        console.log(`🛡️ Safe Mode Pivot: Bytedance rejected real-person image. Falling back to Kling 3.0 (fal.ai) which accepts real faces.`);
+                        try {
+                            let prompt = '';
+                            let imageUrl = null;
+                            let duration = 5;
+                            let resolution = project.routing?.resolution || '1080p';
+                            let aspectRatio = project.routing?.aspectRatio || '16:9';
+                            let mode = project.routing?.mode || 'fast';
+                            
+                            if (project.mode === 'advanced') {
+                                prompt = project.advancedConfig?.prompt || project.title;
+                                imageUrl = project.advancedConfig?.firstImageUrl || null;
+                                duration = project.advancedConfig?.duration || 5;
+                            } else {
+                                prompt = project.backendPrompt || project.title;
+                                imageUrl = project.input?.images?.[0]?.url || null;
+                                duration = project.script?.totalDuration || 5;
+                            }
+                            
+                            // Strip @image tags since Kling accepts the image natively for I2V
+                            prompt = prompt.replace(/@Image\d+/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+                            const klingResult = await submitVideoGeneration({
+                                model: 'kling-3.0',
+                                prompt,
+                                imageUrl,
+                                duration: Math.min(duration, 10),
+                                resolution,
+                                mode,
+                                generateAudio: true,
+                                aspectRatio,
+                                referenceImages: [],
+                            });
+                            
+                            console.log(`✅ Safe Mode: Kling 3.0 task submitted: ${klingResult.requestId}`);
+                            
+                            // Update project with Kling generation details and switch status back to generating
+                            updated.status = project.mode === 'advanced' ? 'advanced-generating' : 'generating';
+                            updated.generation = {
+                                falRequestId: klingResult.requestId,
+                                falEndpoint: klingResult.endpoint,
+                                falStatusUrl: klingResult.statusUrl,
+                                falResultUrl: klingResult.resultUrl,
+                                provider: klingResult.provider || 'fal',
+                                progress: 5,
+                                startedAt: new Date(),
+                                error: '',
+                            };
+                            
+                            // Save the pivot back to the DB immediately
+                            await VideoProject.findByIdAndUpdate(project._id, {
+                                status: updated.status,
+                                generation: updated.generation,
+                                'routing.selectedModel': 'kling-3.0'
+                            });
+                            
+                        } catch (fallbackErr) {
+                            console.error(`❌ Safe Mode Kling fallback failed: ${fallbackErr.message}`);
+                            // Fall through to standard refund if fallback fails
+                            if (project.creditsUsed > 0) {
+                                await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'} - Fallback failed)`, 'video', { projectId: project._id });
+                                await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
+                            }
+                        }
+                    } else {
+                        // Standard failure refund
+                        if (project.creditsUsed > 0) {
+                            await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'})`, 'video', { projectId: project._id });
+                            await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
+                        }
+                    }
                 }
 
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic (if needed)
