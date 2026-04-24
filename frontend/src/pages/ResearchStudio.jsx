@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
 import { researchStudio } from '../services/api'
 import './ResearchStudio.css'
 
-// ── Module definitions (icons = Material Icons only, no emoji) ──────────────
+// ── Module definitions ────────────────────────────────────────────────────────
 const MODULES = [
   {
     id: 'competitor',
@@ -56,6 +57,13 @@ const LOADING_STEPS = [
   { icon: 'psychology', text: 'Processing brand DNA and context' },
   { icon: 'auto_awesome', text: 'Generating your intelligence report' },
 ]
+
+const STUDIO_ICONS = {
+  brainstorm: 'psychology',
+  creative: 'auto_fix_high',
+  content: 'edit_note',
+  video: 'movie',
+}
 
 export default function ResearchStudio() {
   const navigate = useNavigate()
@@ -128,302 +136,310 @@ export default function ResearchStudio() {
   }
 
   return (
-    <div className="rs-root">
+    <DashboardLayout title="Research Studio" subtitle="Live market intelligence">
+      <div className="rs-root">
 
-      {/* ── Header ── */}
-      <div className="rs-header">
-        <div className="rs-header-icon">
-          <span className="material-icons">manage_search</span>
-        </div>
-        <div>
-          <h1 className="rs-title">Research Studio</h1>
-          <p className="rs-subtitle">Live market intelligence — brand DNA + real-time web research</p>
-        </div>
-        {activeBrand && (
-          <div className="rs-brand-chip">
-            <span className="material-icons">storefront</span>
-            {activeBrand.name}
+        {/* ── Page header ── */}
+        <div className="rs-header">
+          <div className="rs-header-icon">
+            <span className="material-symbols-outlined">manage_search</span>
           </div>
-        )}
-      </div>
-
-      {/* ── Body ── */}
-      <div className="rs-body">
-
-        {/* Left: module list */}
-        <div className="rs-modules-col">
-          <p className="rs-section-label">Select Module</p>
-          <div className="rs-module-grid">
-            {MODULES.map(mod => (
-              <button
-                key={mod.id}
-                className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}`}
-                onClick={() => handleModuleSelect(mod)}
-              >
-                <div className="rs-module-icon">
-                  <span className="material-icons">{mod.icon}</span>
-                </div>
-                <div className="rs-module-info">
-                  <span className="rs-module-label">{mod.label}</span>
-                  <span className="rs-module-desc">{mod.description}</span>
-                </div>
-                <span className="material-icons rs-module-arrow">chevron_right</span>
-              </button>
-            ))}
+          <div>
+            <h1 className="rs-title">Research Studio</h1>
+            <p className="rs-subtitle">Live market intelligence — brand DNA + real-time web research</p>
           </div>
-        </div>
-
-        {/* Right: output */}
-        <div className="rs-output-col">
-
-          {/* Empty */}
-          {!activeModule && (
-            <div className="rs-empty-state">
-              <span className="material-icons rs-empty-icon">manage_search</span>
-              <h2>Select a research module</h2>
-              <p>Choose one of the 6 modules to run a live research query for <strong>{activeBrand?.name || 'your brand'}</strong>.</p>
-              <div className="rs-feature-chips">
-                {['Live web research', 'Brand DNA auto-loaded', 'Competitor scraping', 'Structured insights'].map(f => (
-                  <span key={f} className="rs-feature-chip">
-                    <span className="material-icons">check</span>
-                    {f}
-                  </span>
-                ))}
-              </div>
+          {activeBrand && (
+            <div className="rs-brand-chip">
+              <span className="material-symbols-outlined">storefront</span>
+              {activeBrand.name}
             </div>
           )}
+        </div>
 
-          {/* Input */}
-          {activeModule && !result && !loading && (
-            <div className="rs-input-panel">
-              <div className="rs-input-header">
-                <div className="rs-input-icon">
-                  <span className="material-icons">{activeModule.icon}</span>
-                </div>
-                <div>
-                  <h2 className="rs-input-title">{activeModule.label}</h2>
-                  <p className="rs-input-desc">{activeModule.description}</p>
-                </div>
-              </div>
+        {/* ── Body: sidebar + output ── */}
+        <div className="rs-body">
 
-              <div className="rs-query-box">
-                <label className="rs-query-label">
-                  Focus query&nbsp;
-                  <span className="rs-optional">(optional — brand context auto-loaded)</span>
-                </label>
-                <textarea
-                  ref={inputRef}
-                  className="rs-query-input"
-                  placeholder={activeModule.placeholder}
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  rows={3}
-                  onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleRun() }}
-                />
-                <p className="rs-query-hint">
-                  <span className="material-icons">info</span>
-                  Brand DNA, products, and competitors are automatically included.
-                </p>
-              </div>
-
-              <button className="rs-run-btn" onClick={handleRun} disabled={!activeBrand}>
-                <span className="material-icons">play_arrow</span>
-                Run Research
-              </button>
-              {!activeBrand && (
-                <p className="rs-no-brand">Select a brand from the top bar to continue</p>
-              )}
-            </div>
-          )}
-
-          {/* Loading */}
-          {loading && (
-            <div className="rs-loading">
-              <div className="rs-loading-spinner" />
-              <div className="rs-loading-steps">
-                {LOADING_STEPS.map((step, i) => (
-                  <div
-                    key={i}
-                    className={`rs-loading-step${i <= loadingStep ? ' rs-loading-step--active' : ''}${i < loadingStep ? ' rs-loading-step--done' : ''}`}
-                  >
-                    <span className="material-icons">{step.icon}</span>
-                    <span>{step.text}</span>
+          {/* Left: module selector */}
+          <div className="rs-modules-col">
+            <p className="rs-section-label">Select Module</p>
+            <div className="rs-module-grid">
+              {MODULES.map(mod => (
+                <button
+                  key={mod.id}
+                  className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}`}
+                  onClick={() => handleModuleSelect(mod)}
+                >
+                  <div className="rs-module-icon">
+                    <span className="material-symbols-outlined">{mod.icon}</span>
                   </div>
-                ))}
-              </div>
-              <p className="rs-loading-note">Deep research takes 30-60 seconds. Please wait.</p>
+                  <div className="rs-module-info">
+                    <span className="rs-module-label">{mod.label}</span>
+                    <span className="rs-module-desc">{mod.description}</span>
+                  </div>
+                  <span className="material-symbols-outlined rs-module-arrow">chevron_right</span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
-          {/* Error */}
-          {error && !loading && (
-            <div className="rs-error">
-              <span className="material-icons">error_outline</span>
-              <p>{error}</p>
-              <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
-            </div>
-          )}
+          {/* Right: output panel */}
+          <div className="rs-output-col">
 
-          {/* Result */}
-          {result && !loading && (
-            <div className="rs-result">
-
-              {/* Result header */}
-              <div className="rs-result-header">
-                <div className="rs-result-icon">
-                  <span className="material-icons">{activeModule.icon}</span>
-                </div>
-                <div className="rs-result-meta">
-                  <h2>{activeModule.label} — {result.brand || activeBrand?.name}</h2>
-                  <span className="rs-result-time">
-                    {new Date(result.generatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <div className="rs-result-actions-top">
-                  <button className="rs-save-btn" onClick={handleSave} disabled={saving || saved}>
-                    <span className="material-icons">{saved ? 'check' : 'bookmark'}</span>
-                    {saved ? 'Saved' : saving ? 'Saving' : 'Save'}
-                  </button>
-                  <button className="rs-new-btn" onClick={() => { setResult(null); setQuery('') }}>
-                    <span className="material-icons">refresh</span>
-                    New
-                  </button>
+            {/* Empty state */}
+            {!activeModule && (
+              <div className="rs-empty-state">
+                <span className="material-symbols-outlined rs-empty-icon">manage_search</span>
+                <h2>Select a research module</h2>
+                <p>
+                  Choose one of the 6 modules to run a live research query for{' '}
+                  <strong>{activeBrand?.name || 'your brand'}</strong>.
+                </p>
+                <div className="rs-feature-chips">
+                  {['Live web research', 'Brand DNA auto-loaded', 'Competitor scraping', 'Structured insights'].map(f => (
+                    <span key={f} className="rs-feature-chip">
+                      <span className="material-symbols-outlined">check</span>
+                      {f}
+                    </span>
+                  ))}
                 </div>
               </div>
+            )}
 
-              {/* Campaign title / thesis (synthesis mode) */}
-              {(result.strategicThesis || result.campaignTitle) && (
-                <div className="rs-thesis-card">
-                  {result.campaignTitle && (
-                    <h3 className="rs-campaign-title">{result.campaignTitle}</h3>
-                  )}
-                  {result.strategicThesis && <p>{result.strategicThesis}</p>}
+            {/* Input panel */}
+            {activeModule && !result && !loading && (
+              <div className="rs-input-panel">
+                <div className="rs-input-header">
+                  <div className="rs-input-icon">
+                    <span className="material-symbols-outlined">{activeModule.icon}</span>
+                  </div>
+                  <div>
+                    <h2 className="rs-input-title">{activeModule.label}</h2>
+                    <p className="rs-input-desc">{activeModule.description}</p>
+                  </div>
                 </div>
-              )}
 
-              {/* Sections */}
-              {result.sections?.length > 0 && (
-                <div className="rs-sections">
-                  {result.sections.map((sec, i) => (
-                    <div key={i} className="rs-section-card">
-                      <h3 className="rs-section-title">
-                        <span className="rs-section-num">{i + 1}</span>
-                        {sec.title}
-                      </h3>
-                      <ul className="rs-findings">
-                        {sec.findings?.map((f, j) => (
-                          <li key={j}>
-                            <span className="material-icons">arrow_right</span>
-                            <span>{f}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {sec.soWhat && (
-                        <div className="rs-so-what">
-                          <span className="material-icons">lightbulb</span>
-                          <p><strong>So what?</strong> {sec.soWhat}</p>
-                        </div>
-                      )}
+                <div className="rs-query-box">
+                  <label className="rs-query-label">
+                    Focus query&nbsp;
+                    <span className="rs-optional">(optional — brand context auto-loaded)</span>
+                  </label>
+                  <textarea
+                    ref={inputRef}
+                    className="rs-query-input"
+                    placeholder={activeModule.placeholder}
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    rows={3}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleRun() }}
+                  />
+                  <p className="rs-query-hint">
+                    <span className="material-symbols-outlined">info</span>
+                    Brand DNA, products, and competitors are automatically included.
+                  </p>
+                </div>
+
+                <button className="rs-run-btn" onClick={handleRun} disabled={!activeBrand}>
+                  <span className="material-symbols-outlined">play_arrow</span>
+                  Run Research
+                </button>
+                {!activeBrand && (
+                  <p className="rs-no-brand">Select a brand from the top bar to continue</p>
+                )}
+              </div>
+            )}
+
+            {/* Loading */}
+            {loading && (
+              <div className="rs-loading">
+                <div className="rs-loading-spinner" />
+                <div className="rs-loading-steps">
+                  {LOADING_STEPS.map((step, i) => (
+                    <div
+                      key={i}
+                      className={[
+                        'rs-loading-step',
+                        i <= loadingStep ? 'rs-loading-step--active' : '',
+                        i < loadingStep ? 'rs-loading-step--done' : '',
+                      ].join(' ').trim()}
+                    >
+                      <span className="material-symbols-outlined">{step.icon}</span>
+                      <span>{step.text}</span>
                     </div>
                   ))}
                 </div>
-              )}
+                <p className="rs-loading-note">Deep research takes 30–60 seconds. Please wait.</p>
+              </div>
+            )}
 
-              {/* Execution Plan (synthesis) */}
-              {result.executionPlan?.length > 0 && (
-                <div className="rs-exec-plan">
-                  <h3 className="rs-block-title">
-                    <span className="material-icons">calendar_month</span>
-                    Execution Plan
-                  </h3>
-                  <div className="rs-phases">
-                    {result.executionPlan.map((phase, i) => (
-                      <div key={i} className="rs-phase-card">
-                        <div className="rs-phase-header">
-                          <span className="rs-phase-num">{i + 1}</span>
-                          <div>
-                            <strong>{phase.phase}</strong>
-                            <span className="rs-phase-dur">{phase.duration}</span>
-                          </div>
-                        </div>
-                        <ul className="rs-phase-actions">
-                          {phase.actions?.map((a, j) => (
+            {/* Error */}
+            {error && !loading && (
+              <div className="rs-error">
+                <span className="material-symbols-outlined">error_outline</span>
+                <p>{error}</p>
+                <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
+              </div>
+            )}
+
+            {/* Result */}
+            {result && !loading && (
+              <div className="rs-result">
+
+                {/* Result header */}
+                <div className="rs-result-header">
+                  <div className="rs-result-icon">
+                    <span className="material-symbols-outlined">{activeModule.icon}</span>
+                  </div>
+                  <div className="rs-result-meta">
+                    <h2>{activeModule.label} — {result.brand || activeBrand?.name}</h2>
+                    <span className="rs-result-time">
+                      {result.generatedAt
+                        ? new Date(result.generatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                        : 'Just now'}
+                    </span>
+                  </div>
+                  <div className="rs-result-actions-top">
+                    <button className="rs-save-btn" onClick={handleSave} disabled={saving || saved}>
+                      <span className="material-symbols-outlined">{saved ? 'check' : 'bookmark'}</span>
+                      {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button className="rs-new-btn" onClick={() => { setResult(null); setQuery('') }}>
+                      <span className="material-symbols-outlined">refresh</span>
+                      New
+                    </button>
+                  </div>
+                </div>
+
+                {/* Campaign title / thesis */}
+                {(result.strategicThesis || result.campaignTitle) && (
+                  <div className="rs-thesis-card">
+                    {result.campaignTitle && (
+                      <h3 className="rs-campaign-title">{result.campaignTitle}</h3>
+                    )}
+                    {result.strategicThesis && <p>{result.strategicThesis}</p>}
+                  </div>
+                )}
+
+                {/* Sections */}
+                {result.sections?.length > 0 && (
+                  <div className="rs-sections">
+                    {result.sections.map((sec, i) => (
+                      <div key={i} className="rs-section-card">
+                        <h3 className="rs-section-title">
+                          <span className="rs-section-num">{i + 1}</span>
+                          {sec.title}
+                        </h3>
+                        <ul className="rs-findings">
+                          {sec.findings?.map((f, j) => (
                             <li key={j}>
-                              <span className="material-icons">subdirectory_arrow_right</span>
-                              {a}
+                              <span className="material-symbols-outlined">arrow_right</span>
+                              <span>{f}</span>
                             </li>
                           ))}
                         </ul>
+                        {sec.soWhat && (
+                          <div className="rs-so-what">
+                            <span className="material-symbols-outlined">lightbulb</span>
+                            <p><strong>So what?</strong> {sec.soWhat}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Quick Wins */}
-              {result.quickWins?.length > 0 && (
-                <div className="rs-quick-wins">
-                  <h3 className="rs-block-title">
-                    <span className="material-icons">bolt</span>
-                    Quick Wins — Do This Week
-                  </h3>
-                  <div className="rs-wins-grid">
-                    {result.quickWins.map((win, i) => (
-                      <div key={i} className="rs-win-card">
-                        <span className="rs-win-num">{i + 1}</span>
-                        <p>{win}</p>
-                      </div>
-                    ))}
+                {/* Execution Plan */}
+                {result.executionPlan?.length > 0 && (
+                  <div className="rs-exec-plan">
+                    <h3 className="rs-block-title">
+                      <span className="material-symbols-outlined">calendar_month</span>
+                      Execution Plan
+                    </h3>
+                    <div className="rs-phases">
+                      {result.executionPlan.map((phase, i) => (
+                        <div key={i} className="rs-phase-card">
+                          <div className="rs-phase-header">
+                            <span className="rs-phase-num">{i + 1}</span>
+                            <div>
+                              <strong>{phase.phase}</strong>
+                              <span className="rs-phase-dur">{phase.duration}</span>
+                            </div>
+                          </div>
+                          <ul className="rs-phase-actions">
+                            {phase.actions?.map((a, j) => (
+                              <li key={j}>
+                                <span className="material-symbols-outlined">subdirectory_arrow_right</span>
+                                {a}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Key Metrics (synthesis) */}
-              {result.keyMetrics?.length > 0 && (
-                <div className="rs-metrics">
-                  <h3 className="rs-block-title">
-                    <span className="material-icons">monitoring</span>
-                    Key Metrics
-                  </h3>
-                  <div className="rs-metrics-grid">
-                    {result.keyMetrics.map((m, i) => (
-                      <span key={i} className="rs-metric-chip">
-                        <span className="material-icons">bar_chart</span>
-                        {m}
-                      </span>
-                    ))}
+                {/* Quick Wins */}
+                {result.quickWins?.length > 0 && (
+                  <div className="rs-quick-wins">
+                    <h3 className="rs-block-title">
+                      <span className="material-symbols-outlined">bolt</span>
+                      Quick Wins — Do This Week
+                    </h3>
+                    <div className="rs-wins-grid">
+                      {result.quickWins.map((win, i) => (
+                        <div key={i} className="rs-win-card">
+                          <span className="rs-win-num">{i + 1}</span>
+                          <p>{win}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Studio Actions */}
-              {result.studioActions?.length > 0 && (
-                <div className="rs-studio-actions">
-                  <h3 className="rs-block-title">
-                    <span className="material-icons">open_in_new</span>
-                    Take Action
-                  </h3>
-                  <div className="rs-action-btns">
-                    {result.studioActions.map((action, i) => (
-                      <button key={i} className="rs-action-btn" onClick={() => handleStudioAction(action)}>
-                        <span className="material-icons">
-                          {action.studio === 'creative' ? 'auto_fix_high'
-                            : action.studio === 'content' ? 'edit_note'
-                            : action.studio === 'video' ? 'movie'
-                            : 'psychology'}
+                {/* Key Metrics */}
+                {result.keyMetrics?.length > 0 && (
+                  <div className="rs-metrics">
+                    <h3 className="rs-block-title">
+                      <span className="material-symbols-outlined">monitoring</span>
+                      Key Metrics
+                    </h3>
+                    <div className="rs-metrics-grid">
+                      {result.keyMetrics.map((m, i) => (
+                        <span key={i} className="rs-metric-chip">
+                          <span className="material-symbols-outlined">bar_chart</span>
+                          {m}
                         </span>
-                        {action.label}
-                        <span className="material-icons rs-action-arrow">arrow_forward</span>
-                      </button>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-            </div>
-          )}
+                {/* Studio Actions */}
+                {result.studioActions?.length > 0 && (
+                  <div className="rs-studio-actions">
+                    <h3 className="rs-block-title">
+                      <span className="material-symbols-outlined">open_in_new</span>
+                      Take Action
+                    </h3>
+                    <div className="rs-action-btns">
+                      {result.studioActions.map((action, i) => (
+                        <button key={i} className="rs-action-btn" onClick={() => handleStudioAction(action)}>
+                          <span className="material-symbols-outlined">
+                            {STUDIO_ICONS[action.studio] || 'launch'}
+                          </span>
+                          {action.label}
+                          <span className="material-symbols-outlined rs-action-arrow">arrow_forward</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

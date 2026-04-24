@@ -35,7 +35,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
     <div className="sm-result">
       <div className="sm-result-hdr">
         <div className="sm-result-title">{data.modeLabel} — {data.brand}</div>
-        <button className="sm-close-btn" onClick={onClose}><span className="material-icons">close</span></button>
+        <button className="sm-close-btn" onClick={onClose}><span className="material-symbols-outlined">close</span></button>
       </div>
 
       {data.strategicSummary && (
@@ -44,7 +44,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
 
       {data.marketContext && (
         <div className="sm-block">
-          <div className="sm-block-title"><span className="material-icons">insights</span>Market Context</div>
+          <div className="sm-block-title"><span className="material-symbols-outlined">insights</span>Market Context</div>
           <div className="sm-ctx-grid">
             {data.marketContext.keyFindings?.length > 0 && (
               <div className="sm-ctx-col">
@@ -70,7 +70,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
 
       {data.recommendedActions?.length > 0 && (
         <div className="sm-block">
-          <div className="sm-block-title"><span className="material-icons">checklist</span>Recommended Actions</div>
+          <div className="sm-block-title"><span className="material-symbols-outlined">checklist</span>Recommended Actions</div>
           <div className="sm-actions-list">
             {data.recommendedActions.map((a, i) => (
               <div key={i} className="sm-action-item">
@@ -88,7 +88,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
 
       {data.channelBreakdown?.length > 0 && (
         <div className="sm-block">
-          <div className="sm-block-title"><span className="material-icons">hub</span>Channel Breakdown</div>
+          <div className="sm-block-title"><span className="material-symbols-outlined">hub</span>Channel Breakdown</div>
           <div className="sm-channels">
             {data.channelBreakdown.map((ch, i) => (
               <div key={i} className="sm-channel-card">
@@ -101,8 +101,8 @@ function StrategyModeResult({ data, onClose, navigate }) {
                   </div>
                 )}
                 <div className="sm-channel-meta">
-                  {ch.budget && <span><span className="material-icons">paid</span>{ch.budget}</span>}
-                  {ch.kpi && <span><span className="material-icons">flag</span>{ch.kpi}</span>}
+                  {ch.budget && <span><span className="material-symbols-outlined">paid</span>{ch.budget}</span>}
+                  {ch.kpi && <span><span className="material-symbols-outlined">flag</span>{ch.kpi}</span>}
                 </div>
               </div>
             ))}
@@ -112,7 +112,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
 
       {data.contentCalendar?.phases?.length > 0 && (
         <div className="sm-block">
-          <div className="sm-block-title"><span className="material-icons">calendar_month</span>Content Calendar — {data.contentCalendar.duration}</div>
+          <div className="sm-block-title"><span className="material-symbols-outlined">calendar_month</span>Content Calendar — {data.contentCalendar.duration}</div>
           <div className="sm-cal-phases">
             {data.contentCalendar.phases.map((ph, i) => (
               <div key={i} className="sm-cal-phase">
@@ -121,7 +121,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
                   <strong>{ph.name}</strong>
                   <span className="sm-cal-phase-dur">{ph.duration}</span>
                 </div>
-                {ph.theme && <div className="sm-cal-theme"><span className="material-icons" style={{ fontSize: '12px', verticalAlign: 'middle' }}>flag</span> {ph.theme}</div>}
+                {ph.theme && <div className="sm-cal-theme"><span className="material-symbols-outlined" style={{ fontSize: '12px', verticalAlign: 'middle' }}>flag</span> {ph.theme}</div>}
                 <ul className="sm-cal-actions">
                   {ph.actions?.map((a, j) => <li key={j}>{a}</li>)}
                 </ul>
@@ -133,11 +133,11 @@ function StrategyModeResult({ data, onClose, navigate }) {
 
       {data.studioActions?.length > 0 && (
         <div className="sm-block">
-          <div className="sm-block-title"><span className="material-icons">open_in_new</span>Take Action in Studios</div>
+          <div className="sm-block-title"><span className="material-symbols-outlined">open_in_new</span>Take Action in Studios</div>
           <div className="sm-studio-actions">
             {data.studioActions.map((a, i) => (
               <button key={i} className="sm-studio-btn" onClick={() => handleStudioAction(a)}>
-                <span className="material-icons">{studioIcons[a.studio] || 'launch'}</span>
+                <span className="material-symbols-outlined">{studioIcons[a.studio] || 'launch'}</span>
                 {a.label}
               </button>
             ))}
@@ -342,7 +342,7 @@ function ConceptCard({ concept, index, isFilm, onScreenplay, onFeedback, onDeepD
           {expanded ? 'Collapse ↑' : 'Expand ↓'}
         </button>
         <button className="bs-primary-btn bs-deepdive-btn" onClick={() => onDeepDive?.(concept)}>
-          🔬 Deep Dive
+          <span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>biotech</span> Deep Dive
         </button>
         {isFilm && (
           <button className="bs-primary-btn" onClick={() => onScreenplay?.(concept)}>
@@ -360,11 +360,11 @@ function DeepDivePanel({ deepDive }) {
   if (!deepDive?.ideaTitle && !deepDive?.summary) return null
 
   const tabs = [
-    { id: 'competitive', label: '🌐 Competitive', icon: 'groups' },
-    { id: 'playbook', label: '📋 Playbook', icon: 'assignment' },
-    { id: 'content', label: '📝 Content', icon: 'edit_note' },
-    { id: 'budget', label: '💰 Budget', icon: 'payments' },
-    { id: 'risks', label: '⚠️ Risks', icon: 'warning' },
+    { id: 'competitive', label: 'Competitive', icon: 'groups' },
+    { id: 'playbook', label: 'Playbook', icon: 'assignment' },
+    { id: 'content', label: 'Content', icon: 'edit_note' },
+    { id: 'budget', label: 'Budget', icon: 'payments' },
+    { id: 'risks', label: 'Risks', icon: 'warning' },
   ]
 
   return (
@@ -393,7 +393,7 @@ function DeepDivePanel({ deepDive }) {
             ))}
             {deepDive.competitiveAnalysis.whitespace && (
               <div className="bs-dd-whitespace">
-                <div className="bs-dd-whitespace-label">💡 Market Whitespace</div>
+                <div className="bs-dd-whitespace-label"><span className="material-symbols-outlined" style={{fontSize:'14px',verticalAlign:'middle'}}>space_dashboard</span> Market Whitespace</div>
                 <p>{deepDive.competitiveAnalysis.whitespace}</p>
               </div>
             )}
@@ -412,8 +412,8 @@ function DeepDivePanel({ deepDive }) {
                   <div key={j} className="bs-dd-action">
                     <div className="bs-dd-action-task">{a.task}</div>
                     <div className="bs-dd-action-meta">
-                      {a.owner && <span>👤 {a.owner}</span>}
-                      {a.channel && <span>📱 {a.channel}</span>}
+                      {a.owner && <span><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>person</span> {a.owner}</span>}
+                      {a.channel && <span><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>smartphone</span> {a.channel}</span>}
                     </div>
                   </div>
                 ))}
@@ -491,7 +491,7 @@ const PLATFORM_COLORS = {
 }
 const PLATFORM_ICONS = {
   instagram: '📸', linkedin: '💼', twitter: '𝕏', youtube: '▶️',
-  facebook: '👥', blog: '📝', newsletter: '📧'
+  facebook: 'groups', blog: 'article', newsletter: 'mail'
 }
 
 function CalendarView({ calendar, onPushToCalendar }) {
@@ -518,7 +518,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
                   <div key={pi} className="bs-cal-post"
                     style={{ borderLeftColor: PLATFORM_COLORS[post.platform] || '#8b5cf6' }}>
                     <div className="bs-cal-post-top">
-                      <span className="bs-cal-platform">{PLATFORM_ICONS[post.platform] || '📱'} {post.platform}</span>
+                      <span className="bs-cal-platform"><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>{PLATFORM_ICONS[post.platform] || 'smartphone'}</span> {post.platform}</span>
                       <span className="bs-cal-type">{post.type}</span>
                       <span className="bs-cal-time">{post.time}</span>
                     </div>
@@ -537,7 +537,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
 
       {calendar.targetKPIs?.length > 0 && (
         <div className="bs-cal-kpis">
-          <div className="bs-dd-sublabel">📊 Target KPIs</div>
+          <div className="bs-dd-sublabel"><span className="material-symbols-outlined" style={{fontSize:'13px',verticalAlign:'middle'}}>monitoring</span> Target KPIs</div>
           {calendar.targetKPIs.map((k, i) => (
             <div key={i} className="bs-cal-kpi">{k.metric}: <strong>{k.target}</strong> <span>(measure after {k.measureAfter})</span></div>
           ))}
@@ -547,7 +547,7 @@ function CalendarView({ calendar, onPushToCalendar }) {
       {onPushToCalendar && (
         <div className="bs-cal-actions">
           <button className="bs-primary-btn" onClick={onPushToCalendar}>
-            📅 Push to Smart Calendar
+            <span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>calendar_month</span> Push to Smart Calendar
           </button>
         </div>
       )}
@@ -579,7 +579,7 @@ function SessionSidebar({ sessions, activeSessionId, onSelect, onNew, onDelete, 
   return (
     <div className={`bs-sidebar ${visible ? 'open' : ''}`}>
       <div className="bs-sidebar-header">
-        <span>📋 Sessions</span>
+        <span><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>history</span> Sessions</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="bs-sidebar-new" onClick={onNew} title="New session"><span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span></button>
           <button className="bs-sidebar-close" onClick={onToggle}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span></button>
@@ -597,9 +597,9 @@ function SessionSidebar({ sessions, activeSessionId, onSelect, onNew, onDelete, 
                   <div className="bs-sidebar-item-title">{s.title || 'Untitled'}</div>
                   <div className="bs-sidebar-item-meta">
                     <span>{timeAgo(s.lastMessageAt || s.createdAt)}</span>
-                    {s.ideaCount > 0 && <span className="bs-sidebar-badge">💡{s.ideaCount}</span>}
-                    {s.hasDeepDive && <span className="bs-sidebar-badge">🔬</span>}
-                    {s.hasCalendar && <span className="bs-sidebar-badge">📅</span>}
+                    {s.ideaCount > 0 && <span className="bs-sidebar-badge">{s.ideaCount}</span>}
+                    {s.hasDeepDive && <span className="bs-sidebar-badge">Dive</span>}
+                    {s.hasCalendar && <span className="bs-sidebar-badge">Cal</span>}
                   </div>
                   <button className="bs-sidebar-del" onClick={e => { e.stopPropagation(); onDelete(s._id) }} title="Delete">
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
@@ -729,7 +729,7 @@ function StrategyView({ strategy }) {
           <div className="bs-strategy-section-title">Quick Wins</div>
           {strategy.quick_wins.map((w, i) => (
             <div key={i} className="bs-quickwin">
-              <span>⚡</span>
+              <span className="material-symbols-outlined" style={{fontSize:'14px',verticalAlign:'middle'}}>bolt</span>
               <span>{w.action}</span>
               <span className="bs-quickwin-meta">{w.timeline}</span>
             </div>
@@ -1359,7 +1359,7 @@ export default function BrainstormStudio() {
           {showTopics && (
             <div className="sm-section">
               <div className="sm-section-header">
-                <span className="material-icons">auto_awesome</span>
+                <span className="material-symbols-outlined">auto_awesome</span>
                 <span>Strategy Modes — Research-Backed</span>
                 <span className="sm-badge">NEW</span>
               </div>
@@ -1368,7 +1368,6 @@ export default function BrainstormStudio() {
                   <button
                     key={mode.id}
                     className={`sm-mode-card ${smActiveMode?.id === mode.id ? 'sm-mode-card--active' : ''}`}
-                    style={{ '--sm-color': mode.color }}
                     onClick={() => {
                       setSmActiveMode(mode)
                       setSmResult(null)
@@ -1376,7 +1375,7 @@ export default function BrainstormStudio() {
                       setSmInputs({})
                     }}
                   >
-                    <span className="material-icons sm-mode-icon" style={{ color: mode.color }}>{mode.icon}</span>
+                    <span className="material-symbols-outlined sm-mode-icon">{mode.icon}</span>
                     <span className="sm-mode-label">{mode.label}</span>
                     <span className="sm-mode-desc">{mode.desc}</span>
                   </button>
@@ -1386,7 +1385,7 @@ export default function BrainstormStudio() {
               {smActiveMode && !smResult && (
                 <div className="sm-form">
                   <div className="sm-form-title">
-                    <span className="material-icons" style={{ color: smActiveMode.color }}>{smActiveMode.icon}</span>
+                    <span className="material-symbols-outlined">{smActiveMode.icon}</span>
                     {smActiveMode.label}
                   </div>
                   <div className="sm-form-fields">
@@ -1401,8 +1400,8 @@ export default function BrainstormStudio() {
                   <div className="sm-form-actions">
                     <button className="sm-run-btn" onClick={handleStrategyMode} disabled={smLoading}>
                       {smLoading
-                        ? <><span className="material-icons sm-spin">refresh</span>Researching…</>
-                        : <><span className="material-icons">rocket_launch</span>Generate Strategy</>}
+                        ? <><span className="material-symbols-outlined sm-spin">refresh</span>Researching…</>
+                        : <><span className="material-symbols-outlined">rocket_launch</span>Generate Strategy</>}
                     </button>
                     <button className="sm-cancel-btn" onClick={() => setSmActiveMode(null)}>Cancel</button>
                   </div>
@@ -1457,7 +1456,7 @@ export default function BrainstormStudio() {
           />
 
           {error && (
-            <div className="bs-error-banner">⚠️ {error}</div>
+            <div className="bs-error-banner"><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {error}</div>
           )}
 
           <div ref={bottomRef} style={{ height: 1 }} />
