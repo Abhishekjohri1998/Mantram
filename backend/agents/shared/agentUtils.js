@@ -24,9 +24,25 @@ export const agentUtils = {
     buildStyleMemory
 };
 
-// Brand context cache TTL — 5 minutes (300s)
-// Invalidated instantly on any brand update via redis.del() in brands.js
-const BRAND_CACHE_TTL = 300;
+// Brand context cache — Two-tier:
+//   L1: In-process memory (60s TTL) — eliminates Redis REST RTT (~50-100ms)
+//   L2: Redis (30min TTL) — survives restarts, shared across PM2 workers
+// Both are invalidated instantly on any brand update via redis.del() + clearBrandMemCache() in brands.js
+const BRAND_CACHE_TTL = 1800; // 30 minutes (Redis L2)
+const BRAND_MEM_CACHE_TTL = 60_000; // 60 seconds (in-process L1)
+const _brandMemCache = new Map(); // Map<cacheKey, { data, expiry }>
+
+/**
+ * Clear L1 memory cache for a specific brand (called from brands.js on update)
+ * Also exported so brand update routes can invalidate both L1 and L2.
+ */
+export function clearBrandMemCache(brandId) {
+    if (brandId) {
+        _brandMemCache.delete(`brand:${brandId}:context`);
+    } else {
+        _brandMemCache.clear(); // Clear all if no specific brandId
+    }
+}
 
 /**
  * Call AI via router (auto-selects cheapest provider) and parse JSON response.
@@ -189,20 +205,32 @@ export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7,
 export async function loadBrandContext(brandId) {
     if (!brandId) return { brand: null, brandContext: '<brand_bible>No brand data. Use professional style.</brand_bible>', styleMemory: '' };
 
-    // ── Try Redis cache first ──────────────────────────────────────────────
     const cacheKey = `brand:${brandId}:context`;
+
+    // ── L1: In-process memory cache (fastest — 0ms) ──────────────────────
+    const memEntry = _brandMemCache.get(cacheKey);
+    if (memEntry && Date.now() < memEntry.expiry) {
+        return memEntry.data;
+    }
+    // Expired entry — delete it
+    if (memEntry) _brandMemCache.delete(cacheKey);
+
+    // ── L2: Redis cache (~50-100ms RTT) ──────────────────────────────────
     try {
         const cached = await redis.get(cacheKey);
         if (cached) {
             console.log(`⚡ Brand context cache HIT for ${brandId}`);
-            return JSON.parse(cached);
+            const parsed = JSON.parse(cached);
+            // Promote to L1 for subsequent rapid-fire calls
+            _brandMemCache.set(cacheKey, { data: parsed, expiry: Date.now() + BRAND_MEM_CACHE_TTL });
+            return parsed;
         }
     } catch (cacheErr) {
         // Redis unavailable — continue to DB fetch
         console.warn(`⚠️ Brand cache read failed: ${cacheErr.message}`);
     }
 
-    // ── Cache MISS — load from MongoDB ────────────────────────────────────
+    // ── L3: MongoDB (slowest — 200-500ms) ────────────────────────────────
     console.log(`🗄️  Brand context cache MISS — loading from DB for ${brandId}`);
     const brand = await Brand.findById(brandId).lean();
 
@@ -220,7 +248,8 @@ export async function loadBrandContext(brandId) {
     const brandContext = buildBrandContext(brand, products);
     const result = { brand, brandContext, products };
 
-    // ── Store in Redis for next call ───────────────────────────────────────
+    // ── Populate both L1 and L2 caches ───────────────────────────────────
+    _brandMemCache.set(cacheKey, { data: result, expiry: Date.now() + BRAND_MEM_CACHE_TTL });
     try {
         await redis.setex(cacheKey, BRAND_CACHE_TTL, JSON.stringify(result));
     } catch (cacheErr) {

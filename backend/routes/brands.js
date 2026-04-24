@@ -13,17 +13,21 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { mirrorBrandAssets } from '../services/assetMirror.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import redis from '../utils/redisClient.js';
+import { clearBrandMemCache } from '../agents/shared/agentUtils.js';
 
 /**
- * Invalidate the Redis brand context cache for a given brand ID.
+ * Invalidate brand context caches (L1 memory + L2 Redis) for a given brand ID.
  * Called after any brand update so the next generation gets fresh data.
  * Non-blocking — never throws.
  */
 async function invalidateBrandCache(brandId) {
     if (!brandId) return;
     try {
+        // L1: Clear in-process memory cache (instant)
+        clearBrandMemCache(brandId.toString());
+        // L2: Clear Redis cache
         await redis.del(`brand:${brandId}:context`, `trending:${brandId}`);
-        console.log(`🗑️  Brand cache invalidated for ${brandId}`);
+        console.log(`🗑️  Brand cache invalidated (L1+L2) for ${brandId}`);
     } catch (err) {
         console.warn(`⚠️ Brand cache invalidation failed: ${err.message}`);
     }

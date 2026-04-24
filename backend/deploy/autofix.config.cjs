@@ -38,6 +38,9 @@ module.exports = {
         // Graceful shutdown
         kill_timeout: 5000,
 
+        // Disable PM2 APM (PMX) — suppresses pidusage TypeError noise in logs
+        pmx: false,
+
         // Logging — use the same logs dir as main server (~/Mantram/backend/logs/)
         error_file: path.join(logsDir, 'autofix-error.log'),
         out_file: path.join(logsDir, 'autofix-out.log'),

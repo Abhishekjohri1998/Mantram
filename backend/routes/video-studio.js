@@ -4460,23 +4460,18 @@ router.get('/:id/status', protect, async (req, res) => {
 
                 // If completed, auto-upload video to S3 before CDN URL expires, then run critic (if needed)
                 if (updated.status === 'critique' || updated.status === 'completed') {
-                    // Upload video to S3 and save to DB
+                    // Use CDN URL for immediate operations (voiceover mixing, critic, frontend display)
                     let finalVideoUrl = updated.generation?.videoUrl;
-                    if (finalVideoUrl) {
-                        try {
-                            const s3Url = await downloadAndUploadVideoToS3(project._id.toString(), finalVideoUrl);
-                            if (s3Url) {
-                                finalVideoUrl = s3Url;
-                                updated.generation.videoUrl = s3Url;
-                                await VideoProject.findByIdAndUpdate(project._id, {
-                                    'generation.videoUrl': s3Url,
-                                    finalVideoUrl: s3Url
-                                });
-                                console.log(`✅ [Polling] Uploaded and saved S3 URL: ${s3Url}`);
-                            }
-                        } catch (e) {
-                            console.warn('⚠️ Video S3 upload failed:', e.message);
-                        }
+
+                    // ⚡ PERF: Fire S3 archival as background task — don't block the polling response.
+                    // downloadAndUploadVideoToS3 handles its own DB update on completion.
+                    // The CDN URL works for 24-72h which is plenty of time for the background upload.
+                    if (finalVideoUrl && !finalVideoUrl.includes('amazonaws.com')) {
+                        downloadAndUploadVideoToS3(project._id.toString(), finalVideoUrl)
+                            .then(s3Url => {
+                                if (s3Url) console.log(`✅ [BG-S3] Video archived: ${s3Url.substring(0, 80)}`);
+                            })
+                            .catch(e => console.warn('⚠️ [BG-S3] Video archive failed:', e.message));
                     }
 
                     // ── Auto-mix voiceover if the user generated a preview in step 3 ──

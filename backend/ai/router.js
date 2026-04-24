@@ -12,6 +12,9 @@ class ModelRouter {
     constructor() {
         this.providers = {};
         this.usageLog = [];
+        // Circuit breaker: track recent 503 errors per provider for preemptive avoidance
+        // Structure: { providerName: { count, firstSeen, lastSeen } }
+        this._recentErrors = {};
         this._initProviders();
     }
 
@@ -70,9 +73,21 @@ class ModelRouter {
         ].filter(Boolean);
 
         for (const name of priority) {
-            if (this.providers[name]?.isAvailable()) {
-                return this.providers[name];
+            const p = this.providers[name];
+            if (!p?.isAvailable()) continue;
+            // Skip providers in cooldown
+            if (p.cooldownUntil && Date.now() < p.cooldownUntil) continue;
+            // Skip providers that are circuit-broken (frequent recent 503s)
+            if (this._isProviderThrottled(name)) {
+                console.warn(`⚡ Skipping ${name} — circuit breaker open (${this._recentErrors[name]?.count} recent 503s)`);
+                continue;
             }
+            return p;
+        }
+
+        // If all preferred providers are throttled/cooldown, fall back to ANY available
+        for (const name of priority) {
+            if (this.providers[name]?.isAvailable()) return this.providers[name];
         }
         throw new Error('No text AI provider available. Add an API key to .env');
     }
@@ -116,14 +131,24 @@ class ModelRouter {
         try {
             const result = await provider.generateText(params);
             this._logUsage('text', provider.name, result.tokensUsed);
+            // Success — reset circuit breaker for this provider
+            this._resetErrors(provider.name);
             return result;
         } catch (error) {
             lastError = error;
             const isQuotaError = this._testQuotaError(error);
+            const is503Error = this._test503Error(error);
 
             if (isQuotaError) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown
-                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down.`);
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota
+                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down 5m.`);
+            } else if (is503Error) {
+                // 503 = server overloaded — shorter cooldown, track in circuit breaker
+                this._record503(provider.name);
+                if (this._isProviderThrottled(provider.name)) {
+                    provider.cooldownUntil = Date.now() + (2 * 60 * 1000); // 2 min cooldown for 503
+                    console.warn(`⚡ Provider ${provider.name} circuit breaker tripped (${this._recentErrors[provider.name].count} 503s). Cooling down 2m.`);
+                }
             }
 
             console.error(`Provider ${provider.name} failed, searching for fallback:`, error.message);
@@ -146,6 +171,8 @@ class ModelRouter {
                     return result;
                 } catch (fallbackError) {
                     lastError = fallbackError;
+                    // Track 503s on fallback providers too
+                    if (this._test503Error(fallbackError)) this._record503(fallback.name);
                     console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
                 }
             }
@@ -195,6 +222,56 @@ class ModelRouter {
                msg.includes('billing');
     }
 
+    /**
+     * Test if an error is a 503 (server overloaded) — these recover faster than quota.
+     */
+    _test503Error(error) {
+        const msg = error.message?.toLowerCase() || '';
+        return msg.includes('503') || 
+               msg.includes('overloaded') || 
+               msg.includes('service unavailable') ||
+               msg.includes('capacity') ||
+               msg.includes('high demand');
+    }
+
+    /**
+     * Circuit breaker: record a 503 error for a provider.
+     * Tracks errors within a 2-minute sliding window.
+     */
+    _record503(providerName) {
+        const now = Date.now();
+        const entry = this._recentErrors[providerName] || { count: 0, firstSeen: now, lastSeen: 0 };
+        // Reset window if last error was >2 min ago
+        if (now - entry.lastSeen > 120_000) {
+            entry.count = 0;
+            entry.firstSeen = now;
+        }
+        entry.count++;
+        entry.lastSeen = now;
+        this._recentErrors[providerName] = entry;
+    }
+
+    /**
+     * Circuit breaker: check if a provider should be preemptively skipped.
+     * Trips after 3+ 503 errors within a 2-minute window.
+     */
+    _isProviderThrottled(providerName) {
+        const entry = this._recentErrors[providerName];
+        if (!entry) return false;
+        // Auto-recover after 2 minutes
+        if (Date.now() - entry.lastSeen > 120_000) return false;
+        return entry.count >= 3;
+    }
+
+    /**
+     * Reset circuit breaker on successful call — provider has recovered.
+     */
+    _resetErrors(providerName) {
+        if (this._recentErrors[providerName]) {
+            delete this._recentErrors[providerName];
+        }
+    }
+
     _categorizeError(error, type, providerName = 'multi') {
         const msg = error.message?.toLowerCase() || '';
         const isBusy = msg.includes('rate limit') || 
@@ -239,12 +316,20 @@ class ModelRouter {
         }
 
         try {
-            return await provider.generateImage(params);
+            const result = await provider.generateImage(params);
+            this._resetErrors(provider.name);
+            return result;
         } catch (error) {
             const isQuotaError = this._testQuotaError(error);
+            const is503Error = this._test503Error(error);
+
             if (isQuotaError) {
                 provider.cooldownUntil = Date.now() + (5 * 60 * 1000);
-                console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down.`);
+                console.warn(`⏳ Image provider ${provider.name} hit quota limits. Cooling down 5m.`);
+            } else if (is503Error) {
+                this._record503(provider.name);
+                provider.cooldownUntil = Date.now() + (2 * 60 * 1000); // Shorter cooldown for 503
+                console.warn(`⚡ Image provider ${provider.name} returned 503. Cooling down 2m.`);
             }
 
             console.error(`❌ Image provider ${provider.name} failed:`, error.message);

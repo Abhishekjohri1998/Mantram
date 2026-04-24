@@ -30,6 +30,10 @@ module.exports = {
         listen_timeout: 10000,
         wait_ready: false,
 
+        // Disable PM2 APM (PMX) — suppresses pidusage TypeError noise in logs
+        // pidusage crashes when monitoring PIDs that exit during cluster restarts
+        pmx: false,
+
         // Logging
         error_file: './logs/error.log',
         out_file: './logs/out.log',
