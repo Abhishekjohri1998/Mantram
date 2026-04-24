@@ -154,7 +154,11 @@ syncLiveVideoPricing().catch(() => { });
 export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolution = '1080p', mode = 'fast') {
     const liveCost = LIVE_COST_PER_SECOND[model]?.[mode];
     const costPerSec = liveCost || (COST_PER_SECOND[model]?.[mode]) || 0.07;
-    const resMult = resolution === '720p' ? 0.7 : 1.0;
+    let resMult = 1.0;
+    if (resolution === '480p') resMult = 0.5;
+    else if (resolution === '720p') resMult = 0.7;
+    else if (resolution === '4k') resMult = 2.0;
+    
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 93.21).toFixed(0));
     const credits = Math.max(Math.ceil(usd * 70), 5);
@@ -224,10 +228,10 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
         return payload;
     }
     
-    if (model === 'veo-3.1' || model === 'veo-3.1-fast') return { prompt, aspect_ratio: '16:9', resolution: resolution === '720p' ? '720p' : '1080p', generate_audio: generateAudio !== false, auto_fix: true };
+    if (model === 'veo-3.1' || model === 'veo-3.1-fast') return { prompt, aspect_ratio: '16:9', resolution: resolution === '480p' || resolution === '720p' ? '720p' : resolution === '4k' ? '4k' : '1080p', generate_audio: generateAudio !== false, auto_fix: true };
     if (model === 'seedance-1.0') return { prompt, duration: dur >= 8 ? '10' : '5', aspect_ratio: '16:9', seed: Math.floor(Math.random() * 999999) };
     if (model === 'seedance-2.0') return { prompt, duration: String(dur), aspect_ratio: '16:9', generate_audio: generateAudio !== false, seed: Math.floor(Math.random() * 999999) };
-    if (model === 'hunyuan') return { prompt, video_length: dur, seed: Math.floor(Math.random() * 999999), resolution: resolution === '1080p' ? '1080p' : '720p' };
+    if (model === 'hunyuan') return { prompt, video_length: dur, seed: Math.floor(Math.random() * 999999), resolution: resolution === '480p' ? '480p' : resolution === '1080p' ? '1080p' : '720p' };
     if (model === 'grok-imagine') return { prompt };
     throw new Error(`Unknown fal.ai model: ${model}`);
 }
