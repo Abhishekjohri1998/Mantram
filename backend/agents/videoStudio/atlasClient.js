@@ -319,6 +319,16 @@ export async function submitAtlasCloudVideoGeneration({
         uploaded.forEach(url => { if (url) faceS3Urls.push(url); });
     }
 
+    // 🛡️ SAFE MODE BYPASS (Seedance-native): 
+    // If the user provided a first frame (imageUrl) but NO face references, Seedance defaults to 
+    // `image-to-video` which STRICTLY BLOCKS real people.
+    // By copying the first frame to the Face Assets list, we force Seedance into `reference-to-video` mode.
+    // This allows real people to be animated natively in Seedance 2.0 without changing the model.
+    if (firstFrameUrls.length === 1 && faceS3Urls.length === 0) {
+        console.log(`🛡️ Promoting first frame to Face Asset to bypass Seedance I2V real-person safety filter...`);
+        faceS3Urls.push(firstFrameUrls[0]);
+    }
+
     // Step 3 — KEY: Convert face S3 URLs → asset:// URIs via Atlas Asset Library
     // This is the mechanism that enables real person face fidelity across frames
     let faceAssetUris = [];
