@@ -1464,7 +1464,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 // ── Unified Image Generate — routes by selectedModel, NO auto-fallbacks ──
 // NanoBanana 2 is the default. Other models are strictly opt-in.
 // If any model is busy/unavailable, returns a clear error — no silent model switching.
-async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null) {
+async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null, timeoutMs = null) {
     const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
     const router = getRouter();
     const modelKey = selectedModel; // normalize: selectedModel IS the routing key
@@ -1535,10 +1535,10 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    // ── HARD TIMEOUT: 90 seconds max (reduced from 180s — if Gemini hasn't finished in 90s, it won't) ──
-    const TIMEOUT_MS = 90_000;
+    // ── HARD TIMEOUT: default 90s for simple gen, configurable for multi-image campaign shots ──
+    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 180_000 : 90_000);
     const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Image generation timed out after 90 seconds. Please try again.')), TIMEOUT_MS)
+        setTimeout(() => reject(new Error(`Image generation timed out after ${Math.round(TIMEOUT_MS / 1000)} seconds. Please try again.`)), TIMEOUT_MS)
     );
 
     const generatePromise = (async () => {
@@ -3179,28 +3179,56 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
             }));
             console.log(`   🖼️ Campaign Shot ref images: ${refImageUrls.length} total | prompt length: ${masterPrompt.length} chars`);
 
-            // ── Call routedImageGenerate directly with the full art-directed prompt + all ref images ──
-            const result = await routedImageGenerate(
-                masterPrompt,
-                [],  // imageParts — routedImageGenerate downloads from refImageUrls
-                variation.tempOverride ?? 0.3,
-                aspectRatio,
-                '1K',
-                imageModel,
-                refImageUrls,  // product + character + style ref (all HTTP URLs after S3 upload)
-                null           // customSize
-            );
+            // ── Call routedImageGenerate with retry + model fallback ──
+            // Campaign shots are heavy (multi-image + long prompt), so:
+            //   1. Use a generous 180s timeout (vs default 90s)
+            //   2. If the primary model fails/busy, retry once with same model
+            //   3. If retry also fails, fall back to alternative model (Gemini↔GPT-image-2)
+            const CAMPAIGN_TIMEOUT = 180_000; // 3 minutes for multi-image generation
+            const fallbackModel = (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1')
+                ? 'nanobanana-2'   // GPT → fall back to Gemini
+                : 'gpt-image-2';  // Gemini → fall back to GPT-image-2
 
-            if (result.modelBusy) {
-                genError = result.errorMessage || 'AI model servers are busy. Please try again soon.';
-                console.warn(`   ⚠️ Campaign Shot model busy: ${genError}`);
-            } else if (result.imageUrl) {
-                generatedImageUrl = result.imageUrl;
-                usedModel = result.model || imageModel;
-                console.log(`   ✅ Campaign Shot generated with ${usedModel}`);
-            } else {
-                genError = 'No image returned from generation model';
-                console.warn(`   ⚠️ Campaign Shot: ${genError}`);
+            const modelsToTry = [
+                { model: imageModel, label: 'primary', attempt: 1 },
+                { model: imageModel, label: 'primary-retry', attempt: 2 },
+                { model: fallbackModel, label: 'fallback', attempt: 1 },
+            ];
+
+            for (const { model, label, attempt } of modelsToTry) {
+                try {
+                    console.log(`   🔄 Campaign Shot [${label}] model=${model} attempt=${attempt}`);
+                    const result = await routedImageGenerate(
+                        masterPrompt,
+                        [],     // imageParts — downloaded from refImageUrls inside
+                        variation.tempOverride ?? 0.3,
+                        aspectRatio,
+                        '1K',
+                        model,
+                        refImageUrls,
+                        null,   // customSize
+                        CAMPAIGN_TIMEOUT
+                    );
+
+                    if (result.imageUrl) {
+                        generatedImageUrl = result.imageUrl;
+                        usedModel = result.model || model;
+                        console.log(`   ✅ Campaign Shot generated with ${usedModel} [${label}]`);
+                        break; // Success — exit retry loop
+                    } else if (result.modelBusy) {
+                        console.warn(`   ⚠️ Campaign Shot [${label}] ${model} busy: ${result.errorMessage}`);
+                        genError = result.errorMessage;
+                        // Continue to next attempt/fallback
+                    } else {
+                        console.warn(`   ⚠️ Campaign Shot [${label}] ${model} returned no image`);
+                        genError = 'No image returned from generation model';
+                        // Continue to next attempt/fallback
+                    }
+                } catch (attemptErr) {
+                    console.warn(`   ⚠️ Campaign Shot [${label}] ${model} error: ${attemptErr.message}`);
+                    genError = attemptErr.message;
+                    // Continue to next attempt/fallback
+                }
             }
         } catch (e) {
             genError = e.message;
