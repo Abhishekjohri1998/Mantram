@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
@@ -77,7 +77,32 @@ export default function ResearchStudio() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [loadingStep, setLoadingStep] = useState(0)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const inputRef = useRef(null)
+
+  // Fetch history when brand changes or history drawer is opened
+  const fetchHistory = async () => {
+    if (!activeBrand) return
+    setHistoryLoading(true)
+    try {
+      const res = await researchStudio.reports(activeBrand._id)
+      if (res?.success) setHistory(res.reports || [])
+    } catch (e) {
+      console.error('Failed to fetch history:', e)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchHistory()
+  }, [activeBrand])
+
+  useEffect(() => {
+    if (showHistory) fetchHistory()
+  }, [showHistory])
 
   const handleModuleSelect = (mod) => {
     setActiveModule(mod)
@@ -147,6 +172,31 @@ export default function ResearchStudio() {
     navigate(`${basePath}${modeParam}`)
   }
 
+  const handleLoadReport = async (reportId) => {
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    setShowHistory(false) // Close drawer
+    
+    try {
+      const res = await researchStudio.getReport(reportId)
+      if (res?.success && res.report?.researchData) {
+        const data = res.report.researchData
+        setResult(data)
+        setSaved(true)
+        // Automatically switch to the correct module tab
+        const mod = MODULES.find(m => m.id === data.module)
+        if (mod) setActiveModule(mod)
+      } else {
+        setError('Failed to load this report.')
+      }
+    } catch (e) {
+      setError(e.message || 'Error loading report.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <DashboardLayout title="Research Studio" subtitle="Live market intelligence">
       <div className="rs-root">
@@ -161,9 +211,15 @@ export default function ResearchStudio() {
             <p className="rs-subtitle">Live market intelligence — brand DNA + real-time web research</p>
           </div>
           {activeBrand && (
-            <div className="rs-brand-chip">
-              <span className="material-symbols-outlined">storefront</span>
-              {activeBrand.name}
+            <div className="rs-header-actions">
+              <div className="rs-brand-chip">
+                <span className="material-symbols-outlined">storefront</span>
+                {activeBrand.name}
+              </div>
+              <button className="rs-history-btn" onClick={() => setShowHistory(true)}>
+                <span className="material-symbols-outlined">history</span>
+                History
+              </button>
             </div>
           )}
         </div>
@@ -474,6 +530,47 @@ export default function ResearchStudio() {
                 )}
 
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── History Drawer ── */}
+        <div 
+          className={`rs-history-overlay ${showHistory ? 'rs-history-overlay--open' : ''}`}
+          onClick={() => setShowHistory(false)}
+        />
+        <div className={`rs-history-drawer ${showHistory ? 'rs-history-drawer--open' : ''}`}>
+          <div className="rs-history-header">
+            <h2><span className="material-symbols-outlined">history</span> Saved Research</h2>
+            <button className="rs-close-history" onClick={() => setShowHistory(false)}>
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          
+          <div className="rs-history-content">
+            {historyLoading ? (
+              <div className="rs-history-loading" />
+            ) : history.length === 0 ? (
+              <div className="rs-history-empty">
+                <span className="material-symbols-outlined">folder_open</span>
+                <p>No saved research yet</p>
+              </div>
+            ) : (
+              history.map(report => {
+                const mod = MODULES.find(m => m.id === report.researchModule) || MODULES[0]
+                return (
+                  <div key={report._id} className="rs-history-card" onClick={() => handleLoadReport(report._id)}>
+                    <div className="rs-history-card-header">
+                      <h4 className="rs-history-card-title">{report.title}</h4>
+                      <span className="material-symbols-outlined rs-history-card-icon">{mod.icon}</span>
+                    </div>
+                    <div className="rs-history-card-meta">
+                      <span className="rs-history-card-module">{mod.label}</span>
+                      <span>{new Date(report.generatedAt || report.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                    </div>
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
