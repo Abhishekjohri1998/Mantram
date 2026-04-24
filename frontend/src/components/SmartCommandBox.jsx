@@ -21,6 +21,7 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
     const [audioLevel, setAudioLevel] = useState(0)
     const [attachedImages, setAttachedImages] = useState([]) // Array of { file, preview, base64 }
     const [generatingImage, setGeneratingImage] = useState(null)
+    const [zoomedImage, setZoomedImage] = useState(null)
     const inputRef = useRef(null)
     const fileInputRef = useRef(null)
     const chatEndRef = useRef(null)
@@ -435,7 +436,8 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                                                 {(msg.generatedImage || msg.data?.imageUrl) && (
                                                     <div>
                                                         <img src={msg.generatedImage || msg.data.imageUrl} alt="Generated creative"
-                                                            className="rounded-xl w-full max-h-80 object-cover border border-[var(--sys-border)] shadow-lg" />
+                                                            className="rounded-xl w-full max-h-80 object-cover border border-[var(--sys-border)] shadow-lg cursor-zoom-in hover:opacity-90 transition-opacity"
+                                                            onClick={() => setZoomedImage(msg.generatedImage || msg.data.imageUrl)} />
                                                     </div>
                                                 )}
 
@@ -751,6 +753,27 @@ export default function SmartCommandBox({ variant = 'dashboard', className = '' 
                     )}
                 </div>
             </div>
+
+            {/* ZOOM MODAL OVERLAY */}
+            {zoomedImage && (
+                <div 
+                    className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 sm:p-8 cursor-zoom-out animate-fade-in"
+                    onClick={() => setZoomedImage(null)}
+                >
+                    <img 
+                        src={zoomedImage} 
+                        alt="Zoomed creative" 
+                        className="max-w-full max-h-full object-contain rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    <button 
+                        onClick={() => setZoomedImage(null)}
+                        className="absolute top-6 right-6 size-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors backdrop-blur-sm cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
