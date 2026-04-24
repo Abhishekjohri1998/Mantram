@@ -75,6 +75,7 @@ export default function ResearchStudio() {
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [loadingStep, setLoadingStep] = useState(0)
   const inputRef = useRef(null)
 
@@ -118,11 +119,19 @@ export default function ResearchStudio() {
   const handleSave = async () => {
     if (!result) return
     setSaving(true)
+    setSaveError(null)
     try {
-      await researchStudio.save({ brand: activeBrand, module: activeModule.id, data: result })
-      setSaved(true)
-    } catch (_) {}
-    setSaving(false)
+      const res = await researchStudio.save({ brand: activeBrand, module: activeModule.id, data: result })
+      if (res?.success) {
+        setSaved(true)
+      } else {
+        setSaveError(res?.error || 'Save failed — please try again')
+      }
+    } catch (e) {
+      setSaveError(e.message || 'Save failed')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleStudioAction = (action) => {
@@ -132,7 +141,10 @@ export default function ResearchStudio() {
       content: '/content-studio',
       video: '/video-studio',
     }
-    navigate(paths[action.studio] || '/brainstorm')
+    const basePath = paths[action.studio] || '/brainstorm'
+    // Pass strategy mode as query param so target studio can pre-select it
+    const modeParam = action.mode ? `?mode=${encodeURIComponent(action.mode)}` : ''
+    navigate(`${basePath}${modeParam}`)
   }
 
   return (
@@ -309,7 +321,33 @@ export default function ResearchStudio() {
                   </div>
                 </div>
 
-                {/* Campaign title / thesis */}
+                {/* Save error */}
+                {saveError && (
+                  <div className="rs-save-error">
+                    <span className="material-symbols-outlined">error_outline</span>
+                    {saveError}
+                  </div>
+                )}
+
+                {/* Synthesis: prominent Launch Plan CTA */}
+                {activeModule?.id === 'synthesis' && result.studioActions?.length > 0 && (
+                  <div className="rs-launch-banner">
+                    <div className="rs-launch-banner-text">
+                      <span className="material-symbols-outlined">rocket_launch</span>
+                      <span>Strategy ready. Move this into a studio.</span>
+                    </div>
+                    <div className="rs-launch-btns">
+                      {result.studioActions.map((action, i) => (
+                        <button key={i} className={`rs-launch-btn${i === 0 ? ' rs-launch-btn--primary' : ''}`}
+                          onClick={() => handleStudioAction(action)}>
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+
                 {(result.strategicThesis || result.campaignTitle) && (
                   <div className="rs-thesis-card">
                     {result.campaignTitle && (

@@ -869,3 +869,75 @@
   font-size: 14px !important;
   margin-left: auto;
 }
+
+/* ── Save error ──────────────────────────────────────────────────────────── */
+.rs-save-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--sys-bg) 70%, red 30%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.rs-save-error .material-symbols-outlined { font-size: 15px; }
+
+/* ── Synthesis launch banner ─────────────────────────────────────────────── */
+.rs-launch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--sys-surface);
+  border: 1px solid var(--sys-border);
+  border-left: 3px solid var(--sys-primary);
+  border-radius: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.rs-launch-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sys-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.rs-launch-banner-text .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--sys-primary);
+}
+.rs-launch-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rs-launch-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--sys-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sys-text-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rs-launch-btn:hover {
+  border-color: var(--sys-primary);
+  color: var(--sys-primary);
+}
+.rs-launch-btn--primary {
+  background: var(--sys-primary);
+  border-color: var(--sys-primary);
+  color: #fff;
+  font-weight: 600;
+}
+.rs-launch-btn--primary:hover {
+  opacity: 0.9;
+  color: #fff;
+}

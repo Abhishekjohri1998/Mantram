@@ -12,6 +12,7 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
 import { protect } from '../middleware/auth.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 import { requireCredits } from '../middleware/credits.js';
@@ -19,8 +20,22 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext } from '../agents/shared/agentUtils.js';
 import { callMcpToolsParallel } from '../mcp/registry.js';
 import BrandStrategy from '../models/BrandStrategy.js';
+import redis from '../utils/redisClient.js';
 
 const router = Router();
+
+// ── 5-minute result cache per module+brand+query ─────────────────────────────
+const RESULT_CACHE_TTL = 300;
+async function getCachedResult(key) {
+    try { const v = await redis.get(key); return v ? JSON.parse(v) : null; } catch { return null; }
+}
+async function setCachedResult(key, value) {
+    try { await redis.setex(key, RESULT_CACHE_TTL, JSON.stringify(value)); } catch { /* non-fatal */ }
+}
+function resultCacheKey(module, brandId, query) {
+    const qHash = crypto.createHash('md5').update((query || '').trim().toLowerCase()).digest('hex').slice(0, 8);
+    return `rs:${module}:${brandId || 'nobrand'}:${qHash}`;
+}
 
 // ── Shared AI call helper ─────────────────────────────────────────────────────
 async function aiCall(systemPrompt, userPrompt, opts = {}) {
@@ -124,10 +139,14 @@ router.post('/competitor', protect, requireStudio('brainstormStudio'), requireCr
         const brandName = brandDoc?.name || brand?.name || 'Your Brand';
         const industry = dna.industry || 'D2C brand';
 
+        const cacheKey = resultCacheKey('competitor', brandDoc?._id || brand?._id || brand?.id, query);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         // Run MCP tools in parallel
         const mcpResults = await callMcpToolsParallel([
             { tool: 'scrape_competitor', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
-            { tool: 'web_search', args: { query: `${brandName} competitors ${industry} India pricing strategy messaging 2024 2025`, mode: 'deep' } },
+            { tool: 'web_search', args: { query: `${brandName} competitors ${industry} India pricing strategy messaging 2024 2025`, mode: 'quick' } },
         ]);
 
         const researchContext = summariseMcp(mcpResults);
@@ -162,7 +181,9 @@ Analyse all available competitor data and return structured insights.`;
             { label: 'Create Competitor-Beating Ad', studio: 'brainstorm', mode: 'meta-google-ads' },
         ];
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: competitor error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -180,6 +201,10 @@ router.post('/trends', protect, requireStudio('brainstormStudio'), requireCredit
         const dna = brandDoc?.dna || brand?.dna || {};
         const brandName = brandDoc?.name || brand?.name || 'Your Brand';
         const industry = dna.industry || 'D2C brand';
+
+        const cacheKey = resultCacheKey('trends', brandDoc?._id || brand?._id || brand?.id, query);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
 
         const mcpResults = await callMcpToolsParallel([
             { tool: 'fetch_trending', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
@@ -217,7 +242,9 @@ Return the most actionable trends right now.`;
             { label: 'Build Festive Campaign', studio: 'brainstorm', mode: 'festive-seasonal' },
         ];
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: trends error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -293,8 +320,12 @@ router.post('/ads', protect, requireStudio('brainstormStudio'), requireCredits('
         const industry = dna.industry || 'D2C brand';
         const competitorNames = (dna.competitorNames || []).slice(0, 3).join(', ') || '';
 
+        const cacheKey = resultCacheKey('ads', brandDoc?._id || brand?._id || brand?.id, query);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         const mcpResults = await callMcpToolsParallel([
-            { tool: 'web_search', args: { query: `${industry} India Facebook Instagram Meta ads winning creative hooks copy 2025 D2C`, mode: 'deep' } },
+            { tool: 'web_search', args: { query: `${industry} India Facebook Instagram Meta ads winning creative hooks copy 2025 D2C`, mode: 'quick' } },
             { tool: 'web_search', args: { query: `${competitorNames || industry} Google ads PPC strategy keywords ${new Date().getFullYear()}`, mode: 'quick' } },
         ]);
 
@@ -330,7 +361,9 @@ Find winning ad strategies and hooks we can adapt right now.`;
             { label: 'Generate Ad Creative', studio: 'creative', mode: null },
         ];
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: ads error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -443,9 +476,9 @@ OUTPUT FORMAT — return STRICT JSON:
   "quickWins": ["Actionable quick win 1 (do this week)", "Quick win 2", "Quick win 3"],
   "sources": ["Source 1", "Source 2"],
   "studioActions": [
+    { "label": "Build Full Strategy in Brainstorm", "studio": "brainstorm", "mode": "new-product-launch" },
     { "label": "Generate Campaign Creative", "studio": "creative", "mode": null },
-    { "label": "Write Campaign Copy", "studio": "content", "mode": null },
-    { "label": "Build Full Strategy", "studio": "brainstorm", "mode": "new-product-launch" }
+    { "label": "Write Campaign Copy", "studio": "content", "mode": null }
   ]
 }`;
 
