@@ -438,8 +438,19 @@ export async function resubmitAtlasCloudTask(storedPayload, safetyTriggered = fa
         console.log(`🛡️ [Atlas] Safe Mode: Removing Face-lock strictures from prompt to bypass safety filter...`);
         // Remove the Face-lock sentence injected during initial submission
         payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/@Image\d+(?: and @Image\d+)* (?:is|are) the real person who must appear in this video\. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame\./gi, '');
-        // Also clean up any extra whitespace
-        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/\s{2,}/g, ' ').trim();
+        // Aggressively strip user-provided or AI-generated character reference constraints
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/maintain exact facial features/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/exact facial geometry/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/real person/gi, 'person');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/as character reference/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/exact facial features/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/skin tone/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/eye shape/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/expression throughout/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/preserve their/gi, '');
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/(?:maintain|preserve)(?: exact)?(?: facial features| skin tone| eye shape| hair| expression)(?: throughout)?/gi, '');
+        // Clean up loose commas, hyphens, and whitespace
+        payloadToSubmit.input.prompt = payloadToSubmit.input.prompt.replace(/,\s*,/g, ',').replace(/\s*[—-]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
     }
 
     const taskId = await submitAtlasCloudPayload(payloadToSubmit);
