@@ -448,7 +448,11 @@ export async function submitAtlasCloudWatermarkRemoval(videoUrl) {
 
 export async function getAtlasCloudGenerationStatus(taskId) {
     if (taskId && taskId.startsWith('skipped_atlas_')) {
-        return { status: 'COMPLETED', progress: 100 };
+        // Watermark removal was a no-op — return COMPLETED
+        // Note: the videoUrl is NOT available here (it was on the original task).
+        // The caller (pollGenerationStatus) must preserve the videoUrl from the
+        // _originalVideoUrl field or from the state.generation.videoUrl.
+        return { status: 'COMPLETED', progress: 100, videoUrl: '' };
     }
 
     const statusUrl = `${ATLAS_INFERENCE_BASE}/model/prediction/${taskId}`;

@@ -412,21 +412,30 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             // Update project with generation details
             // LaoZhang sync: state.status may be 'critique' (already completed)
             const projectStatus = state.status === 'critique' ? 'completed' : 'advanced-generating';
+            
+            // Ensure generation.status is explicitly set so frontend polling detects completion
+            const genData = { ...state.generation };
+            if (projectStatus === 'completed') {
+                genData.status = 'COMPLETED';
+                genData.progress = 100;
+            }
+            
             const updatePayload = {
                 status: projectStatus,
-                generation: state.generation,
+                generation: genData,
                 backendPrompt: prompt.trim(),
             };
-            if (state.generation?.videoUrl) {
-                updatePayload.finalVideoUrl = state.generation.videoUrl;
+            if (genData.videoUrl) {
+                updatePayload.finalVideoUrl = genData.videoUrl;
             }
             await VideoProject.findByIdAndUpdate(project._id, updatePayload);
+            console.log(`✅ [AdvancedGen] Background task done for ${project._id}: status=${projectStatus}, videoUrl=${genData.videoUrl ? 'yes' : 'no'}, provider=${genData.provider}`);
     
             // LaoZhang sync: video is already generated — upload to S3 before CDN expires
             // This normally happens in the polling loop, but LZ projects skip polling
-            if (projectStatus === 'completed' && state.generation?.videoUrl) {
+            if (projectStatus === 'completed' && genData.videoUrl) {
                 // Use downloadAndUploadVideoToS3 — structured S3 key + DB update
-                downloadAndUploadVideoToS3(project._id.toString(), state.generation.videoUrl)
+                downloadAndUploadVideoToS3(project._id.toString(), genData.videoUrl)
                     .catch(e => console.warn('⚠️ LZ Video S3 mirror failed:', e.message));
             }
         }).catch(async (error) => {
@@ -4329,7 +4338,28 @@ router.get('/:id/status', protect, async (req, res) => {
             });
         }
 
-        if ((project.status === 'generating' || project.status === 'advanced-generating') && project.generation?.falRequestId) {
+        if (project.status === 'generating' || project.status === 'advanced-generating') {
+
+            // ── Race Condition Guard: falRequestId not yet set ──
+            // Between the initial HTTP response and advancedGenerateNode completing
+            // (which takes ~5-30s for prompt enhancement + provider submission),
+            // the DB has status='advanced-generating' but no falRequestId.
+            // Return a proper IN_QUEUE status instead of falling through silently.
+            if (!project.generation?.falRequestId) {
+                return res.json({
+                    success: true,
+                    project: await signVideoProjectAssets({
+                        _id: project._id,
+                        status: project.status,
+                        generation: {
+                            ...(project.generation || {}),
+                            status: 'IN_QUEUE',
+                            progress: project.generation?.progress || 3,
+                        },
+                        pipeline: getPipelineInfo(project.status),
+                    }),
+                });
+            }
 
             // ── HeyGen Provider: Poll HeyGen API directly ──
             if (project.generation?.provider === 'heygen') {
@@ -4553,12 +4583,22 @@ router.get('/:id/status', protect, async (req, res) => {
         }
 
         // Not in generating state — return full project
+        // Normalize generation.status for completed projects so frontend polling detects completion
+        const gen = { ...(project.generation || {}) };
+        if ((project.status === 'completed' || project.status === 'done' || project.status === 'critique') 
+            && (gen.videoUrl || project.finalVideoUrl) 
+            && gen.status !== 'COMPLETED') {
+            gen.status = 'COMPLETED';
+            gen.progress = 100;
+            // Ensure videoUrl is populated from finalVideoUrl if missing
+            if (!gen.videoUrl && project.finalVideoUrl) gen.videoUrl = project.finalVideoUrl;
+        }
         res.json({
             success: true,
             project: await signVideoProjectAssets({
                 _id: project._id,
                 status: project.status,
-                generation: project.generation,
+                generation: gen,
                 critique: project.critique,
                 pipeline: getPipelineInfo(project.status),
             }),

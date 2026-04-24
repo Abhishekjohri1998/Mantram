@@ -561,22 +561,41 @@ export async function pollGenerationStatus(state) {
         statusResult = await getAtlasCloudGenerationStatus(state.generation.falRequestId);
 
         // 🧹 WATERMARK REMOVAL CASCADE:
-        // If generation is complete but we haven't removed the watermark yet, trigger the removal task
+        // If generation is complete but we haven't removed the watermark yet, trigger the removal task.
+        // CRITICAL FIX: Always preserve the original videoUrl — watermark removal is currently a no-op
+        // (submitAtlasCloudWatermarkRemoval returns a fake 'skipped_atlas_*' ID), so the old code
+        // was replacing falRequestId but LOSING the videoUrl. The next poll to the skipped ID
+        // returned COMPLETED with no videoUrl, making the video invisible.
         if (statusResult.status === 'COMPLETED' && !state.generation.isWatermarkRemoved) {
-            console.log(`✨ Atlas Cloud: Video generation done (${statusResult.videoUrl.substring(0, 60)}...). Starting watermark removal...`);
+            const originalVideoUrl = statusResult.videoUrl || '';
+            console.log(`✨ Atlas Cloud: Video generation done (${originalVideoUrl.substring(0, 60)}...). Checking watermark removal...`);
             try {
-                const unwatermark = await submitAtlasCloudWatermarkRemoval(statusResult.videoUrl);
-                return {
-                    ...state,
-                    generation: {
-                        ...state.generation,
-                        falRequestId: unwatermark.taskId,
-                        isWatermarkRemoved: true,
-                        progress: 95, // Stay in progress for the removal step
-                        error: '',
-                    },
-                    status: state.status || 'generating', // Keep in generating/advanced-generating
-                };
+                const unwatermark = await submitAtlasCloudWatermarkRemoval(originalVideoUrl);
+                
+                // If watermark removal is a no-op (skipped_atlas_*), mark completed immediately
+                // and preserve the original video URL
+                if (unwatermark.taskId && unwatermark.taskId.startsWith('skipped_')) {
+                    console.log(`✅ Atlas Cloud: Watermark removal skipped — proceeding with original video`);
+                    // Don't replace falRequestId — just mark as done with the original videoUrl
+                    statusResult.isWatermarkRemoved = true;
+                    // Fall through to normal completion handling below
+                } else {
+                    // Real watermark removal was submitted — enter removal polling loop
+                    // But ALWAYS preserve the original video URL as fallback
+                    return {
+                        ...state,
+                        generation: {
+                            ...state.generation,
+                            falRequestId: unwatermark.taskId,
+                            isWatermarkRemoved: true,
+                            _originalVideoUrl: originalVideoUrl, // Preserve original URL as fallback
+                            videoUrl: originalVideoUrl, // Keep current videoUrl visible
+                            progress: 95,
+                            error: '',
+                        },
+                        status: state.status || 'generating',
+                    };
+                }
             } catch (err) {
                 console.warn(`⚠️ Atlas Cloud: Automatic watermark removal failed: ${err.message}. Proceeding with watermarked video.`);
                 // Fall through to proceed with the watermarked video if removal task submission fails
@@ -672,13 +691,21 @@ export async function pollGenerationStatus(state) {
         statusResult = await getGenerationStatus(state.generation.falRequestId, statusUrl, resultUrl);
     }
 
+    // CRITICAL: Don't let empty videoUrl/thumbnailUrl from statusResult overwrite existing values.
+    // This happens when watermark removal is skipped (getAtlasCloudGenerationStatus returns empty videoUrl)
+    // or when polling returns partial data.
+    const mergedGeneration = {
+        ...state.generation,
+        ...statusResult,
+        // Preserve existing URLs if statusResult returns empty/falsy values
+        videoUrl: statusResult.videoUrl || state.generation?.videoUrl || state.generation?._originalVideoUrl || '',
+        thumbnailUrl: statusResult.thumbnailUrl || state.generation?.thumbnailUrl || '',
+        ...(statusResult.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
+    };
+
     return {
         ...state,
-        generation: {
-            ...state.generation,
-            ...statusResult,
-            ...(statusResult.status === 'COMPLETED' ? { completedAt: new Date() } : {}),
-        },
+        generation: mergedGeneration,
         status: statusResult.status === 'COMPLETED' ? (state.mode === 'image-to-video' ? 'completed' : 'critique')
              : statusResult.status === 'FAILED' ? 'failed'
              : state.status,

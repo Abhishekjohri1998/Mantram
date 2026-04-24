@@ -276,17 +276,28 @@ const LazyVideoThumbnail = PosterThumbnail
 
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
     // ── Completed videos grid (local state, prepend new ones) ──
+    const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
+    const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
+    
     const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && p.generation?.videoUrl)
+        return projects.filter(isCompleted)
     })
 
     // Sync if parent projects prop updates (on mount / history refresh)
+    // Also updates existing entries that transitioned from generating → completed
     useEffect(() => {
         setGridVideos(prev => {
-            const existingIds = new Set(prev.map(p => p._id))
-            const incoming = projects.filter(p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && p.generation?.videoUrl)
-            const newOnes = incoming.filter(p => !existingIds.has(p._id))
-            return newOnes.length ? [...newOnes, ...prev] : prev
+            const incoming = projects.filter(isCompleted)
+            const existingMap = new Map(prev.map(p => [p._id, p]))
+            // Update existing entries + add new ones
+            const newItems = []
+            incoming.forEach(p => {
+                if (!existingMap.has(p._id)) newItems.push(p)
+                existingMap.set(p._id, p) // Always update with latest data
+            })
+            if (newItems.length === 0 && incoming.length === prev.length) return prev // No changes
+            // Prepend new items, update existing ones in place
+            return [...newItems, ...prev.map(p => existingMap.get(p._id) || p).filter(p => !newItems.some(n => n._id === p._id))]
         })
     }, [projects])
 
@@ -313,7 +324,14 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                 const d = await api(`/video-studio/${projectId}/status`)
                 const gen = d.project.generation
                 updateJob(jobId, { progress: gen?.progress || 5 })
-                if (gen?.status === 'COMPLETED' || d.project.status === 'critique' || d.project.status === 'completed') {
+                
+                // Handle IN_QUEUE (background task still initializing — prompt enhancement + provider submission)
+                if (gen?.status === 'IN_QUEUE') {
+                    updateJob(jobId, { progress: Math.max(gen?.progress || 3, 3), status: 'generating' })
+                    return // Keep polling — generation hasn't been submitted to provider yet
+                }
+                
+                if (gen?.status === 'COMPLETED' || d.project.status === 'critique' || d.project.status === 'completed' || d.project.status === 'done') {
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
                     const videoUrl = `${API_BASE}/video-studio/${projectId}/video`
                     updateJob(jobId, { status: 'done', videoUrl, progress: 100 })
@@ -322,7 +340,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     setGridVideos(prev => [syntheticProject, ...prev])
                     // Remove from active jobs after a short delay
                     setTimeout(() => setJobs(prev => prev.filter(j => j.id !== jobId)), 3000)
-                } else if (gen?.status === 'FAILED') {
+                } else if (gen?.status === 'FAILED' || d.project.status === 'failed') {
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
                     updateJob(jobId, { status: 'failed', error: gen?.error || 'Generation failed' })
                 }
@@ -932,7 +950,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                 {/* Completed videos — uses CDN URLs directly (no proxy DB queries) */}
                 {gridVideos.slice(0, Math.max(0, 16 - jobs.length)).map((p, i) => {
                     // Use CDN URL directly from API response — eliminates N+1 DB proxy queries
-                    const cdnUrl = p.generation?.videoUrl || ''
+                    const cdnUrl = p.generation?.videoUrl || p.finalVideoUrl || ''
                     const proxyUrl = p._id ? `${API_BASE}/video-studio/${p._id}/video` : ''
                     const videoSrc = cdnUrl || proxyUrl
                     const ac = p.advancedConfig || {}
