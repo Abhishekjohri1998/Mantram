@@ -2,13 +2,151 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import FormattedText from '../components/FormattedText'
-import { brainstormStudio as bsAPI } from '../services/api'
+import { brainstormStudio as bsAPI, researchStudio } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import Walkthrough from '../components/Walkthrough'
 import './BrainstormStudio.css'
 
-// ── Topic quick-starts ────────────────────────────────────────────────────────
+// ── Strategy Modes (8 goal-oriented research-backed modes) ───────────────────
+const STRATEGY_MODES_LIST = [
+  { id: 'new-product-launch', icon: 'rocket_launch', label: 'New Product Launch', desc: 'Pre-launch buzz, launch-day plan, 90-day amplification.', color: '#6366f1' },
+  { id: 'sales-acceleration', icon: 'trending_up', label: 'Sales Acceleration', desc: 'Conversion boosts, offer architecture, 30-day sprint.', color: '#f59e0b' },
+  { id: 'marketplace-growth', icon: 'storefront', label: 'Marketplace Growth', desc: 'Amazon/Flipkart/Nykaa SEO, listings, sponsored ads.', color: '#10b981' },
+  { id: 'meta-google-ads', icon: 'ads_click', label: 'Meta & Google Ads Brief', desc: 'Winning hooks, creative brief, targeting, budget split.', color: '#3b82f6' },
+  { id: 'retention', icon: 'loyalty', label: 'Retention & Loyalty', desc: 'Win-back flows, repeat purchase triggers, LTV plan.', color: '#ec4899' },
+  { id: 'festive-seasonal', icon: 'celebration', label: 'Festive & Seasonal', desc: 'Seasonal calendar, offer strategy, festive creative brief.', color: '#f97316' },
+  { id: 'brand-awareness', icon: 'record_voice_over', label: 'Brand Awareness', desc: '90-day share-of-voice, PR, UGC, community plan.', color: '#8b5cf6' },
+  { id: 'influencer-campaign', icon: 'person_pin', label: 'Influencer Campaign', desc: 'Creator brief, tier mix, seeding, measurement plan.', color: '#14b8a6' },
+]
+
+// ── Strategy Mode Result Renderer ─────────────────────────────────────────────
+function StrategyModeResult({ data, onClose, navigate }) {
+  if (!data) return null
+  const priorityColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
+  const studioIcons = { creative: 'auto_fix_high', content: 'edit_note', video: 'movie', brainstorm: 'psychology' }
+
+  const handleStudioAction = (action) => {
+    const paths = { creative: '/creative-studio', content: '/content-studio', video: '/video-studio', brainstorm: '/brainstorm' }
+    navigate(paths[action.studio] || '/brainstorm')
+  }
+
+  return (
+    <div className="sm-result">
+      <div className="sm-result-hdr">
+        <div className="sm-result-title">{data.modeLabel} — {data.brand}</div>
+        <button className="sm-close-btn" onClick={onClose}><span className="material-icons">close</span></button>
+      </div>
+
+      {data.strategicSummary && (
+        <div className="sm-thesis">{data.strategicSummary}</div>
+      )}
+
+      {data.marketContext && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-icons">insights</span>Market Context</div>
+          <div className="sm-ctx-grid">
+            {data.marketContext.keyFindings?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Key Findings</div>
+                {data.marketContext.keyFindings.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+            {data.marketContext.competitorGaps?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Competitor Gaps</div>
+                {data.marketContext.competitorGaps.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+            {data.marketContext.trendingAngles?.length > 0 && (
+              <div className="sm-ctx-col">
+                <div className="sm-ctx-label">Trending Angles</div>
+                {data.marketContext.trendingAngles.map((f, i) => <div key={i} className="sm-ctx-item">{f}</div>)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {data.recommendedActions?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-icons">checklist</span>Recommended Actions</div>
+          <div className="sm-actions-list">
+            {data.recommendedActions.map((a, i) => (
+              <div key={i} className="sm-action-item">
+                <span className="sm-priority" style={{ background: priorityColor[a.priority] || '#475569' }}>{a.priority}</span>
+                <div className="sm-action-body">
+                  <strong>{a.action}</strong>
+                  <span className="sm-action-meta">{a.timeline} · {a.owner}</span>
+                  <p>{a.rationale}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.channelBreakdown?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-icons">hub</span>Channel Breakdown</div>
+          <div className="sm-channels">
+            {data.channelBreakdown.map((ch, i) => (
+              <div key={i} className="sm-channel-card">
+                <div className="sm-channel-name">{ch.channel}</div>
+                <p className="sm-channel-strategy">{ch.strategy}</p>
+                {ch.hooks?.length > 0 && (
+                  <div className="sm-hooks">
+                    <span className="sm-hooks-label">Winning hooks:</span>
+                    {ch.hooks.map((h, j) => <span key={j} className="sm-hook-chip">{h}</span>)}
+                  </div>
+                )}
+                <div className="sm-channel-meta">
+                  {ch.budget && <span><span className="material-icons">paid</span>{ch.budget}</span>}
+                  {ch.kpi && <span><span className="material-icons">flag</span>{ch.kpi}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.contentCalendar?.phases?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-icons">calendar_month</span>Content Calendar — {data.contentCalendar.duration}</div>
+          <div className="sm-cal-phases">
+            {data.contentCalendar.phases.map((ph, i) => (
+              <div key={i} className="sm-cal-phase">
+                <div className="sm-cal-phase-hdr">
+                  <span className="sm-cal-phase-num">{i + 1}</span>
+                  <strong>{ph.name}</strong>
+                  <span className="sm-cal-phase-dur">{ph.duration}</span>
+                </div>
+                {ph.theme && <div className="sm-cal-theme">🎯 {ph.theme}</div>}
+                <ul className="sm-cal-actions">
+                  {ph.actions?.map((a, j) => <li key={j}>{a}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.studioActions?.length > 0 && (
+        <div className="sm-block">
+          <div className="sm-block-title"><span className="material-icons">open_in_new</span>Take Action in Studios</div>
+          <div className="sm-studio-actions">
+            {data.studioActions.map((a, i) => (
+              <button key={i} className="sm-studio-btn" onClick={() => handleStudioAction(a)}>
+                <span className="material-icons">{studioIcons[a.studio] || 'launch'}</span>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 const TOPICS = [
   { id: 'ad-film',        icon: 'movie', label: 'Ad Film',        hint: "let's make an ad film" },
   { id: 'campaign',       icon: 'campaign', label: 'Campaign',       hint: "help me plan a marketing campaign" },
@@ -827,6 +965,37 @@ export default function BrainstormStudio() {
   const [showReasoning, setShowReasoning] = useState(false)
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
+  // ── Strategy Mode state ───────────────────────────────────────────────────
+  const [smActiveMode, setSmActiveMode] = useState(null)
+  const [smInputs, setSmInputs] = useState({})
+  const [smLoading, setSmLoading] = useState(false)
+  const [smError, setSmError] = useState(null)
+  const [smResult, setSmResult] = useState(null)
+
+  const handleStrategyMode = async () => {
+    if (!smActiveMode || !activeBrand) return
+    setSmLoading(true)
+    setSmError(null)
+    setSmResult(null)
+    try {
+      const res = await bsAPI.strategyMode({
+        mode: smActiveMode.id,
+        brand: activeBrand,
+        inputs: smInputs.context ? { context: smInputs.context } : {},
+      })
+      if (res?.success && res?.data) {
+        setSmResult(res.data)
+      } else {
+        setSmError(res?.error || 'Strategy generation failed. Please try again.')
+      }
+    } catch (e) {
+      setSmError(e.message || 'Something went wrong.')
+    } finally {
+      setSmLoading(false)
+    }
+  }
+
+
   // Session history state
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [sessionList, setSessionList] = useState([])
@@ -1186,10 +1355,75 @@ export default function BrainstormStudio() {
         {/* Messages */}
         <div className="bs-messages">
 
+          {/* Strategy Modes — goal-oriented research-backed strategies */}
+          {showTopics && (
+            <div className="sm-section">
+              <div className="sm-section-header">
+                <span className="material-icons">auto_awesome</span>
+                <span>Strategy Modes — Research-Backed</span>
+                <span className="sm-badge">NEW</span>
+              </div>
+              <div className="sm-modes-grid">
+                {STRATEGY_MODES_LIST.map(mode => (
+                  <button
+                    key={mode.id}
+                    className={`sm-mode-card ${smActiveMode?.id === mode.id ? 'sm-mode-card--active' : ''}`}
+                    style={{ '--sm-color': mode.color }}
+                    onClick={() => {
+                      setSmActiveMode(mode)
+                      setSmResult(null)
+                      setSmError(null)
+                      setSmInputs({})
+                    }}
+                  >
+                    <span className="material-icons sm-mode-icon" style={{ color: mode.color }}>{mode.icon}</span>
+                    <span className="sm-mode-label">{mode.label}</span>
+                    <span className="sm-mode-desc">{mode.desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {smActiveMode && !smResult && (
+                <div className="sm-form">
+                  <div className="sm-form-title">
+                    <span className="material-icons" style={{ color: smActiveMode.color }}>{smActiveMode.icon}</span>
+                    {smActiveMode.label}
+                  </div>
+                  <div className="sm-form-fields">
+                    <textarea
+                      className="sm-form-input"
+                      placeholder={`Optional: any specific focus or context for ${smActiveMode.label} strategy…`}
+                      value={smInputs.context || ''}
+                      onChange={e => setSmInputs(p => ({ ...p, context: e.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="sm-form-actions">
+                    <button className="sm-run-btn" onClick={handleStrategyMode} disabled={smLoading}>
+                      {smLoading
+                        ? <><span className="material-icons sm-spin">refresh</span>Researching…</>
+                        : <><span className="material-icons">rocket_launch</span>Generate Strategy</>}
+                    </button>
+                    <button className="sm-cancel-btn" onClick={() => setSmActiveMode(null)}>Cancel</button>
+                  </div>
+                  {smError && <div className="sm-error">{smError}</div>}
+                </div>
+              )}
+
+              {smResult && (
+                <StrategyModeResult
+                  data={smResult}
+                  onClose={() => { setSmResult(null); setSmActiveMode(null) }}
+                  navigate={navigate}
+                />
+              )}
+            </div>
+          )}
+
           {/* Topic chips — shown only at start */}
           {showTopics && (
             <div data-wt="bs-topics" className="bs-topics-wrap">
-              <div className="bs-topics-label">What do you want to brainstorm?</div>
+              <div className="bs-topics-label">Or start a brainstorm conversation:</div>
               <div className="bs-topics-grid">
                 {TOPICS.map(t => (
                   <button key={t.id} className="bs-topic-chip"
