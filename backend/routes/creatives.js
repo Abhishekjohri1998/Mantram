@@ -1242,7 +1242,24 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
         }
 
         formData.append('model', modelId);
-        formData.append('prompt', promptText);
+        // ── Truncate prompt for /images/edits — LaoZhang proxy & OpenAI edits have stricter prompt limits ──
+        // The /images/edits endpoint has a ~4000 char limit (LaoZhang even stricter at ~3500).
+        // GPT-image already understands reference images from the multipart attachments,
+        // so verbose per-image labels aren't needed — condense to essential creative direction only.
+        let editPrompt = promptText;
+        if (editPrompt.length > 3500) {
+            // Strip verbose REFERENCE IMAGE blocks (GPT-image infers purpose from attached images)
+            editPrompt = editPrompt
+                .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+            // If still too long, hard truncate
+            if (editPrompt.length > 3500) {
+                editPrompt = editPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
+            }
+            console.log(`📏 Prompt condensed for /images/edits: ${promptText.length} → ${editPrompt.length} chars`);
+        }
+        formData.append('prompt', editPrompt);
         formData.append('n', '1');
         formData.append('size', imageSize);
         formData.append('quality', quality);
@@ -3182,22 +3199,22 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
             // ── Call routedImageGenerate with retry + model fallback ──
             // Campaign shots are heavy (multi-image + long prompt), so:
             //   1. Use a generous 180s timeout (vs default 90s)
-            //   2. If the primary model fails/busy, retry once with same model
-            //   3. If retry also fails, fall back to alternative model (Gemini↔GPT-image-2)
+            //   2. If the primary model fails with a non-timeout error, skip retry and go to fallback
+            //   3. If the primary model times out, retry once, then fall back
             const CAMPAIGN_TIMEOUT = 180_000; // 3 minutes for multi-image generation
             const fallbackModel = (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1')
                 ? 'nanobanana-2'   // GPT → fall back to Gemini
                 : 'gpt-image-2';  // Gemini → fall back to GPT-image-2
 
             const modelsToTry = [
-                { model: imageModel, label: 'primary', attempt: 1 },
-                { model: imageModel, label: 'primary-retry', attempt: 2 },
-                { model: fallbackModel, label: 'fallback', attempt: 1 },
+                { model: imageModel, label: 'primary' },
+                { model: fallbackModel, label: 'fallback' },
             ];
 
-            for (const { model, label, attempt } of modelsToTry) {
+            for (const { model, label } of modelsToTry) {
+                if (generatedImageUrl) break; // Already succeeded
                 try {
-                    console.log(`   🔄 Campaign Shot [${label}] model=${model} attempt=${attempt}`);
+                    console.log(`   🔄 Campaign Shot [${label}] model=${model}`);
                     const result = await routedImageGenerate(
                         masterPrompt,
                         [],     // imageParts — downloaded from refImageUrls inside
@@ -3214,20 +3231,17 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
                         generatedImageUrl = result.imageUrl;
                         usedModel = result.model || model;
                         console.log(`   ✅ Campaign Shot generated with ${usedModel} [${label}]`);
-                        break; // Success — exit retry loop
                     } else if (result.modelBusy) {
-                        console.warn(`   ⚠️ Campaign Shot [${label}] ${model} busy: ${result.errorMessage}`);
+                        console.warn(`   ⚠️ Campaign Shot [${label}] ${model} busy/error: ${result.errorMessage}`);
                         genError = result.errorMessage;
-                        // Continue to next attempt/fallback
+                        // Continue to fallback model
                     } else {
                         console.warn(`   ⚠️ Campaign Shot [${label}] ${model} returned no image`);
                         genError = 'No image returned from generation model';
-                        // Continue to next attempt/fallback
                     }
                 } catch (attemptErr) {
                     console.warn(`   ⚠️ Campaign Shot [${label}] ${model} error: ${attemptErr.message}`);
                     genError = attemptErr.message;
-                    // Continue to next attempt/fallback
                 }
             }
         } catch (e) {
