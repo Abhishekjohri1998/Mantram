@@ -264,9 +264,13 @@ router.post('/keywords', protect, requireStudio('brainstormStudio'), requireCred
         const industry = dna.industry || 'D2C brand';
         const website = dna.website || brand?.dna?.website;
 
+        const cacheKey = resultCacheKey('keywords', brandDoc?._id || brand?._id || brand?.id, query);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         const mcpResults = await callMcpToolsParallel([
             { tool: 'fetch_seo_audit', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
-            { tool: 'web_search', args: { query: `${industry} India top search keywords "best" OR "buy" OR "top" OR "review" site:amazon.in OR site:myntra.com OR site:nykaa.com 2025`, mode: 'deep' } },
+            { tool: 'web_search', args: { query: `${industry} India top search keywords "best" OR "buy" OR "top" OR "review" site:amazon.in OR site:myntra.com OR site:nykaa.com 2025`, mode: 'quick' } },
         ]);
 
         const researchContext = summariseMcp(mcpResults);
@@ -300,7 +304,9 @@ Find the most valuable keyword opportunities to capture right now.`;
             { label: 'Build Marketplace Growth Plan', studio: 'brainstorm', mode: 'marketplace-growth' },
         ];
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: keywords error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -383,8 +389,12 @@ router.post('/audience', protect, requireStudio('brainstormStudio'), requireCred
         const industry = dna.industry || 'D2C brand';
         const targetAudience = dna.targetAudience || brand?.dna?.targetAudience || '';
 
+        const cacheKey = resultCacheKey('audience', brandDoc?._id || brand?._id || brand?.id, query);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         const mcpResults = await callMcpToolsParallel([
-            { tool: 'web_search', args: { query: `${industry} India customer reviews pain points Reddit quora community "I wish" OR "why does" OR "problem with" 2025`, mode: 'deep' } },
+            { tool: 'web_search', args: { query: `${industry} India customer reviews pain points Reddit quora community "I wish" OR "why does" OR "problem with" 2025`, mode: 'quick' } },
             { tool: 'fetch_trending', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
         ]);
 
@@ -419,7 +429,9 @@ Mine real customer language, pain points, desires, and objections from online co
             { label: 'Plan Influencer Campaign', studio: 'brainstorm', mode: 'influencer-campaign' },
         ];
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: audience error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -438,11 +450,15 @@ router.post('/synthesis', protect, requireStudio('brainstormStudio'), requireCre
         const brandName = brandDoc?.name || brand?.name || 'Your Brand';
         const industry = dna.industry || 'D2C brand';
 
+        const cacheKey = resultCacheKey('synthesis', brandDoc?._id || brand?._id || brand?.id, query || goal);
+        const cached = await getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         // Run all research tools in parallel for maximum intel
         const mcpResults = await callMcpToolsParallel([
             { tool: 'fetch_trending', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
             { tool: 'scrape_competitor', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
-            { tool: 'web_search', args: { query: `${industry} India ${goal || 'marketing'} strategy winning campaigns 2025`, mode: 'deep' } },
+            { tool: 'web_search', args: { query: `${industry} India ${goal || 'marketing'} strategy winning campaigns 2025`, mode: 'quick' } },
             { tool: 'fetch_performance_learnings', args: { brandId: brandDoc?._id || brand?._id || brand?.id } },
         ]);
 
@@ -492,7 +508,9 @@ Use ALL available research data and produce the most actionable, specific strate
         result.brand = brandName;
         result.generatedAt = new Date().toISOString();
 
-        res.json({ success: true, data: result });
+        const response = { success: true, data: result };
+        await setCachedResult(cacheKey, response);
+        res.json(response);
     } catch (error) {
         console.error('Research: synthesis error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

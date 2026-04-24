@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import FormattedText from '../components/FormattedText'
 import { brainstormStudio as bsAPI, researchStudio } from '../services/api'
@@ -947,6 +947,7 @@ const LANG_DISPLAY = {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function BrainstormStudio() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { activeBrand } = useBrand()
   const { user } = useAuth()
 
@@ -971,6 +972,15 @@ export default function BrainstormStudio() {
   const [smLoading, setSmLoading] = useState(false)
   const [smError, setSmError] = useState(null)
   const [smResult, setSmResult] = useState(null)
+
+  // Pre-select Strategy Mode from ?mode= query param (set by Research Studio)
+  useEffect(() => {
+    const modeId = searchParams.get('mode')
+    if (modeId && STRATEGY_MODES_LIST.length) {
+      const match = STRATEGY_MODES_LIST.find(m => m.id === modeId)
+      if (match) setSmActiveMode(match)
+    }
+  }, [searchParams])
 
   const handleStrategyMode = async () => {
     if (!smActiveMode || !activeBrand) return
