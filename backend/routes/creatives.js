@@ -1155,18 +1155,34 @@ async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'm
 
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
-    // ── Map aspect ratio → supported OpenAI image sizes ──
+    // ── Map aspect ratio → nearest supported OpenAI image size ──
+    // GPT Image 2 only supports: 1024x1024, 1024x1536, 1536x1024
+    // We pick the closest by actual ratio, then Sharp crops to exact size downstream.
     const sizeMap = {
         '1:1':  '1024x1024',
-        '4:5':  '1024x1024',
-        '2:3':  '1024x1536',
-        '9:16': '1024x1536',
-        '3:4':  '1024x1536',
-        '3:2':  '1536x1024',
-        '16:9': '1536x1024',
-        '4:3':  '1536x1024',
+        '4:5':  '1024x1024',   // 0.8 — closest to square
+        '5:4':  '1536x1024',   // 1.25 — landscape
+        '2:3':  '1024x1536',   // 0.67 — portrait
+        '9:16': '1024x1536',   // 0.56 — portrait
+        '3:4':  '1024x1536',   // 0.75 — portrait
+        '3:2':  '1536x1024',   // 1.5 — landscape
+        '16:9': '1536x1024',   // 1.78 — landscape
+        '4:3':  '1536x1024',   // 1.33 — landscape
+        '21:9': '1536x1024',   // 2.33 — ultra-wide → use landscape, crop downstream
+        '2:1':  '1536x1024',   // 2.0 — wide
+        '1:2':  '1024x1536',   // 0.5 — tall
     };
-    const imageSize = sizeMap[aspectRatio] || '1024x1024';
+    // For any unlisted ratio, pick nearest valid size by actual ratio value
+    function nearestOpenAISize(ratio) {
+        const [wStr, hStr] = ratio.split(':');
+        const w = parseFloat(wStr), h = parseFloat(hStr);
+        if (!w || !h) return '1024x1024';
+        const r = w / h;
+        if (r > 1.2) return '1536x1024'; // landscape
+        if (r < 0.8) return '1024x1536'; // portrait
+        return '1024x1024'; // square-ish
+    }
+    const imageSize = sizeMap[aspectRatio] || nearestOpenAISize(aspectRatio);
     const finalFormat = background === 'transparent' ? 'png' : outputFormat;
 
     // ── Download reference images if provided ──
@@ -3047,18 +3063,37 @@ Return ONLY valid JSON:
             imgIdx++;
         }
 
+        // ── Style transfer block — injected only when a style ref is provided ──
+        // Strong visual style lock: instructs the model to use the ref as a creative bible,
+        // not just as a loose mood suggestion.
+        const styleRefBlock = hasRef ? `
+═══ STYLE TRANSFER DIRECTIVE (CRITICAL — HIGHEST PRIORITY) ═══
+A STYLE REFERENCE image has been provided (see REFERENCE IMAGE ${hasCharacter ? 3 : 2} above).
+You MUST extract and replicate the following attributes FROM THAT REFERENCE IMAGE:
+  • COLOR GRADING — replicate the exact tonal range, saturation, hue shifts, and colour temperature
+  • LIGHTING STYLE — replicate the lighting setup (hard/soft, direction, shadows, highlights, rim lights)
+  • ATMOSPHERIC MOOD — replicate the environmental feel (misty, smoky, clean studio, natural, moody etc.)
+  • COMPOSITIONAL STYLE — replicate the framing approach, negative space usage, and depth layers
+  • TEXTURE & FINISH — replicate the surface texture quality (matte, glossy, film grain, smooth render)
+  • CINEMATIC GRADE — replicate the overall "feel" and aesthetic language of the reference
+The PRODUCT from REFERENCE IMAGE 1 must remain the hero subject.
+The STYLE from the style reference image must define the entire visual world around it.
+Do NOT default to a generic cinematic look — commit fully to the style of the reference image.
+═════════════════════════════════════════════════════════════` : '';
+
         const masterPrompt = `Cinematic moody ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
 ${imageRefBlock}
+${styleRefBlock}
 PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside the provided character/model (see CHARACTER reference image above). The person MUST match the reference — same face, same features. Position them elegantly with the product.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
 
 ${variation.compositionNote}
 
 BRANDING (top center): ${brandName} logo area, product name "${detectedProductName}" in clean brand typography${brandFont !== 'modern sans-serif' ? `, using ${brandFont} font family` : ''}
 
-ENVIRONMENT: ${mood.env}
+ENVIRONMENT: ${hasRef ? 'Derive from style reference image' : mood.env}
 
-LIGHTING: ${mood.lighting}
+LIGHTING: ${hasRef ? 'Derive from style reference image' : mood.lighting}
 
 PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth
 
@@ -3066,9 +3101,9 @@ SECONDARY TYPOGRAPHY (clean brand font):
 "${tagline1}"
 "${tagline2}"
 
-SURFACE: ${mood.surface}
+SURFACE: ${hasRef ? 'Derive from style reference image' : mood.surface}
 
-COLOR PALETTE: ${paletteStr}
+COLOR PALETTE: ${hasRef ? 'Derive from style reference image — do not override with preset colors' : paletteStr}
 
 TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp product detail, ${canvasSize}
 STYLE: magazine-grade product photography, Cannes Lions advertising quality, cinematic color grade
@@ -3196,11 +3231,18 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
             }));
             console.log(`   🖼️ Campaign Shot ref images: ${refImageUrls.length} total | prompt length: ${masterPrompt.length} chars`);
 
+            // ── Handle non-standard aspect ratios (21:9 etc.) — compute custom crop size ──
+            const [arW, arH] = aspectRatio.split(':').map(Number);
+            const standardRatios = ['1:1','4:5','9:16','16:9','2:3','3:4','4:3','3:2','5:4','2:1','1:2'];
+            const isStandardRatio = standardRatios.includes(aspectRatio);
+            const customSizeForCrop = (!isStandardRatio && arW && arH)
+                ? { width: arW * 80, height: arH * 80 }   // e.g. 21:9 → 1680x720
+                : null;
+
             // ── Call routedImageGenerate with retry + model fallback ──
             // Campaign shots are heavy (multi-image + long prompt), so:
             //   1. Use a generous 180s timeout (vs default 90s)
-            //   2. If the primary model fails with a non-timeout error, skip retry and go to fallback
-            //   3. If the primary model times out, retry once, then fall back
+            //   2. If the primary model fails, skip retry and go directly to fallback
             const CAMPAIGN_TIMEOUT = 180_000; // 3 minutes for multi-image generation
             const fallbackModel = (imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1')
                 ? 'nanobanana-2'   // GPT → fall back to Gemini
@@ -3223,7 +3265,7 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
                         '1K',
                         model,
                         refImageUrls,
-                        null,   // customSize
+                        customSizeForCrop,  // triggers Sharp crop for non-standard ratios (21:9 etc.)
                         CAMPAIGN_TIMEOUT
                     );
 
