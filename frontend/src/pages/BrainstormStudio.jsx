@@ -121,7 +121,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
                   <strong>{ph.name}</strong>
                   <span className="sm-cal-phase-dur">{ph.duration}</span>
                 </div>
-                {ph.theme && <div className="sm-cal-theme">🎯 {ph.theme}</div>}
+                {ph.theme && <div className="sm-cal-theme"><span className="material-icons" style={{ fontSize: '12px', verticalAlign: 'middle' }}>flag</span> {ph.theme}</div>}
                 <ul className="sm-cal-actions">
                   {ph.actions?.map((a, j) => <li key={j}>{a}</li>)}
                 </ul>
