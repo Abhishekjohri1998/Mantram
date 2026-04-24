@@ -5192,8 +5192,8 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
         const userId = project?.user?.toString() || 'unknown';
         const brandId = project?.brand?.toString() || 'unbranded';
 
-        // Structured S3 key: users/{userId}/brands/{brandId}/videos/{projectId}.mp4
-        const s3Key = `users/${userId}/brands/${brandId}/videos/${projectId}.mp4`;
+        // Structured S3 key: videos/{userId}/{brandId}/{projectId}.mp4
+        const s3Key = `videos/${userId}/${brandId}/${projectId}.mp4`;
         console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
         const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
         console.log(`✅ Video uploaded to S3: ${s3Url}`);
