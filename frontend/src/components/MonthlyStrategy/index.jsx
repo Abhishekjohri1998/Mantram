@@ -658,7 +658,7 @@ export default function MonthlyStrategy() {
         jobId,
         type:      'monthly-strategy',
         label:     label || `${MONTHS[selectedMonth - 1]} ${selectedYear} strategy`,
-        page:      '/brainstorm-studio',
+        page:      '/brainstorm',
         brandName: activeBrand.name,
       })
 

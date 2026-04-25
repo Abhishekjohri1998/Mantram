@@ -59,6 +59,8 @@ export const UIProvider = ({ children }) => {
   const markRead = useCallback(async (id) => {
     setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n))
     setUnreadCount(c => Math.max(0, c - 1))
+    // Skip API call for optimistic notifications (not real DB records)
+    if (typeof id === 'string' && id.startsWith('optimistic_')) return
     await notificationsAPI.read(id).catch(() => {})
   }, [])
 
@@ -74,6 +76,8 @@ export const UIProvider = ({ children }) => {
       if (n && !n.read) setUnreadCount(c => Math.max(0, c - 1))
       return prev.filter(x => x._id !== id)
     })
+    // Skip API call for optimistic notifications (not real DB records)
+    if (typeof id === 'string' && id.startsWith('optimistic_')) return
     await notificationsAPI.delete(id).catch(() => {})
   }, [])
 
