@@ -282,7 +282,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     <div className="relative" ref={notifBtnRef}>
                         <button
                             className="hdr-action-btn"
-                            onClick={() => { setShowNotifPanel(v => !v); if (!showNotifPanel) fetchNotifications() }}
+                            onClick={() => { if (!showNotifPanel) { setShowNotifPanel(true); fetchNotifications() } else { setShowNotifPanel(false) } }}
                             title="Notifications"
                         >
                             <span className="material-symbols-outlined text-xl">notifications</span>

@@ -2,7 +2,7 @@
  * NotificationPanel — Bell dropdown panel
  * Shows active background jobs (with Stop button) + past notifications
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUI } from '../context/UIContext'
 import { useJobPoller } from '../hooks/useJobPoller'
@@ -32,16 +32,25 @@ export default function NotificationPanel({ onClose }) {
     const { notifications, unreadCount, markRead, markAllRead, deleteNotification, activeJobs, fetchNotifications } = useUI()
     const { cancelJob } = useJobPoller()
     const panelRef = useRef(null)
+    const [loadError, setLoadError] = useState(false)
 
-    useEffect(() => { fetchNotifications() }, [])
+    useEffect(() => {
+        try { fetchNotifications() } catch { setLoadError(true) }
+    }, [])
 
-    // Close on outside click
+    // Close on outside click — uses a small delay to prevent race with the bell button toggle
     useEffect(() => {
         const handler = (e) => {
-            if (panelRef.current && !panelRef.current.contains(e.target)) onClose()
+            if (panelRef.current && !panelRef.current.contains(e.target)) {
+                // Check if the click target is the bell button itself — if so, let the toggle handle it
+                const bellBtn = e.target.closest('.hdr-action-btn')
+                if (bellBtn) return
+                onClose()
+            }
         }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
+        // Use setTimeout to register the listener after the current click event finishes
+        const timer = setTimeout(() => document.addEventListener('mousedown', handler), 0)
+        return () => { clearTimeout(timer); document.removeEventListener('mousedown', handler) }
     }, [onClose])
 
     const handleNotifClick = (n) => {
