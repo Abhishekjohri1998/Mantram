@@ -169,6 +169,9 @@ function App() {
                     <Route path="/pulse-studio/*" element={<ProtectedRoute><PulseStudio /></ProtectedRoute>} />
                     <Route path="/creative-studio/pulse-studio" element={<Navigate to="/pulse-studio" replace />} />
                     <Route path="/creative-studio/pulse-studio/*" element={<Navigate to="/pulse-studio" replace />} />
+
+                    {/* Catch-all: redirect unknown routes to dashboard (prevents blank screens from stale links) */}
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </Suspense>
 

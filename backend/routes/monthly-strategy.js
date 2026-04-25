@@ -408,7 +408,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
     brand:  brandId,
     type:   'monthly-strategy',
     status: 'pending',
-    meta:   { label, page: '/brainstorm-studio', brandName: brand?.name || '' },
+    meta:   { label, page: '/brainstorm', brandName: brand?.name || '' },
     startedAt: new Date(),
   });
 
@@ -471,7 +471,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         type:  'monthly-strategy',
         title: '📅 Strategy Ready',
         body:  `${label} has been generated successfully.`,
-        link:  '/brainstorm-studio',
+        link:  '/brainstorm',
         jobId,
       });
 
@@ -492,7 +492,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         userId, brandId, type: 'monthly-strategy',
         title: '⚠️ Strategy Generation Failed',
         body:  `${label} — ${err.message?.slice(0, 100) || 'Unknown error'}`,
-        link:  '/brainstorm-studio',
+        link:  '/brainstorm',
         jobId,
       });
 
