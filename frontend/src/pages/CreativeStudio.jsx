@@ -3926,8 +3926,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow">
                                         <textarea
                                             value={prompt}
+                                            maxLength={5000}
                                             onChange={e => {
-                                                const val = e.target.value; setPrompt(val);
+                                                const val = e.target.value.slice(0, 5000); setPrompt(val);
                                                 const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\w*)$/);
                                                 if (atMatch && (characters.length > 0 || referenceImages.upload || referenceImages.style)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
                                             }}
@@ -3940,6 +3941,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[140px]"
                                             ref={promptTextareaRef}
                                         />
+                                        {prompt.length > 4000 && (
+                                            <div style={{ textAlign: 'right', fontSize: '10px', padding: '0 12px 4px', color: prompt.length > 4800 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>
+                                                {prompt.length}/5000
+                                            </div>
+                                        )}
                                         
                                         {/* Char Tag Auto-fill Box */}
                                         {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (

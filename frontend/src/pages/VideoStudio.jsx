@@ -442,6 +442,13 @@ export default function VideoStudio() {
     // STEP 1: Start — Submit brief + images → get concepts
     // ══════════════════════════════════════════════════════════════════════════
     async function handleStart() {
+        if (!activeBrand?._id) {
+            setError({
+                message: 'Select a brand from the top bar before creating a video',
+                isProviderError: false
+            });
+            return;
+        }
         if (!brief.trim() && images.length === 0) { 
             setError({
                 message: 'Enter a brief or add at least one image',

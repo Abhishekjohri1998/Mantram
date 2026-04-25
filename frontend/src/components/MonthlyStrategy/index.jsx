@@ -52,6 +52,10 @@ const STUDIO_PATHS = {
 // Content types that get inline image generation (no studio round-trip needed)
 const INLINE_IMAGE_TYPES = new Set(['static', 'carousel', 'story', 'ad'])
 
+// ─── Validation Constants ────────────────────────────────────────────────────
+const MAX_BRIEF_LENGTH = 2000
+const MAX_KEYWORDS     = 15
+
 // ─── Brief Drawer ────────────────────────────────────────────────────────────
 
 function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteback }) {
@@ -619,9 +623,39 @@ export default function MonthlyStrategy() {
   const stratCost  = costs?.monthlyStrategy ?? 15
   const canAfford  = balance?.unlimited || !balance || balance.remaining >= stratCost
 
+  // ── Date validation: prevent past month selection ──
+  const isPastMonth = (() => {
+    const lastDay = new Date(selectedYear, selectedMonth, 0) // last day of selected month
+    return lastDay < now
+  })()
+
+  // ── Duplicate detection: warn if same (month, year, type) already exists ──
+  const existingStrategy = historyList.find(s =>
+    s.month === selectedMonth && s.year === selectedYear && s.strategyType === selectedType
+  )
+
+  // ── Launch event date warnings ──
+  const getEventDateWarning = (dateStr) => {
+    if (!dateStr) return null
+    const d = new Date(dateStr + 'T00:00:00')
+    if (d.getMonth() + 1 !== selectedMonth || d.getFullYear() !== selectedYear) {
+      return `Outside ${MONTHS[selectedMonth - 1]} ${selectedYear}`
+    }
+    if (d < now) return 'This date is in the past'
+    return null
+  }
+
+  // ── Keyword count ──
+  const keywordList = focusKeywords ? focusKeywords.split(',').map(k => k.trim()).filter(Boolean) : []
+  const keywordLimitReached = keywordList.length >= MAX_KEYWORDS
+
   // ── Open credit confirmation modal ──
   const handleGenerateClick = () => {
     if (!activeBrand?._id || !selectedType) return
+    if (isPastMonth) {
+      setGenError('Cannot generate strategy for a past month. Please select the current or a future month.')
+      return
+    }
     setShowCreditModal(true)
   }
 
@@ -1030,9 +1064,16 @@ export default function MonthlyStrategy() {
               value={selectedMonth}
               onChange={e => setSelectedMonth(Number(e.target.value))}
             >
-              {MONTHS.map((m, i) => (
-                <option key={m} value={i + 1}>{m}</option>
-              ))}
+              {MONTHS.map((m, i) => {
+                const monthNum = i + 1
+                const lastDay = new Date(selectedYear, monthNum, 0)
+                const disabled = lastDay < now
+                return (
+                  <option key={m} value={monthNum} disabled={disabled}>
+                    {m}{disabled ? ' (past)' : ''}
+                  </option>
+                )
+              })}
             </select>
             <select
               className="ms-select"
@@ -1044,6 +1085,12 @@ export default function MonthlyStrategy() {
               ))}
             </select>
           </div>
+          {isPastMonth && (
+            <div style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>warning</span>
+              {MONTHS[selectedMonth - 1]} {selectedYear} has already passed. Select the current or a future month.
+            </div>
+          )}
         </div>
 
         {/* ── Campaign Brief Panel ── */}
@@ -1078,8 +1125,12 @@ export default function MonthlyStrategy() {
                   style={{ minHeight: 72, resize: 'vertical', width: '100%', fontFamily: 'inherit' }}
                   placeholder="e.g. We're launching our new protein powder in 3 flavours. Focus on gym culture, avoid price comparisons. Push 30-day transformation messaging."
                   value={userBrief}
-                  onChange={e => setUserBrief(e.target.value)}
+                  maxLength={MAX_BRIEF_LENGTH}
+                  onChange={e => setUserBrief(e.target.value.slice(0, MAX_BRIEF_LENGTH))}
                 />
+                <div style={{ textAlign: 'right', fontSize: '0.65rem', marginTop: '0.2rem', color: userBrief.length > MAX_BRIEF_LENGTH - 200 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>
+                  {userBrief.length} / {MAX_BRIEF_LENGTH}
+                </div>
               </div>
 
               {/* Launch Events */}
@@ -1088,45 +1139,58 @@ export default function MonthlyStrategy() {
                   Launch Events
                   <span style={{ fontSize: '0.62rem', opacity: 0.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>AI will anchor posts on these dates ±3 days</span>
                 </div>
-                {launchEvents.map((ev, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
-                    <input
-                      className="ms-regen-input"
-                      style={{ flex: 2, minWidth: 120 }}
-                      placeholder="Event / Product name"
-                      value={ev.name}
-                      onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
-                    />
-                    <input
-                      type="date"
-                      className="ms-regen-input"
-                      style={{ flex: 1, minWidth: 110 }}
-                      value={ev.date}
-                      onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, date: e.target.value } : x))}
-                    />
-                    <select
-                      className="ms-select"
-                      style={{ flex: 0, minWidth: 90, fontSize: '0.72rem' }}
-                      value={ev.type}
-                      onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))}
-                    >
-                      {['product','campaign','sale','collab','event'].map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <button
-                      onClick={() => setLaunchEvents(prev => prev.filter((_, idx) => idx !== i))}
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '2px 4px' }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                    </button>
-                  </div>
-                ))}
+                {launchEvents.map((ev, i) => {
+                  const dateWarn = getEventDateWarning(ev.date)
+                  return (
+                    <div key={i} style={{ marginBottom: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          className="ms-regen-input"
+                          style={{ flex: 2, minWidth: 120 }}
+                          placeholder="Event / Product name"
+                          value={ev.name}
+                          maxLength={200}
+                          onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
+                        />
+                        <input
+                          type="date"
+                          className="ms-regen-input"
+                          style={{ flex: 1, minWidth: 110, borderColor: dateWarn ? 'rgba(239,68,68,0.5)' : undefined }}
+                          value={ev.date}
+                          onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, date: e.target.value } : x))}
+                        />
+                        <select
+                          className="ms-select"
+                          style={{ flex: 0, minWidth: 90, fontSize: '0.72rem' }}
+                          value={ev.type}
+                          onChange={e => setLaunchEvents(prev => prev.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))}
+                        >
+                          {['product','campaign','sale','collab','event'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <button
+                          onClick={() => setLaunchEvents(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '2px 4px' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                        </button>
+                      </div>
+                      {dateWarn && (
+                        <div style={{ fontSize: '0.65rem', color: '#f59e0b', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>warning</span>
+                          {dateWarn}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
                 <button
                   className="ms-regen-btn"
                   onClick={() => setLaunchEvents(prev => [...prev, { name: '', date: '', type: 'product' }])}
-                  style={{ fontSize: '0.72rem' }}
+                  disabled={launchEvents.length >= MAX_LAUNCH_EVENTS}
+                  style={{ fontSize: '0.72rem', opacity: launchEvents.length >= MAX_LAUNCH_EVENTS ? 0.4 : 1 }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 13 }}>add</span>
-                  Add Event
+                  Add Event{launchEvents.length > 0 ? ` (${launchEvents.length}/10)` : ''}
                 </button>
               </div>
 
@@ -1138,15 +1202,23 @@ export default function MonthlyStrategy() {
                 </div>
                 <input
                   className="ms-regen-input"
-                  placeholder="e.g. protein, gym, transformation, clean label"
+                  placeholder={keywordLimitReached ? `Max ${MAX_KEYWORDS} keywords reached` : 'e.g. protein, gym, transformation, clean label'}
                   value={focusKeywords}
-                  onChange={e => setFocusKeywords(e.target.value)}
+                  disabled={keywordLimitReached}
+                  onChange={e => {
+                    const val = e.target.value
+                    const count = val.split(',').map(k => k.trim()).filter(Boolean).length
+                    if (count <= MAX_KEYWORDS) setFocusKeywords(val)
+                  }}
                 />
                 {focusKeywords && (
-                  <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                    {focusKeywords.split(',').map(k => k.trim()).filter(Boolean).map(k => (
+                  <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {keywordList.map(k => (
                       <span key={k} style={{ fontSize: '0.68rem', background: 'rgba(255,255,255,0.07)', borderRadius: 99, padding: '2px 8px', color: 'rgba(255,255,255,0.7)' }}>{k}</span>
                     ))}
+                    <span style={{ fontSize: '0.62rem', color: keywordLimitReached ? '#f59e0b' : 'rgba(255,255,255,0.35)', marginLeft: 4 }}>
+                      {keywordList.length}/{MAX_KEYWORDS}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1189,7 +1261,7 @@ export default function MonthlyStrategy() {
         <CreditTooltipWrapper action="monthlyStrategy" position="top">
           <button
             className="ms-btn-generate"
-            disabled={!selectedType || !activeBrand}
+            disabled={!selectedType || !activeBrand || isPastMonth}
             onClick={handleGenerateClick}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>calendar_month</span>
@@ -1222,6 +1294,21 @@ export default function MonthlyStrategy() {
               </div>
             </div>
           </div>
+
+          {/* Duplicate strategy warning */}
+          {existingStrategy && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px',
+              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+              borderRadius: 10, marginBottom: 16, fontSize: 12
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f59e0b', flexShrink: 0, marginTop: 1 }}>info</span>
+              <span style={{ color: '#f59e0b' }}>
+                You already have a <strong>{STRATEGY_TYPES.find(t => t.id === selectedType)?.label}</strong> strategy for <strong>{monthName} {selectedYear}</strong> (v{existingStrategy.version || 1}).
+                Generating will create a new version.
+              </span>
+            </div>
+          )}
 
           {/* Cost breakdown */}
           <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>

@@ -29,6 +29,81 @@ import crypto from 'crypto';
 
 const router = express.Router();
 
+// ─── Validation Constants ────────────────────────────────────────────────────
+const VALID_STRATEGY_TYPES = [
+  'social-media', 'performance-marketing', 'seo', 'sales',
+  'content-marketing', 'email-retention', 'influencer-ugc', 'marketplace',
+];
+const MAX_LAUNCH_EVENTS = 10;
+const MAX_BRIEF_LENGTH = 2000;
+const MAX_KEYWORDS = 15;
+
+/**
+ * Shared input validation for strategy generation endpoints.
+ * Returns { error, sanitized } — if error is set, respond 400 and stop.
+ */
+function validateStrategyInput({ brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords }) {
+  // Required fields
+  if (!brandId || !strategyType || !month || !year) {
+    return { error: 'brandId, strategyType, month, year are required' };
+  }
+
+  const m = Number(month);
+  const y = Number(year);
+
+  // Month range
+  if (!Number.isInteger(m) || m < 1 || m > 12) {
+    return { error: 'month must be an integer between 1 and 12' };
+  }
+
+  // Year range — allow current year and next year only
+  const currentYear = new Date().getFullYear();
+  if (!Number.isInteger(y) || y < currentYear || y > currentYear + 1) {
+    return { error: `year must be ${currentYear} or ${currentYear + 1}` };
+  }
+
+  // Past month check — block if the entire target month has already ended
+  const now = new Date();
+  const lastDayOfTarget = new Date(y, m, 0); // last day of target month
+  if (lastDayOfTarget < now) {
+    return { error: 'Cannot generate strategy for a past month.' };
+  }
+
+  // Strategy type enum
+  if (!VALID_STRATEGY_TYPES.includes(strategyType)) {
+    return { error: `Invalid strategy type: ${strategyType}. Valid types: ${VALID_STRATEGY_TYPES.join(', ')}` };
+  }
+
+  // Sanitize optional fields
+  const sanitized = {};
+
+  // Brief — cap length
+  sanitized.userBrief = typeof userBrief === 'string' ? userBrief.slice(0, MAX_BRIEF_LENGTH).trim() : undefined;
+
+  // Focus keywords — cap count
+  if (Array.isArray(focusKeywords)) {
+    sanitized.focusKeywords = focusKeywords.filter(k => typeof k === 'string' && k.trim()).slice(0, MAX_KEYWORDS);
+  } else {
+    sanitized.focusKeywords = undefined;
+  }
+
+  // Launch events — sanitize: remove empty names, cap count, validate date format
+  if (Array.isArray(launchEvents)) {
+    sanitized.launchEvents = launchEvents
+      .filter(ev => ev && typeof ev.name === 'string' && ev.name.trim())
+      .slice(0, MAX_LAUNCH_EVENTS)
+      .map(ev => ({
+        name: ev.name.trim().slice(0, 200),
+        date: /^\d{4}-\d{2}-\d{2}$/.test(ev.date) ? ev.date : '',
+        type: ['product', 'campaign', 'sale', 'collab', 'event'].includes(ev.type) ? ev.type : 'product',
+      }));
+  } else {
+    sanitized.launchEvents = undefined;
+  }
+
+  return { error: null, sanitized };
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const emit = (res, obj) => {
@@ -358,15 +433,16 @@ router.post('/generate/stream', protect, requireCredits('monthlyStrategy'), asyn
   const { brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords, toneOverride } = req.body;
   const userId = req.user._id;
 
-  if (!brandId || !strategyType || !month || !year) {
-    emit(res, { type: 'error', message: 'brandId, strategyType, month, year are required' });
+  const { error: validationError, sanitized } = validateStrategyInput({ brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords });
+  if (validationError) {
+    emit(res, { type: 'error', message: validationError });
     return res.end();
   }
 
   try {
     const doc = await runStrategyPipeline({
       brandId, strategyType, month: Number(month), year: Number(year), userId,
-      userBrief, launchEvents, focusKeywords, toneOverride,
+      userBrief: sanitized.userBrief, launchEvents: sanitized.launchEvents, focusKeywords: sanitized.focusKeywords, toneOverride,
       emitFn: (obj) => emit(res, obj),
     });
     emit(res, { type: 'done', strategyId: doc._id.toString(), version: doc.version });
@@ -390,8 +466,18 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
   const { brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords, toneOverride } = req.body;
   const userId = req.user._id;
 
-  if (!brandId || !strategyType || !month || !year) {
-    return res.status(400).json({ success: false, error: 'brandId, strategyType, month, year are required' });
+  const { error: validationError, sanitized } = validateStrategyInput({ brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords });
+  if (validationError) {
+    return res.status(400).json({ success: false, error: validationError });
+  }
+
+  // Concurrent generation guard — prevent double-submit / credit waste
+  const activeJob = await GenerationJob.findOne({
+    user: userId, type: 'monthly-strategy',
+    status: { $in: ['pending', 'processing'] },
+  }).select('jobId').lean();
+  if (activeJob) {
+    return res.status(429).json({ success: false, error: 'A strategy is already being generated. Please wait for it to finish.', existingJobId: activeJob.jobId });
   }
 
   // Build human-readable label for notifications
@@ -440,7 +526,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
 
       const doc = await runStrategyPipeline({
         brandId, strategyType, month: Number(month), year: Number(year), userId,
-        userBrief, launchEvents, focusKeywords, toneOverride,
+        userBrief: sanitized.userBrief, launchEvents: sanitized.launchEvents, focusKeywords: sanitized.focusKeywords, toneOverride,
         emitFn: async (obj) => {
           // Map SSE events to job steps
           if (obj.type === 'research_done') await pushStep(`Research: ${obj.label || obj.tool}`, 'done');
@@ -510,14 +596,15 @@ router.post('/generate', protect, requireCredits('monthlyStrategy'), async (req,
   const { brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords, toneOverride } = req.body;
   const userId = req.user._id;
 
-  if (!brandId || !strategyType || !month || !year) {
-    return res.status(400).json({ success: false, error: 'brandId, strategyType, month, year are required' });
+  const { error: validationError, sanitized } = validateStrategyInput({ brandId, strategyType, month, year, userBrief, launchEvents, focusKeywords });
+  if (validationError) {
+    return res.status(400).json({ success: false, error: validationError });
   }
 
   try {
     const doc = await runStrategyPipeline({
       brandId, strategyType, month: Number(month), year: Number(year), userId,
-      userBrief, launchEvents, focusKeywords, toneOverride,
+      userBrief: sanitized.userBrief, launchEvents: sanitized.launchEvents, focusKeywords: sanitized.focusKeywords, toneOverride,
       emitFn: () => {}, // no-op for blocking
     });
     res.json({ success: true, strategy: doc });

@@ -1113,8 +1113,8 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                 {/* Manual */}
             {contextType === 'manual' && (
                 <div className="relative">
-                    <textarea value={details} onChange={e => setDetails(e.target.value)}
-                        placeholder={placeholder}
+                    <textarea value={details} onChange={e => setDetails(e.target.value.slice(0, 5000))}
+                        placeholder={placeholder} maxLength={5000}
                         className="cs-input-field cs-textarea-premium px-4 pr-14 py-4" rows={5} autoFocus />
                     <div className="absolute right-4 top-4">
                         <VoiceInput
