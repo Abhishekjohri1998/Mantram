@@ -1229,6 +1229,7 @@ small{color:#94a3b8;font-size:10px}
                                     elapsed={loadingElapsed}
                                     estimatedDuration={ESTIMATED_DURATIONS[activeSection] || 60}
                                     icon="troubleshoot"
+                                    thinkingContext="seo"
                                 />
                                 <div className="absolute bottom-6 left-0 right-0 flex justify-center">
                                     <button onClick={cancelWorkflow}

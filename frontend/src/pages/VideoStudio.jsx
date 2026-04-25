@@ -1440,6 +1440,7 @@ export default function VideoStudio() {
                                     estimatedDuration={30}
                                     stages={['Analyzing Brief', 'Generating Concepts']}
                                     currentStage="Generating Concepts"
+                                    thinkingContext="video"
                                 />
                             ) : (
                                 <button data-wt="video-start" onClick={handleStart}
@@ -1469,6 +1470,7 @@ export default function VideoStudio() {
                                     estimatedDuration={25}
                                     stages={['Concept Analysis', 'Script Writing', 'Shot Planning']}
                                     currentStage="Script Writing"
+                                    thinkingContext="video"
                                 />
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1569,6 +1571,7 @@ export default function VideoStudio() {
                                     estimatedDuration={20}
                                     stages={['Analyzing Script', 'Model Selection', 'Cost Estimation']}
                                     currentStage="Model Selection"
+                                    thinkingContext="video"
                                 />
                             ) : (
                                 <button onClick={handleApproveScript}

@@ -187,6 +187,7 @@ export default function D2CAnalytics() {
                         estimatedDuration={15}
                         stages={['Syncing Shopify', 'Processing Metrics']}
                         currentStage="Syncing Shopify"
+                        thinkingContext="analytics"
                     />
                 </div>
             ) : !data?.connected ? (

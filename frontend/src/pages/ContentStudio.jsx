@@ -1222,6 +1222,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                                 currentStage="Detecting products, colors, mood, text, and marketing angles..." 
                                 icon="psychology"
                                 estimatedDuration={15}
+                                thinkingContext="content"
                             />
 
                             {/* Analysis Error */}
@@ -1362,6 +1363,7 @@ function StepContext({ onComplete, onBack, goal, subType, initialImage, brandId 
                         currentStage="Matching your context to your product catalog" 
                         icon="smart_toy"
                         estimatedDuration={10}
+                        thinkingContext="content"
                     />
 
                     {showProductPanel && suggestedProducts.length > 0 && (
@@ -5701,6 +5703,7 @@ SPOKESPERSON QUOTES:`
                         estimatedDuration={45}
                         pipelineSteps={pipelineSteps}
                         startedAt={generatingStartedAt}
+                        thinkingContext="content"
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
@@ -5741,6 +5744,7 @@ SPOKESPERSON QUOTES:`
                         currentStage="Using brand DNA + PR best practices for professional output"
                         icon="newspaper"
                         estimatedDuration={45}
+                        thinkingContext="content"
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
@@ -5818,6 +5822,7 @@ SPOKESPERSON QUOTES:`
                         currentStage="Running YouTube Research Agent → YouTube Writer Agent pipeline"
                         icon="smart_display"
                         estimatedDuration={60}
+                        thinkingContext="content"
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
@@ -5859,6 +5864,7 @@ SPOKESPERSON QUOTES:`
                         currentStage="Running YouTube Research Agent → SEO Optimizer Agent pipeline"
                         icon="troubleshoot"
                         estimatedDuration={60}
+                        thinkingContext="content"
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>
@@ -5897,6 +5903,7 @@ SPOKESPERSON QUOTES:`
                         currentStage="Research Agent → Blog Writer generating structured content with SEO"
                         icon="edit_note"
                         estimatedDuration={60}
+                        thinkingContext="content"
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>

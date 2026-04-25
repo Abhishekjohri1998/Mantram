@@ -363,7 +363,7 @@ export default function SocialMediaStudio() {
                 </div>
             )}
 
-            {loading && <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center"><div className="max-w-md w-full mx-4"><GlobalLoader isActive={true} title={loadingMsg || 'AI is thinking...'} icon="psychology" estimatedDuration={fullAnalysisRunning ? 90 : 45} stages={fullAnalysisRunning ? ['Strategy', 'Account Audit', 'Competitor Intel'] : ['Analyzing Data', 'Building Report']} currentStage={fullAnalysisRunning ? 'Strategy' : 'Analyzing Data'} /></div></div>}
+            {loading && <div className="fixed inset-0 bg-[var(--sys-surface)] z-50 flex items-center justify-center"><div className="max-w-md w-full mx-4"><GlobalLoader isActive={true} title={loadingMsg || 'AI is thinking...'} icon="psychology" estimatedDuration={fullAnalysisRunning ? 90 : 45} stages={fullAnalysisRunning ? ['Strategy', 'Account Audit', 'Competitor Intel'] : ['Analyzing Data', 'Building Report']} currentStage={fullAnalysisRunning ? 'Strategy' : 'Analyzing Data'} thinkingContext="social" /></div></div>}
 
             {/* ═══════ DASHBOARD ═══════ */}
             {tab === 'dashboard' && (

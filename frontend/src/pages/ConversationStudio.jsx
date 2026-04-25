@@ -318,6 +318,7 @@ export default function ConversationStudio() {
                                 estimatedDuration={10}
                                 stages={['Fetching Messages', 'AI Suggestions']}
                                 currentStage="Fetching Messages"
+                                thinkingContext="conversation"
                             />
                         </div>
                     ) : (

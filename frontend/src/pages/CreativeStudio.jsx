@@ -3255,6 +3255,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 icon="photo_camera"
                                 estimatedDuration={150}
                                 startedAt={job.startedAt}
+                                thinkingContext="creative"
                             />
                         ))}
 
@@ -4660,6 +4661,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 currentStage="Gemini AI is styling your product with professional lighting and composition..."
                                 icon="photo_camera"
                                 estimatedDuration={30}
+                                thinkingContext="creative"
                             />
 
                             {photoshootResult && (
@@ -5422,6 +5424,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 currentStage="AI is creating a seamless panoramic background and splitting into panels..."
                                 icon="view_carousel"
                                 estimatedDuration={30}
+                                thinkingContext="creative"
                             />
 
                             {/* ── Empty State ── */}
@@ -7805,6 +7808,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     currentStage={`AI is designing with ${activeBrand.name}'s brand identity...`}
                                     icon={activeTemplate.icon}
                                     estimatedDuration={25}
+                                    thinkingContext="creative"
                                 />
 
                                 {!templateGenerating && !templateResult && (

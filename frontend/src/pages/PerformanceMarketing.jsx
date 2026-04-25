@@ -842,6 +842,7 @@ export default function PerformanceMarketing() {
                                 estimatedDuration={45}
                                 stages={['Gathering Intel', 'Analyzing Ads', 'Building Report']}
                                 currentStage={loading ? 'Analyzing Ads' : ''}
+                                thinkingContext="performance"
                             />
                         )}
 
@@ -1052,6 +1053,7 @@ export default function PerformanceMarketing() {
                                 estimatedDuration={60}
                                 stages={['Research Review', 'Channel Allocation', 'Budget Optimization', 'Report Generation']}
                                 currentStage={loading ? 'Channel Allocation' : ''}
+                                thinkingContext="performance"
                             />
                         )}
                         {/* Strategy Health Banner */}

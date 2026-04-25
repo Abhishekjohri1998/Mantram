@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 /**
  * GlobalLoader — Premium agentic pipeline loading overlay
@@ -13,6 +13,7 @@ import React, { useState, useEffect, useMemo } from 'react';
  *  - elapsed          (number)  Optional parent-supplied elapsed seconds
  *  - estimatedDuration(number)  Expected total seconds (default 30)
  *  - icon             (string)  Material icon name
+ *  - thinkingContext  (string)  Studio context for simulated thinking steps: 'content'|'creative'|'video'|'seo'|'social'|'performance'|'conversation'|'analytics'|'strategy'
  */
 
 // Agent metadata for display
@@ -30,6 +31,153 @@ const AGENT_META = {
     'processing':        { icon: 'sync',              label: 'Processing',            color: '#FF4D00' },
 };
 
+// ── Thinking Step Definitions per Studio Context ────────────────────────────
+const THINKING_STEPS = {
+    content: [
+        { icon: 'psychology',       label: 'Loading Brand DNA & voice profile...', color: '#FF4D00' },
+        { icon: 'group',            label: 'Analyzing target audience segments...', color: '#8b5cf6' },
+        { icon: 'trending_up',      label: 'Researching trending topics & hooks...', color: '#06b6d4' },
+        { icon: 'edit_note',        label: 'Crafting hook line & opening...', color: '#f97316' },
+        { icon: 'auto_awesome',     label: 'Writing body copy with brand voice...', color: '#ec4899' },
+        { icon: 'tag',              label: 'Adding hashtags, CTA & formatting...', color: '#10b981' },
+        { icon: 'verified',         label: 'Running quality & tone check...', color: '#f59e0b' },
+    ],
+    creative: [
+        { icon: 'psychology',       label: 'Loading brand visual identity...', color: '#FF4D00' },
+        { icon: 'description',      label: 'Analyzing creative brief...', color: '#8b5cf6' },
+        { icon: 'palette',          label: 'Building art direction & composition...', color: '#ec4899' },
+        { icon: 'code',             label: 'Engineering generation prompt...', color: '#06b6d4' },
+        { icon: 'auto_awesome',     label: 'Generating visual with AI model...', color: '#6366f1' },
+        { icon: 'tune',             label: 'Applying style refinements...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Final quality review...', color: '#22c55e' },
+    ],
+    video: [
+        { icon: 'movie',            label: 'Analyzing storyboard structure...', color: '#FF4D00' },
+        { icon: 'psychology',       label: 'Loading brand assets & guidelines...', color: '#8b5cf6' },
+        { icon: 'view_in_ar',       label: 'Composing scene layouts...', color: '#ec4899' },
+        { icon: 'subtitles',        label: 'Aligning script with visuals...', color: '#06b6d4' },
+        { icon: 'auto_awesome',     label: 'Generating video frames...', color: '#6366f1' },
+        { icon: 'layers',           label: 'Compositing & rendering...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Final review & encoding...', color: '#22c55e' },
+    ],
+    seo: [
+        { icon: 'language',         label: 'Crawling page structure...', color: '#FF4D00' },
+        { icon: 'search',           label: 'Analyzing keyword opportunities...', color: '#8b5cf6' },
+        { icon: 'groups',           label: 'Benchmarking against competitors...', color: '#ec4899' },
+        { icon: 'build',            label: 'Running technical SEO audit...', color: '#06b6d4' },
+        { icon: 'analytics',        label: 'Calculating ranking signals...', color: '#6366f1' },
+        { icon: 'lightbulb',        label: 'Building optimization recommendations...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Compiling report...', color: '#22c55e' },
+    ],
+    social: [
+        { icon: 'psychology',       label: 'Loading brand intelligence...', color: '#FF4D00' },
+        { icon: 'analytics',        label: 'Analyzing social media metrics...', color: '#8b5cf6' },
+        { icon: 'groups',           label: 'Studying audience behavior...', color: '#ec4899' },
+        { icon: 'trending_up',      label: 'Building growth strategy...', color: '#06b6d4' },
+        { icon: 'lightbulb',        label: 'Generating actionable insights...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Compiling analysis...', color: '#22c55e' },
+    ],
+    performance: [
+        { icon: 'campaign',         label: 'Loading campaign performance data...', color: '#FF4D00' },
+        { icon: 'analytics',        label: 'Analyzing conversion metrics...', color: '#8b5cf6' },
+        { icon: 'groups',           label: 'Benchmarking against industry...', color: '#ec4899' },
+        { icon: 'trending_up',      label: 'Identifying optimization opportunities...', color: '#06b6d4' },
+        { icon: 'auto_awesome',     label: 'Building AI recommendations...', color: '#6366f1' },
+        { icon: 'check_circle',     label: 'Generating optimization plan...', color: '#22c55e' },
+    ],
+    conversation: [
+        { icon: 'psychology',       label: 'Loading brand context & persona...', color: '#FF4D00' },
+        { icon: 'chat',             label: 'Analyzing conversation intent...', color: '#8b5cf6' },
+        { icon: 'auto_awesome',     label: 'Building intelligent response...', color: '#06b6d4' },
+        { icon: 'verified',         label: 'Running tone & accuracy check...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Finalizing response...', color: '#22c55e' },
+    ],
+    analytics: [
+        { icon: 'database',         label: 'Loading D2C analytics data...', color: '#FF4D00' },
+        { icon: 'analytics',        label: 'Processing business metrics...', color: '#8b5cf6' },
+        { icon: 'trending_up',      label: 'Identifying trends & patterns...', color: '#06b6d4' },
+        { icon: 'lightbulb',        label: 'Generating strategic insights...', color: '#f59e0b' },
+        { icon: 'check_circle',     label: 'Building report...', color: '#22c55e' },
+    ],
+    strategy: [
+        { icon: 'psychology',       label: 'Loading Brand DNA & market position...', color: '#FF4D00' },
+        { icon: 'travel_explore',   label: 'Scanning competitive landscape...', color: '#8b5cf6' },
+        { icon: 'trending_up',      label: 'Analyzing market trends...', color: '#ec4899' },
+        { icon: 'architecture',     label: 'Building strategy framework...', color: '#06b6d4' },
+        { icon: 'edit_note',        label: 'Writing execution playbook...', color: '#f97316' },
+        { icon: 'calendar_month',   label: 'Mapping content calendar...', color: '#6366f1' },
+        { icon: 'check_circle',     label: 'Final review & scoring...', color: '#22c55e' },
+    ],
+};
+
+// ── Hook: Simulated thinking steps timer ─────────────────────────────────────
+function useThinkingSimulator(isActive, thinkingContext, estimatedDuration, hasRealSteps) {
+    const [simulatedSteps, setSimulatedSteps] = useState([]);
+    const timerRef = useRef(null);
+    const indexRef = useRef(0);
+
+    useEffect(() => {
+        // Reset when loader activates
+        if (!isActive) {
+            setSimulatedSteps([]);
+            indexRef.current = 0;
+            if (timerRef.current) clearInterval(timerRef.current);
+            return;
+        }
+
+        // Don't simulate if we have real pipeline steps or no context
+        if (hasRealSteps || !thinkingContext) return;
+
+        const steps = THINKING_STEPS[thinkingContext];
+        if (!steps || steps.length === 0) return;
+
+        // Calculate interval: spread steps across ~70% of estimated duration
+        // First step shows immediately, rest are staggered
+        const totalTime = Math.max(20, estimatedDuration) * 0.7; // use 70% of estimated time
+        const interval = Math.max(2500, (totalTime / steps.length) * 1000); // min 2.5s per step
+
+        // Show first step immediately
+        indexRef.current = 0;
+        setSimulatedSteps([{
+            agent: `sim-${steps[0].icon}`,
+            message: steps[0].label,
+            status: 'working',
+            _icon: steps[0].icon,
+            _color: steps[0].color,
+        }]);
+
+        timerRef.current = setInterval(() => {
+            indexRef.current += 1;
+            const nextIdx = indexRef.current;
+
+            if (nextIdx >= steps.length) {
+                // All steps shown — mark last as working, stop timer
+                clearInterval(timerRef.current);
+                return;
+            }
+
+            setSimulatedSteps(prev => {
+                // Mark all previous as done, add new one as working
+                const updated = prev.map(s => ({ ...s, status: 'done' }));
+                updated.push({
+                    agent: `sim-${steps[nextIdx].icon}`,
+                    message: steps[nextIdx].label,
+                    status: 'working',
+                    _icon: steps[nextIdx].icon,
+                    _color: steps[nextIdx].color,
+                });
+                return updated;
+            });
+        }, interval);
+
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [isActive, thinkingContext, estimatedDuration, hasRealSteps]);
+
+    return simulatedSteps;
+}
+
 export default function GlobalLoader({
     isActive,
     title = 'Processing Request...',
@@ -40,6 +188,7 @@ export default function GlobalLoader({
     estimatedDuration = 120, // ← Bumped default: real generation takes 60-180s
     icon = 'troubleshoot',
     startedAt = null, // Unix timestamp (ms) — if provided, elapsed is calculated from this
+    thinkingContext = null, // Studio context for simulated thinking: 'content'|'creative'|'video'|'seo'|etc.
 }) {
     if (!isActive) return null;
 
@@ -65,14 +214,21 @@ export default function GlobalLoader({
     // Determine if we have real pipeline steps
     const hasRealSteps = pipelineSteps.length > 0;
 
+    // Simulated thinking steps (only when no real steps AND thinkingContext provided)
+    const simulatedSteps = useThinkingSimulator(isActive, thinkingContext, estimatedDuration, hasRealSteps);
+
+    // Use real steps if available, otherwise simulated
+    const displaySteps = hasRealSteps ? pipelineSteps : simulatedSteps;
+    const hasDisplaySteps = displaySteps.length > 0;
+
     // Deduplicate steps — keep latest per agent
     const uniqueSteps = useMemo(() => {
         const map = new Map();
-        for (const step of pipelineSteps) {
+        for (const step of displaySteps) {
             map.set(step.agent, step);
         }
         return [...map.values()];
-    }, [pipelineSteps]);
+    }, [displaySteps]);
 
     // Current active step (the last 'working' step)
     const activeStep = useMemo(() => {
@@ -80,34 +236,27 @@ export default function GlobalLoader({
     }, [uniqueSteps]);
 
     // Progress calculation — smooth asymptotic curve that never looks frozen
-    // Backend queue does NOT send granular step updates, so we rely on elapsed time.
-    // The curve: races to ~80% by estimatedDuration/2, ~92% by estimatedDuration, 
-    // then SLOWLY climbs 92→97% over the next T seconds to avoid a hard stall.
-    // Cap at 97% to leave headroom before the real completion fires.
     const doneCount = uniqueSteps.filter(s => s.status === 'done').length;
     const workingCount = uniqueSteps.filter(s => s.status === 'working').length;
-    const allDone = hasRealSteps && doneCount > 0 && workingCount === 0;
+    const allDone = hasDisplaySteps && doneCount > 0 && workingCount === 0;
     
     let pct;
     if (allDone) {
         pct = 100;
-    } else if (hasRealSteps && doneCount > 0) {
-        // If we have some done steps, use step-based progress (rare path)
+    } else if (hasDisplaySteps && doneCount > 0) {
         const totalExpected = Math.max(6, uniqueSteps.length);
         pct = Math.min(95, (doneCount / totalExpected) * 100);
     } else {
         // Time-based asymptotic curve (the common path)
-        // k=2.0/T → slower climb → at t=T we're ~86%, at t=1.5T ~95%
-        // This prevents the dreaded 98%-forever stall with a realistic time budget
         const t = localElapsed;
-        const T = Math.max(60, estimatedDuration); // min 60s baseline
+        const T = Math.max(60, estimatedDuration);
         const k = 2.0 / T;
         pct = Math.min(97, (1 - Math.exp(-k * t)) * 100);
     }
     const displayPct = Math.round(pct);
-    const isNearlyDone = displayPct >= 90; // show shimmer when almost done
+    const isNearlyDone = displayPct >= 90;
 
-    // ETA remaining — patient, honest messaging
+    // ETA remaining
     const etaRemaining = Math.max(0, estimatedDuration - localElapsed);
     const etaLabel = localElapsed < estimatedDuration * 0.25
         ? `~${Math.ceil(etaRemaining / 60) || 1} min remaining`
@@ -121,7 +270,7 @@ export default function GlobalLoader({
 
     // Determine the dynamic title based on active step
     const dynamicTitle = activeStep
-        ? AGENT_META[activeStep.agent]?.label || activeStep.message
+        ? (hasRealSteps ? (AGENT_META[activeStep.agent]?.label || activeStep.message) : activeStep.message)
         : title;
 
     return (
@@ -132,24 +281,36 @@ export default function GlobalLoader({
                 <div className="mesh-ring mesh-ring-2"></div>
                 <div className="mesh-ring mesh-ring-3"></div>
                 <span className="material-symbols-outlined text-3xl text-primary relative z-10 animate-pulse">
-                    {activeStep ? (AGENT_META[activeStep.agent]?.icon || icon) : icon}
+                    {activeStep
+                        ? (hasRealSteps ? (AGENT_META[activeStep.agent]?.icon || icon) : (activeStep._icon || icon))
+                        : icon}
                 </span>
             </div>
 
             {/* Title */}
             <h3 className="text-lg font-black text-[var(--sys-text)] mb-1">{dynamicTitle}</h3>
-            {activeStep && (
+            {activeStep && hasRealSteps && (
                 <p className="text-sm text-[var(--sys-text-muted)] animate-pulse mb-4 max-w-md">{activeStep.message}</p>
+            )}
+            {/* Fidato thinking label for simulated steps */}
+            {activeStep && !hasRealSteps && thinkingContext && (
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-sm text-primary animate-pulse">psychology</span>
+                    <span className="text-xs font-semibold text-[var(--sys-text-muted)] tracking-wide">Fidato is thinking...</span>
+                </div>
             )}
             {!activeStep && currentStage && (
                 <p className="text-sm text-[var(--sys-text)] animate-pulse mb-4">{currentStage}</p>
             )}
 
-            {/* ── Real-time Pipeline Steps ── */}
-            {hasRealSteps && (
+            {/* ── Real-time / Simulated Pipeline Steps ── */}
+            {hasDisplaySteps && (
                 <div className="w-full max-w-md mt-2 mb-4 text-left">
                     {uniqueSteps.map((step, i) => {
-                        const meta = AGENT_META[step.agent] || { icon: 'circle', label: step.agent, color: '#FF4D00' };
+                        const isSimulated = !hasRealSteps;
+                        const meta = isSimulated
+                            ? { icon: step._icon || 'circle', label: step.message, color: step._color || '#FF4D00' }
+                            : AGENT_META[step.agent] || { icon: 'circle', label: step.agent, color: '#FF4D00' };
                         const isDone = step.status === 'done';
                         const isWorking = step.status === 'working';
                         const duration = step.durationMs ? `${(step.durationMs / 1000).toFixed(1)}s` : '';
@@ -159,6 +320,7 @@ export default function GlobalLoader({
                                 className={`flex items-center gap-3 py-2 px-3 rounded-lg mb-1 transition-all duration-500 ${
                                     isWorking ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' : isDone ? 'opacity-70' : 'opacity-40'
                                 }`}
+                                style={{ animation: `glStepSlideIn 0.4s ease-out ${i * 0.06}s both` }}
                             >
                                 {/* Status icon */}
                                 <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
@@ -226,17 +388,17 @@ export default function GlobalLoader({
                         {isNearlyDone && <span className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-pulse flex-shrink-0" />}
                         {etaLabel}
                     </span>
-                    {hasRealSteps && (
+                    {hasDisplaySteps && (
                         <span className="text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
                             <span className="material-symbols-outlined text-[12px] text-[#FF4D00]">smart_toy</span>
-                            Agentic Pipeline
+                            {hasRealSteps ? 'Agentic Pipeline' : 'Fidato AI'}
                         </span>
                     )}
                 </div>
             </div>
 
-            {/* Stage dots (fallback when no real pipeline steps) */}
-            {!hasRealSteps && stages.length > 0 && (
+            {/* Stage dots (fallback when no real pipeline steps AND no simulated steps) */}
+            {!hasDisplaySteps && stages.length > 0 && (
                 <div className="flex gap-1.5 mt-6 justify-center flex-wrap">
                     {stages.map((s, i) => (
                         <div
@@ -260,7 +422,7 @@ export default function GlobalLoader({
                 </div>
             )}
 
-            {/* Inline CSS for mesh rings + shimmer */}
+            {/* Inline CSS for mesh rings + shimmer + step slide-in */}
             <style dangerouslySetInnerHTML={{__html: `
                 .loader-mesh { position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; }
                 .mesh-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; border-top-color: #FF4D00; }
@@ -271,6 +433,10 @@ export default function GlobalLoader({
                 @keyframes progressShimmer {
                     0% { background-position: -200% 0; }
                     100% { background-position: 200% 0; }
+                }
+                @keyframes glStepSlideIn {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             `}} />
         </div>

@@ -289,6 +289,7 @@ const GalleryPanel = memo(({
                     currentStage={`${job.prompt}${job.prompt.length >= 60 ? '...' : ''}`}
                     icon="photo_camera"
                     estimatedDuration={60}
+                    thinkingContext="creative"
                 />
             ))}
 
