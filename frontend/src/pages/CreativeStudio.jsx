@@ -3,7 +3,7 @@ import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
-import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, API_BASE } from '../services/api'
+import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, monthlyStrategy as monthlyStrategyAPI, API_BASE } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
@@ -354,6 +354,22 @@ export default function CreativeStudio() {
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
+    // ── Monthly Strategy writeback — fires when result is set after coming from calendar ──
+    useEffect(() => {
+        if (!result?.imageUrl) return
+        const ctxRaw = window.sessionStorage.getItem('ms_strategy_ctx')
+        if (!ctxRaw) return
+        try {
+            const { strategyId, itemId } = JSON.parse(ctxRaw)
+            if (!strategyId || !itemId) return
+            window.sessionStorage.removeItem('ms_strategy_ctx')
+            monthlyStrategyAPI.updateAsset(strategyId, itemId, {
+                type:  'image',
+                url:   result.imageUrl,
+                title: result.title || result._prompt || 'Creative Studio output',
+            }).catch(e => console.warn('[CreativeStudio] strategy writeback failed:', e))
+        } catch {}
+    }, [result]) // eslint-disable-line react-hooks/exhaustive-deps
     const [generationHistory, setGenerationHistory] = useState([]) // Persistent gallery for AI Create
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [error, setError] = useState(null)
@@ -1252,6 +1268,41 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         const isFromContent = searchParams.get('fromContent')
         const contentPrompt = searchParams.get('prompt')
         const contentType = searchParams.get('type')
+
+        // ── Monthly Strategy handoff ──────────────────────────────────────────
+        if (searchParams.get('from') === 'monthly_strategy') {
+            try {
+                const raw = window.sessionStorage.getItem('ms_brief_handoff')
+                if (raw) {
+                    const brief = JSON.parse(raw)
+                    // Build a creative image prompt from the strategy brief
+                    const parts = []
+                    if (brief.visualDirection) parts.push(brief.visualDirection)
+                    if (brief.angle) parts.push(`Campaign angle: ${brief.angle}`)
+                    if (brief.tone) parts.push(`Mood: ${brief.tone}`)
+                    const creativePrompt = parts.join('. ') || brief.angle || 'Create a visual for this campaign'
+                    setPrompt(creativePrompt)
+                    setFromContent(false)
+                    setShowQuickStart(false)
+                    // Auto-select a good format for social
+                    const platform = brief.platform?.toLowerCase() || ''
+                    if (platform.includes('instagram')) setSelectedType('instagram-post')
+                    else if (platform.includes('facebook')) setSelectedType('facebook-post')
+                    else if (platform.includes('youtube')) setSelectedType('youtube-thumbnail')
+                    window.sessionStorage.removeItem('ms_brief_handoff')
+                }
+            } catch (e) {
+                console.error('[CreativeStudio] Failed to read ms_brief_handoff:', e)
+            }
+            // Keep ms_strategy_ctx — the generation complete handler will consume it
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev)
+                next.delete('from')
+                return next
+            }, { replace: true })
+            return
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         if (isFromContent && contentPrompt) {
             const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''

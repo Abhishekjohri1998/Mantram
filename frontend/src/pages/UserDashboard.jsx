@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
-import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics, pmStudio, funnelStudio } from '../services/api'
+import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics, pmStudio, funnelStudio, brandCalendar as brandCalendarAPI } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
 import IntelReportViewer from '../components/IntelReportViewer'
@@ -216,6 +216,10 @@ export default function UserDashboard() {
     const [intelReport, setIntelReport] = useState(null) // { mission, findings }
     const [showIntelReport, setShowIntelReport] = useState(false)
 
+    // Today's Calendar widget state
+    const [todaySchedule, setTodaySchedule] = useState({ today: [], tomorrow: [] })
+    const [loadingToday, setLoadingToday] = useState(false)
+
 
     const country = activeBrand?.dna?.country || activeBrand?.country || 'India'
     const upcoming = useMemo(() => getUpcomingEvents(country, 14), [country])
@@ -351,6 +355,16 @@ export default function UserDashboard() {
             finally { setLoadingIntel(false) }
         }
         fetchIntelData()
+    }, [activeBrand?._id])
+
+    // ── Load today's calendar ──
+    useEffect(() => {
+        if (!activeBrand?._id) return
+        setLoadingToday(true)
+        brandCalendarAPI.today(activeBrand._id)
+            .then(data => setTodaySchedule({ today: data.today || [], tomorrow: data.tomorrow || [] }))
+            .catch(() => {})
+            .finally(() => setLoadingToday(false))
     }, [activeBrand?._id])
 
     const openIntelReport = async (mission) => {
@@ -762,6 +776,79 @@ export default function UserDashboard() {
                             </button>
                         </div>
                     )}
+
+                    {/* ── TODAY'S CALENDAR WIDGET ── */}
+                    <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary text-xl">calendar_today</span>
+                                <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest">Today's Posts</h3>
+                            </div>
+                            <button onClick={() => navigate('/brand-calendar')} className="text-[10px] font-bold text-primary hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1">
+                                View Calendar <span className="material-symbols-outlined text-[11px]">arrow_forward</span>
+                            </button>
+                        </div>
+
+                        {loadingToday ? (
+                            <div className="space-y-2">
+                                {[1,2].map(i => <div key={i} className="h-10 rounded-xl bg-[var(--sys-surface)] animate-pulse" />)}
+                            </div>
+                        ) : (todaySchedule.today.length + todaySchedule.tomorrow.length) === 0 ? (
+                            <div className="text-center py-5">
+                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] opacity-30 block mb-2">event_busy</span>
+                                <p className="text-xs text-[var(--sys-text-muted)]">Nothing scheduled today</p>
+                                <button onClick={() => navigate('/brand-calendar')} className="mt-3 px-4 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/20 transition-colors border border-primary/20">
+                                    Schedule a Post
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {todaySchedule.today.length > 0 && (
+                                    <div>
+                                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] mb-2">Today</p>
+                                        <div className="space-y-1.5">
+                                            {todaySchedule.today.slice(0,3).map(e => {
+                                                const PL_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work' }
+                                                const PL_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2' }
+                                                const platform = e.platform?.toLowerCase() || ''
+                                                const statusColor = e.status === 'published' ? 'text-emerald-400' : e.status === 'failed' ? 'text-red-400' : 'text-amber-400'
+                                                const statusIcon  = e.status === 'published' ? 'task_alt' : e.status === 'failed' ? 'error_outline' : 'schedule_send'
+                                                return (
+                                                    <div key={e._id} onClick={() => navigate('/brand-calendar')} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20 cursor-pointer transition-all group">
+                                                        <span className="material-symbols-outlined text-[14px] shrink-0" style={{ color: PL_COLOR[platform] || '#888' }}>{PL_ICON[platform] || 'share'}</span>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] truncate flex-1 group-hover:text-[var(--sys-text)] transition-colors">{e.caption?.slice(0,30) || e.contentType || 'Post'}</p>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            {e.scheduledAt && <span className="text-[10px] text-[var(--sys-text-muted)]">{new Date(e.scheduledAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</span>}
+                                                            <span className={`material-symbols-outlined text-[11px] ${statusColor}`}>{statusIcon}</span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                {todaySchedule.tomorrow.length > 0 && (
+                                    <div>
+                                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] mb-2">Tomorrow</p>
+                                        <div className="space-y-1.5">
+                                            {todaySchedule.tomorrow.slice(0,2).map(e => {
+                                                const PL_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work' }
+                                                const PL_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2' }
+                                                const platform = e.platform?.toLowerCase() || ''
+                                                return (
+                                                    <div key={e._id} onClick={() => navigate('/brand-calendar')} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20 cursor-pointer transition-all group opacity-70 hover:opacity-100">
+                                                        <span className="material-symbols-outlined text-[14px] shrink-0" style={{ color: PL_COLOR[platform] || '#888' }}>{PL_ICON[platform] || 'share'}</span>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] truncate flex-1 group-hover:text-[var(--sys-text)] transition-colors">{e.caption?.slice(0,30) || e.contentType || 'Post'}</p>
+                                                        {e.scheduledAt && <span className="text-[10px] text-[var(--sys-text-muted)] shrink-0">{new Date(e.scheduledAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</span>}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* SYSTEM STATUS */}
                     <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">

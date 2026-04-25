@@ -1,22 +1,22 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { notificationsAPI } from '../services/api'
 
 const UIContext = createContext()
 
 export const useUI = () => {
   const context = useContext(UIContext)
-  if (!context) {
-    throw new Error('useUI must be used within a UIProvider')
-  }
+  if (!context) throw new Error('useUI must be used within a UIProvider')
   return context
 }
 
 export const UIProvider = ({ children }) => {
-  const [fidatoOpen, setFidatoOpen] = useState(false)
+  // ── Fidato / Intel ──────────────────────────────────────────────────────
+  const [fidatoOpen, setFidatoOpen]           = useState(false)
   const [intelMissionCount, setIntelMissionCount] = useState(0)
 
   const toggleFidato = useCallback(() => setFidatoOpen(prev => !prev), [])
-  const openFidato = useCallback(() => setFidatoOpen(true), [])
-  const closeFidato = useCallback(() => setFidatoOpen(false), [])
+  const openFidato   = useCallback(() => setFidatoOpen(true), [])
+  const closeFidato  = useCallback(() => setFidatoOpen(false), [])
 
   const refreshIntelCount = useCallback(async (brandId) => {
     if (!brandId) return
@@ -33,15 +33,75 @@ export const UIProvider = ({ children }) => {
     } catch { /* silent */ }
   }, [])
 
+  // ── Notifications ────────────────────────────────────────────────────────
+  const [notifications, setNotifications]   = useState([])
+  const [unreadCount, setUnreadCount]       = useState(0)
+  const fetchingRef                         = useRef(false)
+
+  const fetchNotifications = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+    try {
+      const data = await notificationsAPI.list(30)
+      if (data?.notifications) {
+        setNotifications(data.notifications)
+        setUnreadCount(data.unreadCount ?? data.notifications.filter(n => !n.read).length)
+      }
+    } catch { /* silent */ }
+    finally { fetchingRef.current = false }
+  }, [])
+
+  const addNotification = useCallback((n) => {
+    setNotifications(prev => [n, ...prev].slice(0, 50))
+    setUnreadCount(c => c + 1)
+  }, [])
+
+  const markRead = useCallback(async (id) => {
+    setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n))
+    setUnreadCount(c => Math.max(0, c - 1))
+    await notificationsAPI.read(id).catch(() => {})
+  }, [])
+
+  const markAllRead = useCallback(async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
+    await notificationsAPI.readAll().catch(() => {})
+  }, [])
+
+  const deleteNotification = useCallback(async (id) => {
+    setNotifications(prev => {
+      const n = prev.find(x => x._id === id)
+      if (n && !n.read) setUnreadCount(c => Math.max(0, c - 1))
+      return prev.filter(x => x._id !== id)
+    })
+    await notificationsAPI.delete(id).catch(() => {})
+  }, [])
+
+  // ── Active Background Jobs ────────────────────────────────────────────────
+  const [activeJobs, setActiveJobs] = useState([]) // [{ jobId, type, label, page, brandName, startedAt }]
+
+  const addActiveJob = useCallback((job) => {
+    setActiveJobs(prev => {
+      if (prev.some(j => j.jobId === job.jobId)) return prev
+      return [job, ...prev]
+    })
+  }, [])
+
+  const removeActiveJob = useCallback((jobId) => {
+    setActiveJobs(prev => prev.filter(j => j.jobId !== jobId))
+  }, [])
+
   return (
     <UIContext.Provider value={{
-      fidatoOpen,
-      toggleFidato,
-      openFidato,
-      closeFidato,
-      intelMissionCount,
-      setIntelMissionCount,
-      refreshIntelCount
+      // Fidato
+      fidatoOpen, toggleFidato, openFidato, closeFidato,
+      intelMissionCount, setIntelMissionCount, refreshIntelCount,
+      // Notifications
+      notifications, unreadCount,
+      fetchNotifications, addNotification,
+      markRead, markAllRead, deleteNotification,
+      // Active Jobs
+      activeJobs, addActiveJob, removeActiveJob,
     }}>
       {children}
     </UIContext.Provider>

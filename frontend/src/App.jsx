@@ -57,6 +57,7 @@ const StudioPreview = lazy(() => import('./pages/StudioPreview'))
 const JoinTeam = lazy(() => import('./pages/JoinTeam'))
 const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 const UserSettings = lazy(() => import('./pages/UserSettings'))
+const BrandCalendar = lazy(() => import('./pages/BrandCalendar'))
 
 // ── Pulse Studio (brief-to-published) ──
 const PulseStudio = lazy(() => import('./pages/PulseStudio/index'))
@@ -163,6 +164,8 @@ function App() {
                     <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
                     <Route path="/retention-studio" element={<ProtectedRoute><RetentionStudio /></ProtectedRoute>} />
                     <Route path="/pulse-studio" element={<ProtectedRoute><PulseStudio /></ProtectedRoute>} />
+                    <Route path="/brand-calendar" element={<ProtectedRoute><BrandCalendar /></ProtectedRoute>} />
+                    <Route path="/publish-schedule" element={<ProtectedRoute><PublishSchedule /></ProtectedRoute>} />
                     <Route path="/pulse-studio/*" element={<ProtectedRoute><PulseStudio /></ProtectedRoute>} />
                     <Route path="/creative-studio/pulse-studio" element={<Navigate to="/pulse-studio" replace />} />
                     <Route path="/creative-studio/pulse-studio/*" element={<Navigate to="/pulse-studio" replace />} />

@@ -40,7 +40,7 @@ async function callToolDirectly(toolName, args) {
     } = await import('../agents/contentStudio/tools.js');
 
     switch (toolName) {
-        case 'web_search':             return webSearch(args.query, args.mode || 'quick');
+        case 'web_search':             return webSearch(args.query, args.mode || 'quick', args.forceDeep || false);
         case 'fetch_trending':         return fetchTrending(args.brandId);
         case 'scrape_competitor':      return scrapeCompetitor(args.brandId);
         case 'fetch_seo_audit':        return fetchSEOAudit(args.brandId);

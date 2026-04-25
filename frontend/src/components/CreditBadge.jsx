@@ -20,6 +20,8 @@ const ACTION_LABELS = {
     trendRefresh: 'Trend Refresh',
     promptEnhance: 'AI Prompt Enhancement',
     imageEnhance: 'AI Image Enhancement',
+    monthlyStrategy: 'Monthly Strategy Calendar',
+    monthlyBrief: 'Brief Regeneration',
 }
 
 /**

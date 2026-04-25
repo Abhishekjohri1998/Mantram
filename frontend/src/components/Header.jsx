@@ -6,6 +6,7 @@ import { useBrand } from '../context/BrandContext'
 import { useCredits } from '../context/CreditContext'
 import { superadmin } from '../services/api'
 import { useUI } from '../context/UIContext'
+import NotificationPanel from './NotificationPanel'
 import './Header.css'
 
 export default function Header({ title, subtitle, onMenuToggle }) {
@@ -16,12 +17,14 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const location = useLocation()
     const [showMenu, setShowMenu] = useState(false)
     const [showBrandMenu, setShowBrandMenu] = useState(false)
-    const { fidatoOpen, toggleFidato, intelMissionCount, refreshIntelCount } = useUI()
+    const { fidatoOpen, toggleFidato, intelMissionCount, refreshIntelCount, unreadCount, fetchNotifications } = useUI()
     const { isCollapsed, setIsCollapsed } = useSidebar()
     const [platformBudgets, setPlatformBudgets] = useState(null)
     const [resumeJobs, setResumeJobs] = useState([])
+    const [showNotifPanel, setShowNotifPanel] = useState(false)
     const menuRef = useRef(null)
     const brandMenuRef = useRef(null)
+    const notifBtnRef = useRef(null)
 
     // Close menus on outside click
     useEffect(() => {
@@ -44,6 +47,9 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     }, [activeBrand?._id])
 
     useEffect(() => { refreshIntelCount(activeBrand?._id) }, [activeBrand?._id, refreshIntelCount])
+
+    // Fetch notifications on mount + when bell opens
+    useEffect(() => { fetchNotifications() }, [activeBrand?._id])
 
     const handleLogout = () => {
         logout()
@@ -273,10 +279,26 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                     )}
 
                     {/* Notifications */}
-                    <button className="hdr-action-btn">
-                        <span className="material-symbols-outlined text-xl">notifications</span>
-                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full border-2 border-[var(--sys-bg)] bg-primary"></span>
-                    </button>
+                    <div className="relative" ref={notifBtnRef}>
+                        <button
+                            className="hdr-action-btn"
+                            onClick={() => { setShowNotifPanel(v => !v); if (!showNotifPanel) fetchNotifications() }}
+                            title="Notifications"
+                        >
+                            <span className="material-symbols-outlined text-xl">notifications</span>
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full text-[9px] font-black bg-[var(--sys-primary)] text-white border-2 border-[var(--sys-bg)] px-0.5">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                            )}
+                            {unreadCount === 0 && (
+                                <span className="absolute top-2 right-2 w-2 h-2 rounded-full border-2 border-[var(--sys-bg)] bg-primary opacity-0" />
+                            )}
+                        </button>
+                        {showNotifPanel && (
+                            <NotificationPanel onClose={() => setShowNotifPanel(false)} />
+                        )}
+                    </div>
 
                     {/* Agent Fidato INTEL */}
                     <button

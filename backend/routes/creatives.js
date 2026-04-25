@@ -55,6 +55,7 @@ import { runCreativePipeline, postGenerationCriticNode } from '../agents/creativ
 import { startProgress, addStep, getProgress, endProgress } from '../utils/progressStore.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 import { getActiveProvider } from '../ai/providerRouting.js';
+import { createNotification } from '../utils/createNotification.js';
 
 
 const router = Router();
@@ -542,6 +543,22 @@ Generate the adapted creative now.`;
                     result: { creative: slimCreative, warnings: result.warnings || [] }
                 }
             ).catch(err => console.error('[GenerationJob] Failed to mark completed:', err.message));
+
+            // Notify user via bell (creative/image generation complete)
+            const jobDoc = await GenerationJob.findOne({ jobId }, 'user brand meta type').lean().catch(() => null);
+            if (jobDoc) {
+                const notifType = jobDoc.type === 'video' ? 'video' : 'creative';
+                const title = notifType === 'video' ? '🎬 Video Ready' : '🎨 Creative Ready';
+                await createNotification({
+                    userId: jobDoc.user,
+                    brandId: jobDoc.brand,
+                    type: notifType,
+                    title,
+                    body: jobDoc.meta?.label || 'Your visual has been generated.',
+                    link: '/creative-studio',
+                    jobId,
+                });
+            }
         }
 
         user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } }).catch(() => { });

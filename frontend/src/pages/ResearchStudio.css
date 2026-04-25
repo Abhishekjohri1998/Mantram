@@ -1305,3 +1305,95 @@
   border-radius: 4px;
   font-weight: 500;
 }
+
+/* ── Source Citations Panel ──────────────────────────────────────────────────── */
+.rs-sources {
+  margin-top: 1.5rem;
+}
+
+.rs-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 20px;
+  padding: 0.125rem 0.5rem;
+  margin-left: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rs-source-badge .material-symbols-outlined {
+  font-size: 0.85rem;
+}
+
+.rs-sources-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.rs-source-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  max-width: 280px;
+}
+
+a.rs-source-item:hover {
+  border-color: var(--accent-purple, #8e44ad);
+  color: var(--text-primary);
+  background: rgba(142, 68, 173, 0.05);
+}
+
+.rs-source-favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.rs-source-domain {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rs-source-title {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.rs-source-ext {
+  font-size: 0.8rem !important;
+  color: var(--text-muted, var(--text-secondary));
+  flex-shrink: 0;
+}
+
+.rs-source-item--text {
+  cursor: default;
+}
+
+.rs-source-item--text:hover {
+  border-color: var(--border);
+  background: var(--surface-1);
+}

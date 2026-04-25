@@ -1,12 +1,12 @@
 /**
  * Content Studio — Agent Tools (v3)
- * 
+ *
  * Real data-gathering tools that agents can use:
- *   - webSearch: Dual-tier search (Grok cheap / Perplexity premium)
+ *   - webSearch: Dual-tier search (Grok cheap / Perplexity premium with citations)
  *   - fetchSEOAudit: Pull latest SEO health check data for a brand
  *   - fetchContentHistory: Past generated content for learning
  *   - fetchTrending: Real-time trending topics via Grok + Google Autocomplete
- *   - scrapeCompetitor: Crawl competitor sites + AI analysis
+ *   - scrapeCompetitor: Crawl competitor sites + AI analysis (brand-level, not retailers)
  *   - fetchPerformanceLearnings: Content playbook from past performance + RLHF
  *   - fetchGA4ContentPerformance: Real GA4 page analytics for published content
  *   - gatherIntelligence: Master function that runs all tools in parallel
@@ -25,13 +25,19 @@ const SEARCH_CACHE_TTL = 1200;   // 20 minutes — quick search results
 const TRENDING_CACHE_TTL = 1200; // 20 minutes — trending per brand
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TOOL 1: WEB SEARCH — Dual-tier (Quick = Grok, Deep = Perplexity + Gemini)
+// TOOL 1: WEB SEARCH — Dual-tier (Quick = Grok, Deep = Perplexity + citations)
 // ══════════════════════════════════════════════════════════════════════════════
-export async function webSearch(query, mode = 'quick') {
-    console.log(`🌐 Content Tool: webSearch (${mode}) — "${query.substring(0, 60)}..."`);
+/**
+ * @param {string} query
+ * @param {'quick'|'deep'} mode
+ * @param {boolean} [forceDeep=false] - Always use Perplexity regardless of mode (for Research Studio)
+ */
+export async function webSearch(query, mode = 'quick', forceDeep = false) {
+    const effectiveMode = (mode === 'deep' || forceDeep) ? 'deep' : 'quick';
+    console.log(`🌐 Content Tool: webSearch (${effectiveMode}) — "${query.substring(0, 60)}..."`);
 
-    if (mode === 'deep') {
-        // Deep search: always fresh (blog SEO needs real-time Perplexity, never cached)
+    if (effectiveMode === 'deep') {
+        // Deep search: always fresh (Perplexity with live web + citations)
         return await deepSearch(query);
     }
 
@@ -100,7 +106,7 @@ Format as structured text. Be factual and specific — no generic advice.`
 }
 
 async function deepSearch(query) {
-    // Try Perplexity first (grounded + citations), fallback to Gemini with Google Search
+    // Try Perplexity first (live web, grounded, returns real citations)
     const perplexityKey = process.env.PERPLEXITY_API_KEY;
     if (perplexityKey) {
         try {
@@ -111,39 +117,35 @@ async function deepSearch(query) {
                     model: 'sonar-pro',
                     messages: [{
                         role: 'system',
-                        content: 'You are a professional content researcher. Provide thorough, well-sourced research for content creation. Include data, statistics, competitor examples, and audience insights. Always cite sources.'
+                        content: 'You are a professional market researcher. Provide thorough, well-sourced research. Include data, statistics, real brand examples, and audience insights. Always cite sources with URLs.'
                     }, {
                         role: 'user',
-                        content: `Deep research for content creation on: ${query}
-
-Provide comprehensive findings:
-1. KEY FACTS & STATISTICS — Recent data points with sources
-2. INDUSTRY TRENDS — What's trending in this space right now
-3. COMPETITOR CONTENT ANALYSIS — How top brands/creators cover this topic, what works, what doesn't
-4. AUDIENCE INSIGHTS — What people are searching, asking, and discussing
-5. CONTENT GAPS — What's NOT being covered that should be
-6. SEO KEYWORDS — Real search terms people use for this topic
-7. EXPERT OPINIONS — Notable quotes or perspectives
-8. CONTENT ANGLE RECOMMENDATIONS — 3 unique angles based on your research`
+                        content: `Deep market research on: ${query}\n\nProvide:\n1. KEY FACTS & STATISTICS with sources\n2. INDUSTRY TRENDS with data\n3. BRAND/COMPETITOR ANALYSIS (brand owners only, NOT retailers)\n4. AUDIENCE INSIGHTS with real data\n5. CONTENT GAPS and opportunities\n6. SPECIFIC NUMBERS: market sizes, growth rates, pricing`
                     }],
-                    max_tokens: 3000,
-                    temperature: 0.2,
+                    max_tokens: 4000,
+                    temperature: 0.1,
                     return_citations: true,
+                    search_recency_filter: 'month', // last 30 days only
                 }),
-                signal: AbortSignal.timeout(20000),
+                signal: AbortSignal.timeout(25000),
             });
             const data = await resp.json();
             const text = data.choices?.[0]?.message?.content || '';
-            const citations = data.citations || [];
+            // Perplexity returns citations as an array of URL strings
+            const citations = (data.citations || []).map((url, i) => ({
+                index: i + 1,
+                url: typeof url === 'string' ? url : url.url || url,
+                title: typeof url === 'object' ? url.title || '' : '',
+            }));
             if (text.length > 100) {
-                return { success: true, data: text, citations, source: 'perplexity', mode: 'deep' };
+                return { success: true, data: text, citations, source: 'perplexity-sonar-pro', mode: 'deep' };
             }
         } catch (err) {
             console.warn('Perplexity deep search failed:', err.message);
         }
     }
 
-    // Fallback: Gemini with Google Search grounding
+    // Fallback: Gemini 2.5 Flash with Google Search grounding (also provides citations)
     try {
         const geminiKey = process.env.GEMINI_API_KEY;
         if (geminiKey) {
@@ -153,23 +155,28 @@ Provide comprehensive findings:
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: `Research this topic thoroughly for content creation: "${query}". Include real data, statistics, competitor examples, trending angles, and SEO keywords.` }] }],
+                        contents: [{ parts: [{ text: `Research this topic thoroughly with real data and sources: "${query}". Include: market statistics, brand comparisons (brand owners NOT retailers), audience data, and specific numbers.` }] }],
                         tools: [{ googleSearch: {} }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 3000 },
                     }),
                 }
             );
             const data = await resp.json();
             const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || '';
+            // Extract Google Search grounding citations
+            const groundingChunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+            const citations = groundingChunks
+                .filter(c => c.web?.uri)
+                .map((c, i) => ({ index: i + 1, url: c.web.uri, title: c.web.title || '' }));
             if (text.length > 100) {
-                return { success: true, data: text, source: 'gemini-grounded', mode: 'deep' };
+                return { success: true, data: text, citations, source: 'gemini-google-search', mode: 'deep' };
             }
         }
     } catch (err) {
         console.warn('Gemini grounded search failed:', err.message);
     }
 
-    // Last resort: try quick search  
+    // Last resort: Grok quick search
     return await quickSearch(query);
 }
 
@@ -391,114 +398,101 @@ Return JSON:
 // TOOL 5: COMPETITOR SCRAPING — Analyze competitor content strategy
 // ══════════════════════════════════════════════════════════════════════════════
 export async function scrapeCompetitor(brandId) {
-    console.log(`🏢 Content Tool: scrapeCompetitor — analyzing competitor content`);
+    console.log(`🏢 Content Tool: scrapeCompetitor — analyzing brand-level competitors`);
 
     try {
         const brand = brandId ? await Brand.findById(brandId).lean() : null;
         if (!brand) return { success: false, data: null, reason: 'No brand found' };
 
-        // Get competitor URLs from Brand DNA
         const dna = brand.dna || {};
         const competitors = dna.competitors || dna.competitorUrls || [];
         const competitorNames = dna.competitorNames || [];
+        const industry = dna.industry || '';
+        const productCategory = dna.productCategory || dna.category || industry;
+        const pricePoint = dna.pricePoint || '';
+        const targetMarkets = dna.targetMarkets || [dna.country || 'India'];
 
-        if (!competitors.length && !competitorNames.length) {
-            return { success: false, data: null, reason: 'No competitors in Brand DNA' };
-        }
-
-        // Dynamically import crawlPage from web-research.js
-        const { crawlPage } = await import('../../utils/web-research.js');
-
-        // Crawl up to 2 competitor homepages (with tight timeout for speed)
-        const urlsToCrawl = competitors.slice(0, 2).map(url => {
-            if (!url.startsWith('http')) url = 'https://' + url;
-            return url;
-        });
-
-        if (!urlsToCrawl.length) {
-            return { success: false, data: null, reason: 'No valid competitor URLs' };
-        }
-
-        const crawlResults = await Promise.allSettled(
-            urlsToCrawl.map(url =>
-                Promise.race([
-                    crawlPage(url),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)) // ⚡ was 10s
-                ])
-            )
-        );
-
-        const competitorData = crawlResults
-            .filter(r => r.status === 'fulfilled' && r.value?.success)
-            .map(r => {
-                const page = r.value;
-                return {
-                    url: page.url,
-                    title: page.title || '',
-                    headings: (page.h1 || []).concat(page.h2 || []).slice(0, 8),
-                    wordCount: page.wordCount || 0,
-                    contentSnippet: (page.contentSnippet || '').substring(0, 300),
-                    hasSchema: page.hasSchemaOrg || false,
-                    tech: (page.tech || []).slice(0, 5),
-                    internalLinks: page.internalLinkCount || 0,
-                };
+        // ── Path A: Brand has competitor URLs — crawl them ────────────────────────
+        if (competitors.length || competitorNames.length) {
+            const { crawlPage } = await import('../../utils/web-research.js');
+            const urlsToCrawl = competitors.slice(0, 2).map(url => {
+                if (!url.startsWith('http')) url = 'https://' + url;
+                return url;
             });
 
-        if (!competitorData.length) {
-            return { success: false, data: null, reason: 'All competitor crawls failed' };
-        }
+            let competitorData = [];
+            if (urlsToCrawl.length) {
+                const crawlResults = await Promise.allSettled(
+                    urlsToCrawl.map(url =>
+                        Promise.race([
+                            crawlPage(url),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+                        ])
+                    )
+                );
+                competitorData = crawlResults
+                    .filter(r => r.status === 'fulfilled' && r.value?.success)
+                    .map(r => ({
+                        url: r.value.url,
+                        title: r.value.title || '',
+                        headings: (r.value.h1 || []).concat(r.value.h2 || []).slice(0, 8),
+                        wordCount: r.value.wordCount || 0,
+                        contentSnippet: (r.value.contentSnippet || '').substring(0, 300),
+                    }));
+            }
 
-        // Quick AI analysis of competitor content strategy
-        const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-        let analysis = '';
-        if (grokKey) {
-            try {
-                const resp = await fetch('https://api.x.ai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
-                    body: JSON.stringify({
-                        model: 'grok-3-mini-fast',
-                        messages: [{
-                            role: 'user',
-                            content: `Analyze these competitors' content strategy for "${brand.name}" (${dna.industry || ''}).
+            let analysis = '';
+            const grokKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+            if (grokKey && (competitorData.length || competitorNames.length)) {
+                try {
+                    const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+                        body: JSON.stringify({
+                            model: 'grok-3-mini-fast',
+                            messages: [{ role: 'user', content: `Analyze content strategy for competitors of "${brand.name}" (${productCategory}).
 
 COMPETITOR DATA:
-${competitorData.map(c => `
-URL: ${c.url}
-Title: ${c.title}
-Headings: ${c.headings.join(', ')}
-Word count: ${c.wordCount}
-Content preview: ${c.contentSnippet}
-`).join('\n---\n')}
+${competitorData.map(c => `URL: ${c.url}\nTitle: ${c.title}\nHeadings: ${c.headings.join(', ')}\nContent: ${c.contentSnippet}`).join('\n---\n')}
+${competitorNames.length ? `Known competitors: ${competitorNames.join(', ')}` : ''}
 
-In 3-4 sentences, summarize:
-1. What content strategies competitors are using
-2. What topics/angles they're covering
-3. Content gaps ${brand.name} could exploit
-4. Tone and style patterns you notice`
-                        }],
-                        max_tokens: 500,
-                        temperature: 0.3,
-                    }),
-                    signal: AbortSignal.timeout(8000),
-                });
-                const data = await resp.json();
-                analysis = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            } catch (err) {
-                console.warn('Competitor AI analysis failed:', err.message);
+Summarize: content strategy, messaging gaps, tone patterns. Focus on brand-level strategy (not retail/distribution).` }],
+                            max_tokens: 600, temperature: 0.3,
+                        }),
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    const data = await resp.json();
+                    analysis = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                } catch (err) { console.warn('Competitor AI analysis failed:', err.message); }
             }
+
+            return {
+                success: true,
+                data: { competitorsAnalyzed: competitorData.length, competitors: competitorData, analysis, competitorNames: competitorNames.slice(0, 5) },
+                source: 'CompetitorScraper+DNA',
+            };
         }
 
+        // ── Path B: No URLs — Discover brand-level competitors via deep web search ────
+        // CRITICAL: we specifically ask for BRAND OWNERS, not retailers/distributors
+        const marketStr = targetMarkets.slice(0, 2).join(', ');
+        const priceStr = pricePoint ? ` at ${pricePoint} price point` : '';
+        const discoveryQuery = `top competing BRANDS (brand owners/manufacturers, NOT retailers or distributors) similar to "${brand.name}" in "${productCategory}"${priceStr} in ${marketStr}. Include: brand positioning, pricing, market share, target audience, key differentiators.`;
+
+        const searchResult = await deepSearch(discoveryQuery);
         return {
             success: true,
             data: {
-                competitorsAnalyzed: competitorData.length,
-                competitors: competitorData,
-                analysis,
-                competitorNames: competitorNames.slice(0, 5),
+                competitorsAnalyzed: 0,
+                competitors: [],
+                analysis: searchResult.data || '',
+                competitorNames: [],
+                discoveredViaSearch: true,
             },
-            source: 'CompetitorScraper'
+            citations: searchResult.citations || [],
+            source: searchResult.source || 'DeepSearch',
         };
+
     } catch (err) {
         console.warn('scrapeCompetitor error:', err.message);
         return { success: false, data: null, error: err.message };

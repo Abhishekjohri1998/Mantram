@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
-import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI } from '../services/api'
+import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI, monthlyStrategy as monthlyStrategyAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
@@ -4730,6 +4730,26 @@ export default function ContentStudio() {
     const [parsedBrief, setParsedBrief] = useState(null)   // AI-classified intent from AgenticBrief
     const [refinedData, setRefinedData] = useState(null)    // Full settings from AgenticRefinement
     const [result, setResult] = useState(null)
+    // ── Monthly Strategy writeback — fires when content result is set from calendar ──
+    useEffect(() => {
+        if (!result) return
+        const ctxRaw = window.sessionStorage.getItem('ms_strategy_ctx')
+        if (!ctxRaw) return
+        try {
+            const { strategyId, itemId } = JSON.parse(ctxRaw)
+            if (!strategyId || !itemId) return
+            window.sessionStorage.removeItem('ms_strategy_ctx')
+            // Content result may have text (caption) or imageUrl (visual)
+            const assetUrl = result.imageUrl || result.visualUrl || ''
+            const assetText = result.caption || result.text || result.body || ''
+            monthlyStrategyAPI.updateAsset(strategyId, itemId, {
+                type:  assetUrl ? 'image' : 'text',
+                url:   assetUrl,
+                title: assetText.slice(0, 80) || 'Content Studio output',
+                body:  assetText,
+            }).catch(e => console.warn('[ContentStudio] strategy writeback failed:', e))
+        } catch {}
+    }, [result]) // eslint-disable-line react-hooks/exhaustive-deps
     const [generating, setGenerating] = useState(false)
     const [error, setError] = useState(null)
     const [prefilledOccasion, setPrefilledOccasion] = useState(null)
@@ -4780,6 +4800,43 @@ export default function ContentStudio() {
         const prompt = searchParams.get('prompt')
         const emoji = searchParams.get('emoji')
         const type = searchParams.get('type')
+
+        // ── Monthly Strategy handoff ──────────────────────────────────────────
+        if (searchParams.get('from') === 'monthly_strategy') {
+            try {
+                const raw = window.sessionStorage.getItem('ms_brief_handoff')
+                if (raw) {
+                    const brief = JSON.parse(raw)
+                    // Build a rich brief string from the strategy brief data
+                    const parts = []
+                    if (brief.angle) parts.push(`Angle: ${brief.angle}`)
+                    if (brief.caption) parts.push(`Draft caption: ${brief.caption}`)
+                    if (brief.cta) parts.push(`CTA: ${brief.cta}`)
+                    if (brief.hashtags?.length) parts.push(`Hashtags: ${brief.hashtags.join(' ')}`)
+                    if (brief.tone) parts.push(`Tone: ${brief.tone}`)
+                    const briefText = parts.join('\n') || brief.angle || 'Create content from monthly strategy brief'
+
+                    const detectedChannel = brief.platform ? brief.platform.toLowerCase() : null
+                    setGoal('promote')
+                    setContext({ details: briefText })
+                    setParsedBrief({
+                        goal: 'promote',
+                        rawInput: briefText,
+                        confidence: 1,
+                        method: 'monthly_strategy',
+                        channel: detectedChannel,
+                    })
+                    if (detectedChannel) setChannel(detectedChannel)
+                    setStep(1)
+                    window.sessionStorage.removeItem('ms_brief_handoff')
+                }
+            } catch (e) {
+                console.error('[ContentStudio] Failed to read ms_brief_handoff:', e)
+            }
+            setSearchParams({}, { replace: true })
+            return
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         if (occasion) {
             // Coming from Calendar or Dashboard with an occasion

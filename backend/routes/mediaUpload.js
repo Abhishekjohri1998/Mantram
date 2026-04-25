@@ -10,9 +10,12 @@
  */
 import { Router } from 'express';
 import axios from 'axios';
-import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath, getObjectStream } from '../utils/s3.js';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath, getObjectStream, s3Client } from '../utils/s3.js';
 import { protect } from '../middleware/auth.js';
 import crypto from 'crypto';
+import config from '../config/env.js';
 
 const router = Router();
 
@@ -141,6 +144,41 @@ router.post('/upload', protect, async (req, res) => {
     } catch (error) {
         console.error('Media upload error:', error);
         res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
+    }
+});
+
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/media/presign-upload — Get a presigned S3 PUT URL
+// Browser uploads the file binary directly to S3 (no base64, no Node proxying)
+// Returns: { uploadUrl, s3Url, key }
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/presign-upload', protect, async (req, res) => {
+    try {
+        const { fileName, contentType = 'image/jpeg', folder = 'refs' } = req.body;
+
+        if (!fileName) return res.status(400).json({ success: false, error: 'fileName is required' });
+
+        const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+        const safeExt = ['jpg','jpeg','png','webp','gif'].includes(ext) ? ext : 'jpg';
+        const key = `${folder}/${req.user._id}/${Date.now()}-${crypto.randomUUID().slice(0,8)}.${safeExt}`;
+
+        const command = new PutObjectCommand({
+            Bucket: config.aws.bucket,
+            Key:    key,
+            ContentType: contentType,
+        });
+
+        // 5-minute window — plenty for direct browser upload
+        const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+        const s3Url = `https://s3.${config.aws.region}.amazonaws.com/${config.aws.bucket}/${key}`;
+
+        console.log(`🔏 Presigned PUT issued for key: ${key}`);
+        res.json({ success: true, uploadUrl, s3Url, key });
+    } catch (error) {
+        console.error('Presign upload error:', error);
+        res.status(500).json({ success: false, error: `Presign failed: ${error.message}` });
     }
 });
 

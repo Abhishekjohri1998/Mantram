@@ -6,6 +6,7 @@ import { brainstormStudio as bsAPI, researchStudio } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import Walkthrough from '../components/Walkthrough'
+import MonthlyStrategy from '../components/MonthlyStrategy'
 import './BrainstormStudio.css'
 
 // ── Strategy Modes (8 goal-oriented research-backed modes) ───────────────────
@@ -1056,6 +1057,9 @@ export default function BrainstormStudio() {
   const [showReasoning, setShowReasoning] = useState(false)
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
+  // ── Studio view toggle ────────────────────────────────────────────────────
+  const [studioView, setStudioView] = useState('brainstorm') // 'brainstorm' | 'monthly'
+
   // ── Strategy Mode state ───────────────────────────────────────────────────
   const [smActiveMode, setSmActiveMode] = useState(STRATEGY_MODES_LIST[0])
   const [smInputs, setSmInputs] = useState({})
@@ -1492,6 +1496,29 @@ export default function BrainstormStudio() {
         <div className="bs-layout-split">
           {/* Left Sidebar: Strategy Modes Navigation */}
           <div className="bs-layout-sidebar">
+            {/* Studio switcher tabs */}
+            <div className="bs-sidebar-section" style={{ paddingBottom: 0 }}>
+              <div style={{ display: 'flex', gap: 4, marginBottom: '0.75rem' }}>
+                <button
+                  className={`bs-mode-item ${studioView === 'brainstorm' ? 'active' : ''}`}
+                  onClick={() => setStudioView('brainstorm')}
+                  style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}
+                >
+                  <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: '#a78bfa', fontSize: 16 }}>psychology</span>
+                  <div className="bs-mode-item-text"><div className="bs-mode-item-label" style={{ fontSize: '0.72rem' }}>Brainstorm</div></div>
+                </button>
+                <button
+                  className={`bs-mode-item ${studioView === 'monthly' ? 'active' : ''}`}
+                  onClick={() => setStudioView('monthly')}
+                  style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}
+                >
+                  <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: '#38bdf8', fontSize: 16 }}>calendar_month</span>
+                  <div className="bs-mode-item-text"><div className="bs-mode-item-label" style={{ fontSize: '0.72rem' }}>Monthly</div></div>
+                </button>
+              </div>
+            </div>
+
+            {studioView === 'brainstorm' && (
             <div className="bs-sidebar-section">
               <div className="bs-sidebar-title">STRATEGY MODE</div>
               <div className="bs-mode-list">
@@ -1515,7 +1542,9 @@ export default function BrainstormStudio() {
                 ))}
               </div>
             </div>
+            )}
 
+            {studioView === 'brainstorm' && (
             <div className="bs-sidebar-section bs-sidebar-section--quick">
               <div className="bs-sidebar-title">QUICK START</div>
               <div className="bs-quick-list">
@@ -1527,6 +1556,7 @@ export default function BrainstormStudio() {
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           {/* Right Main Panel: Hero Preview or Result */}
@@ -1536,21 +1566,30 @@ export default function BrainstormStudio() {
               <div className="bs-topbar-left">
                 <span className="bs-topbar-brand">{activeBrand?.name || 'MANTRAM'}</span>
                 <span className="bs-topbar-slash">/</span>
-                <span className="bs-topbar-studio">Brainstorm Studio</span>
+                <span className="bs-topbar-studio">{studioView === 'monthly' ? 'Monthly Strategy' : 'Brainstorm Studio'}</span>
               </div>
               <div className="bs-topbar-right">
-                <button className="bs-topbar-btn" onClick={() => setSidebarOpen(o => !o)}>
-                  <span className="material-symbols-outlined">history</span>
-                  Sessions
-                </button>
-                <button className="bs-topbar-btn bs-topbar-btn--new" onClick={resetSession}>
-                  <span className="material-symbols-outlined">add</span>
-                  New
-                </button>
+                {studioView === 'brainstorm' && (
+                  <button className="bs-topbar-btn" onClick={() => setSidebarOpen(o => !o)}>
+                    <span className="material-symbols-outlined">history</span>
+                    Sessions
+                  </button>
+                )}
+                {studioView === 'brainstorm' && (
+                  <button className="bs-topbar-btn bs-topbar-btn--new" onClick={resetSession}>
+                    <span className="material-symbols-outlined">add</span>
+                    New
+                  </button>
+                )}
               </div>
             </div>
 
-            {isHeroScreen ? (
+            {/* Monthly Strategy panel */}
+            {studioView === 'monthly' ? (
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <MonthlyStrategy />
+              </div>
+            ) : isHeroScreen ? (
               <>
                 {/* Hero Content */}
                 <div className="bs-hero-content">

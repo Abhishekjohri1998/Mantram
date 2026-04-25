@@ -24,6 +24,7 @@ const navItems = [
 ]
 
 const bottomItems = [
+    { icon: 'calendar_month', label: 'Brand Calendar', to: '/brand-calendar' },
     { icon: 'cases', label: 'Brand Manager', to: '/brands' },
     { icon: 'electrical_services', label: 'Integrations', to: '/integrations' },
     { icon: 'settings', label: 'Settings', to: '/settings' },

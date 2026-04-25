@@ -4,6 +4,8 @@ import Header from './Header'
 import { useAuth } from '../context/AuthContext'
 import { payments as paymentsAPI } from '../services/api'
 import { Link } from 'react-router-dom'
+import NotificationToast from './NotificationToast'
+import { useJobPoller } from '../hooks/useJobPoller'
 
 // Context to share sidebar toggle across components
 const SidebarContext = createContext()
@@ -12,7 +14,10 @@ export const useSidebar = () => useContext(SidebarContext)
 export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('mantram-sidebar-collapsed') === 'true')
-    
+
+    // Mount global job poller — runs for lifetime of dashboard session
+    useJobPoller()
+
     useEffect(() => {
         localStorage.setItem('mantram-sidebar-collapsed', isCollapsed)
     }, [isCollapsed])
@@ -100,6 +105,8 @@ export default function DashboardLayout({ children, title, subtitle }) {
                     {children}
                 </main>
             </div>
+            {/* Global notification toasts — shown on job completion */}
+            <NotificationToast />
         </SidebarContext.Provider>
     )
 }

@@ -636,6 +636,71 @@ export default function ResearchStudio() {
                   </div>
                 )}
 
+                {/* Source Citations */}
+                {(result.sources?.length > 0 || result.researchSources?.citations?.length > 0) && (
+                  <div className="rs-sources">
+                    <h3 className="rs-block-title">
+                      <span className="material-symbols-outlined">verified</span>
+                      Source Citations
+                      {result.researchSources?.searchMode && (
+                        <span className="rs-source-badge">
+                          <span className="material-symbols-outlined">travel_explore</span>
+                          {result.researchSources.searchMode}
+                        </span>
+                      )}
+                    </h3>
+                    <div className="rs-sources-list">
+                      {/* Perplexity/Gemini citation URLs from researchSources */}
+                      {result.researchSources?.citations?.length > 0 && result.researchSources.citations.map((cite, i) => {
+                        const url = typeof cite === 'string' ? cite : cite.url;
+                        const title = typeof cite === 'object' ? cite.title : '';
+                        if (!url) return null;
+                        let domain = url;
+                        try { domain = new URL(url).hostname.replace('www.', ''); } catch {}
+                        return (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="rs-source-item">
+                            <img
+                              className="rs-source-favicon"
+                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                              alt=""
+                              onError={e => { e.target.style.display = 'none'; }}
+                            />
+                            <span className="rs-source-domain">{domain}</span>
+                            {title && <span className="rs-source-title">{title}</span>}
+                            <span className="material-symbols-outlined rs-source-ext">open_in_new</span>
+                          </a>
+                        );
+                      })}
+                      {/* AI-cited sources from sources[] */}
+                      {result.sources?.filter(s => s && !result.researchSources?.citations?.some(c => {
+                        const cu = typeof c === 'string' ? c : c.url;
+                        return s === cu;
+                      })).map((src, i) => {
+                        const isUrl = src?.startsWith('http');
+                        let domain = src;
+                        try { if (isUrl) domain = new URL(src).hostname.replace('www.', ''); } catch {}
+                        return isUrl ? (
+                          <a key={`s${i}`} href={src} target="_blank" rel="noopener noreferrer" className="rs-source-item">
+                            <img
+                              className="rs-source-favicon"
+                              src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                              alt=""
+                              onError={e => { e.target.style.display = 'none'; }}
+                            />
+                            <span className="rs-source-domain">{domain}</span>
+                            <span className="material-symbols-outlined rs-source-ext">open_in_new</span>
+                          </a>
+                        ) : (
+                          <span key={`s${i}`} className="rs-source-item rs-source-item--text">
+                            <span className="material-symbols-outlined">article</span>
+                            <span>{src}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Studio Actions */}
                 {result.studioActions?.length > 0 && (
                   <div className="rs-studio-actions">
@@ -656,6 +721,7 @@ export default function ResearchStudio() {
                     </div>
                   </div>
                 )}
+
 
               </div>
             )}

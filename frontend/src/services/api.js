@@ -1206,7 +1206,32 @@ export const funnelAgentic = {
 // ============ Media Upload API (S3 Upload-First Pattern) ============
 export const media = {
     upload: (data) => apiFetch('/media/upload', { method: 'POST', body: JSON.stringify(data) }),
+    // Returns { uploadUrl, s3Url, key } — use uploadUrl to PUT the file binary directly from browser
+    presignUpload: (data) => apiFetch('/media/presign-upload', { method: 'POST', body: JSON.stringify(data) }),
 };
+
+/**
+ * Upload a File object directly to S3 via presigned PUT (no base64, no Node proxying).
+ * @param {File} file - The browser File object from an <input type="file">
+ * @param {string} folder - S3 folder prefix (default: 'refs')
+ * @returns {Promise<string>} - The permanent S3 URL
+ */
+export async function uploadFileToS3(file, folder = 'refs') {
+    // 1. Get presigned PUT URL from backend
+    const { uploadUrl, s3Url } = await media.presignUpload({
+        fileName: file.name,
+        contentType: file.type || 'image/jpeg',
+        folder,
+    });
+    // 2. PUT the raw binary directly to S3
+    const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: file,
+    });
+    if (!putRes.ok) throw new Error(`S3 upload failed: ${putRes.status}`);
+    return s3Url;
+}
 
 // ============ Studio Reports API (Unified Branded Reports) ============
 export const studioReports = {
@@ -1239,4 +1264,83 @@ export const socialMediaStudio = {
     },
     getStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`),
     deleteStrategy: (id) => apiFetch(`/social-media-studio/strategies/${id}`, { method: 'DELETE' }),
+};
+
+// ============ Monthly Strategy Engine API ============
+export const monthlyStrategy = {
+    // SSE streaming generation — returns raw fetch Response
+    generateStream: (data, signal) => {
+        const base = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${base}/monthly-strategy/generate/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify(data),
+            signal: signal || AbortSignal.timeout(300000),
+        });
+    },
+    // Blocking fallback
+    generate: (data) => apiFetch('/monthly-strategy/generate', { method: 'POST', body: JSON.stringify(data) }),
+    // List
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/monthly-strategy?${query}`);
+    },
+    // Single
+    get: (id) => apiFetch(`/monthly-strategy/${id}`),
+    // Calendar only
+    calendar: (id) => apiFetch(`/monthly-strategy/${id}/calendar`),
+    // Status update
+    updateStatus: (strategyId, itemId, status) =>
+        apiFetch(`/monthly-strategy/${strategyId}/items/${itemId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    // Asset writeback
+    updateAsset: (strategyId, itemId, data) =>
+        apiFetch(`/monthly-strategy/${strategyId}/items/${itemId}/asset`, { method: 'PATCH', body: JSON.stringify(data) }),
+    // Studio handoff info
+    execute: (strategyId, itemId) =>
+        apiFetch(`/monthly-strategy/${strategyId}/items/${itemId}/execute`, { method: 'POST' }),
+    // Regenerate brief (1 credit)
+    regenerateBrief: (strategyId, itemId, instructions = '') =>
+        apiFetch(`/monthly-strategy/${strategyId}/items/${itemId}/regenerate-brief`, { method: 'POST', body: JSON.stringify({ instructions }) }),
+    // Archive
+    delete: (id) => apiFetch(`/monthly-strategy/${id}`, { method: 'DELETE' }),
+    // Inline image generation — reuses /creatives/generate endpoint
+    // refImageUrls: string[] — must be S3/HTTP URLs, never base64
+    generateVisual: (data) =>
+        apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
+    // Fire-and-forget background job — returns { jobId } immediately, pipeline runs on server
+    startJob: (data) => apiFetch('/monthly-strategy/generate/start', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// ── Brand Calendar ──────────────────────────────────────────────────────────
+export const brandCalendar = {
+    // Month view — returns all SocialPosts + strategy items for brand in given month
+    month: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/calendar?${query}`);
+    },
+    // Today + tomorrow — used for dashboard widget
+    today: (brand) => {
+        const q = brand ? `?brand=${brand}` : '';
+        return apiFetch(`/calendar/today${q}`);
+    },
+};
+
+// ── Background Jobs ─────────────────────────────────────────────────────────
+export const jobs = {
+    // All pending/processing jobs for current user
+    active: () => apiFetch('/jobs/active'),
+    // Poll a specific job by ID
+    status: (jobId) => apiFetch(`/jobs/${jobId}`),
+    // Cancel a running job
+    cancel: (jobId) => apiFetch(`/jobs/${jobId}/cancel`, { method: 'PATCH' }),
+};
+
+// ── Notifications ───────────────────────────────────────────────────────────
+export const notificationsAPI = {
+    list: (limit = 30) => apiFetch(`/notifications?limit=${limit}`),
+    unreadCount: () => apiFetch('/notifications/unread-count'),
+    read: (id) => apiFetch(`/notifications/${id}/read`, { method: 'POST' }),
+    readAll: () => apiFetch('/notifications/read-all', { method: 'POST' }),
+    delete: (id) => apiFetch(`/notifications/${id}`, { method: 'DELETE' }),
 };

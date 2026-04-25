@@ -26,8 +26,15 @@ const GenerationJobSchema = new mongoose.Schema(
         // Job source
         type: {
             type: String,
-            enum: ['ai-create', 'photoshoot', 'campaign-shot'],
+            enum: ['ai-create', 'photoshoot', 'campaign-shot', 'monthly-strategy', 'research', 'video'],
             default: 'ai-create',
+        },
+
+        // Human-readable display context (shown in notification panel + header banner)
+        meta: {
+            label:     { type: String },  // e.g. "May 2025 — E-Commerce Strategy"
+            page:      { type: String },  // client-side route, e.g. "/brainstorm-studio"
+            brandName: { type: String },
         },
 
         // Status lifecycle: pending → processing → completed | failed | cancelled
@@ -70,8 +77,9 @@ const GenerationJobSchema = new mongoose.Schema(
         ],
 
         // ── Timing ──
-        startedAt: { type: Date },
+        startedAt:   { type: Date },
         completedAt: { type: Date },
+        cancelledAt: { type: Date },
 
         // ── TTL — MongoDB auto-deletes documents 48h after creation ──
         expiresAt: {

@@ -5,7 +5,7 @@ import { useBrand } from '../context/BrandContext'
 import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import GlobalLoader from '../components/GlobalLoader'
-import { creatives as creativesAPI } from '../services/api'
+import { creatives as creativesAPI, monthlyStrategy as monthlyStrategyAPI } from '../services/api'
 import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
 import UGCPro from '../components/VideoStudio/UGCPro'
@@ -156,6 +156,27 @@ export default function VideoStudio() {
     const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
     const [historyTab, setHistoryTab] = useState('all') // 'all' | 'completed' | 'progress' | 'drafts'
     const [copiedId, setCopiedId] = useState(null)
+
+    // ── Monthly Strategy writeback — fires when a video project gets a finalVideoUrl ──
+    useEffect(() => {
+        if (!projects.length) return
+        const ctxRaw = window.sessionStorage.getItem('ms_strategy_ctx')
+        if (!ctxRaw) return
+        // Find the most recently updated completed project
+        const finished = projects.find(p => p.finalVideoUrl || p.generation?.s3VideoUrl)
+        if (!finished) return
+        const videoUrl = finished.finalVideoUrl || finished.generation?.s3VideoUrl
+        try {
+            const { strategyId, itemId } = JSON.parse(ctxRaw)
+            if (!strategyId || !itemId) return
+            window.sessionStorage.removeItem('ms_strategy_ctx')
+            monthlyStrategyAPI.updateAsset(strategyId, itemId, {
+                type:  'video',
+                url:   videoUrl,
+                title: finished.title || 'Video Studio output',
+            }).catch(e => console.warn('[VideoStudio] strategy writeback failed:', e))
+        } catch {}
+    }, [projects]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Image input UI state
     const [showUrlInput, setShowUrlInput] = useState(false)
@@ -322,6 +343,34 @@ export default function VideoStudio() {
 
     useEffect(() => {
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
+
+        // ── Monthly Strategy handoff ──────────────────────────────────────────
+        if (searchParams.get('from') === 'monthly_strategy') {
+            try {
+                const raw = window.sessionStorage.getItem('ms_brief_handoff')
+                if (raw) {
+                    const brief = JSON.parse(raw)
+                    // Build a video brief from the strategy brief
+                    const parts = []
+                    if (brief.angle) parts.push(brief.angle)
+                    if (brief.visualDirection) parts.push(`Visual direction: ${brief.visualDirection}`)
+                    if (brief.caption) parts.push(`Key message: ${brief.caption}`)
+                    if (brief.cta) parts.push(`CTA: ${brief.cta}`)
+                    if (brief.tone) parts.push(`Tone: ${brief.tone}`)
+                    const videoBrief = parts.join('\n') || brief.angle || 'Create a video for this campaign'
+                    setBrief(videoBrief)
+                    setVideoType('ad-film')
+                    setStudioMode('advanced')
+                    window.sessionStorage.removeItem('ms_brief_handoff')
+                    // ms_strategy_ctx is kept — consumed by writeback effect below
+                }
+            } catch (e) {
+                console.error('[VideoStudio] Failed to read ms_brief_handoff:', e)
+            }
+            setSearchParams({}, { replace: true })
+            return
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         // Check for brainstorm context
         if (searchParams.get('fromBrainstorm') === 'true') {
