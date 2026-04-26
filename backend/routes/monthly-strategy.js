@@ -472,12 +472,26 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
   }
 
   // Concurrent generation guard — prevent double-submit / credit waste
+  // Also auto-expire stale jobs stuck for >10 minutes (e.g. server crash, timeout)
+  const STALE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
   const activeJob = await GenerationJob.findOne({
     user: userId, type: 'monthly-strategy',
     status: { $in: ['pending', 'processing'] },
-  }).select('jobId').lean();
+  }).lean();
+
   if (activeJob) {
-    return res.status(429).json({ success: false, error: 'A strategy is already being generated. Please wait for it to finish.', existingJobId: activeJob.jobId });
+    const jobAge = Date.now() - new Date(activeJob.startedAt || activeJob.createdAt).getTime();
+    if (jobAge > STALE_THRESHOLD_MS) {
+      // Stale job — auto-expire it so user isn't permanently blocked
+      console.warn(`[strategy/start] Auto-expiring stale job ${activeJob.jobId} (age: ${Math.round(jobAge / 1000)}s)`);
+      await GenerationJob.updateOne(
+        { _id: activeJob._id },
+        { $set: { status: 'failed', errorMessage: 'Auto-expired: generation timed out', completedAt: new Date() } }
+      ).catch(() => {});
+      // Allow new generation to proceed
+    } else {
+      return res.status(429).json({ success: false, error: 'A strategy is already being generated. Please wait for it to finish.', existingJobId: activeJob.jobId });
+    }
   }
 
   // Build human-readable label for notifications
