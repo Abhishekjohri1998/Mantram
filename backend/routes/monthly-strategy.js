@@ -353,7 +353,7 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
     fetch_performance_learnings: 'Performance Data', fetch_content_history: 'Content History',
   };
 
-  for (const call of mcpCalls) emitFn({ type: 'research_start', tool: call.tool, label: toolLabels[call.tool] || call.tool });
+  for (const call of mcpCalls) emitFn({ type: 'research_start', tool: call.tool, label: toolLabels[call.tool] || call.tool, args: call.args });
   const mcpResults = await callMcpToolsParallel(mcpCalls);
   for (const call of mcpCalls) emitFn({ type: 'research_done', tool: call.tool, label: toolLabels[call.tool] || call.tool });
 
@@ -373,15 +373,19 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   let parsed;
 
   // Attempt 1: Claude (best quality, 16k output budget)
+  emitFn({ type: 'research_start', tool: 'ai_synthesis', label: 'AI synthesizing strategy' });
   try {
     parsed = await callAgent(system, user, 0.5, 16000, { provider: 'anthropic', timeoutMs: 180_000 });
     if (!parsed?.calendar?.length) throw new Error('Empty calendar from Claude');
+    emitFn({ type: 'research_done', tool: 'ai_synthesis', label: 'Strategy synthesized' });
   } catch (e1) {
     console.warn('[monthly-strategy] Claude attempt failed:', e1.message, '— falling back to Gemini');
+    emitFn({ type: 'research_start', tool: 'ai_fallback', label: 'Switching to backup AI model' });
     // Attempt 2: Gemini 2.5 Pro (65k output, fast)
     try {
       parsed = await callAgent(system, user, 0.3, 16000, { provider: 'gemini', timeoutMs: 180_000 });
       if (!parsed?.calendar?.length) throw new Error('Empty calendar from Gemini');
+      emitFn({ type: 'research_done', tool: 'ai_fallback', label: 'Strategy synthesized (backup)' });
     } catch (e2) {
       console.error('[monthly-strategy] Both providers failed. Claude:', e1.message, 'Gemini:', e2.message);
       throw Object.assign(new Error('strategy_parse_failed'), { status: 500 });
@@ -389,12 +393,15 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   }
 
   // 4. Validate calendar
+  emitFn({ type: 'research_start', tool: 'validation', label: 'Validating calendar' });
   const calendar = validateCalendar(parsed.calendar);
   const brandSpecific = checkBrandSpecificity({ calendar }, brand.name, products);
+  emitFn({ type: 'research_done', tool: 'validation', label: `Validated ${calendar.length} calendar items` });
 
   // 5. Version logic
   const existing = await MonthlyStrategy.find({ user: userId, brand: brandId, strategyType, month, year }).sort({ version: -1 }).limit(1);
   const version = existing.length ? (existing[0].version || 1) + 1 : 1;
+  emitFn({ type: 'generating', message: 'Saving your strategy...' });
 
   // 6. Save
   const doc = await MonthlyStrategy.create({
@@ -517,12 +524,12 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
 
   // ── Background pipeline (survives browser disconnect) ──
   setImmediate(async () => {
-    // Helper to write step progress to DB
-    const pushStep = async (message, status = 'working') => {
+    // Helper to write step progress to DB — supports optional meta { tool, detail }
+    const pushStep = async (message, status = 'working', meta = {}) => {
       await GenerationJob.updateOne(
         { jobId },
         {
-          $push:  { steps: { agent: 'strategy', message, status, ts: new Date() } },
+          $push:  { steps: { agent: 'strategy', message, status, tool: meta.tool || '', detail: meta.detail || '', ts: new Date() } },
           $set:   { status: 'processing' },
         }
       ).catch(() => {});
@@ -535,17 +542,54 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
     };
 
     try {
-      await pushStep('Gathering market intelligence…');
+      await pushStep('Gathering market intelligence…', 'working', { tool: 'init' });
       if (await isCancelled()) return;
 
       const doc = await runStrategyPipeline({
         brandId, strategyType, month: Number(month), year: Number(year), userId,
         userBrief: sanitized.userBrief, launchEvents: sanitized.launchEvents, focusKeywords: sanitized.focusKeywords, toneOverride,
         emitFn: async (obj) => {
-          // Map SSE events to job steps
-          if (obj.type === 'research_done') await pushStep(`Research: ${obj.label || obj.tool}`, 'done');
-          else if (obj.type === 'generating')   await pushStep(obj.message || 'Generating strategy…');
-          else if (obj.type === 'error')        await pushStep(obj.message || 'Error', 'error');
+          // Map pipeline events to detailed job steps for frontend thinking UI
+          if (obj.type === 'research_start') {
+            const thinkingLabels = {
+              brand_dna:                  '🧬 Analyzing brand identity, audience, and positioning...',
+              web_search:                 '🔍 Searching the web for market trends and competitor insights...',
+              fetch_trending:             '📈 Pulling trending topics, hooks, and cultural moments...',
+              scrape_competitor:          '🕵️ Analyzing competitor strategies and content gaps...',
+              fetch_seo_audit:            '🎯 Auditing SEO keywords, rankings, and content opportunities...',
+              fetch_performance_learnings:'📊 Reviewing past content performance and engagement patterns...',
+              fetch_content_history:      '📋 Loading content history to avoid repetition...',
+              ai_synthesis:               '🧠 AI is synthesizing research into a cohesive strategy...',
+              ai_fallback:                '🔄 Switching to backup AI model for generation...',
+              validation:                 '✨ Validating and polishing calendar items...',
+            };
+            // Include search queries / tool args as detail for richer UI
+            const toolDetails = {
+              web_search:                 obj.args?.query || 'market trends, competitor analysis',
+              fetch_trending:             'trending hooks, cultural moments, viral formats',
+              scrape_competitor:          'competitor content gaps, positioning, ad strategies',
+              fetch_seo_audit:            'keyword rankings, content opportunities, technical SEO',
+              fetch_performance_learnings:'top-performing posts, engagement patterns, audience insights',
+              fetch_content_history:      'recent posts, content themes, frequency analysis',
+              ai_synthesis:               `structuring ${strategyType.replace(/-/g, ' ')} calendar with research data`,
+              ai_fallback:                'retrying with backup model for reliability',
+              validation:                 'checking dates, briefs, and brand specificity',
+            };
+            await pushStep(
+              thinkingLabels[obj.tool] || `🔄 ${obj.label || obj.tool}...`,
+              'working',
+              { tool: obj.tool, detail: toolDetails[obj.tool] || '' }
+            );
+          }
+          else if (obj.type === 'research_done') {
+            await pushStep(`✅ ${obj.label || obj.tool}`, 'done', { tool: obj.tool });
+          }
+          else if (obj.type === 'generating') {
+            await pushStep(`🧠 ${obj.message || 'Building strategy calendar...'}`, 'working', { tool: 'generating' });
+          }
+          else if (obj.type === 'error') {
+            await pushStep(obj.message || 'Error', 'error', { tool: 'error' });
+          }
           // Check cancellation at every pipeline step
           if (await isCancelled()) throw Object.assign(new Error('Cancelled by user'), { code: 'CANCELLED' });
         },

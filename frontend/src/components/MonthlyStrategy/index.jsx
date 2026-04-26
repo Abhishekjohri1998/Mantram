@@ -586,6 +586,8 @@ export default function MonthlyStrategy() {
   const [genTools, setGenTools] = useState([])
   const [genProgress, setGenProgress] = useState(0)
   const [genError, setGenError] = useState(null)
+  const [genStartTime, setGenStartTime] = useState(null)
+  const [thinkingExpanded, setThinkingExpanded] = useState(true)
 
   // Credit confirmation modal
   const [showCreditModal, setShowCreditModal] = useState(false)
@@ -668,6 +670,8 @@ export default function MonthlyStrategy() {
     setGenTools([])
     setGenPhase('Submitting to server...')
     setGenProgress(5)
+    setGenStartTime(Date.now())
+    setThinkingExpanded(true)
 
     try {
       // POST returns immediately with jobId — no streaming needed
@@ -708,13 +712,19 @@ export default function MonthlyStrategy() {
             const j = data?.job
             if (!j) return
 
-            // Update steps from DB
+            // Update steps from DB — extract rich metadata for thinking UI
             if (j.steps?.length) {
               const latestStep = j.steps[j.steps.length - 1]
               setGenPhase(latestStep.message || genPhase)
               const done = j.steps.filter(s => s.status === 'done').length
               setGenProgress(Math.min(90, 10 + (done / Math.max(j.steps.length, 1)) * 80))
-              setGenTools(j.steps.map(s => ({ tool: s.agent, label: s.message, status: s.status === 'done' ? 'done' : s.status === 'error' ? 'error' : 'active' })))
+              setGenTools(j.steps.map(s => ({
+                tool: s.tool || s.agent || '',
+                label: s.message,
+                detail: s.detail || '',
+                status: s.status === 'done' ? 'done' : s.status === 'error' ? 'error' : 'active',
+                timestamp: s.ts,
+              })))
             }
 
             if (j.status === 'completed') {
@@ -757,6 +767,14 @@ export default function MonthlyStrategy() {
 
   // Cleanup poll on unmount
   useEffect(() => () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current) }, [])
+
+  // ── Elapsed time ticker — forces re-render every second while generating ──
+  const [, forceRender] = useState(0)
+  useEffect(() => {
+    if (view !== 'generating' || !genStartTime) return
+    const id = setInterval(() => forceRender(n => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [view, genStartTime])
 
   // ── Stop/cancel current job ──
   const handleStopGeneration = useCallback(async () => {
@@ -829,51 +847,108 @@ export default function MonthlyStrategy() {
   }
 
   if (view === 'generating') {
+    const elapsedSec = genStartTime ? ((Date.now() - genStartTime) / 1000).toFixed(1) : '0.0'
+
+    // Deduplicate steps: keep last occurrence per tool key (done > working)
+    const deduped = []
+    const seen = new Map()
+    for (const step of genTools) {
+      const key = step.tool || step.label
+      if (seen.has(key)) {
+        // Replace if the new status is "done" (upgrade) or if same tool is re-emitted
+        const idx = seen.get(key)
+        if (step.status === 'done' || deduped[idx].status !== 'done') {
+          deduped[idx] = step
+        }
+      } else {
+        seen.set(key, deduped.length)
+        deduped.push(step)
+      }
+    }
+
+    const isActive = genProgress < 100
+
     return (
       <div className="ms-root">
         <div className="ms-generating">
-          <div className="ms-gen-spinner" />
-          <div className="ms-gen-phase">{genPhase}</div>
-          <div className="ms-gen-sub">
-            Building 30-day {STRATEGY_TYPES.find(t => t.id === selectedType)?.label} calendar for {activeBrand.name}...
+          {/* Header */}
+          <div className="ms-thinking-header">
+            <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--sys-primary, #FF4D00)' }}>
+              {STRATEGY_TYPES.find(t => t.id === selectedType)?.msIcon || 'psychology'}
+            </span>
+            <div>
+              <div className="ms-thinking-title">
+                Building {STRATEGY_TYPES.find(t => t.id === selectedType)?.label || 'Strategy'}
+              </div>
+              <div className="ms-thinking-subtitle">
+                30-day calendar for {activeBrand.name}
+              </div>
+            </div>
           </div>
 
-          {/* Live step log */}
-          {genTools.length > 0 && (
-            <div className="ms-tool-chips">
-              {genTools.map((t, i) => (
-                <div key={i} className={`ms-tool-chip ${t.status}`}>
-                  <span className={`material-symbols-outlined ${t.status === 'active' ? 'ms-chip-spin' : ''}`} style={{ fontSize: 13 }}>
-                    {t.status === 'done' ? 'check_circle' : t.status === 'error' ? 'error' : 'progress_activity'}
-                  </span>
-                  {t.label}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Thinking panel */}
+          <div className="ms-thinking-panel">
+            <button className="ms-thinking-toggle" onClick={() => setThinkingExpanded(e => !e)}>
+              <span className={`ms-thinking-indicator ${isActive ? 'active' : 'done'}`}>
+                {isActive ? (
+                  <span className="ms-thinking-spinner" />
+                ) : (
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+                )}
+              </span>
+              <span className="ms-thinking-label">
+                {isActive ? 'Thinking...' : `Completed in ${elapsedSec}s`}
+              </span>
+              <span className="ms-thinking-elapsed">{isActive ? `${elapsedSec}s` : ''}</span>
+              <span className="material-symbols-outlined ms-thinking-chevron" style={{ fontSize: 16 }}>
+                {thinkingExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
 
-          <div className="ms-progress-track" style={{ width: '100%', maxWidth: 400 }}>
+            <div className={`ms-thinking-body ${thinkingExpanded ? 'open' : ''}`}>
+              <div className="ms-thinking-steps">
+                {deduped.map((step, i) => (
+                  <div key={i} className={`ms-thinking-step ${step.status}`} style={{ animationDelay: `${i * 60}ms` }}>
+                    <div className="ms-thinking-step-main">
+                      <span className="ms-thinking-step-icon">
+                        {step.status === 'done' ? (
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22c55e' }}>check_circle</span>
+                        ) : step.status === 'error' ? (
+                          <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#ef4444' }}>error</span>
+                        ) : (
+                          <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 14, color: 'var(--sys-primary, #FF4D00)' }}>progress_activity</span>
+                        )}
+                      </span>
+                      <span className="ms-thinking-step-text">{step.label}</span>
+                      {i === deduped.length - 1 && isActive && step.status !== 'done' && (
+                        <span className="ms-thinking-pulse" />
+                      )}
+                    </div>
+                    {step.detail && (
+                      <div className="ms-thinking-step-detail">
+                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>search</span>
+                        {step.detail}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="ms-progress-track" style={{ width: '100%', maxWidth: 440 }}>
             <div className="ms-progress-fill" style={{ width: `${progress}%` }} />
           </div>
 
           {/* Persist notice */}
-          <div style={{ marginTop: '1.5rem', padding: '0.65rem 1rem', background: 'rgba(255,77,0,0.06)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: '8px', maxWidth: 380 }}>
-            <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.5 }}>
-              <span style={{ fontSize: 14, marginRight: 4 }}>🔒</span>
-              This is running on our servers. You can safely close this tab or refresh — we'll notify you via the bell when it's done.
-            </p>
+          <div className="ms-thinking-notice">
+            <span style={{ fontSize: 14, marginRight: 4 }}>🔒</span>
+            This is running on our servers. You can safely close this tab or refresh — we'll notify you via the bell when it's done.
           </div>
 
           {/* Stop button */}
-          <button
-            onClick={handleStopGeneration}
-            style={{
-              marginTop: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-              color: '#ef4444', borderRadius: '8px', padding: '0.45rem 1rem',
-              fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-            }}
-          >
+          <button className="ms-thinking-stop" onClick={handleStopGeneration}>
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>stop_circle</span>
             Stop Generation
           </button>
