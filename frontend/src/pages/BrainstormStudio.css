@@ -399,102 +399,177 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* ── Reasoning Panel (Deep Research style) ────────────────────────────────── */
-.bs-reasoning-panel {
-  margin: 0.75rem 0;
-  border-radius: 0.875rem;
-  background: linear-gradient(135deg, rgba(255, 77, 0,0.06), rgba(6,182,212,0.04));
-  border: 1px solid rgba(255, 77, 0,0.15);
+/* ── Inline Thinking (renders inside message bubble) ──────────────────────── */
+.bs-inline-thinking {
+  margin-bottom: 0.625rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, rgba(255, 77, 0, 0.04), rgba(6, 182, 212, 0.03));
+  border: 1px solid rgba(255, 77, 0, 0.12);
   overflow: hidden;
-  animation: bsReasonIn 0.4s ease forwards;
+  animation: bsItIn 0.3s ease forwards;
 }
-@keyframes bsReasonIn {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes bsItIn {
+  from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.bs-reasoning-toggle {
+
+/* Toggle button */
+.bs-it-toggle {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 0.875rem;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
   background: none;
   border: none;
   cursor: pointer;
   color: var(--sys-text);
   transition: background 0.2s ease;
+  font-family: inherit;
 }
-.bs-reasoning-toggle:hover {
-  background: rgba(255, 77, 0,0.08);
+.bs-it-toggle:hover {
+  background: rgba(255, 77, 0, 0.06);
 }
-.bs-reasoning-icon {
-  font-size: 1.1rem;
-  animation: bsPulseGlow 2s ease-in-out infinite;
+
+/* Indicator (spinner or checkmark) */
+.bs-it-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
-@keyframes bsPulseGlow {
-  0%, 100% { opacity: 0.7; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.15); }
+.bs-it-indicator.active { color: rgba(255, 77, 0, 0.85); }
+.bs-it-indicator.done   { color: rgba(34, 197, 94, 0.85); }
+
+/* Spinning ring */
+.bs-it-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 77, 0, 0.2);
+  border-top-color: rgba(255, 77, 0, 0.8);
+  border-radius: 50%;
+  animation: bsItSpin 0.8s linear infinite;
 }
-.bs-reasoning-title {
-  font-size: 0.78rem;
+@keyframes bsItSpin { to { transform: rotate(360deg); } }
+
+/* Label */
+.bs-it-label {
+  font-size: 0.72rem;
   font-weight: 600;
   flex: 1;
   text-align: left;
+  color: var(--sys-text-muted);
 }
-.bs-reasoning-count {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 77, 0,0.7);
-  background: rgba(255, 77, 0,0.1);
-  padding: 0.15rem 0.45rem;
-  border-radius: 9999px;
+
+/* Chevron */
+.bs-it-chevron {
+  color: var(--sys-text-muted);
+  transition: transform 0.2s ease;
 }
-.bs-reasoning-steps {
-  padding: 0 0.875rem 0.75rem 0.875rem;
+
+/* Collapsible body */
+.bs-it-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  opacity: 0;
+}
+.bs-it-body.open {
+  max-height: 600px;
+  opacity: 1;
+}
+
+/* Steps container */
+.bs-it-steps {
+  padding: 0 0.65rem 0.5rem 0.65rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
-.bs-reasoning-step {
+
+/* Individual step */
+.bs-it-step {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.5rem;
-  background: var(--sys-bg);
-  animation: bsStepIn 0.35s ease forwards;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 0.375rem;
+  animation: bsItStepIn 0.3s ease forwards;
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(-6px);
 }
-@keyframes bsStepIn {
+@keyframes bsItStepIn {
   to { opacity: 1; transform: translateX(0); }
 }
-.bs-step-icon {
-  font-size: 0.9rem;
+.bs-it-step-icon {
+  font-size: 0.85rem;
   flex-shrink: 0;
+  line-height: 1;
 }
-.bs-step-text {
-  font-size: 0.75rem;
+.bs-it-step-text {
+  font-size: 0.72rem;
   color: var(--sys-text-muted);
-  line-height: 1.4;
+  line-height: 1.35;
 }
-.bs-step-pulse {
-  width: 6px;
-  height: 6px;
+
+/* Pulse dot on the latest step */
+.bs-it-pulse {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: rgba(255, 77, 0,0.8);
+  background: rgba(255, 77, 0, 0.8);
   margin-left: auto;
   flex-shrink: 0;
-  animation: bsStepPulse 1.5s ease-in-out infinite;
+  animation: bsItPulse 1.5s ease-in-out infinite;
 }
-@keyframes bsStepPulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 0,0.4); }
-  50%      { opacity: 1;   transform: scale(1.2); box-shadow: 0 0 8px 2px rgba(255, 77, 0,0.3); }
+@keyframes bsItPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 0, 0.4); }
+  50%      { opacity: 1;   transform: scale(1.2); box-shadow: 0 0 6px 2px rgba(255, 77, 0, 0.25); }
 }
-.bs-reasoning-panel.collapsed .bs-reasoning-steps {
-  display: none;
+
+/* Inline citations */
+.bs-it-citations {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 77, 0, 0.08);
+}
+.bs-it-citations-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sys-text-muted);
+  margin-bottom: 0.25rem;
+}
+.bs-it-citations-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.bs-it-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-radius: 9999px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: rgba(6, 182, 212, 0.85);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-it-citation-chip:hover {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #67e8f9;
+  box-shadow: 0 1px 6px rgba(6, 182, 212, 0.12);
 }
 
 /* ── Citations ────────────────────────────────────────────────────────────── */

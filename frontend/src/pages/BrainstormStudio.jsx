@@ -271,51 +271,80 @@ const PHASES = {
   deliver:   { label: 'Delivered',  icon: 'ads_click', color: '#22c55e' },
 }
 
-// ── Thinking dots ─────────────────────────────────────────────────────────────
-function ThinkingDots() {
-  return (
-    <div className="bs-thinking">
-      <span />
-      <span />
-      <span />
-    </div>
-  )
+// ── Elapsed time hook ──────────────────────────────────────────────────────
+function useElapsed(startTime, active) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!startTime || !active) return
+    const tick = () => setElapsed(((Date.now() - startTime) / 1000).toFixed(1))
+    tick()
+    const id = setInterval(tick, 100)
+    return () => clearInterval(id)
+  }, [startTime, active])
+  // Once streaming ends, freeze the final value
+  useEffect(() => {
+    if (!active && startTime) {
+      setElapsed(((Date.now() - startTime) / 1000).toFixed(1))
+    }
+  }, [active, startTime])
+  return elapsed
 }
 
-// ── Reasoning Panel (Deep Research style) ─────────────────────────────────────
-function ReasoningPanel({ steps, citations, visible }) {
-  const [collapsed, setCollapsed] = useState(false)
-  if (!visible || steps.length === 0) return null
+// ── Inline Thinking (renders INSIDE the message bubble) ───────────────────
+function InlineThinking({ steps, isStreaming, startTime, citations }) {
+  const [expanded, setExpanded] = useState(true)
+  const elapsed = useElapsed(startTime, isStreaming)
+  const prevStreamingRef = useRef(isStreaming)
+
+  // Auto-collapse when streaming transitions from true → false
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming && steps.length > 0) {
+      // Small delay so user sees the last step briefly before collapsing
+      const t = setTimeout(() => setExpanded(false), 600)
+      return () => clearTimeout(t)
+    }
+    prevStreamingRef.current = isStreaming
+  }, [isStreaming, steps.length])
+
+  if (steps.length === 0 && !isStreaming) return null
 
   return (
-    <div className={`bs-reasoning-panel ${collapsed ? 'collapsed' : ''}`}>
-      <button className="bs-reasoning-toggle" onClick={() => setCollapsed(c => !c)}>
-        <span className="bs-reasoning-icon"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">psychology</span></span>
-        <span className="bs-reasoning-title">Fidato is thinking...</span>
-        <span className="bs-reasoning-count">{steps.length} steps</span>
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-          {collapsed ? 'expand_more' : 'expand_less'}
+    <div className="bs-inline-thinking">
+      <button className="bs-it-toggle" onClick={() => setExpanded(e => !e)}>
+        <span className={`bs-it-indicator ${isStreaming ? 'active' : 'done'}`}>
+          {isStreaming ? (
+            <span className="bs-it-spinner" />
+          ) : (
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+          )}
+        </span>
+        <span className="bs-it-label">
+          {isStreaming ? 'Thinking...' : `Thought for ${elapsed}s`}
+        </span>
+        <span className="material-symbols-outlined bs-it-chevron" style={{ fontSize: 16 }}>
+          {expanded ? 'expand_less' : 'expand_more'}
         </span>
       </button>
 
-      {!collapsed && (
-        <div className="bs-reasoning-steps">
+      <div className={`bs-it-body ${expanded ? 'open' : ''}`}>
+        <div className="bs-it-steps">
           {steps.map((s, i) => (
-            <div key={i} className="bs-reasoning-step" style={{ animationDelay: `${i * 60}ms` }}>
-              <span className="bs-step-icon">{s.icon}</span>
-              <span className="bs-step-text">{s.text}</span>
-              {i === steps.length - 1 && (
-                <span className="bs-step-pulse" />
-              )}
+            <div key={i} className="bs-it-step" style={{ animationDelay: `${i * 50}ms` }}>
+              <span className="bs-it-step-icon">{s.icon}</span>
+              <span className="bs-it-step-text">{s.text}</span>
+              {i === steps.length - 1 && isStreaming && <span className="bs-it-pulse" />}
             </div>
           ))}
 
-          {citations.length > 0 && (
-            <div className="bs-citations">
-              <div className="bs-citations-label"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">link</span> Sources</div>
-              <div className="bs-citations-list">
+          {citations && citations.length > 0 && (
+            <div className="bs-it-citations">
+              <div className="bs-it-citations-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 3 }}>link</span>
+                Sources
+              </div>
+              <div className="bs-it-citations-list">
                 {citations.map((c, i) => (
-                  <a key={i} className="bs-citation-chip" href={c.url || c.uri || '#'}
+                  <a key={i} className="bs-it-citation-chip" href={c.url || c.uri || '#'}
                     target="_blank" rel="noopener noreferrer" title={c.title || c.url}>
                     {c.title || c.url || `Source ${i + 1}`}
                   </a>
@@ -324,7 +353,7 @@ function ReasoningPanel({ steps, citations, visible }) {
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -947,10 +976,22 @@ function Message({ msg, onScreenplay, onFeedback, onDeepDive, onSelectOption, is
         <div className="bs-fidato-avatar">F</div>
       )}
       <div className={`bs-bubble ${isFidato ? 'bs-bubble-fidato' : 'bs-bubble-user'}`}>
+        {/* Inline Thinking — shows AI reasoning steps inside the bubble */}
+        {isFidato && (msg.reasoningSteps?.length > 0 || msg.thinking) && (
+          <InlineThinking
+            steps={msg.reasoningSteps || []}
+            isStreaming={streaming && isLatest}
+            startTime={msg.thinkingStartTime}
+            citations={msg.citations || []}
+          />
+        )}
         {msg.content && (
           <div className="bs-bubble-text"><FormattedText text={msg.content} /></div>
         )}
-        {msg.thinking && <ThinkingDots />}
+        {/* Minimal thinking dots fallback — only when no reasoning steps yet */}
+        {msg.thinking && (!msg.reasoningSteps || msg.reasoningSteps.length === 0) && (
+          <div className="bs-thinking"><span /><span /><span /></div>
+        )}
 
         {showOptions && (
           <div className="bs-q-options">
@@ -1052,9 +1093,9 @@ export default function BrainstormStudio() {
   const [phase, setPhase] = useState('explore')
   const [isListening, setIsListening] = useState(false)
   const [error, setError] = useState(null)
-  const [reasoningSteps, setReasoningSteps] = useState([])
+  // Note: reasoningSteps are now stored per-message (msg.reasoningSteps)
+  // These global refs are kept only for citations fallback
   const [citations, setCitations] = useState([])
-  const [showReasoning, setShowReasoning] = useState(false)
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
   // ── Studio view toggle ────────────────────────────────────────────────────
@@ -1304,7 +1345,7 @@ export default function BrainstormStudio() {
     // Add empty Fidato message (will stream into it)
     const fidId = `f-${Date.now()}`
     currentMsgIdRef.current = fidId
-    addMessage({ id: fidId, role: 'fidato', content: '', thinking: false, timestamp: Date.now() })
+    addMessage({ id: fidId, role: 'fidato', content: '', thinking: false, reasoningSteps: [], citations: [], thinkingStartTime: Date.now(), timestamp: Date.now() })
 
     // Build history for backend (last 12 messages, exclude current Fidato placeholder)
     const history = messages
@@ -1327,9 +1368,7 @@ export default function BrainstormStudio() {
 
 
     setStreaming(true)
-    setReasoningSteps([])
     setCitations([])
-    setShowReasoning(true)
     let thinkingShown = false
 
     try {
@@ -1348,10 +1387,21 @@ export default function BrainstormStudio() {
             thinkingShown = true
           },
           onReasoningStep: (step, icon) => {
-            setReasoningSteps(prev => [...prev, { text: step, icon: icon || 'psychology' }])
+            // Store reasoning steps per-message for inline display
+            setMessages(prev => prev.map(m =>
+              m.id === fidId
+                ? { ...m, reasoningSteps: [...(m.reasoningSteps || []), { text: step, icon: icon || '🧠' }] }
+                : m
+            ))
           },
           onCitations: (newCitations) => {
             setCitations(prev => [...prev, ...(newCitations || [])])
+            // Also attach citations to the message for inline display
+            setMessages(prev => prev.map(m =>
+              m.id === fidId
+                ? { ...m, citations: [...(m.citations || []), ...(newCitations || [])] }
+                : m
+            ))
           },
           onIdeas: (payload, intent) => {
             updateMessage(fidId, { ideasPayload: payload, intent, thinking: false })
@@ -1392,7 +1442,6 @@ export default function BrainstormStudio() {
       updateMessage(fidId, { content: "Something went wrong — try again!", thinking: false })
     } finally {
       setStreaming(false)
-      setShowReasoning(false)
       currentMsgIdRef.current = null
       inputRef.current?.focus()
     }
@@ -1768,12 +1817,7 @@ export default function BrainstormStudio() {
                         />
                       ))}
 
-                      {/* Live Reasoning Panel — shows during MCoT thinking */}
-                      <ReasoningPanel
-                        steps={reasoningSteps}
-                        citations={citations}
-                        visible={showReasoning && reasoningSteps.length > 0}
-                      />
+                      {/* Reasoning is now rendered inline inside each message bubble */}
 
                       {error && (
                         <div className="bs-error-banner"><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {error}</div>
