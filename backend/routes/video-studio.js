@@ -5176,12 +5176,9 @@ router.get('/', protect, async (req, res) => {
                 if (!brand) {
                     return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
                 }
-                // Show videos for this brand + unbranded videos
-                filter.$or = [
-                    { brand: brandId, user: req.user._id },
-                    { brand: null, user: req.user._id },
-                    { brand: { $exists: false }, user: req.user._id }
-                ];
+                // Strictly show only videos belonging to this brand
+                filter.brand = brandId;
+                filter.user = req.user._id;
             } else {
                 filter.user = req.user._id;
             }
