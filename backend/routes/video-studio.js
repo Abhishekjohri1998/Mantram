@@ -54,6 +54,7 @@ import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shar
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
+import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 import { getPresets } from '../utils/qAdsCache.js';
 import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
@@ -3136,7 +3137,7 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
         };
         const envDesc = envMap[env] || envMap.home;
 
-        // Build a highly specific photography prompt that forces real-camera output
+        // Build a highly specific photography prompt
         const avatarPrompt = [
             `Award-winning editorial portrait photograph.`,
             `Subject: ${description}.`,
@@ -3146,31 +3147,33 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
             `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
             `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
             `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
-            `The subject should look like a real person photographed in a real location — NOT an AI render, NOT a 3D model, NOT an illustration, NOT a cartoon. Real photograph only.`,
         ].join(' ');
 
-        console.log(`[Avatar] Generating via geminiImageGenerate — prompt: "${avatarPrompt.substring(0, 120)}..."`);
+        console.log(`[Avatar] Generating via Flux Pro (fal.ai) — prompt: "${avatarPrompt.substring(0, 120)}..."`);
 
-        // Use geminiImageGenerate which has:
-        // 1. isAvatar=true → systemInstruction forcing photorealistic mode
-        // 2. Automatic Flux Pro v1.1 fallback if NanoBanana 2 fails
-        // 3. S3 upload built-in → returns { imageUrl }
-        const result = await geminiImageGenerate(
-            avatarPrompt,
-            [],   // no reference image parts
-            0.4,  // low temperature for consistent photorealism
-            { aspectRatio: '3:4', isAvatar: true }
-        );
+        // Use Flux Pro explicitly for guaranteed photorealism
+        const falUrl = await falGenerateImage({
+            prompt: avatarPrompt,
+            model: 'fal-ai/flux-pro/v1.1',
+            width: 768,   // 3:4 portrait ratio
+            height: 1024
+        });
 
-        if (!result?.imageUrl) {
-            throw new Error('Avatar generation failed — all models returned no image. Please try again.');
+        if (!falUrl) {
+            throw new Error('Avatar generation failed — Flux Pro returned no image. Please try again.');
         }
 
-        console.log(`[Avatar] ✅ Generated: ${result.imageUrl.substring(0, 60)}...`);
+        console.log(`[Avatar] ✅ Generated on FAL: ${falUrl}`);
+
+        // Mirror to S3 so it doesn't expire
+        const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.jpg`;
+        const avatarUrl = await mirrorUrlToS3(falUrl, s3Key);
+
+        console.log(`[Avatar] ✅ Mirrored to S3: ${avatarUrl.substring(0, 60)}...`);
 
         res.json({
             success: true,
-            avatarUrl: result.imageUrl,
+            avatarUrl,
             generated: true,
         });
     } catch (err) {
