@@ -20,6 +20,7 @@ import multer from 'multer';
 import { s3Client } from '../utils/s3.js';
 import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
+import Avatar from '../models/Avatar.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
@@ -2878,6 +2879,118 @@ router.get('/ugc/:videoId/status', protect, async (req, res) => {
 
 const ugcUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// AVATAR LIBRARY — Persistent avatar management for Q-Ads & UGC Pro
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/video-studio/ugc-pro/avatars ──
+// Returns merged list: active templates + user's own avatars
+router.get('/ugc-pro/avatars', protect, async (req, res) => {
+    try {
+        const { search, gender, filter } = req.query;
+        const userId = req.user._id;
+
+        // Build query for templates
+        const templateQuery = { isTemplate: true, isActive: true };
+        // Build query for user's own avatars
+        const userQuery = { createdBy: userId, isTemplate: false };
+
+        if (gender && gender !== 'all') {
+            templateQuery.gender = gender;
+            userQuery.gender = gender;
+        }
+        if (search) {
+            const rx = new RegExp(search, 'i');
+            templateQuery.$or = [{ name: rx }, { tags: rx }];
+            userQuery.$or = [{ name: rx }, { tags: rx }];
+        }
+
+        let templates = [];
+        let userAvatars = [];
+
+        if (filter === 'my') {
+            userAvatars = await Avatar.find(userQuery).sort({ createdAt: -1 }).limit(100).lean();
+        } else if (filter === 'pinned') {
+            userAvatars = await Avatar.find({ ...userQuery, isPinned: true }).sort({ createdAt: -1 }).limit(100).lean();
+        } else {
+            // 'all' — both templates and user avatars
+            [templates, userAvatars] = await Promise.all([
+                Avatar.find(templateQuery).sort({ isFeatured: -1, createdAt: -1 }).limit(100).lean(),
+                Avatar.find(userQuery).sort({ createdAt: -1 }).limit(100).lean(),
+            ]);
+        }
+
+        res.json({
+            success: true,
+            templates,
+            userAvatars,
+            total: templates.length + userAvatars.length,
+        });
+    } catch (err) {
+        console.error('Avatar list error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/avatars ──
+// Save a new user avatar (from uploaded URL or after generation)
+router.post('/ugc-pro/avatars', protect, ugcUpload.single('avatarImage'), async (req, res) => {
+    try {
+        const { name, gender, imageUrl } = req.body;
+        let finalUrl = imageUrl;
+
+        // If a file was uploaded, store in S3
+        if (req.file) {
+            const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}-${req.file.originalname}`;
+            finalUrl = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+        }
+
+        if (!finalUrl) {
+            return res.status(400).json({ success: false, error: 'Provide an image file or imageUrl' });
+        }
+
+        const avatar = await Avatar.create({
+            name: name || '',
+            imageUrl: finalUrl,
+            gender: gender || 'unspecified',
+            isTemplate: false,
+            createdBy: req.user._id,
+            source: 'upload',
+        });
+
+        res.json({ success: true, avatar });
+    } catch (err) {
+        console.error('Avatar save error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── PUT /api/video-studio/ugc-pro/avatars/:id/pin ──
+// Toggle pin status on a user's avatar
+router.put('/ugc-pro/avatars/:id/pin', protect, async (req, res) => {
+    try {
+        const avatar = await Avatar.findOne({ _id: req.params.id, createdBy: req.user._id });
+        if (!avatar) return res.status(404).json({ success: false, error: 'Avatar not found' });
+        avatar.isPinned = !avatar.isPinned;
+        await avatar.save();
+        res.json({ success: true, avatar });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── DELETE /api/video-studio/ugc-pro/avatars/:id ──
+// Delete a user's own avatar
+router.delete('/ugc-pro/avatars/:id', protect, async (req, res) => {
+    try {
+        const avatar = await Avatar.findOneAndDelete({ _id: req.params.id, createdBy: req.user._id });
+        if (!avatar) return res.status(404).json({ success: false, error: 'Avatar not found or not yours' });
+        res.json({ success: true, deleted: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ── POST /api/video-studio/ugc-pro/analyze-product ──
 // MCoT product grounding — URL or text + optional product images
 router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages', 8), async (req, res) => {
@@ -3138,7 +3251,8 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
         const envDesc = envMap[env] || envMap.home;
 
         // Strong photography prompt — negative keywords prevent 3D/cartoon output
-        const avatarPrompt = `RAW photo, ${description}, ${envDesc}, looking at camera with a natural expression, 85mm f/1.8 portrait lens, shallow depth of field, soft bokeh background, Canon EOS R5, natural skin texture, photorealistic, hyperrealistic, 8k professional portrait photography. Not an illustration. Not a 3D render. Not a cartoon. Not anime. Real photograph.`;
+        // Portrait orientation (9:16) enforced
+        const avatarPrompt = `RAW photo, full body portrait in 9:16 vertical portrait orientation, ${description}, ${envDesc}, looking at camera with a natural expression, 85mm f/1.8 portrait lens, shallow depth of field, soft bokeh background, Canon EOS R5, natural skin texture, photorealistic, hyperrealistic, 8k professional portrait photography. Not an illustration. Not a 3D render. Not a cartoon. Not anime. Real photograph.`;
         console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 100)}..."`);
 
         let avatarUrl = null;
@@ -3232,6 +3346,21 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
         }
 
         if (!avatarUrl) throw new Error('Avatar generation failed — NanoBanana 2 is currently under high load. Please try again in a moment.');
+
+        // Auto-save to Avatar collection so it appears in the picker
+        try {
+            await Avatar.create({
+                name: req.body.name || (description || '').substring(0, 60),
+                imageUrl: avatarUrl,
+                gender: /\b(female|woman|girl|lady)\b/i.test(description) ? 'female' : /\b(male|man|boy|guy)\b/i.test(description) ? 'male' : 'unspecified',
+                isTemplate: false,
+                createdBy: req.user._id,
+                source: 'generated',
+                generatedFromPrompt: description,
+            });
+        } catch (saveErr) {
+            console.warn('[Avatar] Auto-save failed (non-blocking):', saveErr.message);
+        }
 
         res.json({
             success: true,

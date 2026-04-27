@@ -714,6 +714,19 @@ export const superadmin = {
     addImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'POST', body: JSON.stringify(data) }),
     modifyImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'PATCH', body: JSON.stringify(data) }),
     removeImageProvider: (data) => apiFetch('/superadmin/image-providers/provider', { method: 'DELETE', body: JSON.stringify(data) }),
+
+    // Avatar Library
+    getAvatars: () => apiFetch('/superadmin/avatars'),
+    createAvatar: (formData) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return fetch(`${API_BASE}/superadmin/avatars`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(r => r.json());
+    },
+    updateAvatar: (id, data) => apiFetch(`/superadmin/avatars/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteAvatar: (id) => apiFetch(`/superadmin/avatars/${id}`, { method: 'DELETE' }),
 };
 
 // ============ Credits API ============

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
+import AvatarPicker from './AvatarPicker'
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -176,6 +177,7 @@ export default function UGCPro({ activeBrand, projects = [] }) {
     const [language, setLanguage] = useState('english')
     const [cta, setCta] = useState('Shop now')
     const [showSettings, setShowSettings] = useState(false)
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
     // Prompt Preview
     const [promptText, setPromptText] = useState('')
@@ -407,15 +409,12 @@ export default function UGCPro({ activeBrand, projects = [] }) {
                             <span className="ugc-thumb-label">Product</span>
                         </div>
 
-                        {/* Avatar thumbnail */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <div className="ugc-thumb" onClick={() => avatarRef.current?.click()}>
+                            <div className="ugc-thumb" onClick={() => setShowAvatarPicker(true)}>
                                 {avatarUrl ? <img src={avatarUrl} alt="" /> :
                                     avatarGenerating ? <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#a855f7', animation: 'ugc-pulse 1s infinite' }}>progress_activity</span> :
                                     <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>person</span>
                                 }
-                                <input ref={avatarRef} type="file" accept="image/*" hidden
-                                    onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])} />
                             </div>
                             <span className="ugc-thumb-label">Avatar</span>
                         </div>
@@ -482,19 +481,6 @@ export default function UGCPro({ activeBrand, projects = [] }) {
                                     {HOOKS.map(h => (
                                         <button key={h.id} className={`ugc-pill ${hookStyle === h.id ? 'active' : ''}`} onClick={() => setHookStyle(h.id)}>{h.label}</button>
                                     ))}
-                                </div>
-                            </div>
-                            {/* Avatar AI Gen */}
-                            <div className="ugc-settings-group" style={{ minWidth: 200 }}>
-                                <span className="ugc-settings-label">AI Avatar (NanoBanana 2)</span>
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                    <input value={avatarDescription} onChange={e => setAvatarDescription(e.target.value)}
-                                        placeholder="Describe model look..."
-                                        style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 11 }} />
-                                    <button onClick={generateAvatar} disabled={avatarGenerating || !avatarDescription.trim()}
-                                        style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#a855f7', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', opacity: avatarGenerating ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 3 }}>
-                                        {avatarGenerating ? <span className="material-symbols-outlined" style={{ fontSize: 12, animation: 'ugc-pulse 1s infinite' }}>progress_activity</span> : <span className="material-symbols-outlined" style={{ fontSize: 12 }}>auto_awesome</span>} Create
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -581,6 +567,14 @@ export default function UGCPro({ activeBrand, projects = [] }) {
                     </div>
                 </div>
             </div>
+
+            {/* Avatar Picker */}
+            <AvatarPicker
+                isOpen={showAvatarPicker}
+                onClose={() => setShowAvatarPicker(false)}
+                onSelect={(avatar) => setAvatarUrl(avatar.imageUrl)}
+                activeBrand={activeBrand}
+            />
         </div>
     )
 }

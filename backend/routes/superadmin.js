@@ -19,12 +19,14 @@ import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import AuditLog from '../models/AuditLog.js';
 import RetentionOffer from '../models/RetentionOffer.js';
+import Avatar from '../models/Avatar.js';
 import { CREDIT_COSTS, getCreditCosts, getCreditBalance, invalidateCreditCostCache, MODEL_COSTS } from '../middleware/credits.js';
 import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { logAudit } from '../utils/audit.js';
 import CreditUsage from '../models/CreditUsage.js';
 import { uploadToS3 } from '../utils/s3.js';
+import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
@@ -38,6 +40,9 @@ import qAdsRoutes from './superadmin-qads.js';
 import analyticsRoutes from './superadmin-analytics.js';
 
 const router = Router();
+
+// Multer for avatar uploads
+const avatarUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 // Rate limiting for Super Admin to prevent brute force / DoS on heavy stats
 const adminLimiter = rateLimit({
@@ -58,6 +63,81 @@ router.use(protect, authorize('superadmin'), adminLimiter);
 router.use('/templates', templateRoutes);
 router.use('/qads', qAdsRoutes);
 router.use('/analytics', analyticsRoutes);
+
+// ══════════════════════════════════════════════════════════════
+// AVATAR LIBRARY — Super Admin template avatar management
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/superadmin/avatars — List all template avatars
+router.get('/avatars', async (req, res) => {
+    try {
+        const avatars = await Avatar.find({ isTemplate: true }).sort({ isFeatured: -1, createdAt: -1 }).lean();
+        res.json({ success: true, avatars });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/superadmin/avatars — Upload a new template avatar
+router.post('/avatars', avatarUpload.single('avatarImage'), async (req, res) => {
+    try {
+        const { name, gender, tags, isFeatured } = req.body;
+        if (!req.file) return res.status(400).json({ success: false, error: 'Upload an avatar image' });
+
+        const s3Key = `avatars/templates/${Date.now()}-${req.file.originalname}`;
+        const imageUrl = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+
+        const avatar = await Avatar.create({
+            name: name || 'Untitled',
+            imageUrl,
+            gender: gender || 'unspecified',
+            tags: tags ? (typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags) : [],
+            isTemplate: true,
+            isActive: true,
+            isFeatured: isFeatured === 'true' || isFeatured === true,
+            source: 'template',
+            createdBy: null,
+        });
+
+        res.json({ success: true, avatar });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// PUT /api/superadmin/avatars/:id — Update a template avatar
+router.put('/avatars/:id', async (req, res) => {
+    try {
+        const { name, gender, tags, isActive, isFeatured } = req.body;
+        const update = {};
+        if (name !== undefined) update.name = name;
+        if (gender !== undefined) update.gender = gender;
+        if (tags !== undefined) update.tags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;
+        if (isActive !== undefined) update.isActive = isActive;
+        if (isFeatured !== undefined) update.isFeatured = isFeatured;
+
+        const avatar = await Avatar.findOneAndUpdate(
+            { _id: req.params.id, isTemplate: true },
+            update,
+            { returnDocument: 'after' }
+        );
+        if (!avatar) return res.status(404).json({ success: false, error: 'Template avatar not found' });
+        res.json({ success: true, avatar });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// DELETE /api/superadmin/avatars/:id — Delete a template avatar
+router.delete('/avatars/:id', async (req, res) => {
+    try {
+        const avatar = await Avatar.findOneAndDelete({ _id: req.params.id, isTemplate: true });
+        if (!avatar) return res.status(404).json({ success: false, error: 'Template avatar not found' });
+        res.json({ success: true, deleted: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 /**
  * Platform Provider Status — Live health check of all external APIs/DBs

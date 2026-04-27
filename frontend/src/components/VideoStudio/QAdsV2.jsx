@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import AvatarPicker from './AvatarPicker'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -845,50 +846,13 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             </div>
         )}
 
-        {/* Avatar Modal */}
-        {showAvatar && (
-            <div className="scott-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowAvatar(false) }}>
-                <div className="scott-modal">
-                    <div className="scott-modal-hdr">
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>New avatar</div>
-                        <button className="scott-modal-close" onClick={() => setShowAvatar(false)}><span className="material-symbols-outlined">close</span></button>
-                    </div>
-                    <div className="avatar-modal-body">
-                        
-                        <div className="avatar-card">
-                            {avatarUrl && <img src={avatarUrl} className="avatar-preview" alt="avatar" />}
-                            <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginTop: 'auto' }}>
-                                <div style={{ background: 'rgba(0,0,0,0.6)', padding: '12px', borderRadius: 12, backdropFilter: 'blur(10px)', width: '90%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Photorealistic female creator..." 
-                                        value={avatarDesc}
-                                        onChange={e => setAvatarDesc(e.target.value)}
-                                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '8px', color: '#fff', width: '100%', outline: 'none' }}
-                                    />
-                                    <button onClick={handleAvatarGenerate} disabled={avatarBusy || !avatarDesc} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 6, padding: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
-                                        {avatarBusy ? 'Generating...' : 'Generate AI Avatar'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="avatar-card">
-                            <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'rgba(255,255,255,0.6)' }}>cloud_upload</span>
-                                <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>Upload photo</div>
-                                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Turn any photo into an avatar</div>
-                                <input type="file" ref={fileRef} accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files[0] && handleAvatarUpload(e.target.files[0])} />
-                                <button onClick={() => fileRef.current?.click()} disabled={avatarBusy} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>
-                                    Choose File
-                                </button>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        )}
+        {/* Avatar Picker */}
+        <AvatarPicker
+            isOpen={showAvatar}
+            onClose={() => setShowAvatar(false)}
+            onSelect={(avatar) => setAvatarUrl(avatar.imageUrl)}
+            activeBrand={activeBrand}
+        />
 
         {/* Categories Modal */}
         {showCats && (

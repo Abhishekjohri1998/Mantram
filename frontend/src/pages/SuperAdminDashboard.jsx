@@ -157,6 +157,7 @@ export default function SuperAdminDashboard() {
         ]},
         { label: 'Platform', icon: 'settings', items: [
             { id: 'templates', label: 'Template Manager', icon: 'style' },
+            { id: 'avatars', label: 'Avatar Library', icon: 'face' },
             { id: 'qads', label: 'Q-Ads Manager', icon: 'movie' },
             { id: 'analytics', label: 'Analytics', icon: 'analytics' },
             { id: 'studios', label: 'Studio Management', icon: 'rocket_launch' },
@@ -4201,6 +4202,13 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
+                {/* ════════════ AVATAR LIBRARY ════════════ */}
+                {tab === 'avatars' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
+                        <AvatarAdmin />
+                    </div>
+                )}
+
             </div>{/* end flex-1 content */}
             </div>{/* end sidebar+content flex */}
             </div>{/* end outer wrapper */}
@@ -4350,3 +4358,168 @@ function UGCStudioSettings() {
 }
 
 const CREDIT_COSTS = { content: 2, creative: 5, brainstorm: 3, seo: 3, photoshoot: 10, trendMatch: 1 }
+
+/* ── Avatar Library Admin ── */
+function AvatarAdmin() {
+    const [avatars, setAvatars] = React.useState([])
+    const [loading, setLoading] = React.useState(true)
+    const [uploading, setUploading] = React.useState(false)
+    const [name, setName] = React.useState('')
+    const [gender, setGender] = React.useState('unspecified')
+    const [tags, setTags] = React.useState('')
+    const [featured, setFeatured] = React.useState(false)
+    const fileRef = React.useRef(null)
+    const [toast, setToast] = React.useState(null)
+
+    const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+
+    const loadAvatars = async () => {
+        setLoading(true)
+        try {
+            const d = await API.getAvatars()
+            setAvatars(d.avatars || [])
+        } catch { }
+        setLoading(false)
+    }
+
+    React.useEffect(() => { loadAvatars() }, [])
+
+    const handleUpload = async (file) => {
+        if (!file) return
+        setUploading(true)
+        try {
+            const form = new FormData()
+            form.append('avatarImage', file)
+            form.append('name', name || 'Untitled')
+            form.append('gender', gender)
+            form.append('tags', tags)
+            form.append('isFeatured', featured)
+            await API.createAvatar(form)
+            showToast('Avatar uploaded successfully')
+            setName(''); setGender('unspecified'); setTags(''); setFeatured(false)
+            loadAvatars()
+        } catch (e) { showToast(e.error || 'Upload failed', 'error') }
+        setUploading(false)
+    }
+
+    const handleDelete = async (id) => {
+        if (!confirm('Delete this template avatar?')) return
+        try {
+            await API.deleteAvatar(id)
+            showToast('Avatar deleted')
+            loadAvatars()
+        } catch { showToast('Delete failed', 'error') }
+    }
+
+    const handleToggle = async (id, field, val) => {
+        try {
+            await API.updateAvatar(id, { [field]: !val })
+            loadAvatars()
+        } catch { }
+    }
+
+    return (
+        <div className="space-y-6">
+            {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'}`}>{toast.msg}</div>}
+
+            {/* Upload Form */}
+            <div className="glass-panel rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FF4D00]">face</span>
+                    Upload Template Avatar
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Name</label>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Stefan"
+                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Gender</label>
+                        <select value={gender} onChange={e => setGender(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
+                            <option value="unspecified">Unspecified</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Tags (comma-separated)</label>
+                        <input value={tags} onChange={e => setTags(e.target.value)} placeholder="asian, casual, outdoor"
+                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary" />
+                    </div>
+                    <div className="flex items-end gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={featured} onChange={e => setFeatured(e.target.checked)} className="accent-[#FF4D00]" />
+                            <span className="text-sm text-[var(--sys-text)]">Featured</span>
+                        </label>
+                    </div>
+                </div>
+                <div className="flex gap-3">
+                    <input type="file" ref={fileRef} accept="image/*" hidden onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                    <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                        className="px-6 py-2.5 rounded-xl bg-[#FF4D00] text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50">
+                        <span className="material-symbols-outlined text-base">{uploading ? 'progress_activity' : 'cloud_upload'}</span>
+                        {uploading ? 'Uploading...' : 'Upload Avatar Image'}
+                    </button>
+                    <p className="text-xs text-[var(--sys-text-muted)] self-center">Portrait (9:16) recommended — JPG, PNG, WebP</p>
+                </div>
+            </div>
+
+            {/* Grid */}
+            <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">grid_view</span>
+                        Template Avatars ({avatars.length})
+                    </h3>
+                </div>
+
+                {loading ? (
+                    <div className="text-center py-12 text-[var(--sys-text-muted)]">
+                        <span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span>
+                    </div>
+                ) : avatars.length === 0 ? (
+                    <div className="text-center py-12 text-[var(--sys-text-muted)]">
+                        <span className="material-symbols-outlined text-4xl mb-2 block">person_off</span>
+                        <p className="text-sm">No template avatars yet. Upload one above.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                        {avatars.map(av => (
+                            <div key={av._id} className="group relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)]" style={{ aspectRatio: '9/16' }}>
+                                <img src={av.imageUrl} alt={av.name} className="w-full h-full object-cover" loading="lazy" />
+                                {/* Overlay */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 gap-1">
+                                    <p className="text-xs font-bold text-white truncate">{av.name || 'Untitled'}</p>
+                                    <p className="text-[10px] text-white/50">{av.gender} · {av.tags?.join(', ') || 'no tags'}</p>
+                                    <div className="flex gap-1 mt-1">
+                                        <button onClick={() => handleToggle(av._id, 'isActive', av.isActive)}
+                                            className={`px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none ${av.isActive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                                            {av.isActive ? 'Active' : 'Inactive'}
+                                        </button>
+                                        <button onClick={() => handleToggle(av._id, 'isFeatured', av.isFeatured)}
+                                            className={`px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none ${av.isFeatured ? 'bg-yellow-900/50 text-yellow-400' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
+                                            {av.isFeatured ? '★ Featured' : 'Feature'}
+                                        </button>
+                                        <button onClick={() => handleDelete(av._id)}
+                                            className="px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none bg-red-900/30 text-red-400 ml-auto">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Badges */}
+                                {av.isFeatured && (
+                                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-yellow-500/80 text-black">★ Featured</div>
+                                )}
+                                {!av.isActive && (
+                                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/80 text-white">Inactive</div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
