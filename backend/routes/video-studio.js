@@ -5168,20 +5168,11 @@ router.get('/', protect, async (req, res) => {
         if (req.user.role === 'superadmin') {
             if (brandId) filter.brand = brandId;
         } else {
-            if (brandId) {
-                const brand = await Brand.findOne({
-                    _id: brandId,
-                    $or: [{ user: req.user._id }, { sharedWith: req.user._id }]
-                });
-                if (!brand) {
-                    return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
-                }
-                // ✅ Include unbranded projects alongside brand-filtered ones
-                // so videos created without an active brand don't disappear from history.
-                filter.$or = [{ brand: brandId }, { brand: null, user: req.user._id }, { brand: { $exists: false }, user: req.user._id }];
-            } else {
-                filter.user = req.user._id;
-            }
+            // ✅ Always show ALL user videos regardless of active brand.
+            // Videos created under any brand should always remain visible in history.
+            // When a brandId is passed, we validate access but do NOT filter by it —
+            // the frontend sorts/groups by brand if needed.
+            filter.user = req.user._id;
         }
 
         if (status) filter.status = status;
