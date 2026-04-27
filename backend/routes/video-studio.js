@@ -4609,11 +4609,10 @@ router.get('/:id/status', protect, async (req, res) => {
                     console.log(`   🔧 FFmpeg compile: ${clipPaths.length} clips + ${voiceoverPath ? 'VO' : 'no VO'}`);
                     execSync(ffCmd, { stdio: 'pipe', timeout: 180000 });
 
-                    // Upload compiled video to S3 with structured user/brand path
+                    // Upload compiled video to S3
                     const compiledBuffer = fs.readFileSync(outputPath);
                     const compiledUserId = project.user?.toString() || 'unknown';
-                    const compiledBrandId = project.brand?.toString() || 'unbranded';
-                    const s3Key = `users/${compiledUserId}/brands/${compiledBrandId}/videos/${project._id}-compiled.mp4`;
+                    const s3Key = `videos/${compiledUserId}/${project._id}-compiled.mp4`;
                     const finalUrl = await uploadToS3(compiledBuffer, s3Key, 'video/mp4');
                     console.log(`   ✅ Compiled video: ${finalUrl.substring(0, 60)}`);
 
@@ -4958,11 +4957,10 @@ router.get('/:id/status', protect, async (req, res) => {
                             }
                             execSync(ffCmd, { stdio: 'pipe', timeout: 60000 });
 
-                            // Upload mixed video to S3 with structured user/brand path
+                            // Upload mixed video to S3
                             const mixedBuffer = fs.readFileSync(outputPath);
                             const mixUserId = project.user?.toString() || 'unknown';
-                            const mixBrandId = project.brand?.toString() || 'unbranded';
-                            const s3Key = `users/${mixUserId}/brands/${mixBrandId}/videos/${project._id}-mixed.mp4`;
+                            const s3Key = `videos/${mixUserId}/${project._id}-mixed.mp4`;
                             finalVideoUrl = await uploadToS3(mixedBuffer, s3Key, 'video/mp4');
                             console.log(`✅ Voiceover mixed into final video: ${finalVideoUrl.substring(0, 60)}`);
 
@@ -5601,7 +5599,7 @@ router.delete('/:id', protect, async (req, res) => {
 
 /**
  * Download a video from an ephemeral CDN URL and upload to S3 with structured path.
- * S3 key: users/{userId}/brands/{brandId}/videos/{projectId}.mp4
+ * S3 key: videos/{userId}/{projectId}.mp4
  * Updates the project in DB with the permanent S3 URL.
  * Returns the S3 URL if successful, null otherwise.
  */
@@ -5624,13 +5622,12 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
             return null;
         }
 
-        // Load the project to get user/brand context for structured S3 path
-        const project = await VideoProject.findById(projectId).select('user brand').lean();
+        // Load the project to get user context for S3 path
+        const project = await VideoProject.findById(projectId).select('user').lean();
         const userId = project?.user?.toString() || 'unknown';
-        const brandId = project?.brand?.toString() || 'unbranded';
 
-        // Structured S3 key: videos/{userId}/{brandId}/{projectId}.mp4
-        const s3Key = `videos/${userId}/${brandId}/${projectId}.mp4`;
+        // S3 key: videos/{userId}/{projectId}.mp4
+        const s3Key = `videos/${userId}/${projectId}.mp4`;
         console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
         const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
         console.log(`✅ Video uploaded to S3: ${s3Url}`);
