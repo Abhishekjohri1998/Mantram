@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import TemplateManager from './TemplateManager'
 import QAdsManager from './QAdsManager'
 import UsageAnalytics from './UsageAnalytics'
+import AvatarOptionsForm from '../components/AvatarOptionsForm'
 
 export default function SuperAdminDashboard() {
     const navigate = useNavigate()
@@ -4359,167 +4360,280 @@ function UGCStudioSettings() {
 
 const CREDIT_COSTS = { content: 2, creative: 5, brainstorm: 3, seo: 3, photoshoot: 10, trendMatch: 1 }
 
+
 /* ── Avatar Library Admin ── */
-function AvatarAdmin() {
-    const [avatars, setAvatars] = React.useState([])
-    const [loading, setLoading] = React.useState(true)
-    const [uploading, setUploading] = React.useState(false)
-    const [name, setName] = React.useState('')
-    const [gender, setGender] = React.useState('unspecified')
-    const [tags, setTags] = React.useState('')
-    const [featured, setFeatured] = React.useState(false)
-    const fileRef = React.useRef(null)
+// ─── MODEL CONFIGS ────────────────────────────────────────────────────────────
+const ADMIN_MODELS = [
+    { key: 'gpt-image-2',  label: 'GPT-4o Image',  sub: 'Highest fidelity',  color: '#10b981' },
+    { key: 'nanobanana-2', label: 'NanoBanana 2',   sub: 'Gemini • Creative', color: '#6366f1' },
+    { key: 'gpt-image-1',  label: 'GPT Image 1',    sub: 'Fast generation',   color: '#3b82f6' },
+    { key: 'dall-e-3',     label: 'DALL·E 3',       sub: 'Artistic quality',  color: '#8b5cf6' },
+    { key: 'flux-pro',     label: 'Flux Pro',        sub: 'Detail-rich',       color: '#f59e0b' },
+]
+const RATIOS = [
+    { r: '9:16', label: 'Portrait', icon: 'stay_current_portrait' },
+    { r: '1:1',  label: 'Square',   icon: 'crop_square' },
+    { r: '16:9', label: 'Wide',     icon: 'crop_landscape' },
+    { r: '4:5',  label: 'Feed',     icon: 'crop_portrait' },
+    { r: '3:4',  label: 'Tall',     icon: 'crop_5_4' },
+]
+
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+const S = {
+    panel: { background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '18px 20px' },
+    label: { fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10, display: 'block' },
+    chip: (active, color) => ({ padding: '6px 14px', borderRadius: 8, border: `1px solid ${active ? color : 'rgba(255,255,255,0.08)'}`, background: active ? `${color}18` : 'transparent', color: active ? color : 'rgba(255,255,255,0.45)', fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }),
+    input: { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
+    btn: (primary) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 20px', borderRadius: 10, border: primary ? 'none' : '1px solid rgba(255,255,255,0.1)', background: primary ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'rgba(255,255,255,0.05)', color: primary ? '#fff' : 'rgba(255,255,255,0.65)', fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s' }),
+}
+
+// ─── ADMIN IMAGE STUDIO ───────────────────────────────────────────────────────
+function AdminImageStudio() {
+    const apiBase = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
+    const getToken = () => localStorage.getItem('mantram_token')
+
+    const [mode, setMode] = React.useState('avatar')
+    const [model, setModel] = React.useState('gpt-image-2')
+    const [ratio, setRatio] = React.useState('9:16')
+    const [options, setOptions] = React.useState({ origin: 'south-asian', ageRange: 'adult', genderExpression: 'feminine', clothingStyle: 'smart-casual', environment: 'minimalist', lightingMood: 'natural-daylight', additionalDetails: '' })
+    const [prompt, setPrompt] = React.useState('')
+    const [negative, setNegative] = React.useState('')
+    const [generating, setGenerating] = React.useState(false)
+    const [variants, setVariants] = React.useState([])
+    const [selected, setSelected] = React.useState(null)
+    const [genPrompt, setGenPrompt] = React.useState('')
     const [toast, setToast] = React.useState(null)
+    const [saveOpen, setSaveOpen] = React.useState(false)
+    const [saveName, setSaveName] = React.useState('')
+    const [saving, setSaving] = React.useState(false)
 
-    const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+    const notify = (msg, type='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),3200) }
 
-    const loadAvatars = async () => {
-        setLoading(true)
+    const generate = async () => {
+        if (generating) return
+        if (mode === 'creative' && !prompt.trim()) { notify('Enter a prompt','err'); return }
+        setGenerating(true); setVariants([]); setSelected(null)
         try {
-            const d = await API.getAvatars()
-            setAvatars(d.avatars || [])
-        } catch { }
-        setLoading(false)
+            const body = mode === 'creative'
+                ? { directPrompt: prompt.trim(), negativePrompt: negative.trim(), aspectRatio: ratio, model }
+                : { ...options, aspectRatio: ratio, model }
+            const r = await fetch(`${apiBase}/avatar-studio/admin/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                body: JSON.stringify(body),
+            })
+            const d = await r.json()
+            if (!d.success) throw new Error(d.error || 'Generation failed')
+            setVariants(d.variants || [])
+            setGenPrompt(d.prompt || '')
+            const first = (d.variants||[]).find(v=>!v.failed&&v.url)
+            if (first) setSelected(first.slot)
+            const ok = (d.variants||[]).filter(v=>!v.failed).length
+            notify(`${ok}/3 variants ready`)
+        } catch(e) { notify(e.message,'err') }
+        setGenerating(false)
     }
 
-    React.useEffect(() => { loadAvatars() }, [])
-
-    const handleUpload = async (file) => {
-        if (!file) return
-        setUploading(true)
+    const saveTemplate = async () => {
+        if (!saveName.trim()) { notify('Name required','err'); return }
+        const url = variants[selected]?.url; if (!url) return
+        setSaving(true)
         try {
-            const form = new FormData()
-            form.append('avatarImage', file)
-            form.append('name', name || 'Untitled')
-            form.append('gender', gender)
-            form.append('tags', tags)
-            form.append('isFeatured', featured)
-            await API.createAvatar(form)
-            showToast('Avatar uploaded successfully')
-            setName(''); setGender('unspecified'); setTags(''); setFeatured(false)
-            loadAvatars()
-        } catch (e) { showToast(e.error || 'Upload failed', 'error') }
-        setUploading(false)
+            const r = await fetch(`${apiBase}/superadmin/templates/promote-from-generated`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                body: JSON.stringify({ name: saveName.trim(), previewUrl: url, savedPrompt: genPrompt, studioOrigin: mode }),
+            })
+            const d = await r.json()
+            if (!d.success) throw new Error(d.error)
+            notify('Saved to Template Library'); setSaveOpen(false); setSaveName('')
+        } catch(e) { notify(e.message,'err') }
+        setSaving(false)
     }
 
-    const handleDelete = async (id) => {
-        if (!confirm('Delete this template avatar?')) return
-        try {
-            await API.deleteAvatar(id)
-            showToast('Avatar deleted')
-            loadAvatars()
-        } catch { showToast('Delete failed', 'error') }
-    }
-
-    const handleToggle = async (id, field, val) => {
-        try {
-            await API.updateAvatar(id, { [field]: !val })
-            loadAvatars()
-        } catch { }
-    }
+    const selectedUrl = selected !== null ? variants[selected]?.url : null
+    const modelCfg = ADMIN_MODELS.find(m=>m.key===model) || ADMIN_MODELS[0]
 
     return (
-        <div className="space-y-6">
-            {toast && <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-bold shadow-xl ${toast.type === 'error' ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'}`}>{toast.msg}</div>}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minHeight: 520 }}>
 
-            {/* Upload Form */}
-            <div className="glass-panel rounded-2xl p-6">
-                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#FF4D00]">face</span>
-                    Upload Template Avatar
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Name</label>
-                        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Stefan"
-                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary" />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Gender</label>
-                        <select value={gender} onChange={e => setGender(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none">
-                            <option value="unspecified">Unspecified</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1 block">Tags (comma-separated)</label>
-                        <input value={tags} onChange={e => setTags(e.target.value)} placeholder="asian, casual, outdoor"
-                            className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary" />
-                    </div>
-                    <div className="flex items-end gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={featured} onChange={e => setFeatured(e.target.checked)} className="accent-[#FF4D00]" />
-                            <span className="text-sm text-[var(--sys-text)]">Featured</span>
-                        </label>
+            {/* Toast */}
+            {toast && <div style={{ position:'fixed', top:24, right:24, zIndex:9999, padding:'12px 20px', borderRadius:12, fontSize:13, fontWeight:700, background: toast.type==='err' ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)', border:`1px solid ${toast.type==='err'?'rgba(239,68,68,0.25)':'rgba(99,102,241,0.25)'}`, color: toast.type==='err'?'#f87171':'#a5b4fc', backdropFilter:'blur(12px)', pointerEvents:'none' }}>{toast.msg}</div>}
+
+            {/* Save modal */}
+            {saveOpen && selectedUrl && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, backdropFilter:'blur(4px)' }} onClick={()=>setSaveOpen(false)}>
+                    <div style={{ background:'#0d0d18', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:28, width:420 }} onClick={e=>e.stopPropagation()}>
+                        <p style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>Save as Template</p>
+                        <img src={selectedUrl} alt="" style={{ width:'100%', height:160, objectFit:'cover', objectPosition:'top', borderRadius:12, marginBottom:14 }} />
+                        <input value={saveName} onChange={e=>setSaveName(e.target.value)} placeholder="Template name…" style={{ ...S.input, marginBottom:14 }} />
+                        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                            <button onClick={()=>setSaveOpen(false)} style={S.btn(false)}>Cancel</button>
+                            <button onClick={saveTemplate} disabled={saving} style={S.btn(true)}>{saving?'Saving…':'Save Template'}</button>
+                        </div>
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <input type="file" ref={fileRef} accept="image/*" hidden onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                    <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                        className="px-6 py-2.5 rounded-xl bg-[#FF4D00] text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50">
-                        <span className="material-symbols-outlined text-base">{uploading ? 'progress_activity' : 'cloud_upload'}</span>
-                        {uploading ? 'Uploading...' : 'Upload Avatar Image'}
-                    </button>
-                    <p className="text-xs text-[var(--sys-text-muted)] self-center">Portrait (9:16) recommended — JPG, PNG, WebP</p>
-                </div>
-            </div>
+            )}
 
-            {/* Grid */}
-            <div className="glass-panel rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary">grid_view</span>
-                        Template Avatars ({avatars.length})
-                    </h3>
-                </div>
+            {/* ── LEFT PANEL ── */}
+            <div style={{ width:320, flexShrink:0, display:'flex', flexDirection:'column', gap:14 }}>
 
-                {loading ? (
-                    <div className="text-center py-12 text-[var(--sys-text-muted)]">
-                        <span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span>
-                    </div>
-                ) : avatars.length === 0 ? (
-                    <div className="text-center py-12 text-[var(--sys-text-muted)]">
-                        <span className="material-symbols-outlined text-4xl mb-2 block">person_off</span>
-                        <p className="text-sm">No template avatars yet. Upload one above.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
-                        {avatars.map(av => (
-                            <div key={av._id} className="group relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)]" style={{ aspectRatio: '9/16' }}>
-                                <img src={av.imageUrl} alt={av.name} className="w-full h-full object-cover" loading="lazy" />
-                                {/* Overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 gap-1">
-                                    <p className="text-xs font-bold text-white truncate">{av.name || 'Untitled'}</p>
-                                    <p className="text-[10px] text-white/50">{av.gender} · {av.tags?.join(', ') || 'no tags'}</p>
-                                    <div className="flex gap-1 mt-1">
-                                        <button onClick={() => handleToggle(av._id, 'isActive', av.isActive)}
-                                            className={`px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none ${av.isActive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
-                                            {av.isActive ? 'Active' : 'Inactive'}
-                                        </button>
-                                        <button onClick={() => handleToggle(av._id, 'isFeatured', av.isFeatured)}
-                                            className={`px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none ${av.isFeatured ? 'bg-yellow-900/50 text-yellow-400' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>
-                                            {av.isFeatured ? '★ Featured' : 'Feature'}
-                                        </button>
-                                        <button onClick={() => handleDelete(av._id)}
-                                            className="px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer border-none bg-red-900/30 text-red-400 ml-auto">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                                {/* Badges */}
-                                {av.isFeatured && (
-                                    <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-yellow-500/80 text-black">★ Featured</div>
-                                )}
-                                {!av.isActive && (
-                                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/80 text-white">Inactive</div>
-                                )}
-                            </div>
+                {/* Mode selector */}
+                <div style={S.panel}>
+                    <span style={S.label}>Generation Mode</span>
+                    <div style={{ display:'flex', gap:6 }}>
+                        {[{id:'avatar',label:'Avatar',icon:'person'},{id:'creative',label:'Creative',icon:'brush'}].map(t=>(
+                            <button key={t.id} onClick={()=>setMode(t.id)} style={{ ...S.chip(mode===t.id,'#6366f1'), flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:15 }}>{t.icon}</span>{t.label}
+                            </button>
                         ))}
                     </div>
+                </div>
+
+                {/* Model selector */}
+                <div style={S.panel}>
+                    <span style={S.label}>Image Model</span>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {ADMIN_MODELS.map(m=>(
+                            <button key={m.key} onClick={()=>setModel(m.key)} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:10, border:`1px solid ${model===m.key?m.color:'rgba(255,255,255,0.07)'}`, background:model===m.key?`${m.color}12`:'transparent', cursor:'pointer', transition:'all 0.15s', textAlign:'left' }}>
+                                <span style={{ width:8, height:8, borderRadius:'50%', background:m.color, flexShrink:0, opacity:model===m.key?1:0.35 }} />
+                                <span style={{ flex:1 }}>
+                                    <span style={{ display:'block', fontSize:13, fontWeight:700, color:model===m.key?'#fff':'rgba(255,255,255,0.55)' }}>{m.label}</span>
+                                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)', fontWeight:500 }}>{m.sub}</span>
+                                </span>
+                                {model===m.key && <span className="material-symbols-outlined" style={{ fontSize:16, color:m.color }}>check_circle</span>}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Aspect Ratio */}
+                <div style={S.panel}>
+                    <span style={S.label}>Aspect Ratio</span>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                        {RATIOS.map(r=>(
+                            <button key={r.r} onClick={()=>setRatio(r.r)} style={S.chip(ratio===r.r,'#6366f1')}>
+                                {r.label} <span style={{ opacity:0.5, fontSize:10 }}>{r.r}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Controls */}
+                {mode==='avatar' ? (
+                    <div style={S.panel}>
+                        <span style={S.label}>Avatar Options</span>
+                        <AvatarOptionsForm options={options} onChange={(k,v)=>setOptions(p=>({...p,[k]:v}))} errors={{}} compact={true} />
+                    </div>
+                ) : (
+                    <div style={S.panel}>
+                        <span style={S.label}>Prompt</span>
+                        <textarea value={prompt} onChange={e=>setPrompt(e.target.value)} rows={5} placeholder="Describe the image…" style={S.input} />
+                        <span style={{ ...S.label, marginTop:12 }}>Negative Prompt</span>
+                        <textarea value={negative} onChange={e=>setNegative(e.target.value)} rows={2} placeholder="Elements to avoid…" style={S.input} />
+                    </div>
+                )}
+
+                {/* Generate CTA */}
+                <button onClick={generate} disabled={generating} style={{ ...S.btn(true), width:'100%', padding:'13px 0', fontSize:14, background:generating?'rgba(99,102,241,0.3)':'linear-gradient(135deg,#6366f1,#4f46e5)', cursor:generating?'not-allowed':'pointer', opacity:generating?0.7:1 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:18, animation:generating?'spin 1s linear infinite':'none' }}>{generating?'progress_activity':'auto_awesome'}</span>
+                    {generating ? 'Generating 3 variants…' : `Generate · ${modelCfg.label}`}
+                </button>
+                <p style={{ textAlign:'center', fontSize:11, color:'rgba(99,102,241,0.5)', margin:'-6px 0 0', fontWeight:600 }}>Super Admin · Unlimited · S3-persisted</p>
+            </div>
+
+            {/* ── RIGHT: CANVAS ── */}
+            <div style={{ flex:1, minWidth:0 }}>
+                {variants.length===0 && !generating && (
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:440, border:'1px dashed rgba(255,255,255,0.07)', borderRadius:16, gap:12, color:'rgba(255,255,255,0.18)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:48 }}>image_search</span>
+                        <p style={{ fontSize:14, fontWeight:600, margin:0 }}>Configure and generate</p>
+                        <p style={{ fontSize:12, margin:0 }}>3 parallel variants — each saved to S3</p>
+                    </div>
+                )}
+
+                {(generating || variants.length>0) && (
+                    <>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+                            {[0,1,2].map(slot=>{
+                                const v = variants[slot]
+                                const ok = !generating && v && !v.failed && v.url
+                                const fail = !generating && v && v.failed
+                                const sel = selected===slot
+                                return (
+                                    <div key={slot} onClick={()=>ok&&setSelected(slot)} style={{ position:'relative', aspectRatio:ratio.replace(':','/'), borderRadius:14, overflow:'hidden', border:`1.5px solid ${sel?'rgba(99,102,241,0.7)':'rgba(255,255,255,0.07)'}`, background:'rgba(255,255,255,0.03)', cursor:ok?'pointer':'default', boxShadow:sel?'0 0 0 3px rgba(99,102,241,0.2)':'none', transition:'all 0.2s' }}>
+                                        {generating && (
+                                            <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
+                                                <div style={{ width:32, height:32, borderRadius:'50%', border:'2px solid rgba(99,102,241,0.2)', borderTopColor:'#6366f1', animation:'spin 0.9s linear infinite' }} />
+                                                <span style={{ fontSize:11, color:'rgba(255,255,255,0.25)', fontWeight:600 }}>Generating…</span>
+                                            </div>
+                                        )}
+                                        {ok && <img src={v.url} alt={`Variant ${slot+1}`} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />}
+                                        {fail && (
+                                            <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:16, gap:6 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize:28, color:'rgba(239,68,68,0.4)' }}>broken_image</span>
+                                                <span style={{ fontSize:10, color:'rgba(239,68,68,0.5)', textAlign:'center', lineHeight:1.4 }}>{v.error?.substring(0,80)||'Failed'}</span>
+                                            </div>
+                                        )}
+                                        {ok && (
+                                            <div style={{ position:'absolute', bottom:0, left:0, right:0, padding:'24px 12px 10px', background:'linear-gradient(to top,rgba(0,0,0,0.7),transparent)' }}>
+                                                <span style={{ fontSize:10, fontWeight:700, color:sel?'#a5b4fc':'rgba(255,255,255,0.5)' }}>{sel?'● Selected':'Option '+(slot+1)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        {selectedUrl && (
+                            <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
+                                <button onClick={generate} disabled={generating} style={S.btn(false)}>
+                                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>refresh</span>Regenerate
+                                </button>
+                                <a href={selectedUrl} download target="_blank" rel="noopener" style={{ ...S.btn(false), textDecoration:'none' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>download</span>Download
+                                </a>
+                                <button onClick={()=>{setSaveName('');setSaveOpen(true)}} style={{ ...S.btn(false), borderColor:'rgba(99,102,241,0.3)', color:'#a5b4fc' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>bookmark_add</span>Save as Template
+                                </button>
+                            </div>
+                        )}
+
+                        {genPrompt && !generating && (
+                            <details style={{ marginTop:14 }}>
+                                <summary style={{ fontSize:11, color:'rgba(255,255,255,0.2)', cursor:'pointer', fontWeight:600, userSelect:'none' }}>View assembled prompt</summary>
+                                <pre style={{ marginTop:8, padding:12, background:'rgba(255,255,255,0.03)', borderRadius:10, fontSize:11, color:'rgba(255,255,255,0.3)', whiteSpace:'pre-wrap', wordBreak:'break-word', lineHeight:1.6 }}>{genPrompt}</pre>
+                            </details>
+                        )}
+                    </>
                 )}
             </div>
+            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
         </div>
     )
 }
+
+// ─── AVATAR ADMIN WRAPPER ─────────────────────────────────────────────────────
+function AvatarAdmin() {
+    const [tab, setTab] = React.useState('generate')
+    const tabs = [
+        { id:'generate', label:'Image Studio',    icon:'auto_awesome' },
+        { id:'library',  label:'Avatar Library',  icon:'grid_view' },
+    ]
+    return (
+        <div>
+            {/* Tab row */}
+            <div style={{ display:'flex', gap:2, marginBottom:24, borderBottom:'1px solid rgba(255,255,255,0.07)', paddingBottom:0 }}>
+                {tabs.map(t=>(
+                    <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 18px', border:'none', borderBottom:`2px solid ${tab===t.id?'#6366f1':'transparent'}`, background:'transparent', color:tab===t.id?'#a5b4fc':'rgba(255,255,255,0.35)', fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s', marginBottom:-1 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:17 }}>{t.icon}</span>{t.label}
+                    </button>
+                ))}
+            </div>
+            {tab==='generate' && <AdminImageStudio />}
+            {tab==='library'  && <AvatarLibraryAdmin />}
+        </div>
+    )
+}
+
+

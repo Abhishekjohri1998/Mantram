@@ -393,7 +393,17 @@ export default function VideoStudio() {
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Auto-start if triggered from Brainstorm
+    // ── Avatar Studio handoff: pick up pending avatar URL from sessionStorage ──
+    useEffect(() => {
+        const pendingUrl = window.sessionStorage.getItem('mantram_pending_avatar_url')
+        if (pendingUrl) {
+            window.sessionStorage.removeItem('mantram_pending_avatar_url')
+            setImages(prev => [{ url: pendingUrl, source: 'avatar-studio', label: 'Avatar from Avatar Studio' }, ...prev])
+            setStudioMode('ugc-pro')
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+        // Auto-start if triggered from Brainstorm
     useEffect(() => {
         if (autoStart && activeBrand && brief.trim() && !loading && step === 0) {
             setAutoStart(false)

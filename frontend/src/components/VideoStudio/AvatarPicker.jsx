@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import AvatarOptionsForm from '../AvatarOptionsForm'
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -276,9 +277,15 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
     const [showCreate, setShowCreate] = useState(false)
     const [createMode, setCreateMode] = useState(null) // 'upload' | 'generate'
     const [avatarName, setAvatarName] = useState('')
-    const [genPrompt, setGenPrompt] = useState('')
+    // ── Structured generation state (replaces genPrompt free-text) ──
+    const [genOptions, setGenOptions] = useState({
+        origin: 'south-asian', ageRange: 'adult', genderExpression: '',
+        clothingStyle: 'smart-casual', environment: 'minimalist', lightingMood: 'natural-daylight', additionalDetails: ''
+    })
+    const [genErrors, setGenErrors] = useState({})
     const [genBusy, setGenBusy] = useState(false)
-    const [genPreview, setGenPreview] = useState(null)
+    const [genVariants, setGenVariants] = useState([])   // [{ slot, url, failed }]
+    const [genSelectedSlot, setGenSelectedSlot] = useState(null)
     const fileRef = useRef(null)
     const [uploadBusy, setUploadBusy] = useState(false)
 
@@ -324,27 +331,30 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
         setUploadBusy(false)
     }, [activeBrand, loadAvatars, avatarName])
 
-    // Generate avatar with AI
+    // Generate avatar with AI — uses structured options, calls new avatar-studio endpoint
     const handleGenerate = useCallback(async () => {
-        if (!genPrompt.trim()) return
-        setGenBusy(true); setGenPreview(null)
+        if (!genOptions.genderExpression) {
+            setGenErrors({ genderExpression: 'Please select a gender expression' })
+            return
+        }
+        setGenBusy(true); setGenVariants([null, null, null]); setGenSelectedSlot(null)
         try {
-            let finalName = avatarName.trim()
-            if (finalName && !finalName.startsWith('@')) finalName = '@' + finalName
-
-            const d = await api('/video-studio/ugc-pro/generate-avatar', {
+            const d = await api('/avatar-studio/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId: activeBrand?._id, description: genPrompt, environment: 'studio', name: finalName }),
+                body: JSON.stringify({ ...genOptions, brandId: activeBrand?._id }),
             })
-            setGenPreview(d.avatarUrl)
-            // Refresh list
+            const variants = d.variants || []
+            setGenVariants(variants)
+            const firstOk = variants.find(v => !v.failed && v.url)
+            if (firstOk) setGenSelectedSlot(firstOk.slot)
             await loadAvatars()
-            setAvatarName('')
-            setGenPrompt('')
-        } catch { }
+        } catch (err) {
+            console.error('[AvatarPicker] Generate failed:', err.message)
+            setGenVariants([])
+        }
         setGenBusy(false)
-    }, [genPrompt, avatarName, activeBrand, loadAvatars])
+    }, [genOptions, activeBrand, loadAvatars])
 
     // Select and confirm
     const handleSelect = useCallback((avatar) => {
@@ -470,43 +480,76 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                                 </div>
                             )}
 
-                            {/* Generate mode */}
+                            {/* Generate mode — structured options + 3-up variant grid */}
                             {createMode === 'generate' && (
                                 <div className="avpk-gen-form">
-                                    <input
-                                        className="avpk-gen-input"
-                                        placeholder="Name this avatar (e.g. @sarah)"
-                                        value={avatarName}
-                                        onChange={e => setAvatarName(e.target.value)}
+                                    <AvatarOptionsForm
+                                        options={genOptions}
+                                        onChange={(key, val) => {
+                                            setGenOptions(prev => ({ ...prev, [key]: val }))
+                                            if (genErrors[key]) setGenErrors(prev => ({ ...prev, [key]: '' }))
+                                        }}
+                                        errors={genErrors}
+                                        compact={true}
                                     />
-                                    <textarea
-                                        className="avpk-gen-input"
-                                        placeholder="Describe the avatar: e.g. 'Young South Asian woman with wavy hair, wearing a white t-shirt, warm smile'"
-                                        value={genPrompt}
-                                        onChange={e => setGenPrompt(e.target.value)}
-                                        rows={3}
-                                        style={{ resize: 'none' }}
-                                    />
-                                    <button className="avpk-gen-btn primary"
-                                        onClick={handleGenerate}
-                                        disabled={genBusy || !genPrompt.trim() || !avatarName.trim()}>
+                                    <button className="avpk-gen-btn primary" onClick={handleGenerate} disabled={genBusy}>
                                         {genBusy
-                                            ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span> Generating avatar...</>
-                                            : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Generate Avatar</>}
+                                            ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span> Generating 3 variants...</>
+                                            : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span> Generate 3 Variants</>}
                                     </button>
-                                    {genPreview && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                                            <div className="avpk-preview"><img src={genPreview} alt="preview" /></div>
-                                            <button className="avpk-gen-btn primary" onClick={() => {
-                                                onSelect({ _id: null, name: genPrompt, imageUrl: genPreview })
-                                                onClose()
-                                            }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span> Use This Avatar
-                                            </button>
+
+                                    {/* 3-up mini variant grid */}
+                                    {genVariants.length > 0 && (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                                            {[0, 1, 2].map(slot => {
+                                                const v = genVariants[slot]
+                                                const isSelected = genSelectedSlot === slot
+                                                return (
+                                                    <div key={slot}
+                                                        onClick={() => v && !v.failed && v.url && setGenSelectedSlot(slot)}
+                                                        style={{
+                                                            position: 'relative', aspectRatio: '9/16',
+                                                            borderRadius: 10, overflow: 'hidden',
+                                                            border: isSelected ? '2px solid #f97316' : '1.5px solid rgba(255,255,255,0.1)',
+                                                            background: 'rgba(255,255,255,0.04)',
+                                                            cursor: v && !v.failed && v.url ? 'pointer' : 'default',
+                                                        }}
+                                                    >
+                                                        {genBusy && (
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.3)', animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                                            </div>
+                                                        )}
+                                                        {!genBusy && v && !v.failed && v.url && (
+                                                            <img src={v.url} alt={`Variant ${slot + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        )}
+                                                        {!genBusy && v && v.failed && (
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'rgba(239,68,68,0.6)' }}>broken_image</span>
+                                                            </div>
+                                                        )}
+                                                        {isSelected && (
+                                                            <div style={{ position: 'absolute', top: 4, right: 4, background: '#f97316', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 800 }}>✓</div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     )}
+
+                                    {/* Use selected variant */}
+                                    {genSelectedSlot !== null && genVariants[genSelectedSlot]?.url && (
+                                        <button className="avpk-gen-btn primary" onClick={() => {
+                                            onSelect({ _id: null, name: 'AI Avatar', imageUrl: genVariants[genSelectedSlot].url })
+                                            onClose()
+                                        }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>check</span>
+                                            Use This Avatar
+                                        </button>
+                                    )}
+
                                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
-                                        Avatars are generated in 9:16 portrait ratio using NanoBanana 2
+                                        3 variants · 9:16 portrait · 4 credits
                                     </div>
                                 </div>
                             )}

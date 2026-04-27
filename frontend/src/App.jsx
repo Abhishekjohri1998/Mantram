@@ -59,6 +59,7 @@ const JoinTeam = lazy(() => import('./pages/JoinTeam'))
 const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 const UserSettings = lazy(() => import('./pages/UserSettings'))
 const BrandCalendar = lazy(() => import('./pages/BrandCalendar'))
+const AvatarGenerator = lazy(() => import('./pages/AvatarGenerator'))
 
 // ── Pulse Studio (brief-to-published) ──
 const PulseStudio = lazy(() => import('./pages/PulseStudio/index'))
@@ -172,7 +173,9 @@ function App() {
                     <Route path="/creative-studio/pulse-studio" element={<Navigate to="/pulse-studio" replace />} />
                     <Route path="/creative-studio/pulse-studio/*" element={<Navigate to="/pulse-studio" replace />} />
 
-                    {/* Catch-all: redirect unknown routes to dashboard (prevents blank screens from stale links) */}
+                         <Route path="/avatar-generator" element={<ProtectedRoute><AvatarGenerator /></ProtectedRoute>} />
+
+                {/* Catch-all: redirect unknown routes to dashboard (prevents blank screens from stale links) */}
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </Suspense>

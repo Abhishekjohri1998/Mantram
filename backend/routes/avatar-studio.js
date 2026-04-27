@@ -1,0 +1,374 @@
+/**
+ * Avatar Studio Backend Route — Mantram AI
+ *
+ * POST /api/avatar-studio/generate        — User: 3-variant parallel, credit-gated
+ * POST /api/avatar-studio/admin/generate  — SuperAdmin: free, model selector, any ratio, directPrompt
+ *
+ * Image generation strategy (fast, no brand DNA):
+ *   1. Direct call to LaoZhang /v1/images/generations
+ *   2. All output → S3 via mirrorUrlToS3 (URL) or uploadToS3 (base64)
+ *   3. No laozhangImageGenerate wrapper — direct fetch like the working UGC-pro pipeline
+ */
+
+import { Router } from 'express';
+import { protect, superadmin } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/credits.js';
+import { buildAvatarPrompt, RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
+import { mirrorUrlToS3, uploadToS3 } from '../utils/s3.js';
+import Avatar from '../models/Avatar.js';
+
+const router = Router();
+
+// ─── LaoZhang base config ─────────────────────────────────────────────────────
+const LZ_BASE = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
+function getLZKey() {
+    const k = process.env.LAOZHANG_API_KEY;
+    if (!k) throw new Error('LAOZHANG_API_KEY not configured');
+    return k;
+}
+
+// ─── Available image models (selectable by admin) ─────────────────────────────
+// LZ models use /images/generations; nanobanana-2 uses Gemini REST directly
+export const AVATAR_MODELS = {
+    'gpt-image-2': {
+        label: 'GPT Image 2',
+        badge: 'Best',
+        apiModel: 'gpt-image-2',
+        provider: 'lz',
+        defaultSize: '1024x1792',
+        responseFormat: 'url',
+    },
+    'gpt-image-1': {
+        label: 'GPT Image 1',
+        badge: 'Fast',
+        apiModel: 'gpt-image-1',
+        provider: 'lz',
+        defaultSize: '1024x1792',
+        responseFormat: 'url',
+    },
+    'nanobanana-2': {
+        label: 'NanoBanana 2',
+        badge: 'Gemini',
+        apiModel: 'gemini-3.1-flash-image-preview',
+        provider: 'gemini',          // ← uses Gemini REST, not LZ
+        defaultSize: '9:16',         // passed as aspectRatio hint in prompt
+        responseFormat: 'base64',
+    },
+    'dall-e-3': {
+        label: 'DALL·E 3',
+        badge: 'Creative',
+        apiModel: 'dall-e-3',
+        provider: 'lz',
+        defaultSize: '1024x1792',
+        responseFormat: 'url',
+    },
+    'flux-pro': {
+        label: 'Flux Pro',
+        badge: 'Detailed',
+        apiModel: 'flux-pro',
+        provider: 'lz',
+        defaultSize: '576x1024',
+        responseFormat: 'url',
+    },
+};
+
+const DEFAULT_MODEL = 'gpt-image-2';
+
+/**
+ * Generate one image variant.
+ * Routes to Gemini REST (NanoBanana 2) or LaoZhang /images/generations.
+ * Always returns an S3 URL — never base64, never temporary provider URL.
+ *
+ * @returns {{ slot, url, failed, error? }}
+ */
+async function generateOneVariant(slot, prompt, size, modelKey = DEFAULT_MODEL) {
+    try {
+        const cfg = AVATAR_MODELS[modelKey] || AVATAR_MODELS[DEFAULT_MODEL];
+
+        // ── Branch: NanoBanana 2 (Gemini REST) ──────────────────────────────
+        if (cfg.provider === 'gemini') {
+            const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+            if (!imageKey) throw new Error('GEMINI_API_KEY not configured');
+
+            const geminiModel = cfg.apiModel;
+            // Embed aspect ratio hint in prompt (Gemini reads it from text)
+            const arHint = size ? `\n\n[Generate in ${size} aspect ratio — portrait/vertical orientation.]` : '';
+            const geminiPrompt = prompt + arHint;
+
+            console.log(`🎭 [AvatarStudio] Variant ${slot} | NanoBanana 2 (${geminiModel})`);
+
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${imageKey}`;
+            const gemResp = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }],
+                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
+                }),
+                signal: AbortSignal.timeout(90_000),
+            });
+
+            const gemData = await gemResp.json();
+            if (gemData.error) throw new Error(`Gemini: ${gemData.error.message || JSON.stringify(gemData.error)}`);
+
+            const parts = gemData.candidates?.[0]?.content?.parts || [];
+            let b64 = null, mimeType = 'image/png';
+            for (const part of parts) {
+                if (part.inlineData?.mimeType?.startsWith('image/')) {
+                    b64 = part.inlineData.data;
+                    mimeType = part.inlineData.mimeType;
+                    break;
+                }
+            }
+            if (!b64) throw new Error('NanoBanana 2 returned no image in response');
+
+            const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+            const finalUrl = await uploadToS3(
+                Buffer.from(b64, 'base64'),
+                `avatar-studio/nb2-variant-${slot}-${Date.now()}.${ext}`,
+                mimeType
+            );
+            console.log(`✅ [AvatarStudio] Variant ${slot} NanoBanana 2 → S3: ${finalUrl.substring(0, 80)}`);
+            return { slot, url: finalUrl, failed: false };
+        }
+
+        // ── Branch: LaoZhang /images/generations ────────────────────────────
+        const apiKey = getLZKey();
+        const finalSize = size || cfg.defaultSize;
+        console.log(`🎭 [AvatarStudio] Variant ${slot} | model=${cfg.apiModel} | size=${finalSize}`);
+
+        const body = {
+            model: cfg.apiModel,
+            prompt,
+            n: 1,
+            size: finalSize,
+            response_format: cfg.responseFormat || 'url',
+        };
+        if (modelKey === 'gpt-image-2') {
+            body.quality = 'high';
+            body.output_format = 'webp';
+        }
+
+        const resp = await fetch(`${LZ_BASE}/images/generations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(90_000),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text();
+            console.error(`❌ [AvatarStudio] Variant ${slot} HTTP ${resp.status}:`, errText.substring(0, 300));
+            throw new Error(`Image API error (${resp.status}): ${errText.substring(0, 150)}`);
+        }
+
+        const data = await resp.json();
+        const imgData = data.data?.[0];
+        if (!imgData) throw new Error('Empty response from image API');
+
+        let finalUrl;
+        if (imgData.url && imgData.url.startsWith('http')) {
+            finalUrl = await mirrorUrlToS3(imgData.url, `avatar-studio/variant-${slot}-${Date.now()}.webp`);
+            if (!finalUrl) throw new Error('S3 mirror failed');
+        } else if (imgData.b64_json) {
+            // Strip data URI prefix if LZ wraps it
+            let raw = imgData.b64_json;
+            if (raw.startsWith('data:')) raw = raw.substring(raw.indexOf(',') + 1);
+            finalUrl = await uploadToS3(
+                Buffer.from(raw, 'base64'),
+                `avatar-studio/variant-${slot}-${Date.now()}.webp`,
+                'image/webp'
+            );
+        } else {
+            throw new Error('No url or b64_json in image API response');
+        }
+
+        console.log(`✅ [AvatarStudio] Variant ${slot} → S3: ${finalUrl.substring(0, 80)}`);
+        return { slot, url: finalUrl, failed: false };
+
+    } catch (err) {
+        console.error(`❌ [AvatarStudio] Variant ${slot} failed:`, err.message?.substring(0, 200));
+        return { slot, url: null, failed: true, error: err.message?.substring(0, 150) };
+    }
+}
+
+// Map genderExpression values → Avatar schema enum (male|female|unspecified)
+function mapGenderEnum(genderExpression) {
+    if (!genderExpression) return 'unspecified';
+    const g = genderExpression.toLowerCase();
+    if (g === 'masculine' || g === 'male') return 'male';
+    if (g === 'feminine' || g === 'female') return 'female';
+    return 'unspecified';
+}
+
+/**
+ * Auto-save successful variants to Avatar collection (fire-and-forget).
+ * Uses correct schema field: generatedFromPrompt (not generationPrompt).
+ */
+function autoSaveAvatar(url, options, userId) {
+    const name = `AI Avatar — ${options.origin || 'Custom'} ${options.clothingStyle || ''} ${new Date().toLocaleDateString()}`.trim();
+    Avatar.create({
+        name,
+        imageUrl: url,
+        gender: mapGenderEnum(options.genderExpression),
+        isTemplate: false,
+        isActive: true,
+        source: 'generated',
+        generatedFromPrompt: options._prompt || '',
+        createdBy: userId,
+    }).catch(err => console.warn('[AvatarStudio] Auto-save failed:', err.message));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/avatar-studio/models
+// Returns available models list for the frontend model selector
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/models', protect, (req, res) => {
+    const models = Object.entries(AVATAR_MODELS).map(([key, cfg]) => ({
+        key,
+        label: cfg.label,
+        badge: cfg.badge,
+        isDefault: key === DEFAULT_MODEL,
+    }));
+    res.json({ success: true, models, default: DEFAULT_MODEL });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/avatar-studio/generate
+// User-facing: structured options OR directPrompt → 3 parallel variants, credit-gated
+// Users can bypass the structured form with a custom directPrompt
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, res) => {
+    try {
+        const {
+            origin, ageRange, genderExpression, clothingStyle,
+            environment, lightingMood, additionalDetails,
+            directPrompt, // ← user custom prompt bypass
+        } = req.body;
+
+        let finalPrompt;
+
+        if (directPrompt && directPrompt.trim().length >= 10) {
+            // Custom prompt mode — user wrote their own description
+            // Still strip banned age patterns for safety
+            finalPrompt = directPrompt.trim().substring(0, 800);
+            console.log(`🎭 [AvatarStudio] User ${req.user._id} using custom prompt (${finalPrompt.length} chars)`);
+        } else {
+            // Structured options mode
+            try {
+                finalPrompt = buildAvatarPrompt({
+                    origin, ageRange, genderExpression,
+                    clothingStyle, environment, lightingMood, additionalDetails,
+                });
+            } catch (promptErr) {
+                return res.status(promptErr.status || 400).json({ success: false, error: promptErr.message });
+            }
+            console.log(`🎭 [AvatarStudio] User ${req.user._id} using structured options`);
+        }
+
+        const size = RATIO_TO_SIZE['9:16']; // Always 9:16 portrait for user-facing
+        const [v0, v1, v2] = await Promise.all([
+            generateOneVariant(0, finalPrompt, size, DEFAULT_MODEL),
+            generateOneVariant(1, finalPrompt, size, DEFAULT_MODEL),
+            generateOneVariant(2, finalPrompt, size, DEFAULT_MODEL),
+        ]);
+
+        const variants = [v0, v1, v2];
+        const successCount = variants.filter(v => !v.failed).length;
+        console.log(`✅ [AvatarStudio] ${successCount}/3 variants succeeded`);
+
+        const optionsForSave = { origin, genderExpression, clothingStyle, _prompt: finalPrompt };
+        variants.filter(v => !v.failed && v.url).forEach(v => {
+            autoSaveAvatar(v.url, optionsForSave, req.user._id);
+        });
+
+        if (successCount === 0) {
+            return res.status(502).json({ success: false, error: 'All 3 variants failed. Check LaoZhang API key and quota.', variants });
+        }
+
+        res.json({
+            success: true, variants, prompt: finalPrompt,
+            creditsUsed: req.creditsDeducted || 4,
+        });
+    } catch (err) {
+        console.error('❌ [AvatarStudio] /generate error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/avatar-studio/admin/generate
+// SuperAdmin only: free, model selector, directPrompt OR structured options, any aspectRatio
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/admin/generate', protect, superadmin, async (req, res) => {
+    try {
+        const {
+            // Structured avatar options
+            origin, ageRange, genderExpression, clothingStyle, environment, lightingMood, additionalDetails,
+            // Creative generator options
+            directPrompt,
+            negativePrompt,
+            aspectRatio = '9:16',
+            // Model selection
+            model: requestedModel,
+        } = req.body;
+
+        const modelKey = AVATAR_MODELS[requestedModel] ? requestedModel : DEFAULT_MODEL;
+        const modelCfg = AVATAR_MODELS[modelKey];
+
+        // Resolve pixel size from aspect ratio
+        const size = RATIO_TO_SIZE[aspectRatio] || modelCfg.defaultSize;
+
+        let finalPrompt;
+
+        if (directPrompt && directPrompt.trim()) {
+            // Creative Generator mode — use prompt directly
+            finalPrompt = directPrompt.trim();
+            if (negativePrompt && negativePrompt.trim()) {
+                finalPrompt += `. Avoid: ${negativePrompt.trim()}`;
+            }
+        } else {
+            // Structured Avatar Generator mode
+            try {
+                finalPrompt = buildAvatarPrompt({
+                    origin, ageRange, genderExpression,
+                    clothingStyle, environment, lightingMood, additionalDetails,
+                });
+            } catch (promptErr) {
+                return res.status(promptErr.status || 400).json({ success: false, error: promptErr.message });
+            }
+        }
+
+        console.log(`🎭 [AvatarStudio/Admin] model=${modelKey} | ratio=${aspectRatio} | size=${size} | direct=${!!directPrompt}`);
+        console.log(`   📝 Prompt: ${finalPrompt.substring(0, 100)}...`);
+
+        const [v0, v1, v2] = await Promise.all([
+            generateOneVariant(0, finalPrompt, size, modelKey),
+            generateOneVariant(1, finalPrompt, size, modelKey),
+            generateOneVariant(2, finalPrompt, size, modelKey),
+        ]);
+
+        const variants = [v0, v1, v2];
+        const successCount = variants.filter(v => !v.failed).length;
+        console.log(`✅ [AvatarStudio/Admin] ${successCount}/3 variants succeeded`);
+
+        if (successCount === 0) {
+            return res.status(502).json({
+                success: false,
+                error: 'All 3 variants failed. Check LAOZHANG_API_KEY and quota.',
+                variants,
+            });
+        }
+
+        res.json({
+            success: true, variants, prompt: finalPrompt,
+            aspectRatio, size, model: modelKey,
+            creditsUsed: 0,
+        });
+    } catch (err) {
+        console.error('❌ [AvatarStudio/Admin] error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+export default router;

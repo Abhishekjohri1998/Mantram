@@ -261,4 +261,46 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /promote-from-generated
+// Save an AI-generated image (already on S3) directly as a Template.
+// No file upload needed — previewUrl is the S3 URL from avatar-studio or admin/generate.
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/promote-from-generated', protect, superadmin, async (req, res) => {
+    try {
+        const { name, categoryId, description, tags, studioOrigin, previewUrl, savedPrompt } = req.body;
+
+        if (!previewUrl) {
+            return res.status(400).json({ success: false, error: 'previewUrl is required (S3 URL of generated image)' });
+        }
+        if (!savedPrompt) {
+            return res.status(400).json({ success: false, error: 'savedPrompt is required' });
+        }
+        if (!name || !name.trim()) {
+            return res.status(400).json({ success: false, error: 'Template name is required' });
+        }
+
+        const template = await Template.create({
+            name: name.trim(),
+            categoryId: categoryId || null,
+            description: description || '',
+            tags: Array.isArray(tags) ? tags : [],
+            studioOrigin: studioOrigin || 'avatar',
+            previewUrl,
+            previewMediaUrl: previewUrl,      // field used by TemplateManager grid
+            previewMediaType: 'image',
+            previewType: 'image',
+            savedPrompt,
+            isActive: false,        // Admin must explicitly activate — safety gate
+            isFeatured: false,
+            createdBy: req.user._id,
+        });
+
+        res.json({ success: true, template });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
 export default router;
+
