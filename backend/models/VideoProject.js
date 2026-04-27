@@ -159,8 +159,9 @@ const videoProjectSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Indexes
+// Indexes — compound indexes for the listing endpoint's sort/filter patterns
 videoProjectSchema.index({ user: 1, status: 1, createdAt: -1 });
-// Removed redundant brand index here as it's defined inline
+videoProjectSchema.index({ user: 1, createdAt: -1 });              // listing without status filter
+videoProjectSchema.index({ user: 1, brand: 1, createdAt: -1 });    // brand-filtered listing
 
 export default mongoose.model('VideoProject', videoProjectSchema);
