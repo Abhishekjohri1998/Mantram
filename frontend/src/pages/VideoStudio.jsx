@@ -11,7 +11,8 @@ import UGCCreator from '../components/VideoStudio/UGCCreator'
 import UGCPro from '../components/VideoStudio/UGCPro'
 import QAds from '../components/VideoStudio/QAds'
 import QAdsV2 from '../components/VideoStudio/QAdsV2'
-import VideoAgent from '../components/VideoStudio/VideoAgent'
+import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
+import TemplateLibrary from './TemplateLibrary'
 import Walkthrough from '../components/Walkthrough'
 import './VideoStudio.css'
 
@@ -122,6 +123,7 @@ export default function VideoStudio() {
     const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
+    const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
     const [searchParams, setSearchParams] = useSearchParams()
 
     // Project state
@@ -1208,10 +1210,17 @@ export default function VideoStudio() {
 
                             {/* Brief Input */}
                             <div data-wt="video-brief" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
-                                <h3 className="text-base font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary">edit_note</span>
-                                    Your Brief
-                                </h3>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">edit_note</span>
+                                        Your Brief
+                                    </h3>
+                                    <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer font-semibold shadow-sm text-xs">
+                                        <span className="material-symbols-outlined text-[14px]">grid_view</span>
+                                        <span className="hidden sm:inline">Start from Template</span>
+                                        <span className="sm:hidden">Template</span>
+                                    </button>
+                                </div>
                                 <textarea
                                     value={brief}
                                     onChange={e => setBrief(e.target.value)}
@@ -2271,11 +2280,18 @@ export default function VideoStudio() {
                                         Download
                                     </button>
                                 )}
+                                {user?.role === 'superadmin' && projectId && (
+                                    <SaveAsTemplateButton jobId={projectId} jobType="VideoProject" studioOrigin="video" prompt={backendPrompt || ''} />
+                                )}
                             </div>
                         </div>
                     )}
                 </>) /* end storyboard mode */
                 }
+
+            {showTemplateLibrary && (
+                <TemplateLibrary overlayMode={true} studioFilter="video" onCloseOverlay={() => setShowTemplateLibrary(false)} />
+            )}
         </DashboardLayout >
     )
 }

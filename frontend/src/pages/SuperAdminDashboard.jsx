@@ -4,6 +4,9 @@ import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { superadmin as API } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import TemplateManager from './TemplateManager'
+import QAdsManager from './QAdsManager'
+import UsageAnalytics from './UsageAnalytics'
 
 export default function SuperAdminDashboard() {
     const navigate = useNavigate()
@@ -153,6 +156,9 @@ export default function SuperAdminDashboard() {
             { id: 'ugcStudio', label: 'UGC Studio', icon: 'smart_display' },
         ]},
         { label: 'Platform', icon: 'settings', items: [
+            { id: 'templates', label: 'Template Manager', icon: 'style' },
+            { id: 'qads', label: 'Q-Ads Manager', icon: 'movie' },
+            { id: 'analytics', label: 'Analytics', icon: 'analytics' },
             { id: 'studios', label: 'Studio Management', icon: 'rocket_launch' },
             { id: 'content', label: 'Content & Brands', icon: 'article' },
             { id: 'integrations', label: 'Integrations', icon: 'hub' },
@@ -4170,9 +4176,29 @@ export default function SuperAdminDashboard() {
                     </div>
                 )}
 
-                {/* ════════════ UGC STUDIO SETTINGS ════════════ */}
                 {tab === 'ugcStudio' && (
                     <UGCStudioSettings />
+                )}
+
+                {/* ════════════ TEMPLATES ════════════ */}
+                {tab === 'templates' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
+                        <TemplateManager />
+                    </div>
+                )}
+
+                {/* ════════════ Q-ADS MANAGER ════════════ */}
+                {tab === 'qads' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
+                        <QAdsManager />
+                    </div>
+                )}
+
+                {/* ════════════ USAGE ANALYTICS ════════════ */}
+                {tab === 'analytics' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
+                        <UsageAnalytics />
+                    </div>
                 )}
 
             </div>{/* end flex-1 content */}

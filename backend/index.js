@@ -69,6 +69,7 @@ import monthlyStrategyRoutes from './routes/monthly-strategy.js';
 import calendarRoutes from './routes/calendar.js';
 import notificationRoutes from './routes/notifications.js';
 import jobsRoutes from './routes/jobs.js';
+import templatesRoutes from './routes/templates.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 
 const HARDCODED_ORIGINS = [
@@ -374,6 +375,7 @@ app.use('/api/monthly-strategy', monthlyStrategyRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/jobs', jobsRoutes);
+app.use('/api/templates', templatesRoutes);
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
 // Exposes platform intelligence tools to all studio agents via mcpBridge

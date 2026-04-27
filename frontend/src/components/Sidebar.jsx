@@ -159,9 +159,9 @@ export default function Sidebar({ mobileOpen, onClose }) {
                             onClick={handleNavClick}
                             title={isCollapsed ? "Super Admin" : undefined}
                             className={({ isActive }) =>
-                                `flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} rounded-lg text-[13px] font-medium heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${isActive
-                                    ? 'text-primary bg-[var(--sys-primary-dim)] border border-[var(--sys-border)]'
-                                    : 'text-primary/40 hover:text-primary border border-transparent'
+                                `flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2'} rounded-lg text-[12px] font-semibold heavy-in-soft-out transition-all duration-300 cursor-pointer relative ${isActive
+                                    ? 'text-[#f97316] bg-[#f97316]/10 border border-[#f97316]/20'
+                                    : 'text-[#f97316]/60 hover:text-[#f97316] hover:bg-[#f97316]/5 border border-transparent'
                                 }`
                             }
                         >

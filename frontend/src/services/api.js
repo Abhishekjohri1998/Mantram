@@ -217,6 +217,15 @@ export const content = {
     trending: (data) => apiFetch('/content/trending', { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// ============ Templates API ============
+export const templates = {
+    list: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/templates?${query}`);
+    },
+    use: (id, data) => apiFetch(`/templates/${id}/use`, { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+};
+
 // ============ Creatives API ============
 export const creatives = {
     generate: (data, options = {}) => apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), ...options }),

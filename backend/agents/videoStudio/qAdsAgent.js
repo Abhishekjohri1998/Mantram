@@ -15,7 +15,8 @@
 
 import { loadBrandContext, callMultimodalAgent } from '../shared/agentUtils.js';
 import { callMcpToolsParallel } from '../../mcp/registry.js';
-import { getPreset, ANTISLOP_BANNED_WORDS, AGEBLIND_BANNED_WORDS } from './qAdsPresets.js';
+import { getPresets } from '../../utils/qAdsCache.js';
+import { ANTISLOP_BANNED_WORDS, AGEBLIND_BANNED_WORDS } from './qAdsPresets.js';
 
 const MCP_TIMEOUT_MS = 5000;
 
@@ -331,8 +332,10 @@ export async function runQAdsAgent({
     console.log(`[Q-Ads Agent] Starting — brand=${brandId}, preset=${presetId}`);
 
     // ── 1. Load preset ────────────────────────────────────────────────────────
-    const preset = getPreset(presetId);
-    if (!preset) throw new Error(`Unknown Q-Ads preset: ${presetId}`);
+    const allPresets = await getPresets();
+    const rawPreset = allPresets.presets.find(p => p.presetCode === presetId || p.id === presetId || p._id?.toString() === presetId);
+    if (!rawPreset) throw new Error(`Unknown Q-Ads preset: ${presetId}`);
+    const preset = { ...rawPreset, ...(rawPreset.promptRules || {}) };
 
     // ── 2. Load Brand DNA ─────────────────────────────────────────────────────
     const { brandContext } = await loadBrandContext(brandId);

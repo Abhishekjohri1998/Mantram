@@ -103,6 +103,8 @@ export const authorize = (...roles) => (req, res, next) => {
     next();
 };
 
+export const superadmin = authorize('superadmin');
+
 // Generate JWT
 export const generateToken = (userId) => {
     return jwt.sign({ id: userId }, config.jwtSecret, { expiresIn: config.jwtExpire });
