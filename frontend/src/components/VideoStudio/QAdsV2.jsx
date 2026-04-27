@@ -872,24 +872,26 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                         const isExclusive = p.isMantramExclusive;
                         const pId = p.presetCode || p.id || p._id;
                         return (
-                            <div key={pId} className={`cat-card ${selP === pId ? 'active' : ''}`} onClick={() => { setSelP(pId); setShowCats(false); }}>
-                                {p.previewMediaUrl ? (
-                                    p.previewMediaType === 'video' ? (
-                                        <video src={p.previewMediaUrl} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} />
+                            <div key={pId}>
+                                <div className={`cat-card ${selP === pId ? 'active' : ''}`} onClick={() => { setSelP(pId); setShowCats(false); }}>
+                                    {p.previewMediaUrl ? (
+                                        p.previewMediaType === 'video' ? (
+                                            <video src={p.previewMediaUrl} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} />
+                                        ) : (
+                                            <img src={p.previewMediaUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} alt={p.name} />
+                                        )
                                     ) : (
-                                        <img src={p.previewMediaUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} alt={p.name} />
-                                    )
-                                ) : (
-                                    <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${p.color || '#4f46e5'} 0%, #1a1a1a 100%)`, opacity: 0.45, borderRadius: 12 }} />
-                                )}
-                                <div className="cat-card-ov" />
-                                <div style={{ zIndex: 2, color: '#fff', position: 'relative' }}>
-                                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: isExclusive ? '#fbbf24' : (p.color || '#4f46e5'), marginBottom: 4, textTransform: 'uppercase' }}>
-                                        {isExclusive ? '★ Mantram Exclusive' : (p.categoryName || p.group || 'Format')}
+                                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${p.color || '#4f46e5'} 0%, #1a1a1a 100%)`, opacity: 0.45, borderRadius: 12 }} />
+                                    )}
+                                    <div className="cat-card-ov" />
+                                    <div style={{ zIndex: 2, color: '#fff', position: 'relative' }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: isExclusive ? '#fbbf24' : (p.color || '#4f46e5'), marginBottom: 4, textTransform: 'uppercase' }}>
+                                            {isExclusive ? '★ Mantram Exclusive' : (p.categoryName || p.group || 'Format')}
+                                        </div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{p.name}</div>
+                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>{p.tagline}</div>
+                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}>{p.threeWordCamera || p.categoryName || 'Dynamic'}</div>
                                     </div>
-                                    <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{p.name}</div>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>{p.tagline}</div>
-                                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}>{p.threeWordCamera || p.categoryName || 'Dynamic'}</div>
                                 </div>
                             </div>
                         )
