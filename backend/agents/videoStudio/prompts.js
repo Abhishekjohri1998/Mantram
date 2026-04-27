@@ -503,26 +503,28 @@ Return JSON:
 
 export const UGC_AVATAR_PROMPT = (brandContext, userDescription, environment = 'home') => {
   const ENV = {
-    home:    'warm home interior with natural window light',
-    outdoor: 'outdoor lifestyle setting with soft natural daylight',
-    studio:  'clean minimal studio with professional lighting',
-    cafe:    'cozy cafe interior with warm ambient tones',
-    gym:     'modern fitness studio with motivational lighting',
-    office:  'contemporary workspace with clean natural light',
+    home:    'by a window in a cozy home',
+    outdoor: 'outdoors in natural daylight',
+    studio:  'in a clean photography studio',
+    cafe:    'in a warm cafe',
+    gym:     'in a gym',
+    office:  'in a bright modern office',
   };
 
-  return `Generate a highly stylized, vibrant 3D Pixar/Anime style cartoon portrait of a UGC content creator for a product review video.
+  const desc = (userDescription || '').toLowerCase();
+  const isCartoon = /cartoon|anime|illustrated|illustration|2d|cel.shad|pixar|disney|comic|manga|sketch|watercolou?r|painted|vector|flat.style|chibi/i.test(desc);
 
-${brandContext}
+  if (isCartoon) {
+    const style = /anime|manga/i.test(desc) ? 'anime art style' :
+                  /pixar|disney/i.test(desc) ? 'Pixar 3D animation style' :
+                  /comic/i.test(desc) ? 'comic book art style' : 'cartoon art style';
+    return `${style} character: ${userDescription}, ${ENV[environment] || ENV.home}, looking at camera, vibrant colors.`;
+  }
 
-PERSON DESCRIPTION: ${userDescription || 'Approachable 3D stylized character in their 20s-30s, friendly expressive face, looking directly at camera'}
-ENVIRONMENT: ${ENV[environment] || ENV.home} (rendered in matching 3D/stylized aesthetic)
-POSE: Upper body facing camera, arms/hands visible (will be holding a product), slight natural smile.
-STYLE: Vibrant 3D digital art, Pixar/Anime aesthetic, highly detailed but completely non-photorealistic.
-LIGHTING: Bright, vibrant, studio-quality 3D lighting. Catch light in eyes.
-COMPOSITION: Medium close-up, face centered, room for product in frame.
+  const person = userDescription || 'a friendly relatable person in their late 20s';
+  const place   = ENV[environment] || ENV.home;
 
-CRITICAL: The character must NOT look like a real human — it must be completely stylized, cartoonish, or a mascot to bypass deepfake security filters. Smooth 3D textures, expressive exaggerated features, NO photorealism. This image will be used as @image1 for Seedance 2.0 I2V generation.`;
+  return `Photo of ${person}, ${place}, looking at camera, warm natural smile. Portrait photo, real person, natural skin, realistic eyes, soft window light, shallow depth of field background blur. Candid lifestyle photography.`;
 };
 
 

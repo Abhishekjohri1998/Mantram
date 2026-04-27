@@ -19,7 +19,7 @@
 // PER-MODEL PROMPT STYLE GUIDES
 // Research-backed optimal prompt structures for each model
 // ─────────────────────────────────────────────────────────────────────────────
-const MODEL_STYLE_GUIDES = {
+export const MODEL_STYLE_GUIDES = {
     'seedance-2.0': {
         name: 'Seedance 2.0',
         maxWords: 260,

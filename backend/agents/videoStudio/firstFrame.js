@@ -114,24 +114,37 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
             console.log(`🖼️ Trying Gemini model: ${modelId} (90s timeout)`);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
             
-            // 90s timeout — Gemini queues requests when rate-limited instead of returning 429.
-            // Payload is only ~30KB so the wait is purely queue time. Frontend has 1-hour timeout.
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 90000);
 
-            // Build generation config
-            const generationConfig = { responseModalities: ['TEXT', 'IMAGE'], temperature };
+            // Build generation config — include imageConfig so aspect ratio is actually applied
+            const generationConfig = {
+                responseModalities: ['TEXT', 'IMAGE'],
+                temperature,
+            };
             if (aspectRatio) {
-                console.log(`🖼️ Aspect ratio: ${aspectRatio}`);
+                const safeARs = ["1:1","9:16","16:9","4:3","3:4","4:5","5:4","2:3","3:2"];
+                const nativeAR = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
+                generationConfig.imageConfig = { aspectRatio: nativeAR };
+                console.log(`🖼️ Aspect ratio applied: ${nativeAR}`);
             }
+
+            // systemInstruction forces photographic rendering mode.
+            // Without this, Gemini defaults to illustrated/3D-rendered human portraits.
+            const systemInstruction = options.isAvatar
+                ? { parts: [{ text: 'You are a photorealistic portrait photography AI. Always output real-looking photographs of people — never illustrations, paintings, 3D renders, cartoons, or digital art. Every image must look like it was captured by a professional DSLR camera.' }] }
+                : undefined;
+
+            const reqBody = {
+                contents: [{ parts }],
+                generationConfig,
+            };
+            if (systemInstruction) reqBody.systemInstruction = systemInstruction;
 
             const resp = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    generationConfig,
-                }),
+                body: JSON.stringify(reqBody),
                 signal: controller.signal
             });
             clearTimeout(timeoutId);

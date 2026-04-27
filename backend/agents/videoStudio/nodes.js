@@ -992,37 +992,47 @@ export async function ugcProductGroundingNode(state) {
     const productImages = (state.productImageUrls || []).filter(u => u && u.startsWith('http')).slice(0, 4);
     let textContext = state.productText || '';
 
-    // If a product URL is provided, scrape content via MCP web_search
-    if (state.productUrl) {
+    // If productText is already provided (scraped by the route), skip web_search entirely.
+    // Only fall back to web_search when we have a URL but no text at all.
+    if (!textContext && state.productUrl) {
         try {
-            const searchResult = await callMcpTool('web_search', { query: state.productUrl, mode: 'deep' });
+            const searchResult = await Promise.race([
+                callMcpTool('web_search', { query: state.productUrl, mode: 'quick' }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+            ]);
             if (searchResult?.data) {
-                const extractedText = typeof searchResult.data === 'string' ? searchResult.data : searchResult.data.text || JSON.stringify(searchResult.data);
-                textContext = `URL: ${state.productUrl}\n\n${extractedText.substring(0, 5000)}`;
+                const extracted = typeof searchResult.data === 'string' ? searchResult.data : searchResult.data.text || '';
+                textContext = `URL: ${state.productUrl}\n\n${extracted.substring(0, 3000)}`;
             }
         } catch (e) {
-            console.warn(`[UGC Node] URL scrape failed: ${e.message}, using URL only`);
-            textContext = `Product page: ${state.productUrl}`;
+            console.warn(`[UGC Node] web_search skipped (${e.message})`);
+            textContext = `Product URL: ${state.productUrl}`;
         }
     }
 
     const userPrompt = [
         `Analyse this product for UGC video creation.`,
         textContext ? `\nPRODUCT INFO:\n${textContext}` : '',
-        productImages.length > 0 ? `\n${productImages.length} product images are attached for visual analysis.` : '',
+        productImages.length > 0 ? `\n${productImages.length} product images available (URLs provided for reference, not for visual analysis).` : '',
     ].filter(Boolean).join('');
 
     let result;
-    if (productImages.length > 0) {
-        // MCoT: multimodal analysis with product images
+    // FAST PATH: Always use text-only agent when we have rich text context (JSON-LD, OG tags).
+    // Multimodal Gemini Vision with 3+ images takes 15-30s vs 2-3s for text-only.
+    // Only use multimodal as absolute last resort (no text at all, only images).
+    const hasRichText = textContext.length > 100;
+    if (!hasRichText && productImages.length > 0) {
+        // Minimal text — need vision to understand the product (use max 1 image for speed)
+        console.log(`[UGC Node] Using multimodal (minimal text: ${textContext.length} chars, ${productImages.length} imgs)`);
         result = await agentUtils.callMultimodalAgent(
             UGC_PRODUCT_GROUNDING_PROMPT,
             userPrompt,
-            productImages,
+            productImages.slice(0, 1),
             { temperature: 0.2, maxTokens: 2048 }
         );
     } else {
-        // Text-only fallback
+        // Rich text available — fast text-only path (2-3s)
+        console.log(`[UGC Node] Using fast text-only path (${textContext.length} chars text)`);
         result = await agentUtils.callAgent(
             UGC_PRODUCT_GROUNDING_PROMPT,
             userPrompt,
@@ -1069,10 +1079,11 @@ export async function ugcAvatarNode(state) {
             state.environment || 'home'
         );
 
-        console.log(`  -> Generating avatar via NanoBanana 2: "${state.avatarDescription.substring(0, 60)}..."`);
-        const { imageUrl } = await geminiImageGenerate(prompt, [], 0.5, {
+        console.log(`[Avatar] Full prompt → "${prompt}"`);
+        const { imageUrl } = await geminiImageGenerate(prompt, [], 0.2, {
             aspectRatio: '9:16',
             referenceImageUrls: [],
+            isAvatar: true,   // Activates systemInstruction for photorealistic photography mode
         });
 
         console.log(`[UGC Node] Avatar generated: ${imageUrl.substring(0, 60)}...`);

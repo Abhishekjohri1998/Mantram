@@ -55,6 +55,8 @@ import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYST
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
+import { getPresetsForFrontend, getPreset as getPresetV2 } from '../agents/videoStudio/qAdsPresets.js';
+import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
 
 const router = Router();
 
@@ -2156,14 +2158,18 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                // systemInstruction locks the model into photography mode — prevents 3D/illustration output
+                systemInstruction: {
+                    parts: [{ text: 'You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.' }]
+                },
                 contents: [{
                     role: 'user',
                     parts: [
                         { inlineData: { mimeType: imgMime, data: imgBase64 } },
-                        { text: `Edit this photo: ${prompt.trim()}. Keep the person's face and identity exactly the same. Only change the clothing, background, and lighting as described. Output a high quality professional portrait photo.` },
+                        { text: `Edit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.` },
                     ],
                 }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
             }),
             signal: AbortSignal.timeout(60000),
         });
@@ -2898,67 +2904,154 @@ router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages'
             productImageUrls.push(...(urls || []).filter(u => u?.startsWith('http')));
         }
 
-        // If product URL provided but NO images uploaded, try to scrape product images from the page
+        // Scrape page HTML once — reuse for BOTH image extraction AND product text (avoids double fetch)
+        let scrapedProductText = productText || '';
         if (productUrl && productImageUrls.length === 0) {
             try {
-                console.log(`[UGC Analyze] No product images — trying to scrape from URL: ${productUrl}`);
+                console.log(`[UGC Analyze] Fetching page: ${productUrl}`);
                 const pageResp = await fetch(productUrl, {
-                    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MantramBot/1.0)' },
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    },
                     signal: AbortSignal.timeout(8000),
                 });
                 const pageHtml = await pageResp.text();
 
-                // Extract image URLs from og:image, product images, and img src attributes
-                const imgUrls = new Set();
+                // Extract product text for Gemini using simple string ops
+                function extractMeta(html, attr, val) {
+                    const rx = new RegExp('<meta[^>]+' + attr + '=["\']+' + val + '["\']+[^>]*content=["\']+([^"\']{5,500})["\']+', 'i');
+                    const m = html.match(rx) || html.match(new RegExp('<meta[^>]+content=["\']+([^"\']{5,500})["\']+[^>]*' + attr + '=["\']+' + val + '["\']+', 'i'));
+                    return m ? m[1] : null;
+                }
+                const rawTitle = (pageHtml.match(/(?<=<title[^>]*>)[^<]+(?=<\/title>)/i) || [])[0] || '';
+                const metaDesc = extractMeta(pageHtml, 'name', 'description');
+                const ogTitle = extractMeta(pageHtml, 'property', 'og:title');
+                const ogDesc = extractMeta(pageHtml, 'property', 'og:description');
 
-                // OG Image (highest priority for product pages)
-                const ogMatch = pageHtml.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-                if (ogMatch?.[1]) imgUrls.add(ogMatch[1]);
+                // Pull JSON-LD product data (richest source)
+                let ldText = '';
+                const candidateUrls = [];
 
-                // Twitter card image
-                const twMatch = pageHtml.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
-                if (twMatch?.[1]) imgUrls.add(twMatch[1]);
+                // 1. JSON-LD structured data images
+                for (const [, jsonStr] of pageHtml.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+                    try {
+                        const ld = JSON.parse(jsonStr.trim());
+                        const items = Array.isArray(ld) ? ld : [ld];
+                        for (const item of items) {
+                            if (item.image) {
+                                const imgs = Array.isArray(item.image) ? item.image : [item.image];
+                                for (const img of imgs) {
+                                    const url = typeof img === 'string' ? img : (img?.url || img?.contentUrl);
+                                    if (url?.startsWith('http')) candidateUrls.push(url);
+                                }
+                            }
+                        }
+                    } catch { }
+                }
 
-                // Shopify/WooCommerce product image patterns
-                const productImgPattern = /["'](https?:\/\/[^"']*(?:product|cdn|shopify|woocommerce|images)[^"']*\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)/gi;
-                let pMatch;
-                while ((pMatch = productImgPattern.exec(pageHtml)) && imgUrls.size < 4) {
-                    if (!pMatch[1].includes('icon') && !pMatch[1].includes('logo') && !pMatch[1].includes('favicon')) {
-                        imgUrls.add(pMatch[1]);
+                // 2. OG + twitter meta images
+                for (const [, url] of pageHtml.matchAll(/<meta[^>]*(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*content=["']([^"']+)["']/gi)) {
+                    if (url?.startsWith('http')) candidateUrls.push(url);
+                }
+
+                // 3. Shopify CDN direct
+                for (const [, url] of pageHtml.matchAll(/["'](https?:\/\/cdn\.shopify\.com\/s\/files\/[^"'?]+\.(?:jpg|jpeg|png|webp))(?:\?[^"']*)?["']/gi)) {
+                    if (!url.includes('icon') && !url.includes('logo') && !url.includes('_small') && !url.includes('_thumb') && !url.includes('_compact')) {
+                        candidateUrls.push(url);
                     }
                 }
 
-                // Download and upload the first 2 unique product images to S3
-                let scraped = 0;
-                for (const imgUrl of imgUrls) {
-                    if (scraped >= 2) break;
-                    try {
-                        const imgResp = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) });
-                        if (!imgResp.ok) continue;
-                        const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
-                        if (!contentType.startsWith('image/')) continue;
-                        const buffer = Buffer.from(await imgResp.arrayBuffer());
-                        if (buffer.length < 5000) continue; // skip tiny images (icons, etc.)
-                        const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-                        const s3Key = `ugc-pro/products/${req.user._id}/${Date.now()}-scraped-${scraped}.${ext}`;
-                        const s3Url = await uploadToS3(buffer, s3Key, contentType);
-                        productImageUrls.push(s3Url);
-                        scraped++;
-                        console.log(`[UGC Analyze] Scraped product image ${scraped}: ${imgUrl.substring(0, 80)}`);
-                    } catch { /* skip failed images */ }
+                // 4. Generic product/gallery images
+                for (const [, url] of pageHtml.matchAll(/["'](https?:\/\/[^"']*(?:product|item|goods|media|gallery|zoom|large)[^"']*\.(?:jpg|jpeg|png|webp))(?:\?[^"']*)?["']/gi)) {
+                    if (!url.includes('icon') && !url.includes('logo') && !url.includes('favicon') && !url.includes('sprite')) {
+                        candidateUrls.push(url);
+                    }
                 }
-                if (scraped === 0) console.log(`[UGC Analyze] No product images could be scraped from URL`);
+
+                // Deduplicate by normalised base URL (strip query, size suffixes, and normalize http→https)
+                const seen = new Set();
+                const deduped = [];
+                for (const rawUrl of candidateUrls) {
+                    const base = rawUrl.split('?')[0]
+                        .replace(/^http:/, 'https:')
+                        .replace(/_\d+x\d*(\.\w+)$/, '$1')
+                        .replace(/_\d+x(\.\w+)$/, '$1')
+                        .replace(/\/\d+x\d+\//, '/');
+                    if (!seen.has(base)) { seen.add(base); deduped.push(rawUrl); }
+                }
+
+                // Download and upload up to 4 diverse images in parallel with strict 8s timeout
+                const uploadPromises = deduped.slice(0, 4).map(async (imgUrl, i) => {
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Image fetch/upload timeout')), 8000));
+                    
+                    const fetchAndUpload = async () => {
+                        const imgResp = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(6000) });
+                        if (!imgResp.ok) throw new Error('Bad response');
+                        const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
+                        if (!contentType.startsWith('image/')) throw new Error('Not an image');
+                        
+                        const arrayBuffer = await imgResp.arrayBuffer();
+                        const buffer = Buffer.from(arrayBuffer);
+                        if (buffer.length < 8000 || buffer.length > 10_000_000) throw new Error('Invalid size');
+                        
+                        const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+                        const s3Key = `ugc-pro/products/${req.user._id}/${Date.now()}-${i}.${ext}`;
+                        const s3Url = await uploadToS3(buffer, s3Key, contentType);
+                        
+                        console.log(`[UGC Analyze] ✅ Image ${i+1}: ${imgUrl.substring(0, 70)} (${Math.round(buffer.length/1024)}KB)`);
+                        return s3Url;
+                    };
+
+                    try {
+                        return await Promise.race([fetchAndUpload(), timeoutPromise]);
+                    } catch (err) {
+                        return null; // silently skip failures
+                    }
+                });
+
+                const results = await Promise.all(uploadPromises);
+                const successfulUrls = results.filter(Boolean);
+                productImageUrls.push(...successfulUrls);
+                let scraped = successfulUrls.length;
+
+                // ── Build scrapedProductText from extracted page metadata ──
+                // Extract JSON-LD product text data
+                for (const [, jsonStr] of pageHtml.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+                    try {
+                        const ld = JSON.parse(jsonStr.trim());
+                        const items = Array.isArray(ld) ? ld : [ld];
+                        for (const item of items) {
+                            if (item['@type'] === 'Product' || item.name) {
+                                ldText += `Name: ${item.name || ''} | Desc: ${(item.description || '').substring(0, 300)} | Price: ${item.offers?.price || ''} ${item.offers?.priceCurrency || ''}`.trim() + '\n';
+                            }
+                        }
+                    } catch { /* skip */ }
+                }
+
+                scrapedProductText = [
+                    `URL: ${productUrl}`,
+                    ogTitle ? `Title: ${ogTitle}` : rawTitle ? `Title: ${rawTitle.trim()}` : '',
+                    ogDesc ? `Description: ${ogDesc}` : metaDesc ? `Description: ${metaDesc}` : '',
+                    ldText ? `Product Data:\n${ldText}` : '',
+                ].filter(Boolean).join('\n').substring(0, 3000);
+
+                console.log(`[UGC Analyze] ${scraped} images, productText: ${scrapedProductText.length} chars`);
             } catch (err) {
-                console.warn(`[UGC Analyze] Page scrape failed: ${err.message}`);
+                console.warn(`[UGC Analyze] Page fetch failed: ${err.message}`);
+                scrapedProductText = productText || `Product URL: ${productUrl}`;
             }
+        } else if (productUrl) {
+            // Images already uploaded — still need product text, use URL as minimal context
+            scrapedProductText = productText || `Product URL: ${productUrl}`;
         }
 
-        console.log(`[UGC Analyze] Analyzing product - ${productUrl || 'manual'}, ${productImageUrls.length} images`);
+        console.log(`[UGC Analyze] Grounding - ${productUrl || 'manual'}, ${productImageUrls.length} images, ${scrapedProductText.length} chars text`);
 
-        // Run MCoT product grounding node
+        // Run MCoT product grounding node — pass scraped text so node skips its own web_search
         const state = await ugcProductGroundingNode({
-            productUrl: productUrl || null,
-            productText: productText || '',
+            productUrl: null, // Already scraped — prevent duplicate fetch inside the node
+            productText: scrapedProductText,
             productImageUrls,
             brandId,
             userId: req.user._id,
@@ -3026,25 +3119,123 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
             return res.json({ success: true, avatarUrl, generated: false });
         }
 
-        // Path 2: Generate via NanoBanana 2
+        // Path 2: AI Avatar Generation
+        // Primary: NanoBanana 2 (gemini-3.1-flash-image-preview) with 3 retries
+        // Fallback: GPT-image-2 (via LaoZhang proxy or direct OpenAI)
         if (!description?.trim()) {
             return res.status(400).json({ success: false, error: 'Provide a model description or upload a photo' });
         }
 
-        const state = await ugcAvatarNode({
-            brandId,
-            userId: req.user._id,
-            avatarDescription: description,
-            environment: environment || 'home',
-        });
+        const env = environment || 'home';
+        const envMap = {
+            home: 'cozy living room with warm afternoon light coming through sheer curtains',
+            outdoor: 'bright outdoor setting with natural daylight and greenery in the background',
+            studio: 'clean white studio backdrop with professional softbox lighting',
+            cafe: 'warm café interior with wooden furniture and soft ambient light',
+            gym: 'modern gym with natural light, subtle equipment visible in background',
+            office: 'modern office with large windows and a clean desk in the background',
+        };
+        const envDesc = envMap[env] || envMap.home;
 
-        if (!state.avatarReady) {
-            throw new Error(state.avatarError || 'Avatar generation failed');
+        // Strong photography prompt — negative keywords prevent 3D/cartoon output
+        const avatarPrompt = `RAW photo, ${description}, ${envDesc}, looking at camera with a natural expression, 85mm f/1.8 portrait lens, shallow depth of field, soft bokeh background, Canon EOS R5, natural skin texture, photorealistic, hyperrealistic, 8k professional portrait photography. Not an illustration. Not a 3D render. Not a cartoon. Not anime. Real photograph.`;
+        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 100)}..."`);
+
+        let avatarUrl = null;
+
+        // ── Primary: NanoBanana 2 (up to 3 retries to handle server load) ──
+        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${geminiKey}`;
+            for (let attempt = 1; attempt <= 3 && !avatarUrl; attempt++) {
+                console.log(`[Avatar] NanoBanana 2 — attempt ${attempt}/3...`);
+                const controller = new AbortController();
+                const tid = setTimeout(() => controller.abort(), 90000);
+                try {
+                    const geminiResp = await fetch(geminiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: 'user', parts: [{ text: avatarPrompt }] }],
+                            generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
+                        }),
+                        signal: controller.signal,
+                    });
+                    const geminiData = await geminiResp.json();
+                    if (geminiData.error) {
+                        const msg = geminiData.error.message || '';
+                        const isBusy = /overload|busy|capacity|quota/i.test(msg);
+                        if (isBusy && attempt < 3) {
+                            console.warn(`[Avatar] NanoBanana 2 busy (attempt ${attempt}), retrying in 5s...`);
+                            await new Promise(r => setTimeout(r, 5000));
+                            continue;
+                        }
+                        throw new Error(msg);
+                    }
+                    for (const part of (geminiData.candidates?.[0]?.content?.parts || [])) {
+                        if (part.inlineData?.mimeType?.startsWith('image/')) {
+                            const buf = Buffer.from(part.inlineData.data, 'base64');
+                            const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
+                            avatarUrl = await uploadToS3(buf, s3Key, part.inlineData.mimeType);
+                            console.log(`[Avatar] ✅ NanoBanana 2 → ${avatarUrl.substring(0, 60)}...`);
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    if (err.name === 'AbortError' || err.message?.includes('abort') || err.message?.includes('timeout')) {
+                        console.warn(`[Avatar] NanoBanana 2 timeout on attempt ${attempt}`);
+                        if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
+                    } else {
+                        console.warn(`[Avatar] NanoBanana 2 error (attempt ${attempt}): ${err.message}`);
+                    }
+                } finally {
+                    clearTimeout(tid);
+                }
+            }
         }
+
+        // ── Fallback: GPT-image-2 (if NanoBanana 2 failed all retries) ──
+        if (!avatarUrl) {
+            const lzKey = process.env.LAOZHANG_API_KEY;
+            const oaiKey = process.env.OPENAI_API_KEY;
+            const apiKey = lzKey || oaiKey;
+            const baseUrl = lzKey
+                ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1')
+                : 'https://api.openai.com/v1';
+            const modelId = lzKey ? 'gpt-image-2' : 'gpt-image-1';
+
+            if (apiKey) {
+                console.log(`[Avatar] Fallback → ${modelId} via ${lzKey ? 'LaoZhang' : 'OpenAI'}...`);
+                const gptResp = await fetch(`${baseUrl}/images/generations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model: modelId,
+                        prompt: avatarPrompt,
+                        n: 1,
+                        size: '1024x1536',  // 2:3 portrait (closest to 9:16)
+                        quality: 'high',
+                        output_format: 'png',
+                    }),
+                    signal: AbortSignal.timeout(180000),
+                });
+                const gptData = await gptResp.json();
+                const b64 = gptData?.data?.[0]?.b64_json;
+                if (b64) {
+                    let rawB64 = b64.startsWith('data:') ? b64.substring(b64.indexOf(',') + 1) : b64;
+                    const buf = Buffer.from(rawB64, 'base64');
+                    const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
+                    avatarUrl = await uploadToS3(buf, s3Key, 'image/png');
+                    console.log(`[Avatar] ✅ ${modelId} fallback → ${avatarUrl.substring(0, 60)}...`);
+                }
+            }
+        }
+
+        if (!avatarUrl) throw new Error('Avatar generation failed — NanoBanana 2 is currently under high load. Please try again in a moment.');
 
         res.json({
             success: true,
-            avatarUrl: state.avatarUrl,
+            avatarUrl,
             generated: true,
         });
     } catch (err) {
@@ -3237,7 +3428,7 @@ router.post('/ugc-pro/qads/build-prompt', protect, async (req, res) => {
 });
 
 // ── POST /api/video-studio/ugc-pro/qads/generate ──
-router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
+router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), async (req, res) => {
     try {
         const { brandId, categoryId, productData, settings, avatarUrl, productImageUrls: bodyProductImgUrls, prebuiltPrompt } = req.body;
         const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
@@ -3248,17 +3439,17 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
         const category = getCategory(categoryId);
         if (!category) return res.status(400).json({ success: false, error: `Unknown Q-Ad category: ${categoryId}` });
 
-        // Collect image URLs: product images ONLY for Seedance 2.0 API
-        // NOTE: Avatar is intentionally excluded from image inputs because Seedance 2.0
-        // has strict face detection that blocks any real/realistic person photo.
-        // The avatar's appearance is described in the text prompt instead, and Seedance
-        // will render a character from text without triggering safety filters.
+        // Collect product image URLs for Seedance
         const imageUrls = [];
-        if (avatarUrl && !category.noAvatar) {
-            console.log(`[Q-Ads Generate] Avatar provided but excluded from Seedance image inputs (safety filter bypass). Avatar influence is via text prompt only.`);
-        }
         for (const url of parsedProductImgs) {
             if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
+        }
+
+        // Avatar is passed as a face reference — Atlas registers it as an asset:// URI
+        // which bypasses Seedance's raw-image safety filter and provides proper face fidelity.
+        const avatarFaceRefs = (avatarUrl && !category.noAvatar) ? [avatarUrl] : [];
+        if (avatarFaceRefs.length > 0) {
+            console.log(`[Q-Ads Generate] Avatar → face reference (Atlas Asset Library): ${avatarUrl.substring(0, 60)}...`);
         }
 
         // Build or use prebuilt prompt
@@ -3270,19 +3461,11 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
             console.log(`[Q-Ads Generate] Using prebuilt prompt (${prompt.length} chars)`);
         }
 
-        // 🔄 REMAP IMAGE TAGS: Since avatar is excluded from Seedance image inputs,
-        // @image2 (product) is now the actual @image1 sent to the API.
-        // Replace avatar references (@image1) with natural person text,
-        // then remap @image2 → @image1 so Seedance correctly maps the product image.
-        if (imageUrls.length > 0) {
-            // Step 1: Temporarily mark product tags
-            prompt = prompt.replace(/@image2/g, '@@PRODUCT@@');
-            // Step 2: Replace avatar tags with natural person description
-            prompt = prompt.replace(/@image1/g, 'the presenter');
-            // Step 3: Remap product to @image1 (the first actual image sent)
-            prompt = prompt.replace(/@@PRODUCT@@/g, '@image1');
-            console.log(`[Q-Ads Generate] Remapped image tags: avatar→text, product→@image1`);
-        }
+        // Remap image tags: @image1 → avatar (face-locked via Atlas), @image2 → product
+        // Atlas will inject @Image1 (face asset) and @Image2 (product) into the prompt automatically.
+        // Just clean the <<<image_n>>> template tags from the prompt here.
+        prompt = prompt.replace(/@image1/g, '@Image1').replace(/@image2/g, '@Image2');
+        console.log(`[Q-Ads Generate] Image tags preserved for Atlas face-lock injection`);
 
         const duration = parseInt(parsedSettings.duration || category.recommendedDuration);
         const aspectRatio = parsedSettings.format || category.recommendedFormat || '9:16';
@@ -3294,7 +3477,8 @@ router.post('/ugc-pro/qads/generate', protect, async (req, res) => {
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
-            referenceImages: imageUrls.slice(1),
+            referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
+            imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
         });
 
         // Persist as VideoProject
@@ -3408,6 +3592,187 @@ router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
     const credits = getQAdsCreditCost(d);
     res.json({ success: true, duration: d, credits });
 });
+
+// ── GET /api/video-studio/ugc-pro/qads/v2/status/:requestId ──
+// Polls Atlas Cloud for Q-Ads V2 video status and updates VideoProject.
+// V2 jobs store the Atlas taskId in generation.requestId (not generation.falRequestId).
+router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        const result = await pollAtlasCloudStatus(requestId);
+
+        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
+
+        // Update VideoProject with latest status/videoUrl
+        const updatePayload = { 'generation.progress': result.progress || 0 };
+        if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
+        if (result.error) updatePayload['generation.error'] = result.error;
+        if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+            updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
+            updatePayload['generation.status'] = result.status;
+        }
+
+        // V2 projects store taskId in generation.taskId and generation.requestId
+        await VideoProject.findOneAndUpdate(
+            { 'generation.requestId': requestId, user: req.user._id, studioMode: 'q-ads-v2' },
+            { $set: updatePayload }
+        ).catch(e => console.warn('[Q-Ads V2 Status] DB update failed:', e.message));
+
+        res.json({
+            success: true,
+            status: result.status,       // 'COMPLETED' | 'FAILED' | 'IN_PROGRESS' | 'IN_QUEUE'
+            progress: result.progress,
+            videoUrl: result.videoUrl || null,
+            error: result.error || null,
+        });
+    } catch (err) {
+        console.error('[Q-Ads V2 Status] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/ugc-pro/qads/v2/presets ──
+// Returns all 13 presets for frontend grid
+router.get('/ugc-pro/qads/v2/presets', protect, (req, res) => {
+    res.json({ success: true, presets: getPresetsForFrontend() });
+});
+
+// ── POST /api/video-studio/ugc-pro/qads/v2/generate-prompts ──
+// Single Claude call: Brand DNA + MCP + Preset rules → 3 cinematic prose variants (4 credits)
+router.post('/ugc-pro/qads/v2/generate-prompts', protect, requireCredits('qAdsPrompt'), async (req, res) => {
+    try {
+        const { brandId, presetId, userBrief, productData, settings, avatarUrl, productImageUrls } = req.body;
+        const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+        const parsedProdImgs = Array.isArray(productImageUrls) ? productImageUrls : [];
+
+        if (!presetId) return res.status(400).json({ success: false, error: 'presetId is required' });
+
+        console.log(`[Q-Ads V2] generate-prompts: brand=${brandId}, preset=${presetId}, images=${parsedProdImgs.length}`);
+
+        const result = await runQAdsAgent({
+            brandId,
+            presetId,
+            userBrief: userBrief || '',
+            productData: parsedProduct,
+            productImageUrls: parsedProdImgs,
+            avatarUrl: avatarUrl || null,
+            settings: parsedSettings,
+            userId: req.user._id,
+        });
+
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('[Q-Ads V2] generate-prompts error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/ugc-pro/qads/v2/generate-video ──
+// Submit one variant paragraph to Seedance 2.0 (8 credits per call)
+router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGenerate'), async (req, res) => {
+    try {
+        const { brandId, presetId, variantId, prompt, legend, productImageUrls: bodyProductImgUrls, avatarUrl, settings } = req.body;
+        const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
+        const parsedProductImgs = typeof bodyProductImgUrls === 'string'
+            ? JSON.parse(bodyProductImgUrls) : (Array.isArray(bodyProductImgUrls) ? bodyProductImgUrls : []);
+
+        if (!prompt || !prompt.trim()) return res.status(400).json({ success: false, error: 'prompt is required' });
+
+        // Get preset for metadata
+        const preset = getPresetV2(presetId);
+
+        // Product images for Seedance
+        const imageUrls = parsedProductImgs.filter(u => u && typeof u === 'string' && u.startsWith('http'));
+
+        // Avatar as face reference — Atlas Asset Library registers it, bypassing safety filters
+        const avatarFaceRefs = avatarUrl ? [avatarUrl] : [];
+        if (avatarFaceRefs.length > 0) {
+            console.log(`[Q-Ads V2] Avatar → face reference (Atlas Asset Library): ${avatarUrl.substring(0, 60)}...`);
+        }
+
+        // Strip legend from prompt and remap <<<image_n>>> tags
+        let finalPrompt = prompt
+            .replace(/<<<image_\d+>>>\s*=.*\n?/g, '')  // remove legend lines if duplicated
+            .trim();
+
+        // Keep @Image tags as-is — Atlas injects face-lock prefix automatically.
+        // Just clean the <<<image_n>>> template syntax.
+        finalPrompt = finalPrompt.replace(/<<<image_1>>>/g, '@Image1');
+        finalPrompt = finalPrompt.replace(/<<<image_2>>>/g, '@Image2');
+        finalPrompt = finalPrompt.replace(/<<<image_\d+>>>/g, '@Image1');
+
+        const duration = Math.min(parseInt(parsedSettings.duration || preset?.recommendedDuration || 8), 15);
+        const aspectRatio = parsedSettings.format || preset?.recommendedFormat || '9:16';
+
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — ${duration}s, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
+
+        const genResult = await submitAtlasCloudVideoGeneration({
+            prompt: finalPrompt,
+            imageUrl: imageUrls[0] || null,
+            duration,
+            aspectRatio,
+            qualityMode: 'high',
+            generateAudio: true,
+            referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
+            imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
+        });
+
+        // Persist as VideoProject for polling
+        const { VideoProject } = await import('../models/VideoProject.js').catch(() => ({ VideoProject: null }));
+        let projectId = null;
+        if (VideoProject) {
+            const project = await VideoProject.create({
+                user: req.user._id,
+                brand: brandId,
+                studioMode: 'q-ads-v2',
+                status: 'generating',
+                title: `Q-Ad [${preset?.name || presetId}] Variant ${variantId}`,
+                script: finalPrompt,
+                backendPrompt: finalPrompt,
+                input: {
+                    brief: userBrief || '',
+                    images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
+                    presetId,
+                    variantId,
+                    legend: legend || '',
+                },
+                generation: {
+                    provider: 'atlascloud',
+                    model: 'seedance-2.0',
+                    taskId: genResult.taskId,
+                    requestId: genResult.taskId,
+                    duration,
+                    aspectRatio,
+                    progress: 0,
+                    status: 'GENERATING',
+                },
+                settings: parsedSettings,
+                categoryId: presetId,
+            }).catch(e => { console.warn('[Q-Ads V2 Gen] VideoProject create failed:', e.message); return null; });
+            projectId = project?._id;
+        }
+
+        res.json({
+            success: true,
+            projectId,
+            requestId: genResult.taskId,
+            jobId: genResult.taskId,
+            falRequestId: genResult.taskId,
+            provider: 'atlascloud',
+            variantId,
+            presetId,
+            prompt: finalPrompt,
+            imageCount: imageUrls.length,
+            duration,
+            aspectRatio,
+        });
+    } catch (err) {
+        console.error('[Q-Ads V2 Gen] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/:id/select — User picks a concept → script director
@@ -4821,6 +5186,7 @@ router.get('/', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
+                .allowDiskUse(true)
                 .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt')
                 .populate('brand', 'name dna.logo.url')
                 .lean(),

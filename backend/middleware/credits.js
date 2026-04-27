@@ -43,6 +43,10 @@ const ACTION_LABELS = {
     ugcProGenerate: 'UGC Pro Video Generation', ugcProAnalyze: 'UGC Pro Product Analysis',
     monthlyStrategy: 'Monthly Strategy Generation',
     monthlyBrief: 'Monthly Strategy Brief Execution',
+    qAdsPrompt:    'Q-Ads Prompt Generator (3 variants)',
+    qAdsEnhance:   'Q-Ads Brief Enhancer (Stage 1 — legacy)',
+    qAdsDirector:  'Q-Ads Prompt Director (Stage 2 — legacy)',
+    qAdsGenerate:  'Q-Ads Video Generation',
 };
 
 // Provider credit multipliers — Claude is premium (higher API cost to us)
@@ -104,6 +108,10 @@ const DEFAULT_CREDIT_COSTS = {
     ugcProAnalyze: 1,              // Product intelligence analysis
     monthlyStrategy: 15,           // Full strategy + 30-day calendar + all briefs in one Claude call
     monthlyBrief: 0,               // Brief execution charged at target studio's own rate
+    qAdsPrompt:    4,              // Q-Ads single Claude call — brand DNA + MCP + 3 cinematic variants
+    qAdsEnhance:   2,              // Q-Ads Stage 1 legacy — kept for backward compat
+    qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
+    qAdsGenerate:  8,              // Q-Ads Seedance 2.0 video generation (per variant)
 };
 
 // Cache for credit costs (refresh every 5 minutes)
@@ -247,7 +255,7 @@ export const requireCredits = (actionOrCost = 1) => {
             const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
             CreditUsage.create({

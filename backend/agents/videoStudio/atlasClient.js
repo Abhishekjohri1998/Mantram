@@ -288,6 +288,7 @@ export async function uploadImageToHostedUrl(base64DataUri) {
 export async function submitAtlasCloudVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, generateAudio = true,
     referenceImages = [], qualityMode = 'fast',
+    imageRole = 'face', // 'face' (default, UGC Pro) | 'product' (Q-Ads — no face registration)
 }) {
     console.log(`🎞️ [Atlas] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | quality=${qualityMode}`);
 
@@ -324,7 +325,9 @@ export async function submitAtlasCloudVideoGeneration({
     // `image-to-video` which STRICTLY BLOCKS real people.
     // By copying the first frame to the Face Assets list, we force Seedance into `reference-to-video` mode.
     // This allows real people to be animated natively in Seedance 2.0 without changing the model.
-    if (firstFrameUrls.length === 1 && faceS3Urls.length === 0) {
+    // NOTE: Do NOT apply this bypass for product images (imageRole === 'product') — product images
+    //       should not be registered as face assets.
+    if (imageRole !== 'product' && firstFrameUrls.length === 1 && faceS3Urls.length === 0) {
         console.log(`🛡️ Promoting first frame to Face Asset to bypass Seedance I2V real-person safety filter...`);
         faceS3Urls.push(firstFrameUrls[0]);
         firstFrameUrls.pop(); // Remove it from firstFrameUrls so it's not sent as a raw URL which triggers the filter
@@ -332,13 +335,20 @@ export async function submitAtlasCloudVideoGeneration({
 
     // Step 3 — KEY: Convert face S3 URLs → asset:// URIs via Atlas Asset Library
     // This is the mechanism that enables real person face fidelity across frames
+    // SKIP for product images (imageRole === 'product') — no face registration needed
     let faceAssetUris = [];
     if (faceS3Urls.length > 0) {
-        faceAssetUris = await prepFaceReferencesAsAssets(faceS3Urls);
-        if (faceAssetUris.length === 0) {
-            // Asset registration failed, fall back to raw S3 URLs (faces may not lock perfectly)
-            console.warn(`⚠️ [Atlas] Asset registration failed — falling back to raw S3 URLs (face fidelity may be reduced)`);
+        if (imageRole === 'product') {
+            // Product images: skip face asset registration, use raw S3 URLs
+            console.log(`📦 [Atlas] imageRole=product — skipping face asset registration, using raw S3 URLs`);
             faceAssetUris = faceS3Urls;
+        } else {
+            faceAssetUris = await prepFaceReferencesAsAssets(faceS3Urls);
+            if (faceAssetUris.length === 0) {
+                // Asset registration failed, fall back to raw S3 URLs (faces may not lock perfectly)
+                console.warn(`⚠️ [Atlas] Asset registration failed — falling back to raw S3 URLs (face fidelity may be reduced)`);
+                faceAssetUris = faceS3Urls;
+            }
         }
     }
 
@@ -347,13 +357,20 @@ export async function submitAtlasCloudVideoGeneration({
 
     if (faceAssetUris.length > 0) {
         const faceTags  = faceAssetUris.map((_, i) => `@Image${i + 1}`).join(' and ');
-        const faceLock  = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;
+        let faceLock;
+        if (imageRole === 'product') {
+            // Product reference: describe image as hero product, not a real person
+            faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the hero product — maintain its exact shape, color, surface texture, and visual identity in every frame.`;
+        } else {
+            // Face reference: preserve human likeness
+            faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;
+        }
         cleanedPrompt   = `${faceLock} ${cleanedPrompt}`;
         firstFrameUrls.forEach((_, i) => {
             const tag = `@Image${faceAssetUris.length + i + 1}`;
             if (!cleanedPrompt.includes(tag)) cleanedPrompt += ` ${tag} sets the scene.`;
         });
-        console.log(`👤 Face-lock injected for ${faceAssetUris.length} ref(s): ${faceTags}`);
+        console.log(`${imageRole === 'product' ? '📦 Product-lock' : '👤 Face-lock'} injected for ${faceAssetUris.length} ref(s): ${faceTags}`);
     } else if (firstFrameUrls.length > 0) {
         if (!cleanedPrompt.includes('@Image1')) cleanedPrompt += ` @Image1 is the starting scene frame.`;
     }

@@ -10,6 +10,7 @@ import AdvancedMode from '../components/VideoStudio/AdvancedMode'
 import UGCCreator from '../components/VideoStudio/UGCCreator'
 import UGCPro from '../components/VideoStudio/UGCPro'
 import QAds from '../components/VideoStudio/QAds'
+import QAdsV2 from '../components/VideoStudio/QAdsV2'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
 import Walkthrough from '../components/Walkthrough'
 import './VideoStudio.css'
@@ -1129,9 +1130,9 @@ export default function VideoStudio() {
                     <UGCPro activeBrand={activeBrand} projects={projects} />
                 )}
 
-                {/* ── Q-ADS MODE (Category-first Quick Ads) ── */}
+                {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {studioMode === 'q-ads' && (
-                    <QAds activeBrand={activeBrand} projects={projects} />
+                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
