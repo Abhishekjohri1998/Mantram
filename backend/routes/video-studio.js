@@ -3106,7 +3106,8 @@ router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
 });
 
 // ── POST /api/video-studio/ugc-pro/generate-avatar ──
-// NanoBanana 2 avatar generation from text description + Brand DNA
+// Avatar generation from text description — uses geminiImageGenerate (NanoBanana 2)
+// with Flux Pro v1.1 fallback, and isAvatar systemInstruction for photorealism
 router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage'), async (req, res) => {
     try {
         const { brandId, description, environment } = req.body;
@@ -3119,123 +3120,57 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
             return res.json({ success: true, avatarUrl, generated: false });
         }
 
-        // Path 2: AI Avatar Generation
-        // Primary: NanoBanana 2 (gemini-3.1-flash-image-preview) with 3 retries
-        // Fallback: GPT-image-2 (via LaoZhang proxy or direct OpenAI)
+        // Path 2: AI Avatar Generation via geminiImageGenerate (NanoBanana 2 + Flux Pro fallback)
         if (!description?.trim()) {
             return res.status(400).json({ success: false, error: 'Provide a model description or upload a photo' });
         }
 
         const env = environment || 'home';
         const envMap = {
-            home: 'cozy living room with warm afternoon light coming through sheer curtains',
-            outdoor: 'bright outdoor setting with natural daylight and greenery in the background',
-            studio: 'clean white studio backdrop with professional softbox lighting',
-            cafe: 'warm café interior with wooden furniture and soft ambient light',
-            gym: 'modern gym with natural light, subtle equipment visible in background',
-            office: 'modern office with large windows and a clean desk in the background',
+            home: 'cozy modern living room with warm golden-hour sunlight streaming through sheer linen curtains, potted plants and neutral decor in soft focus behind',
+            outdoor: 'sun-dappled park with lush green trees, natural golden-hour backlight creating a warm rim light around the subject',
+            studio: 'clean professional photography studio with large softbox key light, subtle white/grey gradient backdrop, professional fashion shoot setup',
+            cafe: 'trendy coffee shop interior with warm edison bulb lighting, exposed brick and wooden furniture bokeh in background',
+            gym: 'modern fitness studio with floor-to-ceiling windows letting in bright natural daylight, minimalist equipment in soft focus behind',
+            office: 'sleek contemporary office with panoramic city view windows, clean desk and modern furniture in background',
         };
         const envDesc = envMap[env] || envMap.home;
 
-        // Strong photography prompt — negative keywords prevent 3D/cartoon output
-        const avatarPrompt = `RAW photo, ${description}, ${envDesc}, looking at camera with a natural expression, 85mm f/1.8 portrait lens, shallow depth of field, soft bokeh background, Canon EOS R5, natural skin texture, photorealistic, hyperrealistic, 8k professional portrait photography. Not an illustration. Not a 3D render. Not a cartoon. Not anime. Real photograph.`;
-        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 100)}..."`);
+        // Build a highly specific photography prompt that forces real-camera output
+        const avatarPrompt = [
+            `Award-winning editorial portrait photograph.`,
+            `Subject: ${description}.`,
+            `Setting: ${envDesc}.`,
+            `Camera: Canon EOS R5 with 85mm f/1.4 prime lens, shot wide open.`,
+            `Lighting: Natural window light as key light, subtle fill from ambient room light, creating soft directional shadows.`,
+            `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
+            `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
+            `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
+            `The subject should look like a real person photographed in a real location — NOT an AI render, NOT a 3D model, NOT an illustration, NOT a cartoon. Real photograph only.`,
+        ].join(' ');
 
-        let avatarUrl = null;
+        console.log(`[Avatar] Generating via geminiImageGenerate — prompt: "${avatarPrompt.substring(0, 120)}..."`);
 
-        // ── Primary: NanoBanana 2 (up to 3 retries to handle server load) ──
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (geminiKey) {
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${geminiKey}`;
-            for (let attempt = 1; attempt <= 3 && !avatarUrl; attempt++) {
-                console.log(`[Avatar] NanoBanana 2 — attempt ${attempt}/3...`);
-                const controller = new AbortController();
-                const tid = setTimeout(() => controller.abort(), 90000);
-                try {
-                    const geminiResp = await fetch(geminiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ role: 'user', parts: [{ text: avatarPrompt }] }],
-                            generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
-                        }),
-                        signal: controller.signal,
-                    });
-                    const geminiData = await geminiResp.json();
-                    if (geminiData.error) {
-                        const msg = geminiData.error.message || '';
-                        const isBusy = /overload|busy|capacity|quota/i.test(msg);
-                        if (isBusy && attempt < 3) {
-                            console.warn(`[Avatar] NanoBanana 2 busy (attempt ${attempt}), retrying in 5s...`);
-                            await new Promise(r => setTimeout(r, 5000));
-                            continue;
-                        }
-                        throw new Error(msg);
-                    }
-                    for (const part of (geminiData.candidates?.[0]?.content?.parts || [])) {
-                        if (part.inlineData?.mimeType?.startsWith('image/')) {
-                            const buf = Buffer.from(part.inlineData.data, 'base64');
-                            const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
-                            avatarUrl = await uploadToS3(buf, s3Key, part.inlineData.mimeType);
-                            console.log(`[Avatar] ✅ NanoBanana 2 → ${avatarUrl.substring(0, 60)}...`);
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    if (err.name === 'AbortError' || err.message?.includes('abort') || err.message?.includes('timeout')) {
-                        console.warn(`[Avatar] NanoBanana 2 timeout on attempt ${attempt}`);
-                        if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
-                    } else {
-                        console.warn(`[Avatar] NanoBanana 2 error (attempt ${attempt}): ${err.message}`);
-                    }
-                } finally {
-                    clearTimeout(tid);
-                }
-            }
+        // Use geminiImageGenerate which has:
+        // 1. isAvatar=true → systemInstruction forcing photorealistic mode
+        // 2. Automatic Flux Pro v1.1 fallback if NanoBanana 2 fails
+        // 3. S3 upload built-in → returns { imageUrl }
+        const result = await geminiImageGenerate(
+            avatarPrompt,
+            [],   // no reference image parts
+            0.4,  // low temperature for consistent photorealism
+            { aspectRatio: '3:4', isAvatar: true }
+        );
+
+        if (!result?.imageUrl) {
+            throw new Error('Avatar generation failed — all models returned no image. Please try again.');
         }
 
-        // ── Fallback: GPT-image-2 (if NanoBanana 2 failed all retries) ──
-        if (!avatarUrl) {
-            const lzKey = process.env.LAOZHANG_API_KEY;
-            const oaiKey = process.env.OPENAI_API_KEY;
-            const apiKey = lzKey || oaiKey;
-            const baseUrl = lzKey
-                ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1')
-                : 'https://api.openai.com/v1';
-            const modelId = lzKey ? 'gpt-image-2' : 'gpt-image-1';
-
-            if (apiKey) {
-                console.log(`[Avatar] Fallback → ${modelId} via ${lzKey ? 'LaoZhang' : 'OpenAI'}...`);
-                const gptResp = await fetch(`${baseUrl}/images/generations`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({
-                        model: modelId,
-                        prompt: avatarPrompt,
-                        n: 1,
-                        size: '1024x1536',  // 2:3 portrait (closest to 9:16)
-                        quality: 'high',
-                        output_format: 'png',
-                    }),
-                    signal: AbortSignal.timeout(180000),
-                });
-                const gptData = await gptResp.json();
-                const b64 = gptData?.data?.[0]?.b64_json;
-                if (b64) {
-                    let rawB64 = b64.startsWith('data:') ? b64.substring(b64.indexOf(',') + 1) : b64;
-                    const buf = Buffer.from(rawB64, 'base64');
-                    const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
-                    avatarUrl = await uploadToS3(buf, s3Key, 'image/png');
-                    console.log(`[Avatar] ✅ ${modelId} fallback → ${avatarUrl.substring(0, 60)}...`);
-                }
-            }
-        }
-
-        if (!avatarUrl) throw new Error('Avatar generation failed — NanoBanana 2 is currently under high load. Please try again in a moment.');
+        console.log(`[Avatar] ✅ Generated: ${result.imageUrl.substring(0, 60)}...`);
 
         res.json({
             success: true,
-            avatarUrl,
+            avatarUrl: result.imageUrl,
             generated: true,
         });
     } catch (err) {
