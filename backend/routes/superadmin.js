@@ -32,6 +32,11 @@ import { getOnPageProviderStatus } from '../utils/onpage-api.js';
 import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
 import { getRedisStatus } from '../utils/cache.js';
 
+// Super Admin V2 Sub-routers
+import templateRoutes from './superadmin-templates.js';
+import qAdsRoutes from './superadmin-qads.js';
+import analyticsRoutes from './superadmin-analytics.js';
+
 const router = Router();
 
 // Rate limiting for Super Admin to prevent brute force / DoS on heavy stats
@@ -45,6 +50,14 @@ const adminLimiter = rateLimit({
 
 // All routes require superadmin
 router.use(protect, authorize('superadmin'), adminLimiter);
+
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// V2 SUB-ROUTERS (TEMPLATES, Q-ADS, ANALYTICS)
+// ══════════════════════════════════════════════════════════════
+router.use('/templates', templateRoutes);
+router.use('/qads', qAdsRoutes);
+router.use('/analytics', analyticsRoutes);
 
 /**
  * Platform Provider Status — Live health check of all external APIs/DBs

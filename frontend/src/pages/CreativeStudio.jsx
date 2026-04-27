@@ -10,8 +10,8 @@ import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
 import MaskingCanvas from '../components/MaskingCanvas'
 import Walkthrough from '../components/Walkthrough'
+import TemplateLibrary from './TemplateLibrary'
 import './CreativeStudio/CreativeStudio.css'
-
 // ── Helper: Time Ago ──
 
 function getTimeAgo(dateStr) {
@@ -332,6 +332,7 @@ export default function CreativeStudio() {
     const [searchParams, setSearchParams] = useSearchParams()
 
     // ── Global State ──
+    const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
     const [selectedType, setSelectedType] = useState('instagram-post')
     const [prompt, setPrompt] = useState('')
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -2604,6 +2605,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
                                 <span className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest whitespace-nowrap flex-shrink-0">Quick Prompt</span>
                                 <span className="w-px h-3 bg-[var(--sys-border)] flex-shrink-0" />
+                                <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer flex-shrink-0 font-semibold shadow-sm">
+                                    <span className="material-symbols-outlined text-[14px]">grid_view</span>
+                                    <span className="text-[11px] whitespace-nowrap">Start from Template</span>
+                                </button>
                                 {[
                                     { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
                                     { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
@@ -3125,6 +3130,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             className="studio-action-btn-sm" title="Download">
                                             <span className="material-symbols-outlined">download</span>
                                         </button>
+                                        {user?.role === 'superadmin' && result && (result.jobId || result._id) && (
+                                            <SaveAsTemplateButton jobId={result.jobId || result._id} jobType="GenerationJob" studioOrigin="creative" prompt={prompt || result.prompt || result.title || ''} />
+                                        )}
                                         <button onClick={() => result.imageUrl && handleOpenEditPanel(result.imageUrl, result.title || 'Creative')}
                                             className="studio-btn-pill active px-3 flex items-center gap-1.5 py-1.5 border-none">
                                             <span className="material-symbols-outlined text-sm">auto_fix_high</span>
@@ -10404,6 +10412,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
+            {/* ========== TEMPLATE LIBRARY OVERLAY ========== */}
+            {showTemplateLibrary && (
+                <TemplateLibrary overlayMode={true} studioFilter="creative" onCloseOverlay={() => setShowTemplateLibrary(false)} />
+            )}
         </DashboardLayout>
     )
 }

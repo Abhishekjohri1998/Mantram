@@ -9,10 +9,8 @@ import GlobalLoader from '../components/GlobalLoader'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
 import Walkthrough from '../components/Walkthrough'
+import TemplateLibrary from './TemplateLibrary'
 import './ContentStudio.css'
-
-
-
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
 // ============================================================================
@@ -4720,6 +4718,7 @@ function StepProductPicker({ brandId, selectedProduct, onSelect, onBack }) {
 // ============================================================================
 
 export default function ContentStudio() {
+    const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -5653,7 +5652,11 @@ SPOKESPERSON QUOTES:`
                             {i < 2 && <div className={`w-8 h-px ${step > i ? 'bg-primary/40' : 'bg-[var(--sys-surface)]'}`} />}
                         </div>
                     ))}
-                    <div className="ml-auto">
+                    <div className="ml-auto flex items-center gap-3">
+                        <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer font-semibold shadow-sm text-xs">
+                            <span className="material-symbols-outlined text-[16px]">grid_view</span>
+                            <span className="hidden sm:inline">Start from template ↗</span>
+                        </button>
                         <button onClick={() => setShowHistory(!showHistory)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${showHistory ? 'bg-primary/20 text-primary' : 'glass-panel text-[var(--sys-text-muted)] hover:text-white'}`}>
                             <span className="material-symbols-outlined text-sm">history</span>
@@ -5942,6 +5945,10 @@ SPOKESPERSON QUOTES:`
                 onToggle={() => setShowHistory(false)}
                 onSelect={handleHistorySelect}
             />
+            {/* ========== TEMPLATE LIBRARY OVERLAY ========== */}
+            {showTemplateLibrary && (
+                <TemplateLibrary overlayMode={true} studioFilter="content" onCloseOverlay={() => setShowTemplateLibrary(false)} />
+            )}
         </DashboardLayout>
     )
 }

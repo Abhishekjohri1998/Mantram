@@ -8,6 +8,7 @@
  *   - buildStyleMemory: Past projects → memory block
  */
 
+import mongoose from 'mongoose';
 import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { getRouter } from '../../ai/router.js';
@@ -232,7 +233,14 @@ export async function loadBrandContext(brandId) {
 
     // ── L3: MongoDB (slowest — 200-500ms) ────────────────────────────────
     console.log(`🗄️  Brand context cache MISS — loading from DB for ${brandId}`);
-    const brand = await Brand.findById(brandId).lean();
+    
+    // Safety check: Prevent CastErrors if database contains legacy UUIDs instead of ObjectIds
+    let brand = null;
+    if (mongoose.Types.ObjectId.isValid(brandId)) {
+        brand = await Brand.findById(brandId).lean();
+    } else {
+        console.warn(`[loadBrandContext] Invalid brandId format (not an ObjectId): ${brandId}. Proceeding without brand DNA.`);
+    }
 
     // Also load active products for this brand (up to 20)
     let products = [];

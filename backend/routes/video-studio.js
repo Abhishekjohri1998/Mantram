@@ -55,7 +55,7 @@ import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYST
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
-import { getPresetsForFrontend, getPreset as getPresetV2 } from '../agents/videoStudio/qAdsPresets.js';
+import { getPresets } from '../utils/qAdsCache.js';
 import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
 
 const router = Router();
@@ -3633,8 +3633,14 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 
 // ── GET /api/video-studio/ugc-pro/qads/v2/presets ──
 // Returns all 13 presets for frontend grid
-router.get('/ugc-pro/qads/v2/presets', protect, (req, res) => {
-    res.json({ success: true, presets: getPresetsForFrontend() });
+router.get('/ugc-pro/qads/v2/presets', protect, async (req, res) => {
+    try {
+        const data = await getPresets();
+        res.json({ success: true, presets: data.presets });
+    } catch (err) {
+        console.error('[Q-Ads V2] get presets error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
 });
 
 // ── POST /api/video-studio/ugc-pro/qads/v2/generate-prompts ──
@@ -3680,7 +3686,10 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         if (!prompt || !prompt.trim()) return res.status(400).json({ success: false, error: 'prompt is required' });
 
         // Get preset for metadata
-        const preset = getPresetV2(presetId);
+        const allPresets = await getPresets();
+        const rawPreset = allPresets.presets.find(p => p.presetCode === presetId || p.id === presetId || p._id?.toString() === presetId);
+        if (!rawPreset) return res.status(400).json({ success: false, error: `Unknown preset: ${presetId}`});
+        const preset = { ...rawPreset, ...(rawPreset.promptRules || {}) };
 
         // Product images for Seedance
         const imageUrls = parsedProductImgs.filter(u => u && typeof u === 'string' && u.startsWith('http'));

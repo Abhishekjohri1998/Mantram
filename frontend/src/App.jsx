@@ -44,6 +44,7 @@ const Automations = lazy(() => import('./pages/Automations'))
 const AISettings = lazy(() => import('./pages/AISettings'))
 const Insights = lazy(() => import('./pages/Insights'))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'))
+const TemplateLibrary = lazy(() => import('./pages/TemplateLibrary'))
 const CreditsPage = lazy(() => import('./pages/CreditsPage'))
 const VideoStudio = lazy(() => import('./pages/VideoStudio'))
 const YouTubeStudio = lazy(() => import('./pages/YouTubeStudio'))
@@ -159,6 +160,7 @@ function App() {
                     <Route path="/conversations/ai-settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
                     <Route path="/conversations/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
                     <Route path="/credits" element={<ProtectedRoute><CreditsPage /></ProtectedRoute>} />
+                    <Route path="/templates" element={<ProtectedRoute><TemplateLibrary /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
                     <Route path="/skills" element={<ProtectedRoute><SkillsHub /></ProtectedRoute>} />
                     <Route path="/superadmin" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>} />
