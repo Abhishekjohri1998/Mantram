@@ -83,6 +83,25 @@ router.delete('/categories/:id', protect, superadmin, async (req, res) => {
     }
 });
 
+router.post('/categories/:id/upload-preview', protect, superadmin, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+        const category = await QAdsCategory.findById(req.params.id);
+        if (!category) return res.status(404).json({ success: false, error: 'Category not found' });
+        
+        const fileExt = req.file.originalname.split('.').pop() || 'bin';
+        const url = await uploadToS3(req.file.buffer, `qads-categories/${category._id}-${Date.now()}.${fileExt}`, req.file.mimetype);
+        category.previewMediaUrl = url;
+        category.previewMediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+        await category.save();
+        
+        await invalidatePresetsCache();
+        res.json({ success: true, previewMediaUrl: url, previewMediaType: category.previewMediaType });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 
 // ==========================================
 // PRESETS
@@ -161,7 +180,7 @@ router.post('/presets/:id/upload-preview', protect, superadmin, upload.single('f
         if (!preset) return res.status(404).json({ success: false, error: 'Preset not found' });
         
         const fileExt = req.file.originalname.split('.').pop() || 'bin';
-        const url = await uploadToS3(req.file.buffer, req.file.mimetype, `qads-presets/${preset._id}-${Date.now()}.${fileExt}`);
+        const url = await uploadToS3(req.file.buffer, `qads-presets/${preset._id}-${Date.now()}.${fileExt}`, req.file.mimetype);
         preset.previewMediaUrl = url;
         preset.previewMediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
         await preset.save();

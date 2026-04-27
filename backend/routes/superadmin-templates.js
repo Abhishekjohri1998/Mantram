@@ -1,10 +1,13 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { protect, superadmin } from '../middleware/auth.js';
+import { uploadToS3 } from '../utils/s3.js';
 import TemplateCategory from '../models/TemplateCategory.js';
 import Template from '../models/Template.js';
 import VideoProject from '../models/VideoProject.js';
 import GenerationJob from '../models/GenerationJob.js';
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const router = Router();
 
 // ==========================================
@@ -93,6 +96,47 @@ router.get('/', protect, superadmin, async (req, res) => {
 router.post('/', protect, superadmin, async (req, res) => {
     try {
         const template = await Template.create({ ...req.body, createdBy: req.user._id });
+        res.status(201).json({ success: true, template });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/upload', protect, superadmin, upload.single('file'), async (req, res) => {
+    try {
+        const { name, categoryId, description, tags, savedPrompt, studioOrigin, isFeatured, isActive } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'Media file is required' });
+        }
+
+        const s3Key = `templates/previews/${Date.now()}-${req.file.originalname}`;
+        const previewUrl = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
+        const previewType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+
+        let parsedTags = [];
+        if (tags) {
+            try {
+                parsedTags = JSON.parse(tags);
+            } catch (e) {
+                parsedTags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : [];
+            }
+        }
+
+        const template = await Template.create({
+            name,
+            categoryId,
+            description,
+            tags: parsedTags,
+            savedPrompt,
+            studioOrigin,
+            previewUrl,
+            previewType,
+            isFeatured: isFeatured === 'true' || isFeatured === true,
+            isActive: isActive === 'true' || isActive === true,
+            createdBy: req.user._id
+        });
+
         res.status(201).json({ success: true, template });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });

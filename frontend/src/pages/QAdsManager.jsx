@@ -166,6 +166,9 @@ const QAdsManager = () => {
     const fileInputRef = useRef(null);
     const [uploadingPresetId, setUploadingPresetId] = useState(null);
 
+    const catFileInputRef = useRef(null);
+    const [uploadingCatId, setUploadingCatId] = useState(null);
+
     const handleUploadPreview = async (e, presetId) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -193,6 +196,35 @@ const QAdsManager = () => {
     const triggerUpload = (presetId) => {
         setUploadingPresetId(presetId); // temporary set to find the right row for ref
         setTimeout(() => fileInputRef.current?.click(), 0);
+    };
+
+    const handleCatUploadPreview = async (e, catId) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingCatId(catId);
+        
+        const fd = new FormData();
+        fd.append('file', file);
+        
+        try {
+            const res = await api(`/superadmin/qads/categories/${catId}/upload-preview`, {
+                method: 'POST',
+                body: fd,
+                headers: {} // let fetch set multipart
+            });
+            setCategories(prev => prev.map(c => c._id === catId ? { ...c, previewMediaUrl: res.previewMediaUrl, previewMediaType: res.previewMediaType } : c));
+            addToast('Category preview uploaded successfully');
+        } catch (err) {
+            addToast(err.message, 'error');
+        } finally {
+            setUploadingCatId(null);
+            e.target.value = null;
+        }
+    };
+
+    const triggerCatUpload = (catId) => {
+        setUploadingCatId(catId);
+        setTimeout(() => catFileInputRef.current?.click(), 0);
     };
 
     const [presetErrors, setPresetErrors] = useState({});
@@ -269,10 +301,13 @@ const QAdsManager = () => {
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
                         <button onClick={() => setCatModal({ open: true, data: {} })} style={primaryBtnStyle}>+ New Category</button>
                     </div>
+                    <input type="file" ref={catFileInputRef} style={{ display: 'none' }} accept="image/*,video/*" onChange={(e) => handleCatUploadPreview(e, uploadingCatId)} />
+
                     <table style={tableStyle}>
                         <thead>
                             <tr>
                                 <th style={{ width: 40 }}></th>
+                                <th style={{ width: 60 }}>Preview</th>
                                 <th>Name</th>
                                 <th>Status</th>
                                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -283,6 +318,15 @@ const QAdsManager = () => {
                                 <tbody>
                                     {categories.map(cat => (
                                         <SortableRow key={cat._id} id={cat._id} className="sa-table-row">
+                                            <td>
+                                                {cat.previewMediaUrl ? (
+                                                    cat.previewMediaType === 'video' 
+                                                        ? <video src={cat.previewMediaUrl} autoPlay muted loop style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
+                                                        : <img src={cat.previewMediaUrl} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} alt="" />
+                                                ) : (
+                                                    <div style={{ width: 48, height: 48, borderRadius: 6, background: 'rgba(255,255,255,0.05)' }} />
+                                                )}
+                                            </td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                                     <div style={{ width: 16, height: 16, borderRadius: '50%', background: cat.color }} />
@@ -295,7 +339,12 @@ const QAdsManager = () => {
                                                 </button>
                                             </td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <button onClick={() => setCatModal({ open: true, data: cat })} style={actionBtnStyle}>Edit</button>
+                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => triggerCatUpload(cat._id)} style={actionBtnStyle}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>upload</span> Preview
+                                                    </button>
+                                                    <button onClick={() => setCatModal({ open: true, data: cat })} style={actionBtnStyle}>Edit</button>
+                                                </div>
                                             </td>
                                         </SortableRow>
                                     ))}

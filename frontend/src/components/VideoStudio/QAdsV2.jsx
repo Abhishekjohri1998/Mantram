@@ -417,8 +417,10 @@ function GridVideo({ project, onReuse }) {
 }
 
 export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) {
+    const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
     const [selP, setSelP] = useState(null)
+    const [selectedCategory, setSelectedCategory] = useState(null)
     const [productUrl, setProductUrl] = useState('')
     const [productData, setProductData] = useState(null)
     const [productImgs, setProductImgs] = useState([])
@@ -454,6 +456,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
     useEffect(() => {
         api('/video-studio/ugc-pro/qads/v2/presets').then(d => {
             setPresets(d.presets || [])
+            setCategories(d.categories || [])
             if (d.presets?.length > 0 && !selP) setSelP(d.presets[0].id)
         }).catch(() => {})
     }, [])
@@ -858,22 +861,54 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
 
         {/* Categories Modal */}
         {showCats && (
-            <div className="scott-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowCats(false) }}>
+            <div className="scott-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) { setShowCats(false); setSelectedCategory(null); } }}>
                 <div className="scott-modal" style={{ maxWidth: 900 }}>
                     <div className="scott-modal-hdr">
                         <div>
-                            <div style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', color: '#fff' }}>Pick the format that hits</div>
-                            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>From unboxing to UGC - choose the type of video that fits your product and audience.</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {selectedCategory && (
+                                    <button onClick={() => setSelectedCategory(null)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+                                    </button>
+                                )}
+                                <div style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', color: '#fff' }}>
+                                    {selectedCategory ? 'Pick a preset' : 'Pick the format that hits'}
+                                </div>
+                            </div>
+                            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+                                {selectedCategory ? 'Select a specific style for your video.' : 'From unboxing to UGC - choose the type of video that fits your product and audience.'}
+                            </div>
                         </div>
-                        <button className="scott-modal-close" onClick={() => setShowCats(false)}><span className="material-symbols-outlined">close</span></button>
+                        <button className="scott-modal-close" onClick={() => { setShowCats(false); setSelectedCategory(null); }}><span className="material-symbols-outlined">close</span></button>
                     </div>
                     <div className="cat-grid">
-                    {presets.map(p => {
-                        const isExclusive = p.isMantramExclusive;
-                        const pId = p.presetCode || p.id || p._id;
-                        return (
-                            <div key={pId}>
-                                <div className={`cat-card ${selP === pId ? 'active' : ''}`} onClick={() => { setSelP(pId); setShowCats(false); }}>
+                    {!selectedCategory ? (
+                        categories.map(c => (
+                            <div key={c.id} className="cat-card" onClick={() => setSelectedCategory(c)}>
+                                {c.previewMediaUrl ? (
+                                    c.previewMediaType === 'video' ? (
+                                        <video src={c.previewMediaUrl} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} />
+                                    ) : (
+                                        <img src={c.previewMediaUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} alt={c.name} />
+                                    )
+                                ) : (
+                                    <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${c.color || '#4f46e5'} 0%, #1a1a1a 100%)`, opacity: 0.45, borderRadius: 12 }} />
+                                )}
+                                <div className="cat-card-ov" />
+                                <div style={{ zIndex: 2, color: '#fff', position: 'relative' }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, color: c.color || '#4f46e5', marginBottom: 4, textTransform: 'uppercase' }}>
+                                        Category
+                                    </div>
+                                    <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{c.name}</div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        presets.filter(p => p.group === selectedCategory.name).map(p => {
+                            const isExclusive = p.isMantramExclusive;
+                            const pId = p.presetCode || p.id || p._id;
+                            return (
+                                <div key={pId} className={`cat-card ${selP === pId ? 'active' : ''}`} onClick={() => { setSelP(pId); setShowCats(false); setSelectedCategory(null); }}>
                                     {p.previewMediaUrl ? (
                                         p.previewMediaType === 'video' ? (
                                             <video src={p.previewMediaUrl} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, borderRadius: 12 }} />
@@ -893,9 +928,9 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                                         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}>{p.threeWordCamera || p.categoryName || 'Dynamic'}</div>
                                     </div>
                                 </div>
-                            </div>
-                        )
-                    })}
+                            )
+                        })
+                    )}
                     </div>
                 </div>
             </div>

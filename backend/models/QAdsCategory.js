@@ -20,6 +20,15 @@ const qAdsCategorySchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    previewMediaUrl: {
+        type: String,
+        default: null
+    },
+    previewMediaType: {
+        type: String,
+        enum: ['image', 'video'],
+        default: 'image'
+    },
     sortOrder: {
         type: Number,
         default: 0

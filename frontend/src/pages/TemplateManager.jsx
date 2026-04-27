@@ -163,22 +163,50 @@ const TemplateManager = () => {
         e.preventDefault();
         const fd = new FormData(e.target);
         
-        const data = {
-            name: fd.get('name'),
-            categoryId: fd.get('categoryId'),
-            description: fd.get('description'),
-            tags: tags,
-            isFeatured: fd.get('isFeatured') === 'on',
-            isActive: fd.get('isActive') === 'on'
-        };
-
         try {
-            const res = await api(`/superadmin/templates/${modal.data._id}`, {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-            setTemplates(prev => prev.map(t => t._id === modal.data._id ? res.template : t));
-            addToast('Template updated successfully', 'success');
+            if (modal.isNew) {
+                // Must have a file
+                const file = fd.get('file');
+                if (!file || file.size === 0) {
+                    return addToast('Please select a preview image or video', 'error');
+                }
+                
+                const uploadFd = new FormData();
+                uploadFd.append('file', file);
+                uploadFd.append('name', fd.get('name'));
+                uploadFd.append('categoryId', fd.get('categoryId'));
+                uploadFd.append('description', fd.get('description'));
+                uploadFd.append('tags', JSON.stringify(tags));
+                uploadFd.append('savedPrompt', fd.get('savedPrompt'));
+                uploadFd.append('studioOrigin', fd.get('studioOrigin'));
+                uploadFd.append('isFeatured', fd.get('isFeatured') === 'on');
+                uploadFd.append('isActive', fd.get('isActive') === 'on');
+
+                const res = await api('/superadmin/templates/upload', {
+                    method: 'POST',
+                    body: uploadFd,
+                    headers: {} // let fetch set multipart
+                });
+                
+                setTemplates(prev => [res.template, ...prev]);
+                addToast('Template created and uploaded successfully', 'success');
+            } else {
+                const data = {
+                    name: fd.get('name'),
+                    categoryId: fd.get('categoryId'),
+                    description: fd.get('description'),
+                    tags: tags,
+                    isFeatured: fd.get('isFeatured') === 'on',
+                    isActive: fd.get('isActive') === 'on'
+                };
+
+                const res = await api(`/superadmin/templates/${modal.data._id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                setTemplates(prev => prev.map(t => t._id === modal.data._id ? res.template : t));
+                addToast('Template updated successfully', 'success');
+            }
             setModal({ open: false, data: null });
         } catch (err) {
             addToast(err.message, 'error');
@@ -211,8 +239,15 @@ const TemplateManager = () => {
 
     return (
         <div style={{ padding: '32px 40px', color: '#fff', maxWidth: 1400, margin: '0 auto' }}>
-            <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Template Manager</h1>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>Manage and govern platform templates</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
+                <div>
+                    <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Template Manager</h1>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Manage and govern platform templates</div>
+                </div>
+                <button onClick={() => { setTags([]); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+                    + Upload Template
+                </button>
+            </div>
 
             {/* Filter Bar */}
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', background: '#12121A', padding: '16px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -353,13 +388,31 @@ const TemplateManager = () => {
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setModal({ open: false, data: null })}>
                     <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '100%', maxWidth: 640, padding: 24, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Edit Template</h2>
-                            <button onClick={() => setModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{modal.isNew ? 'Upload New Template' : 'Edit Template'}</h2>
+                            <button type="button" onClick={() => setModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
                                 <span className="material-symbols-outlined">close</span>
                             </button>
                         </div>
                         
                         <form onSubmit={saveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {modal.isNew && (
+                                <div style={{ display: 'flex', gap: 16 }}>
+                                    <label style={{ ...labelStyle, flex: 2 }}>
+                                        Preview Media (Image/Video)
+                                        <input type="file" name="file" accept="image/*,video/*" required={modal.isNew} style={{ ...inputStyle, padding: '8px 10px' }} />
+                                    </label>
+                                    <label style={{ ...labelStyle, flex: 1 }}>
+                                        Studio Origin
+                                        <select name="studioOrigin" required defaultValue="Creative" style={inputStyle}>
+                                            <option value="Creative">Creative</option>
+                                            <option value="Video">Video</option>
+                                            <option value="Content">Content</option>
+                                            <option value="QAds">Q-Ads</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            )}
+
                             <div style={{ display: 'flex', gap: 16 }}>
                                 <label style={{ ...labelStyle, flex: 2 }}>
                                     Name
@@ -398,16 +451,25 @@ const TemplateManager = () => {
                             <div style={{ margin: '8px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
                             
                             <div>
-                                <span style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Saved Prompt (Read-Only)</span>
-                                <PromptBlock text={modal.data?.savedPrompt} />
-                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-                                    To change the prompt, create a new template from a studio generation.
-                                </div>
+                                {modal.isNew ? (
+                                    <label style={labelStyle}>
+                                        Prompt Formula (Template)
+                                        <textarea name="savedPrompt" required rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }} placeholder="Enter the exact prompt to use when generating from this template..." />
+                                    </label>
+                                ) : (
+                                    <>
+                                        <span style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Saved Prompt (Read-Only)</span>
+                                        <PromptBlock text={modal.data?.savedPrompt} />
+                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+                                            To change the prompt, create a new template from a studio generation.
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                 <button type="submit" style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
-                                    Save Template
+                                    {modal.isNew ? 'Upload & Create' : 'Save Template'}
                                 </button>
                             </div>
                         </form>

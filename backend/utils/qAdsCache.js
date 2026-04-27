@@ -74,7 +74,14 @@ export async function getPresetsFromDB() {
         }
     }
     
-    return { presets: formattedPresets };
+    return { presets: formattedPresets, categories: categories.map(c => ({
+        id: c._id,
+        name: c.name,
+        slug: c.slug,
+        color: c.color,
+        previewMediaUrl: c.previewMediaUrl,
+        previewMediaType: c.previewMediaType
+    })) };
 }
 
 export async function getPresets() {

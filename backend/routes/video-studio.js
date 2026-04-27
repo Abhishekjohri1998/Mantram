@@ -3774,7 +3774,7 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 router.get('/ugc-pro/qads/v2/presets', protect, async (req, res) => {
     try {
         const data = await getPresets();
-        res.json({ success: true, presets: data.presets });
+        res.json({ success: true, presets: data.presets, categories: data.categories });
     } catch (err) {
         console.error('[Q-Ads V2] get presets error:', err.message);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
