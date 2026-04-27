@@ -3137,37 +3137,109 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
         };
         const envDesc = envMap[env] || envMap.home;
 
-        // Build a highly specific photography prompt
-        const avatarPrompt = [
-            `Award-winning editorial portrait photograph.`,
-            `Subject: ${description}.`,
-            `Setting: ${envDesc}.`,
-            `Camera: Canon EOS R5 with 85mm f/1.4 prime lens, shot wide open.`,
-            `Lighting: Natural window light as key light, subtle fill from ambient room light, creating soft directional shadows.`,
-            `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
-            `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
-            `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
-        ].join(' ');
-
-        console.log(`[Avatar] Generating via Flux Pro (fal.ai) — prompt: "${avatarPrompt.substring(0, 120)}..."`);
-
-        // Use Flux Pro explicitly for guaranteed photorealism
-        const falUrl = await falGenerateImage({
-            prompt: avatarPrompt,
-            model: 'fal-ai/flux-pro/v1.1',
-            width: 768,   // 3:4 portrait ratio
-            height: 1024
-        });
-
-        if (!falUrl) {
-            throw new Error('Avatar generation failed — Flux Pro returned no image. Please try again.');
+        // Build the prompt dynamically based on if they want a cartoon
+        const isCartoonReq = description.toLowerCase().includes('cartoon') || description.toLowerCase().includes('illustrat') || description.toLowerCase().includes('anime') || description.toLowerCase().includes('3d');
+        
+        let avatarPrompt = '';
+        if (isCartoonReq) {
+            avatarPrompt = [
+                `High quality digital art portrait.`,
+                `Subject: ${description}.`,
+                `Setting: ${envDesc}.`,
+                `Style: Clean, vibrant, highly detailed, professional illustration.`,
+            ].join(' ');
+        } else {
+            avatarPrompt = [
+                `Award-winning editorial portrait photograph.`,
+                `Subject: ${description}.`,
+                `Setting: ${envDesc}.`,
+                `Camera: Canon EOS R5 with 85mm f/1.4 prime lens, shot wide open.`,
+                `Lighting: Natural window light as key light, subtle fill from ambient room light, creating soft directional shadows.`,
+                `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
+                `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
+                `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
+            ].join(' ');
         }
 
-        console.log(`[Avatar] ✅ Generated on FAL: ${falUrl}`);
+        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 120)}..."`);
 
-        // Mirror to S3 so it doesn't expire
+        let finalImageUrl = null;
+
+        // ── Primary: Flux Pro (fal.ai) ──
+        try {
+            console.log(`[Avatar] Attempting Flux Pro (fal.ai)...`);
+            const falUrl = await falGenerateImage({
+                prompt: avatarPrompt,
+                model: 'fal-ai/flux-pro/v1.1',
+                width: 768,
+                height: 1024
+            });
+            if (falUrl) {
+                console.log(`[Avatar] ✅ Generated on FAL: ${falUrl}`);
+                finalImageUrl = falUrl;
+            }
+        } catch (falErr) {
+            console.warn(`⚠️ FAL Flux Pro failed (${falErr.message}) — falling back to Gemini...`);
+        }
+
+        // ── Fallback 1: Gemini (NanoBanana 2) ──
+        if (!finalImageUrl) {
+            try {
+                console.log(`[Avatar] Attempting Gemini fallback...`);
+                const geminiRes = await geminiImageGenerate(
+                    avatarPrompt,
+                    [],
+                    0.4,
+                    { aspectRatio: '3:4', isAvatar: !isCartoonReq }
+                );
+                if (geminiRes?.imageUrl) {
+                    console.log(`[Avatar] ✅ Generated on Gemini: ${geminiRes.imageUrl}`);
+                    finalImageUrl = geminiRes.imageUrl;
+                }
+            } catch (gemErr) {
+                console.warn(`⚠️ Gemini fallback failed (${gemErr.message}) — falling back to GPT...`);
+            }
+        }
+
+        // ── Fallback 2: GPT-image-2 (LaoZhang / OpenAI) ──
+        if (!finalImageUrl) {
+            console.log(`[Avatar] Attempting GPT fallback...`);
+            const lzKey = process.env.LAOZHANG_API_KEY;
+            const oaiKey = process.env.OPENAI_API_KEY;
+            const apiKey = lzKey || oaiKey;
+            const baseUrl = lzKey ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1') : 'https://api.openai.com/v1';
+            const modelId = lzKey ? 'gpt-image-2' : 'gpt-image-1';
+
+            if (apiKey) {
+                const gptResp = await fetch(`${baseUrl}/images/generations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model: modelId,
+                        prompt: avatarPrompt,
+                        n: 1,
+                        size: '1024x1024',
+                        quality: 'high',
+                        output_format: 'url',
+                    }),
+                    signal: AbortSignal.timeout(60000),
+                });
+                const gptData = await gptResp.json();
+                const url = gptData?.data?.[0]?.url;
+                if (url) {
+                    console.log(`[Avatar] ✅ Generated on ${modelId}: ${url}`);
+                    finalImageUrl = url;
+                }
+            }
+        }
+
+        if (!finalImageUrl) {
+            throw new Error('Avatar generation failed — all providers (FAL, Gemini, GPT) are unavailable or out of balance. Please check billing.');
+        }
+
+        // Mirror to S3 so it doesn't expire (especially important for FAL and GPT temporary URLs)
         const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.jpg`;
-        const avatarUrl = await mirrorUrlToS3(falUrl, s3Key);
+        const avatarUrl = await mirrorUrlToS3(finalImageUrl, s3Key);
 
         console.log(`[Avatar] ✅ Mirrored to S3: ${avatarUrl.substring(0, 60)}...`);
 
