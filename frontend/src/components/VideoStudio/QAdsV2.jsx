@@ -465,6 +465,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             if (activeBrand?._id) form.append('brandId', activeBrand._id)
             const d = await api('/video-studio/ugc-pro/generate-avatar', { method: 'POST', body: form, headers: {} })
             setAvatarUrl(d.avatarUrl)
+            setShowAvatar(false) // Auto-close modal after successful upload
         } catch (e) { setError(e.message) }
         setAvatarBusy(false)
     }, [activeBrand])
@@ -475,6 +476,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
         try {
             const d = await api('/video-studio/ugc-pro/generate-avatar', { method: 'POST', body: JSON.stringify({ brandId: activeBrand?._id, description: avatarDesc, environment: 'home' }) })
             setAvatarUrl(d.avatarUrl)
+            setShowAvatar(false) // Auto-close modal after successful generation
         } catch (e) { setError(e.message) }
         setAvatarBusy(false)
     }, [avatarDesc, activeBrand])

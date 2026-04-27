@@ -55,6 +55,7 @@ import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shar
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
+import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 import { getPresets } from '../utils/qAdsCache.js';
 import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
@@ -3219,7 +3220,8 @@ router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
 });
 
 // ── POST /api/video-studio/ugc-pro/generate-avatar ──
-// NanoBanana 2 avatar generation from text description + Brand DNA
+// Avatar generation from text description — uses geminiImageGenerate (NanoBanana 2)
+// with Flux Pro v1.1 fallback, and isAvatar systemInstruction for photorealism
 router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage'), async (req, res) => {
     try {
         const { brandId, description, environment } = req.body;
@@ -3232,94 +3234,96 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
             return res.json({ success: true, avatarUrl, generated: false });
         }
 
-        // Path 2: AI Avatar Generation
-        // Primary: NanoBanana 2 (gemini-3.1-flash-image-preview) with 3 retries
-        // Fallback: GPT-image-2 (via LaoZhang proxy or direct OpenAI)
+        // Path 2: AI Avatar Generation via geminiImageGenerate (NanoBanana 2 + Flux Pro fallback)
         if (!description?.trim()) {
             return res.status(400).json({ success: false, error: 'Provide a model description or upload a photo' });
         }
 
         const env = environment || 'home';
         const envMap = {
-            home: 'cozy living room with warm afternoon light coming through sheer curtains',
-            outdoor: 'bright outdoor setting with natural daylight and greenery in the background',
-            studio: 'clean white studio backdrop with professional softbox lighting',
-            cafe: 'warm café interior with wooden furniture and soft ambient light',
-            gym: 'modern gym with natural light, subtle equipment visible in background',
-            office: 'modern office with large windows and a clean desk in the background',
+            home: 'cozy modern living room with warm golden-hour sunlight streaming through sheer linen curtains, potted plants and neutral decor in soft focus behind',
+            outdoor: 'sun-dappled park with lush green trees, natural golden-hour backlight creating a warm rim light around the subject',
+            studio: 'clean professional photography studio with large softbox key light, subtle white/grey gradient backdrop, professional fashion shoot setup',
+            cafe: 'trendy coffee shop interior with warm edison bulb lighting, exposed brick and wooden furniture bokeh in background',
+            gym: 'modern fitness studio with floor-to-ceiling windows letting in bright natural daylight, minimalist equipment in soft focus behind',
+            office: 'sleek contemporary office with panoramic city view windows, clean desk and modern furniture in background',
         };
         const envDesc = envMap[env] || envMap.home;
 
-        // Strong photography prompt — negative keywords prevent 3D/cartoon output
-        // Portrait orientation (9:16) enforced
-        const avatarPrompt = `RAW photo, full body portrait in 9:16 vertical portrait orientation, ${description}, ${envDesc}, looking at camera with a natural expression, 85mm f/1.8 portrait lens, shallow depth of field, soft bokeh background, Canon EOS R5, natural skin texture, photorealistic, hyperrealistic, 8k professional portrait photography. Not an illustration. Not a 3D render. Not a cartoon. Not anime. Real photograph.`;
-        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 100)}..."`);
+        // Build the prompt dynamically based on if they want a cartoon
+        const isCartoonReq = description.toLowerCase().includes('cartoon') || description.toLowerCase().includes('illustrat') || description.toLowerCase().includes('anime') || description.toLowerCase().includes('3d');
+        
+        let avatarPrompt = '';
+        if (isCartoonReq) {
+            avatarPrompt = [
+                `High quality digital art portrait in 9:16 vertical portrait orientation.`,
+                `Subject: ${description}.`,
+                `Setting: ${envDesc}.`,
+                `Style: Clean, vibrant, highly detailed, professional illustration.`,
+            ].join(' ');
+        } else {
+            avatarPrompt = [
+                `Award-winning editorial portrait photograph in 9:16 vertical portrait orientation.`,
+                `Subject: ${description}.`,
+                `Setting: ${envDesc}.`,
+                `Camera: Canon EOS R5 with 85mm f/1.4 prime lens, shot wide open.`,
+                `Lighting: Natural window light as key light, subtle fill from ambient room light, creating soft directional shadows.`,
+                `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
+                `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
+                `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
+            ].join(' ');
+        }
 
-        let avatarUrl = null;
+        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 120)}..."`);
 
-        // ── Primary: NanoBanana 2 (up to 3 retries to handle server load) ──
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (geminiKey) {
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${geminiKey}`;
-            for (let attempt = 1; attempt <= 3 && !avatarUrl; attempt++) {
-                console.log(`[Avatar] NanoBanana 2 — attempt ${attempt}/3...`);
-                const controller = new AbortController();
-                const tid = setTimeout(() => controller.abort(), 90000);
-                try {
-                    const geminiResp = await fetch(geminiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ role: 'user', parts: [{ text: avatarPrompt }] }],
-                            generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
-                        }),
-                        signal: controller.signal,
-                    });
-                    const geminiData = await geminiResp.json();
-                    if (geminiData.error) {
-                        const msg = geminiData.error.message || '';
-                        const isBusy = /overload|busy|capacity|quota/i.test(msg);
-                        if (isBusy && attempt < 3) {
-                            console.warn(`[Avatar] NanoBanana 2 busy (attempt ${attempt}), retrying in 5s...`);
-                            await new Promise(r => setTimeout(r, 5000));
-                            continue;
-                        }
-                        throw new Error(msg);
-                    }
-                    for (const part of (geminiData.candidates?.[0]?.content?.parts || [])) {
-                        if (part.inlineData?.mimeType?.startsWith('image/')) {
-                            const buf = Buffer.from(part.inlineData.data, 'base64');
-                            const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
-                            avatarUrl = await uploadToS3(buf, s3Key, part.inlineData.mimeType);
-                            console.log(`[Avatar] ✅ NanoBanana 2 → ${avatarUrl.substring(0, 60)}...`);
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    if (err.name === 'AbortError' || err.message?.includes('abort') || err.message?.includes('timeout')) {
-                        console.warn(`[Avatar] NanoBanana 2 timeout on attempt ${attempt}`);
-                        if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
-                    } else {
-                        console.warn(`[Avatar] NanoBanana 2 error (attempt ${attempt}): ${err.message}`);
-                    }
-                } finally {
-                    clearTimeout(tid);
+        let finalImageUrl = null;
+
+        // ── Primary: Flux Pro (fal.ai) ──
+        try {
+            console.log(`[Avatar] Attempting Flux Pro (fal.ai)...`);
+            const falUrl = await falGenerateImage({
+                prompt: avatarPrompt,
+                model: 'fal-ai/flux-pro/v1.1',
+                width: 768,
+                height: 1024
+            });
+            if (falUrl) {
+                console.log(`[Avatar] ✅ Generated on FAL: ${falUrl}`);
+                finalImageUrl = falUrl;
+            }
+        } catch (falErr) {
+            console.warn(`⚠️ FAL Flux Pro failed (${falErr.message}) — falling back to Gemini...`);
+        }
+
+        // ── Fallback 1: Gemini (NanoBanana 2) ──
+        if (!finalImageUrl) {
+            try {
+                console.log(`[Avatar] Attempting Gemini fallback...`);
+                const geminiRes = await geminiImageGenerate(
+                    avatarPrompt,
+                    [],
+                    0.4,
+                    { aspectRatio: '9:16', isAvatar: !isCartoonReq }
+                );
+                if (geminiRes?.imageUrl) {
+                    console.log(`[Avatar] ✅ Generated on Gemini: ${geminiRes.imageUrl}`);
+                    finalImageUrl = geminiRes.imageUrl;
                 }
+            } catch (gemErr) {
+                console.warn(`⚠️ Gemini fallback failed (${gemErr.message}) — falling back to GPT...`);
             }
         }
 
-        // ── Fallback: GPT-image-2 (if NanoBanana 2 failed all retries) ──
-        if (!avatarUrl) {
+        // ── Fallback 2: GPT-image-2 (LaoZhang / OpenAI) ──
+        if (!finalImageUrl) {
+            console.log(`[Avatar] Attempting GPT fallback...`);
             const lzKey = process.env.LAOZHANG_API_KEY;
             const oaiKey = process.env.OPENAI_API_KEY;
             const apiKey = lzKey || oaiKey;
-            const baseUrl = lzKey
-                ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1')
-                : 'https://api.openai.com/v1';
+            const baseUrl = lzKey ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1') : 'https://api.openai.com/v1';
             const modelId = lzKey ? 'gpt-image-2' : 'gpt-image-1';
 
             if (apiKey) {
-                console.log(`[Avatar] Fallback → ${modelId} via ${lzKey ? 'LaoZhang' : 'OpenAI'}...`);
                 const gptResp = await fetch(`${baseUrl}/images/generations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -3327,25 +3331,30 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
                         model: modelId,
                         prompt: avatarPrompt,
                         n: 1,
-                        size: '1024x1536',  // 2:3 portrait (closest to 9:16)
+                        size: modelId === 'gpt-image-2' ? '1024x1792' : '1024x1024',
                         quality: 'high',
-                        output_format: 'png',
+                        output_format: 'url',
                     }),
-                    signal: AbortSignal.timeout(180000),
+                    signal: AbortSignal.timeout(60000),
                 });
                 const gptData = await gptResp.json();
-                const b64 = gptData?.data?.[0]?.b64_json;
-                if (b64) {
-                    let rawB64 = b64.startsWith('data:') ? b64.substring(b64.indexOf(',') + 1) : b64;
-                    const buf = Buffer.from(rawB64, 'base64');
-                    const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.png`;
-                    avatarUrl = await uploadToS3(buf, s3Key, 'image/png');
-                    console.log(`[Avatar] ✅ ${modelId} fallback → ${avatarUrl.substring(0, 60)}...`);
+                const url = gptData?.data?.[0]?.url;
+                if (url) {
+                    console.log(`[Avatar] ✅ Generated on ${modelId}: ${url}`);
+                    finalImageUrl = url;
                 }
             }
         }
 
-        if (!avatarUrl) throw new Error('Avatar generation failed — NanoBanana 2 is currently under high load. Please try again in a moment.');
+        if (!finalImageUrl) {
+            throw new Error('Avatar generation failed — all providers (FAL, Gemini, GPT) are unavailable or out of balance. Please check billing.');
+        }
+
+        // Mirror to S3 so it doesn't expire (especially important for FAL and GPT temporary URLs)
+        const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.jpg`;
+        const avatarUrl = await mirrorUrlToS3(finalImageUrl, s3Key);
+
+        console.log(`[Avatar] ✅ Mirrored to S3: ${avatarUrl.substring(0, 60)}...`);
 
         // Auto-save to Avatar collection so it appears in the picker
         try {
@@ -4747,11 +4756,10 @@ router.get('/:id/status', protect, async (req, res) => {
                     console.log(`   🔧 FFmpeg compile: ${clipPaths.length} clips + ${voiceoverPath ? 'VO' : 'no VO'}`);
                     execSync(ffCmd, { stdio: 'pipe', timeout: 180000 });
 
-                    // Upload compiled video to S3 with structured user/brand path
+                    // Upload compiled video to S3
                     const compiledBuffer = fs.readFileSync(outputPath);
                     const compiledUserId = project.user?.toString() || 'unknown';
-                    const compiledBrandId = project.brand?.toString() || 'unbranded';
-                    const s3Key = `users/${compiledUserId}/brands/${compiledBrandId}/videos/${project._id}-compiled.mp4`;
+                    const s3Key = `videos/${compiledUserId}/${project._id}-compiled.mp4`;
                     const finalUrl = await uploadToS3(compiledBuffer, s3Key, 'video/mp4');
                     console.log(`   ✅ Compiled video: ${finalUrl.substring(0, 60)}`);
 
@@ -5096,11 +5104,10 @@ router.get('/:id/status', protect, async (req, res) => {
                             }
                             execSync(ffCmd, { stdio: 'pipe', timeout: 60000 });
 
-                            // Upload mixed video to S3 with structured user/brand path
+                            // Upload mixed video to S3
                             const mixedBuffer = fs.readFileSync(outputPath);
                             const mixUserId = project.user?.toString() || 'unknown';
-                            const mixBrandId = project.brand?.toString() || 'unbranded';
-                            const s3Key = `users/${mixUserId}/brands/${mixBrandId}/videos/${project._id}-mixed.mp4`;
+                            const s3Key = `videos/${mixUserId}/${project._id}-mixed.mp4`;
                             finalVideoUrl = await uploadToS3(mixedBuffer, s3Key, 'video/mp4');
                             console.log(`✅ Voiceover mixed into final video: ${finalVideoUrl.substring(0, 60)}`);
 
@@ -5307,9 +5314,9 @@ router.get('/', protect, async (req, res) => {
                 if (!brand) {
                     return res.status(403).json({ success: false, error: 'Unauthorized access to this brand' });
                 }
-                // ✅ Include unbranded projects alongside brand-filtered ones
-                // so videos created without an active brand don't disappear from history.
-                filter.$or = [{ brand: brandId }, { brand: null, user: req.user._id }, { brand: { $exists: false }, user: req.user._id }];
+                // Strictly show only videos belonging to this brand
+                filter.brand = brandId;
+                filter.user = req.user._id;
             } else {
                 filter.user = req.user._id;
             }
@@ -5324,7 +5331,7 @@ router.get('/', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(Number(limit))
-                .allowDiskUse(true)
+                .setOptions({ allowDiskUse: true })
                 .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt')
                 .populate('brand', 'name dna.logo.url')
                 .lean(),
@@ -5739,7 +5746,7 @@ router.delete('/:id', protect, async (req, res) => {
 
 /**
  * Download a video from an ephemeral CDN URL and upload to S3 with structured path.
- * S3 key: users/{userId}/brands/{brandId}/videos/{projectId}.mp4
+ * S3 key: videos/{userId}/{projectId}.mp4
  * Updates the project in DB with the permanent S3 URL.
  * Returns the S3 URL if successful, null otherwise.
  */
@@ -5762,13 +5769,12 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
             return null;
         }
 
-        // Load the project to get user/brand context for structured S3 path
-        const project = await VideoProject.findById(projectId).select('user brand').lean();
+        // Load the project to get user context for S3 path
+        const project = await VideoProject.findById(projectId).select('user').lean();
         const userId = project?.user?.toString() || 'unknown';
-        const brandId = project?.brand?.toString() || 'unbranded';
 
-        // Structured S3 key: videos/{userId}/{brandId}/{projectId}.mp4
-        const s3Key = `videos/${userId}/${brandId}/${projectId}.mp4`;
+        // S3 key: videos/{userId}/{projectId}.mp4
+        const s3Key = `videos/${userId}/${projectId}.mp4`;
         console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
         const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
         console.log(`✅ Video uploaded to S3: ${s3Url}`);
