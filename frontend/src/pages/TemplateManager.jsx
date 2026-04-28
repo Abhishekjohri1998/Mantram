@@ -82,6 +82,10 @@ const TemplateManager = () => {
     // Inline confirmation tracking
     const [deletingId, setDeletingId] = useState(null);
 
+    // Submission states
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitStatus, setSubmitStatus] = useState('');
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -163,14 +167,17 @@ const TemplateManager = () => {
         e.preventDefault();
         const fd = new FormData(e.target);
         
+        setIsSubmitting(true);
         try {
             if (modal.isNew) {
                 // Must have a file
                 const file = fd.get('file');
                 if (!file || file.size === 0) {
+                    setIsSubmitting(false);
                     return addToast('Please select a preview image or video', 'error');
                 }
                 
+                setSubmitStatus('Uploading...');
                 const uploadFd = new FormData();
                 uploadFd.append('file', file);
                 uploadFd.append('name', fd.get('name'));
@@ -191,6 +198,7 @@ const TemplateManager = () => {
                 setTemplates(prev => [res.template, ...prev]);
                 addToast('Template created and uploaded successfully', 'success');
             } else {
+                setSubmitStatus('Saving...');
                 const data = {
                     name: fd.get('name'),
                     categoryId: fd.get('categoryId'),
@@ -210,6 +218,9 @@ const TemplateManager = () => {
             setModal({ open: false, data: null });
         } catch (err) {
             addToast(err.message, 'error');
+        } finally {
+            setIsSubmitting(false);
+            setSubmitStatus('');
         }
     };
 
@@ -467,9 +478,37 @@ const TemplateManager = () => {
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                <button type="submit" style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>
-                                    {modal.isNew ? 'Upload & Create' : 'Save Template'}
+                                <button 
+                                    type="submit" 
+                                    disabled={isSubmitting}
+                                    style={{ 
+                                        background: isSubmitting ? 'rgba(249, 115, 22, 0.5)' : '#f97316', 
+                                        color: '#fff', 
+                                        border: 'none', 
+                                        padding: '10px 20px', 
+                                        borderRadius: 8, 
+                                        fontWeight: 700, 
+                                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                    }}
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                            {submitStatus}
+                                        </>
+                                    ) : (
+                                        modal.isNew ? 'Upload & Create' : 'Save Template'
+                                    )}
                                 </button>
+                                <style>{`
+                                    @keyframes spin {
+                                        from { transform: rotate(0deg); }
+                                        to { transform: rotate(360deg); }
+                                    }
+                                `}</style>
                             </div>
                         </form>
                     </div>

@@ -95,6 +95,18 @@ export const UIProvider = ({ children }) => {
     setActiveJobs(prev => prev.filter(j => j.jobId !== jobId))
   }, [])
 
+  // ── Standard UI Toasts ───────────────────────────────────────────────────
+  const [toasts, setToasts] = useState([])
+  const toastIdRef = useRef(0)
+
+  const addToast = useCallback((message, type = 'info') => {
+    const id = ++toastIdRef.current
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 4000)
+  }, [])
+
   return (
     <UIContext.Provider value={{
       // Fidato
@@ -106,8 +118,30 @@ export const UIProvider = ({ children }) => {
       markRead, markAllRead, deleteNotification,
       // Active Jobs
       activeJobs, addActiveJob, removeActiveJob,
+      // Toasts
+      addToast,
     }}>
       {children}
+      
+      {/* Standard UI Toasts */}
+      <div className="toast-stack" style={{ bottom: '5rem', zIndex: 10000 }}>
+        {toasts.map(t => (
+          <div key={t.id} className="toast-item" style={{ 
+            borderLeftColor: t.type === 'success' ? '#10b981' : t.type === 'error' ? '#ef4444' : '#3b82f6',
+            background: 'var(--sys-surface, #1e293b)'
+          }}>
+            <div className="toast-icon">
+              {t.type === 'success' ? '✅' : t.type === 'error' ? '❌' : 'ℹ️'}
+            </div>
+            <div className="toast-body">
+              <div className="toast-title" style={{ fontSize: '0.85rem' }}>{t.message}</div>
+            </div>
+            <button className="toast-close" onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+            </button>
+          </div>
+        ))}
+      </div>
     </UIContext.Provider>
   )
 }
