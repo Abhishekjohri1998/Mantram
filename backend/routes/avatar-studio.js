@@ -509,4 +509,38 @@ router.post('/save', protect, async (req, res) => {
     }
 });
 
+// ── Admin: Publish avatar to public library (superadmin only) ─────────────────
+router.post('/admin/publish/:avatarId', protect, superadmin, async (req, res) => {
+    try {
+        const avatar = await Avatar.findByIdAndUpdate(
+            req.params.avatarId,
+            { isPublished: true, isTemplate: true },
+            { new: true }
+        );
+        if (!avatar) return res.status(404).json({ success: false, error: 'Avatar not found' });
+        console.log(`✅ [AvatarStudio] Admin published avatar: ${avatar._id}`);
+        res.json({ success: true, avatar });
+    } catch (err) {
+        console.error('❌ [AvatarStudio] /admin/publish error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── Admin: Unpublish avatar from public library (superadmin only) ─────────────
+router.post('/admin/unpublish/:avatarId', protect, superadmin, async (req, res) => {
+    try {
+        const avatar = await Avatar.findByIdAndUpdate(
+            req.params.avatarId,
+            { isPublished: false, isTemplate: false },
+            { new: true }
+        );
+        if (!avatar) return res.status(404).json({ success: false, error: 'Avatar not found' });
+        console.log(`✅ [AvatarStudio] Admin unpublished avatar: ${avatar._id}`);
+        res.json({ success: true, avatar });
+    } catch (err) {
+        console.error('❌ [AvatarStudio] /admin/unpublish error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 export default router;

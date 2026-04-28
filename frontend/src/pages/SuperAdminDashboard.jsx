@@ -4636,4 +4636,152 @@ function AvatarAdmin() {
     )
 }
 
+// ─── AVATAR LIBRARY ADMIN ────────────────────────────────────────────────────
+// Shows all avatars (publicAvatars + myAvatars) with publish/delete/promote controls
+function AvatarLibraryAdmin() {
+    const apiBase = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
+    const getToken = () => localStorage.getItem('mantram_token')
 
+    const [avatars, setAvatars] = React.useState([])
+    const [loading, setLoading] = React.useState(true)
+    const [toast, setToast] = React.useState(null)
+    const [filter, setFilter] = React.useState('all') // 'all' | 'public' | 'mine'
+    const [busy, setBusy] = React.useState({})
+
+    const notify = (msg, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3200) }
+
+    const load = React.useCallback(async () => {
+        setLoading(true)
+        try {
+            const r = await fetch(`${apiBase}/avatar-studio/library`, {
+                headers: { Authorization: `Bearer ${getToken()}` }
+            })
+            const d = await r.json()
+            if (d.success) {
+                const all = [
+                    ...(d.publicAvatars || []).map(a => ({ ...a, _isPublic: true })),
+                    ...(d.myAvatars || []).map(a => ({ ...a, _isPublic: false })),
+                ]
+                setAvatars(all)
+            }
+        } catch (e) { notify(e.message, 'err') }
+        setLoading(false)
+    }, [apiBase])
+
+    React.useEffect(() => { load() }, [load])
+
+    const doAction = async (avatarId, action) => {
+        setBusy(p => ({ ...p, [avatarId]: action }))
+        try {
+            let url, method = 'POST', body = null
+            if (action === 'delete') {
+                url = `${apiBase}/video-studio/ugc-pro/avatars/${avatarId}`
+                method = 'DELETE'
+            } else if (action === 'publish') {
+                url = `${apiBase}/avatar-studio/admin/publish/${avatarId}`
+            } else if (action === 'unpublish') {
+                url = `${apiBase}/avatar-studio/admin/unpublish/${avatarId}`
+            }
+            const r = await fetch(url, {
+                method,
+                headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                body: body ? JSON.stringify(body) : undefined,
+            })
+            const d = await r.json()
+            if (!d.success) throw new Error(d.error || `${action} failed`)
+            notify(`✓ ${action} complete`)
+            load()
+        } catch (e) { notify(e.message, 'err') }
+        setBusy(p => { const n = { ...p }; delete n[avatarId]; return n })
+    }
+
+    const filtered = filter === 'public' ? avatars.filter(a => a._isPublic)
+        : filter === 'mine' ? avatars.filter(a => !a._isPublic)
+        : avatars
+
+    return (
+        <div>
+            {toast && (
+                <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, padding: '12px 20px', borderRadius: 12, fontSize: 13, fontWeight: 700, background: toast.type === 'err' ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)', border: `1px solid ${toast.type === 'err' ? 'rgba(239,68,68,0.25)' : 'rgba(99,102,241,0.25)'}`, color: toast.type === 'err' ? '#f87171' : '#a5b4fc', backdropFilter: 'blur(12px)', pointerEvents: 'none' }}>{toast.msg}</div>
+            )}
+
+            {/* Filter bar */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center' }}>
+                {[
+                    { id: 'all', label: `All (${avatars.length})` },
+                    { id: 'public', label: `Published (${avatars.filter(a => a._isPublic).length})` },
+                    { id: 'mine', label: `User-Generated (${avatars.filter(a => !a._isPublic).length})` },
+                ].map(f => (
+                    <button key={f.id} onClick={() => setFilter(f.id)}
+                        style={{ ...S.chip(filter === f.id, '#6366f1') }}>
+                        {f.label}
+                    </button>
+                ))}
+                <div style={{ flex: 1 }} />
+                <button onClick={load} style={{ ...S.btn(false), padding: '8px 14px', fontSize: 12 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span> Refresh
+                </button>
+            </div>
+
+            {loading && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+                    {[...Array(12)].map((_, i) => (
+                        <div key={i} style={{ aspectRatio: '9/16', borderRadius: 12, background: 'rgba(255,255,255,0.04)', animation: 'pulse 1.5s infinite' }} />
+                    ))}
+                </div>
+            )}
+
+            {!loading && filtered.length === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.25)', gap: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 44 }}>person_off</span>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>No avatars in this view</div>
+                </div>
+            )}
+
+            {!loading && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+                    {filtered.map(avatar => (
+                        <div key={avatar._id} style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1.5px solid ${avatar._isPublic ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.07)'}`, background: '#1a1a20', aspectRatio: '9/16' }}>
+                            {avatar.imageUrl && (
+                                <img src={avatar.imageUrl} alt={avatar.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                            )}
+
+                            {/* Public badge */}
+                            {avatar._isPublic && (
+                                <div style={{ position: 'absolute', top: 6, left: 6, padding: '2px 7px', borderRadius: 20, fontSize: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, background: 'rgba(20,184,166,0.82)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                                    Published
+                                </div>
+                            )}
+
+                            {/* Action overlay */}
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', padding: '24px 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>
+                                    {avatar.name || 'Untitled'}
+                                </div>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {/* Publish / Unpublish toggle */}
+                                    <button
+                                        onClick={() => doAction(avatar._id, avatar._isPublic ? 'unpublish' : 'publish')}
+                                        disabled={!!busy[avatar._id]}
+                                        style={{ flex: 1, background: avatar._isPublic ? 'rgba(239,68,68,0.2)' : 'rgba(20,184,166,0.22)', border: 'none', borderRadius: 6, color: avatar._isPublic ? '#f87171' : '#2dd4bf', fontSize: 9, fontWeight: 800, cursor: 'pointer', padding: '4px 0', textTransform: 'uppercase', letterSpacing: 0.5 }}
+                                    >
+                                        {busy[avatar._id] === (avatar._isPublic ? 'unpublish' : 'publish') ? '…' : (avatar._isPublic ? 'Unpublish' : 'Publish')}
+                                    </button>
+                                    {/* Delete */}
+                                    <button
+                                        onClick={() => { if (confirm('Delete this avatar?')) doAction(avatar._id, 'delete') }}
+                                        disabled={!!busy[avatar._id]}
+                                        style={{ width: 28, background: 'rgba(239,68,68,0.15)', border: 'none', borderRadius: 6, color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+        </div>
+    )
+}
