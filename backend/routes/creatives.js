@@ -1585,13 +1585,12 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    // ── HARD TIMEOUT: default 90s for simple gen, configurable for multi-image campaign shots ──
-    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 180_000 : 90_000);
-    const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Image generation timed out after ${Math.round(TIMEOUT_MS / 1000)} seconds. Please try again.`)), TIMEOUT_MS)
-    );
+    // ── HARD TIMEOUT: 150s default (was 90s — too short for Gemini's internal retry cycle) ──
+    // Inner provider has 70s/attempt × 2 attempts = ~141s max. Outer must exceed that.
+    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 180_000 : 150_000);
 
-    const generatePromise = (async () => {
+    // ── Build generation function (callable for retry) ──
+    const buildGeneratePromise = () => (async () => {
         // ── Determine aspect ratio for Gemini ──
         let nativeAspectRatio = aspectRatio;
 
@@ -1672,10 +1671,30 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             finalImageParts.push(...downloadedParts);
         }
 
+        // ⚡ SPEED: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
+        // Keep the essential creative direction, strip verbose framework boilerplate
+        let optimizedPrompt = promptText;
+        if (optimizedPrompt.length > 2000) {
+            const origLen = optimizedPrompt.length;
+            // Strip verbose sections that add latency without quality improvement
+            optimizedPrompt = optimizedPrompt
+                .replace(/VISUAL GROUNDING \(from real product\/brand photos\):[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+            // Hard cap at 2000 chars if still too long
+            if (optimizedPrompt.length > 2000) {
+                optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+            }
+            console.log(`⚡ Prompt optimized for speed: ${origLen} → ${optimizedPrompt.length} chars`);
+        }
+
         // ── Generate via native Gemini router ──
-        console.log(`🚀 Generating image via native ${GEMINI_MODEL}...`);
+        const refCount = finalImageParts.length;
+        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${optimizedPrompt.length} chars, refs: ${refCount})`);
         const routerResult = await router.generateImage({
-            prompt: promptText,
+            prompt: optimizedPrompt,
             aspectRatio: nativeAspectRatio,
             model: GEMINI_MODEL,
             imageParts: finalImageParts,
@@ -1693,22 +1712,38 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         };
     })();
 
-    try {
-        return await Promise.race([generatePromise, timeoutPromise]);
-    } catch (error) {
-        console.error(`❌ Image generation failed (${GEMINI_MODEL}):`, error.message);
+    // ── Outer retry loop: retry once on timeout (inner provider may have been mid-generation) ──
+    for (let outerAttempt = 1; outerAttempt <= 2; outerAttempt++) {
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Image generation timed out after ${Math.round(TIMEOUT_MS / 1000)} seconds. Please try again.`)), TIMEOUT_MS)
+        );
 
-        // All failures → single clear message: Gemini is busy
-        return {
-            imageUrl: null,
-            model: selectedModel,
-            textResponse: '',
-            warnings: [],
-            modelBusy: true,
-            busyModel: GEMINI_MODEL,
-            errorMessage: 'Gemini is busy, please try again later.',
-            errorType: 'busy',
-        };
+        try {
+            const genPromise = outerAttempt === 1 ? buildGeneratePromise() : buildGeneratePromise();
+            return await Promise.race([genPromise, timeoutPromise]);
+        } catch (error) {
+            const isTimeout = error.message?.includes('timed out');
+
+            if (isTimeout && outerAttempt === 1) {
+                console.warn(`⏱️ Image generation timed out (outer attempt 1/2) — retrying with fresh connection...`);
+                continue;
+            }
+
+            console.error(`❌ Image generation failed (${GEMINI_MODEL}):`, error.message);
+
+            return {
+                imageUrl: null,
+                model: selectedModel,
+                textResponse: '',
+                warnings: [],
+                modelBusy: true,
+                busyModel: GEMINI_MODEL,
+                errorMessage: isTimeout
+                    ? `Image generation timed out (${Math.round(TIMEOUT_MS / 1000)}s). Google servers may be slow — please try again.`
+                    : (error.message?.includes('BUSY') ? 'Gemini is busy, please try again later.' : error.message || 'Image generation failed. Please try again.'),
+                errorType: isTimeout ? 'timeout' : 'busy',
+            };
+        }
     }
 }
 

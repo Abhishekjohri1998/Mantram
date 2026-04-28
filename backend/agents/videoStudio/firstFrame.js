@@ -111,11 +111,11 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
 
     for (const modelId of GEMINI_MODELS) {
         try {
-            console.log(`🖼️ Trying Gemini model: ${modelId} (90s timeout)`);
+            console.log(`🖼️ Trying Gemini model: ${modelId} (70s timeout)`);
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 90000);
+            const timeoutId = setTimeout(() => controller.abort(), 70000);
 
             // Build generation config — include imageConfig so aspect ratio is actually applied
             const generationConfig = {
@@ -171,7 +171,7 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
             }
         } catch (e) {
             if (e.name === 'AbortError') {
-                console.error(`⏱️ Gemini ${modelId} timed out after 90s`);
+                console.error(`⏱️ Gemini ${modelId} timed out after 70s`);
             } else {
                 console.error(`❌ Gemini ${modelId} error:`, e.message);
             }

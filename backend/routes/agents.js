@@ -1679,7 +1679,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                         temperature: temperature,
                         imageConfig: {
                             aspectRatio: nativeAspectRatio,
-                            imageSize: "2K"
+                            imageSize: "1K"  // ⚡ 1K is 2-3x faster than 2K, still 1024px quality
                         }
                     },
                 };
@@ -1688,7 +1688,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                 let response, data, lastAttemptError = null;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s timeout per attempt
+                    const timeoutId = setTimeout(() => controller.abort(), 70_000); // 70s timeout per attempt (was 90s)
                     try {
                         response = await fetch(url, {
                             method: 'POST',
@@ -1718,13 +1718,13 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                     } catch (attemptErr) {
                         const isTimeout = attemptErr.name === 'AbortError';
                         if (isTimeout && attempt === 1) {
-                            console.warn(`⏳ Photoshoot attempt 1 timed out (90s) — retrying...`);
+                            console.warn(`⏳ Photoshoot attempt 1 timed out (70s) — retrying...`);
                             lastAttemptError = 'timeout';
                             await new Promise(r => setTimeout(r, 2000));
                             continue;
                         }
                         if (isTimeout) {
-                            return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} timed out after 90 seconds. Google servers are likely overloaded. Please try again or switch to a different model.` });
+                            return res.status(200).json({ success: false, modelBusy: true, error: `${modelCfg.name} timed out after 70 seconds. Google servers are likely overloaded. Please try again or switch to a different model.` });
                         }
                         throw attemptErr;
                     } finally {

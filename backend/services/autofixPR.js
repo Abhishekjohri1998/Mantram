@@ -87,8 +87,11 @@ export async function createFixPR(fixResult, errorEvent, options = {}) {
         for (const f of changedFiles) {
             execGit(appRoot, `add "${f}"`);
         }
-        execGit(appRoot, `commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
-
+        // Write commit message to temp file to avoid shell escaping issues with multi-line messages
+        const tmpMsgFile = `${appRoot}/.git/AUTOFIX_COMMIT_MSG`;
+        fs.writeFileSync(tmpMsgFile, commitMsg, 'utf-8');
+        execGit(appRoot, `commit -F "${tmpMsgFile}"`);
+        try { fs.unlinkSync(tmpMsgFile); } catch (_) { /* cleanup best-effort */ }
         // ── 4. Push branch (use PAT-authenticated URL to avoid credential issues) ──
         console.log(`📤 AutoFix: Pushing branch ${branchName}`);
         const pushUrl = `https://x-access-token:${githubPat}@github.com/${githubRepo}.git`;
