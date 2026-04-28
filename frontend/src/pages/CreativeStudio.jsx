@@ -16,7 +16,17 @@ import './CreativeStudio/CreativeStudio.css'
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
-function TemplateSuggestionRow({ brandId, onSelect }) {
+// Lightweight role check from stored JWT — no context needed at module scope
+function getStoredRole() {
+    try {
+        const token = localStorage.getItem('mantram_token')
+        if (!token) return null
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload?.role || null
+    } catch { return null }
+}
+
+function TemplateSuggestionRow({ brandId, onSelect, section = 'ai_create' }) {
     const [templates, setTemplates] = useState([])
     const [loaded, setLoaded] = useState(false)
 
@@ -24,7 +34,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         let cancelled = false
         const token = localStorage.getItem('mantram_token')
         const qs = brandId ? `?brandId=${brandId}` : ''
-        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
+        fetch(`${TMPL_ROW_API}/templates/by-section/${section}${qs}`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(r => r.ok ? r.json() : null)
@@ -32,7 +42,24 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         .catch(() => {}) // silent failure — never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
-    }, [brandId])
+    }, [brandId, section])
+
+    // Superadmin placeholder — shown only to admins when 0 templates exist for this section
+    if (loaded && templates.length === 0 && getStoredRole() === 'superadmin') {
+        return (
+            <div style={{
+                padding: '10px 16px 10px',
+                borderBottom: '1px solid var(--sys-border)',
+                display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, opacity: 0.3 }}>dashboard_customize</span>
+                <span style={{ fontSize: 11, opacity: 0.35, fontWeight: 600 }}>
+                    No templates for <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>{section}</code> yet —{' '}
+                    <a href="/superadmin" style={{ color: '#E84118', textDecoration: 'none', fontWeight: 700 }}>create one in Super Admin</a>
+                </span>
+            </div>
+        )
+    }
 
     // Don't render anything until loaded (prevents layout shift)
     if (!loaded || templates.length === 0) return null
@@ -2736,6 +2763,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ═══ TEMPLATE SUGGESTION ROW — section=ai_create ═══ */}
                         <TemplateSuggestionRow
                             brandId={activeBrand?._id}
+                            section="ai_create"
                             onSelect={(t) => { setShowTemplateLibrary(true) }}
                         />
 

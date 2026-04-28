@@ -4405,6 +4405,9 @@ function AdminImageStudio() {
     const [toast, setToast] = React.useState(null)
     const [saveOpen, setSaveOpen] = React.useState(false)
     const [saveName, setSaveName] = React.useState('')
+    const [saveSection, setSaveSection] = React.useState('general')
+    const [saveCategoryId, setSaveCategoryId] = React.useState('')
+    const [saveCategories, setSaveCategories] = React.useState([])
     const [saving, setSaving] = React.useState(false)
 
     const notify = (msg, type='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null),3200) }
@@ -4442,13 +4445,22 @@ function AdminImageStudio() {
             const r = await fetch(`${apiBase}/superadmin/templates/promote-from-generated`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-                body: JSON.stringify({ name: saveName.trim(), previewUrl: url, savedPrompt: genPrompt, studioOrigin: mode }),
+                body: JSON.stringify({ name: saveName.trim(), previewUrl: url, savedPrompt: genPrompt, studioOrigin: mode, studioSection: saveSection, categoryId: saveCategoryId || undefined }),
             })
             const d = await r.json()
             if (!d.success) throw new Error(d.error)
             notify('Saved to Template Library'); setSaveOpen(false); setSaveName('')
         } catch(e) { notify(e.message,'err') }
         setSaving(false)
+    }
+
+    const openSaveModal = async () => {
+        setSaveOpen(true)
+        try {
+            const r = await fetch(`${apiBase}/superadmin/templates/categories`, { headers: { Authorization: `Bearer ${getToken()}` } })
+            const d = await r.json()
+            setSaveCategories(d.categories || [])
+        } catch {}
     }
 
     const selectedUrl = selected !== null ? variants[selected]?.url : null
@@ -4463,10 +4475,17 @@ function AdminImageStudio() {
             {/* Save modal */}
             {saveOpen && selectedUrl && (
                 <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, backdropFilter:'blur(4px)' }} onClick={()=>setSaveOpen(false)}>
-                    <div style={{ background:'#0d0d18', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:28, width:420 }} onClick={e=>e.stopPropagation()}>
+                    <div style={{ background:'#0d0d18', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:28, width:460 }} onClick={e=>e.stopPropagation()}>
                         <p style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'0 0 16px' }}>Save as Template</p>
-                        <img src={selectedUrl} alt="" style={{ width:'100%', height:160, objectFit:'cover', objectPosition:'top', borderRadius:12, marginBottom:14 }} />
-                        <input value={saveName} onChange={e=>setSaveName(e.target.value)} placeholder="Template name…" style={{ ...S.input, marginBottom:14 }} />
+                        <img src={selectedUrl} alt="" style={{ width:'100%', height:140, objectFit:'cover', objectPosition:'top', borderRadius:12, marginBottom:14 }} />
+                        <input value={saveName} onChange={e=>setSaveName(e.target.value)} placeholder="Template name…" style={{ ...S.input, marginBottom:10 }} />
+                        <select value={saveSection} onChange={e=>setSaveSection(e.target.value)} style={{ ...S.input, marginBottom:10 }}>
+                            {[{v:'ai_create',l:'AI Create'},{v:'carousel',l:'Carousel'},{v:'campaign',l:'Campaign'},{v:'campaign_shot',l:'Campaign Shot'},{v:'video_ugc',l:'Video UGC'},{v:'video_qads',l:'Video Q-Ads'},{v:'avatar',l:'Avatar'},{v:'general',l:'General'}].map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
+                        </select>
+                        <select value={saveCategoryId} onChange={e=>setSaveCategoryId(e.target.value)} style={{ ...S.input, marginBottom:14 }}>
+                            <option value="">No Category</option>
+                            {saveCategories.map(c=><option key={c._id} value={c._id}>{c.name}</option>)}
+                        </select>
                         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                             <button onClick={()=>setSaveOpen(false)} style={S.btn(false)}>Cancel</button>
                             <button onClick={saveTemplate} disabled={saving} style={S.btn(true)}>{saving?'Saving…':'Save Template'}</button>
@@ -4593,7 +4612,7 @@ function AdminImageStudio() {
                                 <a href={selectedUrl} download target="_blank" rel="noopener" style={{ ...S.btn(false), textDecoration:'none' }}>
                                     <span className="material-symbols-outlined" style={{ fontSize:15 }}>download</span>Download
                                 </a>
-                                <button onClick={()=>{setSaveName('');setSaveOpen(true)}} style={{ ...S.btn(false), borderColor:'rgba(99,102,241,0.3)', color:'#a5b4fc' }}>
+                                <button onClick={()=>{setSaveName('');openSaveModal()}} style={{ ...S.btn(false), borderColor:'rgba(99,102,241,0.3)', color:'#a5b4fc' }}>
                                     <span className="material-symbols-outlined" style={{ fontSize:15 }}>bookmark_add</span>Save as Template
                                 </button>
                             </div>
