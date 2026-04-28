@@ -322,10 +322,10 @@ const TemplateManager = () => {
                             return (
                                 <tr key={t._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                     <td style={{ padding: '14px 20px' }}>
-                                        {t.previewMediaUrl ? (
-                                            t.previewMediaType === 'video' 
-                                                ? <video src={t.previewMediaUrl} autoPlay muted loop style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} />
-                                                : <img src={t.previewMediaUrl} style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} alt="" />
+                                        {(t.previewUrl || t.previewImageUrl) ? (
+                                            t.previewType === 'video' 
+                                                ? <video src={t.previewUrl || t.previewImageUrl} autoPlay muted loop style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} />
+                                                : <img src={t.previewUrl || t.previewImageUrl} style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} alt="" />
                                         ) : (
                                             <div style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.2)', fontSize: 24 }}>image</span>
@@ -403,11 +403,10 @@ const TemplateManager = () => {
                                     </label>
                                     <label style={{ ...labelStyle, flex: 1 }}>
                                         Studio Origin
-                                        <select name="studioOrigin" required defaultValue="Creative" style={inputStyle}>
-                                            <option value="Creative">Creative</option>
-                                            <option value="Video">Video</option>
-                                            <option value="Content">Content</option>
-                                            <option value="QAds">Q-Ads</option>
+                                        <select name="studioOrigin" required defaultValue="creative" style={inputStyle}>
+                                            <option value="creative">Creative</option>
+                                            <option value="video">Video</option>
+                                            <option value="content">Content</option>
                                         </select>
                                     </label>
                                 </div>
