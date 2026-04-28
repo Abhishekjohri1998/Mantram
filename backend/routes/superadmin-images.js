@@ -12,11 +12,9 @@
 
 import { Router } from 'express';
 import { protect, superadmin } from '../middleware/auth.js';
-import {
-    laozhangImageGenerate,
-    laozhangMultimodalImageGenerate,
-} from '../agents/videoStudio/laozhangClient.js';
-import { AVATAR_MODELS, RATIO_TO_SIZE } from './avatar-studio.js';
+import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
+import { AVATAR_MODELS } from './avatar-studio.js';
+import { RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
 
 const router = Router();
 
