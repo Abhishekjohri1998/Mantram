@@ -40,7 +40,16 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
             return { mimeType: 'image/jpeg', data: resized.toString('base64') };
         }
 
-        const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(12000) });
+        // ⚡ HEAD-check before full download — skip dead URLs instantly
+        try {
+            const headResp = await fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+            if (headResp && !headResp.ok) {
+                console.warn(`⚡ Skipping dead ref URL (HTTP ${headResp.status}): ${imageUrl.substring(0, 60)}`);
+                return null;
+            }
+        } catch (_) { /* HEAD failed — try full download anyway */ }
+
+        const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(8000) }); // ⚡ 8s (was 12s)
         if (!resp.ok) {
             console.warn(`⚠️ Ref image fetch failed: HTTP ${resp.status} for ${imageUrl.substring(0, 80)}`);
             return null;

@@ -322,7 +322,7 @@ export class GeminiProvider extends BaseProvider {
                                 contents: [{ role: 'user', parts }],
                                 generationConfig: {
                                     responseModalities: ['TEXT', 'IMAGE'],
-                                    temperature: 0.4,
+                                    temperature: 0.2,  // ⚡ OPT 6: Lower temp = faster convergence (was 0.4)
                                     imageConfig: {
                                         aspectRatio: nativeAspectRatio,
                                         imageSize: "1K"  // ⚡ 1K is 2-3x faster than 2K, still 1024px quality

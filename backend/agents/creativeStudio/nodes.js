@@ -910,8 +910,16 @@ export async function visualGroundingNode(state) {
     console.log('🧠 MCoT: Visual Grounding — analyzing product/brand images...');
     const startMs = Date.now();
 
-    // Collect all available images for analysis
+    // ⚡ OPT 2: Early-exit for occasion/greeting posts with no product — saves 3-8s
+    const briefLower = (state.brief || '').toLowerCase();
+    const isOccasion = /\b(happy|merry|eid|diwali|holi|christmas|new year|birthday|valentine|navratri|sale|offer|discount|greet|wish|celebrate)\b/.test(briefLower);
     const mp = state.matchedProduct;
+    if (isOccasion && !mp && (!state.refImageUrls || state.refImageUrls.length === 0)) {
+        console.log('⚡ MCoT: Occasion/greeting post with no product — skipping visual grounding');
+        return { ...state, visualGrounding: null, status: 'visual-grounding-skipped' };
+    }
+
+    // Collect all available images for analysis
     const intel = state.brandIntel || {};
     const imagesToAnalyze = [];
 
@@ -1181,6 +1189,14 @@ export async function runCreativePipeline(params) {
                 // Skip if already cached
                 if (getCachedImageBuffer(url)) return;
                 try {
+                    // ⚡ HEAD-check before full download — skip dead URLs instantly
+                    try {
+                        const headResp = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+                        if (headResp && !headResp.ok) {
+                            console.warn(`⚡ Pre-cache: Skipping dead ref URL (${headResp.status}): ${url.substring(0, 60)}`);
+                            return;
+                        }
+                    } catch (_) { /* HEAD failed — try download */ }
                     // Pre-sign private S3 URLs before downloading
                     let fetchUrl = url;
                     const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
@@ -1193,14 +1209,23 @@ export async function runCreativePipeline(params) {
                     }
                     const resp = await fetch(fetchUrl, {
                         headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' },
-                        signal: AbortSignal.timeout(12000),
+                        signal: AbortSignal.timeout(8000), // ⚡ 8s (was 12s)
                     });
                     if (resp && resp.ok) {
-                        const buf = await resp.arrayBuffer();
+                        const rawBuf = await resp.arrayBuffer();
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
-                        const b64Data = Buffer.from(buf).toString('base64');
-                        setCachedImageBuffer(url, b64Data, ct);
-                        console.log(`⚡ Pre-cached ref image (${Math.round(buf.byteLength / 1024)}KB): ${url.substring(0, 80)}...`);
+                        const origKB = Math.round(rawBuf.byteLength / 1024);
+                        // ⚡ Compress to 512px for faster Gemini processing
+                        let finalBuf = Buffer.from(rawBuf);
+                        let finalMime = ct;
+                        try {
+                            const sharp = (await import('sharp')).default;
+                            finalBuf = await sharp(finalBuf).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
+                            finalMime = 'image/jpeg';
+                        } catch (_) { /* compression failed — use original */ }
+                        const b64Data = finalBuf.toString('base64');
+                        setCachedImageBuffer(url, b64Data, finalMime);
+                        console.log(`⚡ Pre-cached ref: ${origKB}KB → ${Math.round(finalBuf.byteLength / 1024)}KB (${url.substring(0, 60)}...)`);
                     }
                 } catch (e) {
                     // Non-critical — routedImageGenerate will download as fallback

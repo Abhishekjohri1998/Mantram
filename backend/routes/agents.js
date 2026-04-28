@@ -1636,7 +1636,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                                 // IMAGE FIRST — model treats it as primary input to edit
                                 { inlineData: { mimeType: mimeType, data: base64Data } },
                             ];
-                            // Helper: fetch URL image and convert to base64 inline data
+                            // Helper: fetch URL image, compress to 512px, and convert to base64 inline data
                             const fetchImagePart = async (url, label) => {
                                 try {
                                     if (url.startsWith('data:')) {
@@ -1644,10 +1644,25 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                                         const header = url.substring(0, commaIdx);
                                         return { inlineData: { mimeType: header.split(':')[1].split(';')[0], data: url.substring(commaIdx + 1) } };
                                     }
-                                    const resp = await fetch(url);
+                                    // ⚡ HEAD-check before full download — skip dead URLs instantly
+                                    try {
+                                        const headResp = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+                                        if (headResp && !headResp.ok) {
+                                            console.warn(`⚡ Skipping dead ${label} ref URL (${headResp.status})`);
+                                            return null;
+                                        }
+                                    } catch (_) { /* HEAD failed — try download */ }
+                                    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
                                     if (!resp.ok) return null;
-                                    const buf = Buffer.from(await resp.arrayBuffer());
-                                    return { inlineData: { mimeType: resp.headers.get('content-type') || 'image/jpeg', data: buf.toString('base64') } };
+                                    let buf = Buffer.from(await resp.arrayBuffer());
+                                    let mime = resp.headers.get('content-type') || 'image/jpeg';
+                                    // ⚡ Compress ref images to 512px — Gemini doesn't need full-res (saves 5-15s)
+                                    try {
+                                        const sharp = (await import('sharp')).default;
+                                        buf = await sharp(buf).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
+                                        mime = 'image/jpeg';
+                                    } catch (_) { /* compression failed — use original */ }
+                                    return { inlineData: { mimeType: mime, data: buf.toString('base64') } };
                                 } catch (e) {
                                     console.warn(`📸 Could not fetch ${label} ref:`, e.message);
                                     return null;

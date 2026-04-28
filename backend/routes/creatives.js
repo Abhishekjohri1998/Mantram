@@ -214,10 +214,16 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
 
         let pipelineResult;
+        // ⚡ OPT 3: Skip pipeline entirely if prompt was already enhanced by the user
+        // (the "Enhance" button runs the full pipeline — running it again is redundant)
+        if (options?.alreadyEnhanced || options?.skipPipeline) {
+            console.log('⚡ Pipeline skipped — prompt already enhanced by user');
+            agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
+        } else {
         try {
-            // ── 45s timeout on agentic pipeline — falls back to raw prompt if slow ──
+            // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
             const pipelineTimeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Pipeline timeout (45s) — using raw prompt')), 45_000)
+                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
             );
             pipelineResult = await Promise.race([
                 runCreativePipeline({
@@ -246,6 +252,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         } catch (pipelineErr) {
             console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
             agenticMeta.pipelineError = pipelineErr.message;
+        }
         }
 
         let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
@@ -1641,24 +1648,48 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         if (lzRefUrls.length > 0) {
             // ⚡ PERF: Download ALL reference images in parallel (was sequential — saved 10-25s)
             console.log(`📥 Downloading ${lzRefUrls.length} reference images for Gemini in parallel...`);
+            const sharp = await getSharp();
             const refDownloads = lzRefUrls.map(async (url) => {
                 try {
                     const cached = getCachedImageBuffer(url);
                     if (cached) {
-                        console.log(`⚡ Cache HIT for image reference generation: ${url.substring(0, 80)}...`);
+                        console.log(`⚡ Cache HIT for ref image: ${url.substring(0, 60)}...`);
                         return { inlineData: { mimeType: cached.mimeType, data: cached.buffer } };
                     }
+
+                    // ⚡ OPT 5: HEAD-check before full download — skip 404s instantly (saves 5-15s)
+                    try {
+                        const headResp = await presignedFetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+                        if (headResp && !headResp.ok) {
+                            console.warn(`⚡ Skipping dead ref URL (HTTP ${headResp.status}): ${url.substring(0, 60)}`);
+                            return null;
+                        }
+                    } catch (_) { /* HEAD failed — try full download anyway */ }
                     
-                    const resp = await presignedFetch(url, { signal: AbortSignal.timeout(15000) }); // 15s timeout (was 35s)
+                    // ⚡ OPT 7: Reduced timeout 15s → 8s — broken CDNs fail faster
+                    const resp = await presignedFetch(url, { signal: AbortSignal.timeout(8000) });
                     if (resp && resp.ok) {
                         const buf = await resp.arrayBuffer();
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
-                        console.log(`✅ Loaded ref image (${Math.round(buf.byteLength / 1024)}KB)`);
+                        const origKB = Math.round(buf.byteLength / 1024);
+
+                        // ⚡ OPT 1: Compress to 512px max — Gemini doesn't need full-res refs (saves 5-15s)
+                        let finalBuf = Buffer.from(buf);
+                        let finalMime = ct;
+                        try {
+                            finalBuf = await sharp(finalBuf)
+                                .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+                                .jpeg({ quality: 75 })
+                                .toBuffer();
+                            finalMime = 'image/jpeg';
+                        } catch (_) { /* compression failed — use original */ }
                         
-                        const b64Data = Buffer.from(buf).toString('base64');
-                        setCachedImageBuffer(url, b64Data, ct);
+                        const b64Data = finalBuf.toString('base64');
+                        const compKB = Math.round(finalBuf.byteLength / 1024);
+                        console.log(`✅ Ref image: ${origKB}KB → ${compKB}KB (${url.substring(0, 50)}...)`);
+                        setCachedImageBuffer(url, b64Data, finalMime);
                         
-                        return { inlineData: { mimeType: ct, data: b64Data } };
+                        return { inlineData: { mimeType: finalMime, data: b64Data } };
                     } else {
                         console.warn(`⚠️ Ref image fetch returned HTTP ${resp?.status} — skipping`);
                     }
