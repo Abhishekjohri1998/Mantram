@@ -12,6 +12,113 @@ import MaskingCanvas from '../components/MaskingCanvas'
 import Walkthrough from '../components/Walkthrough'
 import TemplateLibrary from './TemplateLibrary'
 import './CreativeStudio/CreativeStudio.css'
+
+// ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
+const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
+
+function TemplateSuggestionRow({ brandId, onSelect }) {
+    const [templates, setTemplates] = useState([])
+    const [loaded, setLoaded] = useState(false)
+
+    useEffect(() => {
+        let cancelled = false
+        const token = localStorage.getItem('mantram_token')
+        const qs = brandId ? `?brandId=${brandId}` : ''
+        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (!cancelled && d?.success) setTemplates((d.templates || []).slice(0, 18)) })
+        .catch(() => {}) // silent failure — never crash the page
+        .finally(() => { if (!cancelled) setLoaded(true) })
+        return () => { cancelled = true }
+    }, [brandId])
+
+    // Don't render anything until loaded (prevents layout shift)
+    if (!loaded || templates.length === 0) return null
+
+    return (
+        <div style={{
+            padding: '10px 0 4px',
+            borderBottom: '1px solid var(--sys-border)',
+        }}>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                paddingLeft: 16,
+                paddingRight: 16,
+                marginBottom: 8,
+            }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.5 }}>dashboard_customize</span>
+                <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.45 }}>
+                    Templates · {templates.length} ready
+                </span>
+            </div>
+            {/* Fixed-height scroll container — no layout shift */}
+            <div style={{
+                display: 'flex',
+                gap: 10,
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                paddingLeft: 16,
+                paddingRight: 16,
+                paddingBottom: 8,
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(255,255,255,0.12) transparent',
+                // Fixed height prevents reflow when images load
+                height: 130,
+                alignItems: 'center',
+            }}>
+                {templates.map(t => (
+                    <button
+                        key={t._id}
+                        title={t.name}
+                        onClick={() => onSelect(t)}
+                        style={{
+                            flex: '0 0 80px',
+                            height: 120,
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            border: '1.5px solid rgba(255,255,255,0.08)',
+                            background: '#1a1a20',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'transform 0.15s, border-color 0.15s',
+                            padding: 0,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)' }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+                    >
+                        {t.previewUrl ? (
+                            <img
+                                src={t.previewUrl}
+                                alt={t.name}
+                                loading="lazy"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            />
+                        ) : (
+                            <div style={{ width: '100%', height: '100%', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 22, opacity: 0.25 }}>image</span>
+                            </div>
+                        )}
+                        {/* Name overlay */}
+                        <div style={{
+                            position: 'absolute', bottom: 0, left: 0, right: 0,
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.82), transparent)',
+                            padding: '14px 6px 5px',
+                        }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t.name}
+                            </div>
+                        </div>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 // ── Helper: Time Ago ──
 
 function getTimeAgo(dateStr) {
@@ -2625,6 +2732,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 ))}
                             </div>
                         </div>
+
+                        {/* ═══ TEMPLATE SUGGESTION ROW — section=ai_create ═══ */}
+                        <TemplateSuggestionRow
+                            brandId={activeBrand?._id}
+                            onSelect={(t) => { setShowTemplateLibrary(true) }}
+                        />
 
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
                         {showAnimatePanel && (
