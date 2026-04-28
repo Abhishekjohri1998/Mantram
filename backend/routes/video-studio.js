@@ -3220,169 +3220,79 @@ router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
 });
 
 // ── POST /api/video-studio/ugc-pro/generate-avatar ──
-// Avatar generation from text description — uses geminiImageGenerate (NanoBanana 2)
-// with Flux Pro v1.1 fallback, and isAvatar systemInstruction for photorealism
+// DEPRECATED — Step 11: Redirects internally to POST /api/avatar-studio/generate
+// Frontend code still hitting this endpoint continues to work transparently.
+// Remove this redirect once all frontend references are updated to /api/avatar-studio/generate
 router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage'), async (req, res) => {
     try {
-        const { brandId, description, environment } = req.body;
+        console.log(`⚠️  [DEPRECATED] /ugc-pro/generate-avatar called — proxying to /api/avatar-studio/generate`);
 
-        // Path 1: Upload — store in S3 and return URL
+        // Build a forwarded request body that avatar-studio /generate understands
+        // avatar-studio /generate accepts: { mode, prompt, genderExpression, origin, ... }
+        // Legacy callers send: { description, environment, brandId }
+        const { description, environment, brandId } = req.body;
+
+        // If it was a file upload (Path 1 of old endpoint) — handle it directly, avatar-studio doesn't have this path
         if (req.file) {
             const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}-${req.file.originalname}`;
             const avatarUrl = await uploadToS3(req.file.buffer, s3Key, req.file.mimetype);
-            console.log(`✅ UGC Pro: Avatar uploaded to S3: ${avatarUrl.substring(0, 60)}`);
+            console.log(`✅ [DEPRECATED redirect] Avatar upload preserved: ${avatarUrl.substring(0, 60)}`);
             return res.json({ success: true, avatarUrl, generated: false });
         }
 
-        // Path 2: AI Avatar Generation via geminiImageGenerate (NanoBanana 2 + Flux Pro fallback)
         if (!description?.trim()) {
             return res.status(400).json({ success: false, error: 'Provide a model description or upload a photo' });
         }
 
-        const env = environment || 'home';
-        const envMap = {
-            home: 'cozy modern living room with warm golden-hour sunlight streaming through sheer linen curtains, potted plants and neutral decor in soft focus behind',
-            outdoor: 'sun-dappled park with lush green trees, natural golden-hour backlight creating a warm rim light around the subject',
-            studio: 'clean professional photography studio with large softbox key light, subtle white/grey gradient backdrop, professional fashion shoot setup',
-            cafe: 'trendy coffee shop interior with warm edison bulb lighting, exposed brick and wooden furniture bokeh in background',
-            gym: 'modern fitness studio with floor-to-ceiling windows letting in bright natural daylight, minimalist equipment in soft focus behind',
-            office: 'sleek contemporary office with panoramic city view windows, clean desk and modern furniture in background',
+        // Forward as directPrompt mode to avatar-studio/generate
+        const forwardBody = {
+            mode: 'directPrompt',
+            directPrompt: description.trim(),
+            brandId: brandId || undefined,
         };
-        const envDesc = envMap[env] || envMap.home;
 
-        // Build the prompt dynamically based on if they want a cartoon
-        const isCartoonReq = description.toLowerCase().includes('cartoon') || description.toLowerCase().includes('illustrat') || description.toLowerCase().includes('anime') || description.toLowerCase().includes('3d');
-        
-        let avatarPrompt = '';
-        if (isCartoonReq) {
-            avatarPrompt = [
-                `High quality digital art portrait in 9:16 vertical portrait orientation.`,
-                `Subject: ${description}.`,
-                `Setting: ${envDesc}.`,
-                `Style: Clean, vibrant, highly detailed, professional illustration.`,
-            ].join(' ');
-        } else {
-            avatarPrompt = [
-                `Award-winning editorial portrait photograph in 9:16 vertical portrait orientation.`,
-                `Subject: ${description}.`,
-                `Setting: ${envDesc}.`,
-                `Camera: Canon EOS R5 with 85mm f/1.4 prime lens, shot wide open.`,
-                `Lighting: Natural window light as key light, subtle fill from ambient room light, creating soft directional shadows.`,
-                `Composition: Half-body portrait from waist up, subject positioned using rule of thirds, looking directly at camera with confident natural expression.`,
-                `Technical: Shallow depth of field with creamy bokeh background, natural skin texture with visible pores and subtle imperfections, no airbrushing.`,
-                `Style: High-end lifestyle magazine editorial, Vogue/GQ quality, authentic and relatable, warm color grading.`,
-            ].join(' ');
-        }
-
-        console.log(`[Avatar] Generating — prompt: "${avatarPrompt.substring(0, 120)}..."`);
-
-        let finalImageUrl = null;
-
-        // ── Primary: Flux Pro (fal.ai) ──
-        try {
-            console.log(`[Avatar] Attempting Flux Pro (fal.ai)...`);
-            const falUrl = await falGenerateImage({
-                prompt: avatarPrompt,
-                model: 'fal-ai/flux-pro/v1.1',
-                width: 768,
-                height: 1024
-            });
-            if (falUrl) {
-                console.log(`[Avatar] ✅ Generated on FAL: ${falUrl}`);
-                finalImageUrl = falUrl;
-            }
-        } catch (falErr) {
-            console.warn(`⚠️ FAL Flux Pro failed (${falErr.message}) — falling back to Gemini...`);
-        }
-
-        // ── Fallback 1: Gemini (NanoBanana 2) ──
-        if (!finalImageUrl) {
-            try {
-                console.log(`[Avatar] Attempting Gemini fallback...`);
-                const geminiRes = await geminiImageGenerate(
-                    avatarPrompt,
-                    [],
-                    0.4,
-                    { aspectRatio: '9:16', isAvatar: !isCartoonReq }
-                );
-                if (geminiRes?.imageUrl) {
-                    console.log(`[Avatar] ✅ Generated on Gemini: ${geminiRes.imageUrl}`);
-                    finalImageUrl = geminiRes.imageUrl;
-                }
-            } catch (gemErr) {
-                console.warn(`⚠️ Gemini fallback failed (${gemErr.message}) — falling back to GPT...`);
-            }
-        }
-
-        // ── Fallback 2: GPT-image-2 (LaoZhang / OpenAI) ──
-        if (!finalImageUrl) {
-            console.log(`[Avatar] Attempting GPT fallback...`);
-            const lzKey = process.env.LAOZHANG_API_KEY;
-            const oaiKey = process.env.OPENAI_API_KEY;
-            const apiKey = lzKey || oaiKey;
-            const baseUrl = lzKey ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1') : 'https://api.openai.com/v1';
-            const modelId = lzKey ? 'gpt-image-2' : 'gpt-image-1';
-
-            if (apiKey) {
-                const gptResp = await fetch(`${baseUrl}/images/generations`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({
-                        model: modelId,
-                        prompt: avatarPrompt,
-                        n: 1,
-                        size: modelId === 'gpt-image-2' ? '1024x1792' : '1024x1024',
-                        quality: 'high',
-                        output_format: 'url',
-                    }),
-                    signal: AbortSignal.timeout(60000),
-                });
-                const gptData = await gptResp.json();
-                const url = gptData?.data?.[0]?.url;
-                if (url) {
-                    console.log(`[Avatar] ✅ Generated on ${modelId}: ${url}`);
-                    finalImageUrl = url;
-                }
-            }
-        }
-
-        if (!finalImageUrl) {
-            throw new Error('Avatar generation failed — all providers (FAL, Gemini, GPT) are unavailable or out of balance. Please check billing.');
-        }
-
-        // Mirror to S3 so it doesn't expire (especially important for FAL and GPT temporary URLs)
-        const s3Key = `ugc-pro/avatars/${req.user._id}/${Date.now()}.jpg`;
-        const avatarUrl = await mirrorUrlToS3(finalImageUrl, s3Key);
-
-        console.log(`[Avatar] ✅ Mirrored to S3: ${avatarUrl.substring(0, 60)}...`);
-
-        // Auto-save to Avatar collection so it appears in the picker
-        try {
-            await Avatar.create({
-                name: req.body.name || (description || '').substring(0, 60),
-                imageUrl: avatarUrl,
-                gender: /\b(female|woman|girl|lady)\b/i.test(description) ? 'female' : /\b(male|man|boy|guy)\b/i.test(description) ? 'male' : 'unspecified',
-                isTemplate: false,
-                createdBy: req.user._id,
-                source: 'generated',
-                generatedFromPrompt: description,
-            });
-        } catch (saveErr) {
-            console.warn('[Avatar] Auto-save failed (non-blocking):', saveErr.message);
-        }
-
-        res.json({
-            success: true,
-            avatarUrl,
-            generated: true,
+        const PORT = process.env.PORT || 3001;
+        const forwardRes = await fetch(`http://localhost:${PORT}/api/avatar-studio/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': req.headers.authorization,
+            },
+            body: JSON.stringify(forwardBody),
         });
+
+        const forwardData = await forwardRes.json();
+
+        if (!forwardRes.ok) {
+            return res.status(forwardRes.status).json(forwardData);
+        }
+
+        // Adapt avatar-studio response shape to legacy shape so old frontend still works
+        // avatar-studio returns: { success, variants: [{url},...] }
+        // legacy expected: { success, avatarUrl, generated }
+        const firstVariant = forwardData.variants?.find(v => !v.failed);
+        if (firstVariant) {
+            return res.json({
+                success: true,
+                avatarUrl: firstVariant.url,
+                generated: true,
+                variants: forwardData.variants, // bonus: expose all variants
+            });
+        }
+
+        return res.status(502).json({ success: false, error: 'Avatar generation failed in new pipeline' });
+
     } catch (err) {
-        console.error('UGC Pro avatar error:', err.message);
+        console.error('[DEPRECATED redirect] ugc-pro/generate-avatar error:', err.message);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
 
+
 // ── POST /api/video-studio/ugc-pro/generate ──
+// Full UGC video generation — builds prompt via nodes, submits to MuAPI
+
+
 // Full UGC video generation — builds prompt via nodes, submits to MuAPI
 router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), async (req, res) => {
     try {

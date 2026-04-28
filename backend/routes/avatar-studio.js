@@ -13,7 +13,7 @@
 import { Router } from 'express';
 import { protect, superadmin } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
-import { buildAvatarPrompt, RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
+import { buildAvatarPrompt, buildDirectPrompt, buildReferencePrompt, RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
 import { mirrorUrlToS3, uploadToS3 } from '../utils/s3.js';
 import Avatar from '../models/Avatar.js';
 
@@ -77,15 +77,31 @@ const DEFAULT_MODEL = 'gpt-image-2';
 /**
  * Generate one image variant.
  * Routes to Gemini REST (NanoBanana 2) or LaoZhang /images/generations.
+ * Optionally accepts refUrls[] for multimodal (reference image) generation.
  * Always returns an S3 URL — never base64, never temporary provider URL.
+ *
+ * Step 10 rule: LZ client (laozhangImageGenerate / laozhangMultimodalImageGenerate)
+ * calls ensureS3Url internally. Do NOT call ensureS3Url on their return values.
  *
  * @returns {{ slot, url, failed, error? }}
  */
-async function generateOneVariant(slot, prompt, size, modelKey = DEFAULT_MODEL) {
+async function generateOneVariant(slot, prompt, size, modelKey = DEFAULT_MODEL, refUrls = []) {
     try {
         const cfg = AVATAR_MODELS[modelKey] || AVATAR_MODELS[DEFAULT_MODEL];
+        const hasRefs = refUrls && refUrls.length > 0;
 
-        // ── Branch: NanoBanana 2 (Gemini REST) ──────────────────────────────
+        // ── Reference / Multimodal path ──────────────────────────────────────
+        if (hasRefs) {
+            // Import from LZ client — multimodal handles S3 mirroring internally
+            const { laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
+            const refs = refUrls.slice(0, 2);
+            console.log(`🎭 [AvatarStudio] Variant ${slot} | multimodal | ${refs.length} refs | model=${cfg.apiModel} | size=${size}`);
+            const result = await laozhangMultimodalImageGenerate(prompt, refs, { model: cfg.apiModel, size });
+            // Step 10: result.imageUrl is ALREADY an S3 URL — do not call ensureS3Url again
+            return { slot, url: result.imageUrl, failed: false };
+        }
+
+
         if (cfg.provider === 'gemini') {
             const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
             if (!imageKey) throw new Error('GEMINI_API_KEY not configured');
@@ -235,26 +251,50 @@ router.get('/models', protect, (req, res) => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/avatar-studio/generate
-// User-facing: structured options OR directPrompt → 3 parallel variants, credit-gated
-// Users can bypass the structured form with a custom directPrompt
+// User-facing: 3 modes — structured | directPrompt | reference
+// Step 11/12: routes to correct prompt builder and pipeline per mode
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, res) => {
     try {
         const {
+            mode = 'structured', // 'structured' | 'directPrompt' | 'reference'
+            // Structured fields
             origin, ageRange, genderExpression, clothingStyle,
             environment, lightingMood, additionalDetails,
-            directPrompt, // ← user custom prompt bypass
+            // Direct prompt
+            directPrompt,
+            // Reference mode
+            referenceImageUrls = [],  // S3 URLs, max 2
+            referenceDescription,     // optional instruction for reference mode
         } = req.body;
 
         let finalPrompt;
+        let useMultimodal = false;
+        let refUrls = [];
 
-        if (directPrompt && directPrompt.trim().length >= 10) {
-            // Custom prompt mode — user wrote their own description
-            // Still strip banned age patterns for safety
-            finalPrompt = directPrompt.trim().substring(0, 800);
-            console.log(`🎭 [AvatarStudio] User ${req.user._id} using custom prompt (${finalPrompt.length} chars)`);
+        if (mode === 'reference') {
+            // Step 12: reference mode — multimodal pipeline with reference image
+            const validRefs = (Array.isArray(referenceImageUrls) ? referenceImageUrls : [])
+                .filter(u => u && typeof u === 'string').slice(0, 2);
+            if (validRefs.length === 0) {
+                return res.status(400).json({ success: false, error: 'reference mode requires at least one referenceImageUrl (S3 URL)' });
+            }
+            refUrls = validRefs;
+            useMultimodal = true;
+            finalPrompt = buildReferencePrompt(referenceDescription || '', { environment, lightingMood, clothingStyle });
+            console.log(`🎭 [AvatarStudio] User ${req.user._id} | mode=reference | ${refUrls.length} refs`);
+
+        } else if (mode === 'directPrompt' || (directPrompt && directPrompt.trim().length >= 10)) {
+            // Step 12: directPrompt mode — sanitised but user controls framing
+            try {
+                finalPrompt = buildDirectPrompt(directPrompt || '');
+            } catch (e) {
+                return res.status(400).json({ success: false, error: e.message });
+            }
+            console.log(`🎭 [AvatarStudio] User ${req.user._id} | mode=directPrompt (${finalPrompt.length} chars)`);
+
         } else {
-            // Structured options mode
+            // Step 12: structured mode — full option selector, fixed cinematic prefix
             try {
                 finalPrompt = buildAvatarPrompt({
                     origin, ageRange, genderExpression,
@@ -263,29 +303,32 @@ router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, 
             } catch (promptErr) {
                 return res.status(promptErr.status || 400).json({ success: false, error: promptErr.message });
             }
-            console.log(`🎭 [AvatarStudio] User ${req.user._id} using structured options`);
+            console.log(`🎭 [AvatarStudio] User ${req.user._id} | mode=structured`);
         }
 
         const size = RATIO_TO_SIZE['9:16']; // Always 9:16 portrait for user-facing
-        const [v0, v1, v2] = await Promise.all([
-            generateOneVariant(0, finalPrompt, size, DEFAULT_MODEL),
-            generateOneVariant(1, finalPrompt, size, DEFAULT_MODEL),
-            generateOneVariant(2, finalPrompt, size, DEFAULT_MODEL),
-        ]);
+
+        // Step 11: reference mode → multimodal; others → standard
+        // generateOneVariant handles both paths internally when refUrls are passed
+        const generateFn = useMultimodal
+            ? (slot) => generateOneVariant(slot, finalPrompt, size, DEFAULT_MODEL, refUrls)
+            : (slot) => generateOneVariant(slot, finalPrompt, size, DEFAULT_MODEL);
+
+        const [v0, v1, v2] = await Promise.all([generateFn(0), generateFn(1), generateFn(2)]);
 
         const variants = [v0, v1, v2];
         const successCount = variants.filter(v => !v.failed).length;
-        console.log(`✅ [AvatarStudio] ${successCount}/3 variants succeeded`);
-
-        // Step 5 fix: do NOT auto-save all variants — user must select one variant and call /save
-        // autoSaveAvatar removed: saves happened before user selection, wasting Avatar records
+        console.log(`✅ [AvatarStudio] ${successCount}/3 variants succeeded | mode=${mode}`);
 
         if (successCount === 0) {
             return res.status(502).json({ success: false, error: 'All 3 variants failed. Check LaoZhang API key and quota.', variants });
         }
 
         res.json({
-            success: true, variants, prompt: finalPrompt,
+            success: true,
+            variants,
+            prompt: finalPrompt,
+            mode,
             creditsUsed: req.creditsDeducted || 4,
         });
     } catch (err) {

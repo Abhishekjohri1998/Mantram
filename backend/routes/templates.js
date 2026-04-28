@@ -10,31 +10,67 @@ import { internalGenerateCreative } from './creatives.js';
 
 const router = express.Router();
 
-// Get active published templates (user-facing browse)
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/templates
+// User-facing browse — published only, prompt fields excluded
+// Supports ?studioSection=ai_create, ?brandId=xxx (brand-aware templates first)
+// ══════════════════════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
     try {
-        const { limit = 50, page = 1, categoryId, studioOrigin, search } = req.query;
-        // Users only see templates that are BOTH active (not deleted) AND published
-        const filter = { isActive: true, isPublished: true };
+        const { limit = 50, page = 1, categoryId, studioOrigin, studioSection, brandId, search } = req.query;
+        const baseFilter = { isActive: true, isPublished: true };
 
-        if (categoryId) filter.categoryId = categoryId;
-        if (studioOrigin) filter.studioOrigin = studioOrigin;
-        
+        if (categoryId) baseFilter.categoryId = categoryId;
+        if (studioOrigin) baseFilter.studioOrigin = studioOrigin;
+        if (studioSection) baseFilter.studioSection = studioSection;
+
         if (search) {
-            filter.$or = [
+            baseFilter.$or = [
                 { name: { $regex: search, $options: 'i' } },
                 { description: { $regex: search, $options: 'i' } },
                 { tags: { $regex: search, $options: 'i' } }
             ];
         }
 
-        const templates = await Template.find(filter)
-            .select('-savedPrompt -promptTemplate -generationParams') // BUG-04 FIX: never expose proprietary prompt
-            .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
-            .skip((parseInt(page) - 1) * parseInt(limit))
-            .limit(parseInt(limit))
-            .populate('categoryId', 'name color iconEmoji')
-            .lean();
+        let templates;
+
+        if (brandId) {
+            // Step 9: when brandId present, brand-aware templates returned first
+            const [brandAware, general] = await Promise.all([
+                Template.find({ ...baseFilter, promptTemplate: { $regex: '\\{brand\\}|\\{product\\}', $options: 'i' } })
+                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                    .limit(parseInt(limit))
+                    .populate('categoryId', 'name color iconEmoji')
+                    .lean(),
+                Template.find({
+                    ...baseFilter,
+                    $or: [
+                        { promptTemplate: { $not: /\{brand\}|\{product\}/i } },
+                        { promptTemplate: { $exists: false } },
+                        { promptTemplate: '' },
+                    ],
+                })
+                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                    .skip((parseInt(page) - 1) * parseInt(limit))
+                    .limit(parseInt(limit))
+                    .populate('categoryId', 'name color iconEmoji')
+                    .lean(),
+            ]);
+            templates = [
+                ...brandAware.map(t => ({ ...t, isBrandAware: true })),
+                ...general.map(t => ({ ...t, isBrandAware: false })),
+            ];
+        } else {
+            templates = (await Template.find(baseFilter)
+                .select('-savedPrompt -promptTemplate -generationParams')
+                .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                .skip((parseInt(page) - 1) * parseInt(limit))
+                .limit(parseInt(limit))
+                .populate('categoryId', 'name color iconEmoji')
+                .lean()).map(t => ({ ...t, isBrandAware: false }));
+        }
 
         res.json({ success: true, templates });
     } catch (error) {
@@ -43,45 +79,95 @@ router.get('/', protect, async (req, res) => {
     }
 });
 
-// Get single template
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/templates/by-section/:section — clean section-scoped alias (Step 9)
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/by-section/:section', protect, async (req, res) => {
+    try {
+        const { section } = req.params;
+        const { brandId, limit = 30 } = req.query;
+        const filter = { isActive: true, isPublished: true, studioSection: section };
+
+        let templates;
+        if (brandId) {
+            const [brandAware, general] = await Promise.all([
+                Template.find({ ...filter, promptTemplate: { $regex: '\\{brand\\}|\\{product\\}', $options: 'i' } })
+                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .sort({ isFeatured: -1, usageCount: -1 })
+                    .limit(10)
+                    .lean(),
+                Template.find({ ...filter, $or: [{ promptTemplate: { $not: /\{brand\}|\{product\}/i } }, { promptTemplate: '' }] })
+                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .sort({ isFeatured: -1, usageCount: -1 })
+                    .limit(parseInt(limit))
+                    .lean(),
+            ]);
+            templates = [
+                ...brandAware.map(t => ({ ...t, isBrandAware: true })),
+                ...general.map(t => ({ ...t, isBrandAware: false })),
+            ];
+        } else {
+            templates = (await Template.find(filter)
+                .select('-savedPrompt -promptTemplate -generationParams')
+                .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                .limit(parseInt(limit))
+                .lean()).map(t => ({ ...t, isBrandAware: false }));
+        }
+
+        res.json({ success: true, section, templates });
+    } catch (error) {
+        console.error('GET /api/templates/by-section error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/templates/:id — single template (prompt excluded for regular users)
+// ══════════════════════════════════════════════════════════════════════════════
 router.get('/:id', protect, async (req, res) => {
     try {
         const template = await Template.findOne({ _id: req.params.id, isActive: true })
             .populate('categoryId', 'name color iconEmoji')
             .lean();
-            
+
         if (!template) {
             return res.status(404).json({ success: false, error: 'Template not found' });
         }
-        res.json({ success: true, template });
+        // Remove prompt fields from user-facing single template response too
+        const { savedPrompt, promptTemplate, generationParams, ...safeTemplate } = template;
+        res.json({ success: true, template: safeTemplate });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Use template
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/templates/:id/use — Step 10 rebuild
+// Accepts productImageUrl + avatarImageUrl as S3 URLs, never base64
+// ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/use', protect, async (req, res) => {
+    const startTime = Date.now();
+    let usageLog = null;
+
     try {
-        const template = await Template.findOne({ _id: req.params.id, isActive: true });
+        const template = await Template.findOne({ _id: req.params.id, isActive: true, isPublished: true });
         if (!template) {
             return res.status(404).json({ success: false, error: 'Template not found or inactive' });
         }
 
-    const { userInputs = {} } = req.body;
-        // BUG-03 FIX: Accept S3 URL strings — never accept base64
-        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandToggle, brandId } = userInputs;
-        const userProductImageBase64 = null;  // deprecated — always null
-        const userAvatarImageBase64 = null;   // deprecated — always null
+        const { userInputs = {} } = req.body;
+        // Step 10 + BUG-03 FIX: Accept S3 URL strings — base64 deprecated
+        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId } = userInputs;
 
-        // 1. Build Prompt
+        // 1. Build prompt — pass S3 URLs, not base64
         const promptData = await buildTemplatePrompt({
             template,
             userPrompt,
-            userProductImageBase64,
-            userAvatarImageBase64
+            productImageUrl,   // S3 URL or null
+            avatarImageUrl,    // S3 URL or null
         });
 
-        // 2. Determine Cost & Deduct Credits
+        // 2. Determine cost & deduct credits
         let cost = 0;
         let deductCategory = 'template';
         if (template.studioOrigin === 'creative') { cost = 4; deductCategory = 'creative'; }
@@ -92,30 +178,39 @@ router.post('/:id/use', protect, async (req, res) => {
             await deductCredits(req.user._id, cost, deductCategory);
         }
 
-        // 3. Increment Usage & Log
-        await Template.findByIdAndUpdate(template._id, { $inc: { usageCount: 1 } });
-        
-        const usageLog = await TemplateUsageLog.create({
+        // 3. Increment usageCount; increment usedByCount only first time per user
+        const alreadyUsed = await TemplateUsageLog.exists({
             templateId: template._id,
             userId: req.user._id,
-            studioOrigin: template.studioOrigin,
-            userBrief: userPrompt || '',
-            hadProductImage: !!userProductImageBase64,
-            hadAvatarImage: !!userAvatarImageBase64,
-            resultJobId: null // We will update this right after
+            status: 'success',
+        });
+        await Template.findByIdAndUpdate(template._id, {
+            $inc: { usageCount: 1, ...(alreadyUsed ? {} : { usedByCount: 1 }) }
         });
 
-        // 4. Create Job & Route to Pipeline
+        // 4. Pre-create usage log
+        usageLog = await TemplateUsageLog.create({
+            templateId: template._id,
+            userId: req.user._id,
+            brandId: brandId || null,
+            studioOrigin: template.studioOrigin,
+            userBrief: userPrompt || '',
+            hadProductImage: !!productImageUrl,
+            hadAvatarImage: !!avatarImageUrl,
+            status: 'success', // optimistic — update to 'failed' in catch
+        });
+
+        // 5. Route to correct pipeline
         let jobId;
-        let jobRecord;
 
         if (template.studioOrigin === 'creative') {
             jobId = `create-${Date.now()}`;
-            // Use internal function in the background
+            // Step 10: internalGenerateCreative already calls ensureS3Url internally.
+            // Do NOT call ensureS3Url on its return value — that would double-mirror.
             internalGenerateCreative({
                 body: {
                     prompt: promptData.finalPrompt,
-                    visionInputs: promptData.visionInputs,
+                    visionInputs: promptData.visionInputs,  // S3 URL refs, not base64
                     format: settings?.format || 'instagram-post',
                     jobId
                 },
@@ -123,11 +218,10 @@ router.post('/:id/use', protect, async (req, res) => {
                 creditsDeducted: cost,
                 jobId
             }).catch(e => console.error('Creative background dispatch error:', e));
-            jobRecord = { _id: jobId }; // internalGenerateCreative handles the DB writes
-        } 
-        else if (template.studioOrigin === 'video') {
+
+        } else if (template.studioOrigin === 'video') {
             jobId = `vid-${Date.now()}`;
-            jobRecord = await GenerationJob.create({
+            await GenerationJob.create({
                 jobId,
                 user: req.user._id,
                 type: 'video',
@@ -137,46 +231,7 @@ router.post('/:id/use', protect, async (req, res) => {
                 creditsDeducted: cost,
                 meta: { label: `Template: ${template.name}`, page: '/video-studio' }
             });
-            
-            // We dispatch internally to /api/video-studio/ugc-pro/qads/generate or similar
-            // But to avoid double deduction, we just call the external API with a bypass or 
-            // the pipeline handles it based on the job. 
-            // For now, we will simulate the pipeline start by doing a fetch to a known generic route 
-            // or just triggering the background agent.
-            // In Mantram, many video pipelines just poll the GenerationJob and an agent picks it up.
-            // Let's use the local API but we need to prevent double deduction.
-            // For simplicity and resilience, we will just return the job and let a worker or 
-            // direct fetch handle the background process.
             fetch(`http://localhost:${process.env.PORT || 3001}/api/video-studio/agent/create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': req.headers.authorization,
-                    'X-Skip-Credits': 'true' // In case we modify middleware later
-                },
-                body: JSON.stringify({
-                    jobId,
-                    prompt: promptData.finalPrompt,
-                    visionInputs: promptData.visionInputs,
-                    settings: promptData.settings
-                })
-            }).catch(e => console.error('Video background dispatch error:', e));
-
-        } 
-        else {
-            jobId = `content-${Date.now()}`;
-            jobRecord = await GenerationJob.create({
-                jobId,
-                user: req.user._id,
-                type: 'content',
-                status: 'pending',
-                prompt: promptData.finalPrompt,
-                options: { ...promptData.settings, ...settings },
-                creditsDeducted: cost,
-                meta: { label: `Template: ${template.name}`, page: '/content-studio' }
-            });
-            
-            fetch(`http://localhost:${process.env.PORT || 3001}/api/content/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -186,14 +241,39 @@ router.post('/:id/use', protect, async (req, res) => {
                 body: JSON.stringify({
                     jobId,
                     prompt: promptData.finalPrompt,
-                    topic: promptData.finalPrompt
+                    visionInputs: promptData.visionInputs,
+                    settings: promptData.settings
                 })
+            }).catch(e => console.error('Video background dispatch error:', e));
+
+        } else {
+            // content
+            jobId = `content-${Date.now()}`;
+            await GenerationJob.create({
+                jobId,
+                user: req.user._id,
+                type: 'content',
+                status: 'pending',
+                prompt: promptData.finalPrompt,
+                options: { ...promptData.settings, ...settings },
+                creditsDeducted: cost,
+                meta: { label: `Template: ${template.name}`, page: '/content-studio' }
+            });
+            fetch(`http://localhost:${process.env.PORT || 3001}/api/content/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': req.headers.authorization,
+                    'X-Skip-Credits': 'true'
+                },
+                body: JSON.stringify({ jobId, prompt: promptData.finalPrompt, topic: promptData.finalPrompt })
             }).catch(e => console.error('Content background dispatch error:', e));
         }
 
-        // Update Usage Log with Job ID
-        if (jobId) {
+        // 6. Update log with jobId + duration
+        if (usageLog && jobId) {
             usageLog.resultJobId = jobId;
+            usageLog.generationDurationMs = Date.now() - startTime;
             await usageLog.save();
         }
 
@@ -206,6 +286,12 @@ router.post('/:id/use', protect, async (req, res) => {
 
     } catch (error) {
         console.error('POST /api/templates/:id/use error:', error);
+        if (usageLog) {
+            usageLog.status = 'failed';
+            usageLog.errorMessage = error.message;
+            usageLog.generationDurationMs = Date.now() - startTime;
+            await usageLog.save().catch(() => {});
+        }
         res.status(500).json({ success: false, error: error.message });
     }
 });

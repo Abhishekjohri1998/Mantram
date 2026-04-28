@@ -4,10 +4,15 @@
  * Pure function module: no I/O, no async, fully deterministic.
  * Exports buildAvatarPrompt(options) + all mapping constants.
  *
+ * THREE GENERATION MODES (dispatched by avatar-studio.js routes):
+ *   1. 'structured'   — full option selector (origin, age, gender, clothing, env, lighting)
+ *   2. 'directPrompt' — user writes the full prompt, bypasses all selectors
+ *   3. 'reference'    — reference image + optional directPrompt, routed to multimodal pipeline
+ *
  * RULES enforced here (not in frontend):
- *  1. Fixed prefix: mid-shot, direct eye contact, 9:16 — always applied
- *  2. genderExpression is required — throws if missing
- *  3. No age numbers / banned age terms — stripped via regex
+ *  1. Fixed prefix: mid-shot, direct eye contact, 9:16 — always applied in structured mode
+ *  2. genderExpression is required in structured mode — throws if missing
+ *  3. No age numbers / banned age terms — stripped via regex (structured + directPrompt)
  *  4. No racial terms — ORIGIN_MAP uses appearance descriptors only
  */
 
@@ -68,10 +73,15 @@ export const LIGHTING_MAP = {
 };
 
 // ─── Banned age patterns ──────────────────────────────────────────────────────
-const BANNED_AGE_PATTERNS = /\b(\d+)\s*(?:year[s]?\s*old|yr[s]?\s*old|y\.?o\.?)\b|\b(?:teen(?:age[r]?)?|juvenile|minor|underage|elderly|geriatric|senior\s+citizen)\b/gi;
+const BANNED_AGE_PATTERNS = /\b(\d+)\s*(?:year[s]?\s*old|yr[s]?\s*old|y\.?o\.?)|\b(?:teen(?:age[r]?)?|juvenile|minor|underage|elderly|geriatric|senior\s+citizen)\b/gi;
+
+// ─── Fixed cinematic constraints (applied in structured mode always) ──────────
+const FIXED_PREFIX = 'mid-shot portrait photograph, subject facing directly toward camera with natural direct confident eye contact, 9:16 vertical aspect ratio';
+const FIXED_SUFFIX = 'photorealistic, commercial photography quality, sharp focus on subject face and upper body, professional post-processing, authentic skin texture';
 
 /**
  * Build a photorealistic avatar prompt from structured options.
+ * MODE: 'structured'
  *
  * @param {Object} options
  * @param {string} options.origin          - Key from ORIGIN_MAP
@@ -108,16 +118,12 @@ export function buildAvatarPrompt({
         .substring(0, 200); // hard cap
 
     // Map each option to descriptor (fall back to first available if unknown key)
-    const originDesc     = ORIGIN_MAP[origin]       || ORIGIN_MAP['south-asian'];
-    const ageDesc        = AGE_MAP[ageRange]         || AGE_MAP['adult'];
+    const originDesc     = ORIGIN_MAP[origin]          || ORIGIN_MAP['south-asian'];
+    const ageDesc        = AGE_MAP[ageRange]            || AGE_MAP['adult'];
     const genderDesc     = GENDER_MAP[genderExpression];
-    const clothingDesc   = CLOTHING_MAP[clothingStyle] || CLOTHING_MAP['smart-casual'];
+    const clothingDesc   = CLOTHING_MAP[clothingStyle]  || CLOTHING_MAP['smart-casual'];
     const envDesc        = ENVIRONMENT_MAP[environment] || ENVIRONMENT_MAP['minimalist'];
     const lightingDesc   = LIGHTING_MAP[lightingMood]   || LIGHTING_MAP['natural-daylight'];
-
-    // Rule 1: fixed prefix always applied — cannot be overridden by frontend
-    const FIXED_PREFIX = 'mid-shot portrait photograph, subject facing directly toward camera with natural direct confident eye contact, 9:16 vertical aspect ratio';
-    const FIXED_SUFFIX = 'photorealistic, commercial photography quality, sharp focus on subject face and upper body, professional post-processing, authentic skin texture';
 
     const parts = [
         FIXED_PREFIX,
@@ -137,6 +143,72 @@ export function buildAvatarPrompt({
 }
 
 /**
+ * Build a prompt for directPrompt mode.
+ * MODE: 'directPrompt'
+ *
+ * User-supplied prompt is sanitised (age terms stripped) then wrapped with
+ * the mandatory cinematic suffix so output quality is consistent.
+ * No fixed prefix is applied — user controls the full framing.
+ *
+ * @param {string} directPrompt - User's raw prompt string
+ * @returns {string} Sanitised + suffixed prompt
+ */
+export function buildDirectPrompt(directPrompt = '') {
+    if (!directPrompt.trim()) {
+        const err = new Error('directPrompt cannot be empty');
+        err.status = 400;
+        throw err;
+    }
+
+    const sanitised = directPrompt
+        .replace(BANNED_AGE_PATTERNS, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .substring(0, 1000); // generous cap for creative prompts
+
+    // Append fixed quality suffix (still enforced) but NOT the mid-shot / 9:16 prefix
+    return `${sanitised}. ${FIXED_SUFFIX}`;
+}
+
+/**
+ * Build a prompt for reference image mode.
+ * MODE: 'reference'
+ *
+ * When reference images are provided, the prompt describes what CHANGES to make
+ * relative to the reference — maintaining likeness, changing environment/style.
+ * Routes to laozhangMultimodalImageGenerate (not laozhangImageGenerate).
+ *
+ * @param {string} [referenceDescription] - Optional instruction for the reference
+ * @param {Object} [structuredOptions]    - Optional structured fields to mix in
+ * @returns {string} Reference-mode prompt
+ */
+export function buildReferencePrompt(referenceDescription = '', structuredOptions = {}) {
+    const baseInstruction = referenceDescription.trim()
+        || 'Maintain the exact face and likeness of the person in the reference image.';
+
+    const sanitised = baseInstruction
+        .replace(BANNED_AGE_PATTERNS, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .substring(0, 500);
+
+    // Optionally inject environment or lighting if structured options provided
+    const extras = [];
+    if (structuredOptions.environment && ENVIRONMENT_MAP[structuredOptions.environment]) {
+        extras.push(ENVIRONMENT_MAP[structuredOptions.environment]);
+    }
+    if (structuredOptions.lightingMood && LIGHTING_MAP[structuredOptions.lightingMood]) {
+        extras.push(LIGHTING_MAP[structuredOptions.lightingMood]);
+    }
+    if (structuredOptions.clothingStyle && CLOTHING_MAP[structuredOptions.clothingStyle]) {
+        extras.push(CLOTHING_MAP[structuredOptions.clothingStyle]);
+    }
+
+    const parts = [sanitised, ...extras, FIXED_SUFFIX];
+    return parts.join('. ');
+}
+
+/**
  * Aspect ratio string → pixel dimensions for LaoZhang image generation.
  * LaoZhang /images/generations accepts size as "WIDTHxHEIGHT".
  */
@@ -145,7 +217,63 @@ export const RATIO_TO_SIZE = {
     '1:1':   '1024x1024',  // Square
     '16:9':  '1792x1024',  // Landscape
     '4:5':   '1024x1280',  // Instagram portrait
-    '3:4':   '1024x1365',  // Tall landscape
+    '3:4':   '1024x1365',  // Tall portrait
 };
 
-export default { buildAvatarPrompt, ORIGIN_MAP, AGE_MAP, GENDER_MAP, CLOTHING_MAP, ENVIRONMENT_MAP, LIGHTING_MAP, RATIO_TO_SIZE };
+export default { buildAvatarPrompt, buildDirectPrompt, buildReferencePrompt, ORIGIN_MAP, AGE_MAP, GENDER_MAP, CLOTHING_MAP, ENVIRONMENT_MAP, LIGHTING_MAP, RATIO_TO_SIZE };
+
+/*
+================================================================================
+STEP 12 — EXAMPLE INPUTS + EXPECTED OUTPUTS (documentation, not executable code)
+================================================================================
+
+── MODE: structured ──────────────────────────────────────────────────────────
+
+Input:
+  origin: 'south-asian', gender: 'feminine', ageRange: 'adult',
+  clothingStyle: 'smart-casual', environment: 'office', lightingMood: 'natural-daylight',
+  additionalDetails: 'red dupatta'
+
+Expected output (roughly):
+  "mid-shot portrait photograph, subject facing directly toward camera with natural direct
+  confident eye contact, 9:16 vertical aspect ratio. feminine presenting, late-twenties to
+  thirties appearance, confident composed bearing, professional maturity, South Asian features,
+  warm golden-brown complexion, expressive dark eyes, defined brow architecture. smart-casual
+  attire — neat collared shirt or tailored blouse, clean well-fitted trousers. sleek contemporary
+  open-plan office background, panoramic window light flooding in, modern desk and city view in
+  soft focus. soft diffused natural daylight, gentle window-direction key illumination, clean
+  even exposure. red dupatta. photorealistic, commercial photography quality, sharp focus on
+  subject face and upper body, professional post-processing, authentic skin texture"
+
+── MODE: directPrompt ────────────────────────────────────────────────────────
+
+Input:
+  directPrompt: "A confident Indian woman in a red saree standing on a rooftop at sunset with city skyline behind her"
+
+Expected output:
+  "A confident Indian woman in a red saree standing on a rooftop at sunset with city skyline
+  behind her. photorealistic, commercial photography quality, sharp focus on subject face and
+  upper body, professional post-processing, authentic skin texture"
+
+Note: no mid-shot/9:16 prefix — user controls framing in directPrompt mode.
+Banned age patterns ("23 years old", "teenage") would be stripped before output.
+
+── MODE: reference ───────────────────────────────────────────────────────────
+
+Input:
+  referenceImageUrls: ['https://s3.../ref-face.jpg']
+  referenceDescription: 'Keep exact face and skin tone. Change to a minimalist white studio background with professional business attire.'
+  structuredOptions: { environment: 'minimalist', lightingMood: 'studio-bright' }
+
+Expected prompt sent to laozhangMultimodalImageGenerate():
+  "Keep exact face and skin tone. Change to a minimalist white studio background with
+  professional business attire. clean seamless studio backdrop, neutral warm-white gradient,
+  professional high-key photography studio setup. clean high-key studio lighting, twin softbox
+  setup, bright even commercial light, no harsh shadows. photorealistic, commercial photography
+  quality, sharp focus on subject face and upper body, professional post-processing, authentic
+  skin texture"
+
+The reference image is passed as imageUrls[0] to the multimodal endpoint.
+The LaoZhang client pre-fetches it server-side to avoid CDN 403 blocks.
+================================================================================
+*/

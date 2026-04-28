@@ -84,10 +84,31 @@ router.delete('/categories/:id', protect, superadmin, async (req, res) => {
 // TEMPLATES
 // ==========================================
 
+// GET all templates (admin view — includes ALL fields including savedPrompt + studioSection)
 router.get('/', protect, superadmin, async (req, res) => {
     try {
-        const templates = await Template.find().sort({ sortOrder: 1 });
-        res.json({ success: true, templates });
+        const { studioSection, isPublished, isActive, search } = req.query;
+        const filter = {};
+        if (studioSection) filter.studioSection = studioSection;
+        if (isPublished !== undefined) filter.isPublished = isPublished === 'true';
+        if (isActive !== undefined) filter.isActive = isActive === 'true';
+        if (search) filter.$or = [
+            { name: { $regex: search, $options: 'i' } },
+            { tags: { $regex: search, $options: 'i' } },
+        ];
+
+        const templates = await Template.find(filter)
+            .sort({ studioSection: 1, usageCount: -1, createdAt: -1 })
+            .populate('categoryId', 'name color iconEmoji')
+            .lean();
+
+        // Step 6: Add isBrandAware label for admin view too
+        const enriched = templates.map(t => ({
+            ...t,
+            isBrandAware: !!(t.promptTemplate && (t.promptTemplate.includes('{brand}') || t.promptTemplate.includes('{product}'))),
+        }));
+
+        res.json({ success: true, templates: enriched, count: enriched.length });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -104,8 +125,12 @@ router.post('/', protect, superadmin, async (req, res) => {
 
 router.post('/upload', protect, superadmin, upload.single('file'), async (req, res) => {
     try {
-        const { name, categoryId, description, tags, savedPrompt, studioOrigin, isFeatured, isActive } = req.body;
-        
+        const {
+            name, categoryId, description, tags, savedPrompt, studioOrigin,
+            isFeatured, isActive, isPublished,
+            studioSection, promptTemplate, generationModel,
+        } = req.body;
+
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'Media file is required' });
         }
@@ -130,10 +155,15 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             tags: parsedTags,
             savedPrompt,
             studioOrigin,
+            studioSection: studioSection || 'general',
+            promptTemplate: promptTemplate || '',
+            generationModel: generationModel || 'gpt-image-2',
             previewUrl,
+            previewImageUrl: previewUrl, // Step 8: always populate both
             previewType,
             isFeatured: isFeatured === 'true' || isFeatured === true,
             isActive: isActive === 'true' || isActive === true,
+            isPublished: isPublished === 'true' || isPublished === true,
             createdBy: req.user._id
         });
 
@@ -169,12 +199,31 @@ router.put('/reorder', protect, superadmin, async (req, res) => {
 
 router.put('/:id', protect, superadmin, async (req, res) => {
     try {
-        // Prevent editing savedPrompt in standard update route
+        // savedPrompt is immutable — block any attempt to change it here
         if (req.body.savedPrompt !== undefined) {
             return res.status(400).json({ success: false, error: 'savedPrompt is immutable after creation. Create a new template to change the prompt.' });
         }
-        const updateData = { ...req.body };
-        
+
+        // Step 6: allow studioSection, isPublished, promptTemplate, generationModel updates
+        const ALLOWED_UPDATES = [
+            'name', 'description', 'tags', 'categoryId', 'studioOrigin', 'studioSection',
+            'isActive', 'isPublished', 'isFeatured',
+            'previewUrl', 'previewImageUrl', 'previewType',
+            'promptTemplate', 'generationModel', 'generationParams',
+            'sortOrder',
+        ];
+        const updateData = {};
+        for (const key of ALLOWED_UPDATES) {
+            if (req.body[key] !== undefined) updateData[key] = req.body[key];
+        }
+
+        // Step 8: keep previewUrl and previewImageUrl in sync
+        if (updateData.previewUrl && !updateData.previewImageUrl) {
+            updateData.previewImageUrl = updateData.previewUrl;
+        } else if (updateData.previewImageUrl && !updateData.previewUrl) {
+            updateData.previewUrl = updateData.previewImageUrl;
+        }
+
         const template = await Template.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
         if (!template) return res.status(404).json({ success: false, error: 'Not found' });
         res.json({ success: true, template });
@@ -274,30 +323,35 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/promote-from-generated', protect, superadmin, async (req, res) => {
     try {
-        const { name, categoryId, description, tags, studioOrigin, previewUrl, savedPrompt } = req.body;
+        const {
+            name, categoryId, description, tags, studioOrigin,
+            previewUrl, savedPrompt,
+            studioSection, promptTemplate, generationModel, generationParams,
+        } = req.body;
 
-        if (!previewUrl) {
-            return res.status(400).json({ success: false, error: 'previewUrl is required (S3 URL of generated image)' });
-        }
-        if (!savedPrompt) {
-            return res.status(400).json({ success: false, error: 'savedPrompt is required' });
-        }
-        if (!name || !name.trim()) {
-            return res.status(400).json({ success: false, error: 'Template name is required' });
-        }
+        if (!previewUrl) return res.status(400).json({ success: false, error: 'previewUrl is required (S3 URL of generated image)' });
+        if (!savedPrompt) return res.status(400).json({ success: false, error: 'savedPrompt is required' });
+        if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Template name is required' });
+
+        // Step 8: guarantee both previewUrl and previewImageUrl are populated
+        const canonicalUrl = previewUrl;
 
         const template = await Template.create({
             name: name.trim(),
             categoryId: categoryId || null,
             description: description || '',
             tags: Array.isArray(tags) ? tags : [],
-            studioOrigin: studioOrigin || 'avatar',
-            previewUrl,
-            previewMediaUrl: previewUrl,      // field used by TemplateManager grid
-            previewMediaType: 'image',
+            studioOrigin: studioOrigin || 'creative',
+            studioSection: studioSection || 'general',
+            promptTemplate: promptTemplate || '',
+            generationModel: generationModel || 'gpt-image-2',
+            generationParams: generationParams || {},
+            previewUrl: canonicalUrl,
+            previewImageUrl: canonicalUrl, // Step 8: both fields populated
             previewType: 'image',
             savedPrompt,
-            isActive: false,        // Admin must explicitly activate — safety gate
+            isActive: false,  // Admin must activate
+            isPublished: false,
             isFeatured: false,
             createdBy: req.user._id,
         });
