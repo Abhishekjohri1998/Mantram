@@ -32,9 +32,30 @@ const templateUsageLogSchema = new mongoose.Schema({
     },
     resultJobType: {
         type: String
+    },
+    // ── Generation outcome tracking ───────────────────────────────────────────
+    status: {
+        type: String,
+        enum: ['success', 'failed'],
+        default: 'success'
+    },
+    errorMessage: {
+        type: String,
+        default: ''
+    },
+    // The S3 URL of the generated image if status = success
+    resultS3Url: {
+        type: String,
+        default: ''
+    },
+    // Generation duration in milliseconds
+    generationDurationMs: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 
 templateUsageLogSchema.index({ templateId: 1, userId: 1, createdAt: -1 });
+templateUsageLogSchema.index({ status: 1, createdAt: -1 });
 
 export default mongoose.model('TemplateUsageLog', templateUsageLogSchema);

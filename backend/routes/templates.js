@@ -10,11 +10,12 @@ import { internalGenerateCreative } from './creatives.js';
 
 const router = express.Router();
 
-// Get active templates
+// Get active published templates (user-facing browse)
 router.get('/', protect, async (req, res) => {
     try {
         const { limit = 50, page = 1, categoryId, studioOrigin, search } = req.query;
-        const filter = { isActive: true };
+        // Users only see templates that are BOTH active (not deleted) AND published
+        const filter = { isActive: true, isPublished: true };
 
         if (categoryId) filter.categoryId = categoryId;
         if (studioOrigin) filter.studioOrigin = studioOrigin;
@@ -28,6 +29,7 @@ router.get('/', protect, async (req, res) => {
         }
 
         const templates = await Template.find(filter)
+            .select('-savedPrompt -promptTemplate -generationParams') // BUG-04 FIX: never expose proprietary prompt
             .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
             .skip((parseInt(page) - 1) * parseInt(limit))
             .limit(parseInt(limit))
@@ -65,8 +67,11 @@ router.post('/:id/use', protect, async (req, res) => {
             return res.status(404).json({ success: false, error: 'Template not found or inactive' });
         }
 
-        const { userInputs = {} } = req.body;
-        const { userPrompt, userProductImageBase64, userAvatarImageBase64, settings } = userInputs;
+    const { userInputs = {} } = req.body;
+        // BUG-03 FIX: Accept S3 URL strings — never accept base64
+        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandToggle, brandId } = userInputs;
+        const userProductImageBase64 = null;  // deprecated — always null
+        const userAvatarImageBase64 = null;   // deprecated — always null
 
         // 1. Build Prompt
         const promptData = await buildTemplatePrompt({

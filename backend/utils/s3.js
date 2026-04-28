@@ -90,63 +90,83 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
 };
 
 /**
- * Ensures a string is a publicly accessible URL.
- * If it's a base64 string, it uploads it to S3 and returns the S3 URL.
- * If it's already a URL, it returns it as is.
+ * Ensures a string is a permanently accessible S3 URL.
+ *
+ * Handles three input types:
+ *   1. Already an S3 URL from our bucket → return as-is, no processing
+ *   2. Base64 data URI (data:image/...) → decode buffer, upload to S3, return S3 URL
+ *   3. Provider URL (fal, openai, laozhang, replicate, etc.) → fetch and mirror to S3
+ *
  * @param {string} input - The URL or base64 string
  * @param {string} folder - The S3 folder/prefix (default: 'video-studio/assets')
- * @returns {Promise<string>} - The S3 URL or original URL
+ * @returns {Promise<string>} - Always returns a stable S3 URL (or original on catastrophic failure)
  */
 export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
     if (!input || typeof input !== 'string') return input;
-    
-    // Bypass if already an S3 URL from our bucket
-    if (input.includes('mantram-media-assets.s3') || input.includes('mantram.ai/api/video/stream')) {
+
+    // ── Type 1: Already our S3 URL — return unchanged ────────────────────────
+    if (
+        input.includes('mantram-media-assets.s3') ||
+        input.includes('mantram.ai/api/video/stream') ||
+        (input.includes('.amazonaws.com') && input.includes(config.aws.bucket))
+    ) {
         return input;
     }
-    
-    if (!input.startsWith('data:')) return input; // Already a URL (probably external)
+
+    // ── Type 2: Base64 data URI — decode and upload to S3 ────────────────────
+    if (input.startsWith('data:')) {
+        try {
+            const mimeMatch = input.match(/^data:([\w/+]+);base64,/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+            const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+            const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+            console.log(`📤 ensureS3Url: Uploading base64 to S3: ${filename}`);
+            return await uploadToS3(input, filename, mimeType);
+        } catch (e) {
+            console.error(`❌ ensureS3Url base64 S3 upload failed: ${e.message}`);
+            return input;
+        }
+    }
+
+    // ── Type 3: External/provider URL — mirror to S3 ─────────────────────────
+    if (!input.startsWith('http')) return input; // relative or unknown — return unchanged
+
+    const PROVIDER_DOMAINS = [
+        'fal.media', 'fal.run', 'fal.ai',
+        'oaidalleapiprodscus.blob.core.windows.net',
+        'openai.com',
+        'laozhang.ai',
+        'replicate.delivery', 'pbxt.replicate.delivery',
+        'ideogram.ai',
+        'stability.ai',
+        'cdn.midjourney.com',
+        'firebasestorage.googleapis.com',
+        'storage.googleapis.com',
+    ];
+
+    const isProviderUrl = PROVIDER_DOMAINS.some(domain => input.includes(domain));
+    if (!isProviderUrl) {
+        // Unknown external URL — return unchanged (user CDN, blob storage, etc.)
+        return input;
+    }
 
     try {
-        const mimeMatch = input.match(/^data:([\w/+]+);base64,/);
-        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
-        const ext = mimeType.includes('png') ? 'png' : 'jpg';
-        const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-
-        console.log(`📤 ensureS3Url: Uploading base64 to S3: ${filename}`);
-        return await uploadToS3(input, filename, mimeType);
-    } catch (e) {
-        console.error(`❌ ensureS3Url S3 upload failed: ${e.message}`);
-        console.log(`🔄 Falling back to freeimage.host anonymous storage...`);
-        
-        try {
-            const base64Data = input.split(",")[1];
-            if (base64Data) {
-                const formData = new FormData();
-                formData.append('source', base64Data);
-                formData.append('key', '6d207e02198a847aa98d0a2a901485a5'); // Public anonymous key
-                
-                const resp = await fetch('https://freeimage.host/api/1/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data?.image?.url) {
-                        console.log(`✅ FreeImage fallback successful: ${data.image.url}`);
-                        return data.image.url;
-                    }
-                } else {
-                    console.error(`❌ FreeImage fallback failed: ${await resp.text()}`);
-                }
-            }
-        } catch (fallbackErr) {
-            console.error(`❌ FreeImage fallback exception: ${fallbackErr.message}`);
+        const ext = input.includes('.webp') ? 'webp' : input.includes('.png') ? 'png' : 'jpg';
+        const targetKey = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+        console.log(`🔁 ensureS3Url: Mirroring provider URL to S3: ${input.substring(0, 80)}...`);
+        const mirrored = await mirrorUrlToS3(input, targetKey);
+        if (mirrored) {
+            console.log(`✅ ensureS3Url: Mirrored → ${mirrored.substring(0, 80)}`);
+            return mirrored;
         }
-        
-        return input; // Absolute fallback to original base64
+        console.warn(`⚠️ ensureS3Url: Mirror failed, returning original URL`);
+        return input;
+    } catch (e) {
+        console.error(`❌ ensureS3Url provider mirror failed: ${e.message}`);
+        return input;
     }
 };
+
 
 /**
  * Generates a pre-signed URL for a given S3 key or full S3 URL.

@@ -277,10 +277,8 @@ router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, 
         const successCount = variants.filter(v => !v.failed).length;
         console.log(`✅ [AvatarStudio] ${successCount}/3 variants succeeded`);
 
-        const optionsForSave = { origin, genderExpression, clothingStyle, _prompt: finalPrompt };
-        variants.filter(v => !v.failed && v.url).forEach(v => {
-            autoSaveAvatar(v.url, optionsForSave, req.user._id);
-        });
+        // Step 5 fix: do NOT auto-save all variants — user must select one variant and call /save
+        // autoSaveAvatar removed: saves happened before user selection, wasting Avatar records
 
         if (successCount === 0) {
             return res.status(502).json({ success: false, error: 'All 3 variants failed. Check LaoZhang API key and quota.', variants });
@@ -367,6 +365,103 @@ router.post('/admin/generate', protect, superadmin, async (req, res) => {
         });
     } catch (err) {
         console.error('❌ [AvatarStudio/Admin] error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/avatar-studio/library
+// Returns: { myAvatars: [...], publicAvatars: [...] }
+// myAvatars = user's own generated/uploaded avatars
+// publicAvatars = superadmin-published library avatars (visible to all users)
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/library', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const [myAvatars, publicAvatars] = await Promise.all([
+            Avatar.find({ createdBy: userId, isActive: true })
+                .select('name imageUrl resolution frameType generationMode source createdAt')
+                .sort({ createdAt: -1 })
+                .limit(100)
+                .lean(),
+            Avatar.find({ createdByRole: 'superadmin', isPublished: true, isActive: true })
+                .select('name imageUrl resolution frameType generationMode isFeatured')
+                .sort({ isFeatured: -1, createdAt: -1 })
+                .limit(50)
+                .lean(),
+        ]);
+        res.json({ success: true, myAvatars, publicAvatars });
+    } catch (err) {
+        console.error('❌ [AvatarStudio] /library error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/avatar-studio/save
+// Saves the user-selected avatar variant after generation.
+// BUG-05 + BUG-17 FIX: name is REQUIRED. Only the selected variant is saved.
+// Body: { name, selectedUrl, generationMode, promptUsed, referenceImageUrl,
+//         createdByRole, modelUsed, options }
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/save', protect, async (req, res) => {
+    try {
+        const {
+            name,
+            selectedUrl,
+            generationMode = 'structured',
+            promptUsed = '',
+            referenceImageUrl = '',
+            createdByRole = 'user',
+            modelUsed = DEFAULT_MODEL,
+            isPublished = false,
+            options = {},
+        } = req.body;
+
+        // BUG-05 FIX: name is required — hard block before Mongoose validation fires
+        const trimmedName = (name || '').trim();
+        if (!trimmedName) {
+            return res.status(400).json({
+                success: false,
+                error: 'Avatar name is required. Give this avatar a name before saving.',
+            });
+        }
+
+        if (!selectedUrl || !selectedUrl.startsWith('http')) {
+            return res.status(400).json({
+                success: false,
+                error: 'selectedUrl must be a valid S3 URL.',
+            });
+        }
+
+        // Only superadmins can set createdByRole to superadmin or isPublished to true
+        const effectiveRole = (req.user.role === 'superadmin' && createdByRole === 'superadmin') ? 'superadmin' : 'user';
+        const effectivePublished = effectiveRole === 'superadmin' ? !!isPublished : false;
+
+        const avatar = await Avatar.create({
+            name: trimmedName,
+            imageUrl: selectedUrl,
+            gender: mapGenderEnum(options.genderExpression),
+            isTemplate: effectiveRole === 'superadmin', // legacy flag for backwards compat
+            isActive: true,
+            source: 'generated',
+            generatedFromPrompt: promptUsed,
+            createdBy: req.user._id,
+            // New fields
+            createdByRole: effectiveRole,
+            isPublished: effectivePublished,
+            generationMode,
+            referenceImageUrl,
+            promptUsed,
+            modelUsed,
+            frameType: 'mid_shot',
+            resolution: '9:16',
+        });
+
+        console.log(`✅ [AvatarStudio] Avatar saved: ${avatar._id} | name=${trimmedName} | role=${effectiveRole} | published=${effectivePublished}`);
+        res.json({ success: true, avatar });
+    } catch (err) {
+        console.error('❌ [AvatarStudio] /save error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });

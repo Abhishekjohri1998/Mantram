@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect, superadmin } from '../middleware/auth.js';
-import { uploadToS3 } from '../utils/s3.js';
+import { uploadToS3, ensureS3Url } from '../utils/s3.js';
 import TemplateCategory from '../models/TemplateCategory.js';
 import Template from '../models/Template.js';
 import VideoProject from '../models/VideoProject.js';
@@ -221,7 +221,9 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
             const project = await VideoProject.findById(sourceJobId);
             if (!project) return res.status(404).json({ success: false, error: 'VideoProject not found' });
             extractedPrompt = project.backendPrompt || project.advancedConfig?.prompt;
-            previewUrl = project.resultVideoUrl || project.posterUrl || '';
+            // BUG-02 FIX: mirror video poster/thumbnail to S3 before storing
+            const rawPosterUrl = project.posterUrl || '';
+            previewUrl = rawPosterUrl ? await ensureS3Url(rawPosterUrl, `templates/preview-${Date.now()}.jpg`) : (project.resultVideoUrl || '');
             previewType = 'video';
             sourceJobId = project._id; // Ensure it's an ObjectId
         } else if (sourceType === 'GenerationJob') {
@@ -230,7 +232,9 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
             if (!job) job = await GenerationJob.findById(sourceJobId);
             if (!job) return res.status(404).json({ success: false, error: 'GenerationJob not found' });
             extractedPrompt = job.prompt;
-            previewUrl = job.imageUrl || '';
+            // BUG-02 FIX: mirror job.imageUrl to S3 before storing (may be provider URL that expires)
+            const rawJobUrl = job.imageUrl || '';
+            previewUrl = rawJobUrl ? await ensureS3Url(rawJobUrl, `templates/preview-${Date.now()}.webp`) : '';
             previewType = 'image';
             sourceJobId = job._id; // Ensure it's an ObjectId
         } else {
@@ -248,11 +252,13 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
             tags,
             studioOrigin,
             previewUrl,
+            previewImageUrl: previewUrl, // canonical S3 field — always mirrors previewUrl
             previewType,
             savedPrompt: extractedPrompt,
             sourceJobId,
             sourceJobType: sourceType,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            isActive: false, // requires admin to activate after review
         });
 
         res.json({ success: true, template });

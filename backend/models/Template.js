@@ -17,6 +17,12 @@ const templateSchema = new mongoose.Schema({
         enum: ['creative', 'video', 'content'],
         required: true
     },
+    // ── Studio Section — scopes which studio section shows this template ──────
+    studioSection: {
+        type: String,
+        enum: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'avatar', 'video_ugc', 'video_qads', 'general'],
+        default: 'general'
+    },
     description: {
         type: String,
         maxlength: 200
@@ -25,9 +31,15 @@ const templateSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
+    // previewUrl kept for backwards compatibility — previewImageUrl is canonical
     previewUrl: {
         type: String,
         required: true
+    },
+    // ── Canonical preview field — always an S3 URL ───────────────────────────
+    previewImageUrl: {
+        type: String,
+        default: ''
     },
     previewType: {
         type: String,
@@ -37,6 +49,11 @@ const templateSchema = new mongoose.Schema({
     savedPrompt: {
         type: String,
         required: true
+    },
+    // ── Parameterized prompt with {product_name}, {brand_color} placeholders ─
+    promptTemplate: {
+        type: String,
+        default: ''
     },
     savedBrief: {
         type: String
@@ -50,7 +67,23 @@ const templateSchema = new mongoose.Schema({
     savedGenerationSource: {
         type: String
     },
+    // ── Model that created the preview — replayed on user generation ──────────
+    generationModel: {
+        type: String,
+        default: 'gpt-image-2'
+    },
+    // ── Params used at generation time (aspectRatio, size string, etc.) ───────
+    generationParams: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+    },
+    // ── isActive = soft-delete flag. isPublished = user-visibility flag. ──────
+    // Users see templates only when BOTH isActive: true AND isPublished: true.
     isActive: {
+        type: Boolean,
+        default: false
+    },
+    isPublished: {
         type: Boolean,
         default: false
     },
@@ -59,6 +92,11 @@ const templateSchema = new mongoose.Schema({
         default: false
     },
     usageCount: {
+        type: Number,
+        default: 0
+    },
+    // ── Unique user count (incremented once per user per template) ────────────
+    usedByCount: {
         type: Number,
         default: 0
     },
@@ -75,6 +113,7 @@ const templateSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Immutability guard — savedPrompt cannot change after creation
 templateSchema.pre('save', function() {
     if (!this.isNew && this.isModified('savedPrompt')) {
         const error = new Error('savedPrompt is immutable after creation. Create a new template to change the prompt.');
@@ -83,10 +122,24 @@ templateSchema.pre('save', function() {
     }
 });
 
+// Sync previewImageUrl ← previewUrl on save if canonical field is empty
+templateSchema.pre('save', function() {
+    if (!this.previewImageUrl && this.previewUrl) {
+        this.previewImageUrl = this.previewUrl;
+    }
+    if (!this.previewUrl && this.previewImageUrl) {
+        this.previewUrl = this.previewImageUrl;
+    }
+});
+
+// Existing indexes
 templateSchema.index({ categoryId: 1 });
 templateSchema.index({ studioOrigin: 1 });
 templateSchema.index({ isActive: 1 });
 templateSchema.index({ isFeatured: 1 });
 templateSchema.index({ usageCount: -1 });
+
+// ── Compound index for section-scoped template queries (Step 9) ───────────────
+templateSchema.index({ studioSection: 1, isPublished: 1, isActive: 1 });
 
 export default mongoose.model('Template', templateSchema);

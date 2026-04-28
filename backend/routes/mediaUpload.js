@@ -10,6 +10,7 @@
  */
 import { Router } from 'express';
 import axios from 'axios';
+import multer from 'multer';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath, getObjectStream, s3Client } from '../utils/s3.js';
@@ -179,6 +180,43 @@ router.post('/presign-upload', protect, async (req, res) => {
     } catch (error) {
         console.error('Presign upload error:', error);
         res.status(500).json({ success: false, error: `Presign failed: ${error.message}` });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/media/image-reference — Multipart file upload for template/avatar refs
+// BUG-03 FIX: Frontend calls this BEFORE generation to pre-upload to S3.
+// Returns { url: S3_URL } — caller sends the URL in the generation body, never base64.
+const refUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+    fileFilter: (req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: jpg, png, webp, gif`));
+    }
+});
+
+router.post('/image-reference', protect, refUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded. Include a "file" field in FormData.' });
+        }
+
+        const { buffer, mimetype, originalname } = req.file;
+        const ext = originalname.split('.').pop()?.toLowerCase() || 'jpg';
+        const safeExt = ['jpg','jpeg','png','webp','gif'].includes(ext) ? ext : 'jpg';
+        const s3Key = `user-uploads/${req.user._id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${safeExt}`;
+
+        console.log(`📤 [image-reference] Uploading ${Math.round(buffer.length / 1024)}KB → ${s3Key}`);
+
+        const s3Url = await uploadToS3(buffer, s3Key, mimetype);
+        console.log(`✅ [image-reference] Uploaded: ${s3Url}`);
+
+        res.json({ success: true, url: s3Url });
+    } catch (error) {
+        console.error('image-reference upload error:', error);
+        res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
     }
 });
 
