@@ -81,7 +81,7 @@ const templateSchema = new mongoose.Schema({
     // Users see templates only when BOTH isActive: true AND isPublished: true.
     isActive: {
         type: Boolean,
-        default: false
+        default: true
     },
     isPublished: {
         type: Boolean,

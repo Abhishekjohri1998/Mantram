@@ -4613,31 +4613,8 @@ function AdminImageStudio() {
     )
 }
 
-// ─── AVATAR ADMIN WRAPPER ─────────────────────────────────────────────────────
-function AvatarAdmin() {
-    const [tab, setTab] = React.useState('generate')
-    const tabs = [
-        { id:'generate', label:'Image Studio',    icon:'auto_awesome' },
-        { id:'library',  label:'Avatar Library',  icon:'grid_view' },
-    ]
-    return (
-        <div>
-            {/* Tab row */}
-            <div style={{ display:'flex', gap:2, marginBottom:24, borderBottom:'1px solid rgba(255,255,255,0.07)', paddingBottom:0 }}>
-                {tabs.map(t=>(
-                    <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 18px', border:'none', borderBottom:`2px solid ${tab===t.id?'#6366f1':'transparent'}`, background:'transparent', color:tab===t.id?'#a5b4fc':'rgba(255,255,255,0.35)', fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s', marginBottom:-1 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:17 }}>{t.icon}</span>{t.label}
-                    </button>
-                ))}
-            </div>
-            {tab==='generate' && <AdminImageStudio />}
-            {tab==='library'  && <AvatarLibraryAdmin />}
-        </div>
-    )
-}
-
 // ─── AVATAR LIBRARY ADMIN ────────────────────────────────────────────────────
-// Shows all avatars (publicAvatars + myAvatars) with publish/delete/promote controls
+// Defined here — BEFORE AvatarAdmin which uses it — satisfying definition-before-use rule
 function AvatarLibraryAdmin() {
     const apiBase = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
     const getToken = () => localStorage.getItem('mantram_token')
@@ -4673,7 +4650,7 @@ function AvatarLibraryAdmin() {
     const doAction = async (avatarId, action) => {
         setBusy(p => ({ ...p, [avatarId]: action }))
         try {
-            let url, method = 'POST', body = null
+            let url, method = 'POST'
             if (action === 'delete') {
                 url = `${apiBase}/video-studio/ugc-pro/avatars/${avatarId}`
                 method = 'DELETE'
@@ -4685,11 +4662,10 @@ function AvatarLibraryAdmin() {
             const r = await fetch(url, {
                 method,
                 headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-                body: body ? JSON.stringify(body) : undefined,
             })
             const d = await r.json()
             if (!d.success) throw new Error(d.error || `${action} failed`)
-            notify(`✓ ${action} complete`)
+            notify(`\u2713 ${action} complete`)
             load()
         } catch (e) { notify(e.message, 'err') }
         setBusy(p => { const n = { ...p }; delete n[avatarId]; return n })
@@ -4704,8 +4680,6 @@ function AvatarLibraryAdmin() {
             {toast && (
                 <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999, padding: '12px 20px', borderRadius: 12, fontSize: 13, fontWeight: 700, background: toast.type === 'err' ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)', border: `1px solid ${toast.type === 'err' ? 'rgba(239,68,68,0.25)' : 'rgba(99,102,241,0.25)'}`, color: toast.type === 'err' ? '#f87171' : '#a5b4fc', backdropFilter: 'blur(12px)', pointerEvents: 'none' }}>{toast.msg}</div>
             )}
-
-            {/* Filter bar */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center' }}>
                 {[
                     { id: 'all', label: `All (${avatars.length})` },
@@ -4722,7 +4696,6 @@ function AvatarLibraryAdmin() {
                     <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span> Refresh
                 </button>
             </div>
-
             {loading && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
                     {[...Array(12)].map((_, i) => (
@@ -4730,14 +4703,12 @@ function AvatarLibraryAdmin() {
                     ))}
                 </div>
             )}
-
             {!loading && filtered.length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.25)', gap: 10 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 44 }}>person_off</span>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>No avatars in this view</div>
                 </div>
             )}
-
             {!loading && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
                     {filtered.map(avatar => (
@@ -4745,29 +4716,23 @@ function AvatarLibraryAdmin() {
                             {avatar.imageUrl && (
                                 <img src={avatar.imageUrl} alt={avatar.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                             )}
-
-                            {/* Public badge */}
                             {avatar._isPublic && (
                                 <div style={{ position: 'absolute', top: 6, left: 6, padding: '2px 7px', borderRadius: 20, fontSize: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, background: 'rgba(20,184,166,0.82)', color: '#fff', backdropFilter: 'blur(4px)' }}>
                                     Published
                                 </div>
                             )}
-
-                            {/* Action overlay */}
                             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', padding: '24px 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>
                                     {avatar.name || 'Untitled'}
                                 </div>
                                 <div style={{ display: 'flex', gap: 4 }}>
-                                    {/* Publish / Unpublish toggle */}
                                     <button
                                         onClick={() => doAction(avatar._id, avatar._isPublic ? 'unpublish' : 'publish')}
                                         disabled={!!busy[avatar._id]}
                                         style={{ flex: 1, background: avatar._isPublic ? 'rgba(239,68,68,0.2)' : 'rgba(20,184,166,0.22)', border: 'none', borderRadius: 6, color: avatar._isPublic ? '#f87171' : '#2dd4bf', fontSize: 9, fontWeight: 800, cursor: 'pointer', padding: '4px 0', textTransform: 'uppercase', letterSpacing: 0.5 }}
                                     >
-                                        {busy[avatar._id] === (avatar._isPublic ? 'unpublish' : 'publish') ? '…' : (avatar._isPublic ? 'Unpublish' : 'Publish')}
+                                        {busy[avatar._id] === (avatar._isPublic ? 'unpublish' : 'publish') ? '\u2026' : (avatar._isPublic ? 'Unpublish' : 'Publish')}
                                     </button>
-                                    {/* Delete */}
                                     <button
                                         onClick={() => { if (confirm('Delete this avatar?')) doAction(avatar._id, 'delete') }}
                                         disabled={!!busy[avatar._id]}
@@ -4782,6 +4747,28 @@ function AvatarLibraryAdmin() {
                 </div>
             )}
             <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+        </div>
+    )
+}
+
+// ─── AVATAR ADMIN WRAPPER ─────────────────────────────────────────────────────
+function AvatarAdmin() {
+    const [tab, setTab] = React.useState('generate')
+    const tabs = [
+        { id:'generate', label:'Image Studio',    icon:'auto_awesome' },
+        { id:'library',  label:'Avatar Library',  icon:'grid_view' },
+    ]
+    return (
+        <div>
+            <div style={{ display:'flex', gap:2, marginBottom:24, borderBottom:'1px solid rgba(255,255,255,0.07)', paddingBottom:0 }}>
+                {tabs.map(t=>(
+                    <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 18px', border:'none', borderBottom:`2px solid ${tab===t.id?'#6366f1':'transparent'}`, background:'transparent', color:tab===t.id?'#a5b4fc':'rgba(255,255,255,0.35)', fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s', marginBottom:-1 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:17 }}>{t.icon}</span>{t.label}
+                    </button>
+                ))}
+            </div>
+            {tab==='generate' && <AdminImageStudio />}
+            {tab==='library'  && <AvatarLibraryAdmin />}
         </div>
     )
 }
