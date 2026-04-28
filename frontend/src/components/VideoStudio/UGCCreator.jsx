@@ -679,7 +679,7 @@ export default function UGCCreator({ activeBrand }) {
         try {
             const resp = await fetch('/api/video-studio/ugc/placement-poses', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
                 body: JSON.stringify({ productImageUrl: productImage.s3Url, avatarId: selectedAvatar.avatar_id }),
             })
             const d = await resp.json()

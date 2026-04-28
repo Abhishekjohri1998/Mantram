@@ -5071,7 +5071,7 @@ export default function ContentStudio() {
         setGeneratingStartedAt(Date.now())
 
         const prompt = buildPrompt(settings)
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+        const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
         try {

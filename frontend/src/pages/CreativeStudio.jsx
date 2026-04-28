@@ -1158,7 +1158,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     async function handleDownloadImage(url, filename) {
         if (!url) return
         try {
-            const token = localStorage.getItem('token') || '';
+            const token = localStorage.getItem('mantram_token') || '';
             const proxyUrl = `${API_BASE}/creatives/proxy-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'mantram-creative.png')}`;
             const res = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${token}` }});
             if (!res.ok) throw new Error('Proxy download failed, status ' + res.status);
@@ -1214,7 +1214,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         setCopyLoading(true);
         setCopyIsAiSuggested(false);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('mantram_token');
             const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/creatives/suggest-copy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -8357,7 +8357,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         async function handleDownloadImage(url, title) {
                             if (!url) return;
                             try {
-                                const token = localStorage.getItem('token') || '';
+                                const token = localStorage.getItem('mantram_token') || '';
                                 const filename = `${(title || 'image').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
                                 const proxyUrl = `${API_BASE}/creatives/proxy-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
                                 const resp = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${token}` }});

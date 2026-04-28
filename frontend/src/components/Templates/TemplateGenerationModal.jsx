@@ -14,7 +14,7 @@ async function uploadImageReference(file) {
     formData.append('file', file);
     const res = await fetch('/api/media/image-reference', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
         body: formData,
     });
     if (!res.ok) {

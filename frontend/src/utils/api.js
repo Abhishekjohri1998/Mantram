@@ -1,7 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default async function api(endpoint, options = {}) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('mantram_token');
     const headers = {
         ...options.headers,
     };

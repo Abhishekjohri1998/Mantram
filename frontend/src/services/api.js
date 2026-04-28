@@ -763,7 +763,7 @@ export const brainstormStudio = {
     // Phase 4: SSE streaming version — returns raw fetch Response for caller to stream
     strategyModeStream: (data) => {
         const base = typeof window !== 'undefined' ? (window.__API_BASE__ || import.meta?.env?.VITE_API_URL || 'http://localhost:5001') : 'http://localhost:5001';
-        const token = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : null;
+        const token = typeof window !== 'undefined' ? (localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')) : null;
         return fetch(`${base}/api/brainstorm-studio/strategy-mode/stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
