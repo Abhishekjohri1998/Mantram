@@ -136,6 +136,10 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
         'oaidalleapiprodscus.blob.core.windows.net',
         'openai.com',
         'laozhang.ai',
+        // LaoZhang R2 CDN domains — temporary URLs, must mirror to our S3
+        'r2cdn.copilotbase.com',
+        'copilotbase.com',
+        'r2.dev',
         'replicate.delivery', 'pbxt.replicate.delivery',
         'ideogram.ai',
         'stability.ai',
@@ -149,6 +153,7 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
         // Unknown external URL — return unchanged (user CDN, blob storage, etc.)
         return input;
     }
+
 
     try {
         const ext = input.includes('.webp') ? 'webp' : input.includes('.png') ? 'png' : 'jpg';
