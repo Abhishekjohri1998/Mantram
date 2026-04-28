@@ -7801,35 +7801,82 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <div className="mt-3 space-y-3">
                                             <p className="text-xs text-[var(--sys-text-muted)]">Tell AI what to change — gender, outfit, pose, background, add/remove elements. Our vision engine will intelligently adapt the entire image.</p>
 
-                                            {/* Smart suggestion chips */}
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {[
-                                                    { label: 'Make model male', value: 'Change the model to a male with similar pose and expression', ms: 'face_6' },
-                                                    { label: 'Make model female', value: 'Change the model to a female with similar pose and expression', ms: 'face_3' },
-                                                    { label: 'Formal outfit', value: 'Change outfit to a formal business suit', ms: 'checkroom' },
-                                                    { label: 'Casual outfit', value: 'Change outfit to casual streetwear', ms: 'styler' },
-                                                    { label: 'Outdoor background', value: 'Change background to an outdoor natural environment', ms: 'park' },
-                                                    { label: 'Studio background', value: 'Change background to a clean studio environment', ms: 'domain' },
-                                                    { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme', ms: 'dark_mode' },
-                                                    { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme', ms: 'light_mode' },
-                                                    { label: 'Indian model', value: 'Change the model to an Indian person with similar pose', ms: 'person' },
-                                                    { label: 'Smiling pose', value: 'Change the expression to a warm natural smile', ms: 'sentiment_satisfied' },
-                                                ].map((chip, i) => (
-                                                    <button key={i} onClick={() => {
-                                                        const current = templateFields._additionalInstructions || ''
-                                                        const sep = current ? '. ' : ''
-                                                        setTemplateFields(prev => ({ ...prev, _additionalInstructions: current + sep + chip.value }))
-                                                    }}
-                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-text)] hover:border-[var(--sys-text)] hover:text-[var(--sys-bg)] cursor-pointer transition-all flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[10px]">{chip.ms}</span>{chip.label}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            {/* Smart suggestion chips — toggle with exclusive groups */}
+                                            {(() => {
+                                                const CHIPS = [
+                                                    { label: 'Make model male', value: 'Change the model to a male with similar pose and expression', ms: 'face_6', group: 'gender' },
+                                                    { label: 'Make model female', value: 'Change the model to a female with similar pose and expression', ms: 'face_3', group: 'gender' },
+                                                    { label: 'Formal outfit', value: 'Change outfit to a formal business suit', ms: 'checkroom', group: 'outfit' },
+                                                    { label: 'Casual outfit', value: 'Change outfit to casual streetwear', ms: 'styler', group: 'outfit' },
+                                                    { label: 'Outdoor background', value: 'Change background to an outdoor natural environment', ms: 'park', group: 'bg' },
+                                                    { label: 'Studio background', value: 'Change background to a clean studio environment', ms: 'domain', group: 'bg' },
+                                                    { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme', ms: 'dark_mode', group: 'theme' },
+                                                    { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme', ms: 'light_mode', group: 'theme' },
+                                                    { label: 'Indian model', value: 'Change the model to an Indian person with similar pose', ms: 'person', group: 'ethnicity' },
+                                                    { label: 'Smiling pose', value: 'Change the expression to a warm natural smile', ms: 'sentiment_satisfied', group: 'expression' },
+                                                ];
+                                                const activeChips = templateFields._activeChips || [];
+                                                const toggleChip = (chip) => {
+                                                    setTemplateFields(prev => {
+                                                        const prevActive = prev._activeChips || [];
+                                                        const isActive = prevActive.includes(chip.label);
+                                                        let nextActive;
+                                                        if (isActive) {
+                                                            // Remove this chip
+                                                            nextActive = prevActive.filter(l => l !== chip.label);
+                                                        } else {
+                                                            // Remove any chip from same exclusive group, then add this one
+                                                            const sameGroupLabels = CHIPS.filter(c => c.group === chip.group).map(c => c.label);
+                                                            nextActive = [...prevActive.filter(l => !sameGroupLabels.includes(l)), chip.label];
+                                                        }
+                                                        // Rebuild prompt from active chips + freeform text
+                                                        const chipTexts = nextActive.map(l => CHIPS.find(c => c.label === l)?.value).filter(Boolean);
+                                                        const freeform = (prev._freeformInstructions || '').trim();
+                                                        const combined = [...chipTexts, ...(freeform ? [freeform] : [])].join('. ');
+                                                        return { ...prev, _activeChips: nextActive, _additionalInstructions: combined };
+                                                    });
+                                                };
+                                                return (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {CHIPS.map((chip, i) => {
+                                                            const isActive = activeChips.includes(chip.label);
+                                                            return (
+                                                                <button key={i} onClick={() => toggleChip(chip)}
+                                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-medium cursor-pointer transition-all flex items-center gap-1 ${isActive
+                                                                        ? 'bg-primary text-white border border-primary shadow-sm'
+                                                                        : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-text)] hover:border-[var(--sys-text)] hover:text-[var(--sys-bg)]'}`}>
+                                                                    <span className="material-symbols-outlined text-[10px]">{isActive ? 'check' : chip.ms}</span>{chip.label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Free-form textarea */}
                                             <textarea
-                                                value={templateFields._additionalInstructions || ''}
-                                                onChange={e => setTemplateFields(prev => ({ ...prev, _additionalInstructions: e.target.value }))}
+                                                value={templateFields._freeformInstructions || ''}
+                                                onChange={e => {
+                                                    const freeform = e.target.value;
+                                                    setTemplateFields(prev => {
+                                                        const CHIPS = [
+                                                            { label: 'Make model male', value: 'Change the model to a male with similar pose and expression' },
+                                                            { label: 'Make model female', value: 'Change the model to a female with similar pose and expression' },
+                                                            { label: 'Formal outfit', value: 'Change outfit to a formal business suit' },
+                                                            { label: 'Casual outfit', value: 'Change outfit to casual streetwear' },
+                                                            { label: 'Outdoor background', value: 'Change background to an outdoor natural environment' },
+                                                            { label: 'Studio background', value: 'Change background to a clean studio environment' },
+                                                            { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme' },
+                                                            { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme' },
+                                                            { label: 'Indian model', value: 'Change the model to an Indian person with similar pose' },
+                                                            { label: 'Smiling pose', value: 'Change the expression to a warm natural smile' },
+                                                        ];
+                                                        const chipTexts = (prev._activeChips || []).map(l => CHIPS.find(c => c.label === l)?.value).filter(Boolean);
+                                                        const trimmed = freeform.trim();
+                                                        const combined = [...chipTexts, ...(trimmed ? [trimmed] : [])].join('. ');
+                                                        return { ...prev, _freeformInstructions: freeform, _additionalInstructions: combined };
+                                                    });
+                                                }}
                                                 placeholder="e.g., Change the model to a young man in a blue hoodie, make the background a sunset beach scene, add sunglasses..."
                                                 className="input-glass w-full py-3 text-sm resize-none" rows={3} />
 
@@ -7866,7 +7913,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <span className="material-symbols-outlined text-xs">visibility</span>
                                                         AI Vision will apply these changes
                                                     </span>
-                                                    <button onClick={() => setTemplateFields(prev => ({ ...prev, _additionalInstructions: '' }))}
+                                                    <button onClick={() => setTemplateFields(prev => ({ ...prev, _additionalInstructions: '', _activeChips: [], _freeformInstructions: '' }))}
                                                         className="text-xs text-primary hover:text-[var(--sys-primary)] cursor-pointer ml-auto">Clear</button>
                                                 </div>
                                             )}
