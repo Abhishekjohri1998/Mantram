@@ -122,7 +122,20 @@ async function generateOneVariant(slot, prompt, size, modelKey = DEFAULT_MODEL, 
                     generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
                 }),
                 signal: AbortSignal.timeout(90_000),
+            }).catch(err => {
+                if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
+                    throw new Error('Image generation timed out after 90 seconds. Please try again.');
+                }
+                throw err;
             });
+
+            if (!gemResp.ok) {
+                const errText = await gemResp.text();
+                if (gemResp.status === 429 || gemResp.status === 503) {
+                    throw new Error('Gemini is busy, please try again later.');
+                }
+                throw new Error(`Gemini API error: ${errText}`);
+            }
 
             const gemData = await gemResp.json();
             if (gemData.error) throw new Error(`Gemini: ${gemData.error.message || JSON.stringify(gemData.error)}`);
