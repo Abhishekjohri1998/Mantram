@@ -7846,7 +7846,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                     prompt: `Image modification instructions: ${templateFields._additionalInstructions.trim()}`,
                                                                     style: 'photorealistic',
                                                                     format: 'template-edit',
-                                                                    aspectRatio: templateResolution?.ratio || '1:1',
+                                                                    aspectRatio: templateFields._aspectRatio || aspectRatio || '1:1',
                                                                 })
                                                                 if (data.enhancedPrompt) setTemplateFields(prev => ({ ...prev, _additionalInstructions: data.enhancedPrompt }))
                                                             } catch (err) { console.error('Enhance failed:', err) }
