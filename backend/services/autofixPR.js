@@ -89,9 +89,10 @@ export async function createFixPR(fixResult, errorEvent, options = {}) {
         }
         execGit(appRoot, `commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
 
-        // ── 4. Push branch ────────────────────────────────────────────────
+        // ── 4. Push branch (use PAT-authenticated URL to avoid credential issues) ──
         console.log(`📤 AutoFix: Pushing branch ${branchName}`);
-        execGit(appRoot, `push origin ${branchName}`);
+        const pushUrl = `https://x-access-token:${githubPat}@github.com/${githubRepo}.git`;
+        execGit(appRoot, `push ${pushUrl} ${branchName}`);
 
         // ── 5. Create Pull Request via GitHub API ─────────────────────────
         const prBody = buildPRBody(fixResult, errorEvent, changedFiles);
@@ -132,7 +133,10 @@ function execGit(cwd, cmd) {
     try {
         return execSync(fullCmd, { cwd, timeout: 30000, encoding: 'utf-8', stdio: 'pipe' });
     } catch (err) {
-        throw new Error(`Git command failed: ${fullCmd}\n${err.stderr || err.message}`);
+        // Redact any PAT tokens from error messages to prevent log leakage
+        const safeCmd = fullCmd.replace(/x-access-token:[^@]+@/, 'x-access-token:***@');
+        const safeErr = (err.stderr || err.message || '').replace(/x-access-token:[^@]+@/, 'x-access-token:***@');
+        throw new Error(`Git command failed: ${safeCmd}\n${safeErr}`);
     }
 }
 
