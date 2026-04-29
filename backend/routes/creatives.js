@@ -331,7 +331,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '2K'; // Default to 2K for higher quality template output
+        const imageSize = options?.imageSize || '1K'; // Reverted to 1K: 2K + ref images + long prompts causes 70s Gemini timeouts
         const customSize = options?.customSize || null;
 
         let ratioNum = 1;

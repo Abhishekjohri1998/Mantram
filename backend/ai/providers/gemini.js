@@ -313,7 +313,7 @@ export class GeminiProvider extends BaseProvider {
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 70_000); // 70s per attempt (was 120s — faster fail→retry)
+                    const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s per attempt (accommodates heavy prompts + refs)
                     try {
                         response = await fetch(url, fetchOptions({
                             method: 'POST',
@@ -361,7 +361,7 @@ export class GeminiProvider extends BaseProvider {
                         }
                         
                         // If it's not a retryable error or we exhausted attempts
-                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 70 seconds. Google servers are likely overloaded.');
+                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 90 seconds. Google servers are likely overloaded.');
                         throw attemptErr;
                     } finally {
                         clearTimeout(timeoutId);
