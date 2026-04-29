@@ -38,7 +38,7 @@ const css = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: radial-gradient(circle at center top, rgba(255, 42, 95, 0.12) 0%, var(--sys-surface) 50%);
+    background: radial-gradient(circle at center top, var(--sys-primary-dim) 0%, var(--sys-surface) 50%);
     padding-top: 40px;
     padding-bottom: 40px;
 }
@@ -695,8 +695,8 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
 
         {/* Hero Header */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#ff2a5f', letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>MARKETING STUDIO</div>
-            <h1 style={{ fontSize: 42, fontWeight: 800, color: '#fff', textTransform: 'uppercase', lineHeight: 1.1, margin: 0, letterSpacing: -1 }}>TURN ANY PRODUCT<br/>INTO A VIDEO AD</h1>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--sys-primary)', letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>VIDEO Q-ADS</div>
+            <h1 style={{ fontSize: 42, fontWeight: 800, color: '#fff', textTransform: 'uppercase', lineHeight: 1.1, margin: 0, letterSpacing: -1 }}>TURN ANY PRODUCT<br/>INTO A VIDEO Q-AD</h1>
         </div>
 
         <div className="qv2-lay">
@@ -826,7 +826,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             {templates.length > 0 && !isGeneratingPrompts && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 24 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ff2a5f' }}>bolt</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>bolt</span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: -0.5 }}>Generate across formats</span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, scrollbarWidth: 'none', justifyContent: 'center' }}>
