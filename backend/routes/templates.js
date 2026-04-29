@@ -232,13 +232,28 @@ router.post('/:id/use', protect, async (req, res) => {
 
             // Step 10: internalGenerateCreative already calls ensureS3Url internally.
             // Do NOT call ensureS3Url on its return value — that would double-mirror.
+            //
+            // CRITICAL: Reference images (product, avatar) MUST go through body.options.*
+            // because internalGenerateCreative extracts them from:
+            //   - options.productImageUrl (line 304 of creatives.js)
+            //   - options.characters[] (line 308 of creatives.js)
+            // The old body.visionInputs field was never read by internalGenerateCreative.
             internalGenerateCreative({
                 body: {
                     brandId,
                     prompt: promptData.finalPrompt,
-                    visionInputs: promptData.visionInputs,  // S3 URL refs, not base64
                     format: settings?.format || 'instagram-post',
-                    jobId
+                    jobId,
+                    options: {
+                        // Product image → extracted at creatives.js L304 → templateRefUrls
+                        productImageUrl: promptData.productImageUrl || null,
+                        // Avatar/face ref → extracted at creatives.js L308 → templateRefUrls
+                        characters: promptData.avatarImageUrl
+                            ? [{ name: 'User Reference', image: promptData.avatarImageUrl }]
+                            : [],
+                        // Pass through any template default settings
+                        ...(settings || {}),
+                    }
                 },
                 user: req.user,
                 creditsDeducted: cost,

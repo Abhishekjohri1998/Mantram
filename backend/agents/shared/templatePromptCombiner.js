@@ -1,4 +1,13 @@
-export async function buildTemplatePrompt({ template, userPrompt, userProductImageBase64, userAvatarImageBase64 }) {
+export async function buildTemplatePrompt({
+    template,
+    userPrompt,
+    // Legacy base64-era names (backward compat)
+    userProductImageBase64,
+    userAvatarImageBase64,
+    // Current S3 URL names (from TemplateGenerationModal)
+    productImageUrl,
+    avatarImageUrl,
+}) {
     if (!template) throw new Error('Template is required to build prompt');
 
     // 1. Merge saved prompt and user prompt
@@ -7,40 +16,52 @@ export async function buildTemplatePrompt({ template, userPrompt, userProductIma
         finalPrompt = finalPrompt ? `${finalPrompt} ${userPrompt.trim()}` : userPrompt.trim();
     }
 
-    // 2. Assemble vision inputs
-    // We pass these exactly as received (HTTP URLs or Base64 data URIs).
-    // The downstream routes (creatives.js, video-studio.js, etc.) are responsible
-    // for uploading Base64 strings to S3 or Atlas CDN as required by their respective models.
+    // 2. Resolve images — prefer URL params, fall back to legacy base64 params
+    const productImage = productImageUrl || userProductImageBase64 || null;
+    const avatarImage = avatarImageUrl || userAvatarImageBase64 || null;
+
+    // Helper: detect format from data string
+    const detectFormat = (data) => {
+        if (!data) return 'unknown';
+        if (data.startsWith('data:')) return 'base64';
+        if (data.startsWith('http')) return 'url';
+        return 'unknown';
+    };
+
+    // 3. Assemble vision inputs
     const visionInputs = [];
-    
+
     if (template.systemReferenceImage) {
         visionInputs.push({
             role: 'system',
-            format: template.systemReferenceImage.startsWith('data:') ? 'base64' : 'url',
+            format: detectFormat(template.systemReferenceImage),
             data: template.systemReferenceImage
         });
     }
-    
-    if (userProductImageBase64) {
+
+    if (productImage) {
         visionInputs.push({
             role: 'product',
-            format: 'base64',
-            data: userProductImageBase64
-        });
-    }
-    
-    if (userAvatarImageBase64) {
-        visionInputs.push({
-            role: 'avatar',
-            format: 'base64',
-            data: userAvatarImageBase64
+            format: detectFormat(productImage),
+            data: productImage
         });
     }
 
-    // 3. Return standardized payload for any studio pipeline
+    if (avatarImage) {
+        visionInputs.push({
+            role: 'avatar',
+            format: detectFormat(avatarImage),
+            data: avatarImage
+        });
+    }
+
+    // 4. Return standardized payload for any studio pipeline
     return {
         finalPrompt,
         visionInputs,
+        // Also return raw URLs for direct use by callers that bypass visionInputs
+        productImageUrl: productImage,
+        avatarImageUrl: avatarImage,
         settings: template.defaultSettings || {}
     };
 }
