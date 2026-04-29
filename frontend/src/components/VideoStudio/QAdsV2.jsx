@@ -17,6 +17,15 @@ async function api(path, opts = {}) {
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
+const VIDEO_MODELS = [
+    {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
+    {value:'happyhorse-1.0',label:'HappyHorse 1.0',msIcon:'pets'},
+    {value:'grok-imagine',label:'Grok Imagine',msIcon:'smart_toy'},
+    {value:'kling-3.0',label:'Kling 3.0',msIcon:'videocam'},
+    {value:'veo-3.1',label:'Veo 3.1',msIcon:'movie'},
+    {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
+    {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
+]
 
 const css = `
 .qv2-root {
@@ -429,6 +438,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
     const [avatarBusy, setAvatarBusy] = useState(false)
     const [duration, setDuration] = useState(8)
     const [format, setFormat] = useState('9:16')
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0')
     const [userBrief, setUserBrief] = useState('')
 
     // Modals
@@ -540,7 +550,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                     presetId: selP,
                     userBrief,
                     productData: pData,
-                    settings: { duration, format },
+                    settings: { duration, format, model: selectedModel },
                     avatarUrl: avatarUrl || null,
                     productImageUrls: pImgs
                 })
@@ -573,7 +583,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                     legend: variant.legend || '',
                     productImageUrls: productImgs,
                     avatarUrl: avatarUrl || null,
-                    settings: { duration, format }
+                    settings: { duration, format, model: selectedModel }
                 })
             })
 
@@ -609,7 +619,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
         } catch (e) {
             setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: e.message } }))
         }
-    }, [selP, productImgs, avatarUrl, duration, format, activeBrand])
+    }, [selP, productImgs, avatarUrl, duration, format, selectedModel, activeBrand])
 
     useEffect(() => {
         return () => Object.values(pollRefs.current).forEach(clearInterval)
@@ -687,7 +697,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                                         <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
                                             <div style={{ height: '100%', width: `${job.progress || 5}%`, background: '#10b981', transition: 'width 1.5s linear' }} />
                                         </div>
-                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Seedance is generating...</div>
+                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{(VIDEO_MODELS.find(m => m.value === selectedModel)?.label || 'AI')} is generating...</div>
                                     </div>
                                 ) : job.status === 'failed' ? (
                                     <div style={{ color: '#ef4444', fontSize: 12, padding: '8px 0' }}>{job.error || 'Generation failed'}</div>
@@ -735,6 +745,9 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={format} onChange={setFormat} options={FMTS} icon="crop" />
                     <CfgMenu value={duration} onChange={setDuration} options={DURS} icon="timer" />
+
+                    <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
+                    <CfgMenu value={selectedModel} onChange={setSelectedModel} options={VIDEO_MODELS} icon="smart_toy" />
 
                     <div style={{ flex: 1 }} />
 
