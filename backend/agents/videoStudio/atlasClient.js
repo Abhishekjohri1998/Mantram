@@ -524,21 +524,14 @@ export async function submitHappyHorseVideoGeneration({
         generate_audio: generateAudio !== false,
     };
 
-    // I2V: upload first frame to Atlas CDN
+    // I2V: pass image to submitAtlasCloudPayload for upload
     if (s3ImageUrls.length > 0 && modelName.includes('image-to-video')) {
-        console.log(`📸 [HappyHorse I2V] Uploading first frame to Atlas CDN...`);
-        const cdnUrl = await uploadMediaToAtlasCDN(s3ImageUrls[0]);
-        if (cdnUrl) taskInput.image = cdnUrl;
-        else taskInput.image_urls = s3ImageUrls;
+        taskInput.image_urls = s3ImageUrls;
     }
 
-    // R2V: pass all reference images
+    // R2V: pass all reference images to submitAtlasCloudPayload for upload
     if (s3RefImages.length > 0 && modelName.includes('reference-to-video')) {
-        const processedRefs = await Promise.all(s3RefImages.map(async url => {
-            return await uploadMediaToAtlasCDN(url);
-        }));
-        taskInput.reference_images = processedRefs.filter(Boolean).slice(0, 9);
-        console.log(`✅ [HappyHorse R2V] reference_images: ${taskInput.reference_images.length}`);
+        taskInput.reference_images = s3RefImages.slice(0, 9);
     }
 
     // T2V with first-frame anchor
