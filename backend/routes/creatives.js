@@ -209,77 +209,6 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         // ⚡ PERF: Removed standalone Brand.findById — the pipeline's loadBrandContext
         // already loads the brand from Redis cache or DB. Validated post-pipeline instead.
 
-        // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
-        // Previously this was defined after the pipeline call, so pipeline always got an empty array.
-        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
-
-        let pipelineResult;
-        // ⚡ OPT 3: Skip pipeline entirely if prompt was already enhanced by the user
-        // (the "Enhance" button runs the full pipeline — running it again is redundant)
-        if (options?.alreadyEnhanced || options?.skipPipeline) {
-            console.log('⚡ Pipeline skipped — prompt already enhanced by user');
-            agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
-        } else {
-        try {
-            // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
-            const pipelineTimeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
-            );
-            pipelineResult = await Promise.race([
-                runCreativePipeline({
-                    brandId,
-                    brief: prompt,
-                    format: type || 'instagram-post',
-                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
-                    refImageUrls: skillRefUrls, // ✅ Now correctly defined before this call
-                    generateCopy: !!(options?.generateCopy), // Only inject text when explicitly enabled
-                    customCopy: options?.customCopy || null,
-                    aspectRatio: options?.aspectRatio || '1:1',
-                    imageModel: (options?.imageModel || 'nanobanana-2').toLowerCase(),
-                    emit: async (agent, message, status, detail) => {
-                        if (progressId) {
-                            await addStep(progressId, { agent, message, status, detail });
-                        }
-                    }
-                }),
-                pipelineTimeout,
-            ]);
-            agenticMeta = {
-                ...agenticMeta,
-                ...pipelineResult,
-                pipelineRan: true
-            };
-        } catch (pipelineErr) {
-            console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
-            agenticMeta.pipelineError = pipelineErr.message;
-        }
-        }
-
-        let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
-        const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
-        const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '1K';
-        const customSize = options?.customSize || null;
-
-        let ratioNum = 1;
-        if (customSize && customSize.width && customSize.height) {
-            ratioNum = customSize.width / customSize.height;
-        } else if (aspectRatio && aspectRatio.includes(':')) {
-            const [w, h] = aspectRatio.split(':').map(Number);
-            if (w && h) ratioNum = w / h;
-        }
-
-        if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
-            console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
-            fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
-        }
-
-        if (progressId) {
-            await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
-        }
-
-        // skillRefUrls is already defined above (before the pipeline call) — reused here for templateRefUrls merging below.
-
         // ── Extract template reference images from options ──
         // Templates send product photos, character images, and reference images
         // via options.baseImage, options.productImageUrl, options.characters, etc.
@@ -348,10 +277,78 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             }
         }
 
-        // Merge skill refs + template refs (deduplicated)
+        // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
+        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
+        
+        // Merge skill refs + template refs (deduplicated) BEFORE the pipeline
         const allRefUrls = [...new Set([...skillRefUrls, ...templateRefUrls])];
         if (allRefUrls.length > 0) {
             console.log(`🖼️ [internalGenerate] Forwarding ${allRefUrls.length} reference image(s) to generation pipeline (skills: ${skillRefUrls.length}, templates: ${templateRefUrls.length})`);
+        }
+
+        let pipelineResult;
+        // ⚡ OPT 3: Skip pipeline entirely if prompt was already enhanced by the user
+        // (the "Enhance" button runs the full pipeline — running it again is redundant)
+        if (options?.alreadyEnhanced || options?.skipPipeline) {
+            console.log('⚡ Pipeline skipped — prompt already enhanced by user');
+            agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
+        } else {
+        try {
+            // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
+            const pipelineTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
+            );
+            pipelineResult = await Promise.race([
+                runCreativePipeline({
+                    brandId,
+                    brief: prompt,
+                    format: type || 'instagram-post',
+                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
+                    refImageUrls: allRefUrls, // ✅ Pass combined reference images to pipeline
+                    generateCopy: !!(options?.generateCopy), // Only inject text when explicitly enabled
+                    customCopy: options?.customCopy || null,
+                    aspectRatio: options?.aspectRatio || '1:1',
+                    imageModel: (options?.imageModel || 'nanobanana-2').toLowerCase(),
+                    emit: async (agent, message, status, detail) => {
+                        if (progressId) {
+                            await addStep(progressId, { agent, message, status, detail });
+                        }
+                    }
+                }),
+                pipelineTimeout,
+            ]);
+            agenticMeta = {
+                ...agenticMeta,
+                ...pipelineResult,
+                pipelineRan: true
+            };
+        } catch (pipelineErr) {
+            console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
+            agenticMeta.pipelineError = pipelineErr.message;
+        }
+        }
+
+        let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
+        const aspectRatio = options?.aspectRatio || '1:1';
+        const imageSize = options?.imageSize || '1K';
+        const customSize = options?.customSize || null;
+
+        let ratioNum = 1;
+        if (customSize && customSize.width && customSize.height) {
+            ratioNum = customSize.width / customSize.height;
+        } else if (aspectRatio && aspectRatio.includes(':')) {
+            const [w, h] = aspectRatio.split(':').map(Number);
+            if (w && h) ratioNum = w / h;
+        }
+
+        if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
+            console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
+            fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
+        }
+
+        if (progressId) {
+            await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
         }
 
         // ── Build template inpainting prompt when a template reference image is provided ──
