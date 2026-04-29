@@ -1696,20 +1696,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             })
 
             if (jobData?.success && jobData?.jobId) {
-                // Register with global job tracker (persists to localStorage)
-                try {
-                    const { addJob } = window.__bgJobs__ || {}
-                    if (addJob) {
-                        addJob(jobData.jobId, {
-                            prompt: fullPrompt,
-                            format: selectedType,
-                            brandId: activeBrand._id,
-                        })
-                    }
-                } catch { /* context not available */ }
+                // NOTE: We intentionally do NOT register with the global background job
+                // tracker here. The local pollLocalJob below already polls this job every 5s
+                // with full UI integration (progress steps, result display, errors).
+                // Registering globally would cause 2-3x duplicate API calls per interval.
+                // If the user navigates away, useBackgroundJobs.reconcileFromServer() will
+                // automatically pick up any in-progress jobs on the next page load.
 
                 // Show optimistic queued state
-                setFeedbackToast('✅ Generation queued! You can navigate to other pages — your image will be ready when done.')
+                setFeedbackToast('✅ Generation queued! Processing in background...')
                 setActiveGenerations(prev => prev.map(j => j.jobId === localJobId ? { ...j, steps: [{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }] } : j))
 
                 // Poll this specific job locally too (so the current page updates)
