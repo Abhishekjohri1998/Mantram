@@ -14,10 +14,20 @@ import { useShopify } from '../context/ShopifyContext'
 import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE } from '../services/api'
 
 const SOCIAL_PLATFORMS = [
-    { id: 'instagram', name: 'Instagram', icon: '📷', color: '#E1306C', desc: 'Share photos, reels & stories' },
+    { id: 'instagram', name: 'Instagram', icon: '📷', color: '#E1306C', desc: 'Photos, reels & stories' },
     { id: 'facebook', name: 'Facebook', icon: '📘', color: '#1877F2', desc: 'Pages, groups & marketplace' },
     { id: 'linkedin', name: 'LinkedIn', icon: '💼', color: '#0A66C2', desc: 'Professional posts & articles' },
     { id: 'twitter', name: 'X (Twitter)', icon: '𝕏', color: '#000000', desc: 'Tweets & threads' },
+    { id: 'tiktok', name: 'TikTok', icon: '🎵', color: '#010101', desc: 'Short-form video content', comingSoon: true },
+    { id: 'youtube', name: 'YouTube', icon: '🎥', color: '#FF0000', desc: 'Long-form video & shorts', comingSoon: true },
+]
+
+const ECOMMERCE_PLATFORMS = [
+    { id: 'shopify', name: 'Shopify', color: '#96BF48', letter: 'S', desc: 'Sync products & inventory', integrated: true },
+    { id: 'woocommerce', name: 'WooCommerce', color: '#96588A', letter: 'W', desc: 'WordPress store products', comingSoon: true },
+    { id: 'etsy', name: 'Etsy', color: '#F56400', letter: 'E', desc: 'Handmade & vintage listings', comingSoon: true },
+    { id: 'amazon', name: 'Amazon Seller', color: '#FF9900', letter: 'A', desc: 'Marketplace listings', comingSoon: true },
+    { id: 'flipkart', name: 'Flipkart', color: '#2874F0', letter: 'F', desc: 'Indian marketplace', comingSoon: true },
 ]
 
 const AD_PLATFORMS = [
@@ -396,108 +406,162 @@ export default function Integrations() {
                         {/* ═══════════ E-COMMERCE SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">shopping_bag</span></span> E-Commerce
-                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by D2C Studio</span>
+                                <span className="material-symbols-outlined text-lg align-middle">shopping_bag</span> E-Commerce
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by D2C Studio · Creative Studio · Research Studio</span>
                             </h2>
-                            <div className="glass-panel rounded-2xl p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-14 h-14 rounded-xl bg-[#96BF48]/10 flex items-center justify-center text-2xl font-bold text-[#96BF48]">S</div>
-                                        <div>
-                                            <h3 className="font-bold text-[var(--sys-text)]">Shopify</h3>
-                                            <p className="text-sm text-[var(--sys-text-muted)]">Sync products & inventory</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                                {/* Shopify — active */}
+                                <div className="glass-panel rounded-2xl p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-xl bg-[#96BF48]/10 flex items-center justify-center text-2xl font-bold text-[#96BF48]">S</div>
+                                            <div>
+                                                <h3 className="font-bold text-[var(--sys-text)]">Shopify</h3>
+                                                <p className="text-sm text-[var(--sys-text-muted)]">Sync products &amp; inventory</p>
+                                            </div>
                                         </div>
+                                        <StatusBadge status={shopifyStatus.status || 'disconnected'} />
                                     </div>
-                                    <StatusBadge status={shopifyStatus.status || 'disconnected'} />
+
+                                    {shopifyStatus.connected ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-4 text-sm">
+                                                <span className="text-[var(--sys-text-muted)]">Store: <span className="text-[var(--sys-text)]">{shopifyStatus.displayName}</span></span>
+                                                {shopifyStatus.lastSyncAt && (
+                                                    <span className="text-[var(--sys-text-muted)]">Last sync: {new Date(shopifyStatus.lastSyncAt).toLocaleDateString()}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={syncProducts} disabled={syncing}
+                                                    className="btn-primary px-4 py-2 rounded-xl text-sm">
+                                                    {syncing ? '⏳ Syncing...' : '🔄 Sync Products'}
+                                                </button>
+                                                <button onClick={() => setActiveTab('products')}
+                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
+                                                    📦 View Products
+                                                </button>
+                                                <button onClick={async () => {
+                                                    if (!confirm('Disconnect Shopify for this brand?')) return;
+                                                    setLoading(l => ({ ...l, shopify: true }));
+                                                    try { await shopifyAPI.disconnect(brandId); loadAllStatuses(); }
+                                                    catch (err) { alert(err.message); }
+                                                    finally { setLoading(l => ({ ...l, shopify: false })); }
+                                                }}
+                                                    className="px-4 py-2 rounded-xl text-sm text-primary hover:bg-[var(--sys-primary-dim)]">
+                                                    Disconnect
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {!isEmbedded && (
+                                                <div className="flex gap-2 mb-2">
+                                                    <button onClick={() => setShopifyMode('token')}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
+                                                        🔑 Access Token
+                                                    </button>
+                                                    <button onClick={() => setShopifyMode('oauth')}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
+                                                        🔗 OAuth
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
+                                                placeholder="my-store.myshopify.com"
+                                                className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            {shopifyMode === 'oauth' && (
+                                                <div className="p-3.5 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex gap-3">
+                                                    <span className="material-symbols-outlined text-primary text-xl">warning</span>
+                                                    <div className="text-xs border-[var(--sys-border)] leading-relaxed">
+                                                        <p className="font-bold text-primary mb-1">Shopify Review Pending</p>
+                                                        Shopify blocks standard OAuth for new apps until review is complete.
+                                                        Use <strong>Access Token</strong> mode instead to connect immediately.
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {shopifyMode === 'token' && (
+                                                <>
+                                                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
+                                                        <h4 className="text-xs font-bold text-primary uppercase tracking-wider">How to connect using Access Token</h4>
+                                                        <ol className="text-[11px] text-[var(--sys-text-muted)] space-y-2 list-decimal ml-4">
+                                                            <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
+                                                            <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
+                                                            <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, <code>read_customers</code></li>
+                                                            <li>Click <strong>Install app</strong> and copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>)</li>
+                                                        </ol>
+                                                    </div>
+                                                    <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
+                                                        placeholder="Admin API Access Token (shpat_...)"
+                                                        className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                                </>
+                                            )}
+                                            <button onClick={connectShopify} disabled={loading.shopify}
+                                                className="btn-primary w-full py-3 rounded-xl text-sm font-medium">
+                                                {loading.shopify ? 'Connecting...' : shopifyMode === 'token' ? '🔗 Connect with Token' : '🔗 Connect via OAuth'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {shopifyStatus.connected ? (
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-4 text-sm">
-                                            <span className="text-[var(--sys-text-muted)]">Store: <span className="text-[var(--sys-text)]">{shopifyStatus.displayName}</span></span>
-                                            {shopifyStatus.lastSyncAt && (
-                                                <span className="text-[var(--sys-text-muted)]">Last sync: {new Date(shopifyStatus.lastSyncAt).toLocaleDateString()}</span>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={syncProducts} disabled={syncing}
-                                                className="btn-primary px-4 py-2 rounded-xl text-sm">
-                                                {syncing ? '⏳ Syncing...' : '🔄 Sync Products'}
-                                            </button>
-                                            <button onClick={() => setActiveTab('products')}
-                                                className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
-                                                📦 View Products
-                                            </button>
-                                            <button onClick={async () => {
-                                                if (!confirm('Disconnect Shopify for this brand?')) return;
-                                                setLoading(l => ({ ...l, shopify: true }));
-                                                try {
-                                                    await shopifyAPI.disconnect(brandId);
-                                                    loadAllStatuses();
-                                                } catch (err) {
-                                                    alert(err.message);
-                                                } finally {
-                                                    setLoading(l => ({ ...l, shopify: false }));
-                                                }
-                                            }}
-                                                className="px-4 py-2 rounded-xl text-sm text-primary hover:bg-[var(--sys-primary-dim)]">
-                                                Disconnect
-                                            </button>
+                                {/* WooCommerce — coming soon */}
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-3 right-3">
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/20">Coming Soon</span>
+                                    </div>
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-14 h-14 rounded-xl bg-[#96588A]/10 flex items-center justify-center text-2xl font-bold text-[#96588A]">W</div>
+                                        <div>
+                                            <h3 className="font-bold text-[var(--sys-text)]">WooCommerce</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">WordPress store products &amp; orders</p>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {!isEmbedded && (
-                                            <div className="flex gap-2 mb-2">
-                                                <button onClick={() => setShopifyMode('token')}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'token' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
-                                                    🔑 Access Token
-                                                </button>
-                                                <button onClick={() => setShopifyMode('oauth')}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${shopifyMode === 'oauth' ? 'bg-[#96BF48]/20 text-[#96BF48] border border-[#96BF48]/30' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
-                                                    🔗 OAuth
-                                                </button>
-                                            </div>
-                                        )}
-                                        <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)}
-                                            placeholder="my-store.myshopify.com"
-                                            className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Connect your WooCommerce store to sync products and power D2C analytics.</p>
+                                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed"
+                                        style={{ background: '#96588A20', color: '#96588A', border: '1px solid #96588A30' }}>
+                                        Connect WooCommerce
+                                    </button>
+                                </div>
 
-                                        {shopifyMode === 'oauth' && (
-                                            <div className="p-3.5 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex gap-3">
-                                                <span className="material-symbols-outlined text-primary text-xl">warning</span>
-                                                <div className="text-xs border-[var(--sys-border)] leading-relaxed">
-                                                    <p className="font-bold text-primary mb-1">Shopify Review Pending</p>
-                                                    Shopify blocks standard OAuth for new apps on production stores until review is complete.
-                                                    Please use <strong>Access Token (Custom App)</strong> mode instead to connect immediately.
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {shopifyMode === 'token' && (
-                                            <>
-                                                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 space-y-3">
-                                                    <h4 className="text-xs font-bold text-primary uppercase tracking-wider">How to connect using Access Token</h4>
-                                                    <ol className="text-[11px] text-[var(--sys-text-muted)] space-y-2 list-decimal ml-4">
-                                                        <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
-                                                        <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
-                                                        <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, and <code>read_customers</code></li>
-                                                        <li>Click <strong>Install app</strong> and copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>)</li>
-                                                    </ol>
-                                                </div>
-                                                <input type="password" value={shopifyToken} onChange={e => setShopifyToken(e.target.value)}
-                                                    placeholder="Admin API Access Token (shpat_...)"
-                                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
-                                            </>
-                                        )}
-                                        <button onClick={connectShopify} disabled={loading.shopify}
-                                            className="btn-primary w-full py-3 rounded-xl text-sm font-medium">
-                                            {loading.shopify ? 'Connecting...' : shopifyMode === 'token' ? '🔗 Connect with Token' : '🔗 Connect via OAuth'}
-                                        </button>
+                                {/* Etsy — coming soon */}
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-3 right-3">
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/20">Coming Soon</span>
                                     </div>
-                                )}
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-14 h-14 rounded-xl bg-[#F56400]/10 flex items-center justify-center text-2xl font-bold text-[#F56400]">E</div>
+                                        <div>
+                                            <h3 className="font-bold text-[var(--sys-text)]">Etsy</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Handmade, vintage &amp; craft listings</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Sync your Etsy shop to generate product visuals and listing copy at scale.</p>
+                                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed"
+                                        style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640030' }}>
+                                        Connect Etsy
+                                    </button>
+                                </div>
+
+                                {/* Amazon — coming soon */}
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-3 right-3">
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/20">Coming Soon</span>
+                                    </div>
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-14 h-14 rounded-xl bg-[#FF9900]/10 flex items-center justify-center text-2xl font-bold text-[#FF9900]">A</div>
+                                        <div>
+                                            <h3 className="font-bold text-[var(--sys-text)]">Amazon Seller</h3>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Marketplace listings &amp; A+ content</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Auto-generate A+ content, listing images and copy from your Amazon catalog.</p>
+                                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed"
+                                        style={{ background: '#FF990020', color: '#FF9900', border: '1px solid #FF990030' }}>
+                                        Connect Amazon
+                                    </button>
+                                </div>
+
                             </div>
-                        </section>
 
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
@@ -576,10 +640,10 @@ export default function Integrations() {
                         {/* ═══════════ COMING SOON ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-2xl">🔮</span> Coming Soon
+                                <span className="material-symbols-outlined text-lg">rocket_launch</span> Coming Soon
                             </h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {['WooCommerce', 'Amazon', 'Pinterest', 'YouTube'].map(name => (
+                                {['Pinterest', 'Flipkart', 'Snapchat', 'WhatsApp Business'].map(name => (
                                     <div key={name} className="glass-panel rounded-xl p-4 opacity-50 text-center">
                                         <p className="text-sm font-medium text-[var(--sys-text-muted)]">{name}</p>
                                         <p className="text-xs text-[var(--sys-text-muted)] mt-1">Coming soon</p>

@@ -10,6 +10,18 @@ import './MonthlyStrategy.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
+const IMAGE_MODELS = [
+  { id: 'nanobanana-2',   name: 'NanoBanana 2',   desc: 'Default · Fast'       },
+  { id: 'nanobanana-pro', name: 'NanoBanana Pro',  desc: 'Premium quality'      },
+  { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1',   desc: 'Photorealistic'       },
+  { id: 'flux-2-pro',    name: 'Flux 2 Pro',      desc: 'Latest Flux'          },
+  { id: 'seedream-5',    name: 'Seedream 5',      desc: 'Artistic style'       },
+  { id: 'ideogram',      name: 'Ideogram v3',     desc: 'Best text in images'  },
+  { id: 'gpt-image-2',   name: 'GPT Image 2',     desc: 'Perfect text'         },
+  { id: 'gpt-image-1',   name: 'GPT Image 1',     desc: 'Clean renders'        },
+]
+
+
 const STRATEGY_TYPES = [
   { id: 'social-media',          msIcon: 'smartphone',        label: 'Social Media',          desc: 'Reels, carousels, stories'      },
   { id: 'performance-marketing', msIcon: 'ads_click',         label: 'Performance Marketing',  desc: 'Paid ads, Meta, Google'         },
@@ -32,25 +44,47 @@ const STATUS_COLORS = {
 
 // Platform → Material Symbol icon name
 const PLATFORM_ICONS = {
-  instagram: 'photo_camera',
-  linkedin:  'business_center',
-  twitter:   'tag',
-  facebook:  'thumb_up',
-  youtube:   'play_circle',
-  email:     'mail',
-  whatsapp:  'chat',
-  amazon:    'inventory_2',
+  instagram:  'photo_camera',
+  linkedin:   'business_center',
+  twitter:    'tag',
+  tiktok:     'music_video',
+  facebook:   'thumb_up',
+  youtube:    'play_circle',
+  gbp:        'storefront',
+  google:     'storefront',
+  email:      'mail',
+  newsletter: 'mark_email_read',
+  whatsapp:   'chat',
+  amazon:     'inventory_2',
+  blog:       'article',
+}
+
+// Content type → icon (overrides platform icon for text-based content)
+const CONTENT_TYPE_ICONS = {
+  blog:       'article',
+  newsletter: 'mark_email_read',
+  article:    'article',
+  reel:       'videocam',
+  video:      'videocam',
+  carousel:   'view_carousel',
+  story:      'amp_stories',
+  static:     'image',
+  ad:         'ads_click',
 }
 
 const STUDIO_PATHS = {
   content:   '/content-studio',
   creative:  '/creative-studio',
   video:     '/video-studio',
-  retention: '/content-studio', // RetentionStudio not yet built — routes to Content Studio
+  retention: '/content-studio',
 }
 
-// Content types that get inline image generation (no studio round-trip needed)
-const INLINE_IMAGE_TYPES = new Set(['static', 'carousel', 'story', 'ad'])
+// Content types for single image inline generation
+const INLINE_IMAGE_TYPES = new Set(['static', 'story', 'ad'])
+// Content types for blog/text generation
+const BLOG_TYPES = new Set(['blog', 'newsletter', 'article'])
+// Content types for carousel (multi-image)
+const CAROUSEL_TYPES = new Set(['carousel'])
 
 // ─── Validation Constants ────────────────────────────────────────────────────
 const MAX_BRIEF_LENGTH = 2000
@@ -71,6 +105,11 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
   const [imageLoading, setImageLoading]             = useState(false)
   const [imageError, setImageError]                 = useState(null)
   const [generatedImageUrl, setGeneratedImageUrl]   = useState(item.generatedAsset?.url || null)
+  // Carousel multi-image state
+  const [carouselImages, setCarouselImages]         = useState(item.generatedAsset?.imageUrls || [])
+  const [carouselLoading, setCarouselLoading]       = useState(false)
+  const [carouselError, setCarouselError]           = useState(null)
+  const [carouselSlideCount, setCarouselSlideCount] = useState(3)
   // Schedule drawer
   const [schedOpen, setSchedOpen]                   = useState(false)
   // Reference image for visual generation (S3 URL only, never base64)
@@ -88,14 +127,16 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
     : ''
 
   const canInlineImage = INLINE_IMAGE_TYPES.has(item.contentType)
+  const canCarousel    = CAROUSEL_TYPES.has(item.contentType)
+  const canBlog        = BLOG_TYPES.has(item.contentType)
 
   // Load brand's recent creatives for the library picker
   useEffect(() => {
-    if (!activeBrand?._id || !canInlineImage) return
+    if (!activeBrand?._id || (!canInlineImage && !canCarousel)) return
     creativesAPI.list({ brandId: activeBrand._id, limit: 10 })
       .then(d => setLibraryImages((d.creatives || []).filter(c => c.imageUrl)))
       .catch(() => {})
-  }, [activeBrand?._id, canInlineImage])
+  }, [activeBrand?._id, canInlineImage, canCarousel])
 
   // Handle reference image file upload — PUT directly to S3, no base64
   const handleRefFileSelect = async (e) => {
@@ -195,7 +236,50 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
     setImageLoading(false)
   }
 
-  // ── Studio execute (for non-inline content types) ──
+  // ── Carousel: generate N slides sequentially ──
+  const handleGenerateCarousel = async () => {
+    if (!activeBrand?._id) return
+    setCarouselLoading(true)
+    setCarouselError(null)
+    const slides = []
+    try {
+      const basePrompt = [
+        brief.visualDirection && brief.visualDirection,
+        brief.angle && `Campaign: ${brief.angle}`,
+        brief.toneDirection && `Mood: ${brief.toneDirection}`,
+        activeBrand.name && `Brand: ${activeBrand.name}`,
+      ].filter(Boolean).join('. ')
+
+      for (let i = 0; i < carouselSlideCount; i++) {
+        const slidePrompt = `${basePrompt}. CAROUSEL SLIDE ${i + 1} of ${carouselSlideCount}: ${i === 0 ? 'Hook slide — bold headline, attention-grabbing' : i === carouselSlideCount - 1 ? 'CTA slide — call to action, brand logo' : `Value slide ${i} — supporting point, detail`}.`
+        const res = await msAPI.generateVisual({
+          brandId: activeBrand._id,
+          type:    'instagram-post',
+          prompt:  slidePrompt,
+          refImageUrls: refImageUrl ? [refImageUrl] : [],
+          options: { aspectRatio: '1:1' },
+        })
+        if (res?.success && res?.creative?.imageUrl) {
+          slides.push(res.creative.imageUrl)
+          setCarouselImages([...slides]) // show progress
+        }
+      }
+      if (slides.length > 0) {
+        await msAPI.updateAsset(strategyId, item._id, {
+          type: 'carousel', imageUrls: slides,
+          url: slides[0], title: brief.angle || 'Carousel',
+        })
+        setCurrentStatus('complete')
+        onStatusChange?.(item._id, 'complete')
+        onAssetWriteback?.(item._id, { imageUrls: slides, url: slides[0], type: 'carousel', status: 'complete' })
+      }
+    } catch (e) {
+      setCarouselError(e.message || 'Carousel generation failed')
+    }
+    setCarouselLoading(false)
+  }
+
+  // ── Studio execute (for blog/video/non-image content) ──
   const handleExecute = async () => {
     setExecuteLoading(true)
     try {
@@ -368,7 +452,110 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
             </div>
           </div>
 
-          {/* ── Inline image generation (static/carousel/story/ad) ── */}
+          {/* ── Blog / Newsletter: open Content Studio ── */}
+          {canBlog && (
+            <div>
+              <div className="ms-drawer-section-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>article</span>
+                Generate Blog / Article
+              </div>
+              {brief.angle && (
+                <div style={{ fontSize: '0.75rem', opacity: 0.65, marginBottom: '0.6rem', lineHeight: 1.5 }}>
+                  <strong>Topic:</strong> {brief.angle}
+                  {brief.targetKeyword && <span> · <strong>Keyword:</strong> {brief.targetKeyword}</span>}
+                </div>
+              )}
+              <button
+                className="ms-drawer-execute"
+                style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}
+                onClick={handleExecute}
+                disabled={executeLoading}
+              >
+                {executeLoading
+                  ? <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 16 }}>progress_activity</span>
+                  : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit_note</span>
+                }
+                {executeLoading ? 'Opening...' : 'Write in Content Studio'}
+              </button>
+            </div>
+          )}
+
+          {/* ── Carousel: generate multiple slides ── */}
+          {canCarousel && (
+            <div>
+              <div className="ms-drawer-section-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>view_carousel</span>
+                Generate Carousel Slides
+                <span style={{ fontSize: '0.65rem', opacity: 0.6, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  — {carouselImages.length > 0 ? `${carouselImages.length} slides generated` : 'generates 3–4 slides'}
+                </span>
+              </div>
+
+              {/* Slide count picker */}
+              <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', opacity: 0.55 }}>Slides:</span>
+                {[3, 4, 5].map(n => (
+                  <button key={n} onClick={() => setCarouselSlideCount(n)}
+                    style={{ padding: '0.2rem 0.55rem', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600,
+                      background: carouselSlideCount === n ? 'var(--sys-primary,#FF4D00)' : 'rgba(255,255,255,0.08)',
+                      border: 'none', color: carouselSlideCount === n ? '#fff' : 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+
+              {/* Generated slides preview strip */}
+              {carouselImages.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem', overflowX: 'auto', paddingBottom: 4 }}>
+                  {carouselImages.map((url, i) => (
+                    <div key={i} style={{ position: 'relative', flexShrink: 0 }}>
+                      <img src={url} alt={`Slide ${i+1}`}
+                        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8,
+                          border: '2px solid rgba(255,255,255,0.15)' }} />
+                      <div style={{ position: 'absolute', bottom: 2, left: 0, right: 0, textAlign: 'center',
+                        fontSize: '0.6rem', color: '#fff', background: 'rgba(0,0,0,0.5)', borderRadius: '0 0 6px 6px' }}>
+                        {i + 1}
+                      </div>
+                    </div>
+                  ))}
+                  {carouselLoading && (
+                    <div style={{ width: 72, height: 72, borderRadius: 8, background: 'rgba(255,255,255,0.05)',
+                      border: '2px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 18, opacity: 0.5 }}>progress_activity</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {carouselError && (
+                <div className="ms-error" style={{ marginBottom: '0.5rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>warning</span>
+                  {carouselError}
+                </div>
+              )}
+
+              <button
+                className="ms-drawer-execute"
+                style={carouselImages.length > 0
+                  ? { background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)', color: '#22c55e' }
+                  : undefined
+                }
+                onClick={handleGenerateCarousel}
+                disabled={carouselLoading || refUploading}
+              >
+                {carouselLoading
+                  ? <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 16 }}>progress_activity</span>
+                  : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{carouselImages.length > 0 ? 'refresh' : 'auto_awesome'}</span>
+                }
+                {carouselLoading
+                  ? `Generating slide ${carouselImages.length + 1}/${carouselSlideCount}...`
+                  : carouselImages.length > 0 ? 'Regenerate Carousel' : `Generate ${carouselSlideCount}-slide Carousel`
+                }
+              </button>
+            </div>
+          )}
+
+          {/* ── Inline image generation (static/story/ad) ── */}
           {canInlineImage && (
             <div>
               <div className="ms-drawer-section-label">
@@ -482,6 +669,47 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
             </div>
           )}
 
+          {/* ── Studio handoff for video/reel/email/listing content ── */}
+          {!canInlineImage && !canCarousel && !canBlog && (
+            <div>
+              <div className="ms-drawer-section-label">
+                <span className="material-symbols-outlined" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>
+                  {item.contentType === 'reel' || item.contentType === 'video' || item.contentType === 'youtube' ? 'videocam'
+                    : item.contentType === 'email' || item.contentType === 'whatsapp' ? 'mail'
+                    : 'open_in_new'}
+                </span>
+                Open in Studio
+              </div>
+              {brief.angle && (
+                <div style={{ fontSize: '0.75rem', opacity: 0.65, marginBottom: '0.6rem', lineHeight: 1.5 }}>
+                  <strong>Brief:</strong> {brief.angle}
+                  {brief.toneDirection && <span> · <strong>Tone:</strong> {brief.toneDirection}</span>}
+                </div>
+              )}
+              <button
+                className="ms-drawer-execute"
+                style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', color: '#38bdf8' }}
+                onClick={handleExecute}
+                disabled={executeLoading}
+              >
+                {executeLoading
+                  ? <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 16 }}>progress_activity</span>
+                  : <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      {item.contentType === 'reel' || item.contentType === 'video' ? 'videocam'
+                        : item.contentType === 'email' ? 'mail'
+                        : 'open_in_new'}
+                    </span>
+                }
+                {executeLoading ? 'Opening...' : `Open in ${
+                  item.targetStudio === 'video' ? 'Video Studio'
+                  : item.targetStudio === 'content' ? 'Content Studio'
+                  : item.targetStudio === 'creative' ? 'Creative Studio'
+                  : 'Studio'
+                }`}
+              </button>
+            </div>
+          )}
+
           {/* ── Schedule to Brand Calendar ── */}
           <button
             className="ms-drawer-execute"
@@ -491,6 +719,7 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>calendar_add_on</span>
             Schedule to Calendar
           </button>
+
         </div>
       </div>
 
@@ -522,10 +751,18 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
 
 function DayCard({ item, onClick }) {
   const statusColor = STATUS_COLORS[item.status] || '#64748b'
-  const typeInfo = STRATEGY_TYPES.find(t => t.id === item.contentType) || {}
   const dateStr = item.date
     ? new Date(item.date + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' })
     : item.date
+
+  // Use content-type icon for text-based types (blog, newsletter) — they don't belong to instagram etc.
+  const isBlogType = BLOG_TYPES.has(item.contentType)
+  const displayIcon = isBlogType
+    ? CONTENT_TYPE_ICONS[item.contentType]
+    : (PLATFORM_ICONS[item.platform] || CONTENT_TYPE_ICONS[item.contentType] || 'description')
+  const displayPlatform = isBlogType
+    ? item.contentType  // show 'blog' / 'newsletter' instead of wrong platform
+    : (item.platform || item.contentType)
 
   return (
     <div className="ms-day-card" onClick={() => onClick(item)} style={{ borderLeftColor: statusColor, borderLeftWidth: 3 }}>
@@ -536,9 +773,9 @@ function DayCard({ item, onClick }) {
       <div className="ms-day-card-body">
         <div className="ms-day-platform">
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>
-            {PLATFORM_ICONS[item.platform] || 'description'}
+            {displayIcon}
           </span>
-          {item.platform}
+          {displayPlatform}
         </div>
         <div className="ms-day-angle">{item.brief?.angle || 'Brief pending'}</div>
         {item.brief?.captionDraft && (
@@ -603,6 +840,13 @@ export default function MonthlyStrategy() {
   // History
   const [historyList, setHistoryList] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // ── Batch generate all images state ──
+  const [batchModel, setBatchModel]         = useState('nanobanana-2')
+  const [showModelMenu, setShowModelMenu]   = useState(false)
+  const [batchGenerating, setBatchGenerating] = useState(false)
+  const [batchProgress, setBatchProgress]   = useState({ done: 0, total: 0 })
+  const batchPollRef = useRef(null)
 
   const abortRef    = useRef(null)
   const activeJobId = useRef(null)  // tracks current background job
@@ -807,6 +1051,48 @@ export default function MonthlyStrategy() {
     } catch {}
   }, [])
 
+  // ── Batch generate all calendar images ──
+  const handleBatchGenerate = useCallback(async () => {
+    if (!strategy?._id || batchGenerating) return
+    setBatchGenerating(true)
+    const pending = calendarItems.filter(it => it.status === 'pending' && (it.targetStudio === 'creative' || !it.targetStudio))
+    setBatchProgress({ done: 0, total: pending.length })
+    try {
+      const data = await msAPI.batchGenerate(strategy._id, { imageModel: batchModel })
+      if (data?.batchId) {
+        let pollCount = 0
+        batchPollRef.current = setInterval(async () => {
+          try {
+            const status = await jobsAPI.status(data.batchId)
+            const j = status?.job || status
+            if (j?.metadata?.completedItems !== undefined) {
+              setBatchProgress({ done: j.metadata.completedItems, total: j.metadata.totalItems || pending.length })
+            }
+            if (j?.status === 'completed' || j?.status === 'failed' || pollCount > 120) {
+              clearInterval(batchPollRef.current)
+              setBatchGenerating(false)
+              // Reload strategy to get updated assets
+              const r = await msAPI.get(strategy._id)
+              if (r?.strategy) {
+                setStrategy(r.strategy)
+                setCalendarItems(r.strategy.calendar || [])
+              }
+            }
+            pollCount++
+          } catch { pollCount++ }
+        }, 5000)
+      } else {
+        setBatchGenerating(false)
+      }
+    } catch (err) {
+      console.error('[batch-generate]', err)
+      setBatchGenerating(false)
+    }
+  }, [strategy?._id, batchGenerating, batchModel, calendarItems])
+
+  // Cleanup batch poll on unmount
+  useEffect(() => () => { if (batchPollRef.current) clearInterval(batchPollRef.current) }, [])
+
   // ── Status change from drawer ──
   const handleStatusChange = useCallback((itemId, status) => {
     setCalendarItems(prev => prev.map(it => it._id === itemId ? { ...it, status } : it))
@@ -987,7 +1273,67 @@ export default function MonthlyStrategy() {
               )}
             </div>
           </div>
-          <div className="ms-result-actions">
+          <div className="ms-result-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Model selector + Generate All */}
+            {calendarItems.filter(it => it.status === 'pending' && (!it.targetStudio || it.targetStudio === 'creative')).length > 0 && (
+              <>
+                {/* Model dropdown */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className="ms-btn-ghost"
+                    onClick={() => setShowModelMenu(v => !v)}
+                    style={{ fontSize: '0.75rem', gap: '0.3rem' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>auto_awesome</span>
+                    {IMAGE_MODELS.find(m => m.id === batchModel)?.name || 'Model'}
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_more</span>
+                  </button>
+                  {showModelMenu && (
+                    <div style={{
+                      position: 'absolute', top: '100%', right: 0, zIndex: 200, marginTop: 4,
+                      background: 'var(--surface-2, #1c1c1e)', border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 10, padding: '0.35rem', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                    }}>
+                      {IMAGE_MODELS.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => { setBatchModel(m.id); setShowModelMenu(false) }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%',
+                            padding: '0.45rem 0.6rem', background: batchModel === m.id ? 'rgba(255,77,0,0.12)' : 'none',
+                            border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: batchModel === m.id ? 'var(--sys-primary,#FF4D00)' : 'rgba(255,255,255,0.9)' }}>{m.name}</div>
+                            <div style={{ fontSize: '0.65rem', opacity: 0.55, color: 'rgba(255,255,255,0.7)' }}>{m.desc}</div>
+                          </div>
+                          {batchModel === m.id && <span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--sys-primary,#FF4D00)' }}>check</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Generate All button */}
+                <button
+                  className="ms-btn-primary"
+                  onClick={handleBatchGenerate}
+                  disabled={batchGenerating}
+                  style={{ gap: '0.35rem', fontSize: '0.8rem' }}
+                >
+                  {batchGenerating
+                    ? <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 14 }}>progress_activity</span>
+                    : <span className="material-symbols-outlined" style={{ fontSize: 14 }}>bolt</span>
+                  }
+                  {batchGenerating
+                    ? `Generating ${batchProgress.done}/${batchProgress.total}...`
+                    : `Generate All Images (${calendarItems.filter(it => it.status === 'pending' && (!it.targetStudio || it.targetStudio === 'creative')).length})`
+                  }
+                </button>
+              </>
+            )}
+
             <button className="ms-btn-ghost" onClick={() => setView('history')}>
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>history</span>
               History
@@ -1013,6 +1359,32 @@ export default function MonthlyStrategy() {
             </div>
           ))}
         </div>
+
+        {/* Batch generation progress banner */}
+        {batchGenerating && (
+          <div style={{
+            margin: '0.75rem 0', padding: '0.75rem 1rem',
+            background: 'rgba(255,77,0,0.08)', border: '1px solid rgba(255,77,0,0.2)',
+            borderRadius: 12, display: 'flex', alignItems: 'center', gap: '0.75rem',
+          }}>
+            <span className="material-symbols-outlined ms-chip-spin" style={{ fontSize: 18, color: 'var(--sys-primary,#FF4D00)' }}>progress_activity</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--sys-primary,#FF4D00)' }}>
+                Generating calendar images with {IMAGE_MODELS.find(m => m.id === batchModel)?.name}…
+              </div>
+              <div style={{ fontSize: '0.72rem', opacity: 0.6, marginTop: 2 }}>
+                {batchProgress.done} of {batchProgress.total} complete — you'll be notified when done
+              </div>
+              <div style={{ marginTop: 6, height: 3, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 4, background: 'var(--sys-primary,#FF4D00)',
+                  width: `${batchProgress.total ? (batchProgress.done / batchProgress.total) * 100 : 5}%`,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Summary */}
         {strategy.summary && (

@@ -9,8 +9,6 @@ const STUDIO_CREDIT_COSTS = {
     content: 2
 };
 
-
-
 // BUG-03 FIX: Pre-upload image to S3 before generation — never send base64
 const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 

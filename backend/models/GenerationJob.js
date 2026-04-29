@@ -26,7 +26,7 @@ const GenerationJobSchema = new mongoose.Schema(
         // Job source
         type: {
             type: String,
-            enum: ['ai-create', 'photoshoot', 'campaign-shot', 'monthly-strategy', 'research', 'video'],
+            enum: ['ai-create', 'photoshoot', 'campaign-shot', 'monthly-strategy', 'research', 'video', 'batch-calendar'],
             default: 'ai-create',
         },
 
@@ -65,6 +65,10 @@ const GenerationJobSchema = new mongoose.Schema(
         errorMessage: { type: String },
         // Warnings from pipeline
         warnings: [{ type: String }],
+
+        // ── Batch job metadata (for batch-calendar type) ──
+        // Tracks per-item generation progress for frontend polling
+        metadata: { type: mongoose.Schema.Types.Mixed },
 
         // ── Progress steps (mirrors the existing progressId system) ──
         steps: [

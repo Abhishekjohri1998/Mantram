@@ -867,4 +867,158 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// ─── POST /:id/batch-generate — One-click generate all pending calendar images ─
+router.post('/:id/batch-generate', protect, async (req, res) => {
+  try {
+    const doc = await MonthlyStrategy.findOne({ _id: req.params.id, user: req.user._id });
+    if (!doc) return res.status(404).json({ success: false, error: 'Strategy not found' });
+
+    const { imageModel = 'nanobanana-2', itemIds } = req.body;
+
+    // Filter to pending items that target creative studio (image generation)
+    const pendingItems = (doc.calendar || []).filter(item => {
+      if (item.status !== 'pending') return false;
+      if (itemIds?.length && !itemIds.includes(item._id.toString())) return false;
+      const studio = item.targetStudio || 'creative';
+      return studio === 'creative';
+    });
+
+    if (pendingItems.length === 0) {
+      return res.json({ success: true, batchId: null, totalItems: 0, message: 'No pending image items to generate' });
+    }
+
+    // Generate a string jobId (UUID) so /api/jobs/:jobId polling works correctly
+    const batchJobId = crypto.randomUUID();
+
+    const batchJob = await GenerationJob.create({
+      jobId: batchJobId,           // ← string UUID for polling via /api/jobs/:jobId
+      user: req.user._id,
+      brand: doc.brand,
+      type: 'batch-calendar',
+      status: 'processing',
+      prompt: `Batch generate ${pendingItems.length} calendar images using ${imageModel}`,
+      metadata: {
+        strategyId: doc._id.toString(),
+        totalItems: pendingItems.length,
+        imageModel,
+        completedItems: 0,
+        failedItems: 0,
+      },
+    });
+
+    // Return jobId (string) immediately — frontend polls /api/jobs/:jobId
+    res.json({ success: true, batchId: batchJobId, totalItems: pendingItems.length });
+
+    // ── Background: run generation sequentially via setImmediate (non-blocking) ──
+    setImmediate(async () => {
+      try {
+        // Import internalGenerateCreative from sibling route
+        // Note: ES module caches the import so this is effectively free after first call
+        const { internalGenerateCreative } = await import('./creatives.js');
+
+        let completed = 0, failed = 0;
+
+        for (const item of pendingItems) {
+          try {
+            // Build prompt from brief fields
+            const prompt = [
+              item.brief?.visualDirection && `VISUAL: ${item.brief.visualDirection}`,
+              item.brief?.angle && `CAMPAIGN: ${item.brief.angle}`,
+              item.brief?.toneDirection && `MOOD: ${item.brief.toneDirection}`,
+              `Brand-consistent professional marketing visual for ${item.platform || 'instagram'}.`,
+              `FORMAT: ${item.contentType || 'static post'}`,
+            ].filter(Boolean).join('\n');
+
+            // Mark item in_progress
+            await MonthlyStrategy.updateOne(
+              { _id: doc._id, 'calendar._id': item._id },
+              { $set: { 'calendar.$.status': 'in_progress' } }
+            );
+
+            const result = await internalGenerateCreative({
+              body: {
+                prompt,
+                brandId: doc.brand?.toString(),
+                type: `${item.platform || 'instagram'}-post`,
+                options: {
+                  aspectRatio: item.contentType === 'story' ? '9:16' : item.contentType === 'carousel' ? '1:1' : '4:5',
+                  imageModel: imageModel,
+                  imageSize: '1K', // 1K for speed in batch mode
+                },
+              },
+              user: req.user,
+              creditsDeducted: 0,  // ← credits charged separately at job level
+            });
+
+            if (result?.success && result?.creative?.imageUrl) {
+              const assetUrl = result.creative.imageUrl;
+              await MonthlyStrategy.updateOne(
+                { _id: doc._id, 'calendar._id': item._id },
+                {
+                  $set: {
+                    'calendar.$.status': 'complete',
+                    'calendar.$.generatedAsset': {
+                      type: 'image',
+                      url: assetUrl,
+                      title: item.brief?.angle || 'Calendar asset',
+                    },
+                  },
+                }
+              );
+              completed++;
+            } else {
+              await MonthlyStrategy.updateOne(
+                { _id: doc._id, 'calendar._id': item._id },
+                { $set: { 'calendar.$.status': 'pending' } }
+              );
+              failed++;
+            }
+          } catch (itemErr) {
+            console.error(`[batch-generate] Item ${item._id} failed:`, itemErr.message);
+            failed++;
+            // Reset this item to pending so user can retry
+            await MonthlyStrategy.updateOne(
+              { _id: doc._id, 'calendar._id': item._id },
+              { $set: { 'calendar.$.status': 'pending' } }
+            ).catch(() => {});
+          }
+
+          // Update batch job progress after each item
+          await GenerationJob.findOneAndUpdate(
+            { jobId: batchJobId },
+            { $set: { 'metadata.completedItems': completed, 'metadata.failedItems': failed } }
+          );
+        }
+
+        // Mark batch complete
+        const finalStatus = completed > 0 ? 'completed' : 'failed';
+        await GenerationJob.findOneAndUpdate(
+          { jobId: batchJobId },
+          { $set: { status: finalStatus, completedAt: new Date() } }
+        );
+
+        // Notify user
+        await createNotification({
+          user: req.user._id,
+          type: 'batch-calendar',
+          title: `📸 Calendar images ready!`,
+          message: `${completed} of ${pendingItems.length} images generated${failed > 0 ? ` (${failed} failed)` : ''}. Open Brainstorming to review.`,
+          link: '/brainstorm',
+        }).catch(e => console.warn('[batch-generate] notification failed:', e.message));
+
+      } catch (bgErr) {
+        console.error('[batch-generate] background error:', bgErr.message);
+        await GenerationJob.findOneAndUpdate(
+          { jobId: batchJobId },
+          { $set: { status: 'failed', completedAt: new Date(), errorMessage: bgErr.message } }
+        ).catch(() => {});
+      }
+    });
+
+  } catch (err) {
+    console.error('[batch-generate]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

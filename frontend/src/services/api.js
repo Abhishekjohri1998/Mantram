@@ -1332,6 +1332,9 @@ export const monthlyStrategy = {
         apiFetch('/creatives/generate', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     // Fire-and-forget background job — returns { jobId } immediately, pipeline runs on server
     startJob: (data) => apiFetch('/monthly-strategy/generate/start', { method: 'POST', body: JSON.stringify(data) }),
+    // Batch generate all pending calendar images — returns { batchId, totalItems }
+    batchGenerate: (strategyId, data) =>
+        apiFetch(`/monthly-strategy/${strategyId}/batch-generate`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Brand Calendar ──────────────────────────────────────────────────────────
