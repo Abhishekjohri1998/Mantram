@@ -61,36 +61,55 @@ function PromptBlock({ text }) {
     );
 }
 
+const STUDIO_SECTIONS = [
+    { value: 'ai_create',    label: 'AI Create' },
+    { value: 'carousel',     label: 'Carousel' },
+    { value: 'campaign',     label: 'Campaign' },
+    { value: 'campaign_shot',label: 'Campaign Shot' },
+    { value: 'video_ugc',    label: 'Video UGC' },
+    { value: 'video_qads',   label: 'Video Q-Ads' },
+    { value: 'avatar',       label: 'Avatar' },
+    { value: 'general',      label: 'General' },
+];
+
 const TemplateManager = () => {
     const { addToast } = useUI();
-    
+
+    // Top-level tab
+    const [activeTab, setActiveTab] = useState('templates'); // 'templates' | 'categories'
+
     // Data
     const [templates, setTemplates] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    // Filtering state
+
+    // Filtering
     const [studioFilter, setStudioFilter] = useState('All');
     const [catFilter, setCatFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'active', 'inactive'
+    const [activeFilter, setActiveFilter] = useState('all');
 
-    // Modal state
+    // Modal
     const [modal, setModal] = useState({ open: false, data: null });
     const [tags, setTags] = useState([]);
-    
-    // Inline confirmation tracking
     const [deletingId, setDeletingId] = useState(null);
-
-    // Submission states
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitStatus, setSubmitStatus] = useState('');
+
+    // Bulk selection (FIX 8)
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkBusy, setBulkBusy] = useState(false);
+
+    // Category Manager state (FIX 4)
+    const [catLoading, setCatLoading] = useState(false);
+    const [catModal, setCatModal] = useState({ open: false, data: null });
+    const [catSubmitting, setCatSubmitting] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const [tempRes, catRes] = await Promise.all([
-                api('/superadmin/templates'), // fetched without pagination limit
+                api('/superadmin/templates'),
                 api('/superadmin/templates/categories')
             ]);
             setTemplates(tempRes.templates || []);
@@ -102,9 +121,62 @@ const TemplateManager = () => {
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const fetchCategories = async () => {
+        setCatLoading(true);
+        try {
+            const res = await api('/superadmin/templates/categories');
+            setCategories(res.categories || []);
+        } catch (err) { addToast(err.message, 'error'); }
+        finally { setCatLoading(false); }
+    };
+
+    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { if (activeTab === 'categories') fetchCategories(); }, [activeTab]);
+
+    // ── Bulk publish helpers (FIX 8) ──
+    const bulkAction = async (action) => {
+        if (!selectedIds.size) return;
+        setBulkBusy(true);
+        const ids = [...selectedIds];
+        try {
+            if (action === 'publish' || action === 'unpublish') {
+                await Promise.all(ids.map(id =>
+                    api(`/superadmin/templates/${id}`, { method: 'PUT', body: JSON.stringify({ isPublished: action === 'publish' }) })
+                ));
+                setTemplates(prev => prev.map(t => ids.includes(t._id) ? { ...t, isPublished: action === 'publish' } : t));
+                addToast(`${ids.length} template${ids.length > 1 ? 's' : ''} ${action === 'publish' ? 'published' : 'unpublished'}`, 'success');
+            } else if (action === 'deactivate') {
+                await Promise.all(ids.map(id =>
+                    api(`/superadmin/templates/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: false }) })
+                ));
+                setTemplates(prev => prev.map(t => ids.includes(t._id) ? { ...t, isActive: false } : t));
+                addToast(`${ids.length} template${ids.length > 1 ? 's' : ''} deactivated`, 'success');
+            }
+            setSelectedIds(new Set());
+        } catch (err) { addToast(err.message, 'error'); }
+        finally { setBulkBusy(false); }
+    };
+
+    // ── Category CRUD (FIX 4) ──
+    const saveCategory = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = { name: fd.get('name'), color: fd.get('color'), description: fd.get('description'), sortOrder: Number(fd.get('sortOrder') || 0) };
+        setCatSubmitting(true);
+        try {
+            if (catModal.data?._id) {
+                await api(`/superadmin/templates/categories/${catModal.data._id}`, { method: 'PUT', body: JSON.stringify(payload) });
+                addToast('Category updated', 'success');
+            } else {
+                await api('/superadmin/templates/categories', { method: 'POST', body: JSON.stringify(payload) });
+                addToast('Category created', 'success');
+            }
+            setCatModal({ open: false, data: null });
+            fetchCategories();
+            fetchData(); // refresh template list too (category names)
+        } catch (err) { addToast(err.message, 'error'); }
+        finally { setCatSubmitting(false); }
+    };
 
     // Formatted date helper
     const formatDate = (dateString) => {
@@ -186,8 +258,10 @@ const TemplateManager = () => {
                 uploadFd.append('tags', JSON.stringify(tags));
                 uploadFd.append('savedPrompt', fd.get('savedPrompt'));
                 uploadFd.append('studioOrigin', fd.get('studioOrigin'));
+                uploadFd.append('studioSection', fd.get('studioSection'));
                 uploadFd.append('isFeatured', fd.get('isFeatured') === 'on');
                 uploadFd.append('isActive', fd.get('isActive') === 'on');
+                uploadFd.append('isPublished', fd.get('isPublished') === 'on');
 
                 const res = await api('/superadmin/templates/upload', {
                     method: 'POST',
@@ -202,10 +276,12 @@ const TemplateManager = () => {
                 const data = {
                     name: fd.get('name'),
                     categoryId: fd.get('categoryId'),
+                    studioSection: fd.get('studioSection'),
                     description: fd.get('description'),
                     tags: tags,
                     isFeatured: fd.get('isFeatured') === 'on',
-                    isActive: fd.get('isActive') === 'on'
+                    isActive: fd.get('isActive') === 'on',
+                    isPublished: fd.get('isPublished') === 'on'
                 };
 
                 const res = await api(`/superadmin/templates/${modal.data._id}`, {
@@ -250,171 +326,198 @@ const TemplateManager = () => {
 
     return (
         <div style={{ padding: '32px 40px', color: '#fff', maxWidth: 1400, margin: '0 auto' }}>
+            {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
                 <div>
                     <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Template Manager</h1>
                     <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Manage and govern platform templates</div>
                 </div>
-                <button onClick={() => { setTags([]); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
-                    + Upload Template
-                </button>
-            </div>
-
-            {/* Filter Bar */}
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', background: '#12121A', padding: '16px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-                {/* Studio Pills */}
-                <div style={{ display: 'flex', gap: 8, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8 }}>
-                    {['All', 'Creative', 'Video', 'Content'].map(s => (
-                        <button 
-                            key={s} 
-                            onClick={() => setStudioFilter(s)}
-                            style={{ 
-                                background: studioFilter === s ? 'rgba(255,255,255,0.15)' : 'transparent', 
-                                color: studioFilter === s ? '#fff' : 'rgba(255,255,255,0.5)', 
-                                border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' 
-                            }}
-                        >
-                            {s}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Category Dropdown */}
-                <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ ...inputStyle, width: 200, padding: '8px 12px' }}>
-                    <option value="">All Categories</option>
-                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-
-                {/* Active Filter Toggle */}
-                <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} style={{ ...inputStyle, width: 150, padding: '8px 12px' }}>
-                    <option value="all">All Status</option>
-                    <option value="active">Active Only</option>
-                    <option value="inactive">Inactive Only</option>
-                </select>
-
-                <div style={{ flex: 1 }} />
-
-                {/* Search */}
-                <div style={{ position: 'relative', width: 260 }}>
-                    <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: 10, fontSize: 18, color: 'rgba(255,255,255,0.4)' }}>search</span>
-                    <input 
-                        type="text" 
-                        placeholder="Search templates..." 
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        style={{ ...inputStyle, paddingLeft: 36, padding: '8px 12px 8px 36px' }}
-                    />
+                <div style={{ display: 'flex', gap: 10 }}>
+                    {activeTab === 'categories'
+                        ? <button onClick={() => setCatModal({ open: true, data: null })} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ New Category</button>
+                        : <button onClick={() => { setTags([]); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
+                    }
                 </div>
             </div>
 
-            {/* Templates Table */}
-            <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <th style={{ padding: '14px 20px', textAlign: 'left', width: 80 }}>Preview</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Name</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Category</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Studio</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Status</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Usage</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'left' }}>Created</th>
-                            <th style={{ padding: '14px 20px', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredTemplates.length === 0 ? (
-                            <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>No templates found matching the criteria.</td></tr>
-                        ) : filteredTemplates.map(t => {
-                            const catName = categories.find(c => c._id === t.categoryId)?.name || 'Uncategorized';
-                            const badge = getStudioBadgeStyle(t.studioOrigin);
-                            const isDeleting = deletingId === t._id;
-                            
-                            return (
-                                <tr key={t._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <td style={{ padding: '14px 20px' }}>
-                                        {(t.previewUrl || t.previewImageUrl) ? (
-                                            t.previewType === 'video' 
-                                                ? <video src={t.previewUrl || t.previewImageUrl} autoPlay muted loop style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} />
-                                                : <img src={t.previewUrl || t.previewImageUrl} style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover' }} alt="" />
-                                        ) : (
-                                            <div style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.2)', fontSize: 24 }}>image</span>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                {[{ id: 'templates', label: 'Templates', count: templates.length }, { id: 'categories', label: 'Categories', count: categories.length }].map(tab => (
+                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ padding: '10px 20px', fontWeight: 700, fontSize: 13, border: 'none', background: 'transparent', color: activeTab === tab.id ? '#f97316' : 'rgba(255,255,255,0.45)', borderBottom: activeTab === tab.id ? '2px solid #f97316' : '2px solid transparent', cursor: 'pointer' }}>
+                        {tab.label} ({tab.count})
+                    </button>
+                ))}
+            </div>
+
+            {/* ===== CATEGORIES TAB ===== */}
+            {activeTab === 'categories' && (
+                <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden' }}>
+                    {catLoading ? <div style={{ padding: 32, textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Loading categories…</div> : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', width: 40 }}>Color</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left' }}>Name</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left' }}>Slug</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left' }}>Sort</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left' }}>Active</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'right' }}>Edit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {categories.length === 0 && <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>No categories yet.</td></tr>}
+                                {categories.map(c => (
+                                    <tr key={c._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '12px 20px' }}><div style={{ width: 22, height: 22, borderRadius: 6, background: c.color || '#888' }} /></td>
+                                        <td style={{ padding: '12px 20px', fontWeight: 700 }}>{c.name}</td>
+                                        <td style={{ padding: '12px 20px' }}><code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 4, fontSize: 11 }}>{c.slug}</code></td>
+                                        <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,0.5)' }}>{c.sortOrder}</td>
+                                        <td style={{ padding: '12px 20px' }}><span style={toggleBtnStyle(c.isActive !== false)}>{c.isActive !== false ? 'Active' : 'Inactive'}</span></td>
+                                        <td style={{ padding: '12px 20px', textAlign: 'right' }}><button onClick={() => setCatModal({ open: true, data: c })} style={actionBtnStyle}>Edit</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            {/* ===== TEMPLATES TAB ===== */}
+            {activeTab === 'templates' && (<>
+                {/* Bulk toolbar */}
+                {selectedIds.size > 0 && (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, padding: '10px 16px', background: 'rgba(232,65,24,0.08)', border: '1px solid rgba(232,65,24,0.2)', borderRadius: 10 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>{selectedIds.size} selected</span>
+                        <button disabled={bulkBusy} onClick={() => bulkAction('publish')} style={{ ...actionBtnStyle, color: '#E84118', borderColor: 'rgba(232,65,24,0.3)' }}>Publish Selected</button>
+                        <button disabled={bulkBusy} onClick={() => bulkAction('unpublish')} style={actionBtnStyle}>Unpublish Selected</button>
+                        <button disabled={bulkBusy} onClick={() => bulkAction('deactivate')} style={{ ...actionBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}>Deactivate Selected</button>
+                        <button onClick={() => setSelectedIds(new Set())} style={{ ...actionBtnStyle, marginLeft: 'auto' }}>Clear</button>
+                    </div>
+                )}
+
+                {/* Filter Bar */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', background: '#12121A', padding: '14px 18px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8 }}>
+                        {['All', 'Creative', 'Video', 'Content'].map(s => (
+                            <button key={s} onClick={() => setStudioFilter(s)} style={{ background: studioFilter === s ? 'rgba(255,255,255,0.15)' : 'transparent', color: studioFilter === s ? '#fff' : 'rgba(255,255,255,0.5)', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{s}</button>
+                        ))}
+                    </div>
+                    <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ ...inputStyle, width: 180, padding: '7px 10px' }}>
+                        <option value="">All Categories</option>
+                        {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                    </select>
+                    <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} style={{ ...inputStyle, width: 140, padding: '7px 10px' }}>
+                        <option value="all">All Status</option>
+                        <option value="active">Active Only</option>
+                        <option value="inactive">Inactive Only</option>
+                    </select>
+                    <div style={{ flex: 1 }} />
+                    <div style={{ position: 'relative', width: 240 }}>
+                        <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: 9, fontSize: 18, color: 'rgba(255,255,255,0.4)' }}>search</span>
+                        <input type="text" placeholder="Search templates..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ ...inputStyle, paddingLeft: 36, padding: '7px 12px 7px 34px' }} />
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <th style={{ padding: '12px 16px', width: 32 }}>
+                                    <input type="checkbox"
+                                        onChange={e => setSelectedIds(e.target.checked ? new Set(filteredTemplates.map(t => t._id)) : new Set())}
+                                        checked={selectedIds.size === filteredTemplates.length && filteredTemplates.length > 0}
+                                    />
+                                </th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', width: 80 }}>Preview</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Name</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Category</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Section</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Active</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#E84118' }}>Published</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usage</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredTemplates.length === 0 ? (
+                                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>No templates found.</td></tr>
+                            ) : filteredTemplates.map(t => {
+                                const catName = categories.find(c => c._id === t.categoryId)?.name || 'Uncategorized';
+                                const isDeleting = deletingId === t._id;
+                                const isSelected = selectedIds.has(t._id);
+                                const previewSrc = t.previewUrl || t.previewImageUrl;
+                                return (
+                                    <tr key={t._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: isSelected ? 'rgba(232,65,24,0.04)' : 'transparent' }}>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <input type="checkbox" checked={isSelected} onChange={e => {
+                                                const s = new Set(selectedIds);
+                                                e.target.checked ? s.add(t._id) : s.delete(t._id);
+                                                setSelectedIds(s);
+                                            }} />
+                                        </td>
+                                        {/* Preview with hover popup (FIX 11) */}
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ position: 'relative', width: 56, height: 56 }}
+                                                onMouseEnter={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'block'; }}
+                                                onMouseLeave={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'none'; }}>
+                                                {previewSrc
+                                                    ? <img src={previewSrc} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />
+                                                    : <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)' }}>image</span></div>
+                                                }
+                                                {previewSrc && (
+                                                    <div className="tmpl-pop" style={{ display: 'none', position: 'absolute', top: 0, left: 64, width: 200, height: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                                        <img src={previewSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '14px 20px', fontWeight: 600 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            {t.name}
-                                            {t.sourceJobId && (
-                                                <div title={`Promoted from ${t.studioOrigin} generation`} style={{ display: 'flex', alignItems: 'center', cursor: 'help' }}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f97316' }}>link</span>
+                                        </td>
+                                        <td style={{ padding: '12px 16px', fontWeight: 600 }}>{t.name}</td>
+                                        <td style={{ padding: '12px 16px' }}><span style={{ background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{catName}</span></td>
+                                        <td style={{ padding: '12px 16px' }}><code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{t.studioSection || 'general'}</code></td>
+                                        {/* Active toggle (green) */}
+                                        <td style={{ padding: '12px 16px' }}><button onClick={() => toggleField(t, 'isActive')} style={toggleBtnStyle(t.isActive)}>{t.isActive ? 'Active' : 'Inactive'}</button></td>
+                                        {/* Publish toggle (orange — FIX 7) */}
+                                        <td style={{ padding: '12px 16px' }}><button onClick={() => toggleField(t, 'isPublished')} style={toggleBtnStyle(t.isPublished, '#E84118')}>{t.isPublished ? 'Published' : 'Draft'}</button></td>
+                                        <td style={{ padding: '12px 16px', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{t.usageCount || 0}</td>
+                                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                            {isDeleting ? (
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{(t.usageCount || 0) > 0 ? 'Deactivate?' : 'Permanent?'}</span>
+                                                    <button onClick={cancelDelete} style={actionBtnStyle}>Cancel</button>
+                                                    <button onClick={() => confirmDelete(t)} style={{ ...actionBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>Confirm</button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => openEditModal(t)} style={actionBtnStyle}>Edit</button>
+                                                    <button onClick={() => handleDeleteClick(t)} style={{ ...actionBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}>Delete</button>
                                                 </div>
                                             )}
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '14px 20px' }}>
-                                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{catName}</span>
-                                    </td>
-                                    <td style={{ padding: '14px 20px' }}>
-                                        <span style={{ background: badge.bg, color: badge.color, padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t.studioOrigin}</span>
-                                    </td>
-                                    <td style={{ padding: '14px 20px' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-                                            <button onClick={() => toggleField(t, 'isActive')} style={toggleBtnStyle(t.isActive)}>
-                                                {t.isActive ? 'Active' : 'Inactive'}
-                                            </button>
-                                            <button onClick={() => toggleField(t, 'isFeatured')} style={toggleBtnStyle(t.isFeatured, '#fbbf24')}>
-                                                {t.isFeatured ? '★ Featured' : 'Not Featured'}
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '14px 20px', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{t.usageCount || 0}</td>
-                                    <td style={{ padding: '14px 20px', color: 'rgba(255,255,255,0.5)' }}>{formatDate(t.createdAt)}</td>
-                                    <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                                        {isDeleting ? (
-                                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginRight: 4 }}>
-                                                    {(t.usageCount || 0) > 0 ? 'Deactivate?' : 'Permanent?'}
-                                                </span>
-                                                <button onClick={cancelDelete} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                                                <button onClick={() => confirmDelete(t)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Confirm Delete</button>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                                <button onClick={() => openEditModal(t)} style={actionBtnStyle}>Edit</button>
-                                                <button onClick={() => handleDeleteClick(t)} style={{ ...actionBtnStyle, color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}>Delete</button>
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </>)}
 
-            {/* EDIT MODAL */}
+            {/* ===== TEMPLATE EDIT MODAL ===== */}
             {modal.open && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setModal({ open: false, data: null })}>
                     <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '100%', maxWidth: 640, padding: 24, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{modal.isNew ? 'Upload New Template' : 'Edit Template'}</h2>
-                            <button type="button" onClick={() => setModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
+                            <button type="button" onClick={() => setModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}><span className="material-symbols-outlined">close</span></button>
                         </div>
-                        
                         <form onSubmit={saveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                             {modal.isNew && (
-                                <div style={{ display: 'flex', gap: 16 }}>
-                                    <label style={{ ...labelStyle, flex: 2 }}>
-                                        Preview Media (Image/Video)
-                                        <input type="file" name="file" accept="image/*,video/*" required={modal.isNew} style={{ ...inputStyle, padding: '8px 10px' }} />
+                                <div style={{ display: 'flex', gap: 14 }}>
+                                    <label style={{ ...labelStyle, flex: 2 }}>Preview Media
+                                        <input type="file" name="file" accept="image/*,video/*" required style={{ ...inputStyle, padding: '7px 10px', marginTop: 6 }} />
                                     </label>
-                                    <label style={{ ...labelStyle, flex: 1 }}>
-                                        Studio Origin
-                                        <select name="studioOrigin" required defaultValue="creative" style={inputStyle}>
+                                    <label style={{ ...labelStyle, flex: 1 }}>Studio Origin
+                                        <select name="studioOrigin" defaultValue="creative" style={{ ...inputStyle, marginTop: 6 }}>
                                             <option value="creative">Creative</option>
                                             <option value="video">Video</option>
                                             <option value="content">Content</option>
@@ -422,93 +525,85 @@ const TemplateManager = () => {
                                     </label>
                                 </div>
                             )}
-
-                            <div style={{ display: 'flex', gap: 16 }}>
-                                <label style={{ ...labelStyle, flex: 2 }}>
-                                    Name
-                                    <input name="name" defaultValue={modal.data?.name} required style={inputStyle} />
+                            <div style={{ display: 'flex', gap: 14 }}>
+                                <label style={{ ...labelStyle, flex: 2 }}>Name
+                                    <input name="name" defaultValue={modal.data?.name} required style={{ ...inputStyle, marginTop: 6 }} />
                                 </label>
-                                <label style={{ ...labelStyle, flex: 1 }}>
-                                    Category
-                                    <select name="categoryId" defaultValue={modal.data?.categoryId} required style={inputStyle}>
+                                <label style={{ ...labelStyle, flex: 1 }}>Category
+                                    <select name="categoryId" defaultValue={modal.data?.categoryId} required style={{ ...inputStyle, marginTop: 6 }}>
                                         <option value="">Select Category</option>
                                         {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                                     </select>
                                 </label>
                             </div>
-
-                            <label style={labelStyle}>
-                                Description
-                                <textarea name="description" defaultValue={modal.data?.description} required rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                            {/* FIX 6 — Studio Section */}
+                            <label style={labelStyle}>Studio Section
+                                <select name="studioSection" defaultValue={modal.data?.studioSection || 'general'} required style={{ ...inputStyle, marginTop: 6 }}>
+                                    {STUDIO_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
                             </label>
-
-                            <label style={labelStyle}>
-                                Tags
+                            <label style={labelStyle}>Description
+                                <textarea name="description" defaultValue={modal.data?.description} required rows={2} style={{ ...inputStyle, resize: 'vertical', marginTop: 6 }} />
+                            </label>
+                            <label style={labelStyle}>Tags
                                 <TagInput tags={tags} setTags={setTags} />
                             </label>
-
-                            <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginTop: 4 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-                                    <input type="checkbox" name="isFeatured" defaultChecked={modal.data?.isFeatured ?? false} />
-                                    Featured
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-                                    <input type="checkbox" name="isActive" defaultChecked={modal.data?.isActive ?? true} />
-                                    Active
-                                </label>
+                            <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginTop: 4 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isFeatured" defaultChecked={modal.data?.isFeatured ?? false} /> Featured</label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isActive" defaultChecked={modal.data?.isActive ?? true} /> Active</label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isPublished" defaultChecked={modal.data?.isPublished ?? false} /> Published</label>
                             </div>
-
-                            <div style={{ margin: '8px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
-                            
+                            <div style={{ margin: '6px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
                             <div>
                                 {modal.isNew ? (
-                                    <label style={labelStyle}>
-                                        Prompt Formula (Template)
-                                        <textarea name="savedPrompt" required rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }} placeholder="Enter the exact prompt to use when generating from this template..." />
+                                    <label style={labelStyle}>Prompt Formula
+                                        <textarea name="savedPrompt" required rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} placeholder="Enter the exact prompt to use when generating from this template..." />
                                     </label>
                                 ) : (
                                     <>
                                         <span style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Saved Prompt (Read-Only)</span>
                                         <PromptBlock text={modal.data?.savedPrompt} />
-                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-                                            To change the prompt, create a new template from a studio generation.
-                                        </div>
+                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>To change the prompt, create a new template from a studio generation.</div>
                                     </>
                                 )}
                             </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                <button 
-                                    type="submit" 
-                                    disabled={isSubmitting}
-                                    style={{ 
-                                        background: isSubmitting ? 'rgba(249, 115, 22, 0.5)' : '#f97316', 
-                                        color: '#fff', 
-                                        border: 'none', 
-                                        padding: '10px 20px', 
-                                        borderRadius: 8, 
-                                        fontWeight: 700, 
-                                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <span className="material-symbols-outlined ugc2-spin" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>
-                                            {submitStatus}
-                                        </>
-                                    ) : (
-                                        modal.isNew ? 'Upload & Create' : 'Save Template'
-                                    )}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <button type="submit" disabled={isSubmitting} style={{ background: isSubmitting ? 'rgba(249,115,22,0.5)' : '#f97316', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {isSubmitting ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>{submitStatus}</> : (modal.isNew ? 'Upload & Create' : 'Save Template')}
                                 </button>
-                                <style>{`
-                                    @keyframes spin {
-                                        from { transform: rotate(0deg); }
-                                        to { transform: rotate(360deg); }
-                                    }
-                                `}</style>
+                                <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== CATEGORY MODAL (FIX 4) ===== */}
+            {catModal.open && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001 }} onClick={() => setCatModal({ open: false, data: null })}>
+                    <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{catModal.data?._id ? 'Edit Category' : 'New Category'}</h2>
+                            <button type="button" onClick={() => setCatModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}><span className="material-symbols-outlined">close</span></button>
+                        </div>
+                        <form onSubmit={saveCategory} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <label style={labelStyle}>Name
+                                <input name="name" defaultValue={catModal.data?.name} required style={{ ...inputStyle, marginTop: 6 }} />
+                            </label>
+                            <label style={labelStyle}>Color
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
+                                    <input type="color" name="color" defaultValue={catModal.data?.color || '#888888'} style={{ width: 44, height: 36, border: 'none', borderRadius: 6, cursor: 'pointer', background: 'transparent' }} />
+                                    <span style={{ ...inputStyle, flex: 1, fontSize: 12, fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>{catModal.data?.color || '#888888'}</span>
+                                </div>
+                            </label>
+                            <label style={labelStyle}>Description
+                                <textarea name="description" defaultValue={catModal.data?.description} rows={2} style={{ ...inputStyle, resize: 'vertical', marginTop: 6 }} />
+                            </label>
+                            <label style={labelStyle}>Sort Order
+                                <input type="number" name="sortOrder" defaultValue={catModal.data?.sortOrder ?? 0} style={{ ...inputStyle, marginTop: 6, width: 100 }} />
+                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                                <button type="submit" disabled={catSubmitting} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{catSubmitting ? 'Saving…' : 'Save Category'}</button>
                             </div>
                         </form>
                     </div>
@@ -522,16 +617,11 @@ const TemplateManager = () => {
 const inputStyle = { background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px', color: '#fff', width: '100%', fontSize: 13, outline: 'none' };
 const labelStyle = { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 };
 const actionBtnStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 };
-
 const toggleBtnStyle = (isActive, activeColor = '#10b981') => ({
     background: isActive ? `${activeColor}22` : 'rgba(255,255,255,0.05)',
     color: isActive ? activeColor : 'rgba(255,255,255,0.4)',
     border: `1px solid ${isActive ? `${activeColor}44` : 'rgba(255,255,255,0.1)'}`,
-    padding: '4px 10px',
-    borderRadius: 12,
-    fontSize: 11,
-    fontWeight: 700,
-    cursor: 'pointer'
+    padding: '4px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer'
 });
 
 export default TemplateManager;

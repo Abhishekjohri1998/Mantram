@@ -17,7 +17,17 @@ import './CreativeStudio/CreativeStudio.css'
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
-function TemplateSuggestionRow({ brandId, onSelect }) {
+// Lightweight role check from stored JWT — no context needed at module scope
+function getStoredRole() {
+    try {
+        const token = localStorage.getItem('mantram_token')
+        if (!token) return null
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload?.role || null
+    } catch { return null }
+}
+
+function TemplateSuggestionRow({ brandId, onSelect, section = 'ai_create' }) {
     const [templates, setTemplates] = useState([])
     const [loaded, setLoaded] = useState(false)
 
@@ -25,7 +35,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         let cancelled = false
         const token = localStorage.getItem('mantram_token')
         const qs = brandId ? `?brandId=${brandId}` : ''
-        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
+        fetch(`${TMPL_ROW_API}/templates/by-section/${section}${qs}`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(r => r.ok ? r.json() : null)
@@ -33,7 +43,24 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         .catch(() => {}) // silent failure — never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
-    }, [brandId])
+    }, [brandId, section])
+
+    // Superadmin placeholder — shown only to admins when 0 templates exist for this section
+    if (loaded && templates.length === 0 && getStoredRole() === 'superadmin') {
+        return (
+            <div style={{
+                padding: '10px 16px 10px',
+                borderBottom: '1px solid var(--sys-border)',
+                display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, opacity: 0.3 }}>dashboard_customize</span>
+                <span style={{ fontSize: 11, opacity: 0.35, fontWeight: 600 }}>
+                    No templates for <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>{section}</code> yet —{' '}
+                    <a href="/superadmin" style={{ color: '#E84118', textDecoration: 'none', fontWeight: 700 }}>create one in Super Admin</a>
+                </span>
+            </div>
+        )
+    }
 
     // Don't render anything until loaded (prevents layout shift)
     if (!loaded || templates.length === 0) return null
@@ -495,6 +522,10 @@ export default function CreativeStudio() {
     const [publishData, setPublishData] = useState(null) // { image, text } or null
     const [imageModel, setImageModel] = useState('nanobanana-2')
     const [showModelMenu, setShowModelMenu] = useState(false)
+    const [modelMenuPos, setModelMenuPos] = useState({ bottom: 200, left: 0 })
+    const [showFormatMenu, setShowFormatMenu] = useState(false)
+    const [formatMenuPos, setFormatMenuPos] = useState({ bottom: 200, left: 0 })
+
     const [showBusyModal, setShowBusyModal] = useState(false)
     const [busyModelInfo, setBusyModelInfo] = useState(null)
     const [selectedShot, setSelectedShot] = useState(null)      // Camera shot preset for AI Create
@@ -1157,6 +1188,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         document.addEventListener('mousedown', handleClick)
         return () => document.removeEventListener('mousedown', handleClick)
     }, [upscaleMenu])
+
+    // ── Close all Scott Panel dropdowns on outside click ──
+    useEffect(() => {
+        const close = () => {
+            setShowModelMenu(false)
+            setShowFormatMenu(false)
+            setShowCsModelMenu(false)
+        }
+        window.addEventListener('click', close)
+        return () => window.removeEventListener('click', close)
+    }, [])
 
     async function handleDownloadImage(url, filename) {
         if (!url) return
@@ -2790,7 +2832,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* ====================== UNIFIED CREATE MODE — SPLIT PANEL ====================== */}
             {studioMode === 'create' && (
                 <>
-                <div className="creative-split fade-up">
+                <div className="creative-split fade-up gallery-only">
 
 
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
@@ -2825,6 +2867,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* ═══ TEMPLATE SUGGESTION ROW — section=ai_create ═══ */}
                         <TemplateSuggestionRow
                             brandId={activeBrand?._id}
+                            section="ai_create"
                             onSelect={(t) => { setShowTemplateLibrary(true) }}
                         />
 
@@ -4038,254 +4081,239 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                    </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
+                    </div>{/* ═══════════ END GALLERY PANEL ═══════════ */}
 
-                    {/* ═══════════ SIDEBAR COMMAND PANEL WITH SETTINGS ═══════════ */}
-                    <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
-                            {/* ── NEW FREEPIK SIDEBAR BODY ── */}
-                            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
-                                
-                                {/* ── Model Selector ── */}
-                                <div className="px-5 mt-3 pb-4">
-                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
-                                    <div className="relative">
-                                        <button onClick={() => setShowModelMenu(!showModelMenu)} className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
-                                            <div className="flex items-center gap-2.5">
-                                                <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
-                                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
-                                                </span>
-                                                <span className="text-[13px] font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-text)] transition-colors">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
-                                            </div>
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]" style={{ fontSize: '18px' }}>settings</span>
-                                        </button>
-                                        {showModelMenu && (
-                                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
-                                                <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                                    {IMAGE_MODELS.map(m => (
-                                                        <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                            className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
-                                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
-                                                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[11px] font-bold truncate">{m.name}</span>
-                                                                    {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
-                                                                </div>
-                                                                <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
-                                                            </div>
-                                                            {imageModel === m.id && (
-                                                                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
-                                                                    <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
-                                                                </div>
-                                                            )}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                </div>{/* ═══ end creative-split (gallery only — sidebar removed) ═══ */}
 
-                                {/* ── References Dash Grid ── */}
-                                <div className="px-5 pb-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
-                                        <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{ (referenceImages.style ? 1 : 0) + characters.length }/14</span>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2 relative z-0">
-                                        {/* Style Block */}
-                                        {referenceImages.style ? (
-                                            <div className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
-                                                <img loading="lazy" decoding="async" src={referenceImages.style} className="w-full h-full rounded-2xl object-cover border border-[var(--sys-border)]" />
-                                                <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
-                                                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur shadow-sm">Style</span>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                                <span className="material-symbols-outlined text-[20px] mb-1">star</span>
-                                                <span className="text-[10px] font-medium leading-none">Style</span>
-                                            </button>
-                                        )}
-                                        {/* Character Blocks */}
-                                        {characters.map((char, idx) => (
-                                            <div key={idx} className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
-                                                <img loading="lazy" decoding="async" src={char.image} alt={char.name} className="w-full h-full rounded-2xl object-cover border border-primary/50" />
-                                                <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
-                                            </div>
-                                        ))}
-                                        {/* Default Add Blocks */}
-                                        {characters.length < 13 && (
-                                            <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                                <span className="material-symbols-outlined text-[20px] mb-1">person</span>
-                                                <span className="text-[10px] font-medium leading-none">Character</span>
-                                            </button>
-                                        )}
-                                        {characters.length < 12 && !referenceImages.style && (
-                                            <button onClick={() => { setRefPickerSlot('character-add'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                                <span className="material-symbols-outlined text-[20px] mb-1">add</span>
-                                                <span className="text-[10px] font-medium leading-none">Add</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
+                {/* ═══════════════════════════════════════════════════
+                    AI CREATE — SCOTT PANEL (floating, full-width)
+                    All settings here: model, format, refs, quality
+                    ═══════════════════════════════════════════════════ */}
+                <div className="cs-scott-layout">
+                    <div className="cs-scott-card">
 
-                                {/* ── Unified Prompt Textarea (Full Height Expansion) ── */}
-                                <div className="px-5 pb-3 flex flex-col flex-grow">
-                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
-                                    <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow">
-                                        <textarea
-                                            value={prompt}
-                                            maxLength={5000}
-                                            onChange={e => {
-                                                const val = e.target.value.slice(0, 5000); setPrompt(val);
-                                                const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\w*)$/);
-                                                if (atMatch && (characters.length > 0 || referenceImages.upload || referenceImages.style)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
-                                            }}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
-                                                if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
-                                            }}
-                                            placeholder={activeBrand ? "Describe your image—try @ to add references" : "Select a brand first..."}
-                                            disabled={!activeBrand || activeGenerations.length >= 3}
-                                            className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[140px]"
-                                            ref={promptTextareaRef}
-                                        />
-                                        {prompt.length > 4000 && (
-                                            <div style={{ textAlign: 'right', fontSize: '10px', padding: '0 12px 4px', color: prompt.length > 4800 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>
-                                                {prompt.length}/5000
-                                            </div>
-                                        )}
-                                        
-                                        {/* Char Tag Auto-fill Box */}
-                                        {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
-                                            <div className="absolute left-2 top-2/3 mb-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-2 z-[60] min-w-[200px] animate-fade-in">
-                                                <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a reference</p>
-                                                {(() => {
-                                                    const tagOptions = [...characters];
-                                                    if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
-                                                    if (referenceImages.style) tagOptions.push({ name: 'Style', image: referenceImages.style });
-                                                    return tagOptions.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
-                                                        <button key={idx} onClick={() => {
-                                                            const textarea = promptTextareaRef.current; if (!textarea) return;
-                                                            const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
-                                                            const cleaned = before.replace(/@\w*$/, ''); const tagName = char.name.replace(/\s/g, '');
-                                                            setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
-                                                        }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
-                                                            <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--sys-border)] shrink-0 bg-[var(--sys-surface)]">
-                                                                <img loading="lazy" decoding="async" src={char.image} alt="" className="w-full h-full object-cover" />
-                                                            </div>
-                                                            <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name.replace(/\s/g, '')}</p></div>
-                                                        </button>
-                                                    ));
-                                                })()}
-                                            </div>
-                                        )}
+                        {/* ── HEADER ── */}
+                        <div className="cs-scott-header">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-primary)' }}>auto_awesome</span>
+                                <span style={{ fontWeight: 700, fontSize: 12 }}>AI Create</span>
+                                {activeBrand && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-primary)', padding: '1px 7px', borderRadius: 4, background: 'var(--sys-primary-dim)', border: '1px solid rgba(255,77,0,0.18)' }}>
+                                        {activeBrand.name}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {activeGenerations.length > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12, animation: 'cs-spin 1s linear infinite' }}>progress_activity</span>
+                                        {activeGenerations.length}/3
+                                    </span>
+                                )}
+                            </div>
+                        </div>
 
-                                        {/* Original Enhance Prompt Button & Voice */}
-                                        <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
-                                            <div className="flex items-center gap-3">
-                                                {/* Text Overlay Toggle for Generation */}
-                                                <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title="Add Text Overlay">
-                                                    <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[18px]' : 'left-[2px]')} />
-                                                </button>
-                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>Add Text to Image (Copy)</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <button onClick={handleEnhancePrompt} disabled={!prompt.trim() || enhancing || !activeBrand} className={"flex items-center gap-1 bg-[var(--sys-primary)]/10 text-[var(--sys-primary)] hover:bg-[var(--sys-primary)] hover:text-white transition-all py-1.5 px-3 rounded-full text-[11px] font-bold cursor-pointer " + (!prompt.trim() ? "opacity-50 grayscale cursor-not-allowed" : "shadow-sm")} title="Enhance prompt with Brand DNA" >
-                                                    <span className={"material-symbols-outlined text-[14px] " + (enhancing ? "animate-spin" : "")}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
-                                                    {enhancing ? 'Enhancing...' : 'Enhance'}
-                                                </button>
-                                                <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
-                                            </div>
-                                        </div>
-                                        {/* Dynamic Text Overlay Controls */}
-                                        {generateCopy && (
-                                            <div className="px-4 py-3 border-t border-[var(--sys-border)] bg-[var(--sys-bg)] space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    {copyLoading ? (
-                                                        <span className="flex items-center gap-1.5 text-[10px] text-[var(--sys-primary)] animate-pulse">Agent is writing your copy...</span>
-                                                    ) : copyIsAiSuggested ? (
-                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested — edit freely</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-[var(--sys-text-muted)]">Customize overlay text (or let AI write it)</span>
-                                                    )}
-                                                    {!copyLoading && prompt?.trim().length > 5 && (
-                                                        <button onClick={() => suggestCopy(prompt)} className="flex items-center gap-0.5 text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] transition-colors cursor-pointer">
-                                                            <span className="material-symbols-outlined text-[10px]">refresh</span> Generate Copy
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <input type="text" value={customHeadline} onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false) }} maxLength={40} placeholder="Headline (AI overrides if left blank)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
-                                                <input type="text" value={customCtaText} onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false) }} maxLength={20} placeholder="CTA Button (e.g. Shop Now)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
-                                            </div>
-                                        )}
+                        {/* ── REFS + CONFIG ROW ─────────────────────────────────────
+                            Left cluster: reference images (product, style, face)
+                            Separator
+                            Right cluster: model, format, quality, more
+                            ───────────────────────────────────────────────────────── */}
+                        <div className="cs-scott-refs">
+
+                            {/* — Style Reference — */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                                {referenceImages?.style ? (
+                                    <div style={{ position: 'relative' }}>
+                                        <img src={referenceImages.style} style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1.5px solid var(--sys-primary)', display: 'block' }} />
+                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>×</button>
                                     </div>
-                                </div>
+                                ) : (
+                                    <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload'); }} style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px dashed var(--sys-border)', background: 'var(--sys-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--sys-primary)'; e.currentTarget.style.background = 'var(--sys-primary-dim)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--sys-border)'; e.currentTarget.style.background = 'var(--sys-surface)'; }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-text-muted)' }}>image</span>
+                                    </button>
+                                )}
+                                <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Style</span>
                             </div>
 
-                            {/* ── Soft Modifiers & Generate Plinth ── */}
-                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)]">
-                                {/* Modifier Pills */}
-                                <div className="flex items-center flex-wrap gap-2">
-                                    <div className="relative group/tray">
-                                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
-                                            <span className="material-symbols-outlined text-[15px]">crop_landscape</span>
-                                            {selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}
-                                        </button>
-                                        <div className="absolute bottom-full left-0 mb-0 pb-2 hidden group-hover/tray:block w-[180px] z-50 animate-fade-in text-left">
-                                            <div className="bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5">
-                                            {creativeTypes.map(c => (
-                                                <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (selectedType === c.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
-                                                    <span className="material-symbols-outlined text-[16px]">{c.icon}</span>
-                                                    <div className="flex flex-col text-left">
-                                                        <span className="text-[11px] font-bold">{c.label.split('(')[0]}</span>
-                                                        <span className="text-[9px] opacity-70">{c.aspectRatio}</span>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                            {selectedType === 'custom-size' && (
-                                                <div className="pt-2 pb-1 px-2 border-t border-[var(--sys-border)] mt-1 flex items-center gap-1">
-                                                    <input type="number" placeholder="W" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
-                                                    <span className="text-[10px] text-gray-500">×</span>
-                                                    <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
-                                                </div>
-                                            )}
-                                            </div>
-                                        </div>
+                            {/* — Character/Face Reference — */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                                {referenceImages?.character ? (
+                                    <div style={{ position: 'relative' }}>
+                                        <img src={referenceImages.character} style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1.5px solid #6366f1', display: 'block' }} />
+                                        <button onClick={() => setReferenceImages(prev => ({ ...prev, character: null }))} style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>×</button>
                                     </div>
-                                    <div className="relative group/tray">
-                                        <button onClick={() => setAgenticQuality(prev => prev === 'fast' ? 'quality' : 'fast')} className="flex items-center justify-center px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
-                                            <span className="material-symbols-outlined text-[15px] mr-1">{agenticQuality==='fast' ? 'bolt' : 'target'}</span> {agenticQuality==='fast' ? '1K' : '2K'}
-                                        </button>
-                                    </div>
-                                    <button onClick={() => setStyle(style ? null : 'modern')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] ml-auto">
+                                ) : (
+                                    <button onClick={() => { setRefPickerSlot('character'); setRefPickerTab('upload'); }} style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px dashed var(--sys-border)', background: 'var(--sys-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--sys-border)'; e.currentTarget.style.background = 'var(--sys-surface)'; }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--sys-text-muted)' }}>face</span>
                                     </button>
-                                </div>
-                                {/* Big Soft Generate */}
-                                <CreditTooltipWrapper action="creative">
-                                    <button data-wt="creative-generate" onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                                        className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (prompt.trim() ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)]" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
-                                        {activeGenerations.length > 0 ? (
-                                            <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating {activeGenerations.length}/3...</span></>
-                                        ) : (
-                                            <><span className="text-[14px] font-bold">Generate</span> <span className="material-symbols-outlined text-[18px]">auto_awesome</span></>
-                                        )}
-                                    </button>
-                                </CreditTooltipWrapper>
+                                )}
+                                <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Face+</span>
                             </div>
 
+                            {/* — Product ref (if set) — */}
+                            {productImage && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                                    <div style={{ position: 'relative' }}>
+                                        <img src={productImage} style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1.5px solid var(--sys-primary)', display: 'block' }} />
+                                        <button onClick={() => setProductImage(null)} style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>×</button>
+                                    </div>
+                                    <span style={{ fontSize: 8, fontWeight: 600, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Product</span>
+                                </div>
+                            )}
 
+                            {/* Vertical divider */}
+                            <div style={{ width: 1, height: 32, background: 'var(--sys-border)', flexShrink: 0, marginLeft: 2, marginRight: 2 }} />
+
+                            {/* — Model pill — */}
+                            <button
+                                onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setModelMenuPos({ bottom: window.innerHeight - r.top + 6, left: r.left }); setShowModelMenu(s => !s); setShowFormatMenu(false); setShowCsModelMenu(false); }}
+                                className={'qa-setting-pill' + (showModelMenu ? ' active' : '')}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text-muted)' }}>
+                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                </span>
+                                <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Model'}
+                                </span>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, opacity: 0.5 }}>expand_more</span>
+                            </button>
+
+                            {/* — Format/Ratio — */}
+                            <button
+                                onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFormatMenuPos({ bottom: window.innerHeight - r.top + 6, left: r.left }); setShowFormatMenu(s => !s); setShowModelMenu(false); }}
+                                className={'qa-setting-pill' + (showFormatMenu ? ' active' : '')}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>aspect_ratio</span>
+                                {aspectRatio || '1:1'}
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, opacity: 0.5 }}>expand_more</span>
+                            </button>
+
+                            {/* — Quality toggle — */}
+                            <button onClick={() => setAgenticQuality(agenticQuality === 'fast' ? 'quality' : 'fast')}
+                                className={'qa-setting-pill' + (agenticQuality === 'quality' ? ' active' : '')}
+                                title={agenticQuality === 'fast' ? 'Switch to 2K Quality' : 'Switch to 1K Fast'}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{agenticQuality === 'fast' ? 'bolt' : 'hd'}</span>
+                                {agenticQuality === 'fast' ? 'Fast' : '2K'}
+                            </button>
+
+                            {/* — Templates shortcut — */}
+                            <button onClick={() => setShowTemplateLibrary(true)} className="qa-setting-pill" style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>grid_view</span>
+                                Templates
+                            </button>
+
+                            {/* — Add refs button — */}
+                            <button onClick={() => { setRefPickerSlot('upload'); setRefPickerTab('upload'); }} className="qa-setting-pill" style={{ flexShrink: 0 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add_photo_alternate</span>
+                                Refs
+                            </button>
+                        </div>
+
+                        {/* ── PROMPT AREA ─────────────────────────────────────────── */}
+                        <div className="cs-scott-prompt">
+                            <div className="cs-scott-prompt-box">
+                                <textarea
+                                    ref={promptTextareaRef}
+                                    className="cs-scott-textarea"
+                                    placeholder="Describe your image — e.g. 'Bold product shot on gradient background, luxury editorial feel, 4K render...'"
+                                    value={prompt}
+                                    onChange={e => setPrompt(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            if (prompt.trim() && activeBrand && activeGenerations.length < 3) handleGenerate();
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* ── BOTTOM BAR ──────────────────────────────────────────── */}
+                        <div className="cs-scott-bottom">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+                                {/* Voice input */}
+                                <VoiceInput onResult={text => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
+                                {/* Enhance prompt */}
+                                {prompt.trim() && (
+                                    <button onClick={() => handleEnhancePrompt && handleEnhancePrompt()}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 7, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', fontSize: 10, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--sys-primary)'}
+                                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>auto_fix_high</span>
+                                        Enhance
+                                    </button>
+                                )}
+                                {!activeBrand && (
+                                    <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>warning</span>
+                                        Select a brand
+                                    </span>
+                                )}
+                                {activeBrand && prompt.trim() && activeGenerations.length === 0 && (
+                                    <span style={{ fontSize: 10, color: 'var(--sys-text-muted)' }}>↵ Enter to generate</span>
+                                )}
+                            </div>
+                            <CreditTooltipWrapper action="creative">
+                                <button
+                                    data-wt="creative-generate-panel"
+                                    onClick={handleGenerate}
+                                    disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
+                                    className="cs-scott-generate">
+                                    {activeGenerations.length > 0 ? (
+                                        <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'cs-spin 1s linear infinite' }}>progress_activity</span>Generating {activeGenerations.length}/3...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Generate</>
+                                    )}
+                                </button>
+                            </CreditTooltipWrapper>
                         </div>
                     </div>
+
+                    {/* — Model dropdown portal — */}
+                    {showModelMenu && (
+                        <div style={{ position: 'fixed', bottom: modelMenuPos.bottom, left: modelMenuPos.left, minWidth: 230, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 16, padding: 8, zIndex: 9999, boxShadow: '0 15px 50px rgba(0,0,0,0.45)' }} onClick={e => e.stopPropagation()}>
+                            {IMAGE_MODELS.map(m => (
+                                <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: 'none', background: imageModel === m.id ? 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))' : 'transparent', color: 'var(--sys-text)', borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%', fontSize: 12, fontWeight: 600 }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: 8, background: m.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: m.color }}>{m.icon}</span>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            {m.name}
+                                            {m.isNew && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: '#10a37f22', color: '#10a37f', fontWeight: 800 }}>NEW</span>}
+                                        </div>
+                                        <div style={{ fontSize: 10, opacity: 0.45 }}>{m.provider}</div>
+                                    </div>
+                                    {imageModel === m.id && <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--sys-primary)' }}>check</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* — Format dropdown portal — */}
+                    {showFormatMenu && (
+                        <div style={{ position: 'fixed', bottom: formatMenuPos.bottom, left: formatMenuPos.left, minWidth: 150, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 16, padding: 8, zIndex: 9999, boxShadow: '0 15px 50px rgba(0,0,0,0.45)' }} onClick={e => e.stopPropagation()}>
+                            {['1:1', '4:5', '9:16', '16:9', '3:2', '2:3'].map(ar => (
+                                <button key={ar} onClick={() => { setAspectRatio(ar); setShowFormatMenu(false) }}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', border: 'none', background: aspectRatio === ar ? 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))' : 'transparent', color: 'var(--sys-text)', borderRadius: 8, cursor: 'pointer', width: '100%', fontSize: 12, fontWeight: 600 }}>
+                                    {ar}
+                                    {aspectRatio === ar && <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--sys-primary)' }}>check</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
             </>
             )}
 
 
-
-
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
+                <>
                 <div className="creative-split fade-up">
                                                 {/* ── NEW FREEPIK SIDEBAR BODY (PHOTOSHOOT) ── */}
                             <div data-wt="ps-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
@@ -5432,6 +5460,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>
 
                 </div>
+
+                </>
             )}
 
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
@@ -10325,6 +10355,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {/* CAMPAIGN SHOT — 1-Click Cinematic Poster Studio */}
             {/* ══════════════════════════════════════════════════════════════════ */}
             {studioMode === 'campaignshot' && (
+                <>
                 <div className="creative-split fade-up">
                     {/* ── LEFT PANEL: Controls ── */}
                     <div data-wt="cs-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
@@ -10659,6 +10690,8 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         )}
                     </div>
                 </div>
+
+                </>
             )}
 
             {/* ========== TEMPLATE LIBRARY OVERLAY ========== */}

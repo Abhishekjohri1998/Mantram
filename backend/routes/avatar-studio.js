@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { protect, superadmin } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import { buildAvatarPrompt, buildDirectPrompt, buildReferencePrompt, RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
+export { RATIO_TO_SIZE }; // re-export for superadmin-images.js
 import { mirrorUrlToS3, uploadToS3 } from '../utils/s3.js';
 import Avatar from '../models/Avatar.js';
 

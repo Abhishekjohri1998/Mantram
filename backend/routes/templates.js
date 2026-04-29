@@ -168,12 +168,12 @@ router.post('/:id/use', protect, async (req, res) => {
             if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
         }
 
-        // 1. Build prompt — pass S3 URLs, not base64
+        // 1. Build prompt — pass correct S3 URL param names
         const promptData = await buildTemplatePrompt({
             template,
             userPrompt,
-            productImageUrl,   // S3 URL or null
-            avatarImageUrl,    // S3 URL or null
+            productImageUrl,  // S3 URL or null (maps to resolvedProduct in combiner)
+            avatarImageUrl,   // S3 URL or null (maps to resolvedAvatar in combiner)
         });
 
         // 2. Determine cost & deduct credits
@@ -215,55 +215,45 @@ router.post('/:id/use', protect, async (req, res) => {
         if (template.studioOrigin === 'creative') {
             jobId = `create-${Date.now()}`;
 
-            // Pre-create GenerationJob so frontend polling doesn't 404 while pipeline runs
+            // BUG-FIX: Create the GenerationJob record FIRST so the frontend poller finds it
             await GenerationJob.create({
                 jobId,
                 user: req.user._id,
                 brand: brandId || null,
-                status: 'processing',
                 type: 'ai-create',
-                format: settings?.format || 'instagram-post',
-                prompt: promptData.finalPrompt || '',
+                format: template.defaultSettings?.format || settings?.format || 'instagram-post',
+                status: 'pending',
+                prompt: promptData.finalPrompt,
                 creditsDeducted: cost,
-                options: settings || {},
-                startedAt: new Date(),
+                options: { ...(promptData.settings || {}), ...(settings || {}) },
                 meta: { label: `Template: ${template.name}`, page: '/creative-studio' }
-            }).catch(e => console.warn('[Template] GenerationJob pre-create failed:', e.message));
+            });
 
-            // Step 10: internalGenerateCreative already calls ensureS3Url internally.
-            // Do NOT call ensureS3Url on its return value — that would double-mirror.
-            //
-            // CRITICAL: Reference images (product, avatar) MUST go through body.options.*
-            // because internalGenerateCreative extracts them from:
-            //   - options.productImageUrl (line 304 of creatives.js)
-            //   - options.characters[] (line 308 of creatives.js)
-            // The old body.visionInputs field was never read by internalGenerateCreative.
+            // Fire generation in background — uses refImageUrls (flat S3 URL list) for image refs
             internalGenerateCreative({
                 body: {
-                    brandId,
+                    brandId: brandId || null,
+                    type: template.defaultSettings?.format || settings?.format || 'instagram-post',
                     prompt: promptData.finalPrompt,
-                    format: settings?.format || 'instagram-post',
-                    jobId,
+                    refImageUrls: promptData.refImageUrls || [],  // flat S3 URL list for Gemini refs
                     options: {
-                        // Product image → extracted at creatives.js L304 → templateRefUrls
-                        productImageUrl: promptData.productImageUrl || null,
-                        // Avatar/face ref → extracted at creatives.js L308 → templateRefUrls
-                        characters: promptData.avatarImageUrl
-                            ? [{ name: 'User Reference', image: promptData.avatarImageUrl }]
-                            : [],
-                        // Pass through any template default settings
+                        ...(promptData.settings || {}),
                         ...(settings || {}),
-                    }
+                        // Pass product/avatar as structured options for the pipeline
+                        productImageUrl: productImageUrl || null,
+                        avatarImageUrl: avatarImageUrl || null,
+                        // System reference image (template design reference)
+                        templateRefImageUrl: template.systemReferenceImage?.startsWith('http') ? template.systemReferenceImage : null,
+                        templateInpainting: !!template.systemReferenceImage?.startsWith('http'),
+                    },
+                    jobId
                 },
                 user: req.user,
                 creditsDeducted: cost,
                 jobId
-            }).catch(e => {
+            }).catch(async (e) => {
                 console.error('Creative background dispatch error:', e);
-                GenerationJob.findOneAndUpdate(
-                    { jobId },
-                    { status: 'failed', completedAt: new Date(), errorMessage: e.message }
-                ).catch(() => {});
+                await GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: e.message || 'Pipeline failed' }).catch(() => {});
             });
 
         } else if (template.studioOrigin === 'video') {
@@ -291,7 +281,10 @@ router.post('/:id/use', protect, async (req, res) => {
                     visionInputs: promptData.visionInputs,
                     settings: promptData.settings
                 })
-            }).catch(e => console.error('Video background dispatch error:', e));
+            }).catch(async (e) => {
+                console.error('Video background dispatch error:', e);
+                await GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: e.message || 'Pipeline failed' }).catch(() => {});
+            });
 
         } else {
             // content
@@ -314,7 +307,10 @@ router.post('/:id/use', protect, async (req, res) => {
                     'X-Skip-Credits': 'true'
                 },
                 body: JSON.stringify({ jobId, prompt: promptData.finalPrompt, topic: promptData.finalPrompt })
-            }).catch(e => console.error('Content background dispatch error:', e));
+            }).catch(async (e) => {
+                console.error('Content background dispatch error:', e);
+                await GenerationJob.updateOne({ jobId }, { status: 'failed', errorMessage: e.message || 'Pipeline failed' }).catch(() => {});
+            });
         }
 
         // 6. Update log with jobId + duration

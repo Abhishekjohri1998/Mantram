@@ -12,6 +12,8 @@ import UGCPro from '../components/VideoStudio/UGCPro'
 import QAds from '../components/VideoStudio/QAds'
 import QAdsV2 from '../components/VideoStudio/QAdsV2'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
+import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow'
+import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal'
 import TemplateLibrary from './TemplateLibrary'
 import Walkthrough from '../components/Walkthrough'
 import './VideoStudio.css'
@@ -124,6 +126,8 @@ export default function VideoStudio() {
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
+    const [showTemplateModal, setShowTemplateModal] = useState(false)
+    const [selectedTemplate, setSelectedTemplate] = useState(null)
     const [searchParams, setSearchParams] = useSearchParams()
 
     // Project state
@@ -1191,6 +1195,21 @@ export default function VideoStudio() {
                     {/* ════════════════════════════════════════════════════════════ */}
                     {step === 0 && (
                         <div className="space-y-6">
+                            {/* ───────────────────────────────────────────────────────── */}
+                            {/* 🆕 TEMPLATE SUGGESTIONS ROW */}
+                            {/* ───────────────────────────────────────────────────────── */}
+                            <div className="mb-2">
+                                <TemplateSuggestionRow 
+                                    brandId={activeBrand?._id}
+                                    section="video"
+                                    onSelect={(t) => {
+                                        if (!t) return setShowTemplateLibrary(true);
+                                        setSelectedTemplate(t);
+                                        setShowTemplateModal(true);
+                                    }} 
+                                />
+                            </div>
+
                             {/* Video Type Selector */}
                             <div data-wt="video-type" className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
                                 <h3 className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -1225,11 +1244,6 @@ export default function VideoStudio() {
                                         <span className="material-symbols-outlined text-primary">edit_note</span>
                                         Your Brief
                                     </h3>
-                                    <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer font-semibold shadow-sm text-xs">
-                                        <span className="material-symbols-outlined text-[14px]">grid_view</span>
-                                        <span className="hidden sm:inline">Start from Template</span>
-                                        <span className="sm:hidden">Template</span>
-                                    </button>
                                 </div>
                                 <textarea
                                     value={brief}
@@ -2303,6 +2317,13 @@ export default function VideoStudio() {
 
             {showTemplateLibrary && (
                 <TemplateLibrary overlayMode={true} studioFilter="video" onCloseOverlay={() => setShowTemplateLibrary(false)} />
+            )}
+
+            {showTemplateModal && selectedTemplate && (
+                <TemplateGenerationModal
+                    onClose={() => setShowTemplateModal(false)}
+                    template={selectedTemplate}
+                />
             )}
         </DashboardLayout >
     )

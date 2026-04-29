@@ -544,26 +544,43 @@ export default function UGCPro({ activeBrand, projects = [] }) {
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>tune</span>
                                 {showSettings ? 'Less' : 'More Settings'}
                             </button>
+                            {promptReady && (
+                                <button className="ugc-cfg-btn" onClick={() => setPromptReady(false)} style={{ color: '#a855f7' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit_note</span>
+                                    Edit Prompt
+                                </button>
+                            )}
                         </div>
-                        {!promptReady ? (
-                            <button className="ugc-generate" disabled={!canGenerate || buildingPrompt || !avatarUrl || !productData}
-                                onClick={handleBuildPrompt}>
-                                {buildingPrompt ? (
-                                    <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'ugc-pulse 1s infinite' }}>progress_activity</span> Building...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit_document</span> Review Prompt</>
-                                )}
-                            </button>
-                        ) : (
-                            <button className="ugc-generate" disabled={!canGenerate || loading || !promptText.trim()}
-                                onClick={handleGenerate}>
-                                {loading ? (
-                                    <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'ugc-pulse 1s infinite' }}>progress_activity</span> Generating...</>
-                                ) : (
-                                    <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>slow_motion_video</span> Generate · {credits}c</>
-                                )}
-                            </button>
-                        )}
+                        <button className="ugc-generate"
+                            disabled={!canGenerate || loading || buildingPrompt}
+                            onClick={async () => {
+                                if (!avatarUrl) { setError('Select an avatar first — click the avatar thumbnail above'); return }
+                                if (!productData) { setError('Analyze a product first — paste a URL or upload images then click Analyze'); return }
+                                if (promptReady && promptText.trim()) {
+                                    handleGenerate()
+                                } else {
+                                    setBuildingPrompt(true); setError(null)
+                                    try {
+                                        const data = await apiJson('/video-studio/ugc-pro/build-prompt', {
+                                            brandId: activeBrand?._id, productData, avatarUrl, productImageUrls,
+                                            settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta },
+                                        })
+                                        setPromptText(data.prompt)
+                                        setPromptReady(true)
+                                        setBuildingPrompt(false)
+                                        handleGenerate()
+                                    } catch (err) {
+                                        setError(err.message)
+                                        setBuildingPrompt(false)
+                                    }
+                                }
+                            }}>
+                            {(loading || buildingPrompt) ? (
+                                <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'ugc-pulse 1s infinite' }}>progress_activity</span>{buildingPrompt ? 'Building prompt…' : 'Generating…'}</>
+                            ) : (
+                                <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>slow_motion_video</span> Generate · {credits}c</>
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>

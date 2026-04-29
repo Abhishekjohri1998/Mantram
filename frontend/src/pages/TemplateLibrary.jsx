@@ -3,7 +3,21 @@ import { templates as templatesAPI } from '../services/api';
 
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal';
 
+// Lightweight role check from stored JWT
+function getStoredRole() {
+    try {
+        const token = localStorage.getItem('mantram_token')
+        if (!token) return null
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload?.role || null
+    } catch { return null }
+}
+
+import { useAuth } from '../context/AuthContext';
+
 export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, studioFilter = '' }) {
+    const { user } = useAuth();
+    const isSuperAdmin = user?.role === 'superadmin';
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -31,13 +45,17 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
         }
     };
 
-    const filteredTemplates = templates.filter(t => 
-        !search || 
-        t.name.toLowerCase().includes(search.toLowerCase()) || 
-        t.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
-        t.categoryId?.name?.toLowerCase().includes(search.toLowerCase())
-    );
+    const [activeSection, setActiveSection] = useState('All');
+    const sections = Array.from(new Set(templates.map(t => t.categoryId?.name).filter(Boolean)));
 
+    const filteredTemplates = templates.filter(t => {
+        const matchesSearch = !search || 
+            t.name.toLowerCase().includes(search.toLowerCase()) || 
+            t.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
+            t.categoryId?.name?.toLowerCase().includes(search.toLowerCase());
+        const matchesSection = activeSection === 'All' || t.categoryId?.name === activeSection;
+        return matchesSearch && matchesSection;
+    });
     const handleTemplateClick = (template) => {
         // Simple tap-to-reveal on mobile
         if (window.innerWidth < 768 && mobileTappedTemplateId !== template._id) {
@@ -48,7 +66,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     };
 
     const containerClasses = overlayMode
-        ? "fixed inset-0 z-[150] bg-[var(--sys-background)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        ? "fixed inset-0 z-[9999] bg-[var(--sys-background)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         : "max-w-[1600px] mx-auto px-4 md:px-6 py-6 pb-24";
 
     return (
@@ -81,18 +99,24 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             <div className={`flex flex-col gap-6 ${overlayMode ? 'p-6 overflow-y-auto flex-1' : 'mt-6'}`}>
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                    <div className="flex gap-2 p-1 bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)]">
-                        {['', 'creative', 'video', 'content'].map(origin => (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {['All', ...sections].map(sec => (
                             <button
-                                key={origin}
-                                onClick={() => setStudioOrigin(origin)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                    studioOrigin === origin
-                                        ? 'bg-[var(--sys-primary)] text-white shadow-sm'
-                                        : 'text-[var(--sys-on-surface-variant)] hover:bg-[var(--sys-primary-dim)] hover:text-[var(--sys-on-surface)]'
-                                }`}
+                                key={sec}
+                                onClick={() => setActiveSection(sec)}
+                                style={{
+                                    padding: '5px 12px',
+                                    borderRadius: 20,
+                                    border: `0.5px solid ${activeSection === sec ? '#E84118' : 'var(--color-border-secondary)'}`,
+                                    fontSize: 12,
+                                    fontWeight: activeSection === sec ? 600 : 500,
+                                    color: activeSection === sec ? '#E84118' : 'var(--color-text-secondary)',
+                                    background: activeSection === sec ? 'rgba(232,65,24,0.06)' : 'transparent',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
                             >
-                                {origin === '' ? 'All Studios' : origin.charAt(0).toUpperCase() + origin.slice(1)}
+                                {sec}
                             </button>
                         ))}
                     </div>
@@ -110,10 +134,21 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                 </div>
 
                 {/* Grid */}
+                <style dangerouslySetInnerHTML={{__html: `
+                    .t-shimmer {
+                        background: linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-background-primary) 50%, var(--color-background-secondary) 75%);
+                        background-size: 200% 100%;
+                        animation: shimmer 1.5s infinite;
+                    }
+                    @keyframes shimmer {
+                        0% { background-position: -200% 0; }
+                        100% { background-position: 200% 0; }
+                    }
+                `}} />
                 {loading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {[1,2,3,4,5,6,7,8].map(i => (
-                            <div key={i} className="aspect-[4/5] rounded-2xl bg-[var(--sys-surface)] animate-pulse border border-[var(--sys-border)]" />
+                            <div key={i} className="aspect-[1/1] rounded-xl t-shimmer border border-[var(--sys-border)]" />
                         ))}
                     </div>
                 ) : filteredTemplates.length === 0 ? (
@@ -126,64 +161,100 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredTemplates.map(template => {
                             const isTapped = mobileTappedTemplateId === template._id;
+                            const isNew = template.isNew || (new Date() - new Date(template.createdAt)) < 7 * 24 * 60 * 60 * 1000;
                             return (
-                                <div
+                                <button
                                     key={template._id}
-                                    className="group relative aspect-[4/5] rounded-2xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer"
+                                    className="group"
                                     onClick={() => handleTemplateClick(template)}
-                                    onMouseLeave={() => setMobileTappedTemplateId(null)} // Reset tap on leave
+                                    onMouseLeave={() => setMobileTappedTemplateId(null)}
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        textAlign: 'left',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        padding: 0,
+                                        cursor: 'pointer',
+                                        position: 'relative'
+                                    }}
                                 >
-                                    {template.previewUrl ? (
-                                        <img 
-                                            src={template.previewUrl} 
-                                            alt={template.name}
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full bg-gradient-to-br from-[var(--sys-primary-dim)] to-[var(--sys-surface)] flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-4xl text-[var(--sys-primary)]/30">image</span>
-                                        </div>
-                                    )}
+                                    <div style={{ 
+                                        width: '100%', 
+                                        aspectRatio: '1/1', 
+                                        borderRadius: 12, 
+                                        overflow: 'hidden', 
+                                        position: 'relative',
+                                        marginBottom: 10,
+                                        background: 'var(--color-background-secondary)',
+                                        border: '1.5px solid var(--color-border-tertiary)'
+                                    }}>
+                                        {template.previewUrl ? (
+                                            <img 
+                                                src={template.previewUrl} 
+                                                alt={template.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                className="transition-transform duration-500 group-hover:scale-105"
+                                                onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.classList.add('t-shimmer'); }}
+                                            />
+                                        ) : (
+                                            <div className="t-shimmer" style={{ width: '100%', height: '100%' }} />
+                                        )}
 
-                                    {/* Badges */}
-                                    <div className="absolute top-3 left-3 flex gap-2">
-                                        {template.isFeatured && (
-                                            <div className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold rounded-md shadow-sm flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[12px]">verified</span>
-                                                Mantram Exclusive
+                                        {/* Badges */}
+                                        {template.isMantramExclusive ? (
+                                            <div style={{
+                                                position: 'absolute', top: 8, left: 8,
+                                                background: 'rgba(232,65,24,0.9)', color: '#fff',
+                                                fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                                                padding: '3px 8px', borderRadius: 20, zIndex: 10
+                                            }}>Exclusive</div>
+                                        ) : isNew ? (
+                                            <div style={{
+                                                position: 'absolute', top: 8, left: 8,
+                                                background: 'rgba(0,212,170,0.9)', color: '#fff',
+                                                fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                                                padding: '3px 8px', borderRadius: 20, zIndex: 10
+                                            }}>New</div>
+                                        ) : null}
+
+                                        {/* Hover / Tap Overlay */}
+                                        <div style={{
+                                            position: 'absolute', inset: 0,
+                                            background: 'rgba(0,0,0,0.35)',
+                                            display: 'flex', alignItems: 'flex-end', padding: 12
+                                        }}
+                                        className={`transition-opacity duration-200 ${isTapped ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'}`}
+                                        >
+                                            <div style={{
+                                                width: '100%', background: '#E84118', color: '#fff',
+                                                fontSize: 11, fontWeight: 600, textAlign: 'center',
+                                                padding: '7px 0', borderRadius: 8
+                                            }}>
+                                                Use this template
+                                            </div>
+                                        </div>
+
+                                        {/* Selected Checkmark */}
+                                        {selectedTemplate?._id === template._id && (
+                                            <div style={{
+                                                position: 'absolute', top: 10, right: 10,
+                                                width: 20, height: 20, borderRadius: '50%',
+                                                background: '#E84118', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                zIndex: 10
+                                            }}>
+                                                <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>check</span>
                                             </div>
                                         )}
                                     </div>
-
-                                    <div className="absolute top-3 right-3">
-                                        <div className="px-2 py-1 bg-black/50 backdrop-blur-md text-white text-xs font-medium rounded-md shadow-sm capitalize border border-white/10">
-                                            {template.studioOrigin}
-                                        </div>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                        {template.name}
                                     </div>
-
-                                    {/* Hover / Tap Overlay */}
-                                    <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-5 transition-opacity duration-300 ${isTapped ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'}`}>
-                                        <h3 className="text-white font-semibold text-lg line-clamp-2 mb-1">{template.name}</h3>
-                                        <p className="text-white/80 text-sm mb-3">{template.categoryId?.name}</p>
-                                        
-                                        <button 
-                                            className="w-full py-2.5 bg-[var(--sys-primary)] text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-[var(--sys-primary)]/90 transition-colors shadow-lg active:scale-95"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedTemplate(template);
-                                            }}
-                                        >
-                                            <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                            Use Template
-                                        </button>
+                                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                        <span>{template.categoryId?.name || 'Template'}</span>
+                                        {template.usageCount > 0 && <span>{template.usageCount} uses</span>}
                                     </div>
-                                    
-                                    {/* Always-visible title bar (fades out on hover) */}
-                                    <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${isTapped ? 'opacity-0' : 'opacity-100 md:group-hover:opacity-0'}`}>
-                                        <h3 className="text-white font-medium truncate">{template.name}</h3>
-                                        <p className="text-white/70 text-xs">{template.categoryId?.name}</p>
-                                    </div>
-                                </div>
+                                </button>
                             );
                         })}
                     </div>
