@@ -37,13 +37,18 @@ const css = `
     min-height: calc(100vh - 80px);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    background: radial-gradient(circle at center top, rgba(255, 42, 95, 0.12) 0%, var(--sys-surface) 50%);
+    padding-top: 40px;
+    padding-bottom: 40px;
 }
 .qv2-bg {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
-    padding: 24px;
-    padding-bottom: 400px;
+    width: 100%;
+    max-width: 1200px;
+    padding: 24px 0;
     opacity: .9;
 }
 .qv2-bi {
@@ -102,19 +107,13 @@ const css = `
     gap: 4px;
 }
 .qv2-lay {
-    position: fixed;
-    bottom: 0; left: 0;
     width: 100%;
-    z-index: 50;
+    max-width: 1200px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0 16px 32px;
-    pointer-events: none;
-    gap: 16px;
-}
-.qv2-lay * {
-    pointer-events: auto;
+    padding: 0 16px;
+    gap: 32px;
 }
 
 /* Scott Box Panel */
@@ -694,18 +693,10 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
     return <div className="qv2-root">
         <style>{css}</style>
 
-        <div className="qv2-bg">
-            {/* Show completed videos: from projects history OR from current session videoJobs */}
-            {[
-                // Projects from DB history
-                ...projects.filter(p => p.studioMode === 'q-ads-v2' && p.generation?.videoUrl),
-                // Current session jobs that completed (not yet in DB history)
-                ...Object.entries(videoJobs)
-                    .filter(([, j]) => j.status === 'done' && j.videoUrl && !projects.some(p => p.generation?.videoUrl === j.videoUrl))
-                    .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }))
-            ].map(p => (
-                <GridVideo key={p._id} project={p} onReuse={handleReuse} />
-            ))}
+        {/* Hero Header */}
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#ff2a5f', letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' }}>MARKETING STUDIO</div>
+            <h1 style={{ fontSize: 42, fontWeight: 800, color: '#fff', textTransform: 'uppercase', lineHeight: 1.1, margin: 0, letterSpacing: -1 }}>TURN ANY PRODUCT<br/>INTO A VIDEO AD</h1>
         </div>
 
         <div className="qv2-lay">
@@ -773,30 +764,6 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                 </div>
             )}
 
-            {/* Templates Row */}
-            {templates.length > 0 && !isGeneratingPrompts && (
-                <div style={{ width: '100%', maxWidth: 900, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, paddingLeft: 4 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ff2a5f' }}>bolt</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Generate across formats</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
-                        {templates.map(t => (
-                            <div key={t._id} className="qv2-temp-card" onClick={() => setUserBrief(t.promptTemplate || t.savedPrompt || '')}>
-                                {t.previewMediaUrl ? <img src={t.previewMediaUrl} alt={t.name} /> : <div style={{ position: 'absolute', inset: 0, background: '#222' }} />}
-                                <div className="overlay" />
-                                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, zIndex: 2 }}>
-                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{t.name}</div>
-                                </div>
-                                <div className="qv2-temp-btn">
-                                    <span>Recreate</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {/* Scott Panel — two row layout */}
             <div className="scott-panel" style={{ flexDirection: 'column', gap: 8, padding: '12px 16px' }}>
 
@@ -854,6 +821,43 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                     </button>
                 </div>
             </div>
+
+            {/* Templates Row */}
+            {templates.length > 0 && !isGeneratingPrompts && (
+                <div style={{ width: '100%', maxWidth: 900, marginTop: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 24 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ff2a5f' }}>bolt</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: -0.5 }}>Generate across formats</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, scrollbarWidth: 'none', justifyContent: 'center' }}>
+                        {templates.map(t => (
+                            <div key={t._id} className="qv2-temp-card" style={{ flex: '0 0 160px', height: 260 }} onClick={() => setUserBrief(t.promptTemplate || t.savedPrompt || '')}>
+                                {t.previewMediaUrl ? <img src={t.previewMediaUrl} alt={t.name} /> : <div style={{ position: 'absolute', inset: 0, background: '#222' }} />}
+                                <div className="overlay" />
+                                <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, textAlign: 'center' }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{t.name}</div>
+                                </div>
+                                <div className="qv2-temp-btn">
+                                    <span>Recreate</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* History Videos */}
+            <div className="qv2-bg">
+                {[
+                    ...projects.filter(p => p.studioMode === 'q-ads-v2' && p.generation?.videoUrl),
+                    ...Object.entries(videoJobs)
+                        .filter(([, j]) => j.status === 'done' && j.videoUrl && !projects.some(p => p.generation?.videoUrl === j.videoUrl))
+                        .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }))
+                ].map(p => (
+                    <GridVideo key={p._id} project={p} onReuse={handleReuse} />
+                ))}
+            </div>
+
         </div>
 
         {/* Product Modal */}
