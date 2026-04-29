@@ -331,7 +331,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '1K'; // Reverted to 1K: 2K + ref images + long prompts causes 70s Gemini timeouts
+        const imageSize = options?.imageSize || '2K'; // 2K default for high-fidelity output (timeout extended to support)
         const customSize = options?.customSize || null;
 
         let ratioNum = 1;
@@ -1589,9 +1589,9 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    // ── HARD TIMEOUT: 150s default (was 90s — too short for Gemini's internal retry cycle) ──
-    // Inner provider has 70s/attempt × 2 attempts = ~141s max. Outer must exceed that.
-    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 180_000 : 150_000);
+    // ── HARD TIMEOUT: 200s default — 2K output + ref images + long prompts need more headroom ──
+    // Inner provider has 90s/attempt × 2 attempts = ~181s max. Outer must exceed that.
+    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 220_000 : 200_000);
 
     // ── Build generation function (callable for retry) ──
     const buildGeneratePromise = () => (async () => {
@@ -1670,13 +1670,14 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
                         const origKB = Math.round(buf.byteLength / 1024);
 
-                        // ⚡ OPT 1: Compress to 512px max — Gemini doesn't need full-res refs (saves 5-15s)
+                        // Resize to 1024px max — preserves product labels, textures, and fine details
+                        // that 512px destroyed. 85% JPEG retains color accuracy for brand fidelity.
                         let finalBuf = Buffer.from(buf);
                         let finalMime = ct;
                         try {
                             finalBuf = await sharp(finalBuf)
-                                .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-                                .jpeg({ quality: 75 })
+                                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+                                .jpeg({ quality: 85 })
                                 .toBuffer();
                             finalMime = 'image/jpeg';
                         } catch (_) { /* compression failed — use original */ }
@@ -1732,11 +1733,32 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             console.log(`⚡ Prompt optimized: ${origLen} → ${optimizedPrompt.length} chars (refs: ${hasRefs})`);
         }
 
-        // ── Generate via native Gemini router ──
+        // ── Inject explicit image role labels when template refs are present ──
+        // Without this, Gemini treats reference images as vague style inspiration
+        // instead of mandatory visual references to faithfully reproduce.
         const refCount = finalImageParts.length;
-        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${optimizedPrompt.length} chars, refs: ${refCount})`);
+        let finalPromptForModel = optimizedPrompt;
+        if (refCount > 0) {
+            const imageRolePreamble = [
+                `\nREFERENCE IMAGES PROVIDED (${refCount} image${refCount > 1 ? 's' : ''}):`,
+            ];
+            // Label each image by its position
+            for (let i = 0; i < refCount; i++) {
+                if (i === 0) {
+                    imageRolePreamble.push(`- IMAGE ${i + 1}: PRODUCT REFERENCE — Your output MUST feature this EXACT product. Reproduce its shape, colors, labels, textures, and proportions with maximum fidelity. Do NOT substitute or hallucinate a different product.`);
+                } else {
+                    imageRolePreamble.push(`- IMAGE ${i + 1}: ADDITIONAL REFERENCE — Use this for face/avatar preservation or style guidance. Maintain the person's likeness, skin tone, and features accurately.`);
+                }
+            }
+            imageRolePreamble.push(`CRITICAL: The reference images are the GROUND TRUTH. Your generated image must be visually consistent with them.\n`);
+            finalPromptForModel = imageRolePreamble.join('\n') + '\n' + optimizedPrompt;
+            console.log(`📌 [RefLabels] Injected ${refCount} image role label(s) into prompt preamble`);
+        }
+
+        // ── Generate via native Gemini router ──
+        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
         const routerResult = await router.generateImage({
-            prompt: optimizedPrompt,
+            prompt: finalPromptForModel,
             aspectRatio: nativeAspectRatio,
             model: GEMINI_MODEL,
             imageParts: finalImageParts,

@@ -20,6 +20,28 @@ export async function buildTemplatePrompt({
     const productImage = productImageUrl || userProductImageBase64 || null;
     const avatarImage = avatarImageUrl || userAvatarImageBase64 || null;
 
+    // 1b. Inject product-replication & avatar-preservation directives
+    // These ensure the pipeline's art director, prompt engineer, and final image model
+    // all understand that the uploaded references are mandatory visual constraints.
+    const directives = [];
+    if (productImage) {
+        directives.push(
+            `PRODUCT REFERENCE IMAGE PROVIDED: A real product photo has been uploaded as a reference image. ` +
+            `You MUST reproduce this EXACT product in the output — same shape, same colors, same labels, same proportions. ` +
+            `Do NOT substitute, reimagine, or hallucinate a different product. The product photo is the GROUND TRUTH.`
+        );
+    }
+    if (avatarImage) {
+        directives.push(
+            `FACE/AVATAR REFERENCE IMAGE PROVIDED: A real person's photo has been uploaded. ` +
+            `You MUST preserve this person's face, skin tone, hair, and features accurately in the output. ` +
+            `Do NOT replace them with a generic model or different person.`
+        );
+    }
+    if (directives.length > 0) {
+        finalPrompt = directives.join('\n') + '\n\n' + finalPrompt;
+    }
+
     // Helper: detect format from data string
     const detectFormat = (data) => {
         if (!data) return 'unknown';

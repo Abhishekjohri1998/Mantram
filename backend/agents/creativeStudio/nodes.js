@@ -1215,12 +1215,13 @@ export async function runCreativePipeline(params) {
                         const rawBuf = await resp.arrayBuffer();
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
                         const origKB = Math.round(rawBuf.byteLength / 1024);
-                        // ⚡ Compress to 512px for faster Gemini processing
+                        // Resize to 1024px max — matches routedImageGenerate compression.
+                        // Preserves product labels, textures, and fine details for Gemini.
                         let finalBuf = Buffer.from(rawBuf);
                         let finalMime = ct;
                         try {
                             const sharp = (await import('sharp')).default;
-                            finalBuf = await sharp(finalBuf).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
+                            finalBuf = await sharp(finalBuf).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
                             finalMime = 'image/jpeg';
                         } catch (_) { /* compression failed — use original */ }
                         const b64Data = finalBuf.toString('base64');
