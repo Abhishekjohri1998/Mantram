@@ -9,6 +9,8 @@ const STUDIO_CREDIT_COSTS = {
     content: 2
 };
 
+import { useBrand } from '../../context/BrandContext';
+
 // BUG-03 FIX: Pre-upload image to S3 before generation — never send base64
 const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
@@ -44,6 +46,9 @@ export default function TemplateGenerationModal({ template, onClose }) {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+
+    // Guard: if template is null don't render (parent should guard too)
+    if (!template) return null;
 
     const cost = STUDIO_CREDIT_COSTS[template.studioOrigin] || 0;
 

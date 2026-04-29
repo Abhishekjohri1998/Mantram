@@ -503,3 +503,197 @@
   font-size: 16px;
 }
 
+/* ── Scott Panel Layout (AI Create floating bottom bar) ── */
+.cs-full-layout {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-bottom: 280px; /* space for floating panel */
+}
+
+.cs-scott-layout {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 20px 16px;
+  pointer-events: none;
+}
+
+.cs-scott-layout * { pointer-events: auto; }
+
+.cs-scott-card {
+  width: 100%;
+  max-width: 900px;
+  background: color-mix(in srgb, var(--sys-surface) 88%, transparent);
+  border: 1px solid var(--sys-border);
+  border-radius: 20px;
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: visible; /* Must be visible so dropdowns aren't clipped */
+  color: var(--sys-text);
+  font-family: 'Inter', sans-serif;
+  max-height: calc(100vh - 100px);
+  /* Use clip-path for visual rounding without clipping children */
+}
+
+/* Inner sections need explicit rounding since we removed overflow:hidden from parent */
+.cs-scott-header {
+  border-radius: 20px 20px 0 0;
+  padding: 8px 16px 6px;
+  border-bottom: 1px solid var(--sys-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+
+.cs-scott-refs {
+  padding: 8px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--sys-border);
+  flex-wrap: wrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cs-scott-refs::-webkit-scrollbar { display: none; }
+
+.cs-scott-prompt {
+  padding: 0 16px 6px;
+  padding-top: 6px;
+}
+
+.cs-scott-prompt-box {
+  background: color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface));
+  border: 1px solid var(--sys-border);
+  border-radius: 12px;
+  transition: border-color 0.2s;
+  overflow: visible;
+}
+
+.cs-scott-prompt-box:focus-within {
+  border-color: var(--sys-primary);
+}
+
+.cs-scott-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--sys-text);
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: inherit;
+  min-height: 60px;
+  max-height: 140px;
+  display: block;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-weight: 500;
+  padding: 10px 12px 4px;
+}
+
+.cs-scott-textarea::placeholder {
+  color: var(--sys-text-muted);
+  opacity: 0.75;
+}
+
+.cs-scott-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--sys-border);
+  flex-wrap: wrap;
+}
+
+.cs-scott-generate {
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--sys-surface);
+  background: var(--sys-primary);
+  box-shadow: 0 4px 15px rgba(255,77,0,0.25);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.cs-scott-generate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255,77,0,0.35);
+  opacity: 0.95;
+}
+
+.cs-scott-generate:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--sys-border);
+  color: var(--sys-text-muted);
+  box-shadow: none;
+  transform: none;
+}
+
+@keyframes cs-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .cs-full-layout {
+    padding-bottom: 320px;
+  }
+  .cs-scott-card {
+    border-radius: 16px;
+  }
+  .cs-scott-refs {
+    gap: 6px;
+  }
+}
+
+/* ── Scott Panel setting pills (shared with QAds style) ── */
+.qa-setting-pill {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sys-text-muted);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.qa-setting-pill:hover { color: var(--sys-text); background: rgba(255,255,255,0.03); }
+.qa-setting-pill.active {
+  background: color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface));
+  color: var(--sys-text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border: 1px solid var(--sys-border);
+}
+
+
