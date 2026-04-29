@@ -93,12 +93,12 @@ router.get('/by-section/:section', protect, async (req, res) => {
         if (brandId) {
             const [brandAware, general] = await Promise.all([
                 Template.find({ ...filter, promptTemplate: { $regex: '\\{brand\\}|\\{product\\}', $options: 'i' } })
-                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .select('-generationParams')
                     .sort({ isFeatured: -1, usageCount: -1 })
                     .limit(10)
                     .lean(),
                 Template.find({ ...filter, $or: [{ promptTemplate: { $not: /\{brand\}|\{product\}/i } }, { promptTemplate: '' }] })
-                    .select('-savedPrompt -promptTemplate -generationParams')
+                    .select('-generationParams')
                     .sort({ isFeatured: -1, usageCount: -1 })
                     .limit(parseInt(limit))
                     .lean(),
@@ -109,7 +109,7 @@ router.get('/by-section/:section', protect, async (req, res) => {
             ];
         } else {
             templates = (await Template.find(filter)
-                .select('-savedPrompt -promptTemplate -generationParams')
+                .select('-generationParams')
                 .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
                 .limit(parseInt(limit))
                 .lean()).map(t => ({ ...t, isBrandAware: false }));

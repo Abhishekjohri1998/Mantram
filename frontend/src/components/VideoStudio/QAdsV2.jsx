@@ -367,6 +367,58 @@ const css = `
     z-index: 1;
 }
 
+/* Template Cards */
+.qv2-temp-card {
+    flex: 0 0 140px;
+    height: 200px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.2s;
+}
+.qv2-temp-card:hover {
+    transform: translateY(-4px);
+    border-color: #ff2a5f;
+    box-shadow: 0 8px 24px rgba(255,42,95,0.3);
+}
+.qv2-temp-card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.qv2-temp-card .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);
+    transition: opacity 0.2s;
+}
+.qv2-temp-btn {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 3;
+}
+.qv2-temp-card:hover .qv2-temp-btn {
+    opacity: 1;
+}
+.qv2-temp-btn span {
+    background: #fff;
+    color: #000;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
 /* Active Output Card */
 .scott-output-card {
     width: 100%;
@@ -428,6 +480,7 @@ function GridVideo({ project, onReuse }) {
 export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) {
     const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
+    const [templates, setTemplates] = useState([])
     const [selP, setSelP] = useState(null)
     const [selectedCategory, setSelectedCategory] = useState(null)
     const [productUrl, setProductUrl] = useState('')
@@ -468,6 +521,10 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             setPresets(d.presets || [])
             setCategories(d.categories || [])
             if (d.presets?.length > 0 && !selP) setSelP(d.presets[0].id)
+        }).catch(() => {})
+
+        api('/templates/by-section/video_qads?limit=20').then(d => {
+            setTemplates(d.templates || [])
         }).catch(() => {})
     }, [])
 
@@ -713,6 +770,30 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                             </div>
                         )
                     })}
+                </div>
+            )}
+
+            {/* Templates Row */}
+            {templates.length > 0 && !isGeneratingPrompts && (
+                <div style={{ width: '100%', maxWidth: 900, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, paddingLeft: 4 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ff2a5f' }}>bolt</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Generate across formats</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
+                        {templates.map(t => (
+                            <div key={t._id} className="qv2-temp-card" onClick={() => setUserBrief(t.promptTemplate || t.savedPrompt || '')}>
+                                {t.previewMediaUrl ? <img src={t.previewMediaUrl} alt={t.name} /> : <div style={{ position: 'absolute', inset: 0, background: '#222' }} />}
+                                <div className="overlay" />
+                                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12, zIndex: 2 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{t.name}</div>
+                                </div>
+                                <div className="qv2-temp-btn">
+                                    <span>Recreate</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
