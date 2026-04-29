@@ -55,6 +55,7 @@ const INLINE_IMAGE_TYPES = new Set(['static', 'carousel', 'story', 'ad'])
 // ─── Validation Constants ────────────────────────────────────────────────────
 const MAX_BRIEF_LENGTH = 2000
 const MAX_KEYWORDS     = 15
+const MAX_LAUNCH_EVENTS = 10
 
 // ─── Brief Drawer ────────────────────────────────────────────────────────────
 
