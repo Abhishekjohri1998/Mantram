@@ -1,5 +1,5 @@
 /**
- * Atlas Cloud Client — Seedance 2.0 Video Generation
+ * Atlas Cloud Client — Seedance 2.0 & HappyHorse 1.0 Video Generation
  *
  * ARCHITECTURE:
  *  - Inference base:  https://api.atlascloud.ai/api/v1
@@ -56,6 +56,19 @@ function resolveModelName(qualityMode, imageCount) {
         return `atlascloud/workflow/${tier}/image-to-video`;
     }
     return `atlascloud/workflow/${tier}/text-to-video`;
+}
+
+function resolveHappyHorseModelName(imageCount) {
+    // HappyHorse 1.0 model slugs on Atlas Cloud
+    if (imageCount > 1) {
+        console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
+        return 'alibaba/happyhorse-1.0/reference-to-video';
+    }
+    if (imageCount === 1) {
+        console.log(`📌 HappyHorse: 1 image → image-to-video`);
+        return 'alibaba/happyhorse-1.0/image-to-video';
+    }
+    return 'alibaba/happyhorse-1.0/text-to-video';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -456,12 +469,94 @@ export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, durati
     return { taskId, provider: 'atlascloud', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
 }
 
+// ── Public: HappyHorse 1.0 Video Generation (T2V / I2V / R2V) ────────────────
+
+export async function submitHappyHorseVideoGeneration({
+    prompt, imageUrl, duration, aspectRatio, generateAudio = true,
+    referenceImages = [], resolution = '720p',
+}) {
+    console.log(`🐴 [HappyHorse] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
+
+    // Extract ZH prompt from Universal Director bilingual JSON
+    let finalPromptText = prompt;
+    try {
+        if (typeof prompt === 'string' && prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
+            const parsed = JSON.parse(prompt);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
+                console.log(`🈯 [HappyHorse] Extracted ZH prompt (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
+    const finalPrompt = truncatePrompt(
+        finalPromptText.replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim()
+    );
+
+    // Step 1 — Prepare images
+    const s3ImageUrls = [];
+    const s3RefImages = [];
+
+    if (imageUrl) {
+        const url = await ensureS3Url(imageUrl, 'video-studio/happyhorse');
+        if (url) s3ImageUrls.push(url);
+    }
+
+    if (referenceImages && referenceImages.length > 0) {
+        const uploaded = await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/happyhorse')));
+        uploaded.forEach(url => { if (url) s3RefImages.push(url); });
+    }
+
+    // Step 2 — Resolve model slug based on image count
+    const imageCount = s3ImageUrls.length + s3RefImages.length;
+    const modelName = resolveHappyHorseModelName(imageCount);
+    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15);
+    const res = resolution === '1080p' ? '1080p' : '720p';
+
+    console.log(`🎯 [HappyHorse] model=${modelName} | dur=${dur}s | images=${s3ImageUrls.length} | refs=${s3RefImages.length} | res=${res}`);
+    console.log(`📝 [HappyHorse] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
+
+    // Step 3 — Build Atlas Cloud payload
+    const taskInput = {
+        prompt:         finalPrompt,
+        aspect_ratio:   aspectRatio || '16:9',
+        duration:       dur,
+        generate_audio: generateAudio !== false,
+    };
+
+    // I2V: upload first frame to Atlas CDN
+    if (s3ImageUrls.length > 0 && modelName.includes('image-to-video')) {
+        console.log(`📸 [HappyHorse I2V] Uploading first frame to Atlas CDN...`);
+        const cdnUrl = await uploadMediaToAtlasCDN(s3ImageUrls[0]);
+        if (cdnUrl) taskInput.image = cdnUrl;
+        else taskInput.image_urls = s3ImageUrls;
+    }
+
+    // R2V: pass all reference images
+    if (s3RefImages.length > 0 && modelName.includes('reference-to-video')) {
+        const processedRefs = await Promise.all(s3RefImages.map(async url => {
+            return await uploadMediaToAtlasCDN(url);
+        }));
+        taskInput.reference_images = processedRefs.filter(Boolean).slice(0, 9);
+        console.log(`✅ [HappyHorse R2V] reference_images: ${taskInput.reference_images.length}`);
+    }
+
+    // T2V with first-frame anchor
+    if (s3ImageUrls.length > 0 && modelName.includes('text-to-video')) {
+        taskInput.image_urls = s3ImageUrls;
+    }
+
+    const payload = { model: 'happyhorse', task_type: modelName, input: taskInput };
+    const taskId  = await submitAtlasCloudPayload(payload);
+    return { taskId, provider: 'atlascloud', model: 'happyhorse-1.0', _payload: payload, type: 'generation' };
+}
+
 // ── Public: Resubmit ─────────────────────────────────────────────────────────
 
 export async function resubmitAtlasCloudTask(storedPayload) {
     console.log(`🔄 [Atlas] Auto-retry resubmit...`);
     const taskId = await submitAtlasCloudPayload(storedPayload);
-    return { taskId, provider: 'atlascloud', model: 'seedance-2.0' };
+    return { taskId, provider: 'atlascloud', model: storedPayload?.task_type?.includes('happyhorse') ? 'happyhorse-1.0' : 'seedance-2.0' };
 }
 
 // ── Public: Watermark Removal ─────────────────────────────────────────────────

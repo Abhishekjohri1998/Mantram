@@ -4,7 +4,7 @@
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration } from './kieClient.js';
-import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend } from './atlasClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration } from './atlasClient.js';
 import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
@@ -28,7 +28,7 @@ const MODEL_ENDPOINTS = {
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
-    'hunyuan': true, 'sora-2': true,
+    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
 };
 
 export function getModelsInfo() {
@@ -45,6 +45,7 @@ export const COST_PER_SECOND = {
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
+    'happyhorse-1.0': { fast: 0.06, quality: 0.10 },
 };
 
 const DURATION_LIMITS = {
@@ -56,6 +57,7 @@ const DURATION_LIMITS = {
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
+    'happyhorse-1.0': { min: 3, max: 15 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -125,6 +127,16 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: false, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['sora-2'], recommended: false,
+    },
+    'happyhorse-1.0': {
+        id: 'happyhorse-1.0', name: 'HappyHorse 1.0', icon: '🐴', provider: 'atlascloud',
+        description: 'Alibaba HappyHorse — cinematic motion, native audio, ref images, 1080p',
+        bestFor: 'Product demos, cinematic ads, brand films, animated content',
+        duration: { min: 3, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.0'], recommended: false,
+        maxPromptLength: 200000,
     },
 };
 
@@ -465,6 +477,33 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             };
         }
         // If provider !== 'grok', it will fall through to fal.ai routing below.
+    }
+
+    // HappyHorse 1.0 — routes directly to Atlas Cloud
+    if (model === 'happyhorse-1.0') {
+        console.log(`🐴 [HappyHorse 1.0] Routing to Atlas Cloud...`);
+        try {
+            const result = await submitHappyHorseVideoGeneration({
+                prompt: safePrompt,
+                imageUrl: s3ImageUrl,
+                duration,
+                aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+                referenceImages: s3ReferenceImages.filter(Boolean),
+                resolution: resolution || '720p',
+            });
+            return {
+                requestId: result.taskId,
+                endpoint: 'atlascloud-happyhorse-1.0',
+                statusUrl: null,
+                resultUrl: null,
+                provider: 'atlascloud',
+                _atlasCloudPayload: result._payload,
+            };
+        } catch (err) {
+            console.error(`❌ [HappyHorse 1.0] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`HappyHorse 1.0 generation failed: ${err.message}`);
+        }
     }
 
     const apiKey = getApiKey();
