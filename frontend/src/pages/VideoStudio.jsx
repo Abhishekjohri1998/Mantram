@@ -1844,6 +1844,7 @@ export default function VideoStudio() {
                             <p className="text-sm text-[var(--sys-text-muted)] -mt-3">
                                 AI recommended <strong className="video-highlight-text">{
                                     routing.selectedModel === 'grok-imagine' ? 'Grok Imagine' :
+                                    routing.selectedModel === 'happyhorse-1.0' ? 'HappyHorse 1.0' :
                                     routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
                                         routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
                                             routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
@@ -1870,6 +1871,7 @@ export default function VideoStudio() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {[
                                     { id: 'grok-imagine', name: 'Grok Imagine', icon: 'smart_toy', desc: 'xAI native — reference images, I2V, extend, native audio, 1-15s', bestFor: 'Social reels, product placement, character-consistent storytelling', features: ['ref-images', 'i2v', 'extend', 'native-audio', '1-15s'], available: true, recommended: true },
+                                    { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', icon: 'pets', desc: 'Premium cinematic animation & realism from Alibaba', bestFor: 'High-end branding, realistic motion, expressive portraits', features: ['ref-images', 'i2v', '3-15s'], available: true, recommended: true },
                                     { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: false },
                                     { id: 'veo-3.1', name: 'Google Veo 3.1', icon: 'movie', desc: 'Cinematic quality with native audio + extend-video', bestFor: 'Premium brand films, cinematic ads', features: ['native-audio', 'cinematic', 'extend-video', '5-8s'], available: true, recommended: false },
                                     { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: 'bolt', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
