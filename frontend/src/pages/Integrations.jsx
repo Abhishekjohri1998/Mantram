@@ -562,6 +562,7 @@ export default function Integrations() {
                                 </div>
 
                             </div>
+                        </section>
 
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
