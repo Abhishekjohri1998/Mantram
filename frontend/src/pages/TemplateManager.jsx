@@ -72,6 +72,13 @@ const STUDIO_SECTIONS = [
     { value: 'general',      label: 'General' },
 ];
 
+// Studio → allowed sections mapping
+const SECTIONS_BY_STUDIO = {
+    creative: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'avatar', 'general'],
+    video:    ['video_ugc', 'video_qads', 'general'],
+    content:  ['general'],
+};
+
 const TemplateManager = () => {
     const { addToast } = useUI();
 
@@ -95,6 +102,17 @@ const TemplateManager = () => {
     const [deletingId, setDeletingId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitStatus, setSubmitStatus] = useState('');
+
+    // Controlled modal form state
+    const [selectedStudio, setSelectedStudio] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedSection, setSelectedSection] = useState('general');
+    const [formErrors, setFormErrors] = useState({});
+
+    // Derived: sections filtered by selected studio
+    const filteredSections = selectedStudio
+        ? STUDIO_SECTIONS.filter(s => (SECTIONS_BY_STUDIO[selectedStudio] || []).includes(s.value))
+        : [];
 
     // Bulk selection (FIX 8)
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -232,33 +250,47 @@ const TemplateManager = () => {
 
     const openEditModal = (template) => {
         setTags(template.tags || []);
+        setSelectedStudio(template.studioOrigin || '');
+        setSelectedCategory(template.categoryId || '');
+        setSelectedSection(template.studioSection || 'general');
+        setFormErrors({});
         setModal({ open: true, data: template });
     };
 
     const saveTemplate = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
-        
+
+        // ── Validation ──
+        const errors = {};
+        if (modal.isNew) {
+            const file = fd.get('file');
+            if (!file || file.size === 0) errors.file = 'Please select a preview image or video';
+            if (!selectedStudio) errors.studioOrigin = 'Please select a studio';
+            if (!fd.get('savedPrompt')?.trim()) errors.savedPrompt = 'Prompt formula is required';
+        }
+        if (!fd.get('name')?.trim()) errors.name = 'Template name is required';
+        if (!selectedCategory) errors.categoryId = 'Please select a category';
+        if (!fd.get('description')?.trim()) errors.description = 'Description is required';
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+        }
+        setFormErrors({});
         setIsSubmitting(true);
         try {
             if (modal.isNew) {
-                // Must have a file
-                const file = fd.get('file');
-                if (!file || file.size === 0) {
-                    setIsSubmitting(false);
-                    return addToast('Please select a preview image or video', 'error');
-                }
-                
                 setSubmitStatus('Uploading...');
                 const uploadFd = new FormData();
-                uploadFd.append('file', file);
+                uploadFd.append('file', fd.get('file'));
                 uploadFd.append('name', fd.get('name'));
-                uploadFd.append('categoryId', fd.get('categoryId'));
+                uploadFd.append('categoryId', selectedCategory);
                 uploadFd.append('description', fd.get('description'));
                 uploadFd.append('tags', JSON.stringify(tags));
                 uploadFd.append('savedPrompt', fd.get('savedPrompt'));
-                uploadFd.append('studioOrigin', fd.get('studioOrigin'));
-                uploadFd.append('studioSection', fd.get('studioSection'));
+                uploadFd.append('studioOrigin', selectedStudio);
+                uploadFd.append('studioSection', selectedSection);
                 uploadFd.append('isFeatured', fd.get('isFeatured') === 'on');
                 uploadFd.append('isActive', fd.get('isActive') === 'on');
                 uploadFd.append('isPublished', fd.get('isPublished') === 'on');
@@ -268,15 +300,19 @@ const TemplateManager = () => {
                     body: uploadFd,
                     headers: {} // let fetch set multipart
                 });
-                
-                setTemplates(prev => [res.template, ...prev]);
+
+                // Ensure new template is visible in the table immediately
+                const newTemplate = { ...res.template, isActive: res.template.isActive ?? true };
+                setTemplates(prev => [newTemplate, ...prev]);
+                // Reset filters if they would hide the new template
+                if (activeFilter === 'inactive') setActiveFilter('all');
                 addToast('Template created and uploaded successfully', 'success');
             } else {
                 setSubmitStatus('Saving...');
                 const data = {
                     name: fd.get('name'),
-                    categoryId: fd.get('categoryId'),
-                    studioSection: fd.get('studioSection'),
+                    categoryId: selectedCategory,
+                    studioSection: selectedSection,
                     description: fd.get('description'),
                     tags: tags,
                     isFeatured: fd.get('isFeatured') === 'on',
@@ -335,7 +371,7 @@ const TemplateManager = () => {
                 <div style={{ display: 'flex', gap: 10 }}>
                     {activeTab === 'categories'
                         ? <button onClick={() => setCatModal({ open: true, data: null })} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ New Category</button>
-                        : <button onClick={() => { setTags([]); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
+                        : <button onClick={() => { setTags([]); setSelectedStudio(''); setSelectedCategory(''); setSelectedSection('general'); setFormErrors({}); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
                     }
                 </div>
             </div>
@@ -511,13 +547,29 @@ const TemplateManager = () => {
                             <button type="button" onClick={() => setModal({ open: false, data: null })} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={saveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {/* ── Validation errors summary ── */}
+                            {Object.keys(formErrors).length > 0 && (
+                                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ef4444', marginTop: 1 }}>error</span>
+                                    <div style={{ fontSize: 12, color: '#ef4444', lineHeight: 1.6 }}>
+                                        {Object.values(formErrors).map((msg, i) => <div key={i}>• {msg}</div>)}
+                                    </div>
+                                </div>
+                            )}
+
                             {modal.isNew && (
                                 <div style={{ display: 'flex', gap: 14 }}>
                                     <label style={{ ...labelStyle, flex: 2 }}>Preview Media
-                                        <input type="file" name="file" accept="image/*,video/*" required style={{ ...inputStyle, padding: '7px 10px', marginTop: 6 }} />
+                                        <input type="file" name="file" accept="image/*,video/*" style={{ ...inputStyle, padding: '7px 10px', marginTop: 6, borderColor: formErrors.file ? 'rgba(239,68,68,0.5)' : undefined }} />
                                     </label>
-                                    <label style={{ ...labelStyle, flex: 1 }}>Studio Origin
-                                        <select name="studioOrigin" defaultValue="creative" style={{ ...inputStyle, marginTop: 6 }}>
+                                    <label style={{ ...labelStyle, flex: 1 }}>Studio Origin *
+                                        <select
+                                            name="studioOrigin"
+                                            value={selectedStudio}
+                                            onChange={e => { setSelectedStudio(e.target.value); setSelectedCategory(''); setSelectedSection('general'); }}
+                                            style={{ ...inputStyle, marginTop: 6, borderColor: formErrors.studioOrigin ? 'rgba(239,68,68,0.5)' : undefined }}
+                                        >
+                                            <option value="">Select Studio</option>
                                             <option value="creative">Creative</option>
                                             <option value="video">Video</option>
                                             <option value="content">Content</option>
@@ -526,24 +578,48 @@ const TemplateManager = () => {
                                 </div>
                             )}
                             <div style={{ display: 'flex', gap: 14 }}>
-                                <label style={{ ...labelStyle, flex: 2 }}>Name
-                                    <input name="name" defaultValue={modal.data?.name} required style={{ ...inputStyle, marginTop: 6 }} />
+                                <label style={{ ...labelStyle, flex: 2 }}>Name *
+                                    <input name="name" defaultValue={modal.data?.name} style={{ ...inputStyle, marginTop: 6, borderColor: formErrors.name ? 'rgba(239,68,68,0.5)' : undefined }} />
                                 </label>
-                                <label style={{ ...labelStyle, flex: 1 }}>Category
-                                    <select name="categoryId" defaultValue={modal.data?.categoryId} required style={{ ...inputStyle, marginTop: 6 }}>
-                                        <option value="">Select Category</option>
-                                        {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                                    </select>
+                                <label style={{ ...labelStyle, flex: 1 }}>Category *
+                                    {!selectedStudio && modal.isNew ? (
+                                        <select disabled style={{ ...inputStyle, marginTop: 6, opacity: 0.4, cursor: 'not-allowed' }}>
+                                            <option>Select studio first</option>
+                                        </select>
+                                    ) : (
+                                        <select
+                                            name="categoryId"
+                                            value={selectedCategory}
+                                            onChange={e => setSelectedCategory(e.target.value)}
+                                            style={{ ...inputStyle, marginTop: 6, borderColor: formErrors.categoryId ? 'rgba(239,68,68,0.5)' : undefined }}
+                                        >
+                                            <option value="">Select Category</option>
+                                            {categories.filter(c => c.isActive !== false).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                                        </select>
+                                    )}
                                 </label>
                             </div>
-                            {/* FIX 6 — Studio Section */}
+                            {/* Studio Section — filtered by selected studio */}
                             <label style={labelStyle}>Studio Section
-                                <select name="studioSection" defaultValue={modal.data?.studioSection || 'general'} required style={{ ...inputStyle, marginTop: 6 }}>
-                                    {STUDIO_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                </select>
+                                {!selectedStudio && modal.isNew ? (
+                                    <select disabled style={{ ...inputStyle, marginTop: 6, opacity: 0.4, cursor: 'not-allowed' }}>
+                                        <option>Select studio first</option>
+                                    </select>
+                                ) : (
+                                    <select
+                                        name="studioSection"
+                                        value={selectedSection}
+                                        onChange={e => setSelectedSection(e.target.value)}
+                                        style={{ ...inputStyle, marginTop: 6 }}
+                                    >
+                                        {(selectedStudio ? filteredSections : STUDIO_SECTIONS).map(s => (
+                                            <option key={s.value} value={s.value}>{s.label}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </label>
-                            <label style={labelStyle}>Description
-                                <textarea name="description" defaultValue={modal.data?.description} required rows={2} style={{ ...inputStyle, resize: 'vertical', marginTop: 6 }} />
+                            <label style={labelStyle}>Description *
+                                <textarea name="description" defaultValue={modal.data?.description} rows={2} style={{ ...inputStyle, resize: 'vertical', marginTop: 6, borderColor: formErrors.description ? 'rgba(239,68,68,0.5)' : undefined }} />
                             </label>
                             <label style={labelStyle}>Tags
                                 <TagInput tags={tags} setTags={setTags} />
@@ -556,8 +632,8 @@ const TemplateManager = () => {
                             <div style={{ margin: '6px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
                             <div>
                                 {modal.isNew ? (
-                                    <label style={labelStyle}>Prompt Formula
-                                        <textarea name="savedPrompt" required rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} placeholder="Enter the exact prompt to use when generating from this template..." />
+                                    <label style={labelStyle}>Prompt Formula *
+                                        <textarea name="savedPrompt" rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6, borderColor: formErrors.savedPrompt ? 'rgba(239,68,68,0.5)' : undefined }} placeholder="Enter the exact prompt to use when generating from this template..." />
                                     </label>
                                 ) : (
                                     <>
