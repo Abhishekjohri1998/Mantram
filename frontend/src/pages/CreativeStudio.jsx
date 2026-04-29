@@ -5,6 +5,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, monthlyStrategy as monthlyStrategyAPI, API_BASE } from '../services/api'
 import { useBrand } from '../context/BrandContext'
+import { useAuth } from '../context/AuthContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
@@ -436,6 +437,7 @@ export default function CreativeStudio() {
 
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
+    const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
 
     // ── Global State ──
