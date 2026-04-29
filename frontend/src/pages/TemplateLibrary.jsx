@@ -48,7 +48,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     };
 
     const containerClasses = overlayMode
-        ? "fixed inset-0 z-[100] bg-[var(--sys-background)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        ? "fixed inset-0 z-[150] bg-[var(--sys-background)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         : "max-w-[1600px] mx-auto px-4 md:px-6 py-6 pb-24";
 
     return (

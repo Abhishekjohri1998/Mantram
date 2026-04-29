@@ -7,6 +7,7 @@ import GenerationJob from '../models/GenerationJob.js';
 import { buildTemplatePrompt } from '../agents/shared/templatePromptCombiner.js';
 import { deductCredits } from '../middleware/credits.js';
 import { internalGenerateCreative } from './creatives.js';
+import Brand from '../models/Brand.js';
 
 const router = express.Router();
 
@@ -157,7 +158,15 @@ router.post('/:id/use', protect, async (req, res) => {
 
         const { userInputs = {} } = req.body;
         // Step 10 + BUG-03 FIX: Accept S3 URL strings — base64 deprecated
-        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId } = userInputs;
+        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId: inputBrandId } = userInputs;
+
+        // Resolve brandId — use provided, or fall back to user's first brand
+        let brandId = inputBrandId || null;
+        if (!brandId) {
+            const fallbackBrand = await Brand.findOne({ user: req.user._id }, '_id').lean();
+            brandId = fallbackBrand?._id?.toString() || null;
+            if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
+        }
 
         // 1. Build prompt — pass S3 URLs, not base64
         const promptData = await buildTemplatePrompt({
@@ -225,6 +234,7 @@ router.post('/:id/use', protect, async (req, res) => {
             // Do NOT call ensureS3Url on its return value — that would double-mirror.
             internalGenerateCreative({
                 body: {
+                    brandId,
                     prompt: promptData.finalPrompt,
                     visionInputs: promptData.visionInputs,  // S3 URL refs, not base64
                     format: settings?.format || 'instagram-post',
