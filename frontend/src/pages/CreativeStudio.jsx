@@ -1374,6 +1374,97 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // Read URL params from Content Studio
     useEffect(() => {
+        // ── Template handoff: pick up a background job by jobId ────────────
+        const incomingJobId = searchParams.get('jobId')
+        if (incomingJobId) {
+            setShowQuickStart(false)
+            const localTrackId = `tmpl_${Date.now()}`
+            setActiveGenerations(prev => [
+                ...prev,
+                { jobId: localTrackId, prompt: 'Template generation', startedAt: Date.now(), steps: [{ agent: 'system', message: 'Template generation in progress...', status: 'working' }] }
+            ])
+
+            // Clean URL immediately to avoid re-triggering
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev)
+                next.delete('jobId')
+                return next
+            }, { replace: true })
+
+            // Poll this template job — same logic as pollLocalJob in handleGenerate
+            let attempts = 0
+            const maxAttempts = 90
+            const tmplPollInterval = setInterval(async () => {
+                attempts++
+                if (attempts > maxAttempts) {
+                    clearInterval(tmplPollInterval)
+                    setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                    setError({ message: 'Template generation timed out. Check your gallery.', isRetryable: false })
+                    return
+                }
+                try {
+                    const pollData = await creativesAPI.pollJob(incomingJobId)
+                    if (!pollData?.success) return
+                    const job = pollData.job
+                    if (job.status === 'completed') {
+                        clearInterval(tmplPollInterval)
+                        const creative = job.result?.creative || {}
+                        const imageUrl = creative.imageUrl || job.imageUrl
+
+                        if (!imageUrl && creative._id) {
+                            // S3 upload pending — wait up to 60s
+                            let retries = 0
+                            const waitForS3 = setInterval(async () => {
+                                retries++
+                                if (retries > 12) {
+                                    clearInterval(waitForS3)
+                                    setResult({ ...creative, _prompt: 'Template' })
+                                    setFeedbackToast('⚠️ Image upload is taking longer than expected. Refresh in a moment.')
+                                    setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                                    return
+                                }
+                                try {
+                                    const repoll = await creativesAPI.pollJob(incomingJobId)
+                                    const freshUrl = repoll?.job?.result?.creative?.imageUrl || repoll?.job?.imageUrl
+                                    if (freshUrl) {
+                                        clearInterval(waitForS3)
+                                        const freshCreative = { ...creative, imageUrl: freshUrl, thumbnailUrl: freshUrl }
+                                        setResult(freshCreative)
+                                        setGenerationHistory(prev => [{ ...freshCreative, _prompt: 'Template', _timestamp: Date.now() }, ...prev])
+                                        setFeedbackToast('')
+                                        setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                                    }
+                                } catch { /* ignore */ }
+                            }, 5000)
+                        } else {
+                            const finalCreative = { ...creative, imageUrl: imageUrl || creative.imageUrl }
+                            setResult(finalCreative)
+                            if (imageUrl) {
+                                setGenerationHistory(prev => [{ ...finalCreative, _prompt: 'Template', _timestamp: Date.now() }, ...prev])
+                            }
+                            if (job.warnings?.length > 0) setAiWarnings(job.warnings)
+                            setFeedbackToast('')
+                            setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                        }
+                    } else if (job.status === 'failed') {
+                        clearInterval(tmplPollInterval)
+                        setError({ message: job.errorMessage || 'Template generation failed.', isRetryable: true })
+                        setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                    } else if (job.status === 'processing') {
+                        const newSteps = job.steps?.length > 0
+                            ? job.steps
+                            : [{ agent: 'brand-intel', message: 'AI agent pipeline running...', status: 'working' }]
+                        setActiveGenerations(prev => prev.map(j =>
+                            j.jobId === localTrackId ? { ...j, steps: newSteps } : j
+                        ))
+                    }
+                } catch { /* ignore polling errors */ }
+            }, 5000)
+
+            return // Don't process other params
+        }
+        // ───────────────────────────────────────────────────────────────────
+
         const isFromContent = searchParams.get('fromContent')
         const contentPrompt = searchParams.get('prompt')
         const contentType = searchParams.get('type')
