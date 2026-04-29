@@ -564,7 +564,6 @@ export default function Integrations() {
                             </div>
                         </section>
 
-                        </section>
 
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
