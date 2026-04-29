@@ -205,6 +205,22 @@ router.post('/:id/use', protect, async (req, res) => {
 
         if (template.studioOrigin === 'creative') {
             jobId = `create-${Date.now()}`;
+
+            // Pre-create GenerationJob so frontend polling doesn't 404 while pipeline runs
+            await GenerationJob.create({
+                jobId,
+                user: req.user._id,
+                brand: brandId || null,
+                status: 'processing',
+                type: 'ai-create',
+                format: settings?.format || 'instagram-post',
+                prompt: promptData.finalPrompt || '',
+                creditsDeducted: cost,
+                options: settings || {},
+                startedAt: new Date(),
+                meta: { label: `Template: ${template.name}`, page: '/creative-studio' }
+            }).catch(e => console.warn('[Template] GenerationJob pre-create failed:', e.message));
+
             // Step 10: internalGenerateCreative already calls ensureS3Url internally.
             // Do NOT call ensureS3Url on its return value — that would double-mirror.
             internalGenerateCreative({
@@ -217,7 +233,13 @@ router.post('/:id/use', protect, async (req, res) => {
                 user: req.user,
                 creditsDeducted: cost,
                 jobId
-            }).catch(e => console.error('Creative background dispatch error:', e));
+            }).catch(e => {
+                console.error('Creative background dispatch error:', e);
+                GenerationJob.findOneAndUpdate(
+                    { jobId },
+                    { status: 'failed', completedAt: new Date(), errorMessage: e.message }
+                ).catch(() => {});
+            });
 
         } else if (template.studioOrigin === 'video') {
             jobId = `vid-${Date.now()}`;
