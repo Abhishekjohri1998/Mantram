@@ -9,14 +9,20 @@ const STUDIO_CREDIT_COSTS = {
 };
 
 // BUG-03 FIX: Pre-upload image to S3 before generation — never send base64
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
+
 async function uploadImageReference(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/media/image-reference', {
+    const res = await fetch(`${API_BASE}/media/image-reference`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
         body: formData,
     });
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+        throw new Error(`Server returned non-JSON response (${res.status}). Please try again.`);
+    }
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Image upload failed');
