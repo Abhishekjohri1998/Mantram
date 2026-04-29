@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { templates as templatesAPI } from '../../services/api';
+import { useBrand } from '../../context/BrandContext';
 
 const STUDIO_CREDIT_COSTS = {
     creative: 4,
@@ -33,6 +34,7 @@ async function uploadImageReference(file) {
 
 export default function TemplateGenerationModal({ template, onClose }) {
     const navigate = useNavigate();
+    const { activeBrand } = useBrand();
     const [userPrompt, setUserPrompt] = useState('');
 
     // Product image state — stores { preview: localObjectUrl, s3Url, uploading, error }
@@ -97,6 +99,7 @@ export default function TemplateGenerationModal({ template, onClose }) {
                 userPrompt,
                 productImageUrl: productImg.s3Url || null,
                 avatarImageUrl: avatarImg.s3Url || null,
+                brandId: activeBrand?._id || null,
             };
 
             const res = await templatesAPI.use(template._id, { userInputs });
