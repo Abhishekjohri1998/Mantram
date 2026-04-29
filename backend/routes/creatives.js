@@ -331,7 +331,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '1K';
+        const imageSize = options?.imageSize || '2K'; // Default to 2K for higher quality template output
         const customSize = options?.customSize || null;
 
         let ratioNum = 1;
@@ -1699,23 +1699,37 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             finalImageParts.push(...downloadedParts);
         }
 
-        // ⚡ SPEED: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
-        // Keep the essential creative direction, strip verbose framework boilerplate
+        // ⚡ SPEED/QUALITY: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
+        // BUT if we have reference images, we MUST preserve the Visual Grounding, otherwise the model hallucinates the product.
         let optimizedPrompt = promptText;
         if (optimizedPrompt.length > 2000) {
             const origLen = optimizedPrompt.length;
-            // Strip verbose sections that add latency without quality improvement
-            optimizedPrompt = optimizedPrompt
-                .replace(/VISUAL GROUNDING \(from real product\/brand photos\):[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
-                .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
-                .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-            // Hard cap at 2000 chars if still too long
-            if (optimizedPrompt.length > 2000) {
-                optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+            const hasRefs = finalImageParts && finalImageParts.length > 0;
+            
+            if (hasRefs) {
+                // Keep VISUAL GROUNDING and REFERENCE IMAGES because they are critical for fidelity
+                optimizedPrompt = optimizedPrompt
+                    .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                // If STILL over 3500, then we do a harder cap but keep the start and end
+                if (optimizedPrompt.length > 3500) {
+                    optimizedPrompt = optimizedPrompt.substring(0, 3450) + '\n\n[...condensed]';
+                }
+            } else {
+                // Strip verbose sections that add latency without quality improvement when no refs are used
+                optimizedPrompt = optimizedPrompt
+                    .replace(/VISUAL GROUNDING \(from real product\/brand photos\):[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                // Hard cap at 2000 chars if still too long
+                if (optimizedPrompt.length > 2000) {
+                    optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+                }
             }
-            console.log(`⚡ Prompt optimized for speed: ${origLen} → ${optimizedPrompt.length} chars`);
+            console.log(`⚡ Prompt optimized: ${origLen} → ${optimizedPrompt.length} chars (refs: ${hasRefs})`);
         }
 
         // ── Generate via native Gemini router ──
