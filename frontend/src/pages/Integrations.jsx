@@ -13,26 +13,116 @@ import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
 import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE } from '../services/api'
 
-const SOCIAL_PLATFORMS = [
-    { id: 'instagram', name: 'Instagram', icon: '📷', color: '#E1306C', desc: 'Photos, reels & stories' },
-    { id: 'facebook', name: 'Facebook', icon: '📘', color: '#1877F2', desc: 'Pages, groups & marketplace' },
-    { id: 'linkedin', name: 'LinkedIn', icon: '💼', color: '#0A66C2', desc: 'Professional posts & articles' },
-    { id: 'twitter', name: 'X (Twitter)', icon: '𝕏', color: '#000000', desc: 'Tweets & threads' },
-    { id: 'tiktok', name: 'TikTok', icon: '🎵', color: '#010101', desc: 'Short-form video content', comingSoon: true },
-    { id: 'youtube', name: 'YouTube', icon: '🎥', color: '#FF0000', desc: 'Long-form video & shorts', comingSoon: true },
-]
+// ── SVG Platform Logos ──────────────────────────────────────────────────────
+function PlatformLogo({ id, size = 28 }) {
+    const s = { width: size, height: size, display: 'block', flexShrink: 0 }
+    switch (id) {
+        case 'instagram': return (
+            <svg style={s} viewBox="0 0 24 24" fill="none">
+                <defs><radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0%" stopColor="#fdf497"/><stop offset="10%" stopColor="#fd5949"/><stop offset="50%" stopColor="#d6249f"/><stop offset="100%" stopColor="#285AEB"/></radialGradient></defs>
+                <rect width="24" height="24" rx="6" fill="url(#ig)"/>
+                <circle cx="12" cy="12" r="4.5" stroke="white" strokeWidth="1.8" fill="none"/>
+                <circle cx="17.5" cy="6.5" r="1.2" fill="white"/>
+            </svg>
+        )
+        case 'facebook': return (
+            <svg style={s} viewBox="0 0 24 24" fill="#1877F2">
+                <rect width="24" height="24" rx="6" fill="#1877F2"/>
+                <path d="M16 8h-2a1 1 0 0 0-1 1v2h3l-.5 3H13v7h-3v-7H8v-3h2V9a4 4 0 0 1 4-4h2v3z" fill="white"/>
+            </svg>
+        )
+        case 'linkedin': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#0A66C2"/>
+                <path d="M7 9h2v8H7V9zm1-3a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 8 6zm4 3h2v1.1C14.4 9.4 15 9 16 9c2 0 2.5 1.5 2.5 3v5h-2v-4.5c0-.8-.3-1.5-1.2-1.5-.9 0-1.3.7-1.3 1.5V17h-2V9z" fill="white"/>
+            </svg>
+        )
+        case 'twitter': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#000"/>
+                <path d="M17.5 6h-2.1l-3.3 4-3-4H6.5l4.4 5.8L6.2 18h2.1l3.6-4.3L15.3 18H18l-4.7-6.1L17.5 6z" fill="white"/>
+            </svg>
+        )
+        case 'tiktok': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#010101"/>
+                <path d="M16 6.5v7a4 4 0 1 1-2-3.46V13a2 2 0 1 0 2 2V6.5h2z" fill="white"/>
+                <path d="M14 6.5c.55.9 1.5 1.5 2 1.7" stroke="#00f2ea" strokeWidth="0.5" fill="none"/>
+                <path d="M14 6.5c.55.9 1.5 1.5 2 1.7" stroke="#ff0050" strokeWidth="0.5" fill="none" transform="translate(0.5,0)"/>
+            </svg>
+        )
+        case 'youtube': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#FF0000"/>
+                <path d="M20.5 8.5s-.2-1.4-.8-2c-.8-.8-1.6-.8-2-.9C15.3 5.5 12 5.5 12 5.5s-3.3 0-5.7.1c-.4.1-1.2.1-2 .9-.6.6-.8 2-.8 2S3.3 10 3.3 11.5v1.4c0 1.4.2 2.9.2 2.9s.2 1.4.8 2c.8.8 1.8.8 2.3.8 1.7.2 7.4.2 7.4.2s3.3 0 5.7-.2c.4-.1 1.2-.1 2-.9.6-.6.8-2 .8-2s.2-1.5.2-3v-1.4c0-1.5-.2-3-.2-3zM10 14.5v-5l5.5 2.5-5.5 2.5z" fill="white"/>
+            </svg>
+        )
+        case 'shopify': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#96BF48"/>
+                <path d="M15.3 5.4c0-.1-.1-.2-.2-.2-.1 0-1.3-.1-1.3-.1s-.9-.9-1-.9H12l-.6 4.4 4.2 1-.3-4.2zM12 5.2s-.5.1-.6.2C11 6 10.8 6.8 10.8 6.8H12V5.2zm-.6 1.6h-1.2c-.4 1.7-.8 4.7-.8 4.7l4.8 1.4-.3-2-2.5-.7V6.8zm5.8.8l-.5-.1c-.1-1-.6-1.8-1.5-1.8h-.1l-.4 2.5 2.5.6v-1.2zm-6.2 8.8l3.2.9 1.8-7.4-4.8-1.4-1.4 6.2.2 1.7zm3-2.8l-1.4-.4.4-2.1 1.4.4-.4 2.1z" fill="white"/>
+            </svg>
+        )
+        case 'woocommerce': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#96588A"/>
+                <path d="M3 7h18v1.5H3V7zm1.5 2.5h15l-1.5 7h-12l-1.5-7zm4.5 2l1 2.5L12 10l2 4 1-4h2l-2 6H9l-2-6h2z" fill="white"/>
+            </svg>
+        )
+        case 'etsy': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#F56400"/>
+                <path d="M8 6h8v2h-5v3h4v2h-4v3h5v2H8V6z" fill="white"/>
+            </svg>
+        )
+        case 'amazon': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#232F3E"/>
+                <path d="M6 13.5c2.5 1.8 8 2 11 .5" stroke="#FF9900" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                <path d="M15.5 15.5l1.5-1.5 1 1.5" stroke="#FF9900" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+                <text x="7" y="12" fontSize="7" fill="white" fontFamily="Arial" fontWeight="bold">amazon</text>
+            </svg>
+        )
+        case 'google-analytics': return (
+            <svg style={s} viewBox="0 0 24 24" fill="none">
+                <path d="M20 4h-4v16h4V4z" fill="#F9AB00" />
+                <path d="M12 10h-4v10h4V10z" fill="#E37400" />
+                <circle cx="4" cy="18" r="2" fill="#E37400" />
+            </svg>
+        )
+        case 'meta': return (
+            <svg style={s} viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#0081FB"/>
+                <path d="M4.5 14c0-2.5 1.2-5.5 3-5.5 1 0 1.8 1 2.5 2.5C11 9 12.2 8 13.5 8c2.5 0 6 3.5 6 6 0 1.4-.7 2-1.5 2-.7 0-1.3-.5-2-1.5C15.2 13.4 14.5 12 13.5 12c-.8 0-1.5 1-2 2.5-.5 1.2-1 2-2 2-1.2 0-2.5-.8-3-1.5-.5-.6-.5-1-.5-1h-1z" fill="white"/>
+            </svg>
+        )
+        case 'google-ads': return (
+            <svg style={s} viewBox="0 0 24 24" fill="none">
+                <path d="M3 17L9 7l6 10H3z" fill="#FBBC04"/>
+                <path d="M15 7l6 10" stroke="#34A853" strokeWidth="3" strokeLinecap="round"/>
+                <circle cx="9" cy="17" r="3" fill="#4285F4"/>
+            </svg>
+        )
+        default: return (
+            <div style={{ ...s, borderRadius: 6, background: 'var(--sys-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: size * 0.55, color: 'white' }}>hub</span>
+            </div>
+        )
+    }
+}
 
-const ECOMMERCE_PLATFORMS = [
-    { id: 'shopify', name: 'Shopify', color: '#96BF48', letter: 'S', desc: 'Sync products & inventory', integrated: true },
-    { id: 'woocommerce', name: 'WooCommerce', color: '#96588A', letter: 'W', desc: 'WordPress store products', comingSoon: true },
-    { id: 'etsy', name: 'Etsy', color: '#F56400', letter: 'E', desc: 'Handmade & vintage listings', comingSoon: true },
-    { id: 'amazon', name: 'Amazon Seller', color: '#FF9900', letter: 'A', desc: 'Marketplace listings', comingSoon: true },
-    { id: 'flipkart', name: 'Flipkart', color: '#2874F0', letter: 'F', desc: 'Indian marketplace', comingSoon: true },
+const SOCIAL_PLATFORMS = [
+    { id: 'instagram', name: 'Instagram', color: '#E1306C', desc: 'Photos, reels & stories' },
+    { id: 'facebook', name: 'Facebook', color: '#1877F2', desc: 'Pages, groups & marketplace' },
+    { id: 'linkedin', name: 'LinkedIn', color: '#0A66C2', desc: 'Professional posts & articles' },
+    { id: 'twitter', name: 'X (Twitter)', color: '#14171A', desc: 'Tweets & threads' },
+    { id: 'tiktok', name: 'TikTok', color: '#010101', desc: 'Short-form video content', comingSoon: true },
+    { id: 'youtube', name: 'YouTube', color: '#FF0000', desc: 'Long-form video & shorts', comingSoon: true },
 ]
 
 const AD_PLATFORMS = [
-    { key: 'meta', name: 'Meta Ads', icon: 'smartphone', color: '#0081FB', desc: 'Facebook & Instagram ads' },
-    { key: 'google', name: 'Google Ads', icon: 'bar_chart', color: '#34A853', desc: 'Search, display & YouTube ads' },
+    { key: 'meta', logoId: 'meta', name: 'Meta Ads', color: '#0081FB', desc: 'Facebook & Instagram ads' },
+    { key: 'google', logoId: 'google-ads', name: 'Google Ads', color: '#34A853', desc: 'Search, display & YouTube ads' },
 ]
 
 export default function Integrations() {
@@ -326,8 +416,11 @@ export default function Integrations() {
                                     </div>
                                 ) : (
                                     <button onClick={connectGA} disabled={gaLoading}
-                                        className="w-full py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] bg-[#F9AB00]/15 text-[#F9AB00] border border-[#F9AB00]/25 hover:bg-[#F9AB00]/25 cursor-pointer disabled:opacity-50">
-                                        {gaLoading ? '⏳ Connecting...' : '🔗 Connect Google Analytics'}
+                                        className="w-full py-3 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] bg-[#F9AB00]/15 text-[#F9AB00] border border-[#F9AB00]/25 hover:bg-[#F9AB00]/25 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+                                        {gaLoading
+                                            ? <><span className="material-symbols-outlined animate-spin text-base">progress_activity</span> Connecting...</>
+                                            : <><span className="material-symbols-outlined text-base">link</span> Connect Google Analytics</>
+                                        }
                                     </button>
                                 )}
                             </div>
@@ -335,8 +428,9 @@ export default function Integrations() {
 
                         {/* ═══════════ AD PLATFORMS SECTION ═══════════ */}
                         <section>
-                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-2xl">📢</span> Ad Platforms
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--sys-text)]">
+                                <span className="material-symbols-outlined text-primary text-lg align-middle">campaign</span>
+                                Ad Platforms
                                 <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by Performance Studio</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -344,12 +438,12 @@ export default function Integrations() {
                                     const conn = adConnections[p.key] || {}
                                     const isConnected = conn.status === 'connected'
                                     return (
-                                        <div key={p.key} className="glass-panel rounded-2xl p-5 hover:border-[var(--sys-border)] transition-all">
+                                        <div key={p.key} className="glass-panel rounded-2xl p-5 hover:border-primary/20 transition-all">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
-                                                        style={{ background: `${p.color}20` }}>
-                                                        <span className="material-symbols-outlined" style={{ color: p.color }}>{p.icon}</span>
+                                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden"
+                                                        style={{ background: `${p.color}15` }}>
+                                                        <PlatformLogo id={p.logoId} size={32} />
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-[var(--sys-text)] text-sm">{p.name}</h3>
@@ -405,17 +499,20 @@ export default function Integrations() {
 
                         {/* ═══════════ E-COMMERCE SECTION ═══════════ */}
                         <section>
-                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-lg align-middle">shopping_bag</span> E-Commerce
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--sys-text)]">
+                                <span className="material-symbols-outlined text-primary text-lg align-middle">shopping_bag</span>
+                                E-Commerce
                                 <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by D2C Studio · Creative Studio · Research Studio</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                                 {/* Shopify — active */}
-                                <div className="glass-panel rounded-2xl p-6">
+                                <div className="glass-panel rounded-2xl p-6 hover:border-primary/20 transition-all">
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-xl bg-[#96BF48]/10 flex items-center justify-center text-2xl font-bold text-[#96BF48]">S</div>
+                                            <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                                                <PlatformLogo id="shopify" size={48} />
+                                            </div>
                                             <div>
                                                 <h3 className="font-bold text-[var(--sys-text)]">Shopify</h3>
                                                 <p className="text-sm text-[var(--sys-text-muted)]">Sync products &amp; inventory</p>
@@ -434,12 +531,13 @@ export default function Integrations() {
                                             </div>
                                             <div className="flex gap-2">
                                                 <button onClick={syncProducts} disabled={syncing}
-                                                    className="btn-primary px-4 py-2 rounded-xl text-sm">
-                                                    {syncing ? '⏳ Syncing...' : '🔄 Sync Products'}
+                                                    className="btn-primary px-4 py-2 rounded-xl text-sm flex items-center gap-1.5">
+                                                    <span className={`material-symbols-outlined text-sm ${syncing ? 'animate-spin' : ''}`}>{syncing ? 'progress_activity' : 'sync'}</span>
+                                                    {syncing ? 'Syncing...' : 'Sync Products'}
                                                 </button>
                                                 <button onClick={() => setActiveTab('products')}
-                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">
-                                                    📦 View Products
+                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-sm">inventory_2</span> View Products
                                                 </button>
                                                 <button onClick={async () => {
                                                     if (!confirm('Disconnect Shopify for this brand?')) return;
@@ -497,20 +595,25 @@ export default function Integrations() {
                                                 </>
                                             )}
                                             <button onClick={connectShopify} disabled={loading.shopify}
-                                                className="btn-primary w-full py-3 rounded-xl text-sm font-medium">
-                                                {loading.shopify ? 'Connecting...' : shopifyMode === 'token' ? '🔗 Connect with Token' : '🔗 Connect via OAuth'}
+                                                className="btn-primary w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
+                                                {loading.shopify
+                                                    ? <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Connecting...</>
+                                                    : <><span className="material-symbols-outlined text-sm">link</span> {shopifyMode === 'token' ? 'Connect with Token' : 'Connect via OAuth'}</>
+                                                }
                                             </button>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* WooCommerce — coming soon */}
-                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden hover:border-primary/10 transition-all">
                                     <div className="absolute top-3 right-3">
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/20">Coming Soon</span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
                                     </div>
                                     <div className="flex items-center gap-4 mb-4">
-                                        <div className="w-14 h-14 rounded-xl bg-[#96588A]/10 flex items-center justify-center text-2xl font-bold text-[#96588A]">W</div>
+                                        <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                                            <PlatformLogo id="woocommerce" size={48} />
+                                        </div>
                                         <div>
                                             <h3 className="font-bold text-[var(--sys-text)]">WooCommerce</h3>
                                             <p className="text-sm text-[var(--sys-text-muted)]">WordPress store products &amp; orders</p>
@@ -524,12 +627,14 @@ export default function Integrations() {
                                 </div>
 
                                 {/* Etsy — coming soon */}
-                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden hover:border-primary/10 transition-all">
                                     <div className="absolute top-3 right-3">
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/20">Coming Soon</span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
                                     </div>
                                     <div className="flex items-center gap-4 mb-4">
-                                        <div className="w-14 h-14 rounded-xl bg-[#F56400]/10 flex items-center justify-center text-2xl font-bold text-[#F56400]">E</div>
+                                        <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                                            <PlatformLogo id="etsy" size={48} />
+                                        </div>
                                         <div>
                                             <h3 className="font-bold text-[var(--sys-text)]">Etsy</h3>
                                             <p className="text-sm text-[var(--sys-text-muted)]">Handmade, vintage &amp; craft listings</p>
@@ -543,12 +648,14 @@ export default function Integrations() {
                                 </div>
 
                                 {/* Amazon — coming soon */}
-                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden hover:border-primary/10 transition-all">
                                     <div className="absolute top-3 right-3">
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/20">Coming Soon</span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
                                     </div>
                                     <div className="flex items-center gap-4 mb-4">
-                                        <div className="w-14 h-14 rounded-xl bg-[#FF9900]/10 flex items-center justify-center text-2xl font-bold text-[#FF9900]">A</div>
+                                        <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                                            <PlatformLogo id="amazon" size={48} />
+                                        </div>
                                         <div>
                                             <h3 className="font-bold text-[var(--sys-text)]">Amazon Seller</h3>
                                             <p className="text-sm text-[var(--sys-text-muted)]">Marketplace listings &amp; A+ content</p>
@@ -567,20 +674,27 @@ export default function Integrations() {
 
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
-                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-2xl"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">smartphone</span></span> Social Media
-                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by Content & Publish Studios</span>
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--sys-text)]">
+                                <span className="material-symbols-outlined text-primary text-lg align-middle">smartphone</span>
+                                Social Media
+                                <span className="text-xs text-[var(--sys-text-muted)] font-normal ml-2">Used by Content &amp; Publish Studios</span>
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {SOCIAL_PLATFORMS.map(platform => {
                                     const status = platformStatus[platform.id] || {}
                                     return (
-                                        <div key={platform.id} className="glass-panel rounded-2xl p-5 hover:border-[var(--sys-border)] transition-all">
+                                        <div key={platform.id} className={`glass-panel rounded-2xl p-5 transition-all relative ${
+                                            platform.comingSoon ? 'opacity-70' : 'hover:border-primary/20'
+                                        }`}>
+                                            {platform.comingSoon && (
+                                                <div className="absolute top-3 right-3">
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
+                                                </div>
+                                            )}
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl"
-                                                        style={{ background: `${platform.color}20` }}>
-                                                        {platform.icon}
+                                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden">
+                                                        <PlatformLogo id={platform.id} size={40} />
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-[var(--sys-text)] text-sm">{platform.name}</h3>
@@ -590,7 +704,13 @@ export default function Integrations() {
                                                 <StatusBadge status={status.status || 'disconnected'} />
                                             </div>
 
-                                            {status.connected && status.accounts ? (
+                                            {platform.comingSoon ? (
+                                                <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed flex items-center justify-center gap-2"
+                                                    style={{ background: `${platform.color}15`, color: platform.color, border: `1px solid ${platform.color}25` }}>
+                                                    <span className="material-symbols-outlined text-sm">link_off</span>
+                                                    Coming Soon
+                                                </button>
+                                            ) : status.connected && status.accounts ? (
                                                 <div className="space-y-2">
                                                     {status.accounts.map(acc => (
                                                         <div key={acc._id} className="flex items-center justify-between p-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
