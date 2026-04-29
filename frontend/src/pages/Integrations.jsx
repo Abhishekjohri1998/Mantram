@@ -563,6 +563,8 @@ export default function Integrations() {
 
                             </div>
 
+                        </section>
+
                         {/* ═══════════ SOCIAL MEDIA SECTION ═══════════ */}
                         <section>
                             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
