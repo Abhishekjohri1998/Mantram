@@ -110,6 +110,42 @@ const THINKING_STEPS = {
     ],
 };
 
+// ── Engagement Messages — fun, user-facing messages that rotate during generation ──
+// These keep users entertained during the 30-120s wait, shown between the title and pipeline steps.
+const ENGAGEMENT_MESSAGES = {
+    creative: [
+        { text: "Hold tight — we're crafting the perfect image for you ✨", icon: 'auto_awesome' },
+        { text: "Our AI is analyzing your brand DNA for pixel-perfect results", icon: 'psychology' },
+        { text: "Mixing colors, composing layouts, perfecting details...", icon: 'palette' },
+        { text: "Great things take a moment — your visual is almost ready", icon: 'hourglass_top' },
+        { text: "Fine-tuning every detail to match your brand's identity", icon: 'tune' },
+        { text: "Applying creative magic — this is going to look amazing 🎨", icon: 'brush' },
+        { text: "Your AI art director is putting final touches on the composition", icon: 'photo_camera' },
+        { text: "Generating at 2K resolution for ultra-sharp quality", icon: 'high_quality' },
+    ],
+    content: [
+        { text: "Crafting words that resonate with your audience ✍️", icon: 'edit_note' },
+        { text: "Analyzing trending hooks for maximum engagement", icon: 'trending_up' },
+        { text: "Your AI copywriter is in the zone — almost done", icon: 'auto_awesome' },
+        { text: "Perfecting tone, style, and brand voice alignment", icon: 'record_voice_over' },
+        { text: "Great content takes a moment — hang tight!", icon: 'hourglass_top' },
+    ],
+    video: [
+        { text: "Building your storyboard frame by frame 🎬", icon: 'movie' },
+        { text: "Our AI director is composing the perfect shots", icon: 'videocam' },
+        { text: "Rendering high-quality video — almost there", icon: 'auto_awesome' },
+        { text: "Aligning visuals with your brand's cinematic style", icon: 'palette' },
+        { text: "Great videos take time — yours is going to be worth it", icon: 'hourglass_top' },
+    ],
+    default: [
+        { text: "Hold on — we're generating the best results for you ✨", icon: 'auto_awesome' },
+        { text: "Our AI agents are working their magic behind the scenes", icon: 'psychology' },
+        { text: "Almost there — perfecting every detail", icon: 'tune' },
+        { text: "Great things take a moment — hang tight!", icon: 'hourglass_top' },
+        { text: "Putting the finishing touches on your creation", icon: 'brush' },
+    ],
+};
+
 // ── Hook: Simulated thinking steps timer ─────────────────────────────────────
 function useThinkingSimulator(isActive, thinkingContext, estimatedDuration, hasRealSteps) {
     const [simulatedSteps, setSimulatedSteps] = useState([]);
@@ -178,6 +214,31 @@ function useThinkingSimulator(isActive, thinkingContext, estimatedDuration, hasR
     return simulatedSteps;
 }
 
+// ── Hook: Rotating engagement messages ─────────────────────────────────────────
+function useEngagementMessage(isActive, thinkingContext) {
+    const [msgIndex, setMsgIndex] = useState(0);
+    const [fadeState, setFadeState] = useState('in'); // 'in' | 'out'
+
+    const messages = ENGAGEMENT_MESSAGES[thinkingContext] || ENGAGEMENT_MESSAGES.default;
+
+    useEffect(() => {
+        if (!isActive) { setMsgIndex(0); return; }
+
+        const interval = setInterval(() => {
+            // Fade out, swap message, fade in
+            setFadeState('out');
+            setTimeout(() => {
+                setMsgIndex(prev => (prev + 1) % messages.length);
+                setFadeState('in');
+            }, 400); // 400ms for fade-out before swapping
+        }, 5000); // Rotate every 5 seconds
+
+        return () => clearInterval(interval);
+    }, [isActive, messages.length]);
+
+    return { message: messages[msgIndex], fadeState };
+}
+
 export default function GlobalLoader({
     isActive,
     title = 'Processing Request...',
@@ -220,6 +281,9 @@ export default function GlobalLoader({
     // Use real steps if available, otherwise simulated
     const displaySteps = hasRealSteps ? pipelineSteps : simulatedSteps;
     const hasDisplaySteps = displaySteps.length > 0;
+
+    // Rotating engagement message
+    const { message: engagementMsg, fadeState } = useEngagementMessage(isActive, thinkingContext);
 
     // Deduplicate steps — keep latest per agent
     const uniqueSteps = useMemo(() => {
@@ -290,17 +354,38 @@ export default function GlobalLoader({
             {/* Title */}
             <h3 className="text-lg font-black text-[var(--sys-text)] mb-1">{dynamicTitle}</h3>
             {activeStep && hasRealSteps && (
-                <p className="text-sm text-[var(--sys-text-muted)] animate-pulse mb-4 max-w-md">{activeStep.message}</p>
+                <p className="text-sm text-[var(--sys-text-muted)] animate-pulse mb-2 max-w-md">{activeStep.message}</p>
             )}
             {/* Fidato thinking label for simulated steps */}
             {activeStep && !hasRealSteps && thinkingContext && (
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-2">
                     <span className="material-symbols-outlined text-sm text-primary animate-pulse">psychology</span>
                     <span className="text-xs font-semibold text-[var(--sys-text-muted)] tracking-wide">Fidato is thinking...</span>
                 </div>
             )}
             {!activeStep && currentStage && (
-                <p className="text-sm text-[var(--sys-text)] animate-pulse mb-4">{currentStage}</p>
+                <p className="text-sm text-[var(--sys-text)] animate-pulse mb-2">{currentStage}</p>
+            )}
+
+            {/* ── Rotating Engagement Message ── */}
+            {thinkingContext && (
+                <div
+                    className="flex items-center justify-center gap-2 mb-4 px-4 py-2.5 rounded-xl max-w-md"
+                    style={{
+                        background: 'var(--sys-surface)',
+                        border: '1px solid var(--sys-border)',
+                        opacity: fadeState === 'in' ? 1 : 0,
+                        transform: fadeState === 'in' ? 'translateY(0)' : 'translateY(4px)',
+                        transition: 'opacity 0.4s ease, transform 0.4s ease',
+                    }}
+                >
+                    <span className="material-symbols-outlined text-base text-primary flex-shrink-0" style={{ fontSize: '16px' }}>
+                        {engagementMsg.icon}
+                    </span>
+                    <span className="text-[13px] font-medium text-[var(--sys-text)]">
+                        {engagementMsg.text}
+                    </span>
+                </div>
             )}
 
             {/* ── Real-time / Simulated Pipeline Steps ── */}
