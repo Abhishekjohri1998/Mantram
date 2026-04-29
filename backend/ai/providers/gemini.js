@@ -280,7 +280,7 @@ export class GeminiProvider extends BaseProvider {
      * Generate image using modern Gemini models (Flash/Pro) or older Imagen models.
      * Supports gemini-3.1-flash-image-preview, imagen-3, etc.
      */
-    async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [] }) {
+    async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [], size = "1K", temperature = 0.4 }) {
         const startTime = Date.now();
         const imageKey = this.imageApiKey;
         const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
@@ -313,7 +313,7 @@ export class GeminiProvider extends BaseProvider {
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 70_000); // 70s per attempt (was 120s — faster fail→retry)
+                    const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s per attempt (accommodates heavy prompts + refs)
                     try {
                         response = await fetch(url, fetchOptions({
                             method: 'POST',
@@ -322,10 +322,10 @@ export class GeminiProvider extends BaseProvider {
                                 contents: [{ role: 'user', parts }],
                                 generationConfig: {
                                     responseModalities: ['TEXT', 'IMAGE'],
-                                    temperature: 0.2,  // ⚡ OPT 6: Lower temp = faster convergence (was 0.4)
+                                    temperature: temperature,  // Pass dynamically instead of hardcoded 0.2
                                     imageConfig: {
                                         aspectRatio: nativeAspectRatio,
-                                        imageSize: "1K"  // ⚡ 1K is 2-3x faster than 2K, still 1024px quality
+                                        imageSize: size || "1K"  // Use passed size for higher quality
                                     }
                                 },
                             }),
@@ -361,7 +361,7 @@ export class GeminiProvider extends BaseProvider {
                         }
                         
                         // If it's not a retryable error or we exhausted attempts
-                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 70 seconds. Google servers are likely overloaded.');
+                        if (isTimeout) throw new Error('BUSY: Gemini API timed out after 90 seconds. Google servers are likely overloaded.');
                         throw attemptErr;
                     } finally {
                         clearTimeout(timeoutId);

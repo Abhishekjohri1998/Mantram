@@ -1,4 +1,13 @@
-export async function buildTemplatePrompt({ template, userPrompt, userProductImageBase64, userAvatarImageBase64 }) {
+export async function buildTemplatePrompt({
+    template,
+    userPrompt,
+    // Legacy base64-era names (backward compat)
+    userProductImageBase64,
+    userAvatarImageBase64,
+    // Current S3 URL names (from TemplateGenerationModal)
+    productImageUrl,
+    avatarImageUrl,
+}) {
     if (!template) throw new Error('Template is required to build prompt');
 
     // 1. Merge saved prompt and user prompt
@@ -7,40 +16,74 @@ export async function buildTemplatePrompt({ template, userPrompt, userProductIma
         finalPrompt = finalPrompt ? `${finalPrompt} ${userPrompt.trim()}` : userPrompt.trim();
     }
 
-    // 2. Assemble vision inputs
-    // We pass these exactly as received (HTTP URLs or Base64 data URIs).
-    // The downstream routes (creatives.js, video-studio.js, etc.) are responsible
-    // for uploading Base64 strings to S3 or Atlas CDN as required by their respective models.
+    // 2. Resolve images — prefer URL params, fall back to legacy base64 params
+    const productImage = productImageUrl || userProductImageBase64 || null;
+    const avatarImage = avatarImageUrl || userAvatarImageBase64 || null;
+
+    // 1b. Inject product-replication & avatar-preservation directives
+    // These ensure the pipeline's art director, prompt engineer, and final image model
+    // all understand that the uploaded references are mandatory visual constraints.
+    const directives = [];
+    if (productImage) {
+        directives.push(
+            `PRODUCT REFERENCE IMAGE PROVIDED: A real product photo has been uploaded as a reference image. ` +
+            `You MUST reproduce this EXACT product in the output — same shape, same colors, same labels, same proportions. ` +
+            `Do NOT substitute, reimagine, or hallucinate a different product. The product photo is the GROUND TRUTH.`
+        );
+    }
+    if (avatarImage) {
+        directives.push(
+            `FACE/AVATAR REFERENCE IMAGE PROVIDED: A real person's photo has been uploaded. ` +
+            `You MUST preserve this person's face, skin tone, hair, and features accurately in the output. ` +
+            `Do NOT replace them with a generic model or different person.`
+        );
+    }
+    if (directives.length > 0) {
+        finalPrompt = directives.join('\n') + '\n\n' + finalPrompt;
+    }
+
+    // Helper: detect format from data string
+    const detectFormat = (data) => {
+        if (!data) return 'unknown';
+        if (data.startsWith('data:')) return 'base64';
+        if (data.startsWith('http')) return 'url';
+        return 'unknown';
+    };
+
+    // 3. Assemble vision inputs
     const visionInputs = [];
-    
+
     if (template.systemReferenceImage) {
         visionInputs.push({
             role: 'system',
-            format: template.systemReferenceImage.startsWith('data:') ? 'base64' : 'url',
+            format: detectFormat(template.systemReferenceImage),
             data: template.systemReferenceImage
         });
     }
-    
-    if (userProductImageBase64) {
+
+    if (productImage) {
         visionInputs.push({
             role: 'product',
-            format: 'base64',
-            data: userProductImageBase64
-        });
-    }
-    
-    if (userAvatarImageBase64) {
-        visionInputs.push({
-            role: 'avatar',
-            format: 'base64',
-            data: userAvatarImageBase64
+            format: detectFormat(productImage),
+            data: productImage
         });
     }
 
-    // 3. Return standardized payload for any studio pipeline
+    if (avatarImage) {
+        visionInputs.push({
+            role: 'avatar',
+            format: detectFormat(avatarImage),
+            data: avatarImage
+        });
+    }
+
+    // 4. Return standardized payload for any studio pipeline
     return {
         finalPrompt,
         visionInputs,
+        // Also return raw URLs for direct use by callers that bypass visionInputs
+        productImageUrl: productImage,
+        avatarImageUrl: avatarImage,
         settings: template.defaultSettings || {}
     };
 }

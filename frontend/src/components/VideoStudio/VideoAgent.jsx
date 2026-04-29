@@ -28,6 +28,7 @@ const MODEL_INFO = {
     'seedance-2.0': { name: 'Seedance 2.0', icon: '🎥', tier: 'Pro' },
     'hunyuan': { name: 'Hunyuan', icon: '🎨', tier: 'Draft' },
     'grok-imagine': { name: 'Grok', icon: '🤖', tier: 'Fast' },
+    'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: '🐴', tier: 'Pro' },
 }
 
 export default function VideoAgent({ activeBrand }) {

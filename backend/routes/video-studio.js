@@ -3759,18 +3759,21 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         finalPrompt = finalPrompt.replace(/<<<image_2>>>/g, '@Image2');
         finalPrompt = finalPrompt.replace(/<<<image_\d+>>>/g, '@Image1');
 
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
         const duration = Math.min(parseInt(parsedSettings.duration || preset?.recommendedDuration || 8), 15);
         const aspectRatio = parsedSettings.format || preset?.recommendedFormat || '9:16';
 
-        console.log(`[Q-Ads V2] Submitting variant ${variantId} — ${duration}s, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
 
-        const genResult = await submitAtlasCloudVideoGeneration({
+        const genResult = await submitVideoGeneration({
             prompt: finalPrompt,
-            imageUrl: imageUrls[0] || null,
+            model: selectedModel,
             duration,
             aspectRatio,
             qualityMode: 'high',
             generateAudio: true,
+            imageUrl: imageUrls[0] || null,
+            s3ImageUrls: imageUrls,
             referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
             imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
         });
@@ -3795,10 +3798,10 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     legend: legend || '',
                 },
                 generation: {
-                    provider: 'atlascloud',
-                    model: 'seedance-2.0',
-                    taskId: genResult.taskId,
-                    requestId: genResult.taskId,
+                    provider: genResult.provider || 'atlascloud',
+                    model: selectedModel,
+                    taskId: genResult.taskId || genResult.requestId || genResult.falRequestId,
+                    requestId: genResult.taskId || genResult.requestId || genResult.falRequestId,
                     duration,
                     aspectRatio,
                     progress: 0,

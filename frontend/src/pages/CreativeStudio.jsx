@@ -5,6 +5,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, monthlyStrategy as monthlyStrategyAPI, API_BASE } from '../services/api'
 import { useBrand } from '../context/BrandContext'
+import { useAuth } from '../context/AuthContext'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
@@ -463,6 +464,7 @@ export default function CreativeStudio() {
 
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
+    const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
 
     // ── Global State ──
@@ -687,6 +689,7 @@ export default function CreativeStudio() {
         'kling-3.0': { name: 'Kling 3.0', icon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Best motion & physics' },
         'veo-3.1': { name: 'Veo 3.1', icon: 'movie_filter', dur: [5, 10], ratios: ['16:9'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Premium cinematic quality' },
         'seedance-1.0': { name: 'Seedance 1.0', icon: 'animation', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
+        'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: 'pets', dur: [5, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Alibaba cinematic — great motion & ref images' },
     }
 
     // ── Animate: AI Prompt Suggestion ──
@@ -1400,6 +1403,97 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // Read URL params from Content Studio
     useEffect(() => {
+        // ── Template handoff: pick up a background job by jobId ────────────
+        const incomingJobId = searchParams.get('jobId')
+        if (incomingJobId) {
+            setShowQuickStart(false)
+            const localTrackId = `tmpl_${Date.now()}`
+            setActiveGenerations(prev => [
+                ...prev,
+                { jobId: localTrackId, prompt: 'Template generation', startedAt: Date.now(), steps: [{ agent: 'system', message: 'Template generation in progress...', status: 'working' }] }
+            ])
+
+            // Clean URL immediately to avoid re-triggering
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev)
+                next.delete('jobId')
+                return next
+            }, { replace: true })
+
+            // Poll this template job — same logic as pollLocalJob in handleGenerate
+            let attempts = 0
+            const maxAttempts = 90
+            const tmplPollInterval = setInterval(async () => {
+                attempts++
+                if (attempts > maxAttempts) {
+                    clearInterval(tmplPollInterval)
+                    setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                    setError({ message: 'Template generation timed out. Check your gallery.', isRetryable: false })
+                    return
+                }
+                try {
+                    const pollData = await creativesAPI.pollJob(incomingJobId)
+                    if (!pollData?.success) return
+                    const job = pollData.job
+                    if (job.status === 'completed') {
+                        clearInterval(tmplPollInterval)
+                        const creative = job.result?.creative || {}
+                        const imageUrl = creative.imageUrl || job.imageUrl
+
+                        if (!imageUrl && creative._id) {
+                            // S3 upload pending — wait up to 60s
+                            let retries = 0
+                            const waitForS3 = setInterval(async () => {
+                                retries++
+                                if (retries > 12) {
+                                    clearInterval(waitForS3)
+                                    setResult({ ...creative, _prompt: 'Template' })
+                                    setFeedbackToast('⚠️ Image upload is taking longer than expected. Refresh in a moment.')
+                                    setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                                    return
+                                }
+                                try {
+                                    const repoll = await creativesAPI.pollJob(incomingJobId)
+                                    const freshUrl = repoll?.job?.result?.creative?.imageUrl || repoll?.job?.imageUrl
+                                    if (freshUrl) {
+                                        clearInterval(waitForS3)
+                                        const freshCreative = { ...creative, imageUrl: freshUrl, thumbnailUrl: freshUrl }
+                                        setResult(freshCreative)
+                                        setGenerationHistory(prev => [{ ...freshCreative, _prompt: 'Template', _timestamp: Date.now() }, ...prev])
+                                        setFeedbackToast('')
+                                        setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                                    }
+                                } catch { /* ignore */ }
+                            }, 5000)
+                        } else {
+                            const finalCreative = { ...creative, imageUrl: imageUrl || creative.imageUrl }
+                            setResult(finalCreative)
+                            if (imageUrl) {
+                                setGenerationHistory(prev => [{ ...finalCreative, _prompt: 'Template', _timestamp: Date.now() }, ...prev])
+                            }
+                            if (job.warnings?.length > 0) setAiWarnings(job.warnings)
+                            setFeedbackToast('')
+                            setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                        }
+                    } else if (job.status === 'failed') {
+                        clearInterval(tmplPollInterval)
+                        setError({ message: job.errorMessage || 'Template generation failed.', isRetryable: true })
+                        setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
+                    } else if (job.status === 'processing') {
+                        const newSteps = job.steps?.length > 0
+                            ? job.steps
+                            : [{ agent: 'brand-intel', message: 'AI agent pipeline running...', status: 'working' }]
+                        setActiveGenerations(prev => prev.map(j =>
+                            j.jobId === localTrackId ? { ...j, steps: newSteps } : j
+                        ))
+                    }
+                } catch { /* ignore polling errors */ }
+            }, 5000)
+
+            return // Don't process other params
+        }
+        // ───────────────────────────────────────────────────────────────────
+
         const isFromContent = searchParams.get('fromContent')
         const contentPrompt = searchParams.get('prompt')
         const contentType = searchParams.get('type')
@@ -1722,20 +1816,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             })
 
             if (jobData?.success && jobData?.jobId) {
-                // Register with global job tracker (persists to localStorage)
-                try {
-                    const { addJob } = window.__bgJobs__ || {}
-                    if (addJob) {
-                        addJob(jobData.jobId, {
-                            prompt: fullPrompt,
-                            format: selectedType,
-                            brandId: activeBrand._id,
-                        })
-                    }
-                } catch { /* context not available */ }
+                // NOTE: We intentionally do NOT register with the global background job
+                // tracker here. The local pollLocalJob below already polls this job every 5s
+                // with full UI integration (progress steps, result display, errors).
+                // Registering globally would cause 2-3x duplicate API calls per interval.
+                // If the user navigates away, useBackgroundJobs.reconcileFromServer() will
+                // automatically pick up any in-progress jobs on the next page load.
 
                 // Show optimistic queued state
-                setFeedbackToast('✅ Generation queued! You can navigate to other pages — your image will be ready when done.')
+                setFeedbackToast('✅ Generation queued! Processing in background...')
                 setActiveGenerations(prev => prev.map(j => j.jobId === localJobId ? { ...j, steps: [{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }] } : j))
 
                 // Poll this specific job locally too (so the current page updates)

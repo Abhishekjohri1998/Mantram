@@ -35,7 +35,7 @@ const css = `
     width:186px; flex-shrink:0;
     border-right:1px solid rgba(255,255,255,0.06);
     padding:22px 12px; display:flex; flex-direction:column; gap:3px;
-    background:rgba(255,255,255,0.015);
+    background:rgba(255,255,255,0.015); overflow-y:auto;
 }
 .avpk-sb-title { font-size:15px; font-weight:800; color:#fff; margin-bottom:18px; padding:0 8px; letter-spacing:-0.3px; }
 .avpk-sb-item {
@@ -261,12 +261,16 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
     // ── Upload ──────────────────────────────────────────────────────────────────
     const handleUpload = useCallback(async (file) => {
-        if (!avatarName.trim()) return
+        let nameToUse = avatarName.trim();
+        if (!nameToUse) {
+            nameToUse = file.name ? file.name.split('.')[0] : 'My Avatar';
+            setAvatarName(nameToUse); // Auto-fill the name
+        }
         setUploadBusy(true)
         try {
             const form = new FormData()
             form.append('avatarImage', file)
-            form.append('name', avatarName.trim())
+            form.append('name', nameToUse)
             if (activeBrand?._id) form.append('brandId', activeBrand._id)
             await api('/video-studio/ugc-pro/avatars', { method:'POST', body:form, headers:{} })
             await loadAvatars(); resetCreate()
@@ -425,7 +429,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                                         <input className="avpk-name-input" placeholder="e.g. @sarah" value={avatarName} onChange={e => setAvatarName(e.target.value)} />
                                     </div>
                                     <input type="file" ref={fileRef} accept="image/*" hidden onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                                    <button className="avpk-btn secondary" onClick={() => fileRef.current?.click()} disabled={uploadBusy || !avatarName.trim()}>
+                                    <button className="avpk-btn secondary" onClick={() => fileRef.current?.click()} disabled={uploadBusy}>
                                         <span className="material-symbols-outlined" style={{ fontSize:17 }}>add_photo_alternate</span>
                                         {uploadBusy ? 'Uploading…' : 'Choose photo'}
                                     </button>

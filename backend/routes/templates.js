@@ -7,6 +7,7 @@ import GenerationJob from '../models/GenerationJob.js';
 import { buildTemplatePrompt } from '../agents/shared/templatePromptCombiner.js';
 import { deductCredits } from '../middleware/credits.js';
 import { internalGenerateCreative } from './creatives.js';
+import Brand from '../models/Brand.js';
 
 const router = express.Router();
 
@@ -157,7 +158,15 @@ router.post('/:id/use', protect, async (req, res) => {
 
         const { userInputs = {} } = req.body;
         // Step 10 + BUG-03 FIX: Accept S3 URL strings — base64 deprecated
-        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId } = userInputs;
+        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId: inputBrandId } = userInputs;
+
+        // Resolve brandId — use provided, or fall back to user's first brand
+        let brandId = inputBrandId || null;
+        if (!brandId) {
+            const fallbackBrand = await Brand.findOne({ user: req.user._id }, '_id').lean();
+            brandId = fallbackBrand?._id?.toString() || null;
+            if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
+        }
 
         // 1. Build prompt — pass S3 URLs, not base64
         const promptData = await buildTemplatePrompt({
@@ -205,19 +214,57 @@ router.post('/:id/use', protect, async (req, res) => {
 
         if (template.studioOrigin === 'creative') {
             jobId = `create-${Date.now()}`;
+
+            // Pre-create GenerationJob so frontend polling doesn't 404 while pipeline runs
+            await GenerationJob.create({
+                jobId,
+                user: req.user._id,
+                brand: brandId || null,
+                status: 'processing',
+                type: 'ai-create',
+                format: settings?.format || 'instagram-post',
+                prompt: promptData.finalPrompt || '',
+                creditsDeducted: cost,
+                options: settings || {},
+                startedAt: new Date(),
+                meta: { label: `Template: ${template.name}`, page: '/creative-studio' }
+            }).catch(e => console.warn('[Template] GenerationJob pre-create failed:', e.message));
+
             // Step 10: internalGenerateCreative already calls ensureS3Url internally.
             // Do NOT call ensureS3Url on its return value — that would double-mirror.
+            //
+            // CRITICAL: Reference images (product, avatar) MUST go through body.options.*
+            // because internalGenerateCreative extracts them from:
+            //   - options.productImageUrl (line 304 of creatives.js)
+            //   - options.characters[] (line 308 of creatives.js)
+            // The old body.visionInputs field was never read by internalGenerateCreative.
             internalGenerateCreative({
                 body: {
+                    brandId,
                     prompt: promptData.finalPrompt,
-                    visionInputs: promptData.visionInputs,  // S3 URL refs, not base64
                     format: settings?.format || 'instagram-post',
-                    jobId
+                    jobId,
+                    options: {
+                        // Product image → extracted at creatives.js L304 → templateRefUrls
+                        productImageUrl: promptData.productImageUrl || null,
+                        // Avatar/face ref → extracted at creatives.js L308 → templateRefUrls
+                        characters: promptData.avatarImageUrl
+                            ? [{ name: 'User Reference', image: promptData.avatarImageUrl }]
+                            : [],
+                        // Pass through any template default settings
+                        ...(settings || {}),
+                    }
                 },
                 user: req.user,
                 creditsDeducted: cost,
                 jobId
-            }).catch(e => console.error('Creative background dispatch error:', e));
+            }).catch(e => {
+                console.error('Creative background dispatch error:', e);
+                GenerationJob.findOneAndUpdate(
+                    { jobId },
+                    { status: 'failed', completedAt: new Date(), errorMessage: e.message }
+                ).catch(() => {});
+            });
 
         } else if (template.studioOrigin === 'video') {
             jobId = `vid-${Date.now()}`;

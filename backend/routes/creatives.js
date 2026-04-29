@@ -209,77 +209,6 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         // ⚡ PERF: Removed standalone Brand.findById — the pipeline's loadBrandContext
         // already loads the brand from Redis cache or DB. Validated post-pipeline instead.
 
-        // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
-        // Previously this was defined after the pipeline call, so pipeline always got an empty array.
-        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
-
-        let pipelineResult;
-        // ⚡ OPT 3: Skip pipeline entirely if prompt was already enhanced by the user
-        // (the "Enhance" button runs the full pipeline — running it again is redundant)
-        if (options?.alreadyEnhanced || options?.skipPipeline) {
-            console.log('⚡ Pipeline skipped — prompt already enhanced by user');
-            agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
-        } else {
-        try {
-            // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
-            const pipelineTimeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
-            );
-            pipelineResult = await Promise.race([
-                runCreativePipeline({
-                    brandId,
-                    brief: prompt,
-                    format: type || 'instagram-post',
-                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
-                    refImageUrls: skillRefUrls, // ✅ Now correctly defined before this call
-                    generateCopy: !!(options?.generateCopy), // Only inject text when explicitly enabled
-                    customCopy: options?.customCopy || null,
-                    aspectRatio: options?.aspectRatio || '1:1',
-                    imageModel: (options?.imageModel || 'nanobanana-2').toLowerCase(),
-                    emit: async (agent, message, status, detail) => {
-                        if (progressId) {
-                            await addStep(progressId, { agent, message, status, detail });
-                        }
-                    }
-                }),
-                pipelineTimeout,
-            ]);
-            agenticMeta = {
-                ...agenticMeta,
-                ...pipelineResult,
-                pipelineRan: true
-            };
-        } catch (pipelineErr) {
-            console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
-            agenticMeta.pipelineError = pipelineErr.message;
-        }
-        }
-
-        let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
-        const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
-        const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '1K';
-        const customSize = options?.customSize || null;
-
-        let ratioNum = 1;
-        if (customSize && customSize.width && customSize.height) {
-            ratioNum = customSize.width / customSize.height;
-        } else if (aspectRatio && aspectRatio.includes(':')) {
-            const [w, h] = aspectRatio.split(':').map(Number);
-            if (w && h) ratioNum = w / h;
-        }
-
-        if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
-            console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
-            fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
-        }
-
-        if (progressId) {
-            await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
-        }
-
-        // skillRefUrls is already defined above (before the pipeline call) — reused here for templateRefUrls merging below.
-
         // ── Extract template reference images from options ──
         // Templates send product photos, character images, and reference images
         // via options.baseImage, options.productImageUrl, options.characters, etc.
@@ -348,10 +277,78 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             }
         }
 
-        // Merge skill refs + template refs (deduplicated)
+        // ── Define skillRefUrls HERE — BEFORE the pipeline call so they reach visual grounding ──
+        const skillRefUrls = (refImageUrls || []).filter(u => u && typeof u === 'string');
+        
+        // Merge skill refs + template refs (deduplicated) BEFORE the pipeline
         const allRefUrls = [...new Set([...skillRefUrls, ...templateRefUrls])];
         if (allRefUrls.length > 0) {
             console.log(`🖼️ [internalGenerate] Forwarding ${allRefUrls.length} reference image(s) to generation pipeline (skills: ${skillRefUrls.length}, templates: ${templateRefUrls.length})`);
+        }
+
+        let pipelineResult;
+        // ⚡ OPT 3: Skip pipeline entirely if prompt was already enhanced by the user
+        // (the "Enhance" button runs the full pipeline — running it again is redundant)
+        if (options?.alreadyEnhanced || options?.skipPipeline) {
+            console.log('⚡ Pipeline skipped — prompt already enhanced by user');
+            agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
+        } else {
+        try {
+            // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
+            const pipelineTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
+            );
+            pipelineResult = await Promise.race([
+                runCreativePipeline({
+                    brandId,
+                    brief: prompt,
+                    format: type || 'instagram-post',
+                    mode: 'fast', // Enforce fast-path to bypass sequential LLM criticism delays
+                    refImageUrls: allRefUrls, // ✅ Pass combined reference images to pipeline
+                    generateCopy: !!(options?.generateCopy), // Only inject text when explicitly enabled
+                    customCopy: options?.customCopy || null,
+                    aspectRatio: options?.aspectRatio || '1:1',
+                    imageModel: (options?.imageModel || 'nanobanana-2').toLowerCase(),
+                    emit: async (agent, message, status, detail) => {
+                        if (progressId) {
+                            await addStep(progressId, { agent, message, status, detail });
+                        }
+                    }
+                }),
+                pipelineTimeout,
+            ]);
+            agenticMeta = {
+                ...agenticMeta,
+                ...pipelineResult,
+                pipelineRan: true
+            };
+        } catch (pipelineErr) {
+            console.error('Agentic Pipeline failed, falling back to raw prompt:', pipelineErr.message);
+            agenticMeta.pipelineError = pipelineErr.message;
+        }
+        }
+
+        let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
+        const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
+        const aspectRatio = options?.aspectRatio || '1:1';
+        const imageSize = options?.imageSize || '2K'; // 2K default for high-fidelity output (timeout extended to support)
+        const customSize = options?.customSize || null;
+
+        let ratioNum = 1;
+        if (customSize && customSize.width && customSize.height) {
+            ratioNum = customSize.width / customSize.height;
+        } else if (aspectRatio && aspectRatio.includes(':')) {
+            const [w, h] = aspectRatio.split(':').map(Number);
+            if (w && h) ratioNum = w / h;
+        }
+
+        if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
+            console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
+            fullPrompt += "\n\nCRITICAL COMPOSITION INSTRUCTION: Render this as a single, continuous, and seamless scene spanning the entire canvas. DO NOT tile the image. DO NOT repeat elements, borders, or patterns.";
+        }
+
+        if (progressId) {
+            await addStep(progressId, { agent: 'generating', message: `Generating using ${selectedImageModel}...`, status: 'working' });
         }
 
         // ── Build template inpainting prompt when a template reference image is provided ──
@@ -1592,9 +1589,9 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     }
 
-    // ── HARD TIMEOUT: 150s default (was 90s — too short for Gemini's internal retry cycle) ──
-    // Inner provider has 70s/attempt × 2 attempts = ~141s max. Outer must exceed that.
-    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 180_000 : 150_000);
+    // ── HARD TIMEOUT: 200s default — 2K output + ref images + long prompts need more headroom ──
+    // Inner provider has 90s/attempt × 2 attempts = ~181s max. Outer must exceed that.
+    const TIMEOUT_MS = timeoutMs || (refImageUrls?.length > 1 ? 220_000 : 200_000);
 
     // ── Build generation function (callable for retry) ──
     const buildGeneratePromise = () => (async () => {
@@ -1673,13 +1670,14 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                         const ct = resp.headers.get('content-type') || 'image/jpeg';
                         const origKB = Math.round(buf.byteLength / 1024);
 
-                        // ⚡ OPT 1: Compress to 512px max — Gemini doesn't need full-res refs (saves 5-15s)
+                        // Resize to 1024px max — preserves product labels, textures, and fine details
+                        // that 512px destroyed. 85% JPEG retains color accuracy for brand fidelity.
                         let finalBuf = Buffer.from(buf);
                         let finalMime = ct;
                         try {
                             finalBuf = await sharp(finalBuf)
-                                .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-                                .jpeg({ quality: 75 })
+                                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+                                .jpeg({ quality: 85 })
                                 .toBuffer();
                             finalMime = 'image/jpeg';
                         } catch (_) { /* compression failed — use original */ }
@@ -1702,30 +1700,65 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             finalImageParts.push(...downloadedParts);
         }
 
-        // ⚡ SPEED: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
-        // Keep the essential creative direction, strip verbose framework boilerplate
+        // ⚡ SPEED/QUALITY: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
+        // BUT if we have reference images, we MUST preserve the Visual Grounding, otherwise the model hallucinates the product.
         let optimizedPrompt = promptText;
         if (optimizedPrompt.length > 2000) {
             const origLen = optimizedPrompt.length;
-            // Strip verbose sections that add latency without quality improvement
-            optimizedPrompt = optimizedPrompt
-                .replace(/VISUAL GROUNDING \(from real product\/brand photos\):[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
-                .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
-                .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-            // Hard cap at 2000 chars if still too long
-            if (optimizedPrompt.length > 2000) {
-                optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+            const hasRefs = finalImageParts && finalImageParts.length > 0;
+            
+            if (hasRefs) {
+                // Keep VISUAL GROUNDING and REFERENCE IMAGES because they are critical for fidelity
+                optimizedPrompt = optimizedPrompt
+                    .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                // If STILL over 3500, then we do a harder cap but keep the start and end
+                if (optimizedPrompt.length > 3500) {
+                    optimizedPrompt = optimizedPrompt.substring(0, 3450) + '\n\n[...condensed]';
+                }
+            } else {
+                // Strip verbose sections that add latency without quality improvement when no refs are used
+                optimizedPrompt = optimizedPrompt
+                    .replace(/VISUAL GROUNDING \(from real product\/brand photos\):[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/ENGINEERING NOTES:[\s\S]*?(?=\n[A-Z]|\n\n[A-Z]|$)/i, '')
+                    .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                // Hard cap at 2000 chars if still too long
+                if (optimizedPrompt.length > 2000) {
+                    optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+                }
             }
-            console.log(`⚡ Prompt optimized for speed: ${origLen} → ${optimizedPrompt.length} chars`);
+            console.log(`⚡ Prompt optimized: ${origLen} → ${optimizedPrompt.length} chars (refs: ${hasRefs})`);
+        }
+
+        // ── Inject explicit image role labels when template refs are present ──
+        // Without this, Gemini treats reference images as vague style inspiration
+        // instead of mandatory visual references to faithfully reproduce.
+        const refCount = finalImageParts.length;
+        let finalPromptForModel = optimizedPrompt;
+        if (refCount > 0) {
+            const imageRolePreamble = [
+                `\nREFERENCE IMAGES PROVIDED (${refCount} image${refCount > 1 ? 's' : ''}):`,
+            ];
+            // Label each image by its position
+            for (let i = 0; i < refCount; i++) {
+                if (i === 0) {
+                    imageRolePreamble.push(`- IMAGE ${i + 1}: PRODUCT REFERENCE — Your output MUST feature this EXACT product. Reproduce its shape, colors, labels, textures, and proportions with maximum fidelity. Do NOT substitute or hallucinate a different product.`);
+                } else {
+                    imageRolePreamble.push(`- IMAGE ${i + 1}: ADDITIONAL REFERENCE — Use this for face/avatar preservation or style guidance. Maintain the person's likeness, skin tone, and features accurately.`);
+                }
+            }
+            imageRolePreamble.push(`CRITICAL: The reference images are the GROUND TRUTH. Your generated image must be visually consistent with them.\n`);
+            finalPromptForModel = imageRolePreamble.join('\n') + '\n' + optimizedPrompt;
+            console.log(`📌 [RefLabels] Injected ${refCount} image role label(s) into prompt preamble`);
         }
 
         // ── Generate via native Gemini router ──
-        const refCount = finalImageParts.length;
-        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${optimizedPrompt.length} chars, refs: ${refCount})`);
+        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
         const routerResult = await router.generateImage({
-            prompt: optimizedPrompt,
+            prompt: finalPromptForModel,
             aspectRatio: nativeAspectRatio,
             model: GEMINI_MODEL,
             imageParts: finalImageParts,
