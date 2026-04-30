@@ -24,6 +24,9 @@ import sharp from 'sharp';
  * This is critical — raw product photos can be 2-5MB which bloats the Gemini REST payload.
  * Resizing to 512px + JPEG 70% quality keeps each image under 50-80KB.
  * Returns null on failure (non-blocking)
+ *
+ * KEY FIX: For our own S3 URLs, we use the SDK directly via getObjectStream()
+ * to bypass signed URL expiration / HTTP 403 issues.
  */
 async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
     try {
@@ -38,6 +41,37 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
                 .toBuffer();
             console.log(`🖼️ Resized data-URI ref: ${inputBuffer.length} → ${resized.length} bytes`);
             return { mimeType: 'image/jpeg', data: resized.toString('base64') };
+        }
+
+        // ── Our own S3 bucket? Use SDK directly (bypasses signed URL expiration) ──
+        const isOurS3 = imageUrl.includes('mantram-assets') || 
+                        (imageUrl.includes('.amazonaws.com') && imageUrl.includes('s3.ap-south-1'));
+        
+        if (isOurS3) {
+            try {
+                const { getObjectStream } = await import('../../utils/s3.js');
+                // Strip query params (signed URL tokens) before extracting key
+                const cleanUrl = imageUrl.split('?')[0];
+                console.log(`🔑 Using S3 SDK direct download for: ${cleanUrl.substring(0, 80)}...`);
+                
+                const { stream, contentType } = await getObjectStream(cleanUrl);
+                const chunks = [];
+                for await (const chunk of stream) {
+                    chunks.push(chunk);
+                }
+                const rawBuffer = Buffer.concat(chunks);
+                
+                const resized = await sharp(rawBuffer)
+                    .resize(maxDimension, maxDimension, { fit: 'inside', withoutEnlargement: true })
+                    .jpeg({ quality: 70 })
+                    .toBuffer();
+                
+                console.log(`🖼️ S3 SDK ref image: ${rawBuffer.length} → ${resized.length} bytes`);
+                return { mimeType: 'image/jpeg', data: resized.toString('base64') };
+            } catch (s3Err) {
+                console.warn(`⚠️ S3 SDK download failed, falling back to HTTP: ${s3Err.message}`);
+                // Fall through to normal HTTP fetch
+            }
         }
 
         // ⚡ HEAD-check before full download — skip dead URLs instantly

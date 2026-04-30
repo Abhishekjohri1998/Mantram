@@ -291,9 +291,30 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             if (avatarUrl) allRefs.push(avatarUrl);
             allRefs.push(...parsedProductImgs);
             
-            let finalPrompt = prompt.replace(/<<<image_1>>>/g, '@Image1').replace(/<<<image_2>>>/g, '@Image2');
+            // Build an enriched prompt that tells Gemini what each reference image is.
+            // Strip @Image tags from the text (the actual images are sent inline as parts).
+            let finalPrompt = prompt
+                .replace(/<<<image_1>>>/g, '@Image1')
+                .replace(/<<<image_2>>>/g, '@Image2');
+            
+            // Build context prefix so Gemini knows what the inline images represent
+            const contextParts = [];
+            if (avatarUrl) contextParts.push('The first reference image provided is the Avatar/Model face — use this person\'s exact likeness.');
+            if (parsedProductImgs.length > 0) contextParts.push(`The ${avatarUrl ? 'next' : 'first'} reference image(s) provided are the Product — use this exact product design, shape, color, and branding.`);
+            
+            // Remove @Image1/@Image2 text tags from prompt (the images are sent as inline parts)
+            let cleanPrompt = finalPrompt
+                .replace(/@Image\d+/g, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+            
+            const enrichedPrompt = contextParts.length > 0
+                ? `${contextParts.join(' ')}\n\nScene description: ${cleanPrompt}`
+                : cleanPrompt;
 
-            const result = await geminiImageGenerate(finalPrompt, [], 0.5, {
+            console.log(`🎨 Enriched prompt for Gemini: ${enrichedPrompt.substring(0, 200)}...`);
+
+            const result = await geminiImageGenerate(enrichedPrompt, [], 0.5, {
                 aspectRatio: format || '1:1',
                 referenceImageUrls: allRefs,
             });
