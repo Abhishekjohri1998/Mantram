@@ -4,18 +4,25 @@
  * Uses Etsy Open API v3 with keystring (API key) auth for reads.
  */
 
+import env from '../config/env.js';
+
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3';
 
 // ── Generic Etsy fetcher ──────────────────────────────────────────────────────
-async function etsyFetch(path, apiKey, options = {}) {
+async function etsyFetch(path, accessToken, options = {}) {
     const url = `${ETSY_API_BASE}${path}`;
+    const headers = {
+        'x-api-key': env.etsy.clientId,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+    };
+    if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    const res = await fetch(url, { ...options, headers });
     const res = await fetch(url, {
         ...options,
-        headers: {
-            'x-api-key': apiKey,
-            'Content-Type': 'application/json',
-            ...(options.headers || {}),
-        },
+        headers,
     });
     if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
@@ -24,35 +31,60 @@ async function etsyFetch(path, apiKey, options = {}) {
     return res.json();
 }
 
+// ── Token Exchange ────────────────────────────────────────────────────────────
+export async function exchangeEtsyOAuthToken(code, codeVerifier, redirectUri) {
+    const res = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            grant_type: 'authorization_code',
+            client_id: env.etsy.clientId,
+            redirect_uri: redirectUri,
+            code,
+            code_verifier: codeVerifier,
+        })
+    });
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Etsy token exchange failed: ${err}`);
+    }
+    return res.json();
+}
+
 // ── Validate API key and fetch shop info ─────────────────────────────────────
-export async function validateEtsyApiKey(apiKey, shopId) {
-    const data = await etsyFetch(`/application/shops/${shopId}`, apiKey);
+export async function fetchEtsyShopDetails(accessToken, shopId) {
+    const data = await etsyFetch(`/application/shops/${shopId}`, accessToken);
+    return data; // { shop_id, shop_name, url, ... }
+}
+
+export async function fetchEtsyShopByUserId(accessToken, userId) {
+    const data = await etsyFetch(`/application/users/${userId}/shops`, accessToken);
     return data; // { shop_id, shop_name, url, ... }
 }
 
 // ── Fetch shop's shipping profiles (needed for listing creation) ──────────────
-export async function fetchEtsyShippingProfiles(apiKey, shopId) {
+export async function fetchEtsyShippingProfiles(accessToken, shopId) {
     try {
-        const data = await etsyFetch(`/application/shops/${shopId}/shipping-profiles`, apiKey);
+        const data = await etsyFetch(`/application/shops/${shopId}/shipping-profiles`, accessToken);
         return data.results || [];
     } catch { return []; }
 }
 
 // ── Fetch shop's taxonomy (needed for listing creation) ───────────────────────
-export async function fetchEtsyTaxonomies(apiKey) {
+export async function fetchEtsyTaxonomies(accessToken) {
     try {
-        const data = await etsyFetch('/application/seller-taxonomy/nodes', apiKey);
+        const data = await etsyFetch('/application/seller-taxonomy/nodes', accessToken);
         return data.results || [];
     } catch { return []; }
 }
 
 // ── Paginated listing fetch ───────────────────────────────────────────────────
-export async function fetchEtsyListings(apiKey, shopId) {
+export async function fetchEtsyListings(accessToken, shopId) {
     const all = [];
     let offset = 0;
     const limit = 100;
     while (true) {
-        const data = await etsyFetch(`/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=Images,MainImage`, apiKey);
+        const data = await etsyFetch(`/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=Images,MainImage`, accessToken);
         const results = data.results || [];
         all.push(...results);
         if (results.length < limit) break;
@@ -63,13 +95,13 @@ export async function fetchEtsyListings(apiKey, shopId) {
 }
 
 // ── Fetch receipts (orders) ───────────────────────────────────────────────────
-export async function fetchEtsyReceipts(apiKey, shopId, { days = 60 } = {}) {
+export async function fetchEtsyReceipts(accessToken, shopId, { days = 60 } = {}) {
     const all = [];
     let offset = 0;
     const limit = 100;
     const minCreated = Math.floor((Date.now() - days * 86400000) / 1000);
     while (true) {
-        const data = await etsyFetch(`/application/shops/${shopId}/receipts?limit=${limit}&offset=${offset}&min_created=${minCreated}`, apiKey);
+        const data = await etsyFetch(`/application/shops/${shopId}/receipts?limit=${limit}&offset=${offset}&min_created=${minCreated}`, accessToken);
         const results = data.results || [];
         all.push(...results);
         if (results.length < limit) break;
@@ -154,7 +186,7 @@ export function transformEtsyReceipt(receipt, userId, brandId) {
 }
 
 // ── Create Etsy listing (requires OAuth access token for write) ───────────────
-export async function createEtsyListing(accessToken, apiKey, shopId, product, shippingProfileId, taxonomyId) {
+export async function createEtsyListing(accessToken, shopId, product, shippingProfileId, taxonomyId) {
     const price = product.variants?.[0]?.price || 0;
     const quantity = product.variants?.[0]?.inventoryQuantity || 1;
 
@@ -174,7 +206,7 @@ export async function createEtsyListing(accessToken, apiKey, shopId, product, sh
     const res = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
         method: 'POST',
         headers: {
-            'x-api-key': apiKey,
+            'x-api-key': env.etsy.clientId,
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
@@ -188,7 +220,7 @@ export async function createEtsyListing(accessToken, apiKey, shopId, product, sh
 }
 
 // ── Update Etsy listing ───────────────────────────────────────────────────────
-export async function updateEtsyListing(accessToken, apiKey, shopId, listingId, product) {
+export async function updateEtsyListing(accessToken, shopId, listingId, product) {
     const price = product.variants?.[0]?.price || 0;
     const body = {
         title: (product.title || '').substring(0, 140),
@@ -200,7 +232,7 @@ export async function updateEtsyListing(accessToken, apiKey, shopId, listingId, 
     const res = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
         method: 'PATCH',
         headers: {
-            'x-api-key': apiKey,
+            'x-api-key': env.etsy.clientId,
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },

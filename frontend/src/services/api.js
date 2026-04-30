@@ -315,7 +315,7 @@ export const shopify = {
 
 // ============ Etsy API ============
 export const etsy = {
-    connect: (shopId, apiKey, brandId) => apiFetch('/etsy/connect', { method: 'POST', body: JSON.stringify({ shopId, apiKey, brandId }) }),
+    auth: (brandId) => apiFetch(`/etsy/auth${brandId ? `?brandId=${brandId}` : ''}`),
     status: (brandId) => apiFetch(`/etsy/status${brandId ? `?brandId=${brandId}` : ''}`),
     sync: (brandId) => apiFetch('/etsy/sync', { method: 'POST', body: JSON.stringify({ brandId }) }),
     products: (params = {}) => {
