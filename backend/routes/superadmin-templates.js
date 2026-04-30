@@ -238,6 +238,11 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             const avatarFaceRefs = avatarUrl ? [avatarUrl] : [];
             let finalPrompt = prompt.replace(/<<<image_1>>>/g, '@Image1').replace(/<<<image_2>>>/g, '@Image2');
 
+            // Filter out empty strings just to be safe
+            const allRefs = [...avatarFaceRefs, ...imageUrls].filter(Boolean);
+            
+            console.log(`🎬 [Superadmin Video] Submitting generation. Refs: ${allRefs.length} (Avatar: ${avatarUrl ? 'Yes' : 'No'}, Products: ${imageUrls.length})`);
+
             const genResult = await submitVideoGeneration({
                 prompt: finalPrompt,
                 model: selectedModel,
@@ -245,10 +250,8 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 aspectRatio: format || '9:16',
                 qualityMode: quality || 'high',
                 generateAudio: true,
-                imageUrl: imageUrls[0] || null,
-                s3ImageUrls: imageUrls,
-                referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
-                imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
+                imageUrl: imageUrls[0] || null, // First product image is the source frame
+                referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)].filter(Boolean),
             });
 
             // Create draft template with generation taskId — poll for completion
@@ -291,6 +294,9 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             if (avatarUrl) allRefs.push(avatarUrl);
             allRefs.push(...parsedProductImgs);
             
+            const validRefs = allRefs.filter(Boolean);
+            console.log(`🎨 [Superadmin Image] Submitting generation. Refs: ${validRefs.length} (Avatar: ${avatarUrl ? 'Yes' : 'No'}, Products: ${parsedProductImgs.length})`);
+            
             // Build an enriched prompt that tells Gemini what each reference image is.
             // Strip @Image tags from the text (the actual images are sent inline as parts).
             let finalPrompt = prompt
@@ -299,8 +305,18 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             
             // Build context prefix so Gemini knows what the inline images represent
             const contextParts = [];
-            if (avatarUrl) contextParts.push('The first reference image provided is the Avatar/Model face — use this person\'s exact likeness.');
-            if (parsedProductImgs.length > 0) contextParts.push(`The ${avatarUrl ? 'next' : 'first'} reference image(s) provided are the Product — use this exact product design, shape, color, and branding.`);
+            
+            if (validRefs.length > 0) {
+                contextParts.push('STRICT DESIGN INSTRUCTIONS - MULTIMODAL REFERENCES:');
+                if (avatarUrl) {
+                    contextParts.push(`- IMAGE 1 (Reference): This is the exact Avatar/Model face. You MUST preserve this person's facial identity, likeness, and features exactly.`);
+                }
+                if (parsedProductImgs.length > 0) {
+                    const prodIndex = avatarUrl ? 'IMAGE 2' : 'IMAGE 1';
+                    contextParts.push(`- ${prodIndex} (Reference): This is the exact Product. You MUST preserve its specific design, shape, branding, and color exactly.`);
+                }
+                contextParts.push('\nUse the reference images above to generate the following scene:');
+            }
             
             // Remove @Image1/@Image2 text tags from prompt (the images are sent as inline parts)
             let cleanPrompt = finalPrompt
@@ -309,14 +325,14 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 .trim();
             
             const enrichedPrompt = contextParts.length > 0
-                ? `${contextParts.join(' ')}\n\nScene description: ${cleanPrompt}`
+                ? `${contextParts.join('\n')}\n\nScene description: ${cleanPrompt}`
                 : cleanPrompt;
 
-            console.log(`🎨 Enriched prompt for Gemini: ${enrichedPrompt.substring(0, 200)}...`);
+            console.log(`🎨 Enriched prompt for Gemini:\n${enrichedPrompt.substring(0, 500)}...`);
 
             const result = await geminiImageGenerate(enrichedPrompt, [], 0.5, {
                 aspectRatio: format || '1:1',
-                referenceImageUrls: allRefs,
+                referenceImageUrls: validRefs,
             });
 
             if (!result.imageUrl) {

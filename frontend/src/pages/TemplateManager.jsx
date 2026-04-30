@@ -235,6 +235,22 @@ const TemplateManager = () => {
         if (!genForm.categoryId) return addToast('Category is required', 'error');
         if (!genForm.prompt.trim()) return addToast('Prompt is required', 'error');
 
+        // URL validation
+        const hasAvatarUrl = genForm.avatarUrl && genForm.avatarUrl.trim().startsWith('http');
+        const validProductUrls = genForm.productImageUrls.filter(u => u && u.trim().startsWith('http'));
+
+        // Check tags vs uploaded images
+        const promptText = genForm.prompt || '';
+        const hasImage1Tag = promptText.includes('@Image1') || promptText.includes('<<<image_1>>>');
+        const hasImage2Tag = promptText.includes('@Image2') || promptText.includes('<<<image_2>>>');
+
+        if (hasImage1Tag && !hasAvatarUrl) {
+            return addToast('Prompt uses @Image1 but no Avatar image is uploaded', 'error');
+        }
+        if (hasImage2Tag && validProductUrls.length === 0) {
+            return addToast('Prompt uses @Image2 but no Product image is uploaded', 'error');
+        }
+
         setGenStatus('generating');
         setGenError('');
         setGenProgress(0);
@@ -250,8 +266,8 @@ const TemplateManager = () => {
                     studioSection: genForm.studioSection,
                     prompt: genForm.prompt,
                     model: genForm.model,
-                    productImageUrls: genForm.productImageUrls.filter(Boolean),
-                    avatarUrl: genForm.avatarUrl,
+                    productImageUrls: validProductUrls,
+                    avatarUrl: hasAvatarUrl ? genForm.avatarUrl.trim() : '',
                     duration: genForm.duration,
                     format: genForm.format,
                     quality: genForm.quality,
