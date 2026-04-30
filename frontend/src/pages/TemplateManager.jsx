@@ -144,7 +144,7 @@ const TemplateManager = () => {
                 addToast('Uploading image...', 'info');
                 const res = await api('/media/upload', {
                     method: 'POST',
-                    body: JSON.stringify({ base64 })
+                    body: JSON.stringify({ imageData: base64, folder: 'templates' })
                 });
                 if (res && res.url) {
                     if (type === 'avatar') {
