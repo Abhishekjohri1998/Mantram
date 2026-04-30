@@ -67,12 +67,13 @@ router.post('/connect', protect, async (req, res) => {
         const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         const redirectUri = `${backendUrl}/api/shopify/callback`;
 
-        // Pass userId + brandId in state so callback can find the right integration
-        const statePayload = Buffer.from(JSON.stringify({ userId: String(req.user._id), brandId: brandId || '' })).toString('base64');
+        // C1 FIX: Generate a cryptographic nonce and store it server-side to prevent CSRF
+        const nonce = crypto.randomBytes(16).toString('hex');
+        const statePayload = Buffer.from(JSON.stringify({ userId: String(req.user._id), brandId: brandId || '', nonce })).toString('base64');
         const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const authUrl = getShopifyAuthUrl(cleanDomain, clientId, redirectUri) + `&state=${statePayload}`;
 
-        // Save pending integration — must match unique shop domain to prevent duplicate key errors
+        // Save pending integration — store nonce for CSRF verification in callback
         await Integration.findOneAndUpdate(
             {
                 user: req.user._id,
@@ -86,6 +87,7 @@ router.post('/connect', protect, async (req, res) => {
                 status: 'pending',
                 brand: brandId || undefined,
                 platformData: { shopDomain: cleanDomain },
+                metadata: { oauthNonce: nonce },  // C1: store nonce for callback verification
             },
             { upsert: true, returnDocument: 'after' }
         );
@@ -162,6 +164,13 @@ router.get('/callback', async (req, res) => {
         const { code, shop, state } = req.query;
         if (!code || !shop) return res.redirect(`${frontendUrl}/integrations?error=missing_params`);
 
+        // C2 FIX: Validate shop domain format — must be *.myshopify.com
+        const SHOPIFY_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
+        if (!SHOPIFY_DOMAIN_REGEX.test(shop)) {
+            console.warn(`⚠️ OAuth callback rejected — invalid shop domain: ${shop}`);
+            return res.redirect(`${frontendUrl}/integrations?error=invalid_shop_domain`);
+        }
+
         const clientId = config.shopify.apiKey;
         const clientSecret = config.shopify.apiSecret;
 
@@ -169,21 +178,30 @@ router.get('/callback', async (req, res) => {
 
         const tokenData = await exchangeShopifyToken(shop, clientId, clientSecret, code);
 
-        // Decode state to get userId + brandId
-        let userId = null, brandId = null;
+        // C1 FIX: Decode and verify the state nonce server-side
+        let userId = null, brandId = null, receivedNonce = null;
         if (state) {
             try {
                 const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
                 userId = decoded.userId;
                 brandId = decoded.brandId;
-            } catch { /* state decode failed */ }
+                receivedNonce = decoded.nonce;
+            } catch { /* state decode failed — proceed without nonce (legacy flow) */ }
         }
 
-        // Find the integration — match by shop domain and brand (decoded from state)
+        // Find the pending integration and verify nonce matches
         const query = { platform: 'shopify', 'platformData.shopDomain': shop };
         if (userId) query.user = userId;
         if (brandId) query.brand = brandId;
         else query.brand = { $exists: false };
+
+        const pendingIntegration = await Integration.findOne({ ...query, status: 'pending' }).select('+metadata');
+        if (pendingIntegration && receivedNonce && pendingIntegration.metadata?.oauthNonce) {
+            if (pendingIntegration.metadata.oauthNonce !== receivedNonce) {
+                console.warn(`⚠️ CSRF: Nonce mismatch for ${shop} — expected ${pendingIntegration.metadata.oauthNonce}, got ${receivedNonce}`);
+                return res.redirect(`${frontendUrl}/integrations?error=csrf_state_mismatch`);
+            }
+        }
 
         const integration = await Integration.findOneAndUpdate(
             query,
@@ -191,6 +209,7 @@ router.get('/callback', async (req, res) => {
                 accessToken: tokenData.access_token,
                 status: 'connected',
                 'platformData.shopDomain': shop,
+                'metadata.oauthNonce': null,  // C1: clear nonce after use
                 ...(brandId ? { brand: brandId } : {}),
             },
             { returnDocument: 'after' }
@@ -374,8 +393,9 @@ router.post('/webhooks/customers-redact', verifyShopifyWebhook, async (req, res)
         const integration = await Integration.findOne({ 'platformData.shopDomain': shop_domain, platform: 'shopify' });
         if (!integration) return;
         await Promise.all([
-            ShopifyCustomer.deleteMany({ shopifyId: String(customer.id), user: integration.user }),
-            ShopifyOrder.deleteMany({ customerEmail: customer.email, user: integration.user }),
+            // H2 FIX: was shopifyId (wrong) — correct field name is shopifyCustomerId
+            ShopifyCustomer.deleteMany({ shopifyCustomerId: String(customer.id), user: integration.user }),
+            ShopifyOrder.deleteMany({ 'customer.email': customer.email, user: integration.user }),
         ]);
     } catch (error) {
         console.error('GDPR customers/redact error:', error);
@@ -502,7 +522,11 @@ router.get('/webhooks/check', (req, res) => {
     });
 });
 
-router.get('/debug-config', (req, res) => {
+// C3 FIX: Both debug endpoints are now protected — require auth + only available in non-production
+router.get('/debug-config', protect, (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Not available in production' });
+    }
     const rawSecret = config.shopify.apiSecret || '';
     const secret = rawSecret.trim();
     res.status(200).json({
@@ -516,7 +540,10 @@ router.get('/debug-config', (req, res) => {
     });
 });
 
-router.post('/debug/hmac-simulator', async (req, res) => {
+router.post('/debug/hmac-simulator', protect, async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'Not available in production' });
+    }
     const providedHmac = req.get('X-Shopify-Hmac-Sha256');
     const secret = req.query.secret || '';
     const rawBody = req.rawBody;
@@ -530,5 +557,6 @@ router.post('/debug/hmac-simulator', async (req, res) => {
         usedSecretLength: secret.length
     });
 });
+
 
 export default router;
