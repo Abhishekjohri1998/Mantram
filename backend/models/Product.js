@@ -64,8 +64,14 @@ const productSchema = new mongoose.Schema({
     shopifyId: { type: String, index: true },
     shopifyUpdatedAt: { type: Date },
 
+    // Etsy-specific
+    etsyListingId: { type: String, index: true, sparse: true },
+
+    // WooCommerce-specific
+    wooCommerceId: { type: String, index: true, sparse: true },
+
     // Metadata
-    source: { type: String, enum: ['shopify', 'shopify_public', 'manual', 'woocommerce', 'website_scan', 'csv_import'], default: 'manual' },
+    source: { type: String, enum: ['shopify', 'shopify_public', 'manual', 'etsy', 'woocommerce', 'website_scan', 'csv_import'], default: 'manual' },
     aiEnriched: { type: Boolean, default: false },
     syncedAt: { type: Date, default: Date.now },
 }, { timestamps: true });

@@ -30,6 +30,9 @@ const shopifyCustomerSchema = new mongoose.Schema({
     acceptsMarketing: { type: Boolean, default: false },
     marketingConsent: { type: mongoose.Schema.Types.Mixed },
 
+    // Platform source — distinguishes Shopify, Etsy, WooCommerce customers
+    source: { type: String, enum: ['shopify', 'etsy', 'woocommerce'], default: 'shopify', index: true },
+
     // Metadata
     tags: [String],
     state: { type: String }, // enabled, disabled, invited, declined
@@ -45,5 +48,6 @@ shopifyCustomerSchema.index({ brand: 1, ordersCount: -1 });
 
 // compound index for upserting
 shopifyCustomerSchema.index({ brand: 1, shopifyCustomerId: 1 }, { unique: true });
+shopifyCustomerSchema.index({ brand: 1, source: 1 });
 
 export default mongoose.model('ShopifyCustomer', shopifyCustomerSchema);

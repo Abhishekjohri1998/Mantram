@@ -43,6 +43,9 @@ const shopifyOrderSchema = new mongoose.Schema({
     // Raw data for future debugging or extra fields
     rawData: { type: mongoose.Schema.Types.Mixed },
 
+    // Platform source — distinguishes Shopify, Etsy, WooCommerce orders
+    source: { type: String, enum: ['shopify', 'etsy', 'woocommerce'], default: 'shopify', index: true },
+
     // Dates
     shopifyCreatedAt: { type: Date },
     shopifyUpdatedAt: { type: Date },
@@ -56,5 +59,6 @@ shopifyOrderSchema.index({ brand: 1, 'customer.shopifyCustomerId': 1 });
 
 // compound index for upserting during sync/webhooks
 shopifyOrderSchema.index({ brand: 1, shopifyOrderId: 1 }, { unique: true });
+shopifyOrderSchema.index({ brand: 1, source: 1, shopifyCreatedAt: -1 });
 
 export default mongoose.model('ShopifyOrder', shopifyOrderSchema);

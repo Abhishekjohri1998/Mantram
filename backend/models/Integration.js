@@ -7,7 +7,7 @@ const integrationSchema = new mongoose.Schema({
     platform: {
         type: String,
         required: true,
-        enum: ['shopify', 'instagram', 'facebook', 'linkedin', 'twitter', 'google-analytics', 'meta-ads', 'google-ads'],
+        enum: ['shopify', 'etsy', 'woocommerce', 'instagram', 'facebook', 'linkedin', 'twitter', 'google-analytics', 'meta-ads', 'google-ads'],
     },
 
     status: {
@@ -54,6 +54,20 @@ const integrationSchema = new mongoose.Schema({
         // Google Ads
         googleAdsCustomerId: { type: String, default: '' },
         googleAdsManagerId: { type: String, default: '' },
+
+        // Etsy
+        etsyShopId: { type: String, default: '' },
+        etsyShopName: { type: String, default: '' },
+        etsyShopUrl: { type: String, default: '' },
+        etsyDefaultShippingProfileId: { type: String, default: '' },
+        etsyDefaultTaxonomyId: { type: String, default: '' },
+
+        // WooCommerce / WordPress
+        wooBaseUrl: { type: String, default: '' },
+        wooSiteName: { type: String, default: '' },
+        wooConsumerKey: { type: String, default: '', select: false },
+        wooConsumerSecret: { type: String, default: '', select: false },
+        wooVersion: { type: String, default: 'v3' },
     },
 
     // Sync metadata

@@ -313,6 +313,41 @@ export const shopify = {
     status: (brandId) => apiFetch(`/shopify/status${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
+// ============ Etsy API ============
+export const etsy = {
+    connect: (shopId, apiKey, brandId) => apiFetch('/etsy/connect', { method: 'POST', body: JSON.stringify({ shopId, apiKey, brandId }) }),
+    status: (brandId) => apiFetch(`/etsy/status${brandId ? `?brandId=${brandId}` : ''}`),
+    sync: (brandId) => apiFetch('/etsy/sync', { method: 'POST', body: JSON.stringify({ brandId }) }),
+    products: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/etsy/products?${query}`);
+    },
+    analytics: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/etsy/analytics?${query}`);
+    },
+    publish: (productId, data = {}) => apiFetch(`/etsy/publish/${productId}`, { method: 'POST', body: JSON.stringify(data) }),
+    disconnect: (brandId) => apiFetch(`/etsy/disconnect${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' }),
+};
+
+// ============ WooCommerce API ============
+export const woocommerce = {
+    connect: (baseUrl, consumerKey, consumerSecret, brandId) => apiFetch('/woocommerce/connect', { method: 'POST', body: JSON.stringify({ baseUrl, consumerKey, consumerSecret, brandId }) }),
+    status: (brandId) => apiFetch(`/woocommerce/status${brandId ? `?brandId=${brandId}` : ''}`),
+    sync: (brandId) => apiFetch('/woocommerce/sync', { method: 'POST', body: JSON.stringify({ brandId }) }),
+    products: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/woocommerce/products?${query}`);
+    },
+    analytics: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/woocommerce/analytics?${query}`);
+    },
+    publish: (productId, data = {}) => apiFetch(`/woocommerce/publish/${productId}`, { method: 'POST', body: JSON.stringify(data) }),
+    disconnect: (brandId) => apiFetch(`/woocommerce/disconnect${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' }),
+};
+
+
 // ============ Products API ============
 export const products = {
     list: (params = {}) => {
