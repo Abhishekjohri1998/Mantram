@@ -11,7 +11,7 @@ import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
-import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE } from '../services/api'
+import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI } from '../services/api'
 
 // ── SVG Platform Logos ──────────────────────────────────────────────────────
 function PlatformLogo({ id, size = 28 }) {
@@ -154,6 +154,21 @@ export default function Integrations() {
     const [adConnections, setAdConnections] = useState({ meta: { status: 'disconnected' }, google: { status: 'disconnected' } })
     const [connectingPlatform, setConnectingPlatform] = useState(null)
 
+    // ── Etsy state ──
+    const [etsyStatus, setEtsyStatus] = useState({ connected: false })
+    const [etsyShopId, setEtsyShopId] = useState('')
+    const [etsyApiKey, setEtsyApiKey] = useState('')
+    const [etsyError, setEtsyError] = useState('')
+    const [etsySuccess, setEtsySuccess] = useState('')
+
+    // ── WooCommerce state ──
+    const [wooStatus, setWooStatus] = useState({ connected: false })
+    const [wooBaseUrl, setWooBaseUrl] = useState('')
+    const [wooKey, setWooKey] = useState('')
+    const [wooSecret, setWooSecret] = useState('')
+    const [wooError, setWooError] = useState('')
+    const [wooSuccess, setWooSuccess] = useState('')
+
     const brandId = activeBrand?._id
 
     // ── Load ALL platform statuses ──
@@ -181,6 +196,18 @@ export default function Integrations() {
                 setGaConnected(gaData.connected)
                 setGaEmail(gaData.email || '')
             } catch { setGaConnected(false); setGaEmail('') }
+
+            // Etsy
+            try {
+                const ed = await etsyAPI.status(brandId)
+                setEtsyStatus(ed.status || { connected: false })
+            } catch { setEtsyStatus({ connected: false }) }
+
+            // WooCommerce
+            try {
+                const wd = await wooAPI.status(brandId)
+                setWooStatus(wd.status || { connected: false })
+            } catch { setWooStatus({ connected: false }) }
 
             // Ad Platforms (Meta + Google)
             try {
@@ -605,11 +632,13 @@ export default function Integrations() {
                                     )}
                                 </div>
 
-                                {/* WooCommerce — coming soon */}
-                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden hover:border-primary/10 transition-all">
-                                    <div className="absolute top-3 right-3">
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
-                                    </div>
+                                {/* WooCommerce */}
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden transition-all" style={{ borderColor: wooStatus.connected ? '#96588A40' : undefined }}>
+                                    {wooStatus.connected && (
+                                        <div className="absolute top-3 right-3">
+                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#96588A20', color: '#96588A', border: '1px solid #96588A40' }}>Connected</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-4 mb-4">
                                         <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
                                             <PlatformLogo id="woocommerce" size={48} />
@@ -619,18 +648,70 @@ export default function Integrations() {
                                             <p className="text-sm text-[var(--sys-text-muted)]">WordPress store products &amp; orders</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Connect your WooCommerce store to sync products and power D2C analytics.</p>
-                                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed"
-                                        style={{ background: '#96588A20', color: '#96588A', border: '1px solid #96588A30' }}>
-                                        Connect WooCommerce
-                                    </button>
+                                    {wooStatus.connected ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] bg-[var(--sys-surface)] rounded-xl px-3 py-2">
+                                                <span className="material-symbols-outlined text-sm" style={{ color: '#96588A' }}>store</span>
+                                                <span className="truncate">{wooStatus.siteName || wooStatus.baseUrl}</span>
+                                            </div>
+                                            {wooStatus.lastSyncAt && (
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Last sync: {new Date(wooStatus.lastSyncAt).toLocaleDateString()}</p>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <button onClick={async () => { try { setLoading(l => ({ ...l, wooSync: true })); await wooAPI.sync(brandId); setWooSuccess('Sync complete!'); setTimeout(() => setWooSuccess(''), 3000); } catch(e) { setWooError(e.message) } finally { setLoading(l => ({ ...l, wooSync: false })) } }}
+                                                    disabled={loading.wooSync}
+                                                    className="flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                                                    style={{ background: '#96588A20', color: '#96588A', border: '1px solid #96588A30' }}>
+                                                    {loading.wooSync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
+                                                    Sync Now
+                                                </button>
+                                                <button onClick={async () => { if (!confirm('Disconnect WooCommerce?')) return; await wooAPI.disconnect(brandId); setWooStatus({ connected: false }); setWooKey(''); setWooSecret(''); }}
+                                                    className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                    style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
+                                                    <span className="material-symbols-outlined text-sm">link_off</span>
+                                                </button>
+                                            </div>
+                                            {wooSuccess && <p className="text-xs text-green-400">{wooSuccess}</p>}
+                                            {wooError && <p className="text-xs text-red-400">{wooError}</p>}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Connect your WooCommerce store to sync products, orders, and power D2C analytics.</p>
+                                            <input type="url" value={wooBaseUrl} onChange={e => setWooBaseUrl(e.target.value)}
+                                                placeholder="https://yourstore.com"
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            <input type="text" value={wooKey} onChange={e => setWooKey(e.target.value)}
+                                                placeholder="Consumer Key (ck_...)"
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            <input type="password" value={wooSecret} onChange={e => setWooSecret(e.target.value)}
+                                                placeholder="Consumer Secret (cs_...)"
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            {wooError && <p className="text-xs text-red-400">{wooError}</p>}
+                                            <button onClick={async () => {
+                                                if (!wooBaseUrl || !wooKey || !wooSecret) return setWooError('All fields are required.');
+                                                setWooError(''); setLoading(l => ({ ...l, woo: true }));
+                                                try {
+                                                    const r = await wooAPI.connect(wooBaseUrl, wooKey, wooSecret, brandId);
+                                                    setWooStatus({ connected: true, siteName: r.siteName, baseUrl: r.baseUrl });
+                                                } catch(e) { setWooError(e.message); }
+                                                finally { setLoading(l => ({ ...l, woo: false })) }
+                                            }} disabled={loading.woo}
+                                                className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                                                style={{ background: '#96588A20', color: '#96588A', border: '1px solid #96588A30' }}>
+                                                {loading.woo ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">link</span>}
+                                                Connect WooCommerce
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Etsy — coming soon */}
-                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden hover:border-primary/10 transition-all">
-                                    <div className="absolute top-3 right-3">
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary border border-primary/20">Coming Soon</span>
-                                    </div>
+                                {/* Etsy */}
+                                <div className="glass-panel rounded-2xl p-6 relative overflow-hidden transition-all" style={{ borderColor: etsyStatus.connected ? '#F5640040' : undefined }}>
+                                    {etsyStatus.connected && (
+                                        <div className="absolute top-3 right-3">
+                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640040' }}>Connected</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-4 mb-4">
                                         <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
                                             <PlatformLogo id="etsy" size={48} />
@@ -640,11 +721,62 @@ export default function Integrations() {
                                             <p className="text-sm text-[var(--sys-text-muted)]">Handmade, vintage &amp; craft listings</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-[var(--sys-text-muted)] mb-3">Sync your Etsy shop to generate product visuals and listing copy at scale.</p>
-                                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed"
-                                        style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640030' }}>
-                                        Connect Etsy
-                                    </button>
+                                    {etsyStatus.connected ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)] bg-[var(--sys-surface)] rounded-xl px-3 py-2">
+                                                <span className="material-symbols-outlined text-sm" style={{ color: '#F56400' }}>storefront</span>
+                                                <span className="truncate">{etsyStatus.shopName || `Shop ${etsyStatus.shopId}`}</span>
+                                            </div>
+                                            {etsyStatus.shopUrl && (
+                                                <a href={etsyStatus.shopUrl} target="_blank" rel="noopener noreferrer" className="text-xs underline" style={{ color: '#F56400' }}>{etsyStatus.shopUrl}</a>
+                                            )}
+                                            {etsyStatus.lastSyncAt && (
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Last sync: {new Date(etsyStatus.lastSyncAt).toLocaleDateString()}</p>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <button onClick={async () => { try { setLoading(l => ({ ...l, etsySync: true })); await etsyAPI.sync(brandId); setEtsySuccess('Sync complete!'); setTimeout(() => setEtsySuccess(''), 3000); } catch(e) { setEtsyError(e.message) } finally { setLoading(l => ({ ...l, etsySync: false })) } }}
+                                                    disabled={loading.etsySync}
+                                                    className="flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                                                    style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640030' }}>
+                                                    {loading.etsySync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
+                                                    Sync Now
+                                                </button>
+                                                <button onClick={async () => { if (!confirm('Disconnect Etsy?')) return; await etsyAPI.disconnect(brandId); setEtsyStatus({ connected: false }); setEtsyShopId(''); setEtsyApiKey(''); }}
+                                                    className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                                    style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
+                                                    <span className="material-symbols-outlined text-sm">link_off</span>
+                                                </button>
+                                            </div>
+                                            {etsySuccess && <p className="text-xs text-green-400">{etsySuccess}</p>}
+                                            {etsyError && <p className="text-xs text-red-400">{etsyError}</p>}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Connect your Etsy shop to sync listings, orders and generate AI-powered product content at scale.</p>
+                                            <input type="text" value={etsyShopId} onChange={e => setEtsyShopId(e.target.value)}
+                                                placeholder="Etsy Shop ID (numeric)"
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            <input type="password" value={etsyApiKey} onChange={e => setEtsyApiKey(e.target.value)}
+                                                placeholder="Etsy API Key (keystring)"
+                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Find your API key at <a href="https://www.etsy.com/developers/your-apps" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: '#F56400' }}>etsy.com/developers</a></p>
+                                            {etsyError && <p className="text-xs text-red-400">{etsyError}</p>}
+                                            <button onClick={async () => {
+                                                if (!etsyShopId || !etsyApiKey) return setEtsyError('Shop ID and API Key are required.');
+                                                setEtsyError(''); setLoading(l => ({ ...l, etsy: true }));
+                                                try {
+                                                    const r = await etsyAPI.connect(etsyShopId, etsyApiKey, brandId);
+                                                    setEtsyStatus({ connected: true, shopName: r.shopName, shopId: r.shopId });
+                                                } catch(e) { setEtsyError(e.message); }
+                                                finally { setLoading(l => ({ ...l, etsy: false })) }
+                                            }} disabled={loading.etsy}
+                                                className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                                                style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640030' }}>
+                                                {loading.etsy ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">link</span>}
+                                                Connect Etsy
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Amazon — coming soon */}
