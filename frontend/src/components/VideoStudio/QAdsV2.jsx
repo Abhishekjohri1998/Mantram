@@ -225,7 +225,7 @@ const css = `
 }
 
 .scott-generate {
-    background: linear-gradient(135deg, #ff4d85, #ff2a5f);
+    background: var(--sys-primary);
     color: #fff;
     border: none;
     border-radius: 12px;
@@ -242,7 +242,7 @@ const css = `
 }
 .scott-generate:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(255, 42, 95, 0.4);
+    box-shadow: 0 10px 20px rgba(255, 77, 0, 0.4);
 }
 .scott-generate:disabled {
     background: #444;
@@ -366,22 +366,23 @@ const css = `
     z-index: 1;
 }
 
-/* Template Cards */
+/* Template Cards — Higgsfield-style looping video */
 .qv2-temp-card {
-    flex: 0 0 140px;
-    height: 200px;
-    border-radius: 12px;
+    flex: 0 0 180px;
+    height: 280px;
+    border-radius: 14px;
     overflow: hidden;
     position: relative;
     cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.1);
-    transition: all 0.2s;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .qv2-temp-card:hover {
-    transform: translateY(-4px);
-    border-color: #ff2a5f;
-    box-shadow: 0 8px 24px rgba(255,42,95,0.3);
+    transform: scale(1.04);
+    border-color: var(--sys-primary);
+    box-shadow: 0 12px 32px rgba(255, 77, 0, 0.2);
 }
+.qv2-temp-card video,
 .qv2-temp-card img {
     position: absolute;
     inset: 0;
@@ -392,8 +393,20 @@ const css = `
 .qv2-temp-card .overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%);
     transition: opacity 0.2s;
+}
+.qv2-temp-name {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 2;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    line-height: 1.3;
 }
 .qv2-temp-btn {
     position: absolute;
@@ -410,12 +423,40 @@ const css = `
     opacity: 1;
 }
 .qv2-temp-btn span {
-    background: #fff;
-    color: #000;
+    background: var(--sys-primary);
+    color: #fff;
     padding: 6px 16px;
     border-radius: 20px;
     font-size: 11px;
     font-weight: 700;
+}
+/* Category pills for template section */
+.qv2-cat-pills {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.qv2-cat-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.qv2-cat-pill:hover {
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+}
+.qv2-cat-pill.active {
+    border-color: var(--sys-primary);
+    color: var(--sys-primary);
+    background: var(--sys-primary-dim);
 }
 
 /* Active Output Card */
@@ -480,6 +521,8 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
     const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
     const [templates, setTemplates] = useState([])
+    const [templateCategories, setTemplateCategories] = useState([])
+    const [selectedTemplateCategory, setSelectedTemplateCategory] = useState('all')
     const [selP, setSelP] = useState(null)
     const [selectedCategory, setSelectedCategory] = useState(null)
     const [productUrl, setProductUrl] = useState('')
@@ -522,9 +565,40 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             if (d.presets?.length > 0 && !selP) setSelP(d.presets[0].id)
         }).catch(() => {})
 
-        api('/templates/by-section/video_qads?limit=20').then(d => {
-            setTemplates(d.templates || [])
+        api('/templates/by-section/video_qads?limit=50').then(d => {
+            const tpls = d.templates || []
+            setTemplates(tpls)
+            // Extract unique categories from templates
+            const cats = [...new Set(tpls.map(t => t.categoryId?.name).filter(Boolean))]
+            setTemplateCategories(cats)
         }).catch(() => {})
+    }, [])
+
+    // Handle template click — pre-fill all fields
+    const handleTemplateClick = useCallback((template) => {
+        // 1. Fill the prompt/brief input
+        setUserBrief(template.promptTemplate || template.savedPrompt || '')
+
+        // 2. Pre-fill product data
+        if (template.savedProductImageUrls?.length > 0) {
+            setProductImgs(template.savedProductImageUrls)
+        }
+        if (template.savedProductUrl) {
+            setProductUrl(template.savedProductUrl)
+        }
+
+        // 3. Pre-fill avatar
+        if (template.savedAvatarUrl) {
+            setAvatarUrl(template.savedAvatarUrl)
+        }
+
+        // 4. Pre-fill video settings
+        if (template.savedVideoSettings) {
+            if (template.savedVideoSettings.duration) setDuration(template.savedVideoSettings.duration)
+            if (template.savedVideoSettings.format) setFormat(template.savedVideoSettings.format)
+            if (template.savedVideoSettings.model) setSelectedModel(template.savedVideoSettings.model)
+            if (template.savedVideoSettings.presetId) setSelP(template.savedVideoSettings.presetId)
+        }
     }, [])
 
     const handleAvatarUpload = useCallback(async file => {
@@ -822,21 +896,41 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                 </div>
             </div>
 
-            {/* Templates Row */}
+            {/* Templates Row with Category Pills */}
             {templates.length > 0 && !isGeneratingPrompts && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 24 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>bolt</span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: -0.5 }}>Generate across formats</span>
                     </div>
+
+                    {/* Category pills */}
+                    {templateCategories.length > 1 && (
+                        <div className="qv2-cat-pills">
+                            <button className={`qv2-cat-pill ${selectedTemplateCategory === 'all' ? 'active' : ''}`}
+                                onClick={() => setSelectedTemplateCategory('all')}>All</button>
+                            {templateCategories.map(cat => (
+                                <button key={cat} className={`qv2-cat-pill ${selectedTemplateCategory === cat ? 'active' : ''}`}
+                                    onClick={() => setSelectedTemplateCategory(cat)}>{cat}</button>
+                            ))}
+                        </div>
+                    )}
+
                     <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, scrollbarWidth: 'none', justifyContent: 'center' }}>
-                        {templates.map(t => (
-                            <div key={t._id} className="qv2-temp-card" style={{ flex: '0 0 160px', height: 260 }} onClick={() => setUserBrief(t.promptTemplate || t.savedPrompt || '')}>
-                                {t.previewMediaUrl ? <img src={t.previewMediaUrl} alt={t.name} /> : <div style={{ position: 'absolute', inset: 0, background: '#222' }} />}
+                        {templates
+                            .filter(t => selectedTemplateCategory === 'all' || t.categoryId?.name === selectedTemplateCategory)
+                            .map(t => (
+                            <div key={t._id} className="qv2-temp-card" style={{ flex: '0 0 180px', height: 280 }} onClick={() => handleTemplateClick(t)}>
+                                {/* Video or Image preview */}
+                                {t.previewType === 'video' && t.previewUrl ? (
+                                    <video src={t.previewUrl} muted autoPlay loop playsInline />
+                                ) : t.previewUrl ? (
+                                    <img src={t.previewUrl} alt={t.name} />
+                                ) : (
+                                    <div style={{ position: 'absolute', inset: 0, background: '#222' }} />
+                                )}
                                 <div className="overlay" />
-                                <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 2, textAlign: 'center' }}>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{t.name}</div>
-                                </div>
+                                <div className="qv2-temp-name">{t.name}</div>
                                 <div className="qv2-temp-btn">
                                     <span>Recreate</span>
                                 </div>

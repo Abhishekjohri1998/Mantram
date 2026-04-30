@@ -189,7 +189,14 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                         background: 'var(--color-background-secondary)',
                                         border: '1.5px solid var(--color-border-tertiary)'
                                     }}>
-                                        {template.previewUrl ? (
+                                        {template.previewType === 'video' && template.previewUrl ? (
+                                            <video 
+                                                src={template.previewUrl} 
+                                                muted autoPlay loop playsInline
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                className="transition-transform duration-500 group-hover:scale-105"
+                                            />
+                                        ) : template.previewUrl ? (
                                             <img 
                                                 src={template.previewUrl} 
                                                 alt={template.name}

@@ -129,6 +129,7 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             name, categoryId, description, tags, savedPrompt, studioOrigin,
             isFeatured, isActive, isPublished,
             studioSection, promptTemplate, generationModel,
+            savedProductUrl, savedProductImageUrls, savedAvatarUrl, savedVideoSettings,
         } = req.body;
 
         if (!req.file) {
@@ -148,6 +149,18 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             }
         }
 
+        // Parse video-specific metadata
+        let parsedProductImageUrls = [];
+        if (savedProductImageUrls) {
+            try { parsedProductImageUrls = JSON.parse(savedProductImageUrls); }
+            catch { parsedProductImageUrls = typeof savedProductImageUrls === 'string' ? savedProductImageUrls.split(',').map(u => u.trim()).filter(Boolean) : []; }
+        }
+        let parsedVideoSettings = {};
+        if (savedVideoSettings) {
+            try { parsedVideoSettings = typeof savedVideoSettings === 'string' ? JSON.parse(savedVideoSettings) : savedVideoSettings; }
+            catch { parsedVideoSettings = {}; }
+        }
+
         const template = await Template.create({
             name,
             categoryId,
@@ -164,6 +177,10 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             isFeatured: isFeatured === 'true' || isFeatured === true,
             isActive: isActive === 'true' || isActive === true,
             isPublished: isPublished === 'true' || isPublished === true,
+            savedProductUrl: savedProductUrl || '',
+            savedProductImageUrls: parsedProductImageUrls,
+            savedAvatarUrl: savedAvatarUrl || '',
+            savedVideoSettings: parsedVideoSettings,
             createdBy: req.user._id
         });
 
@@ -211,6 +228,7 @@ router.put('/:id', protect, superadmin, async (req, res) => {
             'previewUrl', 'previewImageUrl', 'previewType',
             'promptTemplate', 'generationModel', 'generationParams',
             'sortOrder',
+            'savedProductUrl', 'savedProductImageUrls', 'savedAvatarUrl', 'savedVideoSettings',
         ];
         const updateData = {};
         for (const key of ALLOWED_UPDATES) {

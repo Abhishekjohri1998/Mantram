@@ -110,6 +110,25 @@ const templateSchema = new mongoose.Schema({
     sourceJobType: {
         type: String,
         enum: ['GenerationJob', 'VideoProject', 'Content']
+    },
+    // ── Video Template Recreation Metadata ────────────────────────────────
+    // Stores the product/avatar/settings used when creating this template so
+    // users can "Recreate" with the same inputs pre-filled in Q-Ads
+    savedProductUrl: {
+        type: String,
+        default: ''
+    },
+    savedProductImageUrls: {
+        type: [String],
+        default: []
+    },
+    savedAvatarUrl: {
+        type: String,
+        default: ''
+    },
+    savedVideoSettings: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}  // { duration, format, model, presetId }
     }
 }, { timestamps: true });
 
