@@ -923,7 +923,14 @@ const TemplateManager = () => {
                                 </div>
                             )}
 
-                            <label style={labelStyle}>Prompt *
+                            <label style={labelStyle}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>Prompt *</span>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button type="button" onClick={() => setGenForm(f => ({ ...f, prompt: f.prompt + (f.prompt.endsWith(' ') ? '' : ' ') + '@Image1' }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 4, padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}>+ @Image1 (Avatar)</button>
+                                        <button type="button" onClick={() => setGenForm(f => ({ ...f, prompt: f.prompt + (f.prompt.endsWith(' ') ? '' : ' ') + '@Image2' }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 4, padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}>+ @Image2 (Product)</button>
+                                    </div>
+                                </div>
                                 <textarea value={genForm.prompt} onChange={e => setGenForm(f => ({ ...f, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} placeholder="Describe the video/image to generate. Use @Image1 for avatar, @Image2 for product..." />
                             </label>
 
@@ -935,7 +942,7 @@ const TemplateManager = () => {
                             <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 14 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: 0.5 }}>Template Assets (Swappable by Users)</div>
 
-                                <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model Image
+                                <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model Image (@Image1)
                                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                                         <input value={genForm.avatarUrl} onChange={e => setGenForm(f => ({ ...f, avatarUrl: e.target.value }))} style={{ ...inputStyle, flex: 1 }} placeholder="https://... avatar image URL" />
                                         <label style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -945,7 +952,7 @@ const TemplateManager = () => {
                                     </div>
                                 </label>
 
-                                <label style={labelStyle}>Product Images
+                                <label style={labelStyle}>Product Images (@Image2, @Image3...)
                                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                                         <input value={genAssetInputs.productUrl} onChange={e => setGenAssetInputs(a => ({ ...a, productUrl: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProductImageUrl(); } }} style={{ ...inputStyle, flex: 1 }} placeholder="https://... product image URL" />
                                         <button type="button" onClick={addProductImageUrl} style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)' }}>Add URL</button>
