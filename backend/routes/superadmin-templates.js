@@ -286,10 +286,16 @@ router.post('/generate', protect, superadmin, async (req, res) => {
         } else {
             // ── IMAGE GENERATION ──
             const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+            
+            const allRefs = [];
+            if (avatarUrl) allRefs.push(avatarUrl);
+            allRefs.push(...parsedProductImgs);
+            
+            let finalPrompt = prompt.replace(/<<<image_1>>>/g, '@Image1').replace(/<<<image_2>>>/g, '@Image2');
 
-            const result = await geminiImageGenerate(prompt, [], 0.5, {
+            const result = await geminiImageGenerate(finalPrompt, [], 0.5, {
                 aspectRatio: format || '1:1',
-                referenceImageUrls: parsedProductImgs,
+                referenceImageUrls: allRefs,
             });
 
             if (!result.imageUrl) {
