@@ -133,6 +133,37 @@ const TemplateManager = () => {
     const [genError, setGenError] = useState('');
     const [genAssetInputs, setGenAssetInputs] = useState({ productUrl: '', avatarUrl: '' });
 
+    const handleFileUpload = async (e, type) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const base64 = event.target.result;
+            try {
+                addToast('Uploading image...', 'info');
+                const res = await api('/media/upload', {
+                    method: 'POST',
+                    body: JSON.stringify({ base64 })
+                });
+                if (res && res.url) {
+                    if (type === 'avatar') {
+                        setGenForm(f => ({ ...f, avatarUrl: res.url }));
+                    } else if (type === 'product') {
+                        setGenForm(f => ({ ...f, productImageUrls: [...f.productImageUrls, res.url] }));
+                    }
+                    addToast('Image uploaded', 'success');
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (err) {
+                addToast('Failed to upload image', 'error');
+            }
+        };
+        reader.readAsDataURL(file);
+        e.target.value = ''; // Reset input
+    };
+
     const VIDEO_MODELS = [
         { value: 'seedance-2.0', label: 'Seedance 2.0', type: 'video' },
         { value: 'kling-v2-master', label: 'Kling V2 Master', type: 'video' },
@@ -904,14 +935,24 @@ const TemplateManager = () => {
                             <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 14 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: 0.5 }}>Template Assets (Swappable by Users)</div>
 
-                                <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model URL
-                                    <input value={genForm.avatarUrl} onChange={e => setGenForm(f => ({ ...f, avatarUrl: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }} placeholder="https://... avatar image URL" />
+                                <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model Image
+                                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                        <input value={genForm.avatarUrl} onChange={e => setGenForm(f => ({ ...f, avatarUrl: e.target.value }))} style={{ ...inputStyle, flex: 1 }} placeholder="https://... avatar image URL" />
+                                        <label style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span> Upload
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'avatar')} />
+                                        </label>
+                                    </div>
                                 </label>
 
-                                <label style={labelStyle}>Product Image URLs
+                                <label style={labelStyle}>Product Images
                                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                                         <input value={genAssetInputs.productUrl} onChange={e => setGenAssetInputs(a => ({ ...a, productUrl: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProductImageUrl(); } }} style={{ ...inputStyle, flex: 1 }} placeholder="https://... product image URL" />
-                                        <button type="button" onClick={addProductImageUrl} style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)' }}>Add</button>
+                                        <button type="button" onClick={addProductImageUrl} style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)' }}>Add URL</button>
+                                        <label style={{ ...actionBtnStyle, color: '#10b981', borderColor: 'rgba(16,185,129,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span> Upload
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'product')} />
+                                        </label>
                                     </div>
                                 </label>
                                 {genForm.productImageUrls.length > 0 && (
