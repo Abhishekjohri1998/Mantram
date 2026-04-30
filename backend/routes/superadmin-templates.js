@@ -6,6 +6,8 @@ import TemplateCategory from '../models/TemplateCategory.js';
 import Template from '../models/Template.js';
 import VideoProject from '../models/VideoProject.js';
 import GenerationJob from '../models/GenerationJob.js';
+import { submitVideoGeneration } from '../agents/videoStudio/falClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const router = Router();
@@ -161,6 +163,15 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             catch { parsedVideoSettings = {}; }
         }
 
+        // Build templateAssets from product/avatar data
+        const templateAssets = [];
+        if (savedAvatarUrl) {
+            templateAssets.push({ role: 'avatar', label: 'Avatar / Model', url: savedAvatarUrl, swappable: true });
+        }
+        for (const pUrl of parsedProductImageUrls) {
+            templateAssets.push({ role: 'product', label: 'Product Image', url: pUrl, swappable: true });
+        }
+
         const template = await Template.create({
             name,
             categoryId,
@@ -172,8 +183,9 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             promptTemplate: promptTemplate || '',
             generationModel: generationModel || 'gpt-image-2',
             previewUrl,
-            previewImageUrl: previewUrl, // Step 8: always populate both
+            previewImageUrl: previewUrl,
             previewType,
+            previewVideoUrl: previewType === 'video' ? previewUrl : '',
             isFeatured: isFeatured === 'true' || isFeatured === true,
             isActive: isActive === 'true' || isActive === true,
             isPublished: isPublished === 'true' || isPublished === true,
@@ -181,12 +193,179 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             savedProductImageUrls: parsedProductImageUrls,
             savedAvatarUrl: savedAvatarUrl || '',
             savedVideoSettings: parsedVideoSettings,
+            templateAssets,
             createdBy: req.user._id
         });
 
         res.status(201).json({ success: true, template });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
+    }
+});
+
+// ==========================================
+// GENERATE TEMPLATE VIA AI
+// ==========================================
+
+// POST /generate — Generate a video/image via AI and create a draft template
+router.post('/generate', protect, superadmin, async (req, res) => {
+    try {
+        const {
+            name, categoryId, description, tags, studioOrigin, studioSection,
+            prompt, model, productImageUrls, avatarUrl,
+            duration, format, quality,
+        } = req.body;
+
+        if (!prompt || !prompt.trim()) return res.status(400).json({ success: false, error: 'Prompt is required' });
+        if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Template name is required' });
+        if (!categoryId) return res.status(400).json({ success: false, error: 'Category is required' });
+
+        const parsedProductImgs = Array.isArray(productImageUrls) ? productImageUrls.filter(u => u && u.startsWith('http')) : [];
+        const parsedTags = Array.isArray(tags) ? tags : [];
+        const selectedModel = model || 'seedance-2.0';
+        const isVideoModel = ['seedance-2.0', 'kling-v2', 'wan-2.1', 'luma-ray-2', 'minimax-video'].some(m => selectedModel.includes(m));
+
+        // Build templateAssets from inputs
+        const templateAssets = [];
+        if (avatarUrl) templateAssets.push({ role: 'avatar', label: 'Avatar / Model', url: avatarUrl, swappable: true });
+        for (const pUrl of parsedProductImgs) {
+            templateAssets.push({ role: 'product', label: 'Product Image', url: pUrl, swappable: true });
+        }
+
+        if (isVideoModel) {
+            // ── VIDEO GENERATION ──
+            const imageUrls = [...parsedProductImgs];
+            const avatarFaceRefs = avatarUrl ? [avatarUrl] : [];
+            let finalPrompt = prompt.replace(/<<<image_1>>>/g, '@Image1').replace(/<<<image_2>>>/g, '@Image2');
+
+            const genResult = await submitVideoGeneration({
+                prompt: finalPrompt,
+                model: selectedModel,
+                duration: Math.min(parseInt(duration || 8), 15),
+                aspectRatio: format || '9:16',
+                qualityMode: quality || 'high',
+                generateAudio: true,
+                imageUrl: imageUrls[0] || null,
+                s3ImageUrls: imageUrls,
+                referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
+                imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
+            });
+
+            // Create draft template with generation taskId — poll for completion
+            const template = await Template.create({
+                name: name.trim(),
+                categoryId,
+                description: description || '',
+                tags: parsedTags,
+                studioOrigin: studioOrigin || 'video',
+                studioSection: studioSection || 'video_qads',
+                generationModel: selectedModel,
+                savedPrompt: prompt,
+                promptTemplate: prompt,
+                previewUrl: 'pending', // Will be updated when generation completes
+                previewType: 'video',
+                previewVideoUrl: '',
+                templateAssets,
+                savedProductImageUrls: parsedProductImgs,
+                savedAvatarUrl: avatarUrl || '',
+                savedVideoSettings: { duration: parseInt(duration || 8), format: format || '9:16', model: selectedModel },
+                isActive: false,
+                isPublished: false,
+                createdBy: req.user._id,
+                sourceJobId: genResult.taskId,
+                sourceJobType: 'VideoProject',
+            });
+
+            res.json({
+                success: true,
+                template,
+                taskId: genResult.taskId,
+                status: 'generating',
+                type: 'video',
+            });
+        } else {
+            // ── IMAGE GENERATION ──
+            const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+
+            const result = await geminiImageGenerate(prompt, [], 0.5, {
+                aspectRatio: format || '1:1',
+                referenceImageUrls: parsedProductImgs,
+            });
+
+            if (!result.imageUrl) {
+                return res.status(500).json({ success: false, error: 'Image generation failed — no image returned' });
+            }
+
+            // Ensure the generated image is on S3
+            const s3Url = await ensureS3Url(result.imageUrl, `templates/gen-${Date.now()}.webp`);
+
+            const template = await Template.create({
+                name: name.trim(),
+                categoryId,
+                description: description || '',
+                tags: parsedTags,
+                studioOrigin: studioOrigin || 'creative',
+                studioSection: studioSection || 'ai_create',
+                generationModel: selectedModel,
+                savedPrompt: prompt,
+                promptTemplate: prompt,
+                previewUrl: s3Url,
+                previewImageUrl: s3Url,
+                previewType: 'image',
+                templateAssets,
+                savedProductImageUrls: parsedProductImgs,
+                savedAvatarUrl: avatarUrl || '',
+                savedVideoSettings: { format: format || '1:1', model: selectedModel },
+                isActive: false,
+                isPublished: false,
+                createdBy: req.user._id,
+            });
+
+            res.json({
+                success: true,
+                template,
+                status: 'done',
+                type: 'image',
+                previewUrl: s3Url,
+            });
+        }
+    } catch (err) {
+        console.error('[SuperAdmin Template Generate] Error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /generate/status/:taskId — Poll video generation status for template creation
+router.get('/generate/status/:taskId', protect, superadmin, async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const result = await pollAtlasCloudStatus(taskId);
+
+        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
+
+        // If generation completed, update the template with the video URL
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            const s3VideoUrl = await ensureS3Url(result.videoUrl, `templates/gen-video-${Date.now()}.mp4`);
+            await Template.findOneAndUpdate(
+                { sourceJobId: taskId },
+                {
+                    previewUrl: s3VideoUrl,
+                    previewVideoUrl: s3VideoUrl,
+                    previewImageUrl: s3VideoUrl,
+                }
+            );
+        }
+
+        res.json({
+            success: true,
+            status: result.status,
+            progress: result.progress || 0,
+            videoUrl: result.videoUrl || null,
+            error: result.error || null,
+        });
+    } catch (err) {
+        console.error('[SuperAdmin Template Status] Error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -225,10 +404,11 @@ router.put('/:id', protect, superadmin, async (req, res) => {
         const ALLOWED_UPDATES = [
             'name', 'description', 'tags', 'categoryId', 'studioOrigin', 'studioSection',
             'isActive', 'isPublished', 'isFeatured',
-            'previewUrl', 'previewImageUrl', 'previewType',
+            'previewUrl', 'previewImageUrl', 'previewType', 'previewVideoUrl',
             'promptTemplate', 'generationModel', 'generationParams',
             'sortOrder',
             'savedProductUrl', 'savedProductImageUrls', 'savedAvatarUrl', 'savedVideoSettings',
+            'templateAssets',
         ];
         const updateData = {};
         for (const key of ALLOWED_UPDATES) {

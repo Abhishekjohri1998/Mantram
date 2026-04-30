@@ -46,6 +46,19 @@ const templateSchema = new mongoose.Schema({
         enum: ['image', 'video'],
         required: true
     },
+    // ── Generated video URL (separate from poster/thumbnail) ─────────────
+    previewVideoUrl: {
+        type: String,
+        default: ''
+    },
+    // ── Structured Asset Slots ───────────────────────────────────────────
+    // Each asset is labeled with its role so users know what they can swap
+    templateAssets: [{
+        role: { type: String, enum: ['product', 'avatar', 'background', 'reference'] },
+        label: String,
+        url: String,
+        swappable: { type: Boolean, default: true }
+    }],
     savedPrompt: {
         type: String,
         required: true

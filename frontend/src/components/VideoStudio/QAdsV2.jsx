@@ -574,21 +574,30 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
         }).catch(() => {})
     }, [])
 
-    // Handle template click — pre-fill all fields
+    // Handle template click — pre-fill all fields from templateAssets or flat fields
     const handleTemplateClick = useCallback((template) => {
         // 1. Fill the prompt/brief input
         setUserBrief(template.promptTemplate || template.savedPrompt || '')
 
-        // 2. Pre-fill product data
-        if (template.savedProductImageUrls?.length > 0) {
+        // 2. Pre-fill from structured templateAssets (preferred) or fallback flat fields
+        const assets = template.templateAssets || []
+        const productAssets = assets.filter(a => a.role === 'product').map(a => a.url).filter(Boolean)
+        const avatarAsset = assets.find(a => a.role === 'avatar')
+
+        if (productAssets.length > 0) {
+            setProductImgs(productAssets)
+        } else if (template.savedProductImageUrls?.length > 0) {
             setProductImgs(template.savedProductImageUrls)
         }
+
         if (template.savedProductUrl) {
             setProductUrl(template.savedProductUrl)
         }
 
         // 3. Pre-fill avatar
-        if (template.savedAvatarUrl) {
+        if (avatarAsset?.url) {
+            setAvatarUrl(avatarAsset.url)
+        } else if (template.savedAvatarUrl) {
             setAvatarUrl(template.savedAvatarUrl)
         }
 
@@ -922,10 +931,10 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                             .map(t => (
                             <div key={t._id} className="qv2-temp-card" style={{ flex: '0 0 180px', height: 280 }} onClick={() => handleTemplateClick(t)}>
                                 {/* Video or Image preview */}
-                                {t.previewType === 'video' && t.previewUrl ? (
-                                    <video src={t.previewUrl} muted autoPlay loop playsInline />
-                                ) : t.previewUrl ? (
-                                    <img src={t.previewUrl} alt={t.name} />
+                                {t.previewType === 'video' && (t.previewVideoUrl || t.previewUrl) ? (
+                                    <video src={t.previewVideoUrl || t.previewUrl} muted autoPlay loop playsInline />
+                                ) : (t.previewUrl || t.previewImageUrl) ? (
+                                    <img src={t.previewUrl || t.previewImageUrl} alt={t.name} />
                                 ) : (
                                     <div style={{ position: 'absolute', inset: 0, background: '#222' }} />
                                 )}

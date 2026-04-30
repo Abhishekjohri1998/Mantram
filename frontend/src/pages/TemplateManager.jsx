@@ -123,6 +123,28 @@ const TemplateManager = () => {
     const [catModal, setCatModal] = useState({ open: false, data: null });
     const [catSubmitting, setCatSubmitting] = useState(false);
 
+    // Generate Template modal state
+    const [genModal, setGenModal] = useState(false);
+    const [genForm, setGenForm] = useState({ name: '', categoryId: '', description: '', prompt: '', model: 'seedance-2.0', studioOrigin: 'video', studioSection: 'video_qads', productImageUrls: [], avatarUrl: '', duration: 8, format: '9:16', quality: 'high' });
+    const [genStatus, setGenStatus] = useState('idle'); // idle | generating | polling | done | error
+    const [genProgress, setGenProgress] = useState(0);
+    const [genTaskId, setGenTaskId] = useState(null);
+    const [genResult, setGenResult] = useState(null);
+    const [genError, setGenError] = useState('');
+    const [genAssetInputs, setGenAssetInputs] = useState({ productUrl: '', avatarUrl: '' });
+
+    const VIDEO_MODELS = [
+        { value: 'seedance-2.0', label: 'Seedance 2.0', type: 'video' },
+        { value: 'kling-v2-master', label: 'Kling V2 Master', type: 'video' },
+        { value: 'wan-2.1', label: 'Wan 2.1', type: 'video' },
+        { value: 'luma-ray-2', label: 'Luma Ray 2', type: 'video' },
+    ];
+    const IMAGE_MODELS = [
+        { value: 'gemini-image', label: 'Gemini Image', type: 'image' },
+    ];
+    const ALL_MODELS = [...VIDEO_MODELS, ...IMAGE_MODELS];
+    const isVideoModel = (m) => VIDEO_MODELS.some(vm => m.includes(vm.value));
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -150,6 +172,90 @@ const TemplateManager = () => {
 
     useEffect(() => { fetchData(); }, []);
     useEffect(() => { if (activeTab === 'categories') fetchCategories(); }, [activeTab]);
+
+    // Poll for generate status
+    useEffect(() => {
+        if (genStatus !== 'polling' || !genTaskId) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await api(`/superadmin/templates/generate/status/${genTaskId}`);
+                setGenProgress(res.progress || 0);
+                if (res.status === 'COMPLETED') {
+                    setGenStatus('done');
+                    setGenResult(res);
+                    addToast('Template video generated successfully!', 'success');
+                    fetchData();
+                    clearInterval(interval);
+                } else if (res.status === 'FAILED') {
+                    setGenStatus('error');
+                    setGenError(res.error || 'Generation failed');
+                    clearInterval(interval);
+                }
+            } catch (err) {
+                console.warn('Poll error:', err.message);
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [genStatus, genTaskId]);
+
+    const handleGenerate = async () => {
+        if (!genForm.name.trim()) return addToast('Template name is required', 'error');
+        if (!genForm.categoryId) return addToast('Category is required', 'error');
+        if (!genForm.prompt.trim()) return addToast('Prompt is required', 'error');
+
+        setGenStatus('generating');
+        setGenError('');
+        setGenProgress(0);
+        try {
+            const res = await api('/superadmin/templates/generate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: genForm.name,
+                    categoryId: genForm.categoryId,
+                    description: genForm.description,
+                    tags: [],
+                    studioOrigin: genForm.studioOrigin,
+                    studioSection: genForm.studioSection,
+                    prompt: genForm.prompt,
+                    model: genForm.model,
+                    productImageUrls: genForm.productImageUrls.filter(Boolean),
+                    avatarUrl: genForm.avatarUrl,
+                    duration: genForm.duration,
+                    format: genForm.format,
+                    quality: genForm.quality,
+                }),
+            });
+
+            if (res.status === 'done') {
+                // Image generation — done immediately
+                setGenStatus('done');
+                setGenResult(res);
+                addToast('Template image generated successfully!', 'success');
+                fetchData();
+            } else if (res.taskId) {
+                // Video generation — need to poll
+                setGenTaskId(res.taskId);
+                setGenStatus('polling');
+                addToast('Video generation started — polling for results...', 'success');
+            }
+        } catch (err) {
+            setGenStatus('error');
+            setGenError(err.message || 'Generation failed');
+            addToast(err.message, 'error');
+        }
+    };
+
+    const addProductImageUrl = () => {
+        const url = genAssetInputs.productUrl.trim();
+        if (url && url.startsWith('http')) {
+            setGenForm(f => ({ ...f, productImageUrls: [...f.productImageUrls, url] }));
+            setGenAssetInputs(a => ({ ...a, productUrl: '' }));
+        }
+    };
+
+    const removeProductImageUrl = (i) => {
+        setGenForm(f => ({ ...f, productImageUrls: f.productImageUrls.filter((_, idx) => idx !== i) }));
+    };
 
     // ── Bulk publish helpers (FIX 8) ──
     const bulkAction = async (action) => {
@@ -371,7 +477,10 @@ const TemplateManager = () => {
                 <div style={{ display: 'flex', gap: 10 }}>
                     {activeTab === 'categories'
                         ? <button onClick={() => setCatModal({ open: true, data: null })} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ New Category</button>
-                        : <button onClick={() => { setTags([]); setSelectedStudio(''); setSelectedCategory(''); setSelectedSection('general'); setFormErrors({}); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
+                        : <>
+                            <button onClick={() => { setGenForm({ name: '', categoryId: '', description: '', prompt: '', model: 'seedance-2.0', studioOrigin: 'video', studioSection: 'video_qads', productImageUrls: [], avatarUrl: '', duration: 8, format: '9:16', quality: 'high' }); setGenStatus('idle'); setGenError(''); setGenResult(null); setGenModal(true); }} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Generate Template</button>
+                            <button onClick={() => { setTags([]); setSelectedStudio(''); setSelectedCategory(''); setSelectedSection('general'); setFormErrors({}); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
+                        </>
                     }
                 </div>
             </div>
@@ -492,18 +601,27 @@ const TemplateManager = () => {
                                                 setSelectedIds(s);
                                             }} />
                                         </td>
-                                        {/* Preview with hover popup (FIX 11) */}
+                                        {/* Preview with hover popup — video or image */}
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ position: 'relative', width: 56, height: 56 }}
                                                 onMouseEnter={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'block'; }}
                                                 onMouseLeave={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'none'; }}>
-                                                {previewSrc
-                                                    ? <img src={previewSrc} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />
-                                                    : <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)' }}>image</span></div>
-                                                }
+                                                {previewSrc ? (
+                                                    t.previewType === 'video' ? (
+                                                        <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                                                    ) : (
+                                                        <img src={previewSrc} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />
+                                                    )
+                                                ) : (
+                                                    <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)' }}>image</span></div>
+                                                )}
                                                 {previewSrc && (
                                                     <div className="tmpl-pop" style={{ display: 'none', position: 'absolute', top: 0, left: 64, width: 200, height: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                                        <img src={previewSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                                        {t.previewType === 'video' ? (
+                                                            <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        ) : (
+                                                            <img src={previewSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -682,6 +800,144 @@ const TemplateManager = () => {
                                 <button type="submit" disabled={catSubmitting} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{catSubmitting ? 'Saving…' : 'Save Category'}</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== GENERATE TEMPLATE MODAL ===== */}
+            {genModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1002 }} onClick={() => { if (genStatus === 'idle' || genStatus === 'done' || genStatus === 'error') setGenModal(false); }}>
+                    <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '100%', maxWidth: 680, padding: 24, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span className="material-symbols-outlined" style={{ color: '#7C3AED' }}>auto_awesome</span>
+                                Generate Template via AI
+                            </h2>
+                            <button type="button" onClick={() => setGenModal(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}><span className="material-symbols-outlined">close</span></button>
+                        </div>
+
+                        {/* Status banner */}
+                        {genStatus === 'polling' && (
+                            <div style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7C3AED', animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Generating video… {genProgress}%</div>
+                                    <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginTop: 4 }}>
+                                        <div style={{ width: `${genProgress}%`, height: '100%', background: '#7C3AED', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {genStatus === 'done' && (
+                            <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#10b981' }}>check_circle</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981' }}>Generation complete! Template saved as draft.</span>
+                            </div>
+                        )}
+                        {genStatus === 'error' && (
+                            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>Generation failed: {genError}</div>
+                            </div>
+                        )}
+
+                        {/* Form */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div style={{ display: 'flex', gap: 14 }}>
+                                <label style={{ ...labelStyle, flex: 2 }}>Template Name *
+                                    <input value={genForm.name} onChange={e => setGenForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }} placeholder="e.g., Luxury Watch Showcase" />
+                                </label>
+                                <label style={{ ...labelStyle, flex: 1 }}>Category *
+                                    <select value={genForm.categoryId} onChange={e => setGenForm(f => ({ ...f, categoryId: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }}>
+                                        <option value="">Select Category</option>
+                                        {categories.filter(c => c.isActive !== false).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 14 }}>
+                                <label style={{ ...labelStyle, flex: 1 }}>AI Model *
+                                    <select value={genForm.model} onChange={e => {
+                                        const m = e.target.value;
+                                        const isVid = isVideoModel(m);
+                                        setGenForm(f => ({ ...f, model: m, studioOrigin: isVid ? 'video' : 'creative', studioSection: isVid ? 'video_qads' : 'ai_create' }));
+                                    }} style={{ ...inputStyle, marginTop: 6 }}>
+                                        <optgroup label="Video Models">
+                                            {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                        </optgroup>
+                                        <optgroup label="Image Models">
+                                            {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                        </optgroup>
+                                    </select>
+                                </label>
+                                <label style={{ ...labelStyle, flex: 1 }}>Studio Section
+                                    <select value={genForm.studioSection} onChange={e => setGenForm(f => ({ ...f, studioSection: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }}>
+                                        {STUDIO_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+
+                            {/* Video-only settings */}
+                            {isVideoModel(genForm.model) && (
+                                <div style={{ display: 'flex', gap: 14 }}>
+                                    <label style={{ ...labelStyle, flex: 1 }}>Duration (sec)
+                                        <input type="number" min={3} max={15} value={genForm.duration} onChange={e => setGenForm(f => ({ ...f, duration: parseInt(e.target.value) || 8 }))} style={{ ...inputStyle, marginTop: 6 }} />
+                                    </label>
+                                    <label style={{ ...labelStyle, flex: 1 }}>Format
+                                        <select value={genForm.format} onChange={e => setGenForm(f => ({ ...f, format: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }}>
+                                            <option value="9:16">9:16 (Vertical)</option>
+                                            <option value="16:9">16:9 (Landscape)</option>
+                                            <option value="1:1">1:1 (Square)</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            )}
+
+                            <label style={labelStyle}>Prompt *
+                                <textarea value={genForm.prompt} onChange={e => setGenForm(f => ({ ...f, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} placeholder="Describe the video/image to generate. Use @Image1 for avatar, @Image2 for product..." />
+                            </label>
+
+                            <label style={labelStyle}>Description
+                                <input value={genForm.description} onChange={e => setGenForm(f => ({ ...f, description: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }} placeholder="Brief description for users" />
+                            </label>
+
+                            {/* Asset URLs */}
+                            <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 14 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 10, letterSpacing: 0.5 }}>Template Assets (Swappable by Users)</div>
+
+                                <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model URL
+                                    <input value={genForm.avatarUrl} onChange={e => setGenForm(f => ({ ...f, avatarUrl: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }} placeholder="https://... avatar image URL" />
+                                </label>
+
+                                <label style={labelStyle}>Product Image URLs
+                                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                        <input value={genAssetInputs.productUrl} onChange={e => setGenAssetInputs(a => ({ ...a, productUrl: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addProductImageUrl(); } }} style={{ ...inputStyle, flex: 1 }} placeholder="https://... product image URL" />
+                                        <button type="button" onClick={addProductImageUrl} style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)' }}>Add</button>
+                                    </div>
+                                </label>
+                                {genForm.productImageUrls.length > 0 && (
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                        {genForm.productImageUrls.map((url, i) => (
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 6, fontSize: 11 }}>
+                                                <img src={url} style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} alt="" />
+                                                <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.6)' }}>{url.split('/').pop()}</span>
+                                                <button type="button" onClick={() => removeProductImageUrl(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Generate Button */}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.1)', gap: 10 }}>
+                                {genStatus === 'done' && <button type="button" onClick={() => setGenModal(false)} style={{ ...actionBtnStyle, color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>Close</button>}
+                                <button type="button" onClick={handleGenerate} disabled={genStatus === 'generating' || genStatus === 'polling'} style={{ background: genStatus === 'generating' || genStatus === 'polling' ? 'rgba(124,58,237,0.5)' : '#7C3AED', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {genStatus === 'generating' ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>Submitting...</> :
+                                     genStatus === 'polling' ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>Generating {genProgress}%...</> :
+                                     genStatus === 'done' ? <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>Regenerate</> :
+                                     <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Generate</>}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
