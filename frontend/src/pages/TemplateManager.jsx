@@ -132,6 +132,7 @@ const TemplateManager = () => {
     const [genResult, setGenResult] = useState(null);
     const [genError, setGenError] = useState('');
     const [genAssetInputs, setGenAssetInputs] = useState({ productUrl: '', avatarUrl: '' });
+    const [mentionMenu, setMentionMenu] = useState({ visible: false, query: '' });
 
     const handleFileUpload = async (e, type) => {
         const file = e.target.files?.[0];
@@ -923,7 +924,7 @@ const TemplateManager = () => {
                                 </div>
                             )}
 
-                            <label style={labelStyle}>
+                            <label style={{ ...labelStyle, position: 'relative' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span>Prompt *</span>
                                     <div style={{ display: 'flex', gap: 6 }}>
@@ -931,7 +932,82 @@ const TemplateManager = () => {
                                         <button type="button" onClick={() => setGenForm(f => ({ ...f, prompt: f.prompt + (f.prompt.endsWith(' ') ? '' : ' ') + '@Image2' }))} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 4, padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}>+ @Image2 (Product)</button>
                                     </div>
                                 </div>
-                                <textarea value={genForm.prompt} onChange={e => setGenForm(f => ({ ...f, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} placeholder="Describe the video/image to generate. Use @Image1 for avatar, @Image2 for product..." />
+                                <textarea 
+                                    value={genForm.prompt} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setGenForm(f => ({ ...f, prompt: val }));
+                                        const cursor = e.target.selectionStart;
+                                        const textBeforeCursor = val.slice(0, cursor);
+                                        const match = textBeforeCursor.match(/@(\w*)$/);
+                                        if (match) {
+                                            setMentionMenu({ visible: true, query: match[1].toLowerCase() });
+                                        } else {
+                                            setMentionMenu({ visible: false, query: '' });
+                                        }
+                                    }} 
+                                    rows={5} 
+                                    style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }} 
+                                    placeholder="Describe the video/image to generate. Use @Image1 for avatar, @Image2 for product..." 
+                                />
+                                {mentionMenu.visible && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        width: 250,
+                                        background: '#1e293b',
+                                        border: '1px solid #334155',
+                                        borderRadius: 8,
+                                        padding: 6,
+                                        zIndex: 50,
+                                        marginTop: 4,
+                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 2
+                                    }}>
+                                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', padding: '4px 8px', textTransform: 'uppercase', fontWeight: 'bold' }}>Select Tag to Insert</div>
+                                        {[
+                                            ...(genForm.avatarUrl ? [{ id: 'Image1', label: 'Avatar / Model' }] : []),
+                                            ...genForm.productImageUrls.map((_, i) => ({ id: `Image${i + 2}`, label: `Product Image ${i + 1}` }))
+                                        ].filter(tag => tag.id.toLowerCase().includes(mentionMenu.query) || tag.label.toLowerCase().includes(mentionMenu.query)).length > 0 ? [
+                                            ...(genForm.avatarUrl ? [{ id: 'Image1', label: 'Avatar / Model' }] : []),
+                                            ...genForm.productImageUrls.map((_, i) => ({ id: `Image${i + 2}`, label: `Product Image ${i + 1}` }))
+                                        ].filter(tag => tag.id.toLowerCase().includes(mentionMenu.query) || tag.label.toLowerCase().includes(mentionMenu.query)).map(tag => (
+                                            <div 
+                                                key={tag.id}
+                                                onClick={() => {
+                                                    const val = genForm.prompt;
+                                                    const match = val.match(/@(\w*)$/);
+                                                    if (match) {
+                                                        const newVal = val.slice(0, match.index) + '@' + tag.id + ' ';
+                                                        setGenForm(f => ({ ...f, prompt: newVal }));
+                                                    }
+                                                    setMentionMenu({ visible: false, query: '' });
+                                                }}
+                                                style={{
+                                                    padding: '6px 8px',
+                                                    fontSize: 12,
+                                                    cursor: 'pointer',
+                                                    color: '#fff',
+                                                    borderRadius: 4,
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between'
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <span style={{ color: '#a78bfa', fontWeight: 'bold' }}>@{tag.id}</span>
+                                                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{tag.label}</span>
+                                            </div>
+                                        )) : (
+                                            <div style={{ padding: '6px 8px', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                                                Upload images first to tag them!
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </label>
 
                             <label style={labelStyle}>Description
