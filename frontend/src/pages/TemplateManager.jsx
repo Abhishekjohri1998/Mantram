@@ -132,7 +132,7 @@ const TemplateManager = () => {
     const [genResult, setGenResult] = useState(null);
     const [genError, setGenError] = useState('');
     const [genAssetInputs, setGenAssetInputs] = useState({ productUrl: '', avatarUrl: '' });
-    const [mentionMenu, setMentionMenu] = useState({ visible: false, query: '' });
+    const [mentionMenu, setMentionMenu] = useState({ visible: false, query: '', cursor: 0 });
 
     const handleFileUpload = async (e, type) => {
         const file = e.target.files?.[0];
@@ -941,9 +941,9 @@ const TemplateManager = () => {
                                         const textBeforeCursor = val.slice(0, cursor);
                                         const match = textBeforeCursor.match(/@(\w*)$/);
                                         if (match) {
-                                            setMentionMenu({ visible: true, query: match[1].toLowerCase() });
+                                            setMentionMenu({ visible: true, query: match[1].toLowerCase(), cursor });
                                         } else {
-                                            setMentionMenu({ visible: false, query: '' });
+                                            setMentionMenu({ visible: false, query: '', cursor: 0 });
                                         }
                                     }} 
                                     rows={5} 
@@ -979,12 +979,14 @@ const TemplateManager = () => {
                                                 key={tag.id}
                                                 onClick={() => {
                                                     const val = genForm.prompt;
-                                                    const match = val.match(/@(\w*)$/);
+                                                    const textBeforeCursor = val.slice(0, mentionMenu.cursor);
+                                                    const textAfterCursor = val.slice(mentionMenu.cursor);
+                                                    const match = textBeforeCursor.match(/@(\w*)$/);
                                                     if (match) {
-                                                        const newVal = val.slice(0, match.index) + '@' + tag.id + ' ';
+                                                        const newVal = textBeforeCursor.slice(0, match.index) + '@' + tag.id + ' ' + textAfterCursor;
                                                         setGenForm(f => ({ ...f, prompt: newVal }));
                                                     }
-                                                    setMentionMenu({ visible: false, query: '' });
+                                                    setMentionMenu({ visible: false, query: '', cursor: 0 });
                                                 }}
                                                 style={{
                                                     padding: '6px 8px',
