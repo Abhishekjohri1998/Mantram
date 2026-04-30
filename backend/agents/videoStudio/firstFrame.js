@@ -83,9 +83,6 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
  * Returns { imageUrl } with either an HTTP URL (via S3) or base64 data URI
  */
 export async function geminiImageGenerate(prompt, imageParts = [], temperature = 0.5, options = {}) {
-    const imageKey = process.env.GEMINI_API_KEY;
-    if (!imageKey) throw new Error('GEMINI_API_KEY not configured in .env');
-
     const { aspectRatio, referenceImageUrls = [] } = options;
 
     console.log(`🖼️ Gemini image gen: starting (refs=${referenceImageUrls.length}, ratio=${aspectRatio || 'default'})`);
@@ -94,7 +91,6 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
     const fetchedRefParts = [];
     if (referenceImageUrls.length > 0) {
         console.log(`🖼️ Fetching & resizing ${referenceImageUrls.length} reference images...`);
-        // Process sequentially to avoid overwhelming network
         for (const url of referenceImageUrls.slice(0, 2)) {
             const resized = await fetchAndResizeImage(url);
             if (resized) {
@@ -104,116 +100,50 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
         console.log(`🖼️ Ready: ${fetchedRefParts.length}/${referenceImageUrls.length} reference images (resized to 512px)`);
     }
 
-    // Build parts: reference images first (so the model "sees" them before the prompt)
+    // Build parts: reference images first
     const parts = [
         ...fetchedRefParts,
         ...imageParts.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
-        { text: prompt },
     ];
 
-    // Log approximate payload size
-    const payloadSizeKB = Math.round(JSON.stringify(parts).length / 1024);
-    console.log(`🖼️ Payload size: ~${payloadSizeKB}KB (${fetchedRefParts.length} refs + prompt)`);
+    const safeARs = ["1:1","9:16","16:9","4:3","3:4","4:5","5:4","2:3","3:2"];
+    const nativeAR = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
 
-    let imageBase64 = null;
-    let mimeType = 'image/png';
+    try {
+        const { getRouter } = await import('../../ai/router.js');
+        const router = getRouter();
+        
+        console.log(`🖼️ Calling router.generateImage with Gemini natively...`);
+        const result = await router.generateImage({
+            prompt: prompt,
+            aspectRatio: nativeAR,
+            model: 'gemini-3.1-flash-image-preview',
+            imageParts: parts,
+            temperature: temperature
+        }, {
+            provider: 'gemini'
+        });
 
-    for (const modelId of GEMINI_MODELS) {
-        try {
-            console.log(`🖼️ Trying Gemini model: ${modelId} (70s timeout)`);
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${imageKey}`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 70000);
-
-            // Build generation config — include imageConfig so aspect ratio is actually applied
-            const generationConfig = {
-                responseModalities: ['IMAGE'],
-                temperature,
-            };
-            if (aspectRatio) {
-                const safeARs = ["1:1","9:16","16:9","4:3","3:4","4:5","5:4","2:3","3:2"];
-                const nativeAR = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
-                generationConfig.imageConfig = { aspectRatio: nativeAR };
-                console.log(`🖼️ Aspect ratio applied: ${nativeAR}`);
-            }
-
-            // systemInstruction forces photographic rendering mode.
-            // Without this, Gemini defaults to illustrated/3D-rendered human portraits.
-            const systemInstruction = options.isAvatar
-                ? { parts: [{ text: 'You are a photorealistic portrait photography AI. Always output real-looking photographs of people — never illustrations, paintings, 3D renders, cartoons, or digital art. Every image must look like it was captured by a professional DSLR camera.' }] }
-                : undefined;
-
-            const reqBody = {
-                contents: [{ parts }],
-                generationConfig,
-            };
-            if (systemInstruction) reqBody.systemInstruction = systemInstruction;
-
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(reqBody),
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            const data = await resp.json();
-            if (data.error) {
-                console.error(`❌ Gemini ${modelId} error:`, data.error.message);
-                break; // Don't retry, fall through to Flux Pro
-            }
-
-            const resParts = data.candidates?.[0]?.content?.parts || [];
-            for (const part of resParts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    imageBase64 = part.inlineData.data;
-                    mimeType = part.inlineData.mimeType;
-                }
-            }
-            
-            if (imageBase64) {
-                console.log(`✅ NanoBanana 2 image generated via ${modelId} (${imageBase64.length} bytes base64)`);
-                break;
-            } else {
-                console.warn(`⚠️ ${modelId} returned no image in response`);
-            }
-        } catch (e) {
-            if (e.name === 'AbortError') {
-                console.error(`⏱️ Gemini ${modelId} timed out after 70s`);
-            } else {
-                console.error(`❌ Gemini ${modelId} error:`, e.message);
-            }
+        if (!result || !result.imageUrl) {
+            throw new Error('No image URL returned from Gemini router');
         }
-    }
 
-    // ── Fallback to Flux Pro if Gemini failed ──
-    if (!imageBase64) {
-        console.warn('⚠️ NanoBanana 2 failed — falling back to fal-ai Flux Pro...');
-        try {
-            const fallbackImageUrl = await falGenerateImage({
-                prompt: prompt || 'cinematic default scene',
-                imageUrl: referenceImageUrls?.[0] || null, // Pass first ref as style guide
-                model: 'fal-ai/flux-pro/v1.1'
-            });
-            console.log(`✅ Flux Pro fallback image: ${fallbackImageUrl}`);
-            return { imageUrl: fallbackImageUrl };
-        } catch (falErr) {
-            console.error('❌ Flux Pro fallback also failed:', falErr.message);
-            throw new Error('All image generators (Gemini NanoBanana 2 + Flux Pro) failed.');
+        console.log(`✅ Gemini image generated successfully!`);
+
+        // Upload to S3 for an HTTP URL
+        const httpUrl = await uploadToFalStorage(result.imageUrl.split('base64,')[1] || result.imageUrl, result.imageUrl.split(';')[0].replace('data:', '') || 'image/png');
+        if (httpUrl) {
+            console.log(`📤 Image uploaded to S3: ${httpUrl.substring(0, 80)}...`);
+            return { imageUrl: httpUrl };
         }
-    }
 
-    // Upload to S3 for an HTTP URL
-    const httpUrl = await uploadToFalStorage(imageBase64, mimeType);
-    if (httpUrl) {
-        console.log(`📤 Image uploaded to S3: ${httpUrl.substring(0, 80)}...`);
-        return { imageUrl: httpUrl };
+        // Fallback: return data URI
+        console.log('⚠️ S3 upload failed, using data URI fallback');
+        return { imageUrl: result.imageUrl };
+    } catch (e) {
+        console.error(`❌ Gemini image generation error:`, e.message);
+        throw new Error(`Gemini Image Generation failed: ${e.message}`);
     }
-
-    // Fallback: return data URI
-    console.log('⚠️ S3 upload failed, using data URI fallback');
-    return { imageUrl: `data:${mimeType};base64,${imageBase64}` };
 }
 
 /**
