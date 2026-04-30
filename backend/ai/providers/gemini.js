@@ -321,7 +321,7 @@ export class GeminiProvider extends BaseProvider {
                             body: JSON.stringify({
                                 contents: [{ role: 'user', parts }],
                                 generationConfig: {
-                                    responseModalities: ['TEXT', 'IMAGE'],
+                                    responseModalities: ['IMAGE'],
                                     temperature: temperature,  // Pass dynamically instead of hardcoded 0.2
                                     imageConfig: {
                                         aspectRatio: nativeAspectRatio,

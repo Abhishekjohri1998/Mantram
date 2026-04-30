@@ -128,7 +128,7 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
 
             // Build generation config — include imageConfig so aspect ratio is actually applied
             const generationConfig = {
-                responseModalities: ['TEXT', 'IMAGE'],
+                responseModalities: ['IMAGE'],
                 temperature,
             };
             if (aspectRatio) {
