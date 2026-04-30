@@ -950,6 +950,15 @@ const TemplateManager = () => {
                                             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'avatar')} />
                                         </label>
                                     </div>
+                                    {genForm.avatarUrl && (
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 6, fontSize: 11 }}>
+                                                <img src={genForm.avatarUrl} style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} alt="Avatar" />
+                                                <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.6)' }}>{genForm.avatarUrl.split('/').pop()}</span>
+                                                <button type="button" onClick={() => setGenForm(f => ({ ...f, avatarUrl: '' }))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span></button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </label>
 
                                 <label style={labelStyle}>Product Images (@Image2, @Image3...)
