@@ -270,6 +270,7 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         if (videoUrl) {
             containerPayload.video_url = videoUrl;
             containerPayload.media_type = 'REELS'; // Use REELS for video to maximize reach
+            containerPayload.share_to_feed = true; // Also share to the main profile grid
         } else {
             containerPayload.image_url = imageUrl;
         }
@@ -280,11 +281,12 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         console.log(`[SOCIAL] Created Instagram media container: ${creationId}. Waiting for it to be ready...`);
 
         // Step 2: Poll for container readiness
-        // Meta can take several seconds to process images, and significantly longer for videos.
+        // Meta can take several seconds to process images, and up to 5 minutes for videos (Reels).
         let isReady = false;
         let attempts = 0;
-        const maxAttempts = videoUrl ? 40 : 15;
+        const maxAttempts = videoUrl ? 100 : 15; // 100 * 3s = 300 seconds (5 mins)
 
+        let containerError = null;
         while (!isReady && attempts < maxAttempts) {
             attempts++;
             // Wait 3 seconds before each check
@@ -293,7 +295,7 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
             try {
                 const statusResponse = await axios.get(`${FB_API_URL}/${creationId}`, {
                     params: {
-                        fields: 'status_code',
+                        fields: 'status_code,status',
                         access_token: accessToken
                     }
                 });
@@ -304,15 +306,21 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
                 if (status === 'FINISHED') {
                     isReady = true;
                 } else if (status === 'ERROR') {
-                    throw new Error('Instagram media processing failed.');
+                    containerError = 'Instagram media processing failed. The video format or size might be unsupported.';
+                    break; // Exit loop immediately, no recovery possible
                 }
             } catch (err) {
                 console.warn(`[SOCIAL] Error checking container status: ${err.message}`);
+                // Only break on hard HTTP 4xx/5xx errors if we want, but usually it's best to retry network errors
             }
         }
 
+        if (containerError) {
+            throw new Error(containerError);
+        }
+
         if (!isReady) {
-            throw new Error("Instagram media processing timed out. Please try again in a few moments.");
+            throw new Error("Instagram media processing timed out after 5 minutes. Meta is currently experiencing high load.");
         }
 
         // Step 3: Publish the media container
