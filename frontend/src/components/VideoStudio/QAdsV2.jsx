@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import AvatarPicker from './AvatarPicker'
+import PublishModal from '../PublishModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -506,6 +507,10 @@ function GridVideo({ project, onReuse }) {
                 <span className="material-symbols-outlined" style={{fontSize: 14}}>replay</span>
                 Reuse
             </button>
+            <button className="qv2-bi-btn" onClick={() => onPublish(project.generation.videoUrl)}>
+                <span className="material-symbols-outlined" style={{fontSize: 14}}>share</span>
+                Publish
+            </button>
             <button className="qv2-bi-btn" onClick={() => setLiked(!liked)} style={{ color: liked ? '#ff4d85' : '#fff' }}>
                 <span className="material-symbols-outlined" style={{fontSize: 18, fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0"}}>{liked ? 'favorite' : 'favorite_border'}</span>
             </button>
@@ -540,6 +545,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
     const fileRef = useRef(null)
     const prodImgRef = useRef(null)  // product image file upload
     const [isAnalyzing, setIsAnalyzing] = useState(false)
+    const [publishUrl, setPublishUrl] = useState('')
 
     // Prompt generation state (3 variants)
     const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false)
@@ -991,7 +997,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                         .filter(([, j]) => j.status === 'done' && j.videoUrl && !projects.some(p => p.generation?.videoUrl === j.videoUrl))
                         .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }))
                 ].map(p => (
-                    <GridVideo key={p._id} project={p} onReuse={handleReuse} />
+                    <GridVideo key={p._id} project={p} onReuse={handleReuse} onPublish={setPublishUrl} />
                 ))}
             </div>
 
@@ -1170,6 +1176,14 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                 </div>
             </div>
         )}
+
+        {/* Publish Modal */}
+        <PublishModal 
+            isOpen={!!publishUrl} 
+            onClose={() => setPublishUrl('')} 
+            defaultVideo={publishUrl}
+            brandId={activeBrand?._id}
+        />
 
     </div>
 }

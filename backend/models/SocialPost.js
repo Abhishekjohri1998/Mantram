@@ -13,6 +13,7 @@ const socialPostSchema = new mongoose.Schema({
     caption: { type: String, default: '' },
     imageUrl: { type: String, default: '' },
     imageUrls: [{ type: String }], // For carousel/multi-image posts
+    videoUrl: { type: String, default: '' }, // For video/reel posts
 
     // Platform response
     postId: { type: String, default: '' },

@@ -463,7 +463,7 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
  * @access  Private
  */
 router.post('/publish', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, imageUrls, captions } = req.body;
+    const { accountIds, text, imageUrl, imageUrls, captions, videoUrl } = req.body;
 
     if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
         return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
@@ -471,7 +471,7 @@ router.post('/publish', protect, async (req, res) => {
 
     // Determine if this is a carousel (multi-image) or single-image publish
     const isCarousel = Array.isArray(imageUrls) && imageUrls.length > 1;
-    console.log(`[SOCIAL] Publish mode: ${isCarousel ? `CAROUSEL (${imageUrls.length} images)` : 'SINGLE IMAGE'}`);
+    console.log(`[SOCIAL] Publish mode: ${videoUrl ? 'VIDEO' : isCarousel ? `CAROUSEL (${imageUrls.length} images)` : 'SINGLE IMAGE'}`);
 
     // For single-image: ensure URL is absolute
     let absoluteImageUrl = imageUrl;
@@ -560,9 +560,9 @@ router.post('/publish', protect, async (req, res) => {
                 } else {
                     // Single image publish
                     if (account.platform === 'facebook') {
-                        postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                        postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
                     } else if (account.platform === 'instagram') {
-                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
                     } else if (account.platform === 'linkedin') {
                         postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl);
                     }
@@ -598,6 +598,7 @@ router.post('/publish', protect, async (req, res) => {
                     accountName: r.accountName,
                     caption: captions?.[r.platform] || text || '',
                     imageUrl: isCarousel ? carouselUrls[0] : (absoluteImageUrl || ''),
+                    videoUrl: videoUrl || '',
                     postId: r.postId || '',
                     status: r.status === 'success' ? 'published' : 'failed',
                     error: r.error || '',
@@ -668,7 +669,7 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
  * @access  Private
  */
 router.post('/schedule', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId } = req.body;
+    const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId, videoUrl } = req.body;
 
     if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
         return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
@@ -704,6 +705,7 @@ router.post('/schedule', protect, async (req, res) => {
                 caption: postCaption,
                 imageUrl: imageUrl || (Array.isArray(imageUrls) ? imageUrls[0] : '') || '',
                 imageUrls: Array.isArray(imageUrls) && imageUrls.length > 1 ? imageUrls : undefined,
+                videoUrl: videoUrl || '',
                 status: 'scheduled',
                 scheduledFor: scheduleDate,
             });

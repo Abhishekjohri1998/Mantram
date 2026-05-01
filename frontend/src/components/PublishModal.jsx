@@ -11,12 +11,13 @@ const PLATFORM_META = {
 /**
  * PublishModal — Smart publish + schedule flow
  */
-export default function PublishModal({ isOpen, onClose, defaultText = '', defaultImage = null, defaultImages = null, brandId = null }) {
+export default function PublishModal({ isOpen, onClose, defaultText = '', defaultImage = null, defaultImages = null, defaultVideo = null, brandId = null }) {
     const [accounts, setAccounts] = useState([])
     const [selectedAccounts, setSelectedAccounts] = useState([])
     const [loading, setLoading] = useState(false)
     const [imageUrl, setImageUrl] = useState(defaultImage || '')
     const [imageUrls, setImageUrls] = useState(defaultImages || [])
+    const [videoUrl, setVideoUrl] = useState(defaultVideo || '')
     const [caption, setCaption] = useState(defaultText || '')
     const [platformCaptions, setPlatformCaptions] = useState({})
     const [isAdapted, setIsAdapted] = useState(false)
@@ -56,6 +57,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
             const initialImage = defaultImage || (defaultImages?.[0] || '')
             setImageUrl(initialImage)
             setImageUrls(defaultImages || [])
+            setVideoUrl(defaultVideo || '')
             setPlatformCaptions({})
             setIsAdapted(false)
             setResults(null)
@@ -77,7 +79,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 setCaption('')
             }
         }
-    }, [isOpen, defaultImage, defaultImages, defaultText, brandId])
+    }, [isOpen, defaultImage, defaultImages, defaultVideo, defaultText, brandId])
 
     const loadAccounts = async () => {
         setLoading(true)
@@ -184,6 +186,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 captions,
                 imageUrl: isCarouselMode ? undefined : imageUrl,
                 imageUrls: isCarouselMode ? imageUrls : undefined,
+                videoUrl,
                 brandId: brandId || undefined,
             })
             setResults(res.results)
@@ -216,6 +219,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 captions,
                 imageUrl: isCarouselMode ? imageUrls[0] : imageUrl,
                 imageUrls: isCarouselMode ? imageUrls : undefined,
+                videoUrl,
                 brandId: brandId || undefined,
                 scheduledFor,
             })
@@ -329,7 +333,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                         </div>
                     ) : (
                         <>
-                            {/* ── Image Preview ── */}
+                            {/* ── Image/Video Preview ── */}
                             {isCarouselMode ? (
                                 <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -342,6 +346,10 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                             <img key={i} src={url} alt={`Slide ${i+1}`} className="h-28 w-28 object-cover rounded-xl flex-shrink-0 border border-[var(--sys-border)]" loading="lazy" />
                                         ))}
                                     </div>
+                                </div>
+                            ) : videoUrl ? (
+                                <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] bg-black flex justify-center items-center">
+                                    <video src={videoUrl} controls autoPlay muted loop className="w-full max-h-44 object-contain" />
                                 </div>
                             ) : imageUrl && (
                                 <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)]">
@@ -362,13 +370,15 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                             onClick={async () => {
                                                 try {
                                                     const shareData = { title: 'Mantram Creative', text: caption || 'Check out this creative!' }
-                                                    if (imageUrl) {
+                                                    if (imageUrl && !videoUrl) {
                                                         try {
                                                             const res = await fetch(imageUrl)
                                                             const blob = await res.blob()
                                                             const file = new File([blob], 'creative.png', { type: blob.type })
                                                             shareData.files = [file]
                                                         } catch { shareData.url = imageUrl }
+                                                    } else if (videoUrl) {
+                                                        shareData.url = videoUrl;
                                                     }
                                                     await navigator.share(shareData)
                                                 } catch (e) { if (e.name !== 'AbortError') console.warn('Share failed:', e) }
@@ -384,7 +394,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                     {/* Copy Link */}
                                     <button
                                         onClick={() => {
-                                            const textToCopy = imageUrl || caption || ''
+                                            const textToCopy = videoUrl || imageUrl || caption || ''
                                             navigator.clipboard.writeText(textToCopy).then(() => {
                                                 alert('Copied to clipboard!')
                                             })
@@ -399,16 +409,18 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                     {/* Download */}
                                     <button
                                         onClick={async () => {
-                                            if (!imageUrl) return
+                                            if (!imageUrl && !videoUrl) return
+                                            const targetUrl = videoUrl || imageUrl;
+                                            const extension = videoUrl ? 'mp4' : 'png';
                                             try {
-                                                const res = await fetch(imageUrl)
+                                                const res = await fetch(targetUrl)
                                                 const blob = await res.blob()
                                                 const blobUrl = window.URL.createObjectURL(blob)
                                                 const a = document.createElement('a')
-                                                a.href = blobUrl; a.download = 'mantram-creative.png'
+                                                a.href = blobUrl; a.download = `mantram-creative.${extension}`
                                                 document.body.appendChild(a); a.click(); document.body.removeChild(a)
                                                 window.URL.revokeObjectURL(blobUrl)
-                                            } catch { window.open(imageUrl, '_blank') }
+                                            } catch { window.open(targetUrl, '_blank') }
                                         }}
                                         className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer group"
                                     >
@@ -502,7 +514,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                         </div>
                                     )}
                                     {/* AI Caption generate — works even without accounts */}
-                                    {imageUrl && caption.trim().length < 20 && (
+                                    {imageUrl && !videoUrl && caption.trim().length < 20 && (
                                         <button
                                             onClick={async () => {
                                                 const platforms = getSelectedPlatforms()
@@ -606,7 +618,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             )}
 
                             {/* ── Media URL fallback ── */}
-                            {!imageUrl && (
+                            {!imageUrl && !videoUrl && (
                                 <div>
                                     <h4 className="text-xs font-bold text-[var(--sys-text-muted)] mb-2 uppercase tracking-widest">Media URL</h4>
                                     <input type="text" value={imageUrl} onChange={e => setImageUrl(e.target.value)}

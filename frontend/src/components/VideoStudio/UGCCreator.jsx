@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
+import PublishModal from '../PublishModal'
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -168,6 +169,7 @@ export default function UGCCreator({ activeBrand }) {
     const [showHistory, setShowHistory] = useState(false)
     const [ugcHistory, setUgcHistory] = useState([])
     const [loadingHistory, setLoadingHistory] = useState(false)
+    const [publishUrl, setPublishUrl] = useState('')
 
     /* ── Refs ── */
     const pollRef = useRef(null)
@@ -708,8 +710,9 @@ export default function UGCCreator({ activeBrand }) {
                         {videoUrl ? (
                             <div className="ugc2-done-card">
                                 <video src={videoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 16 }} />
-                                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                                <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                                     <a href={videoUrl} download className="ugc2-btn-pri">Download</a>
+                                    <button className="ugc2-btn-sec" onClick={() => setPublishUrl(videoUrl)}>Publish to Socials</button>
                                     <button className="ugc2-btn-sec" onClick={() => { setStep(1); setVideoUrl(''); setProgress(0); setProjectId(null) }}>Create New</button>
                                 </div>
                             </div>
@@ -726,6 +729,14 @@ export default function UGCCreator({ activeBrand }) {
                         )}
                     </div>
                 )}
+
+                {/* Publish Modal */}
+                <PublishModal 
+                    isOpen={!!publishUrl} 
+                    onClose={() => setPublishUrl('')} 
+                    defaultVideo={publishUrl}
+                    brandId={activeBrand?._id}
+                />
 
                 {step >= 1 && (
                     <>

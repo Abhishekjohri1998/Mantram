@@ -213,9 +213,18 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
     return accounts;
 };
 
-export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => {
+export const publishToFacebook = async (pageId, accessToken, text, imageUrl, videoUrl) => {
     try {
-        if (imageUrl) {
+        if (videoUrl) {
+            // Post video with description
+            const url = `${FB_API_URL}/${pageId}/videos`;
+            const response = await axios.post(url, {
+                description: text,
+                file_url: videoUrl,
+                access_token: accessToken
+            });
+            return response.data.id;
+        } else if (imageUrl) {
             // Post photo with caption
             const url = `${FB_API_URL}/${pageId}/photos`;
             const response = await axios.post(url, {
@@ -245,28 +254,36 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl) => 
     }
 };
 
-export const publishToInstagram = async (igAccountId, accessToken, text, imageUrl) => {
+export const publishToInstagram = async (igAccountId, accessToken, text, imageUrl, videoUrl) => {
     try {
-        if (!imageUrl) {
+        if (!imageUrl && !videoUrl) {
             throw new Error("Instagram requires an image or video to publish.");
         }
 
         // Step 1: Create media container
         const containerUrl = `${FB_API_URL}/${igAccountId}/media`;
-        const containerResponse = await axios.post(containerUrl, {
-            image_url: imageUrl,
+        const containerPayload = {
             caption: text,
             access_token: accessToken
-        });
+        };
+        
+        if (videoUrl) {
+            containerPayload.video_url = videoUrl;
+            containerPayload.media_type = 'REELS'; // Use REELS for video to maximize reach
+        } else {
+            containerPayload.image_url = imageUrl;
+        }
+
+        const containerResponse = await axios.post(containerUrl, containerPayload);
 
         const creationId = containerResponse.data.id;
         console.log(`[SOCIAL] Created Instagram media container: ${creationId}. Waiting for it to be ready...`);
 
         // Step 2: Poll for container readiness
-        // Meta can take several seconds to process images. Wait until status_code is 'FINISHED'.
+        // Meta can take several seconds to process images, and significantly longer for videos.
         let isReady = false;
         let attempts = 0;
-        const maxAttempts = 10;
+        const maxAttempts = videoUrl ? 40 : 15;
 
         while (!isReady && attempts < maxAttempts) {
             attempts++;
