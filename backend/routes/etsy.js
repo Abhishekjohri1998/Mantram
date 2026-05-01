@@ -9,8 +9,12 @@ import Integration from '../models/Integration.js';
 import Product from '../models/Product.js';
 import ShopifyOrder from '../models/ShopifyOrder.js';
 import ShopifyCustomer from '../models/ShopifyCustomer.js';
+import crypto from 'crypto';
+import env from '../config/env.js';
+
 import {
-    validateEtsyApiKey,
+    fetchEtsyShopDetails,
+    fetchEtsyShopByUserId,
     fetchEtsyShippingProfiles,
     fetchEtsyListings,
     fetchEtsyReceipts,
@@ -18,6 +22,7 @@ import {
     transformEtsyReceipt,
     createEtsyListing,
     updateEtsyListing,
+    exchangeEtsyOAuthToken,
 } from '../services/etsyService.js';
 import {
     computeOrderAnalytics,
@@ -56,24 +61,28 @@ router.get('/status', protect, async (req, res) => {
     }
 });
 
-// ── POST /api/etsy/connect ────────────────────────────────────────────────────
-router.post('/connect', protect, async (req, res) => {
+// ── PKCE Utility Functions ─────────────────────────────────────────────────────
+function base64URLEncode(buffer) {
+    return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function sha256(buffer) {
+    return crypto.createHash('sha256').update(buffer).digest();
+}
+
+// ── GET /api/etsy/auth ────────────────────────────────────────────────────────
+router.get('/auth', protect, async (req, res) => {
     try {
-        const { apiKey, shopId, brandId } = req.body;
-        if (!apiKey || !shopId) {
-            return res.status(400).json({ success: false, error: 'API Key and Shop ID are required.' });
-        }
-
-        let shopInfo;
-        try {
-            shopInfo = await validateEtsyApiKey(apiKey, shopId);
-        } catch (err) {
-            return res.status(400).json({ success: false, error: `Etsy validation failed: ${err.message}` });
-        }
-
-        // Fetch shipping profiles for future listing creation
-        const shippingProfiles = await fetchEtsyShippingProfiles(apiKey, shopId);
-        const defaultShippingProfileId = shippingProfiles[0]?.shipping_profile_id || '';
+        const { brandId } = req.query;
+        const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+        const codeChallenge = base64URLEncode(sha256(codeVerifier));
+        const nonce = crypto.randomBytes(16).toString('hex');
+        
+        const statePayload = Buffer.from(JSON.stringify({ 
+            userId: String(req.user._id), 
+            brandId: brandId || '', 
+            nonce 
+        })).toString('base64');
 
         const query = {
             user: req.user._id,
@@ -86,11 +95,81 @@ router.post('/connect', protect, async (req, res) => {
             {
                 user: req.user._id,
                 platform: 'etsy',
-                status: 'connected',
-                accessToken: apiKey, // stored as accessToken for reuse
+                status: 'pending',
                 brand: brandId || undefined,
+                metadata: { oauthNonce: nonce, oauthVerifier: codeVerifier }
+            },
+            { upsert: true }
+        );
+
+        const scopes = encodeURIComponent('listings_r listings_w transactions_r shops_r profile_r');
+        const authUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(env.etsy.callbackUrl)}&scope=${scopes}&client_id=${env.etsy.clientId}&state=${statePayload}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+        
+        res.json({ success: true, url: authUrl });
+    } catch (error) {
+        console.error('Etsy auth init error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ── GET /api/etsy/callback ────────────────────────────────────────────────────
+router.get('/callback', async (req, res) => {
+    try {
+        const { code, state, error } = req.query;
+        
+        if (error) {
+            return res.redirect(`${env.frontendUrl[0]}/d2c-analytics/integrations?etsy=error&message=${encodeURIComponent(error)}`);
+        }
+
+        let decoded;
+        try {
+            decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+        } catch {
+            return res.redirect(`${env.frontendUrl[0]}/d2c-analytics/integrations?etsy=error&message=Invalid_state`);
+        }
+
+        const { userId, brandId, nonce } = decoded;
+
+        const query = {
+            user: userId,
+            platform: 'etsy',
+            ...(brandId ? { brand: brandId } : { brand: { $exists: false } }),
+        };
+
+        const pendingIntegration = await Integration.findOne(query);
+
+        if (!pendingIntegration || !pendingIntegration.metadata?.oauthNonce || pendingIntegration.metadata.oauthNonce !== nonce) {
+            return res.redirect(`${env.frontendUrl[0]}/d2c-analytics/integrations?etsy=error&message=CSRF_validation_failed`);
+        }
+
+        const codeVerifier = pendingIntegration.metadata.oauthVerifier;
+
+        // Exchange code for token
+        const tokenData = await exchangeEtsyOAuthToken(code, codeVerifier, env.etsy.callbackUrl);
+        const accessToken = tokenData.access_token;
+        const refreshToken = tokenData.refresh_token;
+        const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+        // Fetch Shop ID using the user ID embedded in the access token
+        const etsyUserId = accessToken.split('.')[0];
+        const shopInfo = await fetchEtsyShopByUserId(accessToken, etsyUserId);
+        const shopId = shopInfo.shop_id;
+
+        // Fetch shipping profiles for future listing creation
+        const shippingProfiles = await fetchEtsyShippingProfiles(accessToken, shopId);
+        const defaultShippingProfileId = shippingProfiles[0]?.shipping_profile_id || '';
+
+        await Integration.findOneAndUpdate(
+            query,
+            {
+                status: 'connected',
+                accessToken,
+                refreshToken,
+                tokenExpiresAt,
                 displayName: shopInfo.shop_name || `Shop ${shopId}`,
                 profileUrl: shopInfo.url || `https://www.etsy.com/shop/${shopId}`,
+                'metadata.oauthNonce': null,
+                'metadata.oauthVerifier': null,
                 platformData: {
                     etsyShopId: String(shopId),
                     etsyShopName: shopInfo.shop_name || '',
@@ -99,14 +178,13 @@ router.post('/connect', protect, async (req, res) => {
                     etsyDefaultTaxonomyId: '',
                 },
             },
-            { upsert: true, returnDocument: 'after' }
+            { upsert: true }
         );
 
-        console.log(`✅ Etsy connected: ${shopInfo.shop_name} (${shopId})`);
-        res.json({ success: true, shopName: shopInfo.shop_name, shopId: String(shopId) });
+        res.redirect(`${env.frontendUrl[0]}/d2c-analytics/integrations?etsy=success`);
     } catch (error) {
-        console.error('Etsy connect error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        console.error('Etsy callback error:', error);
+        res.redirect(`${env.frontendUrl[0]}/d2c-analytics/integrations?etsy=error&message=${encodeURIComponent(safeErrorMessage(error))}`);
     }
 });
 
@@ -262,10 +340,10 @@ router.post('/publish/:productId', protect, async (req, res) => {
         let result;
         if (product.etsyListingId) {
             // Update existing listing
-            result = await updateEtsyListing(apiKey, apiKey, shopId, product.etsyListingId, product);
+            result = await updateEtsyListing(apiKey, shopId, product.etsyListingId, product);
         } else {
-            // Create new listing — requires OAuth access token; for API key-only shops, guide user
-            result = await createEtsyListing(apiKey, apiKey, shopId, product, resolvedShipping, resolvedTaxonomy);
+            // Create new listing
+            result = await createEtsyListing(apiKey, shopId, product, resolvedShipping, resolvedTaxonomy);
             if (result.listing_id) {
                 product.etsyListingId = String(result.listing_id);
                 await product.save();

@@ -156,8 +156,6 @@ export default function Integrations() {
 
     // ── Etsy state ──
     const [etsyStatus, setEtsyStatus] = useState({ connected: false })
-    const [etsyShopId, setEtsyShopId] = useState('')
-    const [etsyApiKey, setEtsyApiKey] = useState('')
     const [etsyError, setEtsyError] = useState('')
     const [etsySuccess, setEtsySuccess] = useState('')
 
@@ -274,6 +272,20 @@ export default function Integrations() {
             navigate('/integrations', { replace: true })
         } else if (gaStatus === 'error') {
             alert(`Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`)
+            navigate('/integrations', { replace: true })
+        }
+
+        const etsyStatusParam = params.get('etsy')
+        const etsyMsg = params.get('message')
+
+        if (etsyStatusParam === 'success') {
+            setEtsySuccess('Etsy connected successfully!')
+            setTimeout(() => setEtsySuccess(''), 5000)
+            loadAllStatuses()
+            navigate('/integrations', { replace: true })
+        } else if (etsyStatusParam === 'error') {
+            setEtsyError(`Connection failed: ${decodeURIComponent(etsyMsg || 'Unknown error')}`)
+            setTimeout(() => setEtsyError(''), 5000)
             navigate('/integrations', { replace: true })
         }
     }, [navigate, loadAllStatuses])
@@ -741,7 +753,7 @@ export default function Integrations() {
                                                     {loading.etsySync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
                                                     Sync Now
                                                 </button>
-                                                <button onClick={async () => { if (!confirm('Disconnect Etsy?')) return; await etsyAPI.disconnect(brandId); setEtsyStatus({ connected: false }); setEtsyShopId(''); setEtsyApiKey(''); }}
+                                                <button onClick={async () => { if (!confirm('Disconnect Etsy?')) return; await etsyAPI.disconnect(brandId); setEtsyStatus({ connected: false }); }}
                                                     className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
                                                     style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
                                                     <span className="material-symbols-outlined text-sm">link_off</span>
@@ -753,27 +765,23 @@ export default function Integrations() {
                                     ) : (
                                         <div className="space-y-3">
                                             <p className="text-xs text-[var(--sys-text-muted)]">Connect your Etsy shop to sync listings, orders and generate AI-powered product content at scale.</p>
-                                            <input type="text" value={etsyShopId} onChange={e => setEtsyShopId(e.target.value)}
-                                                placeholder="Etsy Shop ID (numeric)"
-                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
-                                            <input type="password" value={etsyApiKey} onChange={e => setEtsyApiKey(e.target.value)}
-                                                placeholder="Etsy API Key (keystring)"
-                                                className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
-                                            <p className="text-xs text-[var(--sys-text-muted)]">Find your API key at <a href="https://www.etsy.com/developers/your-apps" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: '#F56400' }}>etsy.com/developers</a></p>
                                             {etsyError && <p className="text-xs text-red-400">{etsyError}</p>}
                                             <button onClick={async () => {
-                                                if (!etsyShopId || !etsyApiKey) return setEtsyError('Shop ID and API Key are required.');
                                                 setEtsyError(''); setLoading(l => ({ ...l, etsy: true }));
                                                 try {
-                                                    const r = await etsyAPI.connect(etsyShopId, etsyApiKey, brandId);
-                                                    setEtsyStatus({ connected: true, shopName: r.shopName, shopId: r.shopId });
+                                                    const res = await etsyAPI.auth(brandId);
+                                                    if (res.url) {
+                                                        window.location.href = res.url;
+                                                    } else {
+                                                        throw new Error('Failed to get authorization URL');
+                                                    }
                                                 } catch(e) { setEtsyError(e.message); }
                                                 finally { setLoading(l => ({ ...l, etsy: false })) }
                                             }} disabled={loading.etsy}
                                                 className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
                                                 style={{ background: '#F5640020', color: '#F56400', border: '1px solid #F5640030' }}>
                                                 {loading.etsy ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">link</span>}
-                                                Connect Etsy
+                                                Connect Etsy via OAuth
                                             </button>
                                         </div>
                                     )}

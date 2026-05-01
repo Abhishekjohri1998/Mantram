@@ -4,7 +4,7 @@
  * Uses Shopify Storefront/Admin REST API.
  */
 
-const SHOPIFY_API_VERSION = '2024-01';
+const SHOPIFY_API_VERSION = '2025-01';
 
 /**
  * Build Shopify OAuth authorization URL

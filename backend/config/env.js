@@ -128,6 +128,13 @@ export default {
         callbackUrl: process.env.SHOPIFY_CALLBACK_URL,
     },
 
+    // Etsy
+    etsy: {
+        clientId: process.env.ETSY_KEYSTR,
+        clientSecret: process.env.ETSY_SHARED_SECRET,
+        callbackUrl: process.env.ETSY_CALLBACK_URL || `${process.env.BACKEND_URL || 'https://api.mantram.ai'}/api/etsy/callback`,
+    },
+
     // Email Config
     email: {
         user: process.env.EMAIL_USER,
