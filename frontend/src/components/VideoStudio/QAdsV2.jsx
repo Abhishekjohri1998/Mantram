@@ -574,21 +574,29 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
         fetchTemplates()
 
         // Poll every 5s if any template is still pending
-        const interval = setInterval(async () => {
+        const interval = setInterval(() => {
             setTemplates(current => {
-                const pending = current.filter(t => t.previewUrl === 'pending' && t.sourceJobId)
+                const pending = current.filter(t => t.previewUrl === 'pending' && t.sourceJobId);
                 if (pending.length > 0) {
-                    Promise.all(pending.map(t => 
-                        api(`/superadmin/templates/generate/status/${t.sourceJobId}`).catch(() => null)
-                    )).then(() => {
-                        fetchTemplates()
-                    })
+                    let updated = false;
+                    Promise.all(pending.map(async (t) => {
+                        try {
+                            const res = await api(`/superadmin/templates/generate/status/${t.sourceJobId}`);
+                            if (res.status === 'COMPLETED' || res.status === 'FAILED') {
+                                updated = true;
+                            }
+                        } catch (e) {
+                            console.warn(`Poll error for template ${t._id}:`, e.message);
+                        }
+                    })).then(() => {
+                        if (updated) fetchTemplates();
+                    });
                 }
-                return current
-            })
-        }, 5000)
+                return current;
+            });
+        }, 5000);
 
-        return () => clearInterval(interval)
+        return () => clearInterval(interval);
     }, [])
 
     // Handle template click — pre-fill all fields from templateAssets or flat fields

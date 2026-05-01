@@ -206,7 +206,7 @@ const TemplateManager = () => {
     useEffect(() => { fetchData(); }, []);
     useEffect(() => { if (activeTab === 'categories') fetchCategories(); }, [activeTab]);
 
-    // Poll for generate status
+    // Poll for active generation status (from modal)
     useEffect(() => {
         if (genStatus !== 'polling' || !genTaskId) return;
         const interval = setInterval(async () => {
@@ -230,6 +230,30 @@ const TemplateManager = () => {
         }, 5000);
         return () => clearInterval(interval);
     }, [genStatus, genTaskId]);
+
+    // Global poll for any stuck "pending" templates
+    useEffect(() => {
+        const pendingTemplates = templates.filter(t => t.previewUrl === 'pending' && t.sourceJobId);
+        if (pendingTemplates.length === 0) return;
+
+        const interval = setInterval(() => {
+            let updated = false;
+            Promise.all(pendingTemplates.map(async (t) => {
+                try {
+                    const res = await api(`/superadmin/templates/generate/status/${t.sourceJobId}`);
+                    if (res.status === 'COMPLETED' || res.status === 'FAILED') {
+                        updated = true;
+                    }
+                } catch (e) {
+                    console.warn(`Poll error for template ${t._id}:`, e.message);
+                }
+            })).then(() => {
+                if (updated) fetchData();
+            });
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [templates]);
 
     const handleGenerate = async () => {
         if (!genForm.name.trim()) return addToast('Template name is required', 'error');
@@ -657,6 +681,8 @@ const TemplateManager = () => {
                                                 onMouseLeave={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'none'; }}>
                                                 {previewSrc === 'pending' ? (
                                                     <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined spin" style={{ fontSize: 20, color: '#7C3AED', animation: 'spin 1s linear infinite' }}>progress_activity</span></div>
+                                                ) : previewSrc === 'failed' ? (
+                                                    <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: '#ef4444' }}>error</span></div>
                                                 ) : previewSrc ? (
                                                     t.previewType === 'video' ? (
                                                         <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} />

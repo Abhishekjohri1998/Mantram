@@ -382,6 +382,18 @@ router.post('/generate', protect, superadmin, async (req, res) => {
 router.get('/generate/status/:taskId', protect, superadmin, async (req, res) => {
     try {
         const { taskId } = req.params;
+
+        // Prevent race condition & duplicate S3 uploads
+        const existing = await Template.findOne({ sourceJobId: taskId });
+        if (existing && existing.previewUrl !== 'pending') {
+            return res.json({
+                success: true,
+                status: existing.previewUrl === 'failed' ? 'FAILED' : 'COMPLETED',
+                progress: 100,
+                videoUrl: existing.previewVideoUrl || existing.previewUrl,
+            });
+        }
+
         const result = await pollAtlasCloudStatus(taskId);
 
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
