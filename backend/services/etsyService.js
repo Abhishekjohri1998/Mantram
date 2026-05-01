@@ -19,7 +19,6 @@ async function etsyFetch(path, accessToken, options = {}) {
     if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
     }
-    const res = await fetch(url, { ...options, headers });
     const res = await fetch(url, {
         ...options,
         headers,
