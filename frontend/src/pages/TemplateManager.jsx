@@ -655,7 +655,9 @@ const TemplateManager = () => {
                                             <div style={{ position: 'relative', width: 56, height: 56 }}
                                                 onMouseEnter={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'block'; }}
                                                 onMouseLeave={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'none'; }}>
-                                                {previewSrc ? (
+                                                {previewSrc === 'pending' ? (
+                                                    <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined spin" style={{ fontSize: 20, color: '#7C3AED', animation: 'spin 1s linear infinite' }}>progress_activity</span></div>
+                                                ) : previewSrc ? (
                                                     t.previewType === 'video' ? (
                                                         <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
                                                     ) : (
@@ -664,7 +666,7 @@ const TemplateManager = () => {
                                                 ) : (
                                                     <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)' }}>image</span></div>
                                                 )}
-                                                {previewSrc && (
+                                                {previewSrc && previewSrc !== 'pending' && (
                                                     <div className="tmpl-pop" style={{ display: 'none', position: 'absolute', top: 0, left: 64, width: 200, height: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>
                                                         {t.previewType === 'video' ? (
                                                             <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

@@ -499,12 +499,8 @@ function CfgMenu({ value, onChange, options, icon }) {
 function GridVideo({ project, onReuse }) {
     const vRef = useRef(null)
     const [liked, setLiked] = useState(false)
-    return <div 
-        className="qv2-bi" 
-        onMouseEnter={() => vRef.current?.play()} 
-        onMouseLeave={() => { if(vRef.current) { vRef.current.pause(); vRef.current.currentTime = 0; } }}
-    >
-        <video ref={vRef} src={project.generation.videoUrl} muted loop playsInline />
+    return <div className="qv2-bi">
+        <video ref={vRef} src={project.generation.videoUrl} muted autoPlay loop playsInline />
         <div className="qv2-bi-ov">
             <button className="qv2-bi-btn reuse" onClick={() => onReuse(project)}>
                 <span className="material-symbols-outlined" style={{fontSize: 14}}>replay</span>
@@ -817,7 +813,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                                 {/* Video output or generate button */}
                                 {job.status === 'done' && job.videoUrl ? (
                                     <div>
-                                        <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180 }} />
+                                        <video src={job.videoUrl} controls muted autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180 }} />
                                         <a href={job.videoUrl} download target="_blank" rel="noreferrer" style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '6px 12px', borderRadius: 8, textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>Download
                                         </a>
@@ -931,7 +927,11 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                             .map(t => (
                             <div key={t._id} className="qv2-temp-card" style={{ flex: '0 0 180px', height: 280 }} onClick={() => handleTemplateClick(t)}>
                                 {/* Video or Image preview */}
-                                {t.previewType === 'video' && (t.previewVideoUrl || t.previewUrl) ? (
+                                {t.previewUrl === 'pending' ? (
+                                    <div style={{ position: 'absolute', inset: 0, background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <span className="material-symbols-outlined spin" style={{ color: 'var(--sys-primary)', fontSize: 24, animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                    </div>
+                                ) : t.previewType === 'video' && (t.previewVideoUrl || t.previewUrl) ? (
                                     <video src={t.previewVideoUrl || t.previewUrl} muted autoPlay loop playsInline />
                                 ) : (t.previewUrl || t.previewImageUrl) ? (
                                     <img src={t.previewUrl || t.previewImageUrl} alt={t.name} />

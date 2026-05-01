@@ -394,7 +394,6 @@ router.get('/generate/status/:taskId', protect, superadmin, async (req, res) => 
                 {
                     previewUrl: s3VideoUrl,
                     previewVideoUrl: s3VideoUrl,
-                    previewImageUrl: s3VideoUrl,
                 }
             );
         }
