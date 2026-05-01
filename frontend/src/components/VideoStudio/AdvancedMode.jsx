@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import PublishModal from '../PublishModal'
 import { creatives as creativesAPI } from '../../services/api'
 import { CreditTooltipWrapper } from '../CreditBadge'
 
@@ -435,6 +436,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     }, [])
 
     // ── Compose form state ──
+    const [publishUrl, setPublishUrl] = useState(null)
     const [showAdvancedOpts, setShowAdvancedOpts] = useState(false)
     const [model, setModel] = useState('seedance-2.0')
     const [prompt, setPrompt] = useState('')
@@ -871,6 +873,15 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             <style>{css}</style>
             <div ref={observerRef} style={{ position: 'absolute', top: 0, left: 0, height: 1, width: '100%', pointerEvents: 'none' }} />
 
+            {/* ── Publish Modal ── */}
+            {publishUrl && (
+                <PublishModal
+                    defaultVideo={publishUrl}
+                    isOpen={true}
+                    onClose={() => setPublishUrl(null)}
+                />
+            )}
+
             {/* ── Video Viewer Modal ── */}
             {viewVideo && (
                 <div className="vm-viewer-modal" onClick={() => setViewVideo(null)}>
@@ -916,6 +927,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                             )}
                             <button className="vm-viewer-btn" onClick={() => downloadVideo(viewVideo.url, 'video')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
+                            </button>
+                            <button className="vm-viewer-btn" onClick={() => setPublishUrl(viewVideo.url)}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>share</span> Publish
                             </button>
                             <button className="vm-viewer-btn" onClick={() => setViewVideo(null)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span> Close
@@ -999,6 +1013,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                     </button>
                                     <button className="vm-bg-overlay-btn" onClick={() => downloadVideo(videoSrc, p.title || 'video')}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span> Download
+                                    </button>
+                                    <button className="vm-bg-overlay-btn" onClick={() => setPublishUrl(videoSrc)}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>share</span> Publish
                                     </button>
                                     <button className="vm-bg-overlay-btn" onClick={() => handleReuse(p)}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 12 }}>replay</span> Reuse
