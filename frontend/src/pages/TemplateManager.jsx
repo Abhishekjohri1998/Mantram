@@ -170,6 +170,7 @@ const TemplateManager = () => {
         { value: 'kling-v2-master', label: 'Kling V2 Master', type: 'video' },
         { value: 'wan-2.1', label: 'Wan 2.1', type: 'video' },
         { value: 'luma-ray-2', label: 'Luma Ray 2', type: 'video' },
+        { value: 'happyhorse-1.0', label: 'HappyHorse 1.0', type: 'video' },
     ];
     const IMAGE_MODELS = [
         { value: 'gemini-image', label: 'Gemini Image', type: 'image' },
