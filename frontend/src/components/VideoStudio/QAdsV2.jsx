@@ -561,13 +561,34 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             if (d.presets?.length > 0 && !selP) setSelP(d.presets[0].id)
         }).catch(() => {})
 
-        api('/templates/by-section/video_qads?limit=50').then(d => {
-            const tpls = d.templates || []
-            setTemplates(tpls)
-            // Extract unique categories from templates
-            const cats = [...new Set(tpls.map(t => t.categoryId?.name).filter(Boolean))]
-            setTemplateCategories(cats)
-        }).catch(() => {})
+        const fetchTemplates = () => {
+            api('/templates/by-section/video_qads?limit=50').then(d => {
+                const tpls = d.templates || []
+                setTemplates(tpls)
+                // Extract unique categories from templates
+                const cats = [...new Set(tpls.map(t => t.categoryId?.name).filter(Boolean))]
+                setTemplateCategories(cats)
+            }).catch(() => {})
+        }
+
+        fetchTemplates()
+
+        // Poll every 5s if any template is still pending
+        const interval = setInterval(async () => {
+            setTemplates(current => {
+                const pending = current.filter(t => t.previewUrl === 'pending' && t.sourceJobId)
+                if (pending.length > 0) {
+                    Promise.all(pending.map(t => 
+                        api(`/superadmin/templates/generate/status/${t.sourceJobId}`).catch(() => null)
+                    )).then(() => {
+                        fetchTemplates()
+                    })
+                }
+                return current
+            })
+        }, 5000)
+
+        return () => clearInterval(interval)
     }, [])
 
     // Handle template click — pre-fill all fields from templateAssets or flat fields
@@ -931,10 +952,15 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
                                     <div style={{ position: 'absolute', inset: 0, background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <span className="material-symbols-outlined spin" style={{ color: 'var(--sys-primary)', fontSize: 24, animation: 'spin 1s linear infinite' }}>progress_activity</span>
                                     </div>
+                                ) : t.previewUrl === 'failed' ? (
+                                    <div style={{ position: 'absolute', inset: 0, background: '#331111', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 4 }}>
+                                        <span className="material-symbols-outlined" style={{ color: '#ef4444', fontSize: 24 }}>error</span>
+                                        <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>FAILED</span>
+                                    </div>
                                 ) : t.previewType === 'video' && (t.previewVideoUrl || t.previewUrl) ? (
-                                    <video src={t.previewVideoUrl || t.previewUrl} muted autoPlay loop playsInline />
+                                    <video src={t.previewVideoUrl || t.previewUrl} muted autoPlay loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (t.previewUrl || t.previewImageUrl) ? (
-                                    <img src={t.previewUrl || t.previewImageUrl} alt={t.name} />
+                                    <img src={t.previewUrl || t.previewImageUrl} alt={t.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (
                                     <div style={{ position: 'absolute', inset: 0, background: '#222' }} />
                                 )}

@@ -396,6 +396,11 @@ router.get('/generate/status/:taskId', protect, superadmin, async (req, res) => 
                     previewVideoUrl: s3VideoUrl,
                 }
             );
+        } else if (result.status === 'FAILED') {
+            await Template.findOneAndUpdate(
+                { sourceJobId: taskId },
+                { previewUrl: 'failed' }
+            );
         }
 
         res.json({
