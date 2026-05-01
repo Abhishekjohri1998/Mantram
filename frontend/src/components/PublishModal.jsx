@@ -243,7 +243,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-[var(--sys-surface)] " onClick={onClose} />
             <div className="relative bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] rounded-3xl w-full max-w-2xl flex flex-col max-h-[90vh] shadow-[0_24px_80px_rgba(0,0,0,0.6)]" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
 
