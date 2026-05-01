@@ -3653,6 +3653,15 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 
         // Update VideoProject with latest status/videoUrl
         const updatePayload = { 'generation.progress': result.progress || 0 };
+        
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            console.log(`[Q-Ads V2] Mirroring video to S3: ${result.videoUrl.substring(0, 80)}...`);
+            const s3VideoUrl = await ensureS3Url(result.videoUrl, `qads/gen-video-${Date.now()}.mp4`);
+            if (s3VideoUrl) {
+                result.videoUrl = s3VideoUrl;
+            }
+        }
+        
         if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
         if (result.error) updatePayload['generation.error'] = result.error;
         if (result.status === 'COMPLETED' || result.status === 'FAILED') {

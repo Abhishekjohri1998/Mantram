@@ -589,7 +589,10 @@ export async function getAtlasCloudGenerationStatus(taskId) {
 
     if (taskStatus === 'completed' || taskStatus === 'success') {
         const outputs  = result.data.outputs || [];
-        const videoUrl = outputs[0] || result.data.video_url || '';
+        let videoUrl = outputs[0] || result.data.video_url || '';
+        if (typeof videoUrl === 'object' && videoUrl !== null) {
+            videoUrl = videoUrl.url || videoUrl.download_url || videoUrl.file_url || '';
+        }
         console.log(`✅ [Atlas] Video complete: ${videoUrl}`);
         return { status: 'COMPLETED', progress: 100, videoUrl, thumbnailUrl: '', audioUrl: '' };
     }

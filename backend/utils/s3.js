@@ -146,6 +146,8 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
         'cdn.midjourney.com',
         'firebasestorage.googleapis.com',
         'storage.googleapis.com',
+        // Atlas Cloud / Alibaba Cloud (Seedance/HappyHorse)
+        'aliyuncs.com', 'atlascloud.ai', 'alibaba.com'
     ];
 
     const isProviderUrl = PROVIDER_DOMAINS.some(domain => input.includes(domain));
