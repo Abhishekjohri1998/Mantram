@@ -213,6 +213,11 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
             platforms.forEach(p => { captions[p] = getCaptionForPlatform(p) })
             const fallbackText = caption.trim() || Object.values(platformCaptions).find(c => c?.trim()) || ''
 
+            // Always send a full ISO timestamp so the server parses it correctly
+            // regardless of the server's timezone. datetime-local gives "2026-05-02T11:27"
+            // (no TZ) which the server in UTC would misinterpret as UTC instead of user's local time.
+            const isoScheduledFor = new Date(scheduledFor).toISOString()
+
             const res = await social.schedule({
                 accountIds: selectedAccounts,
                 text: fallbackText,
@@ -221,7 +226,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                 imageUrls: isCarouselMode ? imageUrls : undefined,
                 videoUrl,
                 brandId: brandId || undefined,
-                scheduledFor,
+                scheduledFor: isoScheduledFor,
             })
             setScheduleResults(res.scheduled)
         } catch (err) {

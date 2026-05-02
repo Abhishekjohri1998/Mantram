@@ -245,6 +245,16 @@ async function processDuePosts() {
 
         if (duePosts.length > 0) {
             console.log(`[SCHEDULER] Found ${duePosts.length} due post(s) — publishing in parallel...`);
+        } else {
+            // Diagnostic: show when the next scheduled post is due (helps catch timezone bugs)
+            const nextPost = await SocialPost.findOne({ status: 'scheduled' })
+                .sort({ scheduledFor: 1 })
+                .select('scheduledFor platform accountName')
+                .lean();
+            if (nextPost) {
+                const diff = Math.round((new Date(nextPost.scheduledFor).getTime() - now.getTime()) / 60000);
+                console.log(`[SCHEDULER] No due posts. Next: ${nextPost.platform} (${nextPost.accountName}) at ${new Date(nextPost.scheduledFor).toISOString()} (in ${diff} min)`);
+            }
         }
 
         // ── 2) Publish all claimed posts in parallel ─────────────────────────
