@@ -4137,6 +4137,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
+                        <>
                         {sidebarPanel === 'create' && <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
 
                             {/* ── Section: Model ── */}
@@ -4472,6 +4473,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </CreditTooltipWrapper>
                             </div>
 
+                        </>
                         </div>
                     </div>
             </>
