@@ -275,14 +275,14 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 isActive: false,
                 isPublished: false,
                 createdBy: req.user._id,
-                sourceJobId: genResult.taskId,
+                sourceJobId: genResult.requestId || genResult.taskId,
                 sourceJobType: 'VideoProject',
             });
 
             res.json({
                 success: true,
                 template,
-                taskId: genResult.taskId,
+                taskId: genResult.requestId || genResult.taskId,
                 status: 'generating',
                 type: 'video',
             });
