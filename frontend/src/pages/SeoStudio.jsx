@@ -66,6 +66,140 @@ function ScoreRing({ score, size = 100, label, color = 'primary' }) {
     )
 }
 
+// ── Mini Score Ring (for compact previous report card) ────────────────────
+function MiniScoreRing({ score, size = 48, label, color }) {
+    const r = (size - 6) / 2, c = 2 * Math.PI * r, offset = c - (score / 100) * c
+    const ringColor = color || (score >= 80 ? '#34d399' : score >= 60 ? '#fbbf24' : score >= 40 ? '#f97316' : '#fb7185')
+    return (
+        <div className="flex flex-col items-center gap-0.5">
+            <svg width={size} height={size} className="-rotate-90">
+                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--sys-border)" strokeWidth="3" />
+                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={ringColor}
+                    strokeWidth="3" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset}
+                    style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
+            </svg>
+            <span className="text-sm font-black text-[var(--sys-text)]" style={{ marginTop: -(size / 2 + 7) + 'px' }}>{score}</span>
+            {label && <p className="text-[9px] text-[var(--sys-text-muted)] font-bold mt-2 uppercase tracking-wider">{label}</p>}
+        </div>
+    )
+}
+
+// ── Previous Report Summary (compact collapsible card) ────────────────────
+function PreviousReportSummary({ data, savedAt, collapsed = false }) {
+    const [expanded, setExpanded] = useState(false)
+    if (!data) return null
+
+    const scores = [
+        { key: 'seoHealthScore', label: 'SEO', color: '#a78bfa' },
+        { key: 'aiVisibilityScore', label: 'AI', color: '#8b5cf6' },
+        { key: 'technicalScore', label: 'Tech', color: '#60a5fa' },
+        { key: 'contentScore', label: 'Content', color: '#fbbf24' },
+        { key: 'authorityScore', label: 'Auth', color: '#34d399' },
+    ].filter(s => data[s.key] !== undefined && data[s.key] > 0)
+
+    const gi = data.groupedIssues || {}
+    const hasIssues = (gi.errorCount || 0) + (gi.warningCount || 0) + (gi.noticeCount || 0) > 0
+    const dateStr = savedAt ? new Date(savedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+
+    return (
+        <div className="glass-panel rounded-2xl overflow-hidden animate-fade-in mb-4" style={{ border: '1px solid rgba(99,102,241,0.12)' }}>
+            {/* Header bar */}
+            <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-all"
+            >
+                <div className="flex items-center gap-2.5">
+                    <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                        <span className="material-symbols-outlined text-primary text-sm">history</span>
+                    </div>
+                    <div className="text-left">
+                        <p className="text-xs font-bold text-[var(--sys-text)]">Previous Report</p>
+                        {dateStr && <p className="text-[10px] text-[var(--sys-text-muted)]">{dateStr}</p>}
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    {/* Inline mini scores */}
+                    {!expanded && scores.length > 0 && (
+                        <div className="hidden sm:flex items-center gap-2">
+                            {scores.slice(0, 3).map(s => (
+                                <span key={s.key} className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${s.color}15`, color: s.color }}>
+                                    {s.label}: {data[s.key]}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    {/* Issue counts inline */}
+                    {!expanded && hasIssues && (
+                        <div className="hidden sm:flex items-center gap-1.5">
+                            {gi.errorCount > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400">{gi.errorCount} err</span>}
+                            {gi.warningCount > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400">{gi.warningCount} warn</span>}
+                            {gi.noticeCount > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{gi.noticeCount} info</span>}
+                        </div>
+                    )}
+                    <span className={`material-symbols-outlined text-sm text-[var(--sys-text-muted)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>expand_more</span>
+                </div>
+            </button>
+
+            {/* Expanded body */}
+            {expanded && (
+                <div className="px-4 pb-4 pt-1 border-t border-white/[0.04] animate-fade-in">
+                    {/* Score rings */}
+                    {scores.length > 0 && (
+                        <div className="flex items-center justify-center gap-6 py-4">
+                            {scores.map(s => (
+                                <MiniScoreRing key={s.key} score={data[s.key]} size={48} label={s.label} color={s.color} />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Issue summary bar */}
+                    {hasIssues && (
+                        <div className="flex items-center gap-2 justify-center mb-3">
+                            {gi.errorCount > 0 && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>{gi.errorCount} Errors</span>}
+                            {gi.warningCount > 0 && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{gi.warningCount} Warnings</span>}
+                            {gi.noticeCount > 0 && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>{gi.noticeCount} Notices</span>}
+                        </div>
+                    )}
+
+                    {/* Summary text */}
+                    {data.summary && (
+                        <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed text-center max-w-xl mx-auto mb-3">{data.summary.substring(0, 250)}{data.summary.length > 250 ? '...' : ''}</p>
+                    )}
+
+                    {/* Top opportunity */}
+                    {data.topOpportunity && (
+                        <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-center">
+                            <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-0.5">Top Opportunity</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] leading-snug">{data.topOpportunity.substring(0, 200)}{data.topOpportunity.length > 200 ? '...' : ''}</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Saved Report Loading Shimmer ──────────────────────────────────────────
+function SavedReportShimmer() {
+    return (
+        <div className="animate-pulse space-y-3 py-6">
+            <div className="flex items-center gap-3 justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[var(--sys-border)]" />
+                <div className="h-4 w-32 rounded bg-[var(--sys-border)]" />
+            </div>
+            <div className="flex gap-4 justify-center">
+                {[1,2,3,4,5].map(i => <div key={i} className="w-12 h-12 rounded-full bg-[var(--sys-border)]" />)}
+            </div>
+            <div className="flex gap-2 justify-center">
+                <div className="h-5 w-16 rounded-full bg-[var(--sys-border)]" />
+                <div className="h-5 w-20 rounded-full bg-[var(--sys-border)]" />
+                <div className="h-5 w-14 rounded-full bg-[var(--sys-border)]" />
+            </div>
+            <div className="h-3 w-64 mx-auto rounded bg-[var(--sys-border)]" />
+        </div>
+    )
+}
+
 // ── Issue Badge ───────────────────────────────────────────────────────────
 function SeverityBadge({ severity }) {
     const c = SEVERITY_COLORS[severity] || 'slate'
@@ -119,6 +253,11 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     const [askResult, setAskResult] = useState(null)
     const [error, setError] = useState(null)
     const [askLoading, setAskLoading] = useState(false)
+
+    // Previous report state — preserved when regenerating
+    const [previousResults, setPreviousResults] = useState(null)
+    const [previousSavedAt, setPreviousSavedAt] = useState(null)
+    const [savedReportLoading, setSavedReportLoading] = useState(false)
 
     // Sync error from context task
     useEffect(() => { if (currentTask?.error) setError(currentTask.error) }, [currentTask?.error])
@@ -275,7 +414,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
         if (currentTask?.status === 'running' || currentTask?.results) return
 
         let cancelled = false
-        setSavedResults(null); setSavedAt(null)
+        setSavedResults(null); setSavedAt(null); setSavedReportLoading(true)
         seoAPI.getSavedReport(activeBrand._id, activeSection)
             .then(data => {
                 if (cancelled) return
@@ -285,6 +424,7 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
                 }
             })
             .catch(() => { /* silently fail — just means no saved data */ })
+            .finally(() => { if (!cancelled) setSavedReportLoading(false) })
         return () => { cancelled = true }
     }, [activeSection, activeBrand?._id, currentTask?.status])
 
@@ -294,6 +434,8 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
             return 
         }
 
+        // Preserve current results so user can reference them while new report generates
+        if (results) { setPreviousResults(results); setPreviousSavedAt(savedAt) }
         setError(null); setSavedResults(null); setSavedAt(null)
 
         const stages = STAGE_MESSAGES[workflowId] || ['Processing...']
@@ -354,6 +496,13 @@ function SeoStudioInner({ activeBrand, activeSection, setActiveSection }) {
     const WORKFLOW_IDS = ['health-check', 'traffic', 'competitors', 'ai-visibility', 'competitor-warroom', 'llm-probe', 'auto-fix', 'prompt-mining']
     const isWorkflow = WORKFLOW_IDS.includes(activeSection)
     const isAdvanced = !isWorkflow
+
+    // Clear previousResults when new results arrive
+    useEffect(() => {
+        if (currentTask?.status === 'done' && currentTask?.results) {
+            setPreviousResults(null); setPreviousSavedAt(null)
+        }
+    }, [currentTask?.status, currentTask?.results])
 
     // ── PDF Download ───────────────────────────────────────────────────────
     const downloadSeoPdf = (type, data, brand) => {
@@ -1237,6 +1386,12 @@ small{color:#94a3b8;font-size:10px}
                                         <span className="material-symbols-outlined text-xs">close</span> Cancel
                                     </button>
                                 </div>
+                                {/* Previous report reference while generating */}
+                                {previousResults && (
+                                    <div className="mt-6">
+                                        <PreviousReportSummary data={previousResults} savedAt={previousSavedAt} collapsed />
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1370,7 +1525,17 @@ small{color:#94a3b8;font-size:10px}
 
                         {/* ─── Workflow empty state ─── */}
                         {isWorkflow && !loading && !results && !error && (
-                            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+                            <div className="flex flex-col items-center justify-center py-12 animate-fade-in">
+                                {/* Show shimmer while fetching saved report */}
+                                {savedReportLoading && <SavedReportShimmer />}
+
+                                {/* Show previous report summary if available */}
+                                {!savedReportLoading && previousResults && (
+                                    <div className="w-full max-w-2xl mb-6">
+                                        <PreviousReportSummary data={previousResults} savedAt={previousSavedAt} />
+                                    </div>
+                                )}
+
                                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${currentItem?.color || '#6366f1'}15` }}>
                                     <span className="material-symbols-outlined text-3xl" style={{ color: currentItem?.color || '#6366f1' }}>{currentItem?.icon || 'search'}</span>
                                 </div>
