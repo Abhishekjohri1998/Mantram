@@ -72,24 +72,49 @@ export async function overlayLogo(imageBuffer, logoBuffer, position = 'bottom-ri
 }
 
 /**
- * Fetch an image URL and return its buffer.
- * Handles both HTTP URLs and base64 data URIs.
+ * In-memory cache for logo buffers. Brand logos rarely change during a session
+ * but the AI Create flow may fetch the same logo URL on every generation.
+ * 10-minute TTL keeps memory bounded while killing redundant network round-trips.
  */
-export async function fetchImageBuffer(urlOrBase64) {
-    if (!urlOrBase64) return null;
+const LOGO_CACHE = new Map(); // url → { buffer, expiresAt }
+const LOGO_TTL_MS = 10 * 60 * 1000;
 
-    // Base64 data URI
+/**
+ * Fetch an image URL and return its buffer.
+ * Handles HTTP URLs (with cache) and base64 data URIs (decoded inline).
+ *
+ * @param {string} urlOrBase64
+ * @param {object} opts          { cache: boolean }  — set false to bypass cache
+ */
+export async function fetchImageBuffer(urlOrBase64, opts = {}) {
+    if (!urlOrBase64) return null;
+    const { cache = true } = opts;
+
+    // Base64 data URI — decode inline, no network
     if (urlOrBase64.startsWith('data:')) {
         const commaIdx = urlOrBase64.indexOf(',');
         if (commaIdx === -1) return null;
         return Buffer.from(urlOrBase64.substring(commaIdx + 1), 'base64');
     }
 
-    // HTTP URL
+    // HTTP URL — check cache first (skip on bust)
     if (urlOrBase64.startsWith('http')) {
+        if (cache) {
+            const hit = LOGO_CACHE.get(urlOrBase64);
+            if (hit && hit.expiresAt > Date.now()) return hit.buffer;
+        }
         const resp = await fetch(urlOrBase64);
         if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
-        return Buffer.from(await resp.arrayBuffer());
+        const buf = Buffer.from(await resp.arrayBuffer());
+        if (cache) {
+            LOGO_CACHE.set(urlOrBase64, { buffer: buf, expiresAt: Date.now() + LOGO_TTL_MS });
+            // Bound memory — drop oldest if cache grows past 50 entries
+            if (LOGO_CACHE.size > 50) {
+                const oldest = LOGO_CACHE.keys().next().value;
+                LOGO_CACHE.delete(oldest);
+            }
+        }
+        return buf;
     }
 
     return null;

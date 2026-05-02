@@ -517,7 +517,7 @@ export async function artDirectorNode(state) {
 
     // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
     // ⚡ PERF: maxTokens reduced from 4096→2048 — art direction JSON output is typically 500-800 tokens
-    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext), userPrompt, 0.7, 2048, { preferFast: true });
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.7, 2048, { preferFast: true });
     console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms`);
 
     return {
@@ -592,7 +592,7 @@ export async function fastCreativeDirectorNode(state) {
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Fast mode already implies speed priority: Gemini 2.5 Flash is ideal
-    const result = await agentUtils.callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext), userPrompt, 0.6, 2048, { preferFast: true });
+    const result = await agentUtils.callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.6, 2048, { preferFast: true });
     console.log(`⚡ Fast Creative Director done in ${Date.now() - startMs}ms`);
 
     return {
@@ -671,7 +671,7 @@ export async function promptEngineerNode(state) {
 
     // ⚡ preferFast — Prompt engineering is technical transformation: Gemini sufficient
     // ⚡ PERF: maxTokens reduced from 4096→2048 — prompt output is typically 400-600 tokens
-    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext), userPrompt, 0.5, 2048, { preferFast: true });
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.5, 2048, { preferFast: true });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms`);
 
     return {
@@ -703,7 +703,7 @@ export async function styleCriticNode(state) {
 
     // ⚡ preferFast — Style critic is evaluation/scoring: Gemini sufficient
     // ⚡ PERF: maxTokens reduced from 4096→1024 — critic returns short JSON verdict/score
-    const result = await agentUtils.callAgent(STYLE_CRITIC_PROMPT(brandContext), userPrompt, 0.3, 1024, { preferFast: true });
+    const result = await agentUtils.callAgent(STYLE_CRITIC_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.3, 1024, { preferFast: true });
     console.log(`🔍 Critique complete in ${Date.now() - startMs}ms — verdict: ${result.verdict}`);
 
     // If critic says improve-first, use the improved prompt (immutable — create new object)
