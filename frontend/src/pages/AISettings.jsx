@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import SEOHead from '../components/SEOHead';
 import { useBrand } from '../context/BrandContext';
-import { routingRules as routingRulesAPI, brands as brandsAPI } from '../services/api';
+import { routingRules as routingRulesAPI, brands as brandsAPI, commentReplies as commentRepliesAPI } from '../services/api';
 
 const INTENT_OPTIONS = [
     { id: 'greeting', label: '👋 Greeting' },
@@ -71,6 +71,11 @@ export default function AISettings() {
     });
     const [savingAutonomy, setSavingAutonomy] = useState(false);
 
+    // Recent auto-replies
+    const [recentReplies, setRecentReplies] = useState([]);
+    const [replyStats, setReplyStats] = useState({ total: 0, replied: 0, dmSent: 0, errors: 0 });
+    const [repliesLoading, setRepliesLoading] = useState(false);
+
     const fetchRules = useCallback(async () => {
         if (!currentBrand?._id) return;
         setLoading(true);
@@ -91,6 +96,21 @@ export default function AISettings() {
     }, [currentBrand]);
 
     useEffect(() => { fetchRules(); }, [fetchRules]);
+
+    // Fetch recent comment auto-replies
+    const fetchCommentReplies = useCallback(async () => {
+        if (!currentBrand?._id) return;
+        setRepliesLoading(true);
+        try {
+            const data = await commentRepliesAPI.list(currentBrand._id, 10);
+            setRecentReplies(data.replies || []);
+            setReplyStats(data.stats || { total: 0, replied: 0, dmSent: 0, errors: 0 });
+        } catch { } finally {
+            setRepliesLoading(false);
+        }
+    }, [currentBrand]);
+
+    useEffect(() => { fetchCommentReplies(); }, [fetchCommentReplies]);
 
     const handleToggleRule = async (ruleId) => {
         const rule = rules.find(r => r.id === ruleId);
@@ -486,6 +506,48 @@ export default function AISettings() {
                     </button>
                 </div>
             </div>
+
+            {/* ── Recent Auto-Replies Activity ── */}
+            {(autonomy.commentAutoReply || autonomy.commentToDM) && (
+                <div style={{ marginTop: '1.5rem', background: '#1e293b', borderRadius: '12px', border: '1px solid #334155', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem' }}><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">history</span> Recent Auto-Replies</h3>
+                            <p style={{ color: '#64748b', margin: '0.25rem 0 0', fontSize: '0.75rem' }}>Live feed of automated comment responses</p>
+                        </div>
+                        <button onClick={fetchCommentReplies} disabled={repliesLoading}
+                            style={{ background: '#334155', color: '#94a3b8', border: 'none', padding: '0.4rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>refresh</span>
+                            {repliesLoading ? 'Loading...' : 'Refresh'}
+                        </button>
+                    </div>
+
+                    {/* Stats bar */}
+                    <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #334155', display: 'flex', gap: '1.5rem' }}>
+                        <StatBadge icon="reply" label="Replied" value={replyStats.replied} color="#10b981" />
+                        <StatBadge icon="forward_to_inbox" label="DMs Sent" value={replyStats.dmSent} color="#818cf8" />
+                        <StatBadge icon="error_outline" label="Errors" value={replyStats.errors} color="#ef4444" />
+                        <StatBadge icon="tag" label="Total" value={replyStats.total} color="#64748b" />
+                    </div>
+
+                    {/* Reply list */}
+                    <div style={{ padding: '0.75rem 1.25rem', maxHeight: '400px', overflowY: 'auto' }}>
+                        {recentReplies.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block', opacity: 0.5 }}>chat_bubble_outline</span>
+                                No auto-replies yet. Enable Comment Auto-Reply and wait for incoming comments.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {recentReplies.map((r, i) => (
+                                    <ReplyLogCard key={r._id || i} reply={r} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
@@ -654,4 +716,76 @@ function ToggleSwitch({ checked, onChange, label }) {
             <span style={{ color: checked ? '#e2e8f0' : '#64748b', fontSize: '0.8rem' }}>{label}</span>
         </div>
     );
+}
+
+function StatBadge({ icon, label, value, color }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem', color }}>{icon}</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{label}:</span>
+            <span style={{ color, fontSize: '0.85rem', fontWeight: 700 }}>{value}</span>
+        </div>
+    );
+}
+
+function ReplyLogCard({ reply }) {
+    const actionColors = {
+        comment_replied: '#10b981',
+        comment_to_dm: '#818cf8',
+        skipped: '#64748b',
+        error: '#ef4444',
+        no_action: '#64748b',
+    };
+    const actionLabels = {
+        comment_replied: '💬 Replied',
+        comment_to_dm: '📤 DM Sent',
+        skipped: '⏭️ Skipped',
+        error: '❌ Error',
+        no_action: '—',
+    };
+    const color = actionColors[reply.action] || '#64748b';
+    const timeAgo = getRelativeTime(reply.createdAt);
+
+    return (
+        <div style={{ background: '#0f172a', borderRadius: '8px', padding: '0.75rem', border: '1px solid #334155' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ color, fontSize: '0.75rem', fontWeight: 600 }}>{actionLabels[reply.action] || reply.action}</span>
+                    {reply.intent && reply.intent !== 'unknown' && (
+                        <Tag label={reply.intent.replace('_', ' ')} color="#6366f1" />
+                    )}
+                    {reply.confidence > 0 && (
+                        <Tag label={`${reply.confidence}%`} color={reply.confidence >= 80 ? '#10b981' : '#f59e0b'} />
+                    )}
+                    <Tag label={reply.platform || 'meta'} color="#64748b" />
+                </div>
+                <span style={{ color: '#475569', fontSize: '0.65rem' }}>{timeAgo}</span>
+            </div>
+            {reply.commenterName && (
+                <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                    <strong style={{ color: '#cbd5e1' }}>{reply.commenterName}:</strong> {(reply.commentText || '').substring(0, 120)}{reply.commentText?.length > 120 ? '…' : ''}
+                </div>
+            )}
+            {reply.replyText && (
+                <div style={{ color: '#e2e8f0', fontSize: '0.8rem', background: '#1e293b', borderRadius: '6px', padding: '0.5rem', marginTop: '0.25rem', borderLeft: `3px solid ${color}` }}>
+                    ↳ {reply.replyText}
+                </div>
+            )}
+            {reply.errorMessage && (
+                <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '0.25rem' }}>⚠️ {reply.errorMessage}</div>
+            )}
+        </div>
+    );
+}
+
+function getRelativeTime(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
 }

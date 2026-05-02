@@ -75,6 +75,7 @@ import templatesRoutes from './routes/templates.js';
 import avatarStudioRoutes from './routes/avatar-studio.js';
 import superadminTemplatesRoutes from './routes/superadmin-templates.js';
 import superadminImagesRoutes from './routes/superadmin-images.js';
+import commentRepliesRoutes from './routes/comment-replies.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 
 const HARDCODED_ORIGINS = [
@@ -395,6 +396,7 @@ app.use('/api/templates', templatesRoutes);
 app.use('/api/avatar-studio', avatarStudioRoutes);
 app.use('/api/superadmin/templates', superadminTemplatesRoutes);
 app.use('/api/superadmin/images', superadminImagesRoutes);
+app.use('/api/comment-replies', commentRepliesRoutes);
 
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──

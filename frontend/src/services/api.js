@@ -1115,6 +1115,11 @@ export const routingRules = {
     test: (data) => apiFetch('/routing-rules/test', { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// ============ Comment Replies API (Auto-Reply Logs) ============
+export const commentReplies = {
+    list: (brandId, limit = 20) => apiFetch(`/comment-replies?brand=${brandId}&limit=${limit}`),
+};
+
 // ============ Payments & Subscriptions API ============
 export const payments = {
     getPackages: () => apiFetch('/payments/packages'),

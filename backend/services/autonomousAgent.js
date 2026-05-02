@@ -16,12 +16,18 @@ import Conversation from '../models/Conversation.js';
 import Contact from '../models/Contact.js';
 import Brand from '../models/Brand.js';
 import Automation from '../models/Automation.js';
+import CommentReply from '../models/CommentReply.js';
 import { detectIntentAI, detectIntent, generateAIReplies, detectLanguage } from './conversationEngine.js';
 import { evaluateRoutes } from './routingEngine.js';
 import { findMatchingAutomation, startAutomation, executeNode } from './automationEngine.js';
+import { getRouter } from '../ai/router.js';
 
 // Rate limiter — track auto-replies per conversation
 const replyTracker = new Map(); // convId → { count, windowStart }
+
+// Duplicate comment guard — prevents double-replying if Meta sends the same webhook twice
+const recentlyRepliedComments = new Set();
+const COMMENT_DEDUP_TTL = 10 * 60 * 1000; // 10 minutes
 
 // ============================================================================
 // MAIN AUTONOMOUS PIPELINE
@@ -327,11 +333,36 @@ export async function runAutonomousPipeline({ userId, brandId, platform, senderI
  * Handle incoming comment — auto-reply or trigger Comment-to-DM
  */
 export async function handleCommentAutonomously({ brandId, commentText, commenterId, commenterName, postId, commentId, platform, pageId }) {
+    const logEntry = {
+        brand: brandId,
+        platform,
+        commentId: commentId || '',
+        postId: postId || '',
+        commentText: (commentText || '').substring(0, 500),
+        commenterName,
+        commenterId: commenterId || '',
+    };
+
     try {
         const brand = brandId ? await Brand.findById(brandId) : null;
         const autonomy = brand?.autonomy || {};
 
-        if (!autonomy.enabled) return { action: 'disabled' };
+        if (!autonomy.enabled) {
+            await safeLogCommentReply({ ...logEntry, action: 'skipped', replySource: 'none', replyText: '', intent: 'disabled' });
+            return { action: 'disabled' };
+        }
+
+        // ── Guard: Skip own comments (prevent reply loops) ──
+        if (commenterId && pageId && commenterId === pageId) {
+            console.log('💬 Skipping own comment (page replying to itself)');
+            return { action: 'skipped_own' };
+        }
+
+        // ── Guard: Duplicate webhook detection ──
+        if (commentId && recentlyRepliedComments.has(commentId)) {
+            console.log(`💬 Duplicate webhook for comment ${commentId}, skipping`);
+            return { action: 'skipped_duplicate' };
+        }
 
         // Detect intent of comment
         let intent;
@@ -342,35 +373,72 @@ export async function handleCommentAutonomously({ brandId, commentText, commente
         }
 
         console.log(`💬 Comment intent: ${intent.intent} (${intent.confidence}%) from ${commenterName}`);
+        logEntry.intent = intent.intent;
+        logEntry.confidence = intent.confidence;
 
         // If Comment-to-DM enabled and intent suggests buying interest
         const dmTriggerIntents = ['purchase_intent', 'price_inquiry', 'product_inquiry', 'booking', 'order_status'];
         if (autonomy.commentToDM && dmTriggerIntents.includes(intent.intent) && intent.confidence >= 60) {
-            // Send a DM prompt to the commenter
-            const dmMessage = generateCommentToDMMessage(brand, commentText, intent);
+            const dmMessage = await generateCommentToDMMessage(brand, commentText, intent);
+            let apiSuccess = false;
             if (commenterId) {
                 const dmIntegration = await findIntegration(brandId, platform);
                 const dmToken = dmIntegration?.platformData?.pageAccessToken || dmIntegration?.accessToken;
-                await sendViaMeta(commenterId, dmMessage, platform, dmToken);
+                const result = await sendViaMeta(commenterId, dmMessage, platform, dmToken);
+                apiSuccess = result?.success || false;
                 console.log(`📤 Comment-to-DM sent to ${commenterName}`);
             }
+            markCommentReplied(commentId);
+            await safeLogCommentReply({ ...logEntry, action: 'comment_to_dm', replyText: dmMessage, replySource: 'ai', apiSuccess });
             return { action: 'comment_to_dm', intent, dmMessage };
         }
 
         // If comment auto-reply enabled
         if (autonomy.commentAutoReply && intent.confidence >= 60) {
-            const replyText = generateCommentReply(brand, commentText, intent);
+            const replyText = await generateCommentReply(brand, commentText, intent);
+            let apiSuccess = false;
             if (commentId && replyText) {
-                await replyToComment(commentId, replyText, brandId);
+                // Anti-bot delay — 30s feels more human
+                console.log('💬 Waiting 30s before replying to comment (anti-bot delay)...');
+                await new Promise(r => setTimeout(r, 30000));
+                const result = await replyToComment(commentId, replyText, brandId);
+                apiSuccess = result?.success || false;
                 console.log(`💬 Comment auto-replied: "${replyText.substring(0, 40)}..."`);
             }
+            markCommentReplied(commentId);
+            await safeLogCommentReply({ ...logEntry, action: 'comment_replied', replyText, replySource: 'ai', apiSuccess });
             return { action: 'comment_replied', intent, reply: replyText };
         }
 
+        await safeLogCommentReply({ ...logEntry, action: 'no_action', replySource: 'none' });
         return { action: 'no_action', intent };
     } catch (error) {
         console.error('❌ Comment pipeline error:', error.message);
+        await safeLogCommentReply({ ...logEntry, action: 'error', errorMessage: error.message });
         return { action: 'error', error: error.message };
+    }
+}
+
+/**
+ * Mark a comment ID as recently replied — prevents double-replies from duplicate webhooks.
+ */
+function markCommentReplied(commentId) {
+    if (!commentId) return;
+    recentlyRepliedComments.add(commentId);
+    setTimeout(() => recentlyRepliedComments.delete(commentId), COMMENT_DEDUP_TTL);
+}
+
+/**
+ * Safely persist a CommentReply log entry. Never throws — logging should not break the pipeline.
+ */
+async function safeLogCommentReply(data) {
+    try {
+        await CommentReply.create(data);
+    } catch (err) {
+        // Ignore duplicate key (commentId unique index) — this is expected for duplicate webhooks
+        if (err.code !== 11000) {
+            console.warn('⚠️ CommentReply log failed:', err.message);
+        }
     }
 }
 
@@ -642,10 +710,43 @@ function generateBookingReply(brand, autonomy) {
 }
 
 /**
- * Generate a DM message triggered by a comment
+ * Generate a DM message triggered by a comment — AI-powered with brand voice.
+ * Falls back to static templates if AI fails.
  */
-function generateCommentToDMMessage(brand, commentText, intent) {
+async function generateCommentToDMMessage(brand, commentText, intent) {
     const name = brand?.name || 'us';
+
+    // ── AI path ──
+    try {
+        const router = getRouter();
+        const voice = brand?.dna?.voice || {};
+        const prompt = `You are a DM reply assistant for the brand "${name}".
+
+BRAND VOICE:
+- Personality: ${voice.personality || 'Professional & Friendly'}
+- Industry: ${brand?.dna?.industry || 'general'}
+
+Someone left this comment on your social media post:
+"${commentText}"
+
+Detected intent: ${intent.intent} (${intent.confidence}% confidence)
+
+Generate a SINGLE short, warm DM message (max 180 characters) to follow up privately.
+- Be genuine, not robotic
+- Use 1 emoji max
+- If the comment is in Hindi/Hinglish, reply in the same language
+- Reference their comment naturally
+
+Respond ONLY with the message text, no quotes, no JSON.`;
+
+        const result = await router.generateText({ prompt, maxTokens: 120, temperature: 0.7 });
+        const text = result.text?.trim();
+        if (text && text.length > 5 && text.length < 300) return text;
+    } catch (err) {
+        console.warn('⚠️ AI comment-to-DM generation failed, using template:', err.message);
+    }
+
+    // ── Fallback: static templates ──
     const intentMessages = {
         purchase_intent: `Hey! 👋 We noticed your interest on our post. We'd love to help you with your purchase! Here's some more info about what we offer at ${name}.`,
         price_inquiry: `Hi there! 💰 Thanks for asking about pricing. We've sent you this DM so we can share all the details privately. What product/service are you interested in?`,
@@ -657,17 +758,54 @@ function generateCommentToDMMessage(brand, commentText, intent) {
 }
 
 /**
- * Generate a public comment reply
+ * Generate a public comment reply — AI-powered with brand voice.
+ * Falls back to static templates if AI fails.
  */
-function generateCommentReply(brand, commentText, intent) {
+async function generateCommentReply(brand, commentText, intent) {
     const name = brand?.name || '';
+
+    // ── AI path ──
+    try {
+        const router = getRouter();
+        const voice = brand?.dna?.voice || {};
+        const prompt = `You are a social media manager for "${name}".
+
+BRAND VOICE:
+- Personality: ${voice.personality || 'Professional & Friendly'}
+- Industry: ${brand?.dna?.industry || 'general'}
+
+Someone commented on your post:
+"${commentText}"
+
+Detected intent: ${intent.intent} | Sentiment: ${intent.sentiment || 'neutral'}
+
+Generate a SHORT public comment reply (max 150 characters).
+Rules:
+- Be authentic and brand-appropriate
+- Use 1 emoji max
+- If the comment is negative/complaint, be empathetic and offer to help via DM
+- If it's positive/feedback, thank them warmly
+- If they're asking about price/product, invite them to DM
+- If the comment is in Hindi/Hinglish, reply in the same language
+- NEVER sound robotic or generic
+
+Respond ONLY with the reply text, no quotes, no JSON.`;
+
+        const result = await router.generateText({ prompt, maxTokens: 100, temperature: 0.7 });
+        const text = result.text?.trim();
+        if (text && text.length > 3 && text.length < 250) return text;
+    } catch (err) {
+        console.warn('⚠️ AI comment reply generation failed, using template:', err.message);
+    }
+
+    // ── Fallback: static templates ──
     const replies = {
         greeting: `Thanks for reaching out! 😊 DM us for more details.`,
         price_inquiry: `Hey! 💬 We've sent you a DM with all the pricing details!`,
         purchase_intent: `🎉 Awesome! Check your DMs, we've sent you more info!`,
         complaint: `We're sorry to hear that. 😔 We've DMed you to resolve this right away.`,
         product_inquiry: `Great question! 💡 Check your inbox, we've sent you the details.`,
-        feedback: `Thank you for your feedback! 🙏 We really appreciate it from ${name}.`,
+        feedback: `Thank you for your feedback! 🙏 We really appreciate it${name ? ` from ${name}` : ''}.`,
     };
     return replies[intent.intent] || `Thanks for your comment! 💬 Feel free to DM us for more info.`;
 }
