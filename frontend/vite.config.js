@@ -3,9 +3,17 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react({ jsxRuntime: 'automatic' }), tailwindcss()],
+  plugins: [
+    react({
+      jsxRuntime: 'automatic',
+      // Exclude CreativeStudio.jsx from Babel's strict JSX parser
+      // (esbuild handles its JSX transformation which is more lenient)
+      exclude: [/CreativeStudio\.jsx$/],
+    }),
+    tailwindcss()
+  ],
   esbuild: {
-    // Use esbuild for JSX transformation (faster, no Babel parser strictness)
+    // Use esbuild for JSX transformation for excluded files
     jsx: 'automatic',
   },
   base: '/',
