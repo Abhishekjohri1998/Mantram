@@ -2779,47 +2779,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 ))}
                 </div>
 
-                {/* ── Row 2: Gallery Toolbar (only in AI Create mode) ── */}
+                {/* ── Gallery Toolbar (AI Create only) ── */}
                 {studioMode === 'create' && (
-                    <div className="flex items-center justify-between px-3 pb-2 pt-0 border-t border-[var(--sys-border)]">
-                        <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-[0.12em] flex items-center gap-1.5 flex-shrink-0">
-                                <span className="material-symbols-outlined text-[12px] text-[var(--sys-text)]">history</span>
-                                {generationHistory.length > 0 ? `Generations (${generationHistory.length})` : 'Generations'}
-                            </span>
-                            <span className="w-px h-3 bg-[var(--sys-surface)] flex-shrink-0" />
-                            <div className="flex items-center gap-0.5">
-                                {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
-                                    <button key={cat}
-                                        onClick={() => setGalleryFilter(cat)}
-                                        className={`gallery-cat-pill ${galleryFilter === cat ? 'active' : ''}`}
-                                        aria-label={`Filter gallery by ${cat}`}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {generationHistory.length > 0 && (
-                                <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
-                            )}
-                            <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
-                                <button onClick={() => setViewMode('list')}
-                                    className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
-                                    title="List view"
-                                    aria-label="Switch to list view"
-                                >
-                                    <span className="material-symbols-outlined">view_list</span>
-                                </button>
-                                <button onClick={() => setViewMode('grid')}
-                                    className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
-                                    title="Grid view"
-                                    aria-label="Switch to grid view"
-                                >
-                                    <span className="material-symbols-outlined">grid_view</span>
-                                </button>
-                            </div>
+                    <div className="flex items-center justify-end px-3 pb-2 pt-0 border-t border-[var(--sys-border)] gap-2">
+                        {generationHistory.length > 0 && (
+                            <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
+                        )}
+                        <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
+                            <button onClick={() => setViewMode('list')}
+                                className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
+                                title="List view" aria-label="Switch to list view">
+                                <span className="material-symbols-outlined">view_list</span>
+                            </button>
+                            <button onClick={() => setViewMode('grid')}
+                                className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
+                                title="Grid view" aria-label="Switch to grid view">
+                                <span className="material-symbols-outlined">grid_view</span>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -3566,7 +3542,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
                                                         {/* Prompt Text Block */}
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed" title={group.prompt}>{group.prompt}</p>
+                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed mb-1" title={group.prompt}>{group.prompt}</p>
+                                                             {group.items[0]?.model && (
+                                                                 <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-bg)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium">
+                                                                     <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
+                                                                     {group.items[0].model}
+                                                                 </span>
+                                                             )}
                                                         </div>
 
                                                         {/* Actions & Metadata Block */}
@@ -3595,15 +3577,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         </div>
                                                     </div>
 
-                                                    {/* Bottom Row: Image Array Gallery */}
-                                                    <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
+                                                    {/* Bottom Row: Image Array — left-aligned, left-to-right */}
+                                                    <div className="flex flex-wrap gap-3 items-start justify-start">
                                                         {group.items.map((item, iIdx) => (
-                                                            <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
-                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                            <div key={item._id || iIdx} className="relative rounded-xl overflow-hidden flex-shrink-0" style={{ width: group.items.length === 1 ? '100%' : '180px' }}>
+                                                                <div className="group/img relative rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
-                                                                    
-                                                                    {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
+                                                                        className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
                                                                     
                                                                     {/* Hover Ribbon Actions inside Image */}
                                                                     <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex items-center justify-center p-1 sm:p-2 pointer-events-none group-hover/img:pointer-events-auto">
@@ -3623,6 +3603,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         ))}
                                                     </div>
+
 
                                                             {/* ── MCoT Thinking Mode Toggle (Session) ── */}
                                                             {group.items[0]?.aiMeta?.mcotReasoning && (
@@ -3781,10 +3762,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="space-y-4">
                                     {filtered.map(img => (
                                     <div key={img._id} className="generation-card">
-                                        {/* Prompt */}
-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
+                                        {/* Prompt + Model */}
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
                                             {img.prompt || img.title || 'AI Generated'}
                                         </p>
+                                        {img.model && (
+                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
+                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
+                                                {img.model}
+                                            </span>
+                                        )}
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
@@ -5281,10 +5268,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="space-y-4">
                                     {filtered.map(img => (
                                     <div key={img._id} className="generation-card">
-                                        {/* Prompt */}
-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
+                                        {/* Prompt + Model */}
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
                                             {img.prompt || img.title || 'AI Generated'}
                                         </p>
+                                        {img.model && (
+                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
+                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
+                                                {img.model}
+                                            </span>
+                                        )}
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
