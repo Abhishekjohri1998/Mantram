@@ -669,17 +669,38 @@ async function findIntegration(brandId, platform) {
 
 /**
  * Reply to a Meta comment using brand-specific token
+ * Tries Integration first, then SocialAccount as fallback.
  */
 async function replyToComment(commentId, text, brandId) {
     try {
+        // Step 1: Try Integration model for token
         const integration = await findIntegration(brandId);
-        const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+        let token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+
+        // Step 2: Fallback — try SocialAccount
+        if (!token) {
+            try {
+                const Brand = (await import('../models/Brand.js')).default;
+                const SocialAccount = (await import('../models/SocialAccount.js')).default;
+                const brand = await Brand.findById(brandId);
+                if (brand?.user) {
+                    const socialAcc = await SocialAccount.findOne({
+                        user: brand.user,
+                        platform: { $in: ['facebook', 'instagram'] },
+                        isActive: true,
+                    }).select('+accessToken');
+                    token = socialAcc?.accessToken;
+                    if (token) console.log('💬 Using SocialAccount token for comment reply');
+                }
+            } catch { /* ignore */ }
+        }
+
         if (!token) {
             console.warn('⚠️ No brand token available for comment reply');
             return { success: false, error: 'No brand token' };
         }
 
-        const response = await fetch(`https://graph.facebook.com/v21.0/${commentId}/replies`, {
+        const response = await fetch(`https://graph.facebook.com/v22.0/${commentId}/replies`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -689,10 +710,13 @@ async function replyToComment(commentId, text, brandId) {
         });
 
         const data = await response.json();
+        if (!response.ok) {
+            console.error('❌ Comment reply Graph API error:', JSON.stringify(data.error || data));
+        }
         return { success: response.ok, data };
     } catch (err) {
         console.error('❌ Comment reply error:', err.message);
-        return { success: false };
+        return { success: false, error: err.message };
     }
 }
 

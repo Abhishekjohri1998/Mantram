@@ -199,8 +199,9 @@ async function handleComment(change, platform, pageId) {
 
         console.log(`💬 [${platform}] Comment from ${commenterName}: "${(commentText).substring(0, 60)}"`);
 
-        // Find brand for this page
-        const integration = await Integration.findOne({
+        // ── Find brand for this page ──
+        // Step 1: Try Integration model (has brand field)
+        let integration = await Integration.findOne({
             $or: [
                 { 'platformData.pageId': pageId },
                 { 'platformData.igBusinessId': pageId },
@@ -209,7 +210,36 @@ async function handleComment(change, platform, pageId) {
             status: 'connected',
         });
 
-        const brandId = integration?.brand;
+        let brandId = integration?.brand;
+
+        // Step 2: Fallback — search SocialAccount (saves from social OAuth flow)
+        // SocialAccount doesn't have a brand field, but we can find the user
+        // and then look up their default brand.
+        if (!brandId) {
+            try {
+                const SocialAccount = (await import('../models/SocialAccount.js')).default;
+                const socialAcc = await SocialAccount.findOne({
+                    accountId: pageId,
+                    platform: { $in: ['instagram', 'facebook'] },
+                    isActive: true,
+                });
+                if (socialAcc?.user) {
+                    const Brand = (await import('../models/Brand.js')).default;
+                    const userBrand = await Brand.findOne({ user: socialAcc.user }).sort({ createdAt: 1 });
+                    brandId = userBrand?._id;
+                    if (brandId) {
+                        console.log(`💬 Found brand via SocialAccount fallback: ${userBrand.name}`);
+                    }
+                }
+            } catch (fallbackErr) {
+                console.warn('⚠️ SocialAccount fallback failed:', fallbackErr.message);
+            }
+        }
+
+        if (!brandId) {
+            console.warn(`⚠️ No brand found for page ${pageId} — comment auto-reply skipped`);
+            return;
+        }
 
         // Run through autonomous comment handler
         const result = await handleCommentAutonomously({

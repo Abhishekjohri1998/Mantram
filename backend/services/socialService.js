@@ -16,6 +16,7 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
+        'pages_manage_engagement',
         'pages_read_user_content',
         'business_management',
         'public_profile'
@@ -25,7 +26,8 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     const igScopes = [
         'instagram_basic',
         'instagram_content_publish',
-        'instagram_manage_insights'
+        'instagram_manage_insights',
+        'instagram_manage_comments'
     ];
 
     const requestedScopes = [...fbScopes];
@@ -187,6 +189,19 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
             }
         } catch (error) {
             // Standard page might not have a linked IG, ignore
+        }
+
+        // ── Subscribe this page to webhook events (comments, feed) ──
+        // Without this, Meta will never send comment/post webhooks to our server.
+        try {
+            const pageToken = page.access_token || userAccessToken;
+            await axios.post(`${FB_API_URL}/${page.id}/subscribed_apps`, {
+                subscribed_fields: 'feed',
+                access_token: pageToken,
+            });
+            console.log(`[SOCIAL] ✅ Page ${page.name} (${page.id}) subscribed to webhook field: feed`);
+        } catch (subErr) {
+            console.warn(`[SOCIAL] ⚠️ Failed to subscribe page ${page.id} to webhooks:`, subErr.response?.data?.error?.message || subErr.message);
         }
     }
 
