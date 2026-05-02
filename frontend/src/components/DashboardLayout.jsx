@@ -6,6 +6,7 @@ import { payments as paymentsAPI } from '../services/api'
 import { Link } from 'react-router-dom'
 import NotificationToast from './NotificationToast'
 import { useJobPoller } from '../hooks/useJobPoller'
+import GlobalCalendarDrawer from './GlobalCalendarDrawer'
 
 // Context to share sidebar toggle across components
 const SidebarContext = createContext()
@@ -14,6 +15,7 @@ export const useSidebar = () => useContext(SidebarContext)
 export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('mantram-sidebar-collapsed') === 'true')
+    const [globalCalendarOpen, setGlobalCalendarOpen] = useState(false)
 
     // Mount global job poller — runs for lifetime of dashboard session
     useJobPoller()
@@ -61,7 +63,7 @@ export default function DashboardLayout({ children, title, subtitle }) {
     }
 
     return (
-        <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, isCollapsed, setIsCollapsed }}>
+        <SidebarContext.Provider value={{ mobileOpen, setMobileOpen, isCollapsed, setIsCollapsed, globalCalendarOpen, setGlobalCalendarOpen }}>
             <div className="bg-[var(--sys-surface)]est overflow-hidden h-screen flex flex-col text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
                 
                 {/* Antigravity atmospheric depth */}
@@ -107,6 +109,9 @@ export default function DashboardLayout({ children, title, subtitle }) {
             </div>
             {/* Global notification toasts — shown on job completion */}
             <NotificationToast />
+
+            {/* Global Calendar Drawer */}
+            <GlobalCalendarDrawer open={globalCalendarOpen} onClose={() => setGlobalCalendarOpen(false)} />
         </SidebarContext.Provider>
     )
 }

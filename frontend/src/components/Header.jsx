@@ -18,7 +18,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
     const [showMenu, setShowMenu] = useState(false)
     const [showBrandMenu, setShowBrandMenu] = useState(false)
     const { fidatoOpen, toggleFidato, intelMissionCount, refreshIntelCount, unreadCount, fetchNotifications } = useUI()
-    const { isCollapsed, setIsCollapsed } = useSidebar()
+    const { isCollapsed, setIsCollapsed, globalCalendarOpen, setGlobalCalendarOpen } = useSidebar()
     const [platformBudgets, setPlatformBudgets] = useState(null)
     const [resumeJobs, setResumeJobs] = useState([])
     const [showNotifPanel, setShowNotifPanel] = useState(false)
@@ -277,6 +277,15 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                             <span className="text-xs font-bold text-primary hidden md:inline">Unlimited</span>
                         </div>
                     )}
+
+                    {/* Global Calendar */}
+                    <button
+                        className={`hdr-action-btn ${globalCalendarOpen ? 'text-primary bg-[var(--sys-surface)]' : ''}`}
+                        onClick={() => setGlobalCalendarOpen(!globalCalendarOpen)}
+                        title="Global Calendar"
+                    >
+                        <span className="material-symbols-outlined text-xl">calendar_month</span>
+                    </button>
 
                     {/* Notifications */}
                     <div className="relative" ref={notifBtnRef}>

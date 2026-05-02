@@ -13,6 +13,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { protect } from '../middleware/auth.js';
 import SocialPost from '../models/SocialPost.js';
+import VideoProject from '../models/VideoProject.js';
+import YoutubeProject from '../models/YoutubeProject.js';
 
 const router = express.Router();
 
@@ -75,6 +77,44 @@ function normalizeStrategyItem(item, strategy) {
     };
 }
 
+// Normalize a VideoProject into a unified CalendarEntry shape
+function normalizeVideoProject(v) {
+    return {
+        _id:         v._id,
+        source:      'video',
+        sourceType:  'video',
+        sourceTitle: v.title || 'Video Generation',
+        platform:    'mantram',
+        contentType: 'video',
+        caption:     v.input?.brief || '',
+        imageUrl:    v.generation?.thumbnailUrl || v.generation?.videoUrl || v.generation?.s3VideoUrl || '',
+        scheduledAt: v.createdAt,
+        status:      v.status === 'completed' ? 'published' : v.status === 'done' ? 'published' : v.status,
+        accountName: '',
+        strategyId:  null,
+        calendarItemId: null,
+    };
+}
+
+// Normalize a YoutubeProject into a unified CalendarEntry shape
+function normalizeYoutubeProject(y) {
+    return {
+        _id:         y._id,
+        source:      'youtube',
+        sourceType:  'youtube',
+        sourceTitle: y.metadata?.title || y.title || 'YouTube Project',
+        platform:    'youtube',
+        contentType: 'video',
+        caption:     y.metadata?.description || y.analysis?.summary || '',
+        imageUrl:    y.generatedThumbnailUrl || y.metadata?.thumbnailUrl || '',
+        scheduledAt: y.createdAt,
+        status:      y.status === 'done' ? 'published' : y.status,
+        accountName: y.metadata?.channelTitle || '',
+        strategyId:  null,
+        calendarItemId: null,
+    };
+}
+
 // ── GET /api/calendar — month view ────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
     try {
@@ -115,10 +155,24 @@ router.get('/', protect, async (req, res) => {
             }
         }
 
+        // 3) Video projects for this brand in this month
+        const videoProjects = await VideoProject.find({
+            brand,
+            createdAt: { $gte: rangeStart, $lte: rangeEnd },
+        }).lean();
+
+        // 4) Youtube projects for this brand in this month
+        const youtubeProjects = await YoutubeProject.find({
+            brandId: brand,
+            createdAt: { $gte: rangeStart, $lte: rangeEnd },
+        }).lean();
+
         // Merge and sort by scheduledAt
         const entries = [
             ...socialPosts.map(normalizeSocialPost),
             ...strategyEntries,
+            ...videoProjects.map(normalizeVideoProject),
+            ...youtubeProjects.map(normalizeYoutubeProject),
         ].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
 
         res.json({ success: true, entries, month: m, year: y });
@@ -172,9 +226,38 @@ router.get('/today', protect, async (req, res) => {
             }
         }
 
+        // Pull video projects for today/tomorrow
+        let videoProjects = [];
+        let youtubeProjects = [];
+        if (brand && brand !== 'all') {
+            videoProjects = await VideoProject.find({
+                brand,
+                user: req.user._id,
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(10).lean();
+
+            youtubeProjects = await YoutubeProject.find({
+                brandId: brand,
+                userId: req.user._id,
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(10).lean();
+        } else {
+            videoProjects = await VideoProject.find({
+                user: req.user._id,
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(10).lean();
+
+            youtubeProjects = await YoutubeProject.find({
+                userId: req.user._id,
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(10).lean();
+        }
+
         const entries = [
             ...posts.map(normalizeSocialPost),
             ...strategyItems,
+            ...videoProjects.map(normalizeVideoProject),
+            ...youtubeProjects.map(normalizeYoutubeProject),
         ].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
 
         // Split today / tomorrow for dashboard convenience
