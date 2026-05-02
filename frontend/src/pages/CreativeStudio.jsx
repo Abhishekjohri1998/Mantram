@@ -1126,6 +1126,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoSize, setLogoSize] = useState('medium')
     const [galleryFilter, setGalleryFilter] = useState('All')
     const [viewMode, setViewMode] = useState('list')
+    const [historyPage, setHistoryPage] = useState(1)
+    const [sidebarPanel, setSidebarPanel] = useState('create')
+    const [exploreExpanded, setExploreExpanded] = useState({})
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [floatingTray, setFloatingTray] = useState(null) // null | 'format' | 'camera' | 'references' | 'text' | 'advanced'
     const [psTray, setPsTray] = useState(null) // null | 'product' | 'camera' | 'scene' | 'ratio' | 'refs'
@@ -3535,7 +3538,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 }
                                             });
 
-                                            return groups.map((group, gIdx) => (
+                                            const PAGE_SIZE_H = 8;
+                                            const totalGroups_H = groups.length;
+                                            const totalPages_H = totalGroups_H > 0 ? (1 + ((totalGroups_H - 1) >> 3)) : 1;
+                                            const startIdx_H = (historyPage - 1) * PAGE_SIZE_H;
+                                            const pagedGroups = groups.slice(startIdx_H, startIdx_H + PAGE_SIZE_H);
+                                            return pagedGroups.map((group, gIdx) => (
                                                 <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-primary/20 bg-primary/[0.04]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden transition-all hover:border-[var(--sys-border-hover)] p-4`}>
                                                     
                                                     {/* Top Row: Prompt + metadata */}
@@ -3586,8 +3594,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                         className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
                                                                     
                                                                     {/* Hover Ribbon Actions inside Image */}
-                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex items-center justify-center p-1 sm:p-2 pointer-events-none group-hover/img:pointer-events-auto">
-                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform max-w-full">
+                                                                    <div className="absolute inset-0 bg-black/50 transition-all opacity-0 group-hover/img:opacity-100 flex items-end justify-center pb-3 pointer-events-none group-hover/img:pointer-events-auto">
+                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden">
                                                                             <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 View
                                                                             </button>
@@ -3693,7 +3701,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         {/* ── Generation History (from Image Bank) ── */}
                         {(() => {
-                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded');
+                            const allGenerated = bankImages.filter(img => {
+                                if (img.source === 'uploaded' || img.type === 'uploaded') return false;
+                                if (img.studioOrigin && img.studioOrigin !== 'creative') return false;
+                                if (img.jobType && img.jobType !== 'GenerationJob') return false;
+                                const tags = (img.tags || []).join(' ').toLowerCase();
+                                if (tags.includes('campaign-logo') || tags.includes('photoshoot') || tags.includes('carousel')) return false;
+                                return img.source === 'ai-generated' || img.category === 'generated' || !!img.imageUrl;
+                            });
                             const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
                                 const tags = (img.tags || []).map(t => t.toLowerCase());
                                 const title = (img.title || '').toLowerCase();
@@ -4060,7 +4075,69 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                     {/* ═══════════ SIDEBAR COMMAND PANEL ═══════════ */}
                     <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-bg)]">
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                        {/* ── Panel Tab Switcher ── */}
+                        <div className="flex border-b border-[var(--sys-border)] flex-shrink-0">
+                            <button onClick={() => setSidebarPanel('create')}
+                                className={"flex-1 py-2.5 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all " + (sidebarPanel === 'create' ? "text-[#FF4D00] border-b-2 border-[#FF4D00] bg-[#FF4D00]/5" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]")}>
+                                <span className="material-symbols-outlined align-middle mr-1" style={{fontSize:"13px"}}>auto_awesome</span>
+                                Create
+                            </button>
+                            <button onClick={() => setSidebarPanel('explore')}
+                                className={"flex-1 py-2.5 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all " + (sidebarPanel === 'explore' ? "text-[#FF4D00] border-b-2 border-[#FF4D00] bg-[#FF4D00]/5" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]")}>
+                                <span className="material-symbols-outlined align-middle mr-1" style={{fontSize:"13px"}}>explore</span>
+                                Explore
+                            </button>
+                        </div>
+
+                        {sidebarPanel === 'explore' && (
+                            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide p-3 space-y-2">
+                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest px-1 pt-1 pb-2">Templates by Category</p>
+                                {templateCategories.map(cat => (
+                                    <div key={cat.id} className="rounded-xl border border-[var(--sys-border)] overflow-hidden">
+                                        <button onClick={() => setExploreExpanded(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-[var(--sys-surface)] hover:bg-[var(--sys-bg)] transition-all cursor-pointer text-left">
+                                            <span className="material-symbols-outlined text-[#FF4D00]" style={{fontSize:"16px"}}>{cat.icon}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[12px] font-bold text-[var(--sys-text)]">{cat.label}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{cat.desc}</p>
+                                            </div>
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] transition-transform flex-shrink-0"
+                                                style={{fontSize:"16px", transform: exploreExpanded[cat.id] ? "rotate(180deg)" : "rotate(0deg)"}}>
+                                                expand_more
+                                            </span>
+                                        </button>
+                                        {exploreExpanded[cat.id] && (
+                                            <div className="border-t border-[var(--sys-border)] divide-y divide-[var(--sys-border)]">
+                                                {cat.subTemplates.map(tmpl => (
+                                                    <div key={tmpl.id} className="flex items-start gap-2.5 px-3 py-2.5 bg-[var(--sys-bg)] hover:bg-[var(--sys-surface)] transition-all">
+                                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] mt-0.5 flex-shrink-0" style={{fontSize:"14px"}}>{tmpl.icon}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-semibold text-[var(--sys-text)] leading-tight">{tmpl.label}</p>
+                                                            <p className="text-[10px] text-[var(--sys-text-muted)] leading-snug mt-0.5 line-clamp-2">{tmpl.desc}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                const built = activeBrand ? tmpl.buildPrompt(activeBrand, {}) : tmpl.desc;
+                                                                setPrompt(built);
+                                                                setSidebarPanel('create');
+                                                                setTimeout(() => { const ta = document.querySelector('[data-wt="creative-prompt"] textarea'); if (ta) ta.focus(); }, 150);
+                                                            }}
+                                                            disabled={!activeBrand}
+                                                            title={activeBrand ? "Use this template" : "Select a brand first"}
+                                                            className={"flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold mt-0.5 transition-all " + (activeBrand ? "bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00] hover:text-white cursor-pointer" : "opacity-30 text-[var(--sys-text-muted)] cursor-not-allowed")}>
+                                                            Use
+                                                            <span className="material-symbols-outlined" style={{fontSize:"11px"}}>arrow_forward</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {sidebarPanel === 'create' && <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
 
                             {/* ── Section: Model ── */}
                             <div className="px-4 pt-4 pb-3">
@@ -4340,6 +4417,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
+
+                        </div>}{/* /create panel */}
 
                             {/* ── Footer: Format + Quality + Generate ── */}
                             <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
