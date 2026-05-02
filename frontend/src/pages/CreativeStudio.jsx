@@ -12,6 +12,7 @@ import GlobalLoader from '../components/GlobalLoader'
 import MaskingCanvas from '../components/MaskingCanvas'
 import Walkthrough from '../components/Walkthrough'
 import TemplateLibrary from './TemplateLibrary'
+import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import './CreativeStudio/CreativeStudio.css'
 
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
@@ -1218,7 +1219,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         setCopyIsAiSuggested(false);
         try {
             const token = localStorage.getItem('mantram_token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/creatives/suggest-copy`, {
+            const res = await fetch(`${API_BASE}/creatives/suggest-copy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ brief: briefText.trim(), brandId: activeBrand?._id, format: selectedType || 'instagram-post' }),
