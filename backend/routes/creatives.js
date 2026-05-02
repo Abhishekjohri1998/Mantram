@@ -331,7 +331,9 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         let fullPrompt = agenticMeta.finalPrompt || agenticMeta.engineeredPrompt?.totalPrompt || prompt;
         const selectedImageModel = (options?.imageModel || 'nanobanana-2').toLowerCase();
         const aspectRatio = options?.aspectRatio || '1:1';
-        const imageSize = options?.imageSize || '2K'; // 2K default for high-fidelity output (timeout extended to support)
+        // ⚡ PERF: 1K default (was 2K). 2K adds ~3–8s per gen with negligible quality
+        // benefit for typical social/ad creatives. Users can opt into 2K explicitly.
+        const imageSize = options?.imageSize || '1K';
         const customSize = options?.customSize || null;
 
         let ratioNum = 1;
@@ -341,6 +343,21 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
             const [w, h] = aspectRatio.split(':').map(Number);
             if (w && h) ratioNum = w / h;
         }
+
+        // ── ASPECT-RATIO REINFORCEMENT ──
+        // Even though Gemini receives imageConfig.aspectRatio, preview models drift toward
+        // 1:1 unless the prompt itself reinforces the orientation. Append a composition
+        // hint matching the chosen format. This was the root cause users reported:
+        // "I select 4:5 / 9:16 but output looks square."
+        const orientationHint =
+            ratioNum > 1.3  ? `WIDESCREEN HORIZONTAL ${aspectRatio}` :
+            ratioNum < 0.85 ? `VERTICAL PORTRAIT ${aspectRatio}` :
+                              `SQUARE ${aspectRatio}`;
+        const composeFor =
+            ratioNum > 1.3  ? 'horizontal cinematic frame — subject occupies the left or right two-thirds, with environmental depth extending across the wide canvas. Use rule-of-thirds horizontal balance.' :
+            ratioNum < 0.85 ? 'vertical reel/story frame — subject is composed top-to-bottom, eyeline upper third, breathing room above the head, brand atmosphere fills the lower third. NEVER center on a square crop.' :
+                              'centered square composition with strong middle-frame focal point and balanced negative space.';
+        fullPrompt += `\n\nCANVAS FORMAT: ${orientationHint}. Compose for a ${composeFor}\nThe final image MUST be rendered in ${aspectRatio} aspect ratio — do NOT default to 1:1 if the requested ratio differs.`;
 
         if (ratioNum >= 2.5 || ratioNum <= 1 / 2.5) {
             console.log(`📐 Extreme aspect ratio detected (ratio ${ratioNum.toFixed(2)}). Injecting anti-tiling prompt.`);
@@ -579,21 +596,40 @@ Generate the adapted creative now.`;
                 let finalUrl = rawImageUrl;
                 const ts = Date.now();
 
+                // ⚡ PERF: when addLogo=true, skip the first S3 upload entirely.
+                // We can decode the data URI directly to a Buffer, composite the logo,
+                // and upload ONCE. Saves the ~1–2s S3 upload + ~500–1500ms re-fetch.
+                const willOverlayLogo = !!(options?.addLogo);
+                let inMemoryImageBuffer = null;
+
                 if (finalUrl.startsWith('data:image/')) {
-                    try {
-                        finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}.png`);
-                    } catch (s3Err) {
-                        console.error('[BG-S3] Upload failed:', s3Err.message);
+                    if (willOverlayLogo) {
+                        // Defer first S3 upload — we'll do composite + single upload below.
+                        try {
+                            inMemoryImageBuffer = await fetchImageBuffer(finalUrl);
+                        } catch (decodeErr) {
+                            console.warn('[BG-LOGO] Direct decode failed, falling back to S3 round-trip:', decodeErr.message);
+                        }
+                    }
+                    if (!inMemoryImageBuffer) {
+                        try {
+                            finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}.png`);
+                        } catch (s3Err) {
+                            console.error('[BG-S3] Upload failed:', s3Err.message);
+                        }
                     }
                 }
 
-                if (options?.addLogo && finalUrl) {
+                if (willOverlayLogo && (inMemoryImageBuffer || finalUrl)) {
                     try {
                         const brandData = await Brand.findById(brandId).lean();
                         const logoUrl = brandData?.dna?.logo?.url;
                         if (logoUrl) {
+                            // Image buffer: from in-memory (fast path) or S3 (fallback path).
+                            // Logo buffer: from in-memory cache (LOGO_CACHE in logoOverlay.js)
+                            // when warm — saves ~200–500ms per repeat generation.
                             const [imageBuffer, logoBuffer] = await Promise.all([
-                                fetchImageBuffer(finalUrl),
+                                inMemoryImageBuffer ? Promise.resolve(inMemoryImageBuffer) : fetchImageBuffer(finalUrl),
                                 fetchImageBuffer(logoUrl),
                             ]);
                             if (imageBuffer && logoBuffer) {
@@ -604,9 +640,14 @@ Generate the adapted creative now.`;
                                 );
                                 const compositedBase64 = `data:image/png;base64,${compositedBuffer.toString('base64')}`;
                                 try {
+                                    // Single S3 upload of the final composited image.
                                     finalUrl = await uploadToS3(compositedBase64, `creatives/${brandId}/${ts}-logo.png`);
                                 } catch (s3Err) {
-                                    console.warn('[BG-LOGO] S3 re-upload failed:', s3Err.message);
+                                    console.warn('[BG-LOGO] S3 upload failed:', s3Err.message);
+                                    // If S3 fails and we have no fallback URL, keep the raw data URI as last resort
+                                    if (!finalUrl || finalUrl.startsWith('data:')) {
+                                        finalUrl = compositedBase64;
+                                    }
                                 }
                             }
                         }
@@ -1725,9 +1766,10 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
                     .replace(/\n{3,}/g, '\n\n')
                     .trim();
-                // Hard cap at 2000 chars if still too long
-                if (optimizedPrompt.length > 2000) {
-                    optimizedPrompt = optimizedPrompt.substring(0, 1950) + '\n\n[...condensed for speed]';
+                // ⚡ PERF: 1500-char cap (was 2000) when no refs — Gemini Flash 3.1 Image
+                // latency scales noticeably above ~1500 chars. Saves ~1–2s per gen.
+                if (optimizedPrompt.length > 1500) {
+                    optimizedPrompt = optimizedPrompt.substring(0, 1450) + '\n\n[...condensed for speed]';
                 }
             }
             console.log(`⚡ Prompt optimized: ${origLen} → ${optimizedPrompt.length} chars (refs: ${hasRefs})`);
