@@ -4420,8 +4420,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         </div>}{/* /create panel */}
 
-                            {/* ── Footer: Format + Quality + Generate ── */}
-                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
+                        {/* ── Footer: Format + Quality + Generate ── */}
+                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
                                 {/* Format + Quality row */}
                                 <div className="flex items-center gap-2">
                                     {/* Format picker */}
