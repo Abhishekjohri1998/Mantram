@@ -279,30 +279,39 @@ connectDB().then(() => {
 // Use the standard CORS package as a fallback but our brute-force above should catch most
 
 
-// Special middleware for Shopify Webhooks
-app.use('/api/shopify/webhooks', express.raw({ type: '*/*', limit: '50mb' }), (req, res, next) => {
-    if (Buffer.isBuffer(req.body)) {
-        req.rawBody = req.body;
-        try {
-            const bodyString = req.body.toString('utf8');
-            if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
-                req.body = JSON.parse(bodyString);
+// Capture raw body for webhooks that require HMAC verification (Shopify + Meta).
+// Meta's X-Hub-Signature-256 is computed over the literal bytes sent — the body
+// must NOT be re-stringified after parsing or the signature will never match.
+const RAW_BODY_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/meta'];
+const isRawBodyRoute = (url) => !!url && RAW_BODY_PREFIXES.some(p => url.startsWith(p));
+
+app.use((req, res, next) => {
+    if (!isRawBodyRoute(req.originalUrl)) return next();
+    express.raw({ type: '*/*', limit: '50mb' })(req, res, (err) => {
+        if (err) return next(err);
+        if (Buffer.isBuffer(req.body)) {
+            req.rawBody = req.body;
+            try {
+                const bodyString = req.body.toString('utf8');
+                if (bodyString && (bodyString.startsWith('{') || bodyString.startsWith('['))) {
+                    req.body = JSON.parse(bodyString);
+                }
+            } catch (e) {
+                console.warn('⚠️ Webhook body is not valid JSON, but rawBody captured');
             }
-        } catch (e) {
-            console.warn('⚠️ Webhook body is not valid JSON, but rawBody captured');
         }
-    }
-    next();
+        next();
+    });
 });
 
-// Regular body parsers - skip for webhooks
+// Regular body parsers - skip for raw-body webhook routes
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
+    if (isRawBodyRoute(req.originalUrl)) return next();
     express.json({ limit: '50mb' })(req, res, next);
 });
 
 app.use((req, res, next) => {
-    if (req.originalUrl && req.originalUrl.includes('/api/shopify/webhooks')) return next();
+    if (isRawBodyRoute(req.originalUrl)) return next();
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
 });
 

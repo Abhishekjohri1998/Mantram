@@ -92,7 +92,7 @@ async function resolveMediaUrl(url, userId, ext = 'png') {
     // Data URI — upload to S3
     if (url.startsWith('data:')) {
         try {
-            const s3Url = await uploadToS3(url, `social-scheduled/${userId}/${Date.now()}.${ext}`);
+            const s3Url = await uploadToS3(url, `social-scheduled/${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`);
             return s3Url;
         } catch (s3Err) {
             console.error('[SCHEDULER] S3 upload failed:', s3Err.message);
@@ -119,23 +119,57 @@ async function publishScheduledPost(post) {
         const account = await SocialAccount.findOne(accountQuery).select('+accessToken');
 
         if (!account) {
-            console.warn(`[SCHEDULER] No active ${post.platform} account for user ${post.user} — marking failed`);
+            console.warn(`[SCHEDULER] No active ${post.platform} account for user ${post.user} (post ${post._id}) — marking failed`);
             post.status = 'failed';
-            post.error = `No active ${post.platform} account connected. Please reconnect and reschedule.`;
+            post.error = `No active ${post.platform} account connected. Please reconnect "${post.accountName || post.accountId}" and reschedule.`;
+            await post.save();
+            return;
+        }
+
+        // Pre-check token expiry — Meta tokens silently die after 60 days for many flows.
+        // Catching this here gives the user a clear "reconnect" message instead of a cryptic Graph error.
+        if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) <= new Date()) {
+            console.warn(`[SCHEDULER] Token expired for ${post.platform} account ${account.accountName} — marking failed`);
+            post.status = 'failed';
+            post.error = `Access token expired for ${post.platform} (${account.accountName}). Please reconnect.`;
+            await post.save();
+            return;
+        }
+
+        if (!account.accessToken) {
+            post.status = 'failed';
+            post.error = `Missing access token for ${post.platform} (${account.accountName}). Please reconnect.`;
             await post.save();
             return;
         }
 
         // Resolve media URLs
-        const absoluteImageUrl = await resolveMediaUrl(post.imageUrl, post.user, 'png');
+        let absoluteImageUrl = await resolveMediaUrl(post.imageUrl, post.user, 'png');
         const absoluteVideoUrl = await resolveMediaUrl(post.videoUrl, post.user, 'mp4');
 
         // Resolve carousel URLs
         let carouselUrls = [];
-        if (post.imageUrls && post.imageUrls.length > 1) {
-            for (const url of post.imageUrls) {
-                carouselUrls.push(await resolveMediaUrl(url, post.user, 'png'));
+        try {
+            if (post.imageUrls && post.imageUrls.length > 1) {
+                carouselUrls = await Promise.all(post.imageUrls.map(u => resolveMediaUrl(u, post.user, 'png')));
             }
+            if (!absoluteImageUrl && carouselUrls.length > 0) {
+                absoluteImageUrl = carouselUrls[0];
+            }
+        } catch (resolveErr) {
+            console.error(`[SCHEDULER] Image resolution failed for post ${post._id}:`, resolveErr.message);
+            post.status = 'failed';
+            post.error = `Image upload/resolution failed: ${resolveErr.message}`;
+            await post.save();
+            return;
+        }
+
+        // Instagram requires media — fail fast with a clear message.
+        if (post.platform === 'instagram' && !absoluteImageUrl && !absoluteVideoUrl && carouselUrls.length === 0) {
+            post.status = 'failed';
+            post.error = 'Instagram posts require at least one image or video. Add media and reschedule.';
+            await post.save();
+            return;
         }
 
         const caption = post.caption || '';
@@ -180,6 +214,7 @@ async function publishScheduledPost(post) {
 
     } catch (err) {
         console.error(`[SCHEDULER] ❌ Failed to publish post ${post._id}:`, err.message);
+        if (err.stack) console.error(err.stack);
         post.status = 'failed';
         post.error = err.message || 'Unknown publishing error';
         await post.save();
@@ -306,11 +341,34 @@ async function processDuePosts() {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 export function startScheduledPostPublisher() {
-    processDuePosts().catch(err => console.warn('[SCHEDULER] Initial run failed:', err.message));
+    console.log(`📅 Scheduled Post Publisher starting — poll interval ${POLL_INTERVAL_MS / 1000}s`);
+
+    processDuePosts()
+        .then(() => console.log('📅 [SCHEDULER] Initial tick complete'))
+        .catch(err => console.warn('[SCHEDULER] Initial run failed:', err.message));
 
     setInterval(() => {
         processDuePosts().catch(err => console.warn('[SCHEDULER] Tick failed:', err.message));
     }, POLL_INTERVAL_MS);
 
     console.log('📅 Scheduled Post Publisher active — checking every 60s (parallel publish + 1-hr reminder + stuck recovery)');
+}
+
+// ── Manual trigger (used by diagnostic endpoint) ──────────────────────────────
+export async function runScheduledPostPublisherNow() {
+    await processDuePosts();
+}
+
+// ── Single-post retry (used by diagnostic endpoint) ───────────────────────────
+export async function retryFailedPost(postId) {
+    const post = await SocialPost.findById(postId);
+    if (!post) throw new Error('Post not found');
+    post.status = 'scheduled';
+    post.error = '';
+    if (!post.scheduledFor || post.scheduledFor > new Date()) {
+        post.scheduledFor = new Date();
+    }
+    await post.save();
+    await publishScheduledPost(post);
+    return post;
 }

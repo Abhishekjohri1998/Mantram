@@ -1,19 +1,38 @@
 # Mantram AI — robots.txt
-# AI-Friendly Crawling Rules
+# Last updated: 2026-05-02
+#
+# Public surface area: homepage, /studio/<slug> SEO sub-pages, legal pages,
+# llms.txt and sitemap. Everything authenticated is disallowed.
+# AI crawlers (GPTBot, Claude, Perplexity, Cohere, etc.) are explicitly allowed
+# on public content so the brand surfaces in AI search and Overviews.
 
+# ── Default rules for all crawlers ──────────────────────────────────────────
 User-agent: *
 Allow: /
 Allow: /studio/
+Allow: /ai-search-optimization
+Allow: /aeo
 Allow: /privacy-policy
 Allow: /terms
 Allow: /data-deletion
+Allow: /llms.txt
+Allow: /mantram-logo.png
+Allow: /mantram-logo.svg
+Allow: /mantram-favicon-32.png
+Allow: /mantram-favicon-192.png
+Allow: /mantram-apple-touch-icon.png
+Allow: /dashboard-hero.png
+Allow: /screenshots/
 
-# Block authenticated/internal pages from indexing
 Disallow: /dashboard
 Disallow: /admin
 Disallow: /superadmin
 Disallow: /onboarding
 Disallow: /auth
+Disallow: /login
+Disallow: /signup
+Disallow: /verify-email
+Disallow: /reset-password
 Disallow: /nexus
 Disallow: /brand-dna
 Disallow: /brands
@@ -21,48 +40,132 @@ Disallow: /analytics
 Disallow: /content-studio
 Disallow: /creative-studio
 Disallow: /video-studio
+Disallow: /youtube-studio
 Disallow: /performance-marketing
 Disallow: /d2c-analytics
 Disallow: /integrations
 Disallow: /smart-calendar
 Disallow: /publish
 Disallow: /brainstorm
+Disallow: /research-studio
 Disallow: /seo-studio
+Disallow: /social-media-studio
+Disallow: /funnel-studio
+Disallow: /retention-studio
+Disallow: /pulse-studio
 Disallow: /conversations
 Disallow: /credits
 Disallow: /skills
 Disallow: /team
+Disallow: /settings
+Disallow: /templates
+Disallow: /ai-canvas
+Disallow: /home
+Disallow: /api/
+Disallow: /join/
 
-# Sitemap
-Sitemap: https://mantram.ai/sitemap.xml
+Crawl-delay: 1
 
-# AI Crawlers — Explicitly Allow
+# ── AI crawlers — explicitly allow on public content ───────────────────────
+# Listed individually so each engine has the same explicit allow-list.
+
 User-agent: GPTBot
 Allow: /
 Allow: /studio/
+Allow: /llms.txt
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /superadmin
 
-User-agent: Google-Extended
+User-agent: ChatGPT-User
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: OAI-SearchBot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
 User-agent: Anthropic-AI
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: Claude-Web
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: Google-Extended
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: Perplexity-User
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
 User-agent: CCBot
 Allow: /
 Allow: /studio/
+Allow: /llms.txt
 
-User-agent: PerplexityBot
+User-agent: Amazonbot
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: Diffbot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: Mistral-AI-User
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: YouBot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
 User-agent: Applebot-Extended
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
 User-agent: cohere-ai
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
 User-agent: Bytespider
 Allow: /
+Allow: /studio/
+Allow: /llms.txt
 
-# Crawl-delay for polite crawling
-User-agent: *
-Crawl-delay: 1
+User-agent: meta-externalagent
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+User-agent: DuckAssistBot
+Allow: /
+Allow: /studio/
+Allow: /llms.txt
+
+# ── Sitemap ─────────────────────────────────────────────────────────────────
+Sitemap: https://mantram.ai/sitemap.xml

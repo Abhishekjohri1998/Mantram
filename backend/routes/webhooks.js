@@ -22,6 +22,8 @@ const META_GRAPH_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 /**
  * Verify Meta X-Hub-Signature-256 header to prevent forged webhooks.
+ * `rawBody` MUST be the exact bytes Meta sent (Buffer or string). Re-stringifying
+ * a parsed JSON body will produce different bytes and the HMAC will never match.
  */
 function verifyMetaSignature(rawBody, signatureHeader) {
     if (!signatureHeader) return false;
@@ -32,8 +34,12 @@ function verifyMetaSignature(rawBody, signatureHeader) {
     }
     const [algo, signature] = signatureHeader.split('=');
     if (algo !== 'sha256' || !signature) return false;
-    const expected = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const bodyBuf = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody || '', 'utf8');
+    const expected = crypto.createHmac('sha256', appSecret).update(bodyBuf).digest('hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const sigBuf = Buffer.from(signature, 'hex');
+    if (expectedBuf.length !== sigBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, sigBuf);
 }
 
 // ── GET /api/webhooks/meta — Webhook verification (Meta requires this) ──
@@ -55,9 +61,15 @@ router.get('/meta', (req, res) => {
 // ── POST /api/webhooks/meta — Receive real events from Meta ──
 
 router.post('/meta', async (req, res) => {
-    // BUG-1 FIX: Verify webhook signature before processing
+    // Verify webhook signature against the EXACT raw bytes Meta sent.
+    // index.js installs express.raw() for /api/webhooks/meta and stores those bytes
+    // on req.rawBody before JSON-parsing, so signature checks survive parsing.
     const signature = req.headers['x-hub-signature-256'];
-    const rawBody = JSON.stringify(req.body);
+    const rawBody = req.rawBody;
+    if (!rawBody) {
+        console.error('❌ Meta webhook missing rawBody — raw-body middleware not applied');
+        return res.sendStatus(500);
+    }
     if (!verifyMetaSignature(rawBody, signature)) {
         console.warn('⚠️ Meta webhook signature verification failed — rejecting');
         return res.sendStatus(403);
