@@ -7,8 +7,10 @@ import { brandCalendar, social } from '../services/api'
 import ScheduleDrawer from '../components/ScheduleDrawer'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const PLATFORM_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work', twitter:'alternate_email', youtube:'smart_display', email:'email', whatsapp:'chat' }
-const PLATFORM_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2', twitter:'#1DA1F2', youtube:'#FF0000', email:'#888', whatsapp:'#25D366' }
+const PLATFORM_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work', twitter:'alternate_email', youtube:'smart_display', email:'email', whatsapp:'chat', mantram:'movie', pinterest:'push_pin' }
+const PLATFORM_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2', twitter:'#1DA1F2', youtube:'#FF0000', email:'#888', whatsapp:'#25D366', mantram:'#8B5CF6', pinterest:'#E60023' }
+const SOURCE_ICON    = { post:'send', strategy:'edit_calendar', video:'movie', youtube:'smart_display', creative:'palette', content:'article' }
+const SOURCE_COLOR   = { post:'#10B981', strategy:'#38BDF8', video:'#8B5CF6', youtube:'#FF0000', creative:'#A855F7', content:'#06B6D4' }
 const STATUS_META = {
     scheduled: { label:'Scheduled', icon:'schedule_send', cls:'text-amber-400 bg-amber-400/10 border-amber-400/20' },
     processing: { label:'Publishing', icon:'progress_activity', cls:'text-orange-400 bg-orange-400/10 border-orange-400/20' },
@@ -47,8 +49,9 @@ function fmtTime(iso) {
 // ── Mini card inside day cell ────────────────────────────────────────────────
 function MiniCard({ entry, onClick }) {
     const platform = entry.platform?.toLowerCase() || ''
-    const icon  = PLATFORM_ICON[platform]  || 'share'
-    const color = PLATFORM_COLOR[platform] || '#888'
+    const useSource = entry.source && SOURCE_ICON[entry.source]
+    const icon  = useSource ? SOURCE_ICON[entry.source] : (PLATFORM_ICON[platform] || 'share')
+    const color = useSource ? SOURCE_COLOR[entry.source] : (PLATFORM_COLOR[platform] || '#888')
     const sm = STATUS_META[entry.status] || STATUS_META.pending
     return (
         <button

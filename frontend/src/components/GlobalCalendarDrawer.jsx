@@ -5,8 +5,10 @@ import { brandCalendar, social } from '../services/api'
 import ScheduleDrawer from './ScheduleDrawer'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const PLATFORM_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work', twitter:'alternate_email', youtube:'smart_display', email:'email', whatsapp:'chat', mantram:'movie' }
-const PLATFORM_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2', twitter:'#1DA1F2', youtube:'#FF0000', email:'#888', whatsapp:'#25D366', mantram:'#8B5CF6' }
+const PLATFORM_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work', twitter:'alternate_email', youtube:'smart_display', email:'email', whatsapp:'chat', mantram:'movie', pinterest:'push_pin' }
+const PLATFORM_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2', twitter:'#1DA1F2', youtube:'#FF0000', email:'#888', whatsapp:'#25D366', mantram:'#8B5CF6', pinterest:'#E60023' }
+const SOURCE_ICON    = { post:'send', strategy:'edit_calendar', video:'movie', youtube:'smart_display', creative:'palette', content:'article' }
+const SOURCE_COLOR   = { post:'#10B981', strategy:'#38BDF8', video:'#8B5CF6', youtube:'#FF0000', creative:'#A855F7', content:'#06B6D4' }
 const STATUS_META = {
     scheduled: { label:'Scheduled', icon:'schedule_send', cls:'text-amber-400 bg-amber-400/10 border-amber-400/20' },
     processing: { label:'Processing', icon:'progress_activity', cls:'text-orange-400 bg-orange-400/10 border-orange-400/20' },
@@ -46,8 +48,10 @@ function fmtTime(iso) {
 // ── Mini card inside day cell ────────────────────────────────────────────────
 function MiniCard({ entry, onClick }) {
     const platform = entry.platform?.toLowerCase() || ''
-    const icon  = PLATFORM_ICON[platform]  || 'share'
-    const color = PLATFORM_COLOR[platform] || '#888'
+    // For creative/content source entries, show source icon instead of platform icon
+    const useSource = entry.source && SOURCE_ICON[entry.source]
+    const icon  = useSource ? SOURCE_ICON[entry.source] : (PLATFORM_ICON[platform] || 'share')
+    const color = useSource ? SOURCE_COLOR[entry.source] : (PLATFORM_COLOR[platform] || '#888')
     const sm = STATUS_META[entry.status] || STATUS_META.pending
     return (
         <button
@@ -66,9 +70,11 @@ function MiniCard({ entry, onClick }) {
 // ── Entry detail panel ───────────────────────────────────────────────────────
 function EntryPanel({ entry, onClose, onReschedule }) {
     const platform = entry?.platform?.toLowerCase() || ''
-    const icon  = PLATFORM_ICON[platform]  || 'share'
-    const color = PLATFORM_COLOR[platform] || '#888'
+    const useSource = entry?.source && SOURCE_ICON[entry.source]
+    const icon  = useSource ? SOURCE_ICON[entry.source] : (PLATFORM_ICON[platform] || 'share')
+    const color = useSource ? SOURCE_COLOR[entry.source] : (PLATFORM_COLOR[platform] || '#888')
     const sm = STATUS_META[entry?.status] || STATUS_META.pending
+    const sourceLabels = { 'creative-studio':'Creative Studio', 'content-studio':'Content Studio', creative:'Creative Studio', content:'Content Studio', strategy:'Monthly Strategy', video:'Video Studio', youtube:'YouTube Studio' }
     if (!entry) return null
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={onClose}>
@@ -82,7 +88,7 @@ function EntryPanel({ entry, onClose, onReschedule }) {
                     <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-xl" style={{ color }}>{icon}</span>
                         <div>
-                            <p className="text-sm font-bold text-[var(--sys-text)] capitalize">{platform === 'mantram' ? 'Video Generation' : platform || 'Post'}</p>
+                            <p className="text-sm font-bold text-[var(--sys-text)] capitalize">{sourceLabels[entry.sourceType] || sourceLabels[entry.source] || (platform === 'mantram' ? 'Video Generation' : platform || 'Post')}</p>
                             <p className="text-[10px] text-[var(--sys-text-muted)]">{entry.accountName || entry.sourceTitle || entry.contentType}</p>
                         </div>
                     </div>
@@ -130,7 +136,7 @@ function EntryPanel({ entry, onClose, onReschedule }) {
                 </div>
 
                 {/* Footer */}
-                {entry.status === 'scheduled' && entry.source !== 'video' && entry.source !== 'youtube' && (
+                {entry.status === 'scheduled' && entry.source !== 'video' && entry.source !== 'youtube' && entry.source !== 'creative' && entry.source !== 'content' && (
                     <div className="px-5 pb-5 flex gap-3">
                         <button
                             onClick={() => { onClose(); onReschedule(entry) }}
@@ -145,6 +151,14 @@ function EntryPanel({ entry, onClose, onReschedule }) {
                         <div className="text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
                             <span className="material-symbols-outlined text-[10px]">info</span>
                             Strategy item — schedule it via the Monthly Strategy brief drawer.
+                        </div>
+                    </div>
+                )}
+                {(entry.source === 'creative' || entry.source === 'content') && (
+                    <div className="px-5 pb-5">
+                        <div className="text-[10px] text-[var(--sys-text-muted)] flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[10px]" style={{ color: SOURCE_COLOR[entry.source] }}>{SOURCE_ICON[entry.source]}</span>
+                            Generated in {entry.source === 'creative' ? 'Creative Studio' : 'Content Studio'} — schedule it to publish.
                         </div>
                     </div>
                 )}
@@ -414,9 +428,11 @@ export default function GlobalCalendarDrawer({ open, onClose }) {
                                 </div>
                             ) : filtered.map((entry, idx) => {
                                 const platform = entry.platform?.toLowerCase() || ''
-                                const icon  = PLATFORM_ICON[platform]  || 'share'
-                                const color = PLATFORM_COLOR[platform] || '#888'
+                                const useSource = entry.source && SOURCE_ICON[entry.source]
+                                const icon  = useSource ? SOURCE_ICON[entry.source] : (PLATFORM_ICON[platform] || 'share')
+                                const color = useSource ? SOURCE_COLOR[entry.source] : (PLATFORM_COLOR[platform] || '#888')
                                 const sm    = STATUS_META[entry.status] || STATUS_META.pending
+                                const sourceLabel = { 'creative-studio':'Creative Studio', 'content-studio':'Content Studio', strategy:'Strategy', video:'Video Studio', youtube:'YouTube' }
                                 return (
                                     <div key={entry._id}
                                         onClick={() => setSelectedEntry(entry)}
@@ -434,11 +450,11 @@ export default function GlobalCalendarDrawer({ open, onClose }) {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <span className="text-xs font-bold capitalize text-[var(--sys-text)]" style={{ color }}>
-                                                    {platform === 'mantram' ? 'Video Generation' : platform}
+                                                    {useSource ? (entry.source === 'creative' ? 'Creative' : entry.source === 'content' ? 'Content' : entry.source) : (platform === 'mantram' ? 'Video Generation' : platform)}
                                                 </span>
                                                 {entry.accountName && <span className="text-[10px] text-[var(--sys-text-muted)]">· {entry.accountName}</span>}
                                                 {entry.sourceType && entry.sourceType !== 'manual' && (
-                                                    <span className="text-[10px] text-primary/70 capitalize">· {entry.sourceType}</span>
+                                                    <span className="text-[10px] text-primary/70 capitalize">· {sourceLabel[entry.sourceType] || entry.sourceType}</span>
                                                 )}
                                             </div>
                                             <p className="text-sm text-[var(--sys-text-muted)] line-clamp-1">{entry.caption || entry.sourceTitle || entry.contentType || '—'}</p>

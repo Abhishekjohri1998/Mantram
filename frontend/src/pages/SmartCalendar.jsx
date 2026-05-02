@@ -43,6 +43,7 @@ const CONTENT_TYPE_META = {
     youtube:   { icon: 'smart_display', label: 'YouTube', color: '#FF0000' },
     image:     { icon: 'image', label: 'Image', color: '#8B5CF6' },
     text:      { icon: 'notes', label: 'Text Post', color: '#64748B' },
+    video:     { icon: 'videocam', label: 'Video', color: '#A855F7' },
 }
 
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']

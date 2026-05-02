@@ -2,7 +2,8 @@
  * Brand Calendar API
  *
  * Unified endpoint that returns scheduled/published posts (SocialPost) merged
- * with Monthly Strategy calendar items for a given brand + month.
+ * with Monthly Strategy calendar items, Creative assets, Content pieces,
+ * Video projects, and YouTube projects for a given brand + month.
  *
  * Routes:
  *   GET /api/calendar?brand=&month=&year=    → full month view
@@ -15,6 +16,8 @@ import { protect } from '../middleware/auth.js';
 import SocialPost from '../models/SocialPost.js';
 import VideoProject from '../models/VideoProject.js';
 import YoutubeProject from '../models/YoutubeProject.js';
+import Creative from '../models/Creative.js';
+import Content from '../models/Content.js';
 
 const router = express.Router();
 
@@ -115,6 +118,55 @@ function normalizeYoutubeProject(y) {
     };
 }
 
+// Normalize a Creative into a unified CalendarEntry shape
+function normalizeCreative(c) {
+    // Map creative type to a platform hint
+    const typePlatform = {
+        'instagram-post': 'instagram', 'instagram-story': 'instagram',
+        'facebook-ad': 'facebook', 'linkedin-post': 'linkedin',
+        'twitter-post': 'twitter', 'youtube-thumb': 'youtube',
+        'pinterest': 'pinterest',
+    };
+    return {
+        _id:         c._id,
+        source:      'creative',
+        sourceType:  'creative-studio',
+        sourceTitle: c.title || c.copy?.headline || c.type || 'Creative',
+        platform:    typePlatform[c.type] || 'instagram',
+        contentType: 'image',
+        caption:     c.copy?.headline ? `${c.copy.headline}${c.copy.subtext ? ' — ' + c.copy.subtext : ''}` : c.prompt?.slice(0, 150) || '',
+        imageUrl:    c.imageUrl || c.thumbnailUrl || '',
+        scheduledAt: c.createdAt,
+        status:      c.status === 'published' ? 'published' : c.status === 'approved' ? 'complete' : 'complete',
+        accountName: '',
+        strategyId:  null,
+        calendarItemId: null,
+    };
+}
+
+// Normalize a Content piece into a unified CalendarEntry shape
+function normalizeContent(c) {
+    const typeToContentType = {
+        blog: 'blog', email: 'email', ad: 'ad',
+        youtube_video: 'video', youtube_shorts: 'video', youtube_content: 'video',
+    };
+    return {
+        _id:         c._id,
+        source:      'content',
+        sourceType:  'content-studio',
+        sourceTitle: c.title || c.type || 'Content',
+        platform:    c.platform?.toLowerCase() || '',
+        contentType: typeToContentType[c.type] || 'text',
+        caption:     c.title || c.content?.slice(0, 200) || '',
+        imageUrl:    c.blogMeta?.heroImageUrl || '',
+        scheduledAt: c.publishedAt || c.createdAt,
+        status:      c.status === 'published' ? 'published' : c.status === 'approved' ? 'complete' : 'complete',
+        accountName: '',
+        strategyId:  null,
+        calendarItemId: null,
+    };
+}
+
 // ── GET /api/calendar — month view ────────────────────────────────────────────
 router.get('/', protect, async (req, res) => {
     try {
@@ -167,12 +219,44 @@ router.get('/', protect, async (req, res) => {
             createdAt: { $gte: rangeStart, $lte: rangeEnd },
         }).lean();
 
+        // 5) Creative assets for this brand in this month
+        const creativeAssets = await Creative.find({
+            brand,
+            imageUrl: { $exists: true, $ne: '' },
+            createdAt: { $gte: rangeStart, $lte: rangeEnd },
+        }).sort({ createdAt: 1 }).lean();
+
+        // 6) Content pieces for this brand in this month
+        const contentPieces = await Content.find({
+            brand,
+            content: { $exists: true, $ne: '' },
+            createdAt: { $gte: rangeStart, $lte: rangeEnd },
+        }).sort({ createdAt: 1 }).lean();
+
+        // Deduplicate: if a creative was already published as a SocialPost, skip it
+        // SocialPosts with sourceType='creative' reference the same content
+        const publishedCreativeImageUrls = new Set(
+            socialPosts.filter(p => p.sourceType === 'creative' && p.imageUrl).map(p => p.imageUrl)
+        );
+        const uniqueCreatives = creativeAssets.filter(c => !publishedCreativeImageUrls.has(c.imageUrl));
+
+        // Deduplicate: if a content piece was already published as a SocialPost, skip it
+        const publishedContentTitles = new Set(
+            socialPosts.filter(p => p.sourceType === 'content' && p.caption).map(p => p.caption?.slice(0, 80))
+        );
+        const uniqueContent = contentPieces.filter(c => {
+            const key = (c.title || c.content?.slice(0, 80) || '');
+            return !publishedContentTitles.has(key);
+        });
+
         // Merge and sort by scheduledAt
         const entries = [
             ...socialPosts.map(normalizeSocialPost),
             ...strategyEntries,
             ...videoProjects.map(normalizeVideoProject),
             ...youtubeProjects.map(normalizeYoutubeProject),
+            ...uniqueCreatives.map(normalizeCreative),
+            ...uniqueContent.map(normalizeContent),
         ].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
 
         res.json({ success: true, entries, month: m, year: y });
@@ -229,6 +313,8 @@ router.get('/today', protect, async (req, res) => {
         // Pull video projects for today/tomorrow
         let videoProjects = [];
         let youtubeProjects = [];
+        let creativeAssets = [];
+        let contentPieces = [];
         if (brand && brand !== 'all') {
             videoProjects = await VideoProject.find({
                 brand,
@@ -241,6 +327,18 @@ router.get('/today', protect, async (req, res) => {
                 userId: req.user._id,
                 createdAt: { $gte: todayStart, $lte: tomorrowEnd },
             }).sort({ createdAt: 1 }).limit(10).lean();
+
+            creativeAssets = await Creative.find({
+                brand,
+                imageUrl: { $exists: true, $ne: '' },
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(20).lean();
+
+            contentPieces = await Content.find({
+                brand,
+                content: { $exists: true, $ne: '' },
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(20).lean();
         } else {
             videoProjects = await VideoProject.find({
                 user: req.user._id,
@@ -251,13 +349,33 @@ router.get('/today', protect, async (req, res) => {
                 userId: req.user._id,
                 createdAt: { $gte: todayStart, $lte: tomorrowEnd },
             }).sort({ createdAt: 1 }).limit(10).lean();
+
+            creativeAssets = await Creative.find({
+                user: req.user._id,
+                imageUrl: { $exists: true, $ne: '' },
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(20).lean();
+
+            contentPieces = await Content.find({
+                user: req.user._id,
+                content: { $exists: true, $ne: '' },
+                createdAt: { $gte: todayStart, $lte: tomorrowEnd },
+            }).sort({ createdAt: 1 }).limit(20).lean();
         }
+
+        // Deduplicate creative/content that were already published as SocialPosts
+        const pubCreativeUrls = new Set(posts.filter(p => p.sourceType === 'creative' && p.imageUrl).map(p => p.imageUrl));
+        const pubContentKeys = new Set(posts.filter(p => p.sourceType === 'content' && p.caption).map(p => p.caption?.slice(0, 80)));
+        const uniqueCreatives = creativeAssets.filter(c => !pubCreativeUrls.has(c.imageUrl));
+        const uniqueContent = contentPieces.filter(c => !pubContentKeys.has((c.title || c.content?.slice(0, 80) || '')));
 
         const entries = [
             ...posts.map(normalizeSocialPost),
             ...strategyItems,
             ...videoProjects.map(normalizeVideoProject),
             ...youtubeProjects.map(normalizeYoutubeProject),
+            ...uniqueCreatives.map(normalizeCreative),
+            ...uniqueContent.map(normalizeContent),
         ].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
 
         // Split today / tomorrow for dashboard convenience
