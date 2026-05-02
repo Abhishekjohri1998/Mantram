@@ -4184,12 +4184,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                         {/* Original Enhance Prompt Button & Voice */}
                                         <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 flex-wrap">
                                                 {/* Text Overlay Toggle for Generation */}
                                                 <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title="Add Text Overlay">
                                                     <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[18px]' : 'left-[2px]')} />
                                                 </button>
                                                 <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>Add Text to Image (Copy)</span>
+
+                                                {/* Brand Logo Toggle — overlay logo at chosen position + size on the generated image.
+                                                    Backend (utils/logoOverlay.js) does the compositing server-side. */}
+                                                <span className="w-px h-4 bg-[var(--sys-border)]" aria-hidden="true" />
+                                                <button onClick={(e) => { e.stopPropagation(); setAddLogo(!addLogo) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (addLogo ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title={activeBrand?.dna?.logo?.url ? "Overlay your brand logo" : "Add a logo to your Brand DNA first"}>
+                                                    <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (addLogo ? 'left-[18px]' : 'left-[2px]')} />
+                                                </button>
+                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none flex items-center gap-1" onClick={() => setAddLogo(!addLogo)}>
+                                                    <span className="material-symbols-outlined text-[13px]">verified</span>
+                                                    Add Brand Logo
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 <button onClick={handleEnhancePrompt} disabled={!prompt.trim() || enhancing || !activeBrand} className={"flex items-center gap-1 bg-[var(--sys-primary)]/10 text-[var(--sys-primary)] hover:bg-[var(--sys-primary)] hover:text-white transition-all py-1.5 px-3 rounded-full text-[11px] font-bold cursor-pointer " + (!prompt.trim() ? "opacity-50 grayscale cursor-not-allowed" : "shadow-sm")} title="Enhance prompt with Brand DNA" >
@@ -4218,6 +4229,111 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 </div>
                                                 <input type="text" value={customHeadline} onChange={e => { setCustomHeadline(e.target.value); setCopyIsAiSuggested(false) }} maxLength={40} placeholder="Headline (AI overrides if left blank)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
                                                 <input type="text" value={customCtaText} onChange={e => { setCustomCtaText(e.target.value); setCopyIsAiSuggested(false) }} maxLength={20} placeholder="CTA Button (e.g. Shop Now)" className="w-full bg-[var(--sys-surface)] text-[var(--sys-text)] p-2 rounded-lg text-xs outline-none border border-[var(--sys-border)] focus:border-[var(--sys-primary)]/50" />
+                                            </div>
+                                        )}
+
+                                        {/* Brand Logo Controls — compact 3×3 visual position grid + tiny size pills.
+                                            Layout designed to fit in ~110px of vertical space (was ~280px). */}
+                                        {addLogo && (
+                                            <div className="px-4 py-2.5 border-t border-[var(--sys-border)] bg-[var(--sys-bg)]">
+                                                {!activeBrand?.dna?.logo?.url ? (
+                                                    <div className="flex items-center gap-2 text-[11px] text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-[14px] text-amber-500">warning</span>
+                                                        Add a logo in Brand DNA → Visual Identity to enable.
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-start gap-3">
+                                                        {/* 3×3 visual position grid — each cell maps to a real anchor.
+                                                            Explicit gridTemplateColumns/Rows + per-cell width/height because Tailwind
+                                                            grid-cols-3 alone collapses to 1 col when cells have no content. */}
+                                                        <div>
+                                                            <span className="text-[8px] text-[var(--sys-text-muted)] uppercase tracking-[0.15em] font-bold block mb-1">Logo</span>
+                                                            <div
+                                                                role="radiogroup"
+                                                                aria-label="Logo position"
+                                                                style={{
+                                                                    display: 'grid',
+                                                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                                                    gridTemplateRows: 'repeat(3, 1fr)',
+                                                                    gap: 2,
+                                                                    padding: 4,
+                                                                    width: 64,
+                                                                    height: 64,
+                                                                    borderRadius: 6,
+                                                                    border: '1px solid var(--sys-border)',
+                                                                    background: 'var(--sys-bg)',
+                                                                }}
+                                                            >
+                                                                {[
+                                                                    'top-left',    'top-center',    'top-right',
+                                                                    'center-left','center',         'center-right',
+                                                                    'bottom-left','bottom-center', 'bottom-right',
+                                                                ].map(pos => {
+                                                                    const isActive = logoPosition === pos
+                                                                    return (
+                                                                        <button
+                                                                            key={pos}
+                                                                            type="button"
+                                                                            role="radio"
+                                                                            aria-checked={isActive}
+                                                                            title={pos.replace('-', ' ')}
+                                                                            onClick={(e) => { e.stopPropagation(); setLogoPosition(pos) }}
+                                                                            // Inactive cells use --sys-surface (the card colour) so they
+                                                                            // contrast against the parent --sys-bg. Works for both themes.
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                height: '100%',
+                                                                                minWidth: 14,
+                                                                                minHeight: 14,
+                                                                                padding: 0,
+                                                                                border: 0,
+                                                                                borderRadius: 3,
+                                                                                cursor: 'pointer',
+                                                                                background: isActive ? 'var(--sys-primary)' : 'var(--sys-surface)',
+                                                                                boxShadow: isActive ? '0 0 8px rgba(255,77,0,0.6)' : 'inset 0 0 0 1px rgba(127,127,127,0.18)',
+                                                                                transition: 'background 0.15s, box-shadow 0.15s',
+                                                                            }}
+                                                                            onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(255,77,0,0.5)' }}
+                                                                            onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(127,127,127,0.18)' }}
+                                                                        />
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Right column — Size pills + tiny status line */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <span className="text-[8px] text-[var(--sys-text-muted)] uppercase tracking-[0.15em] font-bold block mb-1">Size</span>
+                                                            <div className="inline-flex rounded-md border border-[var(--sys-border)] bg-[var(--sys-surface)] p-[2px] gap-[2px]">
+                                                                {[
+                                                                    { id: 'small',  label: 'S' },
+                                                                    { id: 'medium', label: 'M' },
+                                                                    { id: 'large',  label: 'L' },
+                                                                ].map(sz => {
+                                                                    const isActive = logoSize === sz.id
+                                                                    return (
+                                                                        <button
+                                                                            key={sz.id}
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); setLogoSize(sz.id) }}
+                                                                            title={sz.id}
+                                                                            className="px-2 py-[3px] rounded-[3px] text-[10px] font-bold transition-all cursor-pointer min-w-[22px]"
+                                                                            style={{
+                                                                                background: isActive ? 'var(--sys-primary)' : 'transparent',
+                                                                                color: isActive ? 'white' : 'var(--sys-text-muted)',
+                                                                            }}
+                                                                        >
+                                                                            {sz.label}
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            <p className="mt-1.5 text-[9px] text-[var(--sys-text-muted)] truncate">
+                                                                {logoPosition?.replace('-', ' ')} · {logoSize}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
