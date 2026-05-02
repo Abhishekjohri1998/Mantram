@@ -68,7 +68,9 @@ const PulseStudio = lazy(() => import('./pages/PulseStudio/index'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const DataDeletion = lazy(() => import('./pages/DataDeletion'))
+const Blog = lazy(() => import('./pages/Blog'))
 const UnderConstruction = lazy(() => import('./pages/UnderConstruction'))
+
 
 // ── Loading Fallback ──
 function LoadingSpinner() {
@@ -133,7 +135,10 @@ function App() {
                     <Route path="/studio/:slug" element={<StudioPreview />} />
                     <Route path="/ai-search-optimization" element={<AISearchOptimization />} />
                     <Route path="/aeo" element={<AISearchOptimization />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route path="/blog/:slug" element={<Blog />} />
                     <Route path="/join/:token" element={<JoinTeam />} />
+
 
                     {/* Protected routes — require authentication */}
                     <Route path="/nexus" element={<ProtectedRoute><Nexus /></ProtectedRoute>} />
