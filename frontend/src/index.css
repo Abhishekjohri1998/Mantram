@@ -1523,3 +1523,154 @@
   color: var(--sys-surface);
   border-color: var(--sys-text);
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Landing-page animation system. Pure CSS, no framework deps.
+   Used by /pages/Landing.jsx and components in /components/landing/.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --brand-primary: #FF4D00;
+  --brand-secondary: #06B6D4;
+}
+
+/* Reveal-on-scroll — paired with IntersectionObserver in JS */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Cyan agent pulse — used on "live / agentic" elements */
+@keyframes agent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(6,182,212,0.55); }
+  50%      { box-shadow: 0 0 0 12px rgba(6,182,212,0); }
+}
+.agent-pulse { animation: agent-pulse 2.4s ease-out infinite; }
+
+/* Orange brand pulse — used on primary CTAs and the logo node */
+@keyframes brand-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,77,0,0.5); }
+  50%      { box-shadow: 0 0 0 14px rgba(255,77,0,0); }
+}
+.brand-pulse { animation: brand-pulse 3s ease-out infinite; }
+
+/* Marquee — used by trust strip + MCP ticker */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+@keyframes marquee-fast {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.ticker-track { animation: marquee-fast 30s linear infinite; }
+
+/* Scan line — used by Brand DNA hero visual */
+@keyframes dna-scan {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(200%); opacity: 0; }
+}
+.dna-scan-line { animation: dna-scan 3.5s ease-in-out infinite; }
+
+/* Field unfurl — for fields flying out of the brand-DNA scan */
+@keyframes field-unfurl {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.field-unfurl { animation: field-unfurl 0.6s ease-out forwards; }
+
+/* Studio orbit — agents orbiting the central Brand DNA node */
+@keyframes orbit {
+  from { transform: rotate(0deg)   translateX(140px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(140px) rotate(-360deg); }
+}
+.studio-orbit { animation: orbit 30s linear infinite; }
+
+/* Cursor-trailing soft glow — mounted by CursorGlow.jsx */
+.cursor-glow {
+  position: fixed;
+  top: 0; left: 0;
+  width: 360px;
+  height: 360px;
+  margin-left: -180px;
+  margin-top: -180px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255,77,0,0.10) 0%, rgba(6,182,212,0.05) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+  transition: transform 0.06s linear;
+  will-change: transform;
+}
+
+/* Glow card — used on key pillar cards */
+.glow-card {
+  position: relative;
+  isolation: isolate;
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,77,0,0.4) 0%, rgba(6,182,212,0.4) 100%);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.glow-card:hover::before { opacity: 1; }
+
+/* Cyan thread connector — used between sections */
+@keyframes thread-flow {
+  0%   { stroke-dashoffset: 0;   opacity: 0.4; }
+  50%  { opacity: 1; }
+  100% { stroke-dashoffset: -40; opacity: 0.4; }
+}
+.thread-line {
+  stroke-dasharray: 6 6;
+  animation: thread-flow 3s linear infinite;
+}
+
+/* Count-up number reveal */
+@keyframes count-up-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-up { animation: count-up-reveal 0.6s ease-out forwards; }
+
+/* Live "LATEST" badge ping */
+@keyframes badge-ping {
+  0%, 70%, 100% { opacity: 0.5; }
+  35%           { opacity: 1; }
+}
+.badge-ping { animation: badge-ping 2.2s ease-in-out infinite; }
+
+/* Reduced-motion respect */
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .agent-pulse,
+  .brand-pulse,
+  .marquee-track,
+  .ticker-track,
+  .dna-scan-line,
+  .field-unfurl,
+  .studio-orbit,
+  .badge-ping,
+  .thread-line { animation: none; }
+}

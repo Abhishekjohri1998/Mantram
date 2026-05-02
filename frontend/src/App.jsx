@@ -55,6 +55,7 @@ const SocialMediaStudio = lazy(() => import('./pages/SocialMediaStudio'))
 const BrandManagement = lazy(() => import('./pages/BrandManagement'))
 const SkillsHub = lazy(() => import('./pages/SkillsHub'))
 const StudioPreview = lazy(() => import('./pages/StudioPreview'))
+const AISearchOptimization = lazy(() => import('./pages/AISearchOptimization'))
 const JoinTeam = lazy(() => import('./pages/JoinTeam'))
 const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 const UserSettings = lazy(() => import('./pages/UserSettings'))
@@ -130,6 +131,8 @@ function App() {
                     <Route path="/data-deletion" element={<DataDeletion />} />
                     <Route path="/data-deletion-status" element={<DataDeletion />} />
                     <Route path="/studio/:slug" element={<StudioPreview />} />
+                    <Route path="/ai-search-optimization" element={<AISearchOptimization />} />
+                    <Route path="/aeo" element={<AISearchOptimization />} />
                     <Route path="/join/:token" element={<JoinTeam />} />
 
                     {/* Protected routes — require authentication */}
