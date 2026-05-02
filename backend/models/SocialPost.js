@@ -22,13 +22,14 @@ const socialPostSchema = new mongoose.Schema({
     // Status
     status: {
         type: String,
-        enum: ['published', 'scheduled', 'failed', 'cancelled'],
+        enum: ['published', 'scheduled', 'processing', 'failed', 'cancelled'],
         default: 'published'
     },
     error: { type: String, default: '' },
 
     // Scheduling
     scheduledFor: { type: Date },
+    processingStartedAt: { type: Date, default: null },
 
     // Source traceability — which studio/workflow created this post
     sourceType: {

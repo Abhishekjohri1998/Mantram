@@ -158,7 +158,7 @@ export default function SocialMediaStudio() {
     }, [currentMonth, currentYear, monthEvents, scheduledForMonth])
 
     const publishedPosts = socialPosts.filter(p => p.status === 'published')
-    const scheduledPosts = socialPosts.filter(p => p.status === 'scheduled')
+    const scheduledPosts = socialPosts.filter(p => p.status === 'scheduled' || p.status === 'processing')
     const failedPosts = socialPosts.filter(p => p.status === 'failed')
     const togglePlatform = (id) => setSelectedPlatforms(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
     const formatTimeAgo = (d) => { const s = Math.floor((Date.now() - new Date(d)) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s/60) + 'm ago' : s < 86400 ? Math.floor(s/3600) + 'h ago' : Math.floor(s/86400) + 'd ago' }

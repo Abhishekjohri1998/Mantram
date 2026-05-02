@@ -693,6 +693,59 @@ router.post('/schedule', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'No valid connected accounts selected' });
         }
 
+        // ── Eagerly mirror media to S3 at schedule time ───────────────────
+        // External URLs may expire and data URIs are too large for the Graph API.
+        // By uploading now, the scheduler always has a persistent S3 link.
+        const userId = req.user._id;
+        let persistedImageUrl = imageUrl || '';
+        let persistedVideoUrl = videoUrl || '';
+        let persistedImageUrls = undefined;
+
+        // Single image
+        if (persistedImageUrl) {
+            if (persistedImageUrl.startsWith('data:')) {
+                try {
+                    persistedImageUrl = await uploadToS3(persistedImageUrl, `social-scheduled/${userId}/${Date.now()}.png`);
+                    console.log(`[SCHEDULE] Uploaded data URI to S3: ${persistedImageUrl.substring(0, 60)}...`);
+                } catch (e) {
+                    console.warn('[SCHEDULE] S3 upload for data URI failed:', e.message);
+                }
+            } else if (persistedImageUrl.startsWith('http') && !persistedImageUrl.includes(process.env.AWS_S3_BUCKET || '__none__')) {
+                const s3Url = await mirrorUrlToS3(persistedImageUrl, `social-scheduled/${userId}/${Date.now()}.png`);
+                if (s3Url) persistedImageUrl = s3Url;
+            } else if (!persistedImageUrl.startsWith('http')) {
+                const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
+                const urlPath = persistedImageUrl.startsWith('/') ? persistedImageUrl : `/${persistedImageUrl}`;
+                persistedImageUrl = `${baseUrl}${urlPath}`;
+            }
+        }
+
+        // Video URL — mirror to S3 if external
+        if (persistedVideoUrl && persistedVideoUrl.startsWith('http') && !persistedVideoUrl.includes(process.env.AWS_S3_BUCKET || '__none__')) {
+            const s3Url = await mirrorUrlToS3(persistedVideoUrl, `social-scheduled/${userId}/${Date.now()}.mp4`);
+            if (s3Url) persistedVideoUrl = s3Url;
+        }
+
+        // Carousel images
+        if (Array.isArray(imageUrls) && imageUrls.length > 1) {
+            persistedImageUrls = [];
+            for (let i = 0; i < imageUrls.length; i++) {
+                let url = imageUrls[i];
+                if (!url) continue;
+                if (url.startsWith('data:')) {
+                    try {
+                        url = await uploadToS3(url, `social-scheduled/${userId}/${Date.now()}-${i}.png`);
+                    } catch (e) {
+                        console.warn(`[SCHEDULE] Carousel S3 upload ${i} failed:`, e.message);
+                    }
+                } else if (url.startsWith('http') && !url.includes(process.env.AWS_S3_BUCKET || '__none__')) {
+                    const s3Url = await mirrorUrlToS3(url, `social-scheduled/${userId}/${Date.now()}-${i}.png`);
+                    if (s3Url) url = s3Url;
+                }
+                persistedImageUrls.push(url);
+            }
+        }
+
         const scheduled = [];
         for (const account of accounts) {
             const postCaption = captions?.[account.platform] || text || '';
@@ -703,9 +756,9 @@ router.post('/schedule', protect, async (req, res) => {
                 accountId: account.accountId,
                 accountName: account.accountName,
                 caption: postCaption,
-                imageUrl: imageUrl || (Array.isArray(imageUrls) ? imageUrls[0] : '') || '',
-                imageUrls: Array.isArray(imageUrls) && imageUrls.length > 1 ? imageUrls : undefined,
-                videoUrl: videoUrl || '',
+                imageUrl: persistedImageUrl || (persistedImageUrls ? persistedImageUrls[0] : '') || '',
+                imageUrls: persistedImageUrls,
+                videoUrl: persistedVideoUrl,
                 status: 'scheduled',
                 scheduledFor: scheduleDate,
             });
@@ -765,8 +818,8 @@ router.put('/posts/:id/cancel', protect, async (req, res) => {
     try {
         const post = await SocialPost.findOne({ _id: req.params.id, user: req.user._id });
         if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
-        if (post.status !== 'scheduled') {
-            return res.status(400).json({ success: false, error: 'Only scheduled posts can be cancelled' });
+        if (post.status !== 'scheduled' && post.status !== 'processing') {
+            return res.status(400).json({ success: false, error: 'Only scheduled or processing posts can be cancelled' });
         }
         post.status = 'cancelled';
         await post.save();

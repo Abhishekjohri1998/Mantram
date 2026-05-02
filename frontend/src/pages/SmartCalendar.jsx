@@ -436,7 +436,7 @@ export default function SmartCalendar() {
                                                 {dayObj.entries?.slice(0, 2).map((entry, j) => {
                                                     const ctMeta = CONTENT_TYPE_META[entry.contentType] || CONTENT_TYPE_META.text
                                                     const platMeta = PLATFORM_META[entry.platform] || {}
-                                                    const statusColor = entry.status === 'published' ? '#22D3EE' : entry.status === 'scheduled' ? '#8B5CF6' : entry.status === 'complete' ? '#22C55E' : '#64748B'
+                                                    const statusColor = entry.status === 'published' ? '#22D3EE' : entry.status === 'scheduled' ? '#8B5CF6' : entry.status === 'processing' ? '#F59E0B' : entry.status === 'complete' ? '#22C55E' : '#64748B'
                                                     return (
                                                         <div key={`en-${j}`} className="flex items-center gap-1 truncate">
                                                             {entry.imageUrl ? (
@@ -514,11 +514,12 @@ export default function SmartCalendar() {
                                                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                                                                             entry.status === 'published' ? 'bg-[#22D3EE]/20 text-[#22D3EE]' :
                                                                             entry.status === 'scheduled' ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' :
+                                                                            entry.status === 'processing' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
                                                                             entry.status === 'complete' ? 'bg-[#22C55E]/20 text-[#22C55E]' :
                                                                             entry.status === 'in_progress' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' :
                                                                             'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'
                                                                         }`}>
-                                                                            {entry.status === 'published' ? '✓ SENT' : entry.status === 'scheduled' ? '⏰ QUEUED' : entry.status === 'complete' ? '✓ READY' : entry.status === 'in_progress' ? '⚡ WORKING' : '○ PENDING'}
+                                                                            {entry.status === 'published' ? '✓ SENT' : entry.status === 'scheduled' ? '⏰ QUEUED' : entry.status === 'processing' ? '⚡ PUBLISHING' : entry.status === 'complete' ? '✓ READY' : entry.status === 'in_progress' ? '⚡ WORKING' : '○ PENDING'}
                                                                         </span>
                                                                     </div>
                                                                     <p className="text-xs text-[var(--sys-text-muted)] mt-0.5 truncate">

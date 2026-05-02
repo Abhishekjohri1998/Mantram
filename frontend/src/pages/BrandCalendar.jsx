@@ -11,6 +11,7 @@ const PLATFORM_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin
 const PLATFORM_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2', twitter:'#1DA1F2', youtube:'#FF0000', email:'#888', whatsapp:'#25D366' }
 const STATUS_META = {
     scheduled: { label:'Scheduled', icon:'schedule_send', cls:'text-amber-400 bg-amber-400/10 border-amber-400/20' },
+    processing: { label:'Publishing', icon:'progress_activity', cls:'text-orange-400 bg-orange-400/10 border-orange-400/20' },
     published:  { label:'Published',  icon:'task_alt',      cls:'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
     pending:    { label:'Planned',    icon:'edit_calendar', cls:'text-sky-400 bg-sky-400/10 border-sky-400/20' },
     in_progress:{ label:'In Progress',icon:'pending',       cls:'text-violet-400 bg-violet-400/10 border-violet-400/20' },
