@@ -66,6 +66,7 @@ const STUDIO_SECTIONS = [
     { value: 'carousel',     label: 'Carousel' },
     { value: 'campaign',     label: 'Campaign' },
     { value: 'campaign_shot',label: 'Campaign Shot' },
+    { value: 'logo',         label: 'Logo' },
     { value: 'video_ugc',    label: 'Video UGC' },
     { value: 'video_qads',   label: 'Video Q-Ads' },
     { value: 'avatar',       label: 'Avatar' },
@@ -74,7 +75,7 @@ const STUDIO_SECTIONS = [
 
 // Studio → allowed sections mapping
 const SECTIONS_BY_STUDIO = {
-    creative: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'avatar', 'general'],
+    creative: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'logo', 'avatar', 'general'],
     video:    ['video_ugc', 'video_qads', 'general'],
     content:  ['general'],
 };

@@ -947,6 +947,29 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoError, setLogoError] = useState(null)
     const [logoAspectRatio, setLogoAspectRatio] = useState('1:1')
 
+    // ── Campaign Logo Generator: Model Config ──
+    const LOGO_IMAGE_MODELS = [
+        { id: 'gpt-image-2',  name: 'GPT Image 2',  icon: 'text_rotate_vertical', desc: 'Best text rendering · Complex layouts',    badge: 'star',         color: '#10a37f', isDefault: true },
+        { id: 'recraft-v4',   name: 'Recraft v4',    icon: 'pentagon',             desc: 'Native vector design · Logo specialist',  badge: 'new_releases', color: '#6366f1', isNew: true },
+        { id: 'gpt-image-1',  name: 'GPT Image 1',   icon: 'auto_fix_high',        desc: 'Clean renders · Good for flat logos',     badge: null,           color: '#0ea5e9' },
+        { id: 'nanobanana-2', name: 'NanoBanana 2',  icon: 'auto_awesome',         desc: 'Fast · Best with brand colors',           badge: 'bolt',         color: 'var(--sys-text)' },
+    ]
+
+    // ── Campaign Logo Generator: Dedicated model state (isolated from global imageModel) ──
+    const [logoImageModel, setLogoImageModel] = useState('gpt-image-2')
+
+    // ── Campaign Logo Generator: Zoom lightbox state ──
+    const [logoZoomOpen, setLogoZoomOpen] = useState(false)
+    const [logoZoomUrl, setLogoZoomUrl] = useState(null)
+    const [logoZoomScale, setLogoZoomScale] = useState(1)
+    const [logoZoomUpscaling, setLogoZoomUpscaling] = useState(false)
+    const [logoZoomUpscaled, setLogoZoomUpscaled] = useState(null)
+
+    // ── Campaign Logo Generator: Animation Director state ──
+    // logoAnimate* state removed — logo Animate + Edit now reuse the shared
+    // handleAnimateClick / handleOpenEditPanel handlers (same as AI Create studio)
+
+
     // ── Campaign Logo Generator State ──
     const [clgText, setClgText] = useState('')
     const [clgStyle, setClgStyle] = useState('')
@@ -957,7 +980,8 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [clgBg, setClgBg] = useState('transparent')
     const [clgShape, setClgShape] = useState('freeform')
     const [clgEnhance, setClgEnhance] = useState('')
-    const [clgResults, setClgResults] = useState([])
+    const [clgResults, setClgResults] = useState([]) // each item: { url, title, createdAt }
+    const [clgHistoryLoaded, setClgHistoryLoaded] = useState(false)
     const [clgLoading, setClgLoading] = useState(false)
     const [clgError, setClgError] = useState(null)
 
@@ -1342,6 +1366,42 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [studioMode, activeBrand?._id])
+
+    // ── Logo History: Load from Creative Bank when studio opens ──
+    // Persists logo history across page refreshes by fetching previously
+    // saved logos with source='campaign-logo' from the image bank.
+    useEffect(() => {
+        if (studioMode === 'campaignlogo' && activeBrand?._id && !clgHistoryLoaded) {
+            setClgHistoryLoaded(true);
+            creativesAPI.imageBank({ source: 'campaign-logo', brandId: activeBrand._id, limit: 50 })
+                .then(res => {
+                    const items = res?.images || res?.data || [];
+                    if (items.length > 0) {
+                        // Map bank items to { url, title, createdAt } and merge with any in-session results
+                        const historicItems = items.map(img => ({
+                            url: img.imageUrl || img.url,
+                            title: img.title || img.prompt || 'Campaign Logo',
+                            createdAt: img.createdAt || img.savedAt || new Date().toISOString(),
+                        })).filter(item => !!item.url);
+                        setClgResults(prev => {
+                            // Merge: session results first (top), then history — deduplicate by URL
+                            const existingUrls = new Set(prev.map(r => r.url || r));
+                            const newFromHistory = historicItems.filter(h => !existingUrls.has(h.url));
+                            return [...prev, ...newFromHistory];
+                        });
+                    }
+                })
+                .catch(() => { /* history load failure is non-critical */ });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
+
+    // Reset logo history when active brand changes so we reload for the new brand
+    useEffect(() => {
+        setClgHistoryLoaded(false);
+        setClgResults([]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeBrand?._id])
 
     useEffect(() => {
         if (prompt.trim()) {
@@ -3017,7 +3077,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
                         {/* ═══ GEMINI EDIT IMAGE WORKSPACE ═══ */}
-                        {showEditPanel && studioMode === 'create' && (
+                        {showEditPanel && (studioMode === 'create' || studioMode === 'campaignlogo') && (
                             <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
                                 <div className="p-5 sm:p-6 xl:p-8">
@@ -5554,6 +5614,173 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
             {studioMode === 'campaignlogo' && (
                 <div data-wt="logo-area" className="max-w-6xl mx-auto fade-up pt-6">
+                    {/* ═══ ANIMATE PANEL (logo mode) ═══ */}
+                    {showAnimatePanel && (
+                        <div className="mb-6 studio-card border-primary/30 shadow-lg shadow-primary/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary-dim" />
+                            <div className="p-4 flex items-center justify-between border-b border-[var(--sys-border)]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                        <span className="material-symbols-outlined text-primary">animation</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-[var(--sys-text)]">Cinematic Animation</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Animate this logo with AI video generation</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }} className="studio-action-btn-sm">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                            <div className="p-5">
+                                {animateImageRef.current && (
+                                    <div className="flex gap-4 mb-5">
+                                        <img src={animateImageRef.current} alt="Logo to animate" className="w-20 h-20 rounded-xl object-contain bg-[var(--sys-surface)] border border-[var(--sys-border)] flex-shrink-0" />
+                                        <div className="flex-1">
+                                            {animateAnalyzing ? (
+                                                <div className="flex items-center gap-2 text-primary text-xs">
+                                                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                                    AI is composing animation prompt...
+                                                </div>
+                                            ) : (
+                                                <textarea value={animatePrompt} onChange={e => setAnimatePrompt(e.target.value)} rows={3}
+                                                    placeholder="Describe the animation motion..."
+                                                    className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs placeholder:text-[var(--sys-text-muted)] focus:outline-none resize-none" />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                    <div>
+                                        <label className="text-[10px] font-semibold text-[var(--sys-text-muted)] mb-1 block">Model</label>
+                                        <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
+                                            className="w-full px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:outline-none cursor-pointer">
+                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                                <option key={id} value={id}>{m.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-semibold text-[var(--sys-text-muted)] mb-1 block">Ratio</label>
+                                        <div className="flex gap-1">
+                                            {(ANIMATE_MODELS[animateModel]?.ratios || ['1:1','16:9','9:16']).map(r => (
+                                                <button key={r} onClick={() => setAnimateAspectRatio(r)}
+                                                    className={"flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer " + (animateAspectRatio === r ? "bg-primary/20 border-primary/50 text-primary" : "bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)]")}>
+                                                    {r}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-semibold text-[var(--sys-text-muted)] mb-1 block">Duration</label>
+                                        <div className="flex gap-1">
+                                            {[5,10,15].map(d => (
+                                                <button key={d} onClick={() => setAnimateDuration(d)}
+                                                    className={"flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer " + (animateDuration === d ? "bg-primary/20 border-primary/50 text-primary" : "bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)]")}>
+                                                    {d}s
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                {animateGenerating && (
+                                    <div className="mb-4 space-y-2">
+                                        <div className="flex justify-between text-xs font-bold"><span className="text-primary">Rendering...</span><span>{animateProgress}%</span></div>
+                                        <div className="w-full h-1.5 bg-[var(--sys-border)] rounded-full overflow-hidden">
+                                            <div className="h-full bg-gradient-to-r from-primary to-orange-400 rounded-full transition-all duration-300" style={{ width: animateProgress + "%" }} />
+                                        </div>
+                                    </div>
+                                )}
+                                {animateError && (
+                                    <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm">error</span>{typeof animateError === 'string' ? animateError : animateError?.message}
+                                    </div>
+                                )}
+                                {animateVideoUrl ? (
+                                    <div className="rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
+                                        <video src={animateVideoUrl} controls autoPlay loop muted playsInline className="w-full max-h-[300px] bg-black/50" />
+                                        <div className="p-3 flex gap-2">
+                                            <a href={animateVideoUrl} download="logo-animation.mp4" className="studio-btn-primary flex-1">
+                                                <span className="material-symbols-outlined text-[18px]">cloud_download</span>Save Video
+                                            </a>
+                                            <button onClick={() => { setAnimateVideoUrl(null); setAnimateProgress(0); }} className="studio-action-btn-sm w-10 h-10">
+                                                <span className="material-symbols-outlined text-sm">refresh</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-3">
+                                        <button onClick={handleAnimateGenerate}
+                                            disabled={animateGenerating || animateAnalyzing || !animatePrompt.trim()}
+                                            className="studio-btn-primary flex-1">
+                                            {animateGenerating ? (
+                                                <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />Rendering...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-[18px]">play_circle</span>Animate Logo</>
+                                            )}
+                                        </button>
+                                        <button onClick={() => { if (!animateGenerating) { setShowAnimatePanel(false); setAnimateModalOpen(false); } }} disabled={animateGenerating} className="studio-btn-secondary">Cancel</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {/* ═══ EDIT PANEL (logo mode) ═══ */}
+                    {showEditPanel && studioMode === 'campaignlogo' && (
+                        <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
+                            <div className="p-4 flex items-center justify-between border-b border-[var(--sys-border)]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
+                                        <span className="material-symbols-outlined text-violet-400">auto_fix_high</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-[var(--sys-text)]">Gemini AI Edit</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Describe changes — Gemini edits the logo for you</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }} className="studio-action-btn-sm">
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                            <div className="p-5 flex flex-col sm:flex-row gap-5">
+                                {editSourceImageUrl && (
+                                    <div className="w-full sm:w-36 flex-shrink-0">
+                                        <img src={editResult?.imageUrl || editSourceImageUrl} alt="Editing" className="w-full rounded-xl object-contain bg-[var(--sys-surface)] border border-[var(--sys-border)]" />
+                                        {editHistory.length > 0 && (
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] text-center mt-1">{editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</p>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="flex-1">
+                                    {editError && (
+                                        <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">{typeof editError === 'string' ? editError : editError?.message}</div>
+                                    )}
+                                    <textarea value={editPromptText} onChange={e => setEditPromptText(e.target.value)} rows={3}
+                                        placeholder="e.g. Make the text golden, add sparkles, change background to deep navy..."
+                                        className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-violet-500/50 resize-none mb-3" />
+                                    <div className="flex gap-2">
+                                        <button onClick={handleEditGenerate}
+                                            disabled={editGenerating || !editPromptText.trim() || !editImageRef.current}
+                                            className="studio-btn-primary flex-1" style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}>
+                                            {editGenerating ? (
+                                                <><div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />Editing...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-[18px]">auto_fix_high</span>Apply Edit</>
+                                            )}
+                                        </button>
+                                        {editHistory.length > 0 && (
+                                            <button onClick={() => { const o = editHistory[0].sourceImageUrl; editImageRef.current = o; setEditSourceImageUrl(o); setEditHistory([]); setEditResult(null); setEditPromptText('') }}
+                                                className="studio-btn-secondary text-xs">Reset</button>
+                                        )}
+                                        <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }} disabled={editGenerating} className="studio-action-btn-sm w-10 h-10">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="glow-border rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden" style={{ background: 'var(--sys-primary), rgba(239,68,68,0.04), rgba(255, 77, 0,0.03))' }}>
                         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 80% 20%, rgba(245,158,11,0.08) 0%, transparent 50%)' }} />
                         <div className="relative">
@@ -5652,6 +5879,38 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
+                            {/* AI Model Selector */}
+                            <div className="studio-card p-4 sm:p-5">
+                                <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-primary text-lg">model_training</span>
+                                    AI Model
+                                    <span className="ml-auto text-[10px] text-[var(--sys-text-muted)] font-normal">Affects style &amp; quality</span>
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {LOGO_IMAGE_MODELS.map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => setLogoImageModel(m.id)}
+                                            className={`relative flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border transition-all text-left cursor-pointer ${
+                                                logoImageModel === m.id
+                                                    ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-primary)] text-[var(--sys-primary)]'
+                                                    : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text)] hover:border-[var(--sys-border)]'
+                                            }`}
+                                        >
+                                            {m.badge && (
+                                                <span className="absolute top-1.5 right-1.5 material-symbols-outlined !text-[10px]" style={{ color: m.color }}>{m.badge}</span>
+                                            )}
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined !text-sm" style={{ color: m.color }}>{m.icon}</span>
+                                                <span className="text-[11px] font-bold leading-none">{m.name}</span>
+                                                {m.isNew && <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1 rounded font-bold">NEW</span>}
+                                            </span>
+                                            <span className="text-[9px] text-[var(--sys-text-muted)] leading-tight pl-5">{m.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Generate */}
                              <button disabled={!clgText||clgLoading} onClick={async()=>{
                                  setClgLoading(true);setClgError('');
@@ -5659,12 +5918,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                      const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
                                      const v=clgResults.length+1;
                                      const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
-                                     const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:'logo',imageModel}}, { timeout: 180000 });
+                                     const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:clgStyle||'modern',occasion:clgOccasion||'',logoText:clgText,iconElements:clgIcon||'',bgTreatment:clgBg,shape:clgShape,enhance:clgEnhance||'',brandColors,imageModel:logoImageModel}}, { timeout: 180000 });
                                      if (res.warnings?.length > 0) {
                                          setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
                                      }
                                      const url=res.creative?.imageUrl||res.imageUrl;
-                                     if(url)setClgResults(prev=>[...prev,url]);
+                                     if(url){
+                                         const newEntry = { url, title: clgText || 'Campaign Logo', createdAt: new Date().toISOString() };
+                                         // Prepend — newest always on top
+                                         // NOTE: No saveToBank needed — generate endpoint already persists
+                                         // with type:'campaign-logo' in the Creative model automatically.
+                                         setClgResults(prev => [newEntry, ...prev.filter(r => (r.url||r) !== url)]);
+                                     }
                                      else setClgError({
                                          message: 'No image returned — try again',
                                          isProviderError: false
@@ -5716,33 +5981,181 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         {/* Right — Results */}
                         <div className="col-span-12 lg:col-span-7">
                             <div className="studio-card p-4 sm:p-5 min-h-[500px] flex flex-col">
-                                <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4"><span className="material-symbols-outlined text-primary text-lg">image</span>Logo Variants</h3>
-                                {clgResults.length>0?(
+                                <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
+                                    <span className="material-symbols-outlined text-primary text-lg">image</span>
+                                    Logo Variants
+                                    {clgResults.length > 0 && (
+                                        <span className="ml-auto text-[10px] text-[var(--sys-text-muted)] font-normal">{clgResults.length} logo{clgResults.length !== 1 ? 's' : ''}</span>
+                                    )}
+                                </h3>
+                                {clgResults.length > 0 ? (
                                     <div className="flex-1">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                                            {clgResults.map((url,i)=>(
-                                                <div key={i} className="rounded-xl overflow-hidden bg-[var(--sys-bg)] group relative">
-                                                    <img loading="lazy" decoding="async" src={url} alt={`Variant ${i+1}`} className="w-full h-auto object-contain" />
-                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                        <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">download</span>Save</a>
-                                                        <button onClick={()=>{setCampCampaignLogo(url);setStudioMode('campaigns');creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:'Campaign Logo',source:'campaign-logo'}).catch(()=>{})}} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-xs font-medium hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer flex items-center gap-1"><span className="material-symbols-outlined text-sm">campaign</span>Use in Campaign</button>
+                                            {clgResults.map((item, i) => {
+                                                const url = item?.url || item; // handle both object and legacy string
+                                                const title = item?.title || 'Campaign Logo';
+                                                const ts = item?.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short' }) : null;
+                                            return (
+                                                <div key={url+i} className="rounded-xl overflow-hidden bg-[var(--sys-bg)] group relative">
+                                                    <img loading="lazy" decoding="async" src={url} alt={title} className="w-full h-auto object-contain" />
+                                                     {/* Title & date badge — bottom overlay on hover */}
+                                                     {(title || ts) && (
+                                                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/75 to-transparent px-2.5 py-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+                                                             <p className="text-white text-[10px] font-semibold leading-snug truncate">{title}</p>
+                                                             {ts && <p className="text-white/55 text-[9px]">{ts}</p>}
+                                                         </div>
+                                                     )}
+                                                    {/* Action bar — appears on hover */}
+                                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2 p-3">
+                                                        <div className="flex gap-2 flex-wrap justify-center">
+                                                            {/* Zoom / View */}
+                                                            <button
+                                                                onClick={() => { setLogoZoomUrl(url); setLogoZoomScale(1); setLogoZoomUpscaled(null); setLogoZoomOpen(true); }}
+                                                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-all cursor-pointer backdrop-blur-sm"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">zoom_in</span>Zoom
+                                                            </button>
+                                                            {/* Download */}
+                                                            <a href={url} download={`campaign-logo-${i+1}.png`} target="_blank" rel="noreferrer"
+                                                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-medium transition-all cursor-pointer backdrop-blur-sm"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">download</span>Save
+                                                            </a>
+                                                            {/* Use in Campaign */}
+                                                            <button
+                                                                onClick={() => { creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:`Campaign Logo — ${clgText}`,source:'campaign-logo'}).catch(()=>{}); setStudioMode('campaigns'); }}
+                                                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] hover:bg-orange-500/30 text-[var(--sys-primary)] text-xs font-medium transition-all cursor-pointer border border-[var(--sys-border)]"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">campaign</span>Campaign
+                                                            </button>
+                                                        </div>
+                                                        {/* Animate + AI Edit row */}
+                                                        <div className="flex gap-2 flex-wrap justify-center mt-1">
+                                                            <button
+                                                                onClick={() => handleAnimateClick({ imageUrl: url, prompt: title })}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-600/80 to-indigo-600/80 hover:from-violet-500/90 hover:to-indigo-500/90 text-white text-xs font-bold transition-all cursor-pointer border border-violet-500/30 shadow-lg"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">movie</span>
+                                                                Animate
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleOpenEditPanel(url, title)}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 text-xs font-bold transition-all cursor-pointer border border-violet-500/30"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                                                                AI Edit
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {/* Variant badge */}
+                                                    <div className="absolute top-2 left-2 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm">
+                                                        V{i+1} · {LOGO_IMAGE_MODELS.find(m => m.id === logoImageModel)?.name || logoImageModel}
                                                     </div>
                                                 </div>
-                                            ))}
+                                            );
+                                            })}
                                         </div>
                                     </div>
-                                ):(
+                                ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-                                        <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4"><span className="material-symbols-outlined text-4xl text-primary/40">verified</span></div>
+                                        <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4">
+                                            <span className="material-symbols-outlined text-4xl text-primary/40">verified</span>
+                                        </div>
                                         <p className="text-[var(--sys-text-muted)] text-sm font-medium mb-1">No logos generated yet</p>
                                         <p className="text-[var(--sys-text-muted)] text-xs">Enter your text, pick a style, and generate</p>
                                     </div>
                                 )}
                             </div>
+
+                            )}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* ── Logo Zoom Lightbox Modal ── */}
+            {logoZoomOpen && logoZoomUrl && (
+                <div
+                    className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
+                    onClick={e => { if (e.target === e.currentTarget) setLogoZoomOpen(false); }}
+                >
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-3 mb-4 bg-white/10 backdrop-blur-md rounded-2xl px-4 py-2 border border-white/15">
+                        {/* Zoom controls */}
+                        <button onClick={() => setLogoZoomScale(s => Math.max(s - 0.5, 0.5))} className="p-1.5 rounded-lg hover:bg-white/10 text-white transition-all cursor-pointer" title="Zoom Out">
+                            <span className="material-symbols-outlined text-lg">zoom_out</span>
+                        </button>
+                        <span className="text-white text-xs font-bold w-10 text-center">{Math.round(logoZoomScale * 100)}%</span>
+                        <button onClick={() => setLogoZoomScale(s => Math.min(s + 0.5, 4))} className="p-1.5 rounded-lg hover:bg-white/10 text-white transition-all cursor-pointer" title="Zoom In">
+                            <span className="material-symbols-outlined text-lg">zoom_in</span>
+                        </button>
+                        <div className="w-px h-5 bg-white/20" />
+                        <button onClick={() => setLogoZoomScale(1)} className="px-2 py-1 rounded-lg hover:bg-white/10 text-white text-[10px] font-medium transition-all cursor-pointer">Reset</button>
+                        <div className="w-px h-5 bg-white/20" />
+                        {/* Upscale */}
+                        <button
+                            disabled={logoZoomUpscaling}
+                            onClick={async () => {
+                                setLogoZoomUpscaling(true);
+                                try {
+                                    const res = await creativesAPI.upscale({ imageUrl: logoZoomUpscaled || logoZoomUrl, brandId: activeBrand?._id });
+                                    if (res?.imageUrl) setLogoZoomUpscaled(res.imageUrl);
+                                } catch {}
+                                finally { setLogoZoomUpscaling(false); }
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[10px] font-bold transition-all cursor-pointer border border-emerald-500/30 disabled:opacity-50"
+                        >
+                            {logoZoomUpscaling ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">hd</span>}
+                            {logoZoomUpscaling ? 'Upscaling...' : 'Upscale'}
+                        </button>
+                        {/* Gemini Edit */}
+                        <button
+                            onClick={() => {
+                                setLogoZoomOpen(false);
+                                // Switch to AI Create mode and pre-load the logo as a reference image
+                                setStudioMode('create');
+                                // Store the URL in localStorage for AI Create to pick up as a ref image
+                                try { localStorage.setItem('mantram_logo_edit_ref', logoZoomUpscaled || logoZoomUrl); } catch {}
+                                setTimeout(() => {
+                                    document.dispatchEvent(new CustomEvent('mantram:load-ref-image', { detail: { url: logoZoomUpscaled || logoZoomUrl } }));
+                                }, 200);
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[10px] font-bold transition-all cursor-pointer border border-blue-500/30"
+                        >
+                            <span className="material-symbols-outlined text-sm">edit</span>AI Edit
+                        </button>
+                        <div className="w-px h-5 bg-white/20" />
+                        {/* Download */}
+                        <a href={logoZoomUpscaled || logoZoomUrl} download="logo.png" target="_blank" rel="noreferrer"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-white/10 text-white text-[10px] font-medium transition-all cursor-pointer"
+                        >
+                            <span className="material-symbols-outlined text-sm">download</span>Save
+                        </a>
+                        <div className="w-px h-5 bg-white/20" />
+                        <button onClick={() => setLogoZoomOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white transition-all cursor-pointer">
+                            <span className="material-symbols-outlined text-lg">close</span>
+                        </button>
+                    </div>
+
+                    {/* Image */}
+                    <div className="overflow-auto max-w-full max-h-[75vh] rounded-2xl border border-white/10">
+                        <img
+                            src={logoZoomUpscaled || logoZoomUrl}
+                            alt="Logo zoom view"
+                            style={{ transform: `scale(${logoZoomScale})`, transformOrigin: 'center', transition: 'transform 0.2s ease' }}
+                            className="max-w-2xl max-h-[70vh] object-contain block"
+                        />
+                    </div>
+                    {logoZoomUpscaled && (
+                        <div className="mt-3 flex items-center gap-1.5 text-emerald-400 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+                            <span className="material-symbols-outlined text-sm">hd</span>
+                            Showing upscaled version
+                        </div>
+                    )}
+                </div>
+            )}
+
+
 
 
             {/* =================== CAROUSEL GENERATOR =================== */}

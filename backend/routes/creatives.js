@@ -292,6 +292,166 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         if (options?.alreadyEnhanced || options?.skipPipeline) {
             console.log('⚡ Pipeline skipped — prompt already enhanced by user');
             agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ── LOGO FAST PATH: Campaign Logo uses specialist 2026 Art Director ──
+        // Bypasses the generic creative pipeline entirely. Instead:
+        //   1. Load brand context (Redis cached — near-zero latency)
+        //   2. Run LOGO_ART_DIRECTOR_PROMPT to build a style-specific logo prompt
+        //   3. Pass the enhanced prompt directly to routedImageGenerate
+        // This ensures logos get 2026 design intelligence (India New Luxe,
+        // Glassmorphism 2.0, Anti-AI-Slop, etc.) on EVERY generation.
+        // ══════════════════════════════════════════════════════════════════════
+        } else if (type === 'campaign-logo') {
+            console.log('\n══════ LOGO ART DIRECTOR (2026 Design Intelligence) ══════');
+            try {
+                const { LOGO_ART_DIRECTOR_PROMPT } = await import('../agents/creativeStudio/prompts.js');
+                const { agentUtils } = await import('../agents/shared/agentUtils.js');
+                const aiRouter = getRouter();
+
+                // Load brand context (Redis cached — ~0ms on hit)
+                const { brandContext } = await agentUtils.loadBrandContext(brandId);
+
+                // ── Extract all logo-specific fields from options ──
+                const logoText = options?.logoText
+                    || (prompt.match(/TEXT:\s*"([^"]+)"/)?.[1])
+                    || prompt.split('\n')[0]
+                    || prompt;
+
+                const clgStyle   = options?.style   || 'auto';
+                const clgOccasion= options?.occasion || '';
+                const clgIcon    = options?.iconElements || '';
+                const clgBg      = options?.bgTreatment  || 'auto';
+                const clgShape   = options?.shape    || '';
+                const clgEnhance = options?.enhance  || '';
+                const clgColors  = options?.brandColors || '';
+
+                console.log(`🎨 [LogoAD] Text: "${logoText}" | Style: ${clgStyle} | Mood: ${clgEnhance || 'auto'} | Occasion: ${clgOccasion || 'none'}`);
+
+                // ══════════════════════════════════════════════════════════════
+                // STYLE MANDATE SYSTEM
+                // When the user explicitly selects a visual style, these are
+                // NON-NEGOTIABLE image generation directives that the Art
+                // Director receives as LOCKED constraints — it cannot override them.
+                // ══════════════════════════════════════════════════════════════
+                const STYLE_MANDATES = {
+                    '3d-render':    'MANDATORY 3D RENDER STYLE: The logo MUST be fully three-dimensional — volumetric, dimensional type with physical depth, subsurface scattering on surfaces, realistic cast shadows, specular highlights. NOT flat. NOT 2D. Render quality: cinema-grade 3D. Think Cinema 4D / Blender render output.',
+                    '2d-flat':      'MANDATORY 2D FLAT STYLE: Pure flat vector illustration aesthetic. No gradients unless linear. No shadows. No depth. Solid fills only. SVG-clean output. Think Figma-exported vector art.',
+                    'isometric':    'MANDATORY ISOMETRIC STYLE: Strict 120° isometric projection. All elements rendered on isometric grid. 3D-feeling but geometrically precise and flat-shaded. No perspective distortion.',
+                    'hand-drawn':   'MANDATORY HAND-DRAWN STYLE: Looks genuinely hand-crafted — brush strokes visible, ink texture, slight imperfections in line weight, sketch-like quality. Anti-AI-slop signal. Zine / risograph aesthetic.',
+                    'neon':         'MANDATORY NEON GLOW STYLE: Dark (near-black or deep navy) background. Type and elements rendered as glowing neon tube lights. Electric colour bloom around each element. Chromatic aberration at edges. The glow is the texture.',
+                    'metallic':     'MANDATORY METALLIC STYLE: Every element has iridescent metallic surface — liquid metal, foil-stamped, or embossed. Gold, platinum, rose gold, or copper tones depending on brand palette. Micro-reflections visible. Premium badge feel.',
+                    'gradient':     'MANDATORY GRADIENT KINETIC STYLE: Bold, vibrant gradient is the HERO — not just a background. Gradient creates visual movement and energy. Type is white or light-toned over the gradient. Gradient tells a story (dark → bright).',
+                    'pixel':        'MANDATORY PIXEL ART STYLE: Retro pixel / 8-bit aesthetic. Coarse pixel grid visible. Limited colour palette (max 8 colours). CRT scan-line texture possible. Nostalgic + precision combined.',
+                    'auto':         '', // Art Director decides freely
+                };
+
+                // ══════════════════════════════════════════════════════════════
+                // MOOD-TO-COLOR INTELLIGENCE
+                // Translates feel/mood keywords into specific colour science.
+                // This runs even when Art Director would otherwise default to
+                // brand's dark/bold palette.
+                // ══════════════════════════════════════════════════════════════
+                const MOOD_COLOR_MAP = {
+                    elegant:    'Muted, sophisticated palette — soft champagne, ivory, blush, warm taupe, aged gold. Never harsh or saturated. Delicate.',
+                    caring:     'Warm, nurturing palette — soft rose, peach, cream, warm coral, sage green. Gentle, approachable, never cold or dark.',
+                    playful:    'Bright, energetic palette — sunny yellow, coral, sky blue, lime green. High energy, dopamine-rich.',
+                    luxury:     'Deep, prestigious palette — near-black navy or forest, champagne gold accent, ivory pop. Restraint is the signal.',
+                    bold:       'High contrast palette — deep background, electric accent, white type. Punchy and confident.',
+                    minimalist: 'Near-monochrome — one colour at very low saturation, generous white space, nothing competes.',
+                    retro:      'Muted vintage palette — ochre, burnt sienna, teal, cream. Faded Kodak Portra colour science.',
+                    futuristic: 'Cold technology palette — deep space black, electric cyan or violet, white type. No warm tones.',
+                    vibrant:    'Maximum saturation — hot pink, electric orange, lime, cyan. Dopamine colour overload intentional.',
+                    festive:    'Rich celebration palette — crimson, gold, deep jewel tones. Warm and celebratory.',
+                    warm:       'Amber, terracotta, burnt gold, cream. Comfortable and inviting. No cool tones.',
+                    cool:       'Blues, teals, silvers, whites. Crisp, modern, clinical if needed.',
+                    natural:    'Forest green, earth brown, sky blue, warm beige. Organic and grounded.',
+                    soft:       'Very light, low-contrast palette. Pastels — lavender, mint, peach, cloud white.',
+                    dark:       'Deep backgrounds — near-black, charcoal, dark navy. High contrast type.',
+                    light:      'White or very light backgrounds. Airy, open, spacious.',
+                };
+
+                // Resolve mood color directive from clgEnhance keywords
+                const moodKeywords = (clgEnhance || '').toLowerCase().split(/[\s,]+/).filter(Boolean);
+                const moodColorDirectives = moodKeywords
+                    .map(kw => MOOD_COLOR_MAP[kw])
+                    .filter(Boolean);
+
+                // Build the mandate block that the Art Director receives as hard constraints
+                const styleMandateBlock = STYLE_MANDATES[clgStyle] || '';
+                const moodMandateBlock = moodColorDirectives.length > 0
+                    ? `MANDATORY COLOUR & FEEL DIRECTION (user-specified): ${moodColorDirectives.join(' ')} These colour choices OVERRIDE any conflicting defaults. The mood "${clgEnhance}" must be immediately obvious in the first 0.5 seconds.`
+                    : clgColors
+                        ? `COLOUR PALETTE (locked): Use these specific colours as the foundation — ${clgColors}. Do not substitute with brand defaults if these are specified.`
+                        : '';
+
+                const userMandates = [
+                    styleMandateBlock,
+                    moodMandateBlock,
+                    clgShape && clgShape !== 'freeform'
+                        ? `MANDATORY BADGE SHAPE: The logo MUST be contained within a ${clgShape} shape. This is non-negotiable.` : '',
+                    clgIcon && clgIcon !== 'none'
+                        ? `MANDATORY ICON ELEMENT: Include a ${clgIcon} icon/symbol element. It must be present and visible.` : '',
+                    clgBg === 'transparent'
+                        ? 'MANDATORY: Fully transparent background (alpha channel). Logo elements only — no background fill.'
+                        : clgBg && clgBg !== 'auto'
+                            ? `MANDATORY BACKGROUND: ${clgBg} background — solid colour fill as specified.` : '',
+                    clgEnhance && !moodColorDirectives.length
+                        ? `MANDATORY STYLE KEYWORDS: "${clgEnhance}" — ensure these qualities are obvious in the visual output.` : '',
+                ].filter(Boolean);
+
+                // Build the full Art Director prompt with mandates injected as locked constraints
+                const logoADPrompt = LOGO_ART_DIRECTOR_PROMPT(brandContext, logoText, clgStyle, clgOccasion)
+                    + (userMandates.length > 0
+                        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nUSER-LOCKED MANDATES (CANNOT BE OVERRIDDEN BY YOUR CREATIVE DECISIONS)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nThe following are absolute user requirements. Your engineeredPrompt MUST faithfully execute ALL of them. Do not substitute, soften, or ignore any:\n\n${userMandates.map((m, i) => `${i + 1}. ${m}`).join('\n\n')}`
+                        : '');
+
+                // Call the Logo Art Director (Claude for precision reasoning)
+                const adResult = await aiRouter.generateText({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 800,
+                    messages: [{ role: 'user', content: logoADPrompt }]
+                });
+                const adRaw = adResult?.content?.[0]?.text || adResult?.text || '';
+
+                // Extract the engineered image prompt from the Art Director's JSON response
+                let enhancedLogoPrompt = prompt; // fallback to full raw prompt
+                try {
+                    const jsonMatch = adRaw.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const adJson = JSON.parse(jsonMatch[0]);
+                        enhancedLogoPrompt = adJson.engineeredPrompt || adJson.imagePrompt || adJson.finalPrompt || adJson.primaryPrompt || prompt;
+                        console.log(`✅ [LogoAD] Style chosen: ${adJson.chosenStyle || clgStyle}`);
+                        console.log(`✅ [LogoAD] Colors: ${adJson.colorStrategy || 'N/A'}`);
+                        console.log(`✅ [LogoAD] Type: ${adJson.typographyTreatment || 'N/A'}`);
+                    } else if (adRaw.length > 20) {
+                        enhancedLogoPrompt = adRaw;
+                    }
+                } catch {
+                    if (adRaw.length > 20) enhancedLogoPrompt = adRaw;
+                }
+
+                // Append safety guardrails that must survive any prompt truncation
+                const guardrails = [
+                    `The text "${logoText}" MUST be the largest, clearest, most readable element — always.`,
+                    'No placeholder text. No watermarks. No additional brand wordmark.',
+                    styleMandateBlock ? styleMandateBlock.split(':')[0] + ': confirmed.' : '',
+                ].filter(Boolean).join(' ');
+
+                enhancedLogoPrompt += `\n\n${guardrails}`;
+
+                console.log(`📝 [LogoAD] Final prompt (${enhancedLogoPrompt.length} chars): ${enhancedLogoPrompt.substring(0, 200)}...`);
+                agenticMeta = {
+                    pipelineRan: false,
+                    pipelineSkipped: 'logo-fast-path',
+                    finalPrompt: enhancedLogoPrompt,
+                    engineeredPrompt: { primaryPrompt: enhancedLogoPrompt },
+                };
+            } catch (logoErr) {
+                console.warn('⚠️ [LogoAD] Art Director failed, using raw prompt:', logoErr.message);
+                agenticMeta = { pipelineRan: false, pipelineSkipped: 'logo-ad-fallback', finalPrompt: prompt };
+            }
+
         } else {
         try {
             // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
@@ -517,11 +677,16 @@ Generate the adapted creative now.`;
             }
         }
 
+        // For campaign-logo, derive a clean title from the logo text (not the raw prompt blob)
+        const savedTitle = type === 'campaign-logo' && options?.logoText
+            ? `Campaign Logo — ${options.logoText}`
+            : result.title || '';
+
         const creative = await Creative.create({
             user: user._id,
             brand: brandId,
             type: type || 'instagram-post',
-            title: result.title || '',
+            title: savedTitle,
             prompt,
             imageUrl: rawImageUrl,
             thumbnailUrl: result.thumbnailUrl || rawImageUrl,
@@ -1566,6 +1731,76 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
     console.log(`🎯 Image Generation: model=${modelKey}`);
     if (customSize) console.log(`📐 Custom Size: ${customSize.width}x${customSize.height}`);
 
+    // ── Route: Recraft v4 (via LaoZhang proxy) ────────────────────────────────
+    // Recraft v4 specialises in vector-grade logos, iconography, and typographic design.
+    // Routed through the same LaoZhang proxy as GPT-image-2 for unified key management.
+    if (modelKey === 'recraft-v4') {
+        const lzKey = process.env.LAOZHANG_API_KEY;
+        if (!lzKey) {
+            console.warn('⚠️ [Recraft v4] LAOZHANG_API_KEY missing — falling back to gpt-image-2');
+            return routedImageGenerate(promptText, imageParts, temperature, aspectRatio, imageSize, 'gpt-image-2', refImageUrls, customSize, timeoutMs);
+        }
+        const lzBase = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
+        const recraftSizeMap = {
+            '1:1':  '1024x1024', '4:5':  '1024x1024',
+            '9:16': '1024x1820', '16:9': '1820x1024',
+            '4:3':  '1365x1024', '3:4':  '1024x1365',
+            '3:2':  '1820x1024', '2:3':  '1024x1365',
+        };
+        function nearestRecraftSize(ar) {
+            if (!ar || !ar.includes(':')) return '1024x1024';
+            const [w, h] = ar.split(':').map(Number);
+            if (!w || !h) return '1024x1024';
+            const r = w / h;
+            if (r > 1.4) return '1820x1024';
+            if (r < 0.7) return '1024x1820';
+            if (r > 1.1) return '1365x1024';
+            if (r < 0.9) return '1024x1365';
+            return '1024x1024';
+        }
+        const recraftSize = recraftSizeMap[aspectRatio] || nearestRecraftSize(aspectRatio);
+        const TIMEOUT_MS = 150_000;
+        console.log(`\n══════ RECRAFT V4 GENERATION (via LaoZhang) ══════`);
+        console.log(`📐 Aspect Ratio: ${aspectRatio} → ${recraftSize}`);
+        console.log(`📝 Prompt (first 200): ${promptText.substring(0, 200)}...`);
+        try {
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Recraft v4 timed out after 150s. Please try again.')), TIMEOUT_MS)
+            );
+            const generatePromise = (async () => {
+                const response = await fetch(`${lzBase}/images/generations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lzKey}` },
+                    body: JSON.stringify({ model: 'recraftai/recraftv4', prompt: promptText, n: 1, size: recraftSize, response_format: 'url' }),
+                    signal: AbortSignal.timeout(TIMEOUT_MS),
+                });
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Recraft v4 failed (${response.status}): ${errText.substring(0, 200)}`);
+                }
+                const data = await response.json();
+                const imgData = data.data?.[0];
+                const imageUrl = imgData?.url || '';
+                const b64 = imgData?.b64_json || '';
+                if (!imageUrl && !b64) throw new Error('Recraft v4 returned empty image response');
+                const rawUrl = imageUrl || `data:image/png;base64,${b64}`;
+                const { ensureS3Url } = await import('../utils/s3.js');
+                const finalUrl = await ensureS3Url(rawUrl, 'studio/recraft');
+                console.log(`✅ [Recraft v4] Image generated (${recraftSize}): ${finalUrl.substring(0, 80)}...`);
+                return { imageUrl: finalUrl, model: 'recraft-v4', textResponse: '', warnings: [] };
+            })();
+            return await Promise.race([generatePromise, timeoutPromise]);
+        } catch (error) {
+            console.error(`❌ Recraft v4 failed:`, error.message);
+            return {
+                imageUrl: null, model: selectedModel, textResponse: '', warnings: [],
+                modelBusy: true, busyModel: 'recraft-v4',
+                errorMessage: error.message || 'Recraft v4 is unavailable. Please try again.',
+                errorType: 'error',
+            };
+        }
+    }
+
     // ── Route: Grok Imagen (xAI direct) ─────────────────────────────────────
     if (modelKey === 'grok-imagen') {
         const TIMEOUT_MS = 120_000;
@@ -2262,13 +2497,15 @@ router.post('/save-to-bank', protect, async (req, res) => {
 // GET /api/creatives/image-bank — List all saved images for image bank view
 router.get('/image-bank', protect, async (req, res) => {
     try {
-        const { brandId, limit = 30, page = 1, category } = req.query;
+        const { brandId, limit = 30, page = 1, category, source } = req.query;
 
         const match = { user: req.user._id, imageUrl: { $exists: true, $ne: '' } };
         if (brandId) match.brand = new mongoose.Types.ObjectId(brandId);
 
-        // Category filtering
-        if (category === 'uploaded') {
+        // Source/type filtering — used by logo history loader
+        if (source) {
+            match.type = source; // e.g. 'campaign-logo'
+        } else if (category === 'uploaded') {
             match.type = 'uploaded';
         } else if (category === 'generated') {
             match.type = { $in: ['ai-photoshoot', 'instagram-post', 'instagram-story', 'facebook-ad', 'linkedin-post', 'youtube-thumb', 'banner', 'twitter-post', 'pinterest', 'photoshoot', 'virtual-tryon', 'lifestyle-mockup', 'logo-mockup', 'campaign', 'campaign-logo', 'other'] };
@@ -3555,6 +3792,79 @@ Write a short cinematic ad copy block (3-5 lines) — in the style of a luxury b
         }
         const errorMsg = error?.message || safeErrorMessage(error);
         res.status(500).json({ success: false, error: errorMsg });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/creatives/analyse-logo-for-animation
+// Step 1: Vision-analyses the logo image with Claude multimodal.
+// Step 2: Feeds description to LOGO_ANIMATION_DIRECTOR_PROMPT → Seedance 2 brief.
+// Returns: { seedancePrompt, motionConcept, logoDescription, animationData }
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/analyse-logo-for-animation', protect, requireStudio('creativeStudio'), async (req, res) => {
+    try {
+        const { imageUrl, logoText = '' } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl is required' });
+
+        const { LOGO_ANIMATION_DIRECTOR_PROMPT } = await import('../agents/creativeStudio/prompts.js');
+        const aiRouter = getRouter();
+
+        console.log(`\n══════ LOGO ANIMATION DIRECTOR ══════`);
+        console.log(`🖼️  Logo: ${imageUrl.substring(0, 80)}...`);
+        console.log(`📝 LogoText: "${logoText}"`);
+
+        // ── Step 1: Vision analysis ──
+        let logoDescription = `A campaign logo/badge design${logoText ? ` with the text "${logoText}"` : ''}.`;
+        try {
+            const imgResp = await presignedFetch(imageUrl, { signal: AbortSignal.timeout(15000) });
+            if (imgResp && imgResp.ok) {
+                const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+                const mime = imgResp.headers.get('content-type') || 'image/png';
+                const visionResult = await aiRouter.generateText({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 300,
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            { type: 'image', source: { type: 'base64', media_type: mime, data: imgBuf.toString('base64') } },
+                            { type: 'text', text: 'Describe this logo/badge design in 2-3 sentences. Include: typography style, colors, symbolic elements/icons, background treatment, and overall design mood. Be specific — this description feeds an Animation Director.' }
+                        ]
+                    }]
+                });
+                const raw = visionResult?.content?.[0]?.text || visionResult?.text || '';
+                if (raw.length > 10) logoDescription = raw;
+            }
+        } catch (e) {
+            console.warn('⚠️ [AnimDir] Vision failed, using fallback description:', e.message);
+        }
+
+        // ── Step 2: Animation Director ──
+        const animInput = LOGO_ANIMATION_DIRECTOR_PROMPT(logoDescription, logoText, '1:1');
+        const animResult = await aiRouter.generateText({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 600,
+            messages: [{ role: 'user', content: animInput }]
+        });
+        const rawAnim = animResult?.content?.[0]?.text || animResult?.text || '';
+        let animData = {};
+        try {
+            const match = rawAnim.match(/\{[\s\S]*\}/);
+            if (match) animData = JSON.parse(match[0]);
+        } catch { /* keep empty */ }
+
+        const fallbackPrompt = `The ${logoText || 'campaign logo'} badge pulses with golden energy as fine particles drift upward, the icon gently orbits and settles, the bold text materialises with a crisp metallic sheen. Camera locked off with subtle ambient shimmer. Smooth loop, clean edges, high fidelity, no motion blur on text.`;
+        console.log(`✅ [AnimDir] Prompt ready (${(animData.seedancePrompt || '').length} chars)`);
+
+        return res.json({
+            success: true,
+            logoDescription,
+            motionConcept: animData.motionConcept || '',
+            seedancePrompt: animData.seedancePrompt || fallbackPrompt,
+            animationData: animData,
+        });
+    } catch (err) {
+        console.error('❌ [AnimDir] Error:', err.message);
+        return res.status(500).json({ success: false, error: err.message });
     }
 });
 

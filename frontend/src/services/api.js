@@ -269,6 +269,8 @@ export const creatives = {
     editImage: (data) => apiFetch('/creatives/edit-image', { method: 'POST', body: JSON.stringify(data), timeout: 200000 }),
     // Campaign Shot — 1-click cinematic product poster
     campaignShot: (data) => apiFetch('/creatives/campaign-shot', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    // Logo Animation Director — analyses a logo image and writes a Seedance 2 animation prompt
+    analyseForAnimation: (data) => apiFetch('/creatives/analyse-logo-for-animation', { method: 'POST', body: JSON.stringify(data), timeout: 60000 }),
 };
 
 // ============ Agent API ============
