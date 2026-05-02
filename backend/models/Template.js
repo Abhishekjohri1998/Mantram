@@ -118,7 +118,7 @@ const templateSchema = new mongoose.Schema({
         ref: 'User'
     },
     sourceJobId: {
-        type: mongoose.Schema.Types.ObjectId
+        type: String
     },
     sourceJobType: {
         type: String,
