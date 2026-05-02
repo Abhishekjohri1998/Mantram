@@ -33,6 +33,10 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
     const [scheduledFor, setScheduledFor] = useState('')
     const [scheduleResults, setScheduleResults] = useState(null)
 
+    // Existing scheduled posts — prevents duplicate scheduling
+    const [existingScheduled, setExistingScheduled] = useState([])
+    const [cancellingId, setCancellingId] = useState(null)
+
     const autoGenerateCaption = async (imgUrl) => {
         setGeneratingCaption(true)
         try {
@@ -68,6 +72,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
             setScheduleResults(null)
             setAdaptError('')
             loadAccounts()
+            loadExistingScheduled()
 
             if (defaultText) {
                 setCaption(defaultText)
@@ -90,6 +95,31 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
             console.error('Load accounts error:', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const loadExistingScheduled = async () => {
+        try {
+            const data = await social.publishHistory({ status: 'scheduled' })
+            const posts = data.posts || data.data || []
+            // Also fetch processing posts
+            const processingData = await social.publishHistory({ status: 'processing' })
+            const processingPosts = processingData.posts || processingData.data || []
+            setExistingScheduled([...posts, ...processingPosts])
+        } catch (err) {
+            console.warn('Failed to load scheduled posts:', err)
+        }
+    }
+
+    const handleCancelScheduled = async (postId) => {
+        setCancellingId(postId)
+        try {
+            await social.cancelScheduled(postId)
+            setExistingScheduled(prev => prev.filter(p => p._id !== postId))
+        } catch (err) {
+            alert(err.message || 'Failed to cancel')
+        } finally {
+            setCancellingId(null)
         }
     }
 
@@ -338,6 +368,50 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                         </div>
                     ) : (
                         <>
+                            {/* ── Existing Scheduled Posts Banner ── */}
+                            {existingScheduled.length > 0 && (
+                                <div className="rounded-2xl border border-[#FF4D00]/25 bg-[#FF4D00]/5 p-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[#FF4D00] text-lg">schedule_send</span>
+                                        <p className="text-sm font-bold text-[#FF7A00]">
+                                            {existingScheduled.length} post{existingScheduled.length > 1 ? 's' : ''} already scheduled
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {existingScheduled.slice(0, 6).map(post => (
+                                            <div key={post._id} className="flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl bg-[var(--sys-surface)]/50">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-sm">{PLATFORM_META[post.platform]?.icon || '📱'}</span>
+                                                    <span className="text-xs font-semibold text-[var(--sys-text)] truncate">{post.accountName}</span>
+                                                    <span className="text-[10px] text-[var(--sys-text-muted)] uppercase">{post.platform}</span>
+                                                    <span className="text-[10px] text-[#FF7A00] font-medium">
+                                                        {new Date(post.scheduledFor).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                    {post.status === 'processing' ? (
+                                                        <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-bold flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                                                            PUBLISHING
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleCancelScheduled(post._id)}
+                                                            disabled={cancellingId === post._id}
+                                                            className="px-2 py-0.5 rounded-md bg-red-500/10 text-red-400 text-[10px] font-bold hover:bg-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            {cancellingId === post._id ? '...' : '✕ Cancel'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {existingScheduled.length > 6 && (
+                                        <p className="text-[10px] text-[var(--sys-text-muted)] text-center">+ {existingScheduled.length - 6} more scheduled</p>
+                                    )}
+                                </div>
+                            )}
                             {/* ── Image/Video Preview ── */}
                             {isCarouselMode ? (
                                 <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] p-3">
