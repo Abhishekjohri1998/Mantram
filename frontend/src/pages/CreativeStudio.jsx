@@ -4038,7 +4038,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{img.aiMeta.mcotScore}/100</span>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{String(img.aiMeta.mcotScore) + "/100"}</span>
                                                                     </div>
                                                                     {img.aiMeta.mcotCritique?.verdict && (
                                                                         <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
@@ -4137,7 +4137,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        <>
                         {sidebarPanel === 'create' && <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
 
                             {/* ── Section: Model ── */}
@@ -4180,7 +4179,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <div className="px-4 pt-3 pb-3">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
-                                    <span className="text-[9px] text-[var(--sys-text-muted)] tabular-nums">{(referenceImages.style ? 1 : 0) + characters.length}/14</span>
+                                    <span className="text-[9px] text-[var(--sys-text-muted)] tabular-nums">{String((referenceImages.style ? 1 : 0) + characters.length) + "/14"}</span>
                                 </div>
                                 <div className="grid grid-cols-4 gap-2">
                                     {/* Style slot */}
@@ -4241,7 +4240,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         ref={promptTextareaRef}
                                     />
                                     {prompt.length > 4000 && (
-                                        <div className="text-right text-[9px] px-3 pb-1 text-[var(--sys-text-muted)]">{prompt.length}/5000</div>
+                                        <div className="text-right text-[9px] px-3 pb-1 text-[var(--sys-text-muted)]">{String(prompt.length) + "/5000"}</div>
                                     )}
                                     {/* @ Tag autocomplete */}
                                     {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
@@ -4421,8 +4420,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                         </div>}{/* /create panel */}
 
-                        {/* ── Footer: Format + Quality + Generate ── */}
-                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
+                            {/* ── Footer: Format + Quality + Generate ── */}
+                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
                                 {/* Format + Quality row */}
                                 <div className="flex items-center gap-2">
                                     {/* Format picker */}
@@ -4465,7 +4464,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <button data-wt="creative-generate" onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
                                         className={"w-full py-3 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2 " + (prompt.trim() && activeBrand ? "bg-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/90 text-white shadow-md shadow-[var(--sys-primary)]/20" : "bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-not-allowed")}>
                                         {activeGenerations.length > 0 ? (
-                                            <><span className="material-symbols-outlined animate-spin" style={{ fontSize: '18px' }}>progress_activity</span><span>Generating {activeGenerations.length}/3...</span></>
+                                            <><span className="material-symbols-outlined animate-spin" style={{ fontSize: '18px' }}>progress_activity</span><span>Generating {String(activeGenerations.length) + "/3"}...</span></>
                                         ) : (
                                             <><span>Generate</span><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span></>
                                         )}
@@ -4473,7 +4472,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </CreditTooltipWrapper>
                             </div>
 
-                        </>
                         </div>
                     </div>
             </>
@@ -5610,7 +5608,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{img.aiMeta.mcotScore}/100</span>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{String(img.aiMeta.mcotScore) + "/100"}</span>
                                                                     </div>
                                                                     {img.aiMeta.mcotCritique?.verdict && (
                                                                         <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
