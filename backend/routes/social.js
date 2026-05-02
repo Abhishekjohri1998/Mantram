@@ -776,6 +776,91 @@ router.put('/posts/:id/cancel', protect, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/social/scheduled/diagnostic
+ * @desc    Inspect scheduler health for the current user — counts by status,
+ *          last 10 failed posts with their error reasons, and connected accounts.
+ *          Useful when "I scheduled a post but nothing happened" — surfaces the
+ *          actual failure reason that the publisher already wrote to post.error.
+ * @access  Private
+ */
+router.get('/scheduled/diagnostic', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const [counts, recentFailed, recentScheduled, accounts] = await Promise.all([
+            SocialPost.aggregate([
+                { $match: { user: new mongoose.Types.ObjectId(userId) } },
+                { $group: { _id: '$status', count: { $sum: 1 } } },
+            ]),
+            SocialPost.find({ user: userId, status: 'failed' })
+                .sort({ updatedAt: -1 }).limit(10)
+                .select('platform accountName scheduledFor error caption updatedAt'),
+            SocialPost.find({ user: userId, status: 'scheduled' })
+                .sort({ scheduledFor: 1 }).limit(10)
+                .select('platform accountName scheduledFor caption'),
+            SocialAccount.find({ user: userId })
+                .select('platform accountName accountId isActive tokenExpiresAt'),
+        ]);
+
+        const now = new Date();
+        const statusCounts = counts.reduce((acc, c) => ({ ...acc, [c._id]: c.count }), {});
+        const overdue = await SocialPost.countDocuments({
+            user: userId, status: 'scheduled', scheduledFor: { $lte: now },
+        });
+
+        res.json({
+            success: true,
+            now: now.toISOString(),
+            statusCounts,
+            overdueScheduled: overdue, // > 0 means scheduler isn't running, or is stuck
+            accounts: accounts.map(a => ({
+                platform: a.platform,
+                accountName: a.accountName,
+                accountId: a.accountId,
+                isActive: a.isActive,
+                tokenExpiresAt: a.tokenExpiresAt,
+                tokenExpired: !!(a.tokenExpiresAt && a.tokenExpiresAt <= now),
+            })),
+            recentFailed,
+            upcoming: recentScheduled,
+        });
+    } catch (error) {
+        console.error('Scheduler diagnostic error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route   POST /api/social/posts/:id/retry
+ * @desc    Manually retry a failed scheduled post — re-marks as scheduled and
+ *          runs the publish path immediately (does not wait for the next 5-min tick).
+ * @access  Private
+ */
+router.post('/posts/:id/retry', protect, async (req, res) => {
+    try {
+        const post = await SocialPost.findOne({ _id: req.params.id, user: req.user._id });
+        if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+        if (!['failed', 'scheduled'].includes(post.status)) {
+            return res.status(400).json({ success: false, error: `Cannot retry a ${post.status} post` });
+        }
+        const { retryFailedPost } = await import('../services/scheduledPostPublisher.js');
+        const updated = await retryFailedPost(post._id);
+        res.json({
+            success: true,
+            post: {
+                _id: updated._id,
+                status: updated.status,
+                postId: updated.postId,
+                error: updated.error,
+                publishedAt: updated.publishedAt,
+            },
+        });
+    } catch (error) {
+        console.error('Retry post error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Retry failed' });
+    }
+});
+
+/**
  * @route   ANY /api/social/delete-data
  * @desc    Meta Data Deletion Callback Webhook
  * @access  Public

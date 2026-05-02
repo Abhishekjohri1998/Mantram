@@ -15,8 +15,10 @@
 import Conversation from '../models/Conversation.js';
 import Contact from '../models/Contact.js';
 import Brand from '../models/Brand.js';
+import Automation from '../models/Automation.js';
 import { detectIntentAI, detectIntent, generateAIReplies, detectLanguage } from './conversationEngine.js';
 import { evaluateRoutes } from './routingEngine.js';
+import { findMatchingAutomation, startAutomation, executeNode } from './automationEngine.js';
 
 // Rate limiter — track auto-replies per conversation
 const replyTracker = new Map(); // convId → { count, windowStart }
@@ -237,6 +239,30 @@ export async function runAutonomousPipeline({ userId, brandId, platform, senderI
             pipelineLog.steps.push(`routing_error:${routeErr.message}`);
         }
 
+        // ── Step 13b: User-defined Automation Studio flows ──
+        // Either resume an in-progress automation for this conversation, or match
+        // a new automation against the inbound message. Runs BEFORE the AI fallback
+        // so user-built flows take priority over generic AI replies.
+        try {
+            const automationResult = await runAutomationStep({
+                conversation,
+                contact,
+                brandId,
+                platform,
+                messageText: messageContent,
+                intent,
+                channel,
+            });
+            if (automationResult?.handled) {
+                pipelineLog.steps.push(`automation:${automationResult.tag}`);
+                pipelineLog.action = automationResult.completed ? 'automation_completed' : 'automation_running';
+                trackReply(convId);
+                return { contact, conversation, intent, pipeline: pipelineLog };
+            }
+        } catch (autoErr) {
+            pipelineLog.steps.push(`automation_error:${autoErr.message}`);
+        }
+
         // ── Step 14: Confidence-gated autonomous reply ──
         const confidenceThreshold = autonomy.autoReplyConfidence || 75;
 
@@ -445,6 +471,116 @@ async function sendViaMeta(recipientId, messageText, platform = 'instagram', tok
         console.warn('⚠️ Meta send unavailable:', err.message);
     }
     return { success: false };
+}
+
+/**
+ * Resume an in-progress automation flow, or match + start a new one.
+ * Returns { handled, completed, tag } so the pipeline can short-circuit.
+ *
+ * Why: previously runAutonomousPipeline jumped straight from intent detection
+ * to AI auto-reply, so flows built in the Automation Studio (Automations.jsx)
+ * never fired. This bridges that gap.
+ */
+async function runAutomationStep({ conversation, contact, brandId, platform, messageText, intent, channel }) {
+    if (!brandId) return { handled: false };
+
+    // Resume in-progress automation: contact's reply feeds the waiting node.
+    if (conversation.activeAutomation?.automationId && conversation.activeAutomation?.currentNode) {
+        const automation = await Automation.findById(conversation.activeAutomation.automationId);
+        if (!automation || !automation.isActive || automation.status !== 'active') {
+            conversation.activeAutomation = null;
+            await conversation.save();
+        } else {
+            const messages = await advanceAutomation(automation, conversation, contact, messageText);
+            await dispatchAutomationMessages(messages, contact, conversation, brandId, platform);
+            return {
+                handled: true,
+                completed: !conversation.activeAutomation,
+                tag: `resume:${automation.name}`,
+            };
+        }
+    }
+
+    // Match against active automations for this brand.
+    const automation = await findMatchingAutomation(brandId, messageText, intent.intent, channel);
+    if (!automation) return { handled: false };
+
+    const messages = await startAutomation(automation, conversation, contact);
+    await dispatchAutomationMessages(messages, contact, conversation, brandId, platform);
+    return {
+        handled: true,
+        completed: !conversation.activeAutomation,
+        tag: `match:${automation.name}`,
+    };
+}
+
+/**
+ * Walk an automation forward from its currently-waiting node, feeding the
+ * contact's latest message as the userResponse for ask_question / quick_replies.
+ */
+async function advanceAutomation(automation, conversation, contact, userResponse) {
+    const messagesToSend = [];
+    let currentNodeId = conversation.activeAutomation.currentNode;
+    let response = userResponse;
+
+    for (let step = 0; step < 20; step++) {
+        const result = await executeNode(automation, currentNodeId, conversation, contact, response);
+        response = null; // userResponse only consumed by the first waiting node
+
+        if (result.message) {
+            messagesToSend.push(result.message);
+            conversation.messages.push(result.message);
+        }
+
+        if (result.completed) {
+            conversation.activeAutomation = null;
+            automation.stats.completedRuns = (automation.stats.completedRuns || 0) + 1;
+            await automation.save();
+            break;
+        }
+
+        if (result.waitForResponse) {
+            conversation.activeAutomation.currentNode = result.nextNodeId || currentNodeId;
+            break;
+        }
+
+        if (result.delayMs > 0) {
+            conversation.activeAutomation.currentNode = result.nextNodeId;
+            break;
+        }
+
+        currentNodeId = result.nextNodeId;
+        if (!currentNodeId) {
+            conversation.activeAutomation = null;
+            break;
+        }
+    }
+
+    conversation.lastMessageAt = new Date();
+    if (messagesToSend.length > 0) {
+        conversation.lastMessagePreview = `Bot: ${messagesToSend[messagesToSend.length - 1].content.substring(0, 80)}`;
+    }
+    await conversation.save();
+    return messagesToSend;
+}
+
+/**
+ * Send each automation-generated message out via Meta with a small delay so
+ * Meta's anti-spam/anti-mimicry signals stay clean.
+ */
+async function dispatchAutomationMessages(messages, contact, conversation, brandId, platform) {
+    if (!messages?.length || !contact?.platformUserId) return;
+    const integration = await findIntegration(brandId, platform);
+    const token = integration?.platformData?.pageAccessToken || integration?.accessToken;
+    if (!token) {
+        console.warn('⚠️ Automation produced messages but no Meta token available');
+        return;
+    }
+    for (const msg of messages) {
+        if (msg.role !== 'brand') continue;
+        await sendViaMeta(contact.platformUserId, msg.content, conversation.platform || platform, token);
+        await new Promise(r => setTimeout(r, 800));
+    }
 }
 
 /**

@@ -12,7 +12,10 @@ import SocialAccount from '../models/SocialAccount.js';
 import {
     publishToFacebook,
     publishToInstagram,
-    publishToLinkedIn
+    publishToLinkedIn,
+    publishCarouselToInstagram,
+    publishCarouselToFacebook,
+    publishCarouselToLinkedIn,
 } from './socialService.js';
 import { uploadToS3 } from '../utils/s3.js';
 import { sendRetentionEmail } from '../agents/retention/mailer.js';
@@ -70,6 +73,19 @@ async function sendOneHourReminder(post) {
     }
 }
 
+// ── Resolve any image URL to something Meta can fetch ─────────────────────────
+async function toAbsoluteImageUrl(url, post) {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('data:')) {
+        const s3Url = await uploadToS3(url, `social-scheduled/${post.user}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.png`);
+        return s3Url;
+    }
+    const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+}
+
 // ── Publish a single post ─────────────────────────────────────────────────────
 async function publishScheduledPost(post) {
     try {
@@ -82,40 +98,75 @@ async function publishScheduledPost(post) {
         const account = await SocialAccount.findOne(accountQuery).select('+accessToken');
 
         if (!account) {
-            console.warn(`[SCHEDULER] No active ${post.platform} account for user ${post.user} — marking failed`);
+            console.warn(`[SCHEDULER] No active ${post.platform} account for user ${post.user} (post ${post._id}) — marking failed`);
             post.status = 'failed';
-            post.error = `No active ${post.platform} account connected. Please reconnect and reschedule.`;
+            post.error = `No active ${post.platform} account connected. Please reconnect "${post.accountName || post.accountId}" and reschedule.`;
             await post.save();
             return;
         }
 
-        // Ensure imageUrl is absolute
-        let absoluteImageUrl = post.imageUrl;
-        if (absoluteImageUrl && !absoluteImageUrl.startsWith('http')) {
-            if (absoluteImageUrl.startsWith('data:')) {
-                try {
-                    const s3Url = await uploadToS3(absoluteImageUrl, `social-scheduled/${post.user}/${Date.now()}.png`);
-                    absoluteImageUrl = s3Url;
-                } catch (s3Err) {
-                    console.error('[SCHEDULER] S3 upload failed:', s3Err.message);
-                }
-            } else {
-                const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
-                const path = absoluteImageUrl.startsWith('/') ? absoluteImageUrl : `/${absoluteImageUrl}`;
-                absoluteImageUrl = `${baseUrl}${path}`;
+        // Pre-check token expiry — Meta tokens silently die after 60 days for many flows.
+        // Catching this here gives the user a clear "reconnect" message instead of a cryptic Graph error.
+        if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) <= new Date()) {
+            console.warn(`[SCHEDULER] Token expired for ${post.platform} account ${account.accountName} — marking failed`);
+            post.status = 'failed';
+            post.error = `Access token expired for ${post.platform} (${account.accountName}). Please reconnect.`;
+            await post.save();
+            return;
+        }
+
+        if (!account.accessToken) {
+            post.status = 'failed';
+            post.error = `Missing access token for ${post.platform} (${account.accountName}). Please reconnect.`;
+            await post.save();
+            return;
+        }
+
+        // Resolve image URLs — supports single image OR carousel (imageUrls).
+        let absoluteImageUrl = '';
+        let absoluteImageUrls = [];
+        try {
+            if (Array.isArray(post.imageUrls) && post.imageUrls.length > 1) {
+                absoluteImageUrls = await Promise.all(post.imageUrls.map(u => toAbsoluteImageUrl(u, post)));
             }
+            if (post.imageUrl) {
+                absoluteImageUrl = await toAbsoluteImageUrl(post.imageUrl, post);
+            } else if (absoluteImageUrls.length > 0) {
+                absoluteImageUrl = absoluteImageUrls[0];
+            }
+        } catch (resolveErr) {
+            console.error(`[SCHEDULER] Image resolution failed for post ${post._id}:`, resolveErr.message);
+            post.status = 'failed';
+            post.error = `Image upload/resolution failed: ${resolveErr.message}`;
+            await post.save();
+            return;
+        }
+
+        // Instagram requires media — fail fast with a clear message.
+        if (post.platform === 'instagram' && !absoluteImageUrl && absoluteImageUrls.length === 0) {
+            post.status = 'failed';
+            post.error = 'Instagram posts require at least one image. Add an image and reschedule.';
+            await post.save();
+            return;
         }
 
         const caption = post.caption || '';
-        console.log(`[SCHEDULER] Publishing post ${post._id} to ${post.platform} (${account.accountName})`);
+        const isCarousel = absoluteImageUrls.length > 1;
+        console.log(`[SCHEDULER] Publishing post ${post._id} to ${post.platform} (${account.accountName}) — ${isCarousel ? `carousel x${absoluteImageUrls.length}` : (absoluteImageUrl ? 'single image' : 'text only')}`);
 
         let postId = null;
         if (post.platform === 'facebook') {
-            postId = await publishToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrl);
+            postId = isCarousel
+                ? await publishCarouselToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrls)
+                : await publishToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrl);
         } else if (post.platform === 'instagram') {
-            postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl);
+            postId = isCarousel
+                ? await publishCarouselToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrls)
+                : await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl);
         } else if (post.platform === 'linkedin') {
-            postId = await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl);
+            postId = isCarousel
+                ? await publishCarouselToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrls)
+                : await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl);
         } else {
             post.status = 'failed';
             post.error = `Unsupported platform: ${post.platform}`;
@@ -133,6 +184,7 @@ async function publishScheduledPost(post) {
 
     } catch (err) {
         console.error(`[SCHEDULER] ❌ Failed to publish post ${post._id}:`, err.message);
+        if (err.stack) console.error(err.stack);
         post.status = 'failed';
         post.error = err.message || 'Unknown publishing error';
         await post.save();
@@ -193,11 +245,34 @@ async function processDuePosts() {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 export function startScheduledPostPublisher() {
-    processDuePosts().catch(err => console.warn('[SCHEDULER] Initial run failed:', err.message));
+    console.log(`📅 Scheduled Post Publisher starting — poll interval ${POLL_INTERVAL_MS / 1000}s`);
+
+    processDuePosts()
+        .then(() => console.log('📅 [SCHEDULER] Initial tick complete'))
+        .catch(err => console.warn('[SCHEDULER] Initial run failed:', err.message));
 
     setInterval(() => {
         processDuePosts().catch(err => console.warn('[SCHEDULER] Tick failed:', err.message));
     }, POLL_INTERVAL_MS);
 
     console.log('📅 Scheduled Post Publisher active — checking every 5 min (publish + 1-hr reminder)');
+}
+
+// ── Manual trigger (used by diagnostic endpoint) ──────────────────────────────
+export async function runScheduledPostPublisherNow() {
+    await processDuePosts();
+}
+
+// ── Single-post retry (used by diagnostic endpoint) ───────────────────────────
+export async function retryFailedPost(postId) {
+    const post = await SocialPost.findById(postId);
+    if (!post) throw new Error('Post not found');
+    post.status = 'scheduled';
+    post.error = '';
+    if (!post.scheduledFor || post.scheduledFor > new Date()) {
+        post.scheduledFor = new Date();
+    }
+    await post.save();
+    await publishScheduledPost(post);
+    return post;
 }
