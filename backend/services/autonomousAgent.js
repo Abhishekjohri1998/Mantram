@@ -403,7 +403,11 @@ export async function handleCommentAutonomously({ brandId, commentText, commente
                 await new Promise(r => setTimeout(r, 30000));
                 const result = await replyToComment(commentId, replyText, brandId);
                 apiSuccess = result?.success || false;
-                console.log(`💬 Comment auto-replied: "${replyText.substring(0, 40)}..."`);
+                if (apiSuccess) {
+                    console.log(`💬 ✅ Comment auto-replied to ${commentId}: "${replyText.substring(0, 40)}..."`);
+                } else {
+                    console.error(`💬 ❌ Comment reply FAILED for ${commentId}:`, JSON.stringify(result?.data?.error || result?.error || 'Unknown'));
+                }
             }
             markCommentReplied(commentId);
             await safeLogCommentReply({ ...logEntry, action: 'comment_replied', replyText, replySource: 'ai', apiSuccess });
@@ -696,9 +700,11 @@ async function replyToComment(commentId, text, brandId) {
         }
 
         if (!token) {
-            console.warn('⚠️ No brand token available for comment reply');
+            console.warn('⚠️ No brand token available for comment reply — checked Integration and SocialAccount');
             return { success: false, error: 'No brand token' };
         }
+
+        console.log(`💬 Attempting Graph API reply to comment ${commentId} with token ${token.substring(0, 12)}...`);
 
         const response = await fetch(`https://graph.facebook.com/v22.0/${commentId}/replies`, {
             method: 'POST',
@@ -712,6 +718,13 @@ async function replyToComment(commentId, text, brandId) {
         const data = await response.json();
         if (!response.ok) {
             console.error('❌ Comment reply Graph API error:', JSON.stringify(data.error || data));
+            // Log specific permission errors so they're easy to find in logs
+            if (data.error?.code === 10 || data.error?.code === 200) {
+                console.error('❌ PERMISSION ERROR: Your app likely needs instagram_manage_comments permission approved by Meta App Review.');
+                console.error('❌ For testing, ensure the commenter is a registered Test User in your Meta app.');
+            }
+        } else {
+            console.log(`💬 ✅ Graph API reply successful. Reply ID: ${data.id}`);
         }
         return { success: response.ok, data };
     } catch (err) {

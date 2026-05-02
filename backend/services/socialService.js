@@ -18,22 +18,23 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
         'pages_manage_posts',
         'pages_manage_engagement',
         'pages_read_user_content',
+        'pages_manage_metadata',   // Required for webhook subscriptions via subscribed_apps
         'business_management',
         'public_profile'
     ];
 
-    // Additional scopes for Instagram (only if specifically requested or if Instagram is active)
+    // Instagram scopes — always included because Meta's unified OAuth
+    // covers both platforms simultaneously. Users expect comment automation
+    // to work regardless of which platform they selected during connect.
     const igScopes = [
         'instagram_basic',
         'instagram_content_publish',
         'instagram_manage_insights',
-        'instagram_manage_comments'
+        'instagram_manage_comments'  // Required for comment auto-reply
     ];
 
-    const requestedScopes = [...fbScopes];
-    if (platform === 'instagram') {
-        requestedScopes.push(...igScopes);
-    }
+    // Always request the full set of permissions
+    const requestedScopes = [...fbScopes, ...igScopes];
 
     const scopes = requestedScopes.join(',');
 
@@ -195,13 +196,20 @@ export const fetchUserPagesAndIgAccounts = async (userAccessToken) => {
         // Without this, Meta will never send comment/post webhooks to our server.
         try {
             const pageToken = page.access_token || userAccessToken;
+            // Subscribe to feed (includes comments on FB) AND messages (DMs)
+            // Without this subscription, Meta will never deliver comment/post/DM webhooks.
             await axios.post(`${FB_API_URL}/${page.id}/subscribed_apps`, {
-                subscribed_fields: 'feed',
+                subscribed_fields: 'feed,messages',
                 access_token: pageToken,
             });
-            console.log(`[SOCIAL] ✅ Page ${page.name} (${page.id}) subscribed to webhook field: feed`);
+            console.log(`[SOCIAL] ✅ Page ${page.name} (${page.id}) subscribed to webhook fields: feed, messages`);
         } catch (subErr) {
-            console.warn(`[SOCIAL] ⚠️ Failed to subscribe page ${page.id} to webhooks:`, subErr.response?.data?.error?.message || subErr.message);
+            const errMsg = subErr.response?.data?.error?.message || subErr.message;
+            console.warn(`[SOCIAL] ⚠️ Failed to subscribe page ${page.id} to webhooks:`, errMsg);
+            // Log the full error for debugging permission issues
+            if (subErr.response?.data?.error) {
+                console.warn(`[SOCIAL]   Error code: ${subErr.response.data.error.code}, type: ${subErr.response.data.error.type}`);
+            }
         }
     }
 

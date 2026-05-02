@@ -350,4 +350,110 @@ export async function sendMetaQuickReplies(recipientId, text, buttons, platform 
 }
 
 
+// ── GET /api/webhooks/meta/diagnostics — Check comment reply infrastructure ──
+
+router.get('/meta/diagnostics', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        checks: {},
+    };
+
+    try {
+        // Check 1: Do we have any connected social accounts with tokens?
+        const SocialAccount = (await import('../models/SocialAccount.js')).default;
+        const activeAccounts = await SocialAccount.find({ isActive: true })
+            .select('+accessToken')
+            .limit(10);
+
+        results.checks.socialAccounts = {
+            total: activeAccounts.length,
+            withTokens: activeAccounts.filter(a => !!a.accessToken).length,
+            platforms: activeAccounts.map(a => ({ platform: a.platform, name: a.accountName, hasToken: !!a.accessToken })),
+        };
+
+        // Check 2: Do we have Integration records?
+        const Integration = (await import('../models/Integration.js')).default;
+        const integrations = await Integration.find({ status: 'connected' })
+            .select('+accessToken +platformData.pageAccessToken')
+            .limit(10);
+
+        results.checks.integrations = {
+            total: integrations.length,
+            withPageTokens: integrations.filter(i => !!i.platformData?.pageAccessToken || !!i.accessToken).length,
+        };
+
+        // Check 3: Do we have any brands with autonomy enabled?
+        const Brand = (await import('../models/Brand.js')).default;
+        const brands = await Brand.find({ status: 'active' }).select('name autonomy').limit(10);
+        results.checks.brands = brands.map(b => ({
+            name: b.name,
+            autonomyEnabled: b.autonomy?.enabled || false,
+            commentAutoReply: b.autonomy?.commentAutoReply || false,
+            commentToDM: b.autonomy?.commentToDM || false,
+        }));
+
+        // Check 4: Test webhook subscription status for first page
+        const fbAccount = activeAccounts.find(a => a.platform === 'facebook' && a.accessToken);
+        if (fbAccount) {
+            try {
+                const subResp = await fetch(
+                    `https://graph.facebook.com/v22.0/${fbAccount.accountId}/subscribed_apps?access_token=${fbAccount.accessToken}`
+                );
+                const subData = await subResp.json();
+                results.checks.webhookSubscription = {
+                    pageId: fbAccount.accountId,
+                    pageName: fbAccount.accountName,
+                    status: subResp.ok ? 'ok' : 'error',
+                    subscriptions: subData.data || subData.error || subData,
+                };
+            } catch (e) {
+                results.checks.webhookSubscription = { error: e.message };
+            }
+        } else {
+            results.checks.webhookSubscription = { status: 'no_facebook_account_with_token' };
+        }
+
+        // Check 5: Test token permissions
+        if (fbAccount) {
+            try {
+                const permResp = await fetch(
+                    `https://graph.facebook.com/v22.0/me/permissions?access_token=${fbAccount.accessToken}`
+                );
+                const permData = await permResp.json();
+                const perms = (permData.data || []).filter(p => p.status === 'granted').map(p => p.permission);
+                const commentPerms = ['instagram_manage_comments', 'pages_manage_engagement', 'pages_read_user_content'];
+                results.checks.permissions = {
+                    granted: perms,
+                    missingForComments: commentPerms.filter(p => !perms.includes(p)),
+                    hasCommentPermission: perms.includes('instagram_manage_comments'),
+                };
+            } catch (e) {
+                results.checks.permissions = { error: e.message };
+            }
+        }
+
+        // Check 6: Recent CommentReply logs
+        try {
+            const CommentReply = (await import('../models/CommentReply.js')).default;
+            const recentReplies = await CommentReply.find().sort({ createdAt: -1 }).limit(5).lean();
+            results.checks.recentCommentReplies = recentReplies.map(r => ({
+                action: r.action,
+                apiSuccess: r.apiSuccess,
+                intent: r.intent,
+                commentText: (r.commentText || '').substring(0, 60),
+                replyText: (r.replyText || '').substring(0, 60),
+                createdAt: r.createdAt,
+                errorMessage: r.errorMessage,
+            }));
+        } catch (e) {
+            results.checks.recentCommentReplies = { error: e.message };
+        }
+
+        res.json({ success: true, diagnostics: results });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message, diagnostics: results });
+    }
+});
+
+
 export default router;
