@@ -41,7 +41,9 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     // Always use Facebook Dialog for Business Accounts
     const baseUrl = 'https://www.facebook.com/v22.0/dialog/oauth';
 
-    return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code`;
+    // auth_type=rerequest forces Meta to re-prompt the user for any missing permissions
+    // if the scopes have changed since they last connected.
+    return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&scope=${scopes}&response_type=code&auth_type=rerequest`;
 };
 
 export const exchangeCodeForToken = async (code, platform = 'facebook') => {
