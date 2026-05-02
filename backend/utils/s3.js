@@ -98,38 +98,49 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
  *   3. Provider URL (fal, openai, laozhang, replicate, etc.) → fetch and mirror to S3
  *
  * @param {string} input - The URL or base64 string
- * @param {string} folder - The S3 folder/prefix (default: 'video-studio/assets')
+ * @param {string} folderOrFilename - The S3 folder/prefix, or exact filename (default: 'video-studio/assets')
  * @returns {Promise<string>} - Always returns a stable S3 URL (or original on catastrophic failure)
  */
-export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
+export const ensureS3Url = async (input, folderOrFilename = 'video-studio/assets') => {
     if (!input || typeof input !== 'string') return input;
+
+    // Normalize protocol-less URLs
+    let normalizedInput = input;
+    if (normalizedInput.startsWith('//')) {
+        normalizedInput = 'https:' + normalizedInput;
+    }
 
     // ── Type 1: Already our S3 URL — return unchanged ────────────────────────
     if (
-        input.includes('mantram-media-assets.s3') ||
-        input.includes('mantram.ai/api/video/stream') ||
-        (input.includes('.amazonaws.com') && input.includes(config.aws.bucket))
+        normalizedInput.includes('mantram-media-assets.s3') ||
+        normalizedInput.includes('mantram.ai/api/video/stream') ||
+        (normalizedInput.includes('.amazonaws.com') && normalizedInput.includes(config.aws.bucket))
     ) {
-        return input;
+        return normalizedInput;
     }
 
     // ── Type 2: Base64 data URI — decode and upload to S3 ────────────────────
-    if (input.startsWith('data:')) {
+    if (normalizedInput.startsWith('data:')) {
         try {
-            const mimeMatch = input.match(/^data:([\w/+]+);base64,/);
+            const mimeMatch = normalizedInput.match(/^data:([\w/+]+);base64,/);
             const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
             const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
-            const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-            console.log(`📤 ensureS3Url: Uploading base64 to S3: ${filename}`);
-            return await uploadToS3(input, filename, mimeType);
+            
+            let targetKey = folderOrFilename;
+            if (!folderOrFilename.match(/\.(png|jpg|jpeg|webp|mp4|gif)$/i)) {
+                targetKey = `${folderOrFilename}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+            }
+
+            console.log(`📤 ensureS3Url: Uploading base64 to S3: ${targetKey}`);
+            return await uploadToS3(normalizedInput, targetKey, mimeType);
         } catch (e) {
             console.error(`❌ ensureS3Url base64 S3 upload failed: ${e.message}`);
-            return input;
+            return normalizedInput;
         }
     }
 
     // ── Type 3: External/provider URL — mirror to S3 ─────────────────────────
-    if (!input.startsWith('http')) return input; // relative or unknown — return unchanged
+    if (!normalizedInput.startsWith('http')) return normalizedInput; // relative or unknown — return unchanged
 
     const PROVIDER_DOMAINS = [
         'fal.media', 'fal.run', 'fal.ai',
@@ -147,30 +158,37 @@ export const ensureS3Url = async (input, folder = 'video-studio/assets') => {
         'firebasestorage.googleapis.com',
         'storage.googleapis.com',
         // Atlas Cloud / Alibaba Cloud (Seedance/HappyHorse)
-        'aliyuncs.com', 'atlascloud.ai', 'alibaba.com'
+        'aliyuncs.com', 'atlascloud.ai', 'alibaba.com',
+        'piapi.ai', 'muapi.ai', 'kling.ai', 'seedance.ai', 'heygen.com', 'modelslab.com'
     ];
 
-    const isProviderUrl = PROVIDER_DOMAINS.some(domain => input.includes(domain));
+    const isProviderUrl = PROVIDER_DOMAINS.some(domain => normalizedInput.includes(domain));
     if (!isProviderUrl) {
-        // Unknown external URL — return unchanged (user CDN, blob storage, etc.)
-        return input;
+        // Unknown external URL — but since we're generating videos, if it's an http URL and not our S3, mirror it just in case,
+        // or return unchanged. For safety, we return unchanged, but allow specific additions above.
+        return normalizedInput;
     }
 
 
     try {
-        const ext = input.includes('.webp') ? 'webp' : input.includes('.png') ? 'png' : 'jpg';
-        const targetKey = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-        console.log(`🔁 ensureS3Url: Mirroring provider URL to S3: ${input.substring(0, 80)}...`);
-        const mirrored = await mirrorUrlToS3(input, targetKey);
+        let targetKey = folderOrFilename;
+        // If folderOrFilename does not have a common extension, treat it as a folder
+        if (!folderOrFilename.match(/\.(png|jpg|jpeg|webp|mp4|webm|gif)$/i)) {
+            const ext = normalizedInput.includes('.mp4') ? 'mp4' : normalizedInput.includes('.webp') ? 'webp' : normalizedInput.includes('.png') ? 'png' : 'jpg';
+            targetKey = `${folderOrFilename}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+        }
+
+        console.log(`🔁 ensureS3Url: Mirroring provider URL to S3: ${normalizedInput.substring(0, 80)}...`);
+        const mirrored = await mirrorUrlToS3(normalizedInput, targetKey);
         if (mirrored) {
             console.log(`✅ ensureS3Url: Mirrored → ${mirrored.substring(0, 80)}`);
             return mirrored;
         }
         console.warn(`⚠️ ensureS3Url: Mirror failed, returning original URL`);
-        return input;
+        return normalizedInput;
     } catch (e) {
         console.error(`❌ ensureS3Url provider mirror failed: ${e.message}`);
-        return input;
+        return normalizedInput;
     }
 };
 
