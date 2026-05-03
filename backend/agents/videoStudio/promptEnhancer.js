@@ -22,52 +22,88 @@
 export const MODEL_STYLE_GUIDES = {
     'seedance-2.0': {
         name: 'Seedance 2.0',
-        maxWords: 260,
+        maxWords: 500,
         structure: `
 SEEDANCE 2.0 — DIRECTORIAL PROMPTING (Official Best Practices):
 
 You are a film director writing a production-ready scene prompt for Seedance 2.0.
 Seedance works best with DIRECTORIAL prompts: tell the model WHAT to show, HOW to film it, and WHEN things happen.
 
-PROMPT STRUCTURE (follow this order):
-1. SUBJECT: Who/what is in the scene. Be specific — describe appearance, clothing, posture, expression. Use functional roles ("figure", "rider", "speaker") instead of age-based words (no "boy", "girl", "young").
-2. ACTION: One clear verb in present tense. Describe intensity ("speeds past" not "passes by"). Keep to ONE primary action per shot.
-3. CAMERA: Explicit framing (wide/medium/close-up/extreme close-up) + movement (dolly-in, orbit, pan, handheld, tracking). Include focal length feel when relevant ("compressed 85mm", "wide 24mm").
-4. STYLE: At least one style keyword (cinematic, documentary, photorealistic, moody, ethereal). Describe lighting (golden hour, dramatic side-light, soft diffused). Set atmosphere.
-5. CONSTRAINTS: Brief consistency notes ("maintain facial consistency", "stable framing").
+If generating an Ad Film (longer sequence), write the entire Ad Film sequence using this structure based on the brief and brand DNA.
+If generating a Short or single scene, write the scene using this structure.
+Always tag whatever product or character is added (using @image tags), ensuring they are in sync with the product and character references.
 
-TIMELINE MARKERS (use for sequences longer than 5s):
-Structure events with time codes or time ranges:
-  0-3s: Wide establishing shot of the scene.
-  3-5s: Medium shot — subject begins action.
-  5-7s: Close-up — emotional beat or product reveal.
-CRITICAL: If the user requests specific cut timings (e.g., "cut every 1.5 sec") or provides an explicit timeline, you MUST strictly follow their instruction by generating a precise second-by-second timeline (e.g. 0-1.5s, 1.5-3s, 3-4.5s) containing all their requested actions. DO NOT skip or condense their requested shots.
+📋 SEEDANCE PROMPT TEMPLATE (You MUST strictly follow this exact format):
 
-AUDIO / VOICEOVER:
-If the user requests voiceover or specific audio, describe the sound inline within the scene description or at the end. (e.g., "Deep menacing voiceover: 'Begin...'", "Sound of heavy breathing").
+STYLE: [Visual treatment — animation type, lighting, motion quality, aesthetic references, polish level]
 
-@TAG REFERENCE RULES (when reference images are provided):
+WARDROBE: [Character clothing/appearance, tracked across shots for continuity. Note any wardrobe changes by shot number]
+
+ENVIRONMENT: [All locations used in the sequence, listed with key visual details]
+
+MOOD: [Emotional tone and arc — chaotic, romantic, awe-inspiring, comedic, etc.]
+
+SHOT 1: [Shot type], [lens] [camera movement] / [Action description]. [Dialogue if any]: "..."
+
+SHOT 2: [Shot type], [lens] [camera movement] / [Action description]. [Dialogue if any]: "..."
+
+[...continue for all shots]
+
+🎬 SHOT GRAMMAR REFERENCE
+
+Shot Types (size/framing)
+- ECU: Extreme Close-Up (Eyes, hands, small details, emotional intimacy)
+- MCU: Medium Close-Up (Face + shoulders, dialogue, reactions)
+- MS: Medium Shot (Waist-up, action with context)
+- WS: Wide Shot (Full body + environment)
+- OTS: Over-the-Shoulder (Conversation, POV-adjacent framing)
+- POV: Point of View (Subjective, immersive)
+
+Lens Choices (focal length)
+- 24mm: Wide, immersive, slight distortion (Establishing shots, reveals, environments)
+- 35mm: Natural wide, dynamic (Tracking shots, walking, action)
+- 50mm: Natural human eye (Conversation, dialogue, neutral storytelling)
+- 85mm: Compressed, intimate, cinematic (Close-ups, emotional beats, detail shots)
+
+Camera Movements
+- Push-in: slow zoom toward subject
+- Pull-back / Pull-out: reveals scale or context
+- Tracking: camera follows subject in motion
+- Slide / Dolly: lateral move
+- Handheld: chaotic, intimate, raw energy
+- Snap push: fast aggressive zoom
+- Static: locked-off, contemplative
+- Aerial / Drone: high-angle, scale, grandeur
+- Tilt up/down: vertical reveal
+- Match-cut: seamless transition between shots/scenes
+
+🧱 STRUCTURAL PRINCIPLES
+1. Wardrobe continuity is law — track every change by shot range (e.g., "pajamas in shots 1–9, suit in shots 12–15").
+2. Lens choice = emotion — match the lens to the feeling.
+3. Camera movement = narrative intent.
+4. Dialogue is short and surgical — one-liners.
+5. Each shot does one job.
+6. Shot count guidance: Quick teaser (3-5 shots), Standard sequence (8-12 shots), Full narrative arc (13-15 shots), Logo stinger (5-8 shots).
+7. Character limit: under 2200 characters — be precise, cut filler.
+
+@TAG REFERENCE RULES:
 - Give every @image a SPECIFIC JOB. Never just list them.
-- GOOD: "@image1 as character reference — the figure wears the same outfit and hairstyle. @image2 as environment mood reference — match this color palette and lighting."
-- BAD: "@image1 @image2 create video."
-- If an image is a product, describe how the product appears in the scene.
+- If an image is a product (@image1), describe how the product appears in the scene.
+- If it's a character/presenter (@image2), describe their wardrobe and actions.
 
 QUALITY SUFFIX (always append at the end):
 End every prompt with: "4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture."
-
-WORD COUNT: 100–260 words. Quality drops sharply above 260 words.
-TENSE: Always present tense.
-AVOID: Conflicting instructions (fast-paced + slow-motion), multiple complex actions in one shot, vague adjectives without visual specifics. `,
+`,
     },
 
     'seedance-1.0': {
         name: 'Seedance 1.0',
-        maxWords: 150,
+        maxWords: 300,
         structure: `
 SEEDANCE 1.0 — CONCISE DIRECTORIAL PROMPT:
 
-Same directorial style as Seedance 2.0 but shorter (80–150 words max).
-Subject + Action + Camera + Style. One clear scene, one camera movement.
+Same directorial style as Seedance 2.0 but shorter. Use the SHOT 1, SHOT 2 structure but limit to 3-5 shots max.
+Keep character limit under 1200 characters.
 End with: "4K, cinematic, sharp detail, stable picture."
 
 TENSE: Present tense. AVOID: Age markers, conflicting directions.
@@ -173,10 +209,10 @@ function getAdFilmStructureGuide(duration) {
 AD FILM STRUCTURE — Embed the following Ad Film arc into your Seedance-Director prose.
 Duration: ${duration}s
 
-Ensure your English and Chinese descriptions follow this arc:
-• ${Math.round(duration * 0.18)}s HOOK: Pure emotion/problem, arresting wide shot. No product yet.
-• ${Math.round(duration * 0.72)}s STORY: Human truth, product in use. Tracking/handheld.
-• ${Math.round(duration * 0.90)}s PRODUCT REVEAL: Brand colors in lighting. Soft macro orbit.
+Ensure your shots follow this narrative arc:
+• HOOK: Pure emotion/problem, arresting wide shot. No product yet.
+• STORY: Human truth, product in use. Tracking/handheld.
+• PRODUCT REVEAL: Brand colors in lighting. Soft macro orbit.
 • FINAL CTA: Brand logo overlay against clean brand colors.
 
 REQUIRED ELEMENTS (return in adFilmPlan JSON):

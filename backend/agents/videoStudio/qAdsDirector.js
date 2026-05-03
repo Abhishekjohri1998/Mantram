@@ -89,15 +89,15 @@ Your prompt MUST contain ALL of the following. Absence of any = failure:
 3. SUBJECT CHOREOGRAPHY — Exact actions the person or product takes. Verb-specific: "lifts", "exhales", "tilts the bottle toward the light". NO vague moves.
 4. TEXTURE DETAIL — One sentence on material surface: condensation, fabric grain, matte finish, metallic gleam, skin texture.
 5. BACKGROUND DEPTH — What is the bokeh field? What is out of focus behind the subject?
-6. TIMECODE BEATS — Every scene segment must be labelled with exact seconds.
+6. SHOT BEATS — Every scene segment must be labelled as SHOT 1, SHOT 2, etc.
 
 ═══════════════════════════════════════════════════════
-TIMECODE STRUCTURE (embed in every prompt)
+NARRATIVE STRUCTURE (embed in every prompt via Shots)
 ═══════════════════════════════════════════════════════
-0–${hookEnd}s HOOK: Arresting first frame — pure visual emotion. No product. A texture, a gesture, an expression, a light flare. Viewer must stop scrolling.
-${hookEnd}–${midEnd}s STORY: Human truth + product integration. Camera moves with the subject. Product enters naturally as part of the action — never placed, always discovered.
-${midEnd}–${revealEnd}s PRODUCT REVEAL: Brand colors activate in the lighting. Camera holds on the product. One macro detail shot. This is the payoff.
-${revealEnd}–${duration}s CLOSE: The subject or scene settles. Energy drops to a breath. The brand moment lands — felt, not announced.
+HOOK SHOT(S): Arresting first frame — pure visual emotion. No product. A texture, a gesture, an expression, a light flare. Viewer must stop scrolling.
+STORY SHOT(S): Human truth + product integration. Camera moves with the subject. Product enters naturally as part of the action — never placed, always discovered.
+PRODUCT REVEAL SHOT(S): Brand colors activate in the lighting. Camera holds on the product. One macro detail shot. This is the payoff.
+CLOSE SHOT(S): The subject or scene settles. Energy drops to a breath. The brand moment lands — felt, not announced.
 
 ═══════════════════════════════════════════════════════
 ANTISLOP RULE — Never use these words
@@ -124,11 +124,11 @@ OUTPUT FORMAT — Return ONLY valid JSON, no markdown
     {
       "variantId": "A",
       "angle": "The angle title from Stage 1",
-      "prompt": "The full Seedance 2.0 prompt. Plain English directorial prose. Present tense. Include timecodes. Include @image tags. Include quality suffix. 180–280 words. NO markdown, NO brackets, NO labels — just the paragraph exactly as it will be sent to Seedance. Must feel like a master director wrote it.",
+      "prompt": "The full Seedance 2.0 prompt following the EXACT Seedance Prompt Template (STYLE, WARDROBE, ENVIRONMENT, MOOD, SHOT 1, SHOT 2...). Include @image tags. Include quality suffix. NO markdown, NO brackets around final text — just the structured prompt exactly as it will be sent to Seedance. Must feel like a master director wrote it.",
       "timecodeBreakdown": {
-        "hook": "Exact scene at 0–${hookEnd}s",
-        "story": "Exact scene at ${hookEnd}–${midEnd}s",
-        "productReveal": "Exact scene at ${midEnd}–${revealEnd}s",
+        "hook": "Exact scene for the hook",
+        "story": "Exact scene for the story",
+        "productReveal": "Exact scene for the product reveal",
         "close": "Exact closing beat"
       },
       "voiceLine": "One cinematic voiceover line (15 words max) matching brand voice. Present tense. Null if no voiceover."
