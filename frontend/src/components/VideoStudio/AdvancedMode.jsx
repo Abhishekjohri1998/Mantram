@@ -152,7 +152,8 @@ const css = `
 .vm-ac-item:hover { border-color: var(--sys-border); background: rgba(255,255,255,0.05); }
 .vm-library { margin: 0 24px 16px; background: var(--sys-surface-glass); backdrop-filter: blur(20px); border: 1px solid var(--sys-border); border-radius: 14px; padding: 14px; color: var(--sys-text); position: absolute; bottom: 100%; max-width: calc(100% - 48px); z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
 .vm-library-head { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; font-weight: 700; }
-.vm-library-grid img { width: 100%; height: 56px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid transparent; transition: all .2s; }
+.vm-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px; }
+.vm-library-grid img { width: 100%; height: 60px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid transparent; transition: all .2s; }
 .vm-library-grid img:hover { border-color: #eab308; }
 .vm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 8px; background: rgba(255, 77, 0,0.08); border: 1px solid var(--sys-border); font-size: 12px; color: var(--sys-text); font-weight: 600; }
 @keyframes vm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
