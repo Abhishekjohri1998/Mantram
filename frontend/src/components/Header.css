@@ -130,12 +130,10 @@
 }
 .hdr-logo-text {
   font-family: var(--font-headline, sans-serif);
-  letter-spacing: -0.05em;
-  font-size: 1.5rem;
-  font-weight: 900;
-  font-style: italic;
-  color: var(--sys-primary);
-  text-transform: uppercase;
+  letter-spacing: -0.025em;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sys-text);
   display: none;
 }
 @media (min-width: 1024px) {

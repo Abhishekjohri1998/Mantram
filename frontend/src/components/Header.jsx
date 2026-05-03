@@ -164,7 +164,7 @@ export default function Header({ title, subtitle, onMenuToggle }) {
                 <div className="hdr-left">
                     <div className="hdr-logo-group">
                         <img src="/mantram-logo.png" alt="Mantram AI" className="hdr-logo-img" />
-                        <div className="hdr-logo-text">Mantram.AI</div>
+                        <div className="hdr-logo-text">Mantram <span className="text-primary">AI</span></div>
                     </div>
                     {/* Hamburger — visible on mobile/tablet */}
                     <button
