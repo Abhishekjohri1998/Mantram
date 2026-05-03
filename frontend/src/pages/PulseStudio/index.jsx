@@ -3204,7 +3204,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
         setStep('ready')
 
         // ── Fallback auto-save: persist basic product data even if user doesn’t select a mood ──
-        if (brandId && product?.title) {
+        if (brandId && product?.title && !/oops|something went wrong|access denied|captcha/i.test(product.title)) {
             apiFetch('/brand-studio/product-context', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3276,11 +3276,13 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
         })
         // ── Auto-save to Library in background (non-blocking) ──
         if (brandId && productDNA) {
+            const pName = analyzedProduct?.title || productDNA?.productCategory || 'Product'
+            if (!/oops|something went wrong|access denied|captcha/i.test(pName)) {
             apiFetch('/brand-studio/product-context', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     brandId,
-                    productName: analyzedProduct?.title || productDNA?.productCategory || 'Product',
+                    productName: pName,
                     productCategory: productDNA?.productCategory || '',
                     productBrand: analyzedProduct?.brand || '',
                     productUrl: productUrl || '',
@@ -3296,6 +3298,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
             }).then(r => {
                 if (r.success) console.log(`✅ Product auto-saved to Library${r.updated ? ' (updated)' : ''}`)
             }).catch(() => {})
+            }
         }
     }
 

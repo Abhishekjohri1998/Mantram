@@ -707,21 +707,20 @@ router.post('/aplus/analyze-product', protect, async (req, res) => {
             console.warn(`   \u26a0\ufe0f  No images found \u2014 PDI will run text-only. URL may require login or bot protection.`);
         }
 
-        // ── Mirror top 4 product images to S3 for permanent storage ──
+        // ── Mirror top 4 product images to S3 for permanent storage (non-blocking) ──
         // Scraped URLs (Amazon CDN, etc.) can expire — S3 copies persist forever
+        // Fire-and-forget: response is sent immediately; S3 copies happen in background
         if (product.images?.length > 0) {
-            const mirrorPromises = product.images.slice(0, 4).map(async (imgUrl, i) => {
+            const userId = req.user._id;
+            Promise.all(product.images.slice(0, 4).map(async (imgUrl, i) => {
                 try {
-                    const s3Key = `product-library/${req.user._id}/${Date.now()}-${i}-product.jpg`;
-                    const s3Url = await mirrorUrlToS3(imgUrl, s3Key);
-                    return s3Url || imgUrl; // fallback to original if mirror fails
-                } catch (e) {
-                    return imgUrl;
-                }
-            });
-            const persistedImages = await Promise.all(mirrorPromises);
-            product.persistedImages = persistedImages;
-            console.log(`📦 Mirrored ${persistedImages.filter(u => u.includes('amazonaws')).length}/${persistedImages.length} images to S3`);
+                    const s3Key = `product-library/${userId}/${Date.now()}-${i}-product.jpg`;
+                    return await mirrorUrlToS3(imgUrl, s3Key) || imgUrl;
+                } catch (e) { return imgUrl; }
+            })).then(persistedImages => {
+                product.persistedImages = persistedImages;
+                console.log(`📦 Mirrored ${persistedImages.filter(u => u.includes('amazonaws')).length}/${persistedImages.length} images to S3`);
+            }).catch(e => console.warn('⚠️ S3 mirroring failed (non-critical):', e.message));
         }
 
         res.json({ success: true, product });
