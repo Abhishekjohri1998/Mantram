@@ -226,6 +226,17 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                             }}>New</div>
                                         ) : null}
 
+                                        {/* Category Badge */}
+                                        <div style={{
+                                            position: 'absolute', top: 8, right: 8,
+                                            background: 'rgba(0,0,0,0.6)', color: '#fff',
+                                            fontSize: 10, fontWeight: 700,
+                                            padding: '3px 8px', borderRadius: 20, zIndex: 10,
+                                            backdropFilter: 'blur(4px)'
+                                        }}>
+                                            {template.categoryId?.name || 'Template'}
+                                        </div>
+
                                         {/* Hover / Tap Overlay */}
                                         <div style={{
                                             position: 'absolute', inset: 0,
@@ -259,7 +270,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                         {template.name}
                                     </div>
                                     <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2, display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                        <span>{template.categoryId?.name || 'Template'}</span>
+                                        <span></span>
                                         {template.usageCount > 0 && <span>{template.usageCount} uses</span>}
                                     </div>
                                 </button>
