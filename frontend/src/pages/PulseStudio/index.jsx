@@ -97,9 +97,33 @@ function useGenerate(stagesList) {
 
 // ── UI Components ──────────────────────────────────────────────────────────
 
-function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage, setReferenceImage, onGenerate, loading, buttonColor, toolName, credits }) {
+function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage, setReferenceImage, onGenerate, loading, buttonColor, toolName, credits, productContext }) {
     const [urlInput, setUrlInput] = useState('')
     const [fetchingUrl, setFetchingUrl] = useState(false)
+
+    // ── Auto-fill from product context (scanned in Step 1) ──
+    useEffect(() => {
+        if (productContext?.productDNA) {
+            const dna = productContext.productDNA
+            const pd = productContext.productData || {}
+            const ctx = [
+                pd.title ? `Product Name: ${pd.title}` : '',
+                pd.brand ? `Brand: ${pd.brand}` : '',
+                dna.productCategory ? `Category: ${dna.productCategory}` : '',
+                dna.materials ? `Materials: ${dna.materials}` : '',
+                dna.surfaceFinish ? `Surface: ${dna.surfaceFinish}` : '',
+                dna.dominantColors?.length ? `Colors: ${dna.dominantColors.map(c => c.name).join(', ')}` : '',
+                productContext.moodLabel ? `Mood: ${productContext.moodLabel}` : '',
+                pd.features?.length ? `Features: ${pd.features.join(', ')}` : '',
+                pd.price ? `Price: ${pd.price}` : '',
+            ].filter(Boolean).join('\n')
+            if (ctx) setUrlContext(ctx)
+            // Use first product image as reference if none set
+            if (!referenceImage && productContext.productImages?.length > 0) {
+                setReferenceImage(productContext.productImages[0])
+            }
+        }
+    }, [productContext])
 
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
@@ -131,67 +155,108 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
         setFetchingUrl(false)
     }
 
+    const hasProductContext = !!productContext?.productDNA
+
     return (
         <div style={{ background: 'var(--sys-surface)', borderRadius: 16, padding: 40, border: '1px solid var(--sys-border)', position: 'relative' }}>
-            <div style={{ marginBottom: 24, padding: 20, background: 'color-mix(in srgb, var(--sys-text) 2%, var(--sys-surface))', borderRadius: 12, border: '1px solid var(--sys-border)' }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: buttonColor }}>link</span>
-                    Product Data Source
-                </label>
-                <div style={{ display: 'flex', gap: 12, marginBottom: urlContext ? 12 : 0 }}>
-                    <input 
-                        value={urlInput} 
-                        onChange={e => setUrlInput(e.target.value)} 
-                        placeholder="Paste a product URL to scan..."
-                        style={{ flex: 1, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', padding: '12px 16px', borderRadius: 8, color: 'var(--sys-text)', fontSize: 13, outline: 'none' }}
-                        onFocus={e => e.target.style.borderColor = buttonColor}
-                        onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
-                    />
-                    <button 
-                        onClick={handleFetchUrl} 
-                        disabled={fetchingUrl || !urlInput}
-                        style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', color: 'var(--sys-text)', border: '1px solid var(--sys-border)', padding: '0 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: fetchingUrl ? 0.7 : 1, transition: 'all 0.2s' }}
-                    >
-                        {fetchingUrl ? 'Scanning...' : 'Scan URL'}
-                    </button>
-                </div>
-                {(urlContext || (!urlInput && urlContext)) && (
-                    <textarea 
-                        value={urlContext}
-                        onChange={e => setUrlContext(e.target.value)}
-                        placeholder="Or type product features, pricing, and details manually..."
-                        rows={3}
-                        style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none' }}
-                        onFocus={e => e.target.style.borderColor = buttonColor}
-                        onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
-                    />
-                )}
-                {!urlContext && (
-                    <textarea 
-                    value={urlContext}
-                    onChange={e => setUrlContext(e.target.value)}
-                    placeholder="Or type product features, pricing, and details manually..."
-                    rows={1}
-                    style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none', marginTop: 12 }}
-                    onFocus={e => e.target.style.borderColor = buttonColor}
-                    onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
-                />
-                )}
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-                    <label style={{ cursor: 'pointer', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px dashed var(--sys-border)', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--sys-text)', transition: 'all 0.2s', fontWeight: 600 }} onMouseEnter={e => e.currentTarget.style.borderColor = buttonColor} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
-                        Upload Product Reference Image
-                        <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                    </label>
-                    {referenceImage && (
-                        <div style={{ position: 'relative', width: 40, height: 40, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--sys-border)' }}>
-                            <img src={referenceImage} alt="Ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <button onClick={(e) => { e.preventDefault(); setReferenceImage(null); }} style={{ position: 'absolute', top: 2, right: 2, background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', border: 'none', color: 'var(--sys-text)', width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10 }}>×</button>
+            {/* Product Context Banner — replaces URL scanner when product is active */}
+            {hasProductContext ? (
+                <div style={{ marginBottom: 24, padding: 16, background: 'linear-gradient(135deg, rgba(124,58,237,0.08), rgba(34,197,94,0.04))', borderRadius: 12, border: '1px solid rgba(124,58,237,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#A78BFA' }}>inventory_2</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#22C55E' }}>check_circle</span>
+                                {productContext.productName || productContext.productDNA?.productCategory || 'Product Context Active'}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 2 }}>
+                                {productContext.moodLabel && `${productContext.moodLabel} · `}
+                                {productContext.palette?.length > 0 && `${productContext.palette.length} colors locked · `}
+                                Product intelligence from Library
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                            {(productContext.palette || productContext.productDNA?.dominantColors || []).slice(0, 6).map((c, i) => (
+                                <div key={i} style={{ width: 14, height: 14, borderRadius: 3, background: c.hex || c, border: '1px solid var(--sys-border)' }} />
+                            ))}
+                        </div>
+                    </div>
+                    {/* Product Images Row */}
+                    {productContext.productImages?.length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                            {productContext.productImages.slice(0, 4).map((img, i) => (
+                                <img key={i} src={img} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--sys-border)' }} onError={e => e.target.style.display='none'} />
+                            ))}
+                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#A78BFA', marginRight: 3 }}>auto_awesome</span>
+                                AI will use these as visual reference
+                            </div>
                         </div>
                     )}
                 </div>
-            </div>
+            ) : (
+                <div style={{ marginBottom: 24, padding: 20, background: 'color-mix(in srgb, var(--sys-text) 2%, var(--sys-surface))', borderRadius: 12, border: '1px solid var(--sys-border)' }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: buttonColor }}>link</span>
+                        Product Data Source
+                    </label>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: urlContext ? 12 : 0 }}>
+                        <input 
+                            value={urlInput} 
+                            onChange={e => setUrlInput(e.target.value)} 
+                            placeholder="Paste a product URL to scan..."
+                            style={{ flex: 1, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', padding: '12px 16px', borderRadius: 8, color: 'var(--sys-text)', fontSize: 13, outline: 'none' }}
+                            onFocus={e => e.target.style.borderColor = buttonColor}
+                            onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
+                        />
+                        <button 
+                            onClick={handleFetchUrl} 
+                            disabled={fetchingUrl || !urlInput}
+                            style={{ background: 'color-mix(in srgb, var(--sys-text) 8%, var(--sys-surface))', color: 'var(--sys-text)', border: '1px solid var(--sys-border)', padding: '0 20px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: fetchingUrl ? 0.7 : 1, transition: 'all 0.2s' }}
+                        >
+                            {fetchingUrl ? 'Scanning...' : 'Scan URL'}
+                        </button>
+                    </div>
+                    {(urlContext || (!urlInput && urlContext)) && (
+                        <textarea 
+                            value={urlContext}
+                            onChange={e => setUrlContext(e.target.value)}
+                            placeholder="Or type product features, pricing, and details manually..."
+                            rows={3}
+                            style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none' }}
+                            onFocus={e => e.target.style.borderColor = buttonColor}
+                            onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
+                        />
+                    )}
+                    {!urlContext && (
+                        <textarea 
+                        value={urlContext}
+                        onChange={e => setUrlContext(e.target.value)}
+                        placeholder="Or type product features, pricing, and details manually..."
+                        rows={1}
+                        style={{ width: '100%', background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: '12px 16px', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', outline: 'none', marginTop: 12 }}
+                        onFocus={e => e.target.style.borderColor = buttonColor}
+                        onBlur={e => e.target.style.borderColor = 'var(--sys-border)'}
+                    />
+                    )}
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                        <label style={{ cursor: 'pointer', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px dashed var(--sys-border)', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--sys-text)', transition: 'all 0.2s', fontWeight: 600 }} onMouseEnter={e => e.currentTarget.style.borderColor = buttonColor} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
+                            Upload Product Reference Image
+                            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                        </label>
+                        {referenceImage && (
+                            <div style={{ position: 'relative', width: 40, height: 40, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--sys-border)' }}>
+                                <img src={referenceImage} alt="Ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <button onClick={(e) => { e.preventDefault(); setReferenceImage(null); }} style={{ position: 'absolute', top: 2, right: 2, background: 'color-mix(in srgb, var(--sys-bg) 70%, transparent)', border: 'none', color: 'var(--sys-text)', width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 10 }}>×</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <textarea
                 value={brief}
@@ -361,7 +426,7 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
     )
 }
 
-function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage }) {
+function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(DECK_STAGES)
     const [editedPlan, setEditedPlan] = useState(null)
@@ -375,7 +440,7 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/deck/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, deckType: 'Campaign Pitch', slideCount: 8, urlContext, referenceImage })
+                body: JSON.stringify({ brandId, brief, deckType: 'Campaign Pitch', slideCount: 8, urlContext, referenceImage, productContext: productContext || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -528,14 +593,14 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#7c3aed" toolName="Deck" credits={20} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#7c3aed" toolName="Deck" credits={20} productContext={productContext} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="slideshow" />
         </div>
     )
 }
 
 // ── Pulse Page Tool ──────────────────────────────────────────────────────────
-function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage }) {
+function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(PAGE_STAGES)
     const [shopDomain, setShopDomain] = useState('')
@@ -547,7 +612,7 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/landing-page/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, pageType: 'campaign', urlContext, referenceImage })
+                body: JSON.stringify({ brandId, brief, pageType: 'campaign', urlContext, referenceImage, productContext: productContext || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -631,14 +696,14 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#10b981" toolName="Page" credits={18} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#10b981" toolName="Page" credits={18} productContext={productContext} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="web" />
         </div>
     )
 }
 
 // ── Pulse Mail Tool ──────────────────────────────────────────────────────────
-function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage }) {
+function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(MAIL_STAGES)
     const [viewMode, setViewMode] = useState('mobile')
@@ -649,7 +714,7 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/email/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, emailType: 'Campaign', urlContext, referenceImage })
+                body: JSON.stringify({ brandId, brief, emailType: 'Campaign', urlContext, referenceImage, productContext: productContext || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -710,7 +775,7 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#0ea5e9" toolName="Mail" credits={12} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#0ea5e9" toolName="Mail" credits={12} productContext={productContext} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="mail" />
         </div>
     )
