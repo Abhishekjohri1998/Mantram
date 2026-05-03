@@ -4839,6 +4839,40 @@ export default function ContentStudio() {
         }
         // ─────────────────────────────────────────────────────────────────────
 
+        // ── Template Routing Hydration ──
+        const templateId = searchParams.get('templateId')
+        if (templateId) {
+            import('../services/api').then(({ templates }) => {
+                if (!templates) return;
+                templates.get(templateId).then(res => {
+                    const tpl = res.template;
+                    if (tpl) {
+                        const briefText = tpl.promptTemplate || tpl.savedPrompt || '';
+                        const assets = tpl.templateAssets || [];
+                        const prodImg = assets.find(a => a.role === 'product')?.url || tpl.savedProductImageUrls?.[0] || '';
+                        
+                        setContext({ details: briefText });
+                        setGoal('promote');
+                        
+                        let parsedData = { goal: 'promote', rawInput: briefText, confidence: 1, method: 'template', channel: null };
+                        if (prodImg) {
+                            parsedData.imagePreview = prodImg;
+                        }
+                        
+                        setParsedBrief(parsedData);
+                        setStep(1); // Go to AgenticRefinement step
+                    }
+                }).catch(err => console.error("[ContentStudio] Failed to load template", err));
+            }).catch(() => {});
+            
+            setSearchParams(prev => {
+                const next = new URLSearchParams(prev);
+                next.delete('templateId');
+                return next;
+            }, { replace: true });
+            return;
+        }
+
         if (occasion) {
             // Coming from Calendar or Dashboard with an occasion
             const briefText = `Create content for ${occasion}.${emoji ? 'Emoji: ' + emoji + '. ' : ''}This is a ${tone || 'festive'} occasion.`

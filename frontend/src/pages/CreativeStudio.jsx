@@ -1650,13 +1650,20 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         const assets = tpl.templateAssets || [];
                         const prodImg = assets.find(a => a.role === 'product')?.url || tpl.savedProductImageUrls?.[0] || '';
                         const avatarImg = assets.find(a => a.role === 'avatar')?.url || tpl.savedAvatarUrl || '';
+                        const templateImg = assets.find(a => a.role === 'template')?.url || '';
                         
                         if (prodImg) {
                             setCsProductImage(prodImg);
                             setProductImage(prodImg);
+                            setMockupProductImage(prodImg);
+                            setVtoGarmentImage(prodImg);
                         }
                         if (avatarImg) {
                             setCsCharacterImage(avatarImg);
+                            setVtoPersonImage(avatarImg);
+                        }
+                        if (templateImg) {
+                            setMockupTemplateImage(templateImg);
                         }
                     }
                 }).catch(err => console.error("[CreativeStudio] Failed to load template", err));
