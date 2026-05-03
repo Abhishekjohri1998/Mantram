@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { templates as templatesAPI } from '../services/api';
+import DashboardLayout from '../components/DashboardLayout';
 
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal';
 
@@ -67,9 +68,9 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
 
     const containerClasses = overlayMode
         ? "fixed inset-0 z-[9999] bg-[var(--sys-background)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-        : "max-w-[1600px] mx-auto px-4 md:px-6 py-6 pb-24";
+        : "max-w-[1600px] mx-auto px-4 md:px-6 py-6 pb-24 w-full";
 
-    return (
+    const content = (
         <div className={containerClasses}>
             {overlayMode ? (
                 <div className="flex items-center justify-between p-4 border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
@@ -275,5 +276,11 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                 />
             )}
         </div>
+    );
+
+    return overlayMode ? content : (
+        <DashboardLayout title="Explore Templates" subtitle="Discover and use high-quality creative templates">
+            {content}
+        </DashboardLayout>
     );
 }
