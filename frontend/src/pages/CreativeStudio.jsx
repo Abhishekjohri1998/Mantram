@@ -4147,10 +4147,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <button onClick={() => setShowModelMenu(!showModelMenu)}
                                         className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)]/40 transition-all cursor-pointer group">
                                         <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>auto_awesome</span>
+                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '16px' }}>auto_awesome</span>
                                             <span className="text-[12px] font-semibold text-[var(--sys-text)]">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
                                         </div>
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '16px' }}>unfold_more</span>
+                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]" style={{ fontSize: '16px' }}>settings</span>
                                     </button>
                                     {showModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-surface)] rounded-xl shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
@@ -4199,6 +4199,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </button>
                                     )}
                                     {/* Character slots */}
+                                    {characters.length === 0 && (
+                                        <button onClick={() => { setRefPickerSlot('character-0'); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person</span>
+                                            <span className="text-[9px] font-medium">Character</span>
+                                        </button>
+                                    )}
                                     {characters.map((char, idx) => (
                                         <div key={idx} className="relative group">
                                             <img loading="lazy" decoding="async" src={char.image} alt={char.name} className="w-full aspect-square rounded-xl object-cover border border-[var(--sys-primary)]/40" />
@@ -4207,11 +4213,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                         </div>
                                     ))}
-                                    {/* Add character slot */}
+                                    {/* Add slot */}
                                     {characters.length < 13 && (
                                         <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_add</span>
-                                            <span className="text-[9px] font-medium">Character</span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+                                            <span className="text-[9px] font-medium">Add</span>
                                         </button>
                                     )}
                                 </div>
@@ -4427,9 +4433,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {/* Format picker */}
                                     <div className="relative group/fmt flex-1">
                                         <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-semibold text-[var(--sys-text)] hover:border-[var(--sys-text-muted)] transition-all cursor-pointer">
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '14px' }}>crop_landscape</span>
-                                            <span className="flex-1 text-left truncate">{selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}</span>
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '12px' }}>expand_less</span>
+                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '16px' }}>{selectedType === 'instagram-post' ? 'crop_square' : (selectedType ? creativeTypes.find(c => c.id === selectedType)?.icon : 'crop_square')}</span>
+                                            <span className="flex-1 text-left truncate">{selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : 'Instagram Post'}</span>
                                         </button>
                                         <div className="absolute bottom-full left-0 mb-1 pb-1 hidden group-hover/fmt:block w-[160px] z-50 animate-fade-in">
                                             <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-xl rounded-xl p-1">
