@@ -1841,6 +1841,23 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
         })
     }
 
+    // ── Hydrate from external context (parent ProductDiscoverySection) ──
+    // When user already scanned a product in Step 1, skip the scan UI entirely
+    useEffect(() => {
+        if (externalContext?.productDNA) {
+            setProductDNA(externalContext.productDNA)
+            setAnalyzedProduct(externalContext.productData || null)
+            setProductImages(externalContext.productImages || [])
+            setProductUrl(externalContext.productUrl || '')
+            setDesignContext(externalContext.designContext || null)
+            setSelectedMood(externalContext.selectedMood || null)
+            if (externalContext.productMoodDirections) setProductMoodDirections(externalContext.productMoodDirections)
+            if (externalContext.moodImages) setMoodImages(externalContext.moodImages)
+            // Jump straight to the generation form — no re-scan needed
+            setPdiStep('pdi_ready')
+        }
+    }, [externalContext])
+
     // Fallback mood options (used before AI generates product-specific ones)
     const MOOD_STATIC = {
         editorial: { id: 'editorial', label: 'Editorial Clean', icon: 'straighten',  desc: 'Clean, precise, studio-perfect', bg: 'linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%)' },
