@@ -3044,9 +3044,9 @@ function ProductContextBar({ brandId, activeContext, onContextChange }) {
                                 <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', marginLeft: 4 }}>Color Guard · All tools use this palette</span>
                             </div>
                         </div>
-                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'var(--sys-border)'}`, color: saved ? '#22C55E' : 'var(--sys-text)', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{saved ? 'check' : saving ? 'hourglass_empty' : 'bookmark'}</span>
-                            {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Context'}
+                        <button onClick={handleSave} disabled={saving} style={{ background: saved ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.06)', border: `1px solid ${saved ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)'}`, color: saved ? '#22C55E' : '#4ade80', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{saved ? 'check' : saving ? 'hourglass_empty' : 'cloud_done'}</span>
+                            {saved ? 'Updated!' : saving ? 'Saving...' : 'Auto-Saved'}
                         </button>
                         <button onClick={() => setShowLibrary(true)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.2)', color: '#A78BFA', padding: '6px 13px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>library_books</span>Library
@@ -3202,6 +3202,28 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
             }
         } catch (e) { console.warn('PDI failed:', e.message) }
         setStep('ready')
+
+        // ── Fallback auto-save: persist basic product data even if user doesn’t select a mood ──
+        if (brandId && product?.title) {
+            apiFetch('/brand-studio/product-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    brandId,
+                    productName: product?.title || 'Product',
+                    productCategory: '',
+                    productBrand: product?.brand || '',
+                    productUrl: productUrl || '',
+                    productImages: (product?.persistedImages || images || []).slice(0, 4),
+                    palette: [],
+                    productDNA: {},
+                    selectedMoodId: '',
+                    moodDirections: {},
+                    moodImages: {},
+                    designContext: null,
+                    autoSaved: true,
+                })
+            }).catch(() => {})
+        }
     }
 
     const handleAnalyze = async () => {
@@ -3252,6 +3274,29 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
             moodImages,
             designContext: dc,
         })
+        // ── Auto-save to Library in background (non-blocking) ──
+        if (brandId && productDNA) {
+            apiFetch('/brand-studio/product-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    brandId,
+                    productName: analyzedProduct?.title || productDNA?.productCategory || 'Product',
+                    productCategory: productDNA?.productCategory || '',
+                    productBrand: analyzedProduct?.brand || '',
+                    productUrl: productUrl || '',
+                    productImages: (analyzedProduct?.persistedImages || productImages || []).slice(0, 4),
+                    palette: productDNA?.dominantColors || [],
+                    productDNA: productDNA || {},
+                    selectedMoodId: moodId,
+                    moodDirections: productMoodDirections || {},
+                    moodImages: moodImages || {},
+                    designContext: dc,
+                    autoSaved: true,
+                })
+            }).then(r => {
+                if (r.success) console.log(`✅ Product auto-saved to Library${r.updated ? ' (updated)' : ''}`)
+            }).catch(() => {})
+        }
     }
 
     const moodSwatchMap = {

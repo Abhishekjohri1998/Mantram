@@ -13,6 +13,7 @@ import PulseHistory from '../models/PulseHistory.js';
 import ProductContext from '../models/ProductContext.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
+import { mirrorUrlToS3 } from '../utils/s3.js';
 
 const router = express.Router();
 
@@ -706,6 +707,23 @@ router.post('/aplus/analyze-product', protect, async (req, res) => {
             console.warn(`   \u26a0\ufe0f  No images found \u2014 PDI will run text-only. URL may require login or bot protection.`);
         }
 
+        // ── Mirror top 4 product images to S3 for permanent storage ──
+        // Scraped URLs (Amazon CDN, etc.) can expire — S3 copies persist forever
+        if (product.images?.length > 0) {
+            const mirrorPromises = product.images.slice(0, 4).map(async (imgUrl, i) => {
+                try {
+                    const s3Key = `product-library/${req.user._id}/${Date.now()}-${i}-product.jpg`;
+                    const s3Url = await mirrorUrlToS3(imgUrl, s3Key);
+                    return s3Url || imgUrl; // fallback to original if mirror fails
+                } catch (e) {
+                    return imgUrl;
+                }
+            });
+            const persistedImages = await Promise.all(mirrorPromises);
+            product.persistedImages = persistedImages;
+            console.log(`📦 Mirrored ${persistedImages.filter(u => u.includes('amazonaws')).length}/${persistedImages.length} images to S3`);
+        }
+
         res.json({ success: true, product });
     } catch (err) {
         console.error('\u274c A+ analyze-product:', err.message);
@@ -853,6 +871,7 @@ router.post('/product-context', protect, async (req, res) => {
             productName, productCategory, productBrand, productUrl,
             productImages, palette, productDNA, selectedMoodId,
             moodDirections, moodImages, designContext, tags, notes, brandId,
+            autoSaved,
         } = req.body;
 
         if (!productName || !brandId) {
@@ -862,6 +881,34 @@ router.post('/product-context', protect, async (req, res) => {
         // Use first mood board image as the thumbnail for gallery preview
         const thumbnail = moodImages?.[selectedMoodId] || Object.values(moodImages || {})[0] || '';
 
+        // ── Deduplication: upsert by productUrl or productName within same brand + user ──
+        const dedupeQuery = productUrl
+            ? { brandId, userId: req.user._id, productUrl: productUrl.trim() }
+            : { brandId, userId: req.user._id, productName: productName.trim() };
+
+        const existing = await ProductContext.findOne(dedupeQuery);
+
+        if (existing) {
+            // Update existing entry with fresh scan data
+            existing.productName     = productName.trim();
+            existing.productCategory = productCategory || existing.productCategory;
+            existing.productBrand    = productBrand || existing.productBrand;
+            existing.productUrl      = productUrl || existing.productUrl;
+            existing.productImages   = productImages?.length ? productImages : existing.productImages;
+            existing.palette         = palette?.length ? palette : existing.palette;
+            existing.productDNA      = productDNA || existing.productDNA;
+            existing.selectedMoodId  = selectedMoodId || existing.selectedMoodId;
+            if (moodDirections && Object.keys(moodDirections).length > 0) existing.moodDirections = moodDirections;
+            if (moodImages && Object.keys(moodImages).length > 0) existing.moodImages = moodImages;
+            if (designContext) existing.designContext = designContext;
+            if (thumbnail) existing.thumbnail = thumbnail;
+            if (autoSaved !== undefined) existing.autoSaved = autoSaved;
+            await existing.save();
+            console.log(`✅ [ProductContext] Updated existing: "${existing.productName}"`);
+            return res.json({ success: true, context: existing, updated: true });
+        }
+
+        // Create new entry
         const ctx = await ProductContext.create({
             brandId,
             userId: req.user._id,
@@ -879,8 +926,10 @@ router.post('/product-context', protect, async (req, res) => {
             tags:            tags || [],
             thumbnail,
             notes:           notes || '',
+            autoSaved:       autoSaved || false,
         });
 
+        console.log(`✅ [ProductContext] Created new: "${ctx.productName}"`);
         res.json({ success: true, context: ctx });
     } catch (err) {
         console.error('❌ [ProductContext save]:', err.message);

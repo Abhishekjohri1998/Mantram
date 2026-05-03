@@ -48,6 +48,7 @@ const ProductContextSchema = new mongoose.Schema({
     tags:      [{ type: String }],
     thumbnail: { type: String, default: '' },   // mood board image URL for gallery preview
     notes:     { type: String, default: '' },   // optional user notes
+    autoSaved: { type: Boolean, default: false }, // true = auto-saved after scan, false = manually saved
 }, {
     timestamps: true,
 });
