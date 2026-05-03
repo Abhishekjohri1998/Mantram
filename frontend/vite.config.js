@@ -6,8 +6,7 @@ export default defineConfig({
   plugins: [
     react({
       jsxRuntime: 'automatic',
-      // Exclude CreativeStudio.jsx from Babel's strict JSX parser
-      // (esbuild handles its JSX transformation which is more lenient)
+      // CreativeStudio.jsx uses esbuild-compatible JSX patterns (not Babel)
       exclude: [/CreativeStudio\.jsx$/],
     }),
     tailwindcss()

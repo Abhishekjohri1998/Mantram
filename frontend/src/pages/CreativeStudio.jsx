@@ -4074,7 +4074,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
 
                     {/* ═══════════ SIDEBAR COMMAND PANEL ═══════════ */}
-                    <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-bg)]">
+                    <div data-wt="creative-prompt" key="create-sidebar" className="creative-tools-panel !border-none !bg-[var(--sys-bg)]">
                         {/* ── Panel Tab Switcher ── */}
                         <div className="flex border-b border-[var(--sys-border)] flex-shrink-0">
                             <button onClick={() => setSidebarPanel('create')}
@@ -4082,62 +4082,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <span className="material-symbols-outlined align-middle mr-1" style={{fontSize:"13px"}}>auto_awesome</span>
                                 Create
                             </button>
-                            <button onClick={() => setSidebarPanel('explore')}
-                                className={"flex-1 py-2.5 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all " + (sidebarPanel === 'explore' ? "text-[#FF4D00] border-b-2 border-[#FF4D00] bg-[#FF4D00]/5" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]")}>
-                                <span className="material-symbols-outlined align-middle mr-1" style={{fontSize:"13px"}}>explore</span>
-                                Explore
-                            </button>
+
                         </div>
 
-                        {sidebarPanel === 'explore' && (
-                            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide p-3 space-y-2">
-                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest px-1 pt-1 pb-2">Templates by Category</p>
-                                {templateCategories.map(cat => (
-                                    <div key={cat.id} className="rounded-xl border border-[var(--sys-border)] overflow-hidden">
-                                        <button onClick={() => setExploreExpanded(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
-                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 bg-[var(--sys-surface)] hover:bg-[var(--sys-bg)] transition-all cursor-pointer text-left">
-                                            <span className="material-symbols-outlined text-[#FF4D00]" style={{fontSize:"16px"}}>{cat.icon}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[12px] font-bold text-[var(--sys-text)]">{cat.label}</p>
-                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{cat.desc}</p>
-                                            </div>
-                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] transition-transform flex-shrink-0"
-                                                style={{fontSize:"16px", transform: exploreExpanded[cat.id] ? "rotate(180deg)" : "rotate(0deg)"}}>
-                                                expand_more
-                                            </span>
-                                        </button>
-                                        {exploreExpanded[cat.id] && (
-                                            <div className="border-t border-[var(--sys-border)] divide-y divide-[var(--sys-border)]">
-                                                {cat.subTemplates.map(tmpl => (
-                                                    <div key={tmpl.id} className="flex items-start gap-2.5 px-3 py-2.5 bg-[var(--sys-bg)] hover:bg-[var(--sys-surface)] transition-all">
-                                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] mt-0.5 flex-shrink-0" style={{fontSize:"14px"}}>{tmpl.icon}</span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-[11px] font-semibold text-[var(--sys-text)] leading-tight">{tmpl.label}</p>
-                                                            <p className="text-[10px] text-[var(--sys-text-muted)] leading-snug mt-0.5 line-clamp-2">{tmpl.desc}</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                const built = activeBrand ? tmpl.buildPrompt(activeBrand, {}) : tmpl.desc;
-                                                                setPrompt(built);
-                                                                setSidebarPanel('create');
-                                                                setTimeout(() => { const ta = document.querySelector('[data-wt="creative-prompt"] textarea'); if (ta) ta.focus(); }, 150);
-                                                            }}
-                                                            disabled={!activeBrand}
-                                                            title={activeBrand ? "Use this template" : "Select a brand first"}
-                                                            className={"flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold mt-0.5 transition-all " + (activeBrand ? "bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00] hover:text-white cursor-pointer" : "opacity-30 text-[var(--sys-text-muted)] cursor-not-allowed")}>
-                                                            Use
-                                                            <span className="material-symbols-outlined" style={{fontSize:"11px"}}>arrow_forward</span>
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {sidebarPanel === 'create' && <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                        <div className="overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body p-0">
 
                             {/* ── Section: Model ── */}
                             <div className="px-4 pt-4 pb-3">
@@ -4418,10 +4366,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
 
 
-                        </div>}{/* /create panel */}
+                        </div>{/* /creative-tools-panel-body */}
 
-                            {/* ── Footer: Format + Quality + Generate ── */}
-                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
+                        {/* ── Footer: Format + Quality + Generate ── */}
+                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
                                 {/* Format + Quality row */}
                                 <div className="flex items-center gap-2">
                                     {/* Format picker */}
@@ -4470,10 +4418,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         )}
                                     </button>
                                 </CreditTooltipWrapper>
-                            </div>
+                        </div>{/* /creative-tools-panel-footer */}
 
-                        </div>
-                    </div>
+                    </div>{/* /creative-tools-panel */}
             </>
             )}
 
