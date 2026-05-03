@@ -1,0 +1,17 @@
+# Netlify _redirects — SPA fallback + security headers
+# All unknown paths fall back to index.html so React Router handles routing.
+# Pre-rendered pages (/, /blog, /studio/*) are served as static HTML by Netlify
+# automatically since vite-plugin-prerender writes them as real HTML files.
+
+# Static assets — serve directly (no rewrite needed, Netlify handles these)
+/mantram-logo.png           /mantram-logo.png           200
+/mantram-logo.svg           /mantram-logo.svg           200
+/mantram-favicon-32.png     /mantram-favicon-32.png     200
+/mantram-favicon-192.png    /mantram-favicon-192.png    200
+/dashboard-hero.png         /dashboard-hero.png         200
+/sitemap.xml                /sitemap.xml                200
+/robots.txt                 /robots.txt                 200
+/llms.txt                   /llms.txt                   200
+
+# SPA fallback — everything else gets index.html (React Router takes over)
+/*    /index.html   200

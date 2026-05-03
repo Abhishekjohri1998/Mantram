@@ -145,4 +145,31 @@
     <priority>0.3</priority>
   </url>
 
+  <!-- Blog -->
+  <url>
+    <loc>https://mantram.ai/blog</loc>
+    <lastmod>2026-05-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mantram.ai/blog/why-indian-d2c-brands-need-ai-marketing-os</loc>
+    <lastmod>2026-05-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mantram.ai/blog/what-is-aeo-answer-engine-optimization-2026</loc>
+    <lastmod>2026-05-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mantram.ai/blog/brand-dna-ai-marketing-guide</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
 </urlset>
+
