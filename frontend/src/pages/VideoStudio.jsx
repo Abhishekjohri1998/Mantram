@@ -130,6 +130,7 @@ export default function VideoStudio() {
     const [showTemplateModal, setShowTemplateModal] = useState(false)
     const [selectedTemplate, setSelectedTemplate] = useState(null)
     const [searchParams, setSearchParams] = useSearchParams()
+    const [initialTemplateId, setInitialTemplateId] = useState(null)
 
     // Project state
     const [projectId, setProjectId] = useState(null)
@@ -352,6 +353,26 @@ export default function VideoStudio() {
     useEffect(() => {
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
 
+        // ── Template Routing ──────────────────────────────────────────────────
+        const modeParam = searchParams.get('mode');
+        const templateIdParam = searchParams.get('templateId');
+        
+        if (modeParam) {
+            setStudioMode(modeParam);
+        }
+        if (templateIdParam) {
+            setInitialTemplateId(templateIdParam);
+        }
+
+        if (modeParam || templateIdParam) {
+            setSearchParams(params => {
+                params.delete('mode');
+                params.delete('templateId');
+                return params;
+            }, { replace: true });
+            return;
+        }
+
         // ── Monthly Strategy handoff ──────────────────────────────────────────
         if (searchParams.get('from') === 'monthly_strategy') {
             try {
@@ -375,7 +396,7 @@ export default function VideoStudio() {
             } catch (e) {
                 console.error('[VideoStudio] Failed to read ms_brief_handoff:', e)
             }
-            setSearchParams({}, { replace: true })
+            setSearchParams(params => { params.delete('from'); return params }, { replace: true })
             return
         }
         // ─────────────────────────────────────────────────────────────────────
@@ -1149,7 +1170,7 @@ export default function VideoStudio() {
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {studioMode === 'q-ads' && (
-                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} />
+                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}

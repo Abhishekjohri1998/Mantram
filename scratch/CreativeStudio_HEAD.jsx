@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+﻿import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
@@ -15,7 +15,7 @@ import TemplateLibrary from './TemplateLibrary'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import './CreativeStudio/CreativeStudio.css'
 
-// ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
+// ΓöÇΓöÇ TemplateSuggestionRow ΓÇö horizontally scrollable, non-shifting, silent-fail ΓöÇΓöÇ
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
 function TemplateSuggestionRow({ brandId, onSelect }) {
@@ -31,7 +31,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (!cancelled && d?.success) setTemplates((d.templates || []).slice(0, 18)) })
-        .catch(() => {}) // silent failure — never crash the page
+        .catch(() => {}) // silent failure ΓÇö never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
     }, [brandId])
@@ -54,10 +54,10 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
             }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.5 }}>dashboard_customize</span>
                 <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.45 }}>
-                    Templates · {templates.length} ready
+                    Templates ┬╖ {templates.length} ready
                 </span>
             </div>
-            {/* Fixed-height scroll container — no layout shift */}
+            {/* Fixed-height scroll container ΓÇö no layout shift */}
             <div style={{
                 display: 'flex',
                 gap: 10,
@@ -121,7 +121,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
     )
 }
 
-// ── Helper: Time Ago ──
+// ΓöÇΓöÇ Helper: Time Ago ΓöÇΓöÇ
 
 function getTimeAgo(dateStr) {
     if (!dateStr) return '';
@@ -149,7 +149,7 @@ async function uploadToS3(base64Data, folder = 'uploads') {
     }
 }
 
-// ── Aspect Ratio Options ──
+// ΓöÇΓöÇ Aspect Ratio Options ΓöÇΓöÇ
 const ASPECT_RATIOS = [
     { ratio: '1:1', label: 'Square', icon: 'crop_square' },
     { ratio: '16:9', label: 'Widescreen', icon: 'crop_16_9' },
@@ -161,22 +161,22 @@ const ASPECT_RATIOS = [
     { ratio: '4:3', label: 'Classic', icon: 'crop_7_5' },
 ]
 
-// ── Creative Formats ──
+// ΓöÇΓöÇ Creative Formats ΓöÇΓöÇ
 const creativeTypes = [
-    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080×1350', aspectRatio: '4:5', w: 1080, h: 1350 },
-    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080×1920', aspectRatio: '9:16', w: 1080, h: 1920 },
-    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080×1350', aspectRatio: '4:5', w: 1080, h: 1350 },
-    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200×1200', aspectRatio: '1:1', w: 1200, h: 1200 },
-    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280×720', aspectRatio: '16:9', w: 1280, h: 720 },
-    { id: 'banner', icon: 'web', label: 'Banner', size: '1920×600', aspectRatio: '16:9', w: 1920, h: 600 },
-    { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000×3000', aspectRatio: '2:3', w: 2000, h: 3000 },
-    { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920×1080', aspectRatio: '16:9', w: 1920, h: 1080 },
-    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480×3508', aspectRatio: '2:3', w: 2480, h: 3508 },
-    { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200×1200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'instagram-post', icon: 'photo_camera', label: 'Instagram Post', size: '1080├ù1350', aspectRatio: '4:5', w: 1080, h: 1350 },
+    { id: 'instagram-story', icon: 'smartphone', label: 'Story / Reel', size: '1080├ù1920', aspectRatio: '9:16', w: 1080, h: 1920 },
+    { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080├ù1350', aspectRatio: '4:5', w: 1080, h: 1350 },
+    { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200├ù1200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280├ù720', aspectRatio: '16:9', w: 1280, h: 720 },
+    { id: 'banner', icon: 'web', label: 'Banner', size: '1920├ù600', aspectRatio: '16:9', w: 1920, h: 600 },
+    { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000├ù3000', aspectRatio: '2:3', w: 2000, h: 3000 },
+    { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920├ù1080', aspectRatio: '16:9', w: 1920, h: 1080 },
+    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480├ù3508', aspectRatio: '2:3', w: 2480, h: 3508 },
+    { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200├ù1200', aspectRatio: '1:1', w: 1200, h: 1200 },
     { id: 'custom-size', icon: 'tune', label: 'Custom Size', size: 'Custom', aspectRatio: null },
 ]
 
-// ── Design Styles ──
+// ΓöÇΓöÇ Design Styles ΓöÇΓöÇ
 const styles = [
     { id: 'modern', label: 'Modern', icon: 'auto_awesome' },
     { id: 'minimal', label: 'Minimal', icon: 'format_shapes' },
@@ -186,7 +186,7 @@ const styles = [
     { id: 'corporate', label: 'Corporate', icon: 'business' },
 ]
 
-// ── Quick-start categories ──
+// ΓöÇΓöÇ Quick-start categories ΓöÇΓöÇ
 const quickStartCards = [
     { id: 'social', icon: 'share', label: 'Social Media Post', desc: 'Instagram, Facebook, LinkedIn', color: '#6366f1' },
     { id: 'product', icon: 'inventory_2', label: 'Product Showcase', desc: 'Feature your product or service', color: '#f59e0b' },
@@ -196,7 +196,7 @@ const quickStartCards = [
     { id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#ec4899' },
 ]
 
-// ── Template Categories with Sub-Templates ──
+// ΓöÇΓöÇ Template Categories with Sub-Templates ΓöÇΓöÇ
 const templateCategories = [
     {
         id: 'sales', icon: 'local_offer', label: 'Sales & Offers', color: '#ef4444',
@@ -226,20 +226,20 @@ const templateCategories = [
                 ],
                 buildPrompt: (brand, vals) => {
                     const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                    return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
+                    return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali ΓÇö diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
                 }
             },
             {
                 id: 'republic-sale', label: 'Republic Day Sale', icon: 'flag',
                 desc: 'Patriotic themed sale',
                 fields: [
-                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale – 26% OFF' },
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale ΓÇô 26% OFF' },
                     { key: 'productName', label: 'Product', type: 'text', placeholder: 'e.g. on all categories' },
                     { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
                 ],
                 buildPrompt: (brand, vals) => {
                     const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
-                    return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
+                    return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day ΓÇö tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
                 }
             },
         ]
@@ -441,7 +441,7 @@ export default function CreativeStudio() {
     const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
 
-    // ── Global State ──
+    // ΓöÇΓöÇ Global State ΓöÇΓöÇ
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
     const [selectedType, setSelectedType] = useState('instagram-post')
     const [prompt, setPrompt] = useState('')
@@ -465,7 +465,7 @@ export default function CreativeStudio() {
     const [autoGenerate, setAutoGenerate] = useState(false)
     const [enhancing, setEnhancing] = useState(false)
     const [result, setResult] = useState(null)
-    // ── Monthly Strategy writeback — fires when result is set after coming from calendar ──
+    // ΓöÇΓöÇ Monthly Strategy writeback ΓÇö fires when result is set after coming from calendar ΓöÇΓöÇ
     useEffect(() => {
         if (!result?.imageUrl) return
         const ctxRaw = window.sessionStorage.getItem('ms_strategy_ctx')
@@ -501,115 +501,115 @@ export default function CreativeStudio() {
     const [selectedShot, setSelectedShot] = useState(null)      // Camera shot preset for AI Create
     const [psSelectedShot, setPsSelectedShot] = useState(null)  // Camera shot preset for Photo Studio
 
-    // ── Camera Shot Presets ── (professional directive injected into prompt)
+    // ΓöÇΓöÇ Camera Shot Presets ΓöÇΓöÇ (professional directive injected into prompt)
     const CAMERA_SHOT_PRESETS = [
         {
             id: 'worms-eye-hero',
             label: "Worm's Eye",
             icon: 'south',
-            emoji: '🐛',
+            emoji: '≡ƒÉ¢',
             color: '#f97316',
             description: 'Camera flat on ground, subject towers above, open sky fills the frame',
-            injection: 'SHOT TYPE: extreme worm\'s-eye view. Camera is placed flat on the ground pointing straight up. The subject stands directly over the camera lens, legs straddling it, body filling the full vertical frame from bottom to top. The product or hand is thrust downward toward the lens and appears enormous in the near foreground — 3× to 5× larger than life. The subject\'s face looks down at the camera with confidence. Open blue sky, clouds, or clean studio ceiling fills the top 60% of the frame behind them. Ultra-wide 14mm lens, strong forced perspective, feet and legs massive at bottom, torso receding, face small at top. Shot style: Maxi / Pepsi commercial worm\'s-eye street photography.',
+            injection: 'SHOT TYPE: extreme worm\'s-eye view. Camera is placed flat on the ground pointing straight up. The subject stands directly over the camera lens, legs straddling it, body filling the full vertical frame from bottom to top. The product or hand is thrust downward toward the lens and appears enormous in the near foreground ΓÇö 3├ù to 5├ù larger than life. The subject\'s face looks down at the camera with confidence. Open blue sky, clouds, or clean studio ceiling fills the top 60% of the frame behind them. Ultra-wide 14mm lens, strong forced perspective, feet and legs massive at bottom, torso receding, face small at top. Shot style: Maxi / Pepsi commercial worm\'s-eye street photography.',
         },
         {
             id: 'high-action',
             label: 'High Action',
             icon: 'bolt',
-            emoji: '⚡',
+            emoji: 'ΓÜí',
             color: '#ef4444',
             description: 'Mid-air jump, product thrust toward lens, motion-blurred background',
-            injection: 'SHOT TYPE: low-angle action freeze shot. Camera is positioned at waist height or below, angled upward. Subject is caught mid-jump or mid-leap, body airborne, at least one foot off or near the ground. The product (can, bottle, sneaker, or box) is gripped in one hand and thrust aggressively toward the camera — it appears massive and sharp in the foreground while the subject\'s body is in focus behind it. Background is a real urban street or concrete wall with horizontal motion blur streaks from passing cars or environmental movement. Sky fills the top of frame. 1/2000s freeze shutter. 24mm wide-angle. Shot style: Red Bull / Nike action advertising.',
+            injection: 'SHOT TYPE: low-angle action freeze shot. Camera is positioned at waist height or below, angled upward. Subject is caught mid-jump or mid-leap, body airborne, at least one foot off or near the ground. The product (can, bottle, sneaker, or box) is gripped in one hand and thrust aggressively toward the camera ΓÇö it appears massive and sharp in the foreground while the subject\'s body is in focus behind it. Background is a real urban street or concrete wall with horizontal motion blur streaks from passing cars or environmental movement. Sky fills the top of frame. 1/2000s freeze shutter. 24mm wide-angle. Shot style: Red Bull / Nike action advertising.',
         },
         {
             id: 'fisheye-lean',
             label: 'Fisheye Flex',
             icon: 'lens',
-            emoji: '🐟',
+            emoji: '≡ƒÉƒ',
             color: 'var(--sys-text)',
             description: 'Extreme fisheye, ground level, buildings bow outward around the subject',
-            injection: 'SHOT TYPE: extreme ground-level fisheye distortion shot. Camera is placed at or below ankle height with a super-wide 8mm fisheye lens. Subject crouches or squats low to the ground, filling the center frame. Their sneakers, feet, or lower body are enormous and occupying the bottom third of the frame. Surrounding skyscrapers, buildings, or walls bow dramatically outward in a barrel-distortion curve — bending away from the center like the frame is wrapping around the subject. The ground curves downward at the edges. Everything except the subject is distorted. Sky at top. Shot style: Supreme / streetwear fisheye skate photography, girl-in-city crouch pose.',
+            injection: 'SHOT TYPE: extreme ground-level fisheye distortion shot. Camera is placed at or below ankle height with a super-wide 8mm fisheye lens. Subject crouches or squats low to the ground, filling the center frame. Their sneakers, feet, or lower body are enormous and occupying the bottom third of the frame. Surrounding skyscrapers, buildings, or walls bow dramatically outward in a barrel-distortion curve ΓÇö bending away from the center like the frame is wrapping around the subject. The ground curves downward at the edges. Everything except the subject is distorted. Sky at top. Shot style: Supreme / streetwear fisheye skate photography, girl-in-city crouch pose.',
         },
         {
             id: 'fashion-low',
             label: 'Low Editorial',
             icon: 'camera_enhance',
-            emoji: '👟',
+            emoji: '≡ƒæƒ',
             color: '#06b6d4',
             description: 'Ground-level, sole/product massive in foreground, model crouches over the lens',
-            injection: 'SHOT TYPE: ultra-low ground editorial shot. Camera is positioned at floor level, lens pointing upward at roughly 45 degrees. Subject crouches or leans dramatically toward the camera, one leg extended toward the lens so the shoe sole or sneaker sole fills the extreme bottom foreground in sharp focus — appearing as large as the subject\'s entire torso. The model\'s face is visible above, looking down into the lens with editorial attitude. Studio background with strong directional rim lighting. The sole detail, tread, and texture are razor-sharp in macro foreground while the body is also in focus. Shot style: Midjourney sneaker editorial — sole-forward crouch shot, fashion magazine.',
+            injection: 'SHOT TYPE: ultra-low ground editorial shot. Camera is positioned at floor level, lens pointing upward at roughly 45 degrees. Subject crouches or leans dramatically toward the camera, one leg extended toward the lens so the shoe sole or sneaker sole fills the extreme bottom foreground in sharp focus ΓÇö appearing as large as the subject\'s entire torso. The model\'s face is visible above, looking down into the lens with editorial attitude. Studio background with strong directional rim lighting. The sole detail, tread, and texture are razor-sharp in macro foreground while the body is also in focus. Shot style: Midjourney sneaker editorial ΓÇö sole-forward crouch shot, fashion magazine.',
         },
         {
             id: 'dutch-tilt',
             label: 'Dutch Tilt',
             icon: 'rotate_90_degrees_cw',
-            emoji: '↗️',
+            emoji: 'Γåù∩╕Å',
             color: '#ec4899',
-            description: 'Camera tilted 20–30°, horizon diagonal, cinematic psychological tension',
-            injection: 'SHOT TYPE: Dutch angle / canted camera shot. The entire frame is rotated approximately 25 degrees clockwise or counter-clockwise. The horizon line is a strong diagonal. Subject is positioned off-center in the frame, their body aligned with the tilt so they appear to defy gravity. Strong negative space on one side. The product is held prominently. Background shows a cityscape, hallway, or editorial studio that also participates in the tilt creating visual disorientation. Anamorphic lens with slight oval bokeh. Shot style: cinematic editorial, fashion campaign, psychological tension photography — Vogue editorial.',
+            description: 'Camera tilted 20ΓÇô30┬░, horizon diagonal, cinematic psychological tension',
+            injection: 'SHOT TYPE: Dutch angle / canted camera shot. The entire frame is rotated approximately 25 degrees clockwise or counter-clockwise. The horizon line is a strong diagonal. Subject is positioned off-center in the frame, their body aligned with the tilt so they appear to defy gravity. Strong negative space on one side. The product is held prominently. Background shows a cityscape, hallway, or editorial studio that also participates in the tilt creating visual disorientation. Anamorphic lens with slight oval bokeh. Shot style: cinematic editorial, fashion campaign, psychological tension photography ΓÇö Vogue editorial.',
         },
         {
             id: 'overhead-flatlay',
             label: 'Overhead',
             icon: 'arrow_downward',
-            emoji: '⬇️',
+            emoji: 'Γ¼ç∩╕Å',
             color: '#22c55e',
-            description: 'Dead overhead flat lay — product styled on surface with dramatic shadows',
-            injection: 'SHOT TYPE: dead-overhead flat lay. Camera is mounted directly above, pointing straight down at 90 degrees to the surface. The product is the hero — beautifully styled and placed on a clean surface (marble, concrete, white seamless, or textured paper). Supporting props are arranged symmetrically or artistically around the product. A single strong light source from one side casts crisp, long geometric shadows that become a design element. The product label or face is perfectly oriented toward the viewer. Top-down. Nothing in the frame except product, surface, and intentional props. Shot style: commercial product flat lay, Kinfolk magazine, Apple product photography.',
+            description: 'Dead overhead flat lay ΓÇö product styled on surface with dramatic shadows',
+            injection: 'SHOT TYPE: dead-overhead flat lay. Camera is mounted directly above, pointing straight down at 90 degrees to the surface. The product is the hero ΓÇö beautifully styled and placed on a clean surface (marble, concrete, white seamless, or textured paper). Supporting props are arranged symmetrically or artistically around the product. A single strong light source from one side casts crisp, long geometric shadows that become a design element. The product label or face is perfectly oriented toward the viewer. Top-down. Nothing in the frame except product, surface, and intentional props. Shot style: commercial product flat lay, Kinfolk magazine, Apple product photography.',
         },
         {
             id: 'dramatic-close',
             label: 'Extreme Close',
             icon: 'search',
-            emoji: '🔍',
+            emoji: '≡ƒöì',
             color: '#eab308',
             description: 'Macro close-up, product texture as hero, silky bokeh surrounds it',
-            injection: 'SHOT TYPE: extreme macro close-up. Camera is at macro range — lens nearly touching the product or face. Subject or product fills and overflows the entire frame — we see nothing but texture, material, and surface detail. The label, fabric weave, skin pore, condensation droplet, or material finish becomes the visual universe. Shot on 105mm macro lens, f/2.8, razor-thin depth of field — only a 2mm slice is perfectly sharp while everything behind and in front dissolves into smooth creamy bokeh. Studio lighting rakes at a low angle to reveal every micro-texture as relief. Shot style: watch advertisement close-up, perfume flask, sneaker material close.',
+            injection: 'SHOT TYPE: extreme macro close-up. Camera is at macro range ΓÇö lens nearly touching the product or face. Subject or product fills and overflows the entire frame ΓÇö we see nothing but texture, material, and surface detail. The label, fabric weave, skin pore, condensation droplet, or material finish becomes the visual universe. Shot on 105mm macro lens, f/2.8, razor-thin depth of field ΓÇö only a 2mm slice is perfectly sharp while everything behind and in front dissolves into smooth creamy bokeh. Studio lighting rakes at a low angle to reveal every micro-texture as relief. Shot style: watch advertisement close-up, perfume flask, sneaker material close.',
         },
         {
             id: 'cinematic-wide',
             label: 'Cinematic Wide',
             icon: 'panorama_wide_angle',
-            emoji: '🎬',
+            emoji: '≡ƒÄ¼',
             color: 'var(--sys-text)',
             description: 'Epic 2.39:1 anamorphic wide, subject small in vast landscape, cinematic haze',
-            injection: 'SHOT TYPE: anamorphic cinematic wide shot. Ultra-wide establishing frame in 2.39:1 letterbox widescreen ratio. The subject and product are positioned confidently in the lower third of the frame — intentionally small relative to the sweeping landscape, architecture, or environment around them. The scene has multiple depth layers: sharp foreground element, subject in mid-ground, atmospheric haze or fog in the distance. Anamorphic lens flare visible on light sources. Golden hour or dramatic mixed light. Cinematic color grade — teal shadows, warm highlights. Shot style: Denis Villeneuve / Christopher Nolan commercial — the environment is as important as the subject.',
+            injection: 'SHOT TYPE: anamorphic cinematic wide shot. Ultra-wide establishing frame in 2.39:1 letterbox widescreen ratio. The subject and product are positioned confidently in the lower third of the frame ΓÇö intentionally small relative to the sweeping landscape, architecture, or environment around them. The scene has multiple depth layers: sharp foreground element, subject in mid-ground, atmospheric haze or fog in the distance. Anamorphic lens flare visible on light sources. Golden hour or dramatic mixed light. Cinematic color grade ΓÇö teal shadows, warm highlights. Shot style: Denis Villeneuve / Christopher Nolan commercial ΓÇö the environment is as important as the subject.',
         },
         {
             id: 'freeze-motion',
             label: 'Freeze Frame',
             icon: 'shutter_speed',
-            emoji: '❄️',
+            emoji: 'Γ¥ä∩╕Å',
             color: '#67e8f9',
-            description: 'Ultra-fast shutter: liquid splash, fabric fan, or flying product — all suspended',
-            injection: 'SHOT TYPE: high-speed strobe freeze. Camera set to 1/8000s shutter speed or strobe-frozen at that equivalent. A physically impossible moment is captured: liquid bursting outward from a shaken bottle, fabric billowing and suspended mid-flow, the product thrown into the air with trajectory particles around it, or water droplets exploding upward from a surface hit. Every droplet, thread, and particle is individually sharp and frozen — arrested mid-physics. Background is a clean studio or gradient. The product is at the center of the explosive energy. Shot style: Milk splash advertisement, Absolut Vodka frozen moment, fashion water spray editorial.',
+            description: 'Ultra-fast shutter: liquid splash, fabric fan, or flying product ΓÇö all suspended',
+            injection: 'SHOT TYPE: high-speed strobe freeze. Camera set to 1/8000s shutter speed or strobe-frozen at that equivalent. A physically impossible moment is captured: liquid bursting outward from a shaken bottle, fabric billowing and suspended mid-flow, the product thrown into the air with trajectory particles around it, or water droplets exploding upward from a surface hit. Every droplet, thread, and particle is individually sharp and frozen ΓÇö arrested mid-physics. Background is a clean studio or gradient. The product is at the center of the explosive energy. Shot style: Milk splash advertisement, Absolut Vodka frozen moment, fashion water spray editorial.',
         },
         {
             id: 'shoulder-candid',
             label: 'Street Candid',
             icon: 'photo_camera_back',
-            emoji: '📸',
+            emoji: '≡ƒô╕',
             color: '#a3e635',
             description: 'Handheld 35mm film, authentic unposed street energy, real-life moment',
-            injection: 'SHOT TYPE: candid street documentary. Handheld camera with natural shake, shot on 35mm film equivalent (Kodak Portra 400 or Fuji 400H color science). The subject is NOT posed — they are caught mid-laugh, mid-walk, mid-sip, or mid-conversation, fully immersed in their own world. The product appears naturally in the scene (in their hand, on a table, in a bag). Composition is slightly off-center, breathing room on one side. Natural available light — golden hour sunlight, neon bounce, or soft overcast. Film grain at ISO 1600 visible. Slight vignette. No studio feel whatsoever. Shot style: Leica street photography, Tyler Mitchell, Nan Goldin — real moment, real life.',
+            injection: 'SHOT TYPE: candid street documentary. Handheld camera with natural shake, shot on 35mm film equivalent (Kodak Portra 400 or Fuji 400H color science). The subject is NOT posed ΓÇö they are caught mid-laugh, mid-walk, mid-sip, or mid-conversation, fully immersed in their own world. The product appears naturally in the scene (in their hand, on a table, in a bag). Composition is slightly off-center, breathing room on one side. Natural available light ΓÇö golden hour sunlight, neon bounce, or soft overcast. Film grain at ISO 1600 visible. Slight vignette. No studio feel whatsoever. Shot style: Leica street photography, Tyler Mitchell, Nan Goldin ΓÇö real moment, real life.',
         },
         {
             id: 'birds-eye-social',
             label: "Bird's Eye",
             icon: 'north',
-            emoji: '🦅',
+            emoji: '≡ƒªà',
             color: '#f59e0b',
             description: "Directly overhead, subject looks tiny within bold graphic ground geometry",
-            injection: "SHOT TYPE: high aerial bird's-eye view. Camera is positioned directly above, 10–30 feet high, pointing straight down. The subject lies, sits, or stands on a graphic surface — bold geometric tiles, painted road markings, a colorful rug, or a patterned floor. The geometric ground pattern creates a strong graphic composition that the subject is deliberately placed within — like a human element in an abstract diagram. The subject and product are seen from directly above, face visible looking up at the camera (if portrait) or artfully arranged (if flatlay). Negative space is used intentionally. Shot style: aerial fashion Instagram, Cosmo flat lay, Alex Prager overhead.",
+            injection: "SHOT TYPE: high aerial bird's-eye view. Camera is positioned directly above, 10ΓÇô30 feet high, pointing straight down. The subject lies, sits, or stands on a graphic surface ΓÇö bold geometric tiles, painted road markings, a colorful rug, or a patterned floor. The geometric ground pattern creates a strong graphic composition that the subject is deliberately placed within ΓÇö like a human element in an abstract diagram. The subject and product are seen from directly above, face visible looking up at the camera (if portrait) or artfully arranged (if flatlay). Negative space is used intentionally. Shot style: aerial fashion Instagram, Cosmo flat lay, Alex Prager overhead.",
         },
         {
             id: 'over-shoulder',
             label: 'Over Shoulder',
             icon: 'switch_camera',
-            emoji: '👁️',
+            emoji: '≡ƒæü∩╕Å',
             color: 'var(--sys-text)',
             description: "Camera behind subject's shoulder \u2014 immersive POV, we see what they see",
-            injection: "SHOT TYPE: over-the-shoulder POV shot. Camera is positioned just behind and above the subject's right or left shoulder — we see the back of their head, neck, and one shoulder blurred in the immediate foreground. The subject is reaching toward the product, looking at it, interacting with it — and we are right behind them, inhabiting their perspective. The product is in sharp focus in the mid-ground. If another person is present, we see their face reacting to our subject. 85mm lens, shallow depth of field, shoulder is soft bokeh at screen edge. Intimate, cinematic, first-person narrative. Shot style: fashion film, perfume campaign — immersive editorial storytelling.",
+            injection: "SHOT TYPE: over-the-shoulder POV shot. Camera is positioned just behind and above the subject's right or left shoulder ΓÇö we see the back of their head, neck, and one shoulder blurred in the immediate foreground. The subject is reaching toward the product, looking at it, interacting with it ΓÇö and we are right behind them, inhabiting their perspective. The product is in sharp focus in the mid-ground. If another person is present, we see their face reacting to our subject. 85mm lens, shallow depth of field, shoulder is soft bokeh at screen edge. Intimate, cinematic, first-person narrative. Shot style: fashion film, perfume campaign ΓÇö immersive editorial storytelling.",
         },
     ];
 
@@ -617,18 +617,18 @@ export default function CreativeStudio() {
 
 
     const IMAGE_MODELS = [
-        { id: 'nanobanana-2',  name: 'NanoBanana 2',   icon: 'auto_awesome',  desc: 'Default • Fast • Best with references',       provider: 'LaoZhang', badge: 'bolt',                 color: 'var(--sys-text)' },
-        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond',      desc: 'Premium quality • Better details',             provider: 'LaoZhang', badge: 'diamond',              color: '#ec4899' },
-        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt',          desc: 'Photorealistic • Great anatomy',               provider: 'LaoZhang', badge: 'local_fire_department', color: '#f97316' },
-        { id: 'flux-2-pro',   name: 'Flux 2 Pro',     icon: 'stars',         desc: 'Latest Flux • Premium photorealism',          provider: 'LaoZhang', badge: 'auto_awesome',         color: '#eab308' },
-        { id: 'seedream-5',   name: 'Seedream 5',     icon: 'park',          desc: 'Creative • Artistic style',                   provider: 'LaoZhang', badge: 'eco',                  color: '#22c55e' },
+        { id: 'nanobanana-2',  name: 'NanoBanana 2',   icon: 'auto_awesome',  desc: 'Default ΓÇó Fast ΓÇó Best with references',       provider: 'LaoZhang', badge: 'bolt',                 color: 'var(--sys-text)' },
+        { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond',      desc: 'Premium quality ΓÇó Better details',             provider: 'LaoZhang', badge: 'diamond',              color: '#ec4899' },
+        { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt',          desc: 'Photorealistic ΓÇó Great anatomy',               provider: 'LaoZhang', badge: 'local_fire_department', color: '#f97316' },
+        { id: 'flux-2-pro',   name: 'Flux 2 Pro',     icon: 'stars',         desc: 'Latest Flux ΓÇó Premium photorealism',          provider: 'LaoZhang', badge: 'auto_awesome',         color: '#eab308' },
+        { id: 'seedream-5',   name: 'Seedream 5',     icon: 'park',          desc: 'Creative ΓÇó Artistic style',                   provider: 'LaoZhang', badge: 'eco',                  color: '#22c55e' },
         { id: 'ideogram',     name: 'Ideogram v3',    icon: 'text_fields',   desc: 'Best for text in images',                     provider: 'LaoZhang', badge: 'palette',              color: '#06b6d4' },
-        { id: 'grok-imagen',  name: 'Grok Imagen',    icon: 'smart_toy',     desc: 'xAI • High quality generation',               provider: 'xAI',      badge: 'smart_toy',            color: '#ef4444' },
-        { id: 'gpt-image-2',  name: 'GPT Image 2',    icon: 'text_rotate_vertical', desc: 'Near-perfect text • Complex layouts • Ref images supported', provider: 'OpenAI', badge: 'new_releases', color: '#10a37f', isNew: true },
-        { id: 'gpt-image-1',  name: 'GPT Image 1',    icon: 'auto_fix_high', desc: 'Instruction following • Clean renders • Ref images supported', provider: 'OpenAI', badge: 'star',         color: '#0ea5e9' },
+        { id: 'grok-imagen',  name: 'Grok Imagen',    icon: 'smart_toy',     desc: 'xAI ΓÇó High quality generation',               provider: 'xAI',      badge: 'smart_toy',            color: '#ef4444' },
+        { id: 'gpt-image-2',  name: 'GPT Image 2',    icon: 'text_rotate_vertical', desc: 'Near-perfect text ΓÇó Complex layouts ΓÇó Ref images supported', provider: 'OpenAI', badge: 'new_releases', color: '#10a37f', isNew: true },
+        { id: 'gpt-image-1',  name: 'GPT Image 1',    icon: 'auto_fix_high', desc: 'Instruction following ΓÇó Clean renders ΓÇó Ref images supported', provider: 'OpenAI', badge: 'star',         color: '#0ea5e9' },
     ]
 
-    // ── Animate State ──
+    // ΓöÇΓöÇ Animate State ΓöÇΓöÇ
     const [animateModalOpen, setAnimateModalOpen] = useState(false)
     const [showAnimatePanel, setShowAnimatePanel] = useState(false)
     const [animatePrompt, setAnimatePrompt] = useState('')
@@ -644,7 +644,7 @@ export default function CreativeStudio() {
     const animatePollRef = useRef(null)
     const animateImageRef = useRef(null) // Stores the image URL being animated (avoids stale closure)
 
-    // ── Gemini Edit Image State ── (inline panel, mirrors animate panel UX)
+    // ΓöÇΓöÇ Gemini Edit Image State ΓöÇΓöÇ (inline panel, mirrors animate panel UX)
     const [showEditPanel, setShowEditPanel] = useState(false)
     const [editSourceImageUrl, setEditSourceImageUrl] = useState(null) // Original image being edited
     const [editPromptText, setEditPromptText] = useState('')
@@ -652,7 +652,7 @@ export default function CreativeStudio() {
     const [editResult, setEditResult] = useState(null) // { imageUrl, description }
     const [editError, setEditError] = useState(null)
     const [editHistory, setEditHistory] = useState([]) // Multi-turn edit conversation
-    const editImageRef = useRef(null) // Avoids stale closure — stores current source URL
+    const editImageRef = useRef(null) // Avoids stale closure ΓÇö stores current source URL
     const [isMaskingMode, setIsMaskingMode] = useState(false)
     const maskingCanvasRef = useRef(null)
 
@@ -663,10 +663,10 @@ export default function CreativeStudio() {
         'kling-3.0': { name: 'Kling 3.0', icon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Best motion & physics' },
         'veo-3.1': { name: 'Veo 3.1', icon: 'movie_filter', dur: [5, 10], ratios: ['16:9'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Premium cinematic quality' },
         'seedance-1.0': { name: 'Seedance 1.0', icon: 'animation', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
-        'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: 'pets', dur: [5, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Alibaba cinematic — great motion & ref images' },
+        'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: 'pets', dur: [5, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Alibaba cinematic ΓÇö great motion & ref images' },
     }
 
-    // ── Animate: AI Prompt Suggestion ──
+    // ΓöÇΓöÇ Animate: AI Prompt Suggestion ΓöÇΓöÇ
     // Accepts an optional imageItem so gallery buttons can pass the specific
     // image directly instead of relying on the async setResult + stale closure.
     const handleAnimateClick = async (imageItem) => {
@@ -683,7 +683,7 @@ export default function CreativeStudio() {
         }
         if (!imageUrl.startsWith('http')) {
             setError({
-                message: 'Cannot animate — image needs to be uploaded first. Try regenerating.',
+                message: 'Cannot animate ΓÇö image needs to be uploaded first. Try regenerating.',
                 isProviderError: false
             })
             setTimeout(() => setError(null), 4000)
@@ -723,7 +723,7 @@ export default function CreativeStudio() {
 ${originalContext}
 
 CRITICAL INSTRUCTION: You MUST write the prompt entirely in ENGLISH. Do not use Hindi, mixing scripts, or any other language except pure English.
-Be specific and cinematic. Do NOT describe the image — describe the MOTION only. Output ONLY the prompt, nothing else.`,
+Be specific and cinematic. Do NOT describe the image ΓÇö describe the MOTION only. Output ONLY the prompt, nothing else.`,
                 activeBrand?._id,
                 { images: [imageUrl] }
             )
@@ -737,7 +737,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         setAnimateAnalyzing(false)
     }
 
-    // ── Animate: Generate Video ──
+    // ΓöÇΓöÇ Animate: Generate Video ΓöÇΓöÇ
     const handleAnimateGenerate = async () => {
         const imageUrl = animateImageRef.current || result?.imageUrl
         if (!imageUrl || !animatePrompt.trim()) return
@@ -814,7 +814,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     // Cleanup animate polling on unmount
     useEffect(() => () => { if (animatePollRef.current) clearInterval(animatePollRef.current) }, [])
 
-    // ── AI Image Editing — Inline Edit Panel (like Animate) ──
+    // ΓöÇΓöÇ AI Image Editing ΓÇö Inline Edit Panel (like Animate) ΓöÇΓöÇ
     const handleOpenEditPanel = (imageUrl, title = 'Creative') => {
         if (!imageUrl) return
         // Show the inline edit panel instead of navigating to canvas
@@ -835,7 +835,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ── Gemini Edit: Generate edited image ──
+    // ΓöÇΓöÇ Gemini Edit: Generate edited image ΓöÇΓöÇ
     const handleEditGenerate = async () => {
         const sourceUrl = editImageRef.current || editSourceImageUrl
         if (!sourceUrl || !editPromptText.trim()) return
@@ -869,7 +869,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 }
                 setEditHistory(prev => [...prev, historyEntry])
                 setEditResult({ imageUrl: result.imageUrl, description: result.editDescription })
-                // Update source for next edit — chained editing
+                // Update source for next edit ΓÇö chained editing
                 editImageRef.current = result.imageUrl
                 setEditSourceImageUrl(result.imageUrl)
                 setEditPromptText('')
@@ -883,7 +883,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
     
-    // ── Studio Mode — driven by URL ?mode= param ──
+    // ΓöÇΓöÇ Studio Mode ΓÇö driven by URL ?mode= param ΓöÇΓöÇ
     const studioMode = searchParams.get('mode') || 'create'
     const setStudioMode = useCallback((mode) => {
         setSearchParams(prev => {
@@ -893,7 +893,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }, { replace: true })
     }, [setSearchParams])
 
-    // ── Virtual Try-On State ──
+    // ΓöÇΓöÇ Virtual Try-On State ΓöÇΓöÇ
     const [vtoPersonImage, setVtoPersonImage] = useState(null)
     const [vtoGarmentImage, setVtoGarmentImage] = useState(null)
     const [vtoPreviewResult, setVtoPreviewResult] = useState(null)
@@ -902,7 +902,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [vtoHdLoading, setVtoHdLoading] = useState(false)
     const [vtoError, setVtoError] = useState(null)
 
-    // ── Lifestyle Mockups State ──
+    // ΓöÇΓöÇ Lifestyle Mockups State ΓöÇΓöÇ
     const [mockupProductImage, setMockupProductImage] = useState(null)
     const [mockupScenePrompt, setMockupScenePrompt] = useState('')
     const [mockupResult, setMockupResult] = useState(null)
@@ -914,7 +914,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [mockupTemplateImage, setMockupTemplateImage] = useState(null)
     const [mockupHarmonize, setMockupHarmonize] = useState(false)
 
-    // ══ Campaign Shot State ══
+    // ΓòÉΓòÉ Campaign Shot State ΓòÉΓòÉ
     const [csProductImage, setCsProductImage] = useState(null)       // Product image URL
     const [csProductFile, setCsProductFile] = useState(null)         // Product image File object
     const [csRefImage, setCsRefImage] = useState(null)               // Style reference image
@@ -931,11 +931,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [csResult, setCsResult] = useState(null)                   // Legacy compat (primary result)
     const [csError, setCsError] = useState(null)
     const [showCsModelMenu, setShowCsModelMenu] = useState(false)    // Dropdown state for model picker
-    const [csCopyEnabled, setCsCopyEnabled] = useState(false)        // Copy toggle — generate cinematic ad copy alongside image
+    const [csCopyEnabled, setCsCopyEnabled] = useState(false)        // Copy toggle ΓÇö generate cinematic ad copy alongside image
     const [csCustomW, setCsCustomW] = useState('1080')
     const [csCustomH, setCsCustomH] = useState('1080')
 
-    // ── Logo/Brand Mockup State ──
+    // ΓöÇΓöÇ Logo/Brand Mockup State ΓöÇΓöÇ
     const [logoImage, setLogoImage] = useState(null)
     const [logoUrl, setLogoUrl] = useState('')
     const [logoSurface, setLogoSurface] = useState('')
@@ -947,30 +947,30 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoError, setLogoError] = useState(null)
     const [logoAspectRatio, setLogoAspectRatio] = useState('1:1')
 
-    // ── Campaign Logo Generator: Model Config ──
+    // ΓöÇΓöÇ Campaign Logo Generator: Model Config ΓöÇΓöÇ
     const LOGO_IMAGE_MODELS = [
-        { id: 'gpt-image-2',  name: 'GPT Image 2',  icon: 'text_rotate_vertical', desc: 'Best text rendering · Complex layouts',    badge: 'star',         color: '#10a37f', isDefault: true },
-        { id: 'recraft-v4',   name: 'Recraft v4',    icon: 'pentagon',             desc: 'Native vector design · Logo specialist',  badge: 'new_releases', color: '#6366f1', isNew: true },
-        { id: 'gpt-image-1',  name: 'GPT Image 1',   icon: 'auto_fix_high',        desc: 'Clean renders · Good for flat logos',     badge: null,           color: '#0ea5e9' },
-        { id: 'nanobanana-2', name: 'NanoBanana 2',  icon: 'auto_awesome',         desc: 'Fast · Best with brand colors',           badge: 'bolt',         color: 'var(--sys-text)' },
+        { id: 'gpt-image-2',  name: 'GPT Image 2',  icon: 'text_rotate_vertical', desc: 'Best text rendering ┬╖ Complex layouts',    badge: 'star',         color: '#10a37f', isDefault: true },
+        { id: 'recraft-v4',   name: 'Recraft v4',    icon: 'pentagon',             desc: 'Native vector design ┬╖ Logo specialist',  badge: 'new_releases', color: '#6366f1', isNew: true },
+        { id: 'gpt-image-1',  name: 'GPT Image 1',   icon: 'auto_fix_high',        desc: 'Clean renders ┬╖ Good for flat logos',     badge: null,           color: '#0ea5e9' },
+        { id: 'nanobanana-2', name: 'NanoBanana 2',  icon: 'auto_awesome',         desc: 'Fast ┬╖ Best with brand colors',           badge: 'bolt',         color: 'var(--sys-text)' },
     ]
 
-    // ── Campaign Logo Generator: Dedicated model state (isolated from global imageModel) ──
+    // ΓöÇΓöÇ Campaign Logo Generator: Dedicated model state (isolated from global imageModel) ΓöÇΓöÇ
     const [logoImageModel, setLogoImageModel] = useState('gpt-image-2')
 
-    // ── Campaign Logo Generator: Zoom lightbox state ──
+    // ΓöÇΓöÇ Campaign Logo Generator: Zoom lightbox state ΓöÇΓöÇ
     const [logoZoomOpen, setLogoZoomOpen] = useState(false)
     const [logoZoomUrl, setLogoZoomUrl] = useState(null)
     const [logoZoomScale, setLogoZoomScale] = useState(1)
     const [logoZoomUpscaling, setLogoZoomUpscaling] = useState(false)
     const [logoZoomUpscaled, setLogoZoomUpscaled] = useState(null)
 
-    // ── Campaign Logo Generator: Animation Director state ──
-    // logoAnimate* state removed — logo Animate + Edit now reuse the shared
+    // ΓöÇΓöÇ Campaign Logo Generator: Animation Director state ΓöÇΓöÇ
+    // logoAnimate* state removed ΓÇö logo Animate + Edit now reuse the shared
     // handleAnimateClick / handleOpenEditPanel handlers (same as AI Create studio)
 
 
-    // ── Campaign Logo Generator State ──
+    // ΓöÇΓöÇ Campaign Logo Generator State ΓöÇΓöÇ
     const [clgText, setClgText] = useState('')
     const [clgStyle, setClgStyle] = useState('')
     const [clgOccasion, setClgOccasion] = useState('')
@@ -985,7 +985,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [clgLoading, setClgLoading] = useState(false)
     const [clgError, setClgError] = useState(null)
 
-    // ── Campaign Creatives Wizard State ──
+    // ΓöÇΓöÇ Campaign Creatives Wizard State ΓöÇΓöÇ
     const [campStep, setCampStep] = useState(1)
     const [campName, setCampName] = useState('')
     const [campGoal, setCampGoal] = useState('')
@@ -1015,7 +1015,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [campFeatures, setCampFeatures] = useState([]) // product features to distribute across creatives
     const [campFeatureInput, setCampFeatureInput] = useState('')
 
-    // ── Carousel Mode State ──
+    // ΓöÇΓöÇ Carousel Mode State ΓöÇΓöÇ
     const [carouselPrompt, setCarouselPrompt] = useState('')
     const [carouselSlides, setCarouselSlides] = useState(3)
     const [carouselStyle, setCarouselStyle] = useState('modern')
@@ -1042,13 +1042,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [campProgress, setCampProgress] = useState(0)
     const [campError, setCampError] = useState(null)
 
-    // ── Best Performing Library State ──
+    // ΓöÇΓöÇ Best Performing Library State ΓöÇΓöÇ
     const [bplOpen, setBplOpen] = useState(false)
     const [bplCreatives, setBplCreatives] = useState([])
     const [bplLoading, setBplLoading] = useState(false)
     const [bplMode, setBplMode] = useState('style')
 
-    // ── AI Photoshoot State ──
+    // ΓöÇΓöÇ AI Photoshoot State ΓöÇΓöÇ
     const [productImage, setProductImage] = useState(null)
     const [productFile, setProductFile] = useState(null)
     const [productPickerOpen, setProductPickerOpen] = useState(false)
@@ -1082,7 +1082,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [psMaskMode, setPsMaskMode] = useState(false)
     const [psMaskBrushSize, setPsMaskBrushSize] = useState(30)
 
-    // ── Image Bank State ──
+    // ΓöÇΓöÇ Image Bank State ΓöÇΓöÇ
     const [bankImages, setBankImages] = useState([])
     const [bankLoading, setBankLoading] = useState(false)
     const [bankTotal, setBankTotal] = useState(0)
@@ -1092,7 +1092,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [bankTab, setBankTab] = useState('generated')
     const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
 
-    // ── Template & Category State ──
+    // ΓöÇΓöÇ Template & Category State ΓöÇΓöÇ
     const [activeTemplate, setActiveTemplate] = useState(null)
     const [templateFields, setTemplateFields] = useState({})
     const [templatePromptPreview, setTemplatePromptPreview] = useState('')
@@ -1117,7 +1117,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [creatingCategory, setCreatingCategory] = useState(false)
     const [newCat, setNewCat] = useState({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
 
-    // ── Other UI/Ref State ──
+    // ΓöÇΓöÇ Other UI/Ref State ΓöÇΓöÇ
     const [designBaseImage, setDesignBaseImage] = useState(null)
     const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
     const [characters, setCharacters] = useState([])
@@ -1126,9 +1126,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoSize, setLogoSize] = useState('medium')
     const [galleryFilter, setGalleryFilter] = useState('All')
     const [viewMode, setViewMode] = useState('list')
-    const [historyPage, setHistoryPage] = useState(1)
-    const [sidebarPanel, setSidebarPanel] = useState('create')
-    const [exploreExpanded, setExploreExpanded] = useState({})
     const [showAdvanced, setShowAdvanced] = useState(false)
     const [floatingTray, setFloatingTray] = useState(null) // null | 'format' | 'camera' | 'references' | 'text' | 'advanced'
     const [psTray, setPsTray] = useState(null) // null | 'product' | 'camera' | 'scene' | 'ratio' | 'refs'
@@ -1153,13 +1150,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [zoomImage, setZoomImage] = useState(null)
     const [expandedReasoning, setExpandedReasoning] = useState(null) // MCoT Thinking Mode: which creative ID's reasoning is shown
 
-    // ── Refs ──
+    // ΓöÇΓöÇ Refs ΓöÇΓöÇ
     const psMaskCanvasRef = useRef(null)
     const psMaskCtxRef = useRef(null)
     const psImageRef = useRef(null)
     const psIsPainting = useRef(false)
     const promptTextareaRef = useRef(null)
-    // Per-tab AbortControllers — so generations survive tab switches
+    // Per-tab AbortControllers ΓÇö so generations survive tab switches
     const aiCreateAbortRef = useRef(null)
     const psAbortRef = useRef(null)
     const campAbortRef = useRef(null)
@@ -1174,9 +1171,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }, [prompt])
 
-    // ── Helper Functions ──
-    const [upscaleMenu, setUpscaleMenu] = useState(null) // { url, filename, x, y } — tracks which download menu is open
-    const [upscalingState, setUpscalingState] = useState(null) // null | '2k' | '4k' — loading indicator
+    // ΓöÇΓöÇ Helper Functions ΓöÇΓöÇ
+    const [upscaleMenu, setUpscaleMenu] = useState(null) // { url, filename, x, y } ΓÇö tracks which download menu is open
+    const [upscalingState, setUpscalingState] = useState(null) // null | '2k' | '4k' ΓÇö loading indicator
     const upscaleMenuRef = useRef(null)
 
     // Close upscale menu on outside click
@@ -1239,7 +1236,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         return ref.current.signal
     }
 
-    // ── Agentic copy suggestion — runs when toggle is ON or brief changes ──
+    // ΓöÇΓöÇ Agentic copy suggestion ΓÇö runs when toggle is ON or brief changes ΓöÇΓöÇ
     const suggestCopy = useCallback(async (briefText) => {
         if (!briefText?.trim() || briefText.trim().length < 5) return;
         setCopyLoading(true);
@@ -1289,7 +1286,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         return () => clearTimeout(suggestCopyTimerRef.current);
     }, [prompt, generateCopy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Effects ──
+    // ΓöÇΓöÇ Effects ΓöÇΓöÇ
     useEffect(() => {
         return () => {
             aiCreateAbortRef.current?.abort()
@@ -1311,9 +1308,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 if (data?.brand?.dna?.brandImages?.length > 0) {
                     setBrandImages(data.brand.dna.brandImages)
                 } else {
-                    console.log('🖼️ No brand images for', activeBrand.name)
+                    console.log('≡ƒû╝∩╕Å No brand images for', activeBrand.name)
                 }
-            } catch (e) { console.warn('🖼️ Could not fetch brand images:', e.message) }
+            } catch (e) { console.warn('≡ƒû╝∩╕Å Could not fetch brand images:', e.message) }
         })()
     }, [activeBrand?._id])
 
@@ -1370,7 +1367,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [studioMode, activeBrand?._id])
 
-    // ── Logo History: Load from Creative Bank when studio opens ──
+    // ΓöÇΓöÇ Logo History: Load from Creative Bank when studio opens ΓöÇΓöÇ
     // Persists logo history across page refreshes by fetching previously
     // saved logos with source='campaign-logo' from the image bank.
     useEffect(() => {
@@ -1387,7 +1384,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             createdAt: img.createdAt || img.savedAt || new Date().toISOString(),
                         })).filter(item => !!item.url);
                         setClgResults(prev => {
-                            // Merge: session results first (top), then history — deduplicate by URL
+                            // Merge: session results first (top), then history ΓÇö deduplicate by URL
                             const existingUrls = new Set(prev.map(r => r.url || r));
                             const newFromHistory = historicItems.filter(h => !existingUrls.has(h.url));
                             return [...prev, ...newFromHistory];
@@ -1440,7 +1437,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // Read URL params from Content Studio
     useEffect(() => {
-        // ── Template handoff: pick up a background job by jobId ────────────
+        // ΓöÇΓöÇ Template handoff: pick up a background job by jobId ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         const incomingJobId = searchParams.get('jobId')
         if (incomingJobId) {
             setShowQuickStart(false)
@@ -1457,7 +1454,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 return next
             }, { replace: true })
 
-            // Poll this template job — same logic as pollLocalJob in handleGenerate
+            // Poll this template job ΓÇö same logic as pollLocalJob in handleGenerate
             let attempts = 0
             const maxAttempts = 90
             const tmplPollInterval = setInterval(async () => {
@@ -1478,14 +1475,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         const imageUrl = creative.imageUrl || job.imageUrl
 
                         if (!imageUrl && creative._id) {
-                            // S3 upload pending — wait up to 60s
+                            // S3 upload pending ΓÇö wait up to 60s
                             let retries = 0
                             const waitForS3 = setInterval(async () => {
                                 retries++
                                 if (retries > 12) {
                                     clearInterval(waitForS3)
                                     setResult({ ...creative, _prompt: 'Template' })
-                                    setFeedbackToast('⚠️ Image upload is taking longer than expected. Refresh in a moment.')
+                                    setFeedbackToast('ΓÜá∩╕Å Image upload is taking longer than expected. Refresh in a moment.')
                                     setActiveGenerations(prev => prev.filter(j => j.jobId !== localTrackId))
                                     return
                                 }
@@ -1529,13 +1526,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
             return // Don't process other params
         }
-        // ───────────────────────────────────────────────────────────────────
+        // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
         const isFromContent = searchParams.get('fromContent')
         const contentPrompt = searchParams.get('prompt')
         const contentType = searchParams.get('type')
 
-        // ── Monthly Strategy handoff ──────────────────────────────────────────
+        // ΓöÇΓöÇ Monthly Strategy handoff ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if (searchParams.get('from') === 'monthly_strategy') {
             try {
                 const raw = window.sessionStorage.getItem('ms_brief_handoff')
@@ -1560,7 +1557,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             } catch (e) {
                 console.error('[CreativeStudio] Failed to read ms_brief_handoff:', e)
             }
-            // Keep ms_strategy_ctx — the generation complete handler will consume it
+            // Keep ms_strategy_ctx ΓÇö the generation complete handler will consume it
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev)
                 next.delete('from')
@@ -1568,7 +1565,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }, { replace: true })
             return
         }
-        // ─────────────────────────────────────────────────────────────────────
+        // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
         if (isFromContent && contentPrompt) {
             const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
@@ -1630,45 +1627,6 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 return next
             }, { replace: true })
         }
-
-        // ── Template Routing Hydration ──
-        const templateId = searchParams.get('templateId');
-        const mode = searchParams.get('mode');
-        
-        if (mode && ['create', 'photoshoot', 'product', 'magic', 'tryon', 'mockups', 'agent', 'campaignshot', 'imagebank', 'inpaint'].includes(mode)) {
-            setStudioMode(mode);
-        }
-
-        if (templateId) {
-            import('../services/api').then(({ templates }) => {
-                if (!templates) return;
-                templates.get(templateId).then(res => {
-                    const tpl = res.template;
-                    if (tpl) {
-                        setPrompt(tpl.promptTemplate || tpl.savedPrompt || '');
-                        
-                        const assets = tpl.templateAssets || [];
-                        const prodImg = assets.find(a => a.role === 'product')?.url || tpl.savedProductImageUrls?.[0] || '';
-                        const avatarImg = assets.find(a => a.role === 'avatar')?.url || tpl.savedAvatarUrl || '';
-                        
-                        if (prodImg) {
-                            setCsProductImage(prodImg);
-                            setProductImage(prodImg);
-                        }
-                        if (avatarImg) {
-                            setCsCharacterImage(avatarImg);
-                        }
-                    }
-                }).catch(err => console.error("[CreativeStudio] Failed to load template", err));
-            }).catch(() => {});
-            
-            setSearchParams(prev => {
-                const next = new URLSearchParams(prev);
-                next.delete('templateId');
-                next.delete('mode');
-                return next;
-            }, { replace: true });
-        }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
     async function loadImageBank(cat) {
@@ -1684,7 +1642,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setBankTotal(data.total || 0)
             if (data.counts) setBankCounts(data.counts)
         } catch (err) {
-            console.error('📸 Failed to load image bank:', err)
+            console.error('≡ƒô╕ Failed to load image bank:', err)
         } finally {
             setBankLoading(false)
         }
@@ -1708,7 +1666,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             })
             if (result.success) {
                 setPhotoshootSaved(true)
-                console.log('✅ Image saved to bank')
+                console.log('Γ£à Image saved to bank')
             } else {
                 console.error('Save to bank failed:', result.error)
             }
@@ -1722,7 +1680,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
 
 
-    // ── Client-side logo compositing (pixel-perfect, uses actual brand logo) ──
+    // ΓöÇΓöÇ Client-side logo compositing (pixel-perfect, uses actual brand logo) ΓöÇΓöÇ
     function compositeLogoOnImage(imageUrl, logoUrl, position, size) {
         return new Promise((resolve) => {
             const img = new window.Image()
@@ -1777,9 +1735,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         try {
             // Build description of reference images for the enhancer
             const refDescs = []
-            if (referenceImages.style) refDescs.push('A style reference image is attached — replicate its visual aesthetic, color palette, composition layout, subject pose/position, product placement, camera angle, and overall mood')
-            if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} — include these characters in the design`)
-            if (referenceImages.upload) refDescs.push('A general reference image is attached — use it as contextual inspiration')
+            if (referenceImages.style) refDescs.push('A style reference image is attached ΓÇö replicate its visual aesthetic, color palette, composition layout, subject pose/position, product placement, camera angle, and overall mood')
+            if (characters.length > 0) refDescs.push(`${characters.length} character reference image(s) are attached: ${characters.map(c => c.name).join(', ')} ΓÇö include these characters in the design`)
+            if (referenceImages.upload) refDescs.push('A general reference image is attached ΓÇö use it as contextual inspiration')
 
             const signal = getSignal(aiCreateAbortRef)
             const data = await creativesAPI.enhancePrompt({
@@ -1788,7 +1746,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 style,
                 format: selectedType,
                 aspectRatio,
-                imageModel, // ← Pass selected model so pipeline applies model-specific prompt language
+                imageModel, // ΓåÉ Pass selected model so pipeline applies model-specific prompt language
                 referenceDescriptions: refDescs.length > 0 ? refDescs.join('. ') : '',
             }, { signal })
 
@@ -1798,14 +1756,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 // If the full agentic pipeline ran, surface what the AI decided
                 if (data.agenticEnhanced) {
                     const parts = []
-                    if (data.designTrend) parts.push(`🎨 ${data.designTrend}`)
+                    if (data.designTrend) parts.push(`≡ƒÄ¿ ${data.designTrend}`)
                     if (data.productMatched) {
-                        parts.push(`📦 Featuring: ${data.productMatched}`)
+                        parts.push(`≡ƒôª Featuring: ${data.productMatched}`)
                         setAgenticMatchedProduct(data.productMatched) // Show product chip in sidebar
                     }
-                    if (data.mood) parts.push(`✨ ${data.mood}`)
+                    if (data.mood) parts.push(`Γ£¿ ${data.mood}`)
                     if (parts.length > 0) {
-                        setFeedbackToast(parts.join(' · '))
+                        setFeedbackToast(parts.join(' ┬╖ '))
                         setTimeout(() => setFeedbackToast(''), 5000)
                     }
                 }
@@ -1875,14 +1833,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 fullPrompt += `\n\nPRODUCT CONTEXT: ${selectedProduct.title}`
                 if (selectedProduct.description) fullPrompt += ` - ${selectedProduct.description}`
                 if (selectedProduct.features?.length) fullPrompt += `. Key features: ${selectedProduct.features.slice(0, 3).join(', ')}`
-                if (selectedProduct.price?.amount) fullPrompt += `. Price: ₹${selectedProduct.price.amount}`
+                if (selectedProduct.price?.amount) fullPrompt += `. Price: Γé╣${selectedProduct.price.amount}`
                 if (selectedProduct.images?.[0]?.url) {
                     options.productImageUrl = selectedProduct.images[0].url
                 }
             }
 
-            // ── BACKGROUND JOB MODE ──
-            // Fire the job API — returns jobId in ~100ms, pipeline runs server-side.
+            // ΓöÇΓöÇ BACKGROUND JOB MODE ΓöÇΓöÇ
+            // Fire the job API ΓÇö returns jobId in ~100ms, pipeline runs server-side.
             // User can navigate away freely; the global BackgroundJobsPanel polls for results.
             const jobData = await creativesAPI.createJob({
                 brandId: activeBrand._id,
@@ -1900,13 +1858,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 // automatically pick up any in-progress jobs on the next page load.
 
                 // Show optimistic queued state
-                setFeedbackToast('✅ Generation queued! Processing in background...')
+                setFeedbackToast('Γ£à Generation queued! Processing in background...')
                 setActiveGenerations(prev => prev.map(j => j.jobId === localJobId ? { ...j, steps: [{ agent: 'queued', message: 'Image generation queued. Processing in background...', status: 'working' }] } : j))
 
                 // Poll this specific job locally too (so the current page updates)
                 const pollLocalJob = async () => {
                     let attempts = 0
-                    const maxAttempts = 90 // 90 × 5s = 7.5min max
+                    const maxAttempts = 90 // 90 ├ù 5s = 7.5min max
                     const localPollInterval = setInterval(async () => {
                         attempts++
                         if (attempts > maxAttempts) {
@@ -1925,14 +1883,14 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                                 const imageUrl = creative.imageUrl || job.imageUrl
 
                                 if (!imageUrl && creative._id) {
-                                    // S3 not done yet — wait up to 60s
+                                    // S3 not done yet ΓÇö wait up to 60s
                                     let retries = 0
                                     const waitForS3 = setInterval(async () => {
                                         retries++
                                         if (retries > 12) {
                                             clearInterval(waitForS3)
                                             setResult({ ...creative, _prompt: prompt })
-                                            setFeedbackToast('⚠️ Image upload is taking longer than expected. Refresh in a moment.')
+                                            setFeedbackToast('ΓÜá∩╕Å Image upload is taking longer than expected. Refresh in a moment.')
                                             setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                                             return
                                         }
@@ -1965,7 +1923,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                                 setError({ message: job.errorMessage || 'Generation failed.', isRetryable: true })
                                 setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
                             } else if (job.status === 'processing') {
-                                // Update steps ONLY for THIS job — never overwrite siblings
+                                // Update steps ONLY for THIS job ΓÇö never overwrite siblings
                                 const newSteps = job.steps?.length > 0
                                     ? job.steps
                                     : [{ agent: 'brand-intel', message: 'Launching AI agent pipeline...', status: 'working' }]
@@ -1977,11 +1935,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     }, 5000)
                 }
                 pollLocalJob()
-                // Don't remove from activeGenerations here — the poll interval will do it
+                // Don't remove from activeGenerations here ΓÇö the poll interval will do it
                 return
             }
         } catch (e) {
-            console.error('❌ Generation error:', e)
+            console.error('Γ¥î Generation error:', e)
             // Clean up from active generations since no polling was started
             setActiveGenerations(prev => prev.filter(j => j.jobId !== localJobId))
             
@@ -1989,7 +1947,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             
             if (errMsg.includes('busy') || errMsg.includes('high demand') || errMsg.includes('overloaded') || errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('rate limit')) {
                 setError({
-                    message: '🔄 AI model servers are currently experiencing high demand. Please try again in a few seconds, or switch to a different image model.',
+                    message: '≡ƒöä AI model servers are currently experiencing high demand. Please try again in a few seconds, or switch to a different image model.',
                     isProviderError: true,
                     provider: 'AI Server',
                     isRetryable: true,
@@ -2018,17 +1976,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     async function handleFeedback(signalType, extra = {}) {
         if (!result?._id) {
-            console.warn('Feedback: no result._id — skipping API call but showing UI feedback')
+            console.warn('Feedback: no result._id ΓÇö skipping API call but showing UI feedback')
         }
 
         // Immediate visual feedback
         if (signalType === 'thumbs') {
             const dir = extra.thumbs
             setFeedbackState(dir === 'up' ? 'liked' : 'disliked')
-            setFeedbackToast(dir === 'up' ? '👍 Liked! This helps improve future creatives.' : '👎 Feedback noted. We\'ll improve next time.')
+            setFeedbackToast(dir === 'up' ? '≡ƒæì Liked! This helps improve future creatives.' : '≡ƒæÄ Feedback noted. We\'ll improve next time.')
         } else if (signalType === 'accept') {
             setFeedbackState('accepted')
-            setFeedbackToast('✅ Creative accepted & saved!')
+            setFeedbackToast('Γ£à Creative accepted & saved!')
         }
 
         // Auto-dismiss toast
@@ -2044,7 +2002,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
 
-    // ── Photoshoot: generate handler ──
+    // ΓöÇΓöÇ Photoshoot: generate handler ΓöÇΓöÇ
     const handlePhotoshoot = async () => {
         if (!productImage || !activeBrand) return
         setPhotoshootGenerating(true)
@@ -2079,7 +2037,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 setPsHistory(prev => [{ ...data, _brief: photoshootBrief, _timestamp: Date.now() }, ...prev])
                 saveToImageBank(data)
             } else if (data.modelBusy) {
-                setPhotoshootError(data.error || 'Model is busy — try switching to a different model using the selector above.')
+                setPhotoshootError(data.error || 'Model is busy ΓÇö try switching to a different model using the selector above.')
             } else {
                 setPhotoshootError({
                     message: data.error || 'Generation failed',
@@ -2098,7 +2056,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }
 
-    // ── Carousel: generate handler ──
+    // ΓöÇΓöÇ Carousel: generate handler ΓöÇΓöÇ
     const handleCarouselGenerate = async () => {
         if (!activeBrand || !carouselPrompt.trim() || carouselGenerating) return
         setCarouselGenerating(true)
@@ -2148,7 +2106,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             clearInterval(poll)
                         }
                         retries++
-                        if (retries > 100) { clearInterval(poll); setCarouselPolling(false); setCarouselError('Generation is taking too long — panels may still be processing.') }
+                        if (retries > 100) { clearInterval(poll); setCarouselPolling(false); setCarouselError('Generation is taking too long ΓÇö panels may still be processing.') }
                     } catch { retries++; if (retries > 100) { clearInterval(poll); setCarouselPolling(false) } }
                 }, 3000)
             } else {
@@ -2160,7 +2118,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         setCarouselGenerating(false)
     }
 
-    // ── Photoshoot AI Editing: mask helpers ──
+    // ΓöÇΓöÇ Photoshoot AI Editing: mask helpers ΓöÇΓöÇ
     function setupPsMaskCanvas() {
         const img = psImageRef.current
         if (!img || psMaskCanvasRef.current) return
@@ -2219,7 +2177,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }
 
 
-    // ── Photoshoot AI Edit Handler ──
+    // ΓöÇΓöÇ Photoshoot AI Edit Handler ΓöÇΓöÇ
     async function handlePsEdit() {
         if (!photoshootResult?.imageUrl) return
         setPsEditLoading(true)
@@ -2265,7 +2223,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }
 
 
-    // ── Template Generation Handler ──
+    // ΓöÇΓöÇ Template Generation Handler ΓöÇΓöÇ
     async function handleTemplateGenerate(tmpl) {
 
         if (!activeBrand || templateGenerating) return
@@ -2278,7 +2236,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             // Append additional user instructions (gender change, outfit, background, etc.)
             const extraInstructions = templateFields._additionalInstructions?.trim()
             if (extraInstructions) {
-                builtPrompt += `\n\nADDITIONAL CHANGES (apply these intelligently — adapt the ENTIRE image, not just face swap):\n${extraInstructions}`
+                builtPrompt += `\n\nADDITIONAL CHANGES (apply these intelligently ΓÇö adapt the ENTIRE image, not just face swap):\n${extraInstructions}`
             }
 
             setTemplatePromptPreview(builtPrompt)
@@ -2291,13 +2249,13 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 characters: [],
             }
 
-            // Collect ALL image fields from the template — separate by role
+            // Collect ALL image fields from the template ΓÇö separate by role
             const imageFields = (tmpl.fields || []).filter(f => f.type === 'image')
             const modelFields = imageFields.filter(f => /model|person|human|character|lady|man|woman/i.test(f.label || f.key))
             const productFields = imageFields.filter(f => /product|item|device|object|photo/i.test(f.label || f.key))
             const otherImageFields = imageFields.filter(f => !modelFields.includes(f) && !productFields.includes(f))
 
-            // Model/Person images → character references (for face/appearance preservation)
+            // Model/Person images ΓåÆ character references (for face/appearance preservation)
             for (const mf of modelFields) {
                 const imgSrc = templateFields[mf.key]
                 if (imgSrc) {
@@ -2305,7 +2263,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 }
             }
 
-            // Product images → product image (first one wins)
+            // Product images ΓåÆ product image (first one wins)
             const productField = productFields[0]
             const productImage = productField ? templateFields[productField.key] : null
 
@@ -2374,7 +2332,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             }
         } catch (err) {
             if (err.name === 'AbortError') return
-            console.error('❌ Template generation error:', err)
+            console.error('Γ¥î Template generation error:', err)
             setTemplateError({
                 message: err.message,
                 isProviderError: err.isProviderError,
@@ -2385,7 +2343,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }
 
 
-    // ── Reverse Prompt Handler (analyze uploaded image to extract design formula) ──
+    // ΓöÇΓöÇ Reverse Prompt Handler (analyze uploaded image to extract design formula) ΓöÇΓöÇ
     async function handleReversePrompt(imageSource, tmplId) {
 
         if (!activeBrand) return
@@ -2433,7 +2391,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
             })
 
             if (data.description) {
-                // Successfully got a prompt formula — set it as the template prompt
+                // Successfully got a prompt formula ΓÇö set it as the template prompt
                 setTemplatePromptPreview(data.description)
                 // Also auto-fill the prompt field so user can generate immediately
                 setPrompt(data.description
@@ -2457,7 +2415,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Load custom templates for the active brand ──
+    // ΓöÇΓöÇ Load custom templates for the active brand ΓöÇΓöÇ
     async function loadCustomTemplates() {
 
         if (!activeBrand?._id) return
@@ -2471,7 +2429,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Create a new custom template ──
+    // ΓöÇΓöÇ Create a new custom template ΓöÇΓöÇ
     async function handleCreateTemplate() {
 
         if (!activeBrand?._id || !newTmpl.label || !newTmpl.promptFormula) return
@@ -2491,7 +2449,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Analyze image for new template creation — SMART STRUCTURED ANALYSIS ──
+    // ΓöÇΓöÇ Analyze image for new template creation ΓÇö SMART STRUCTURED ANALYSIS ΓöÇΓöÇ
     async function handleAnalyzeForTemplate(imageSource) {
 
         if (!activeBrand) return
@@ -2572,7 +2530,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Load custom categories from DB ──
+    // ΓöÇΓöÇ Load custom categories from DB ΓöÇΓöÇ
     async function loadCustomCategories() {
 
         if (!activeBrand?._id) return
@@ -2583,7 +2541,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Create a new custom category ──
+    // ΓöÇΓöÇ Create a new custom category ΓöÇΓöÇ
     async function handleCreateCategory() {
 
         if (!activeBrand?._id || !newCat.label) return
@@ -2604,7 +2562,7 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
     }
 
 
-    // ── Analyze image for category creation (reverse prompting) ──
+    // ΓöÇΓöÇ Analyze image for category creation (reverse prompting) ΓöÇΓöÇ
     async function handleAnalyzeForCategory(imageSource) {
 
         if (!activeBrand) return
@@ -2663,8 +2621,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
 
-    // ── Smart format detection from prompt ──
-    // ══ Campaign Shot: 1-click cinematic poster generator ══
+    // ΓöÇΓöÇ Smart format detection from prompt ΓöÇΓöÇ
+    // ΓòÉΓòÉ Campaign Shot: 1-click cinematic poster generator ΓòÉΓòÉ
     async function handleCampaignShot() {
         if (!csProductImage) { setCsError('Please upload a product image first'); return }
         setCsGenerating(true); setCsError(null); setCsResult(null)
@@ -2764,7 +2722,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             subtitle="AI-powered image generation & design"
         >
             <SEOHead 
-                title="Creative Studio — Mantram AI Design & Photoshoots" 
+                title="Creative Studio ΓÇö Mantram AI Design & Photoshoots" 
                 description="Use Mantram AI Creative Studio to generate stunning, brand-aligned ad creatives, social media graphics, and AI product photoshoots without a graphic designer." 
                 canonical="/creative-studio"
             />
@@ -2780,9 +2738,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {studioMode === 'templates' && <Walkthrough studioId="creativeTemplates" dependsOn="creativeStudio" />}
             {studioMode === 'imagebank' && <Walkthrough studioId="creativeImagebank" dependsOn="creativeStudio" />}
 
-            {/* ══ Unified Studio Navigation (sticky — tabs + optional gallery sub-bar) ══ */}
+            {/* ΓòÉΓòÉ Unified Studio Navigation (sticky ΓÇö tabs + optional gallery sub-bar) ΓòÉΓòÉ */}
             <div data-wt="creative-modes" className="flex flex-col gap-0 sticky z-40 border-b border-[var(--sys-border)]" style={{ top: 0, backgroundColor: 'var(--sys-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                {/* ── Row 1: Tab Buttons ── */}
+                {/* ΓöÇΓöÇ Row 1: Tab Buttons ΓöÇΓöÇ */}
                 <div className="flex items-center gap-1.5 p-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
                 {[
                     { id: 'create', icon: 'auto_awesome', label: 'AI Create' },
@@ -2821,29 +2779,53 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 ))}
                 </div>
 
-                {/* ── Gallery Toolbar (AI Create only) ── */}
+                {/* ΓöÇΓöÇ Row 2: Gallery Toolbar (only in AI Create mode) ΓöÇΓöÇ */}
                 {studioMode === 'create' && (
-                    <div className="flex items-center justify-end px-3 pb-2 pt-0 border-t border-[var(--sys-border)] gap-2">
-                        {generationHistory.length > 0 && (
-                            <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
-                        )}
-                        <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
-                            <button onClick={() => setViewMode('list')}
-                                className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
-                                title="List view" aria-label="Switch to list view">
-                                <span className="material-symbols-outlined">view_list</span>
-                            </button>
-                            <button onClick={() => setViewMode('grid')}
-                                className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
-                                title="Grid view" aria-label="Switch to grid view">
-                                <span className="material-symbols-outlined">grid_view</span>
-                            </button>
+                    <div className="flex items-center justify-between px-3 pb-2 pt-0 border-t border-[var(--sys-border)]">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-[0.12em] flex items-center gap-1.5 flex-shrink-0">
+                                <span className="material-symbols-outlined text-[12px] text-[var(--sys-text)]">history</span>
+                                {generationHistory.length > 0 ? `Generations (${generationHistory.length})` : 'Generations'}
+                            </span>
+                            <span className="w-px h-3 bg-[var(--sys-surface)] flex-shrink-0" />
+                            <div className="flex items-center gap-0.5">
+                                {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
+                                    <button key={cat}
+                                        onClick={() => setGalleryFilter(cat)}
+                                        className={`gallery-cat-pill ${galleryFilter === cat ? 'active' : ''}`}
+                                        aria-label={`Filter gallery by ${cat}`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {generationHistory.length > 0 && (
+                                <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
+                            )}
+                            <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
+                                <button onClick={() => setViewMode('list')}
+                                    className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
+                                    title="List view"
+                                    aria-label="Switch to list view"
+                                >
+                                    <span className="material-symbols-outlined">view_list</span>
+                                </button>
+                                <button onClick={() => setViewMode('grid')}
+                                    className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
+                                    title="Grid view"
+                                    aria-label="Switch to grid view"
+                                >
+                                    <span className="material-symbols-outlined">grid_view</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* ── Cross-Tab Generation Indicator ── */}
+            {/* ΓöÇΓöÇ Cross-Tab Generation Indicator ΓöÇΓöÇ */}
             {(() => {
                 const bgTasks = [];
                 if (studioMode !== 'create' && activeGenerations.length > 0) bgTasks.push({ label: 'AI Create', mode: 'create', icon: 'auto_awesome' })
@@ -2866,18 +2848,48 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 )
             })()}
 
-            {/* ====================== UNIFIED CREATE MODE — SPLIT PANEL ====================== */}
+            {/* ====================== UNIFIED CREATE MODE ΓÇö SPLIT PANEL ====================== */}
             {studioMode === 'create' && (
                 <>
                 <div className="creative-split fade-up">
 
 
-                    {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
+                    {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ GALLERY (full-width ΓÇö settings moved to floating bar) ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
                     <div className="creative-gallery relative" data-wt="creative-gallery">
 
+                        {/* ΓöÇΓöÇ Quick Prompt Bar (always visible at top) ΓöÇΓöÇ */}
+                        <div className="sticky top-0 z-20 bg-[var(--sys-bg)]/90 backdrop-blur-lg border-b border-[var(--sys-border)] px-4 py-2.5">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                                <span className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest whitespace-nowrap flex-shrink-0">Quick Prompt</span>
+                                <span className="w-px h-3 bg-[var(--sys-border)] flex-shrink-0" />
+                                <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer flex-shrink-0 font-semibold shadow-sm">
+                                    <span className="material-symbols-outlined text-[14px]">grid_view</span>
+                                    <span className="text-[11px] whitespace-nowrap">Start from Template</span>
+                                </button>
+                                {[
+                                    { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
+                                    { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
+                                    { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create a bold promotional sale creative for ${activeBrand?.name || 'the brand'}. Feature a big discount offer, urgency-driven design, eye-catching colors.`; })() },
+                                    { icon: 'format_quote', label: 'Quote', color: '#10b981', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an elegant quote card for ${activeBrand?.name || 'the brand'}. Large quotation marks, brand colors, professional typography.`; })() },
+                                    { icon: 'campaign', label: 'Announcement', color: 'var(--sys-text)', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an announcement creative for ${activeBrand?.name || 'the brand'}. Bold, attention-grabbing design.`; })() },
+                                    { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
+                                ].map(chip => (
+                                    <button key={chip.label} onClick={() => setPrompt(chip.prompt)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text-muted)] hover:shadow-sm transition-all cursor-pointer flex-shrink-0 group">
+                                        <span className="material-symbols-outlined text-[14px] transition-transform group-hover:scale-110" style={{ color: chip.color }}>{chip.icon}</span>
+                                        <span className="text-[11px] font-semibold text-[var(--sys-text)] whitespace-nowrap">{chip.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
+                        {/* ΓòÉΓòÉΓòÉ TEMPLATE SUGGESTION ROW ΓÇö section=ai_create ΓòÉΓòÉΓòÉ */}
+                        <TemplateSuggestionRow
+                            brandId={activeBrand?._id}
+                            onSelect={(t) => { setShowTemplateLibrary(true) }}
+                        />
 
-                        {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
+                        {/* ΓòÉΓòÉΓòÉ NATIVE ANIMATE WORKSPACE (MAIN UI) ΓòÉΓòÉΓòÉ */}
                         {showAnimatePanel && (
                             <div className="mb-6 studio-card border-primary/30 shadow-lg shadow-primary/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary-dim" />
@@ -2955,7 +2967,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             className="input-glass w-full py-3 px-4 pl-11 text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] focus:border-[#FF4D00] transition-colors rounded-xl outline-none appearance-none shadow-sm cursor-pointer hover:bg-[var(--sys-surface-hover)]">
                                                             {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
                                                                 <option key={id} value={id}>
-                                                                    {m.name} — {m.desc}
+                                                                    {m.name} ΓÇö {m.desc}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -3064,7 +3076,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ═══ GEMINI EDIT IMAGE WORKSPACE ═══ */}
+                        {/* ΓòÉΓòÉΓòÉ GEMINI EDIT IMAGE WORKSPACE ΓòÉΓòÉΓòÉ */}
                         {showEditPanel && (studioMode === 'create' || studioMode === 'campaignlogo') && (
                             <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
@@ -3142,7 +3154,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                     <div>
                                                         <h3 className="text-base font-bold text-[var(--sys-text)] leading-tight">Gemini Edit Workspace</h3>
-                                                        <p className="text-[11px] text-[var(--sys-text-muted)] leading-tight mt-0.5">Edit images with natural language — chain multiple edits</p>
+                                                        <p className="text-[11px] text-[var(--sys-text-muted)] leading-tight mt-0.5">Edit images with natural language ΓÇö chain multiple edits</p>
                                                     </div>
                                                 </div>
                                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
@@ -3175,7 +3187,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
                                                     placeholder="Describe how to edit this image... e.g. 'Remove the background', 'Make the colors more vibrant', 'Add dramatic studio lighting'"
                                                     className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-violet-500 min-h-[110px] shadow-inner font-medium text-[var(--sys-text)] bg-[var(--sys-bg)]" rows={4} />
-                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">⌘+Enter to apply · Edits are chained — each edit builds on the last</p>
+                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">Γîÿ+Enter to apply ┬╖ Edits are chained ΓÇö each edit builds on the last</p>
                                             </div>
 
                                             {/* Error */}
@@ -3206,7 +3218,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 className="studio-btn-primary py-1.5 px-3 text-[11px] h-9">
                                                                 <span className="material-symbols-outlined text-[14px]">cloud_download</span> Download
                                                             </button>
-                                                            <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited — ' + (editPromptText.slice(0, 40) || 'Edit') }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
+                                                            <button onClick={async () => { try { await creativesAPI.uploadToBank({ imageUrl: editResult.imageUrl, brandId: activeBrand?._id, title: 'Gemini Edited ΓÇö ' + (editPromptText.slice(0, 40) || 'Edit') }); setFeedbackToast('Saved to Image Bank!'); setTimeout(() => setFeedbackToast(''), 2500) } catch(e) { console.error(e) } }}
                                                                 className="studio-btn-secondary py-1.5 px-3 text-[11px] h-9">
                                                                 <span className="material-symbols-outlined text-[14px]">save</span> Save
                                                             </button>
@@ -3260,7 +3272,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── AI Provider Warnings ── */}
+                        {/* ΓöÇΓöÇ AI Provider Warnings ΓöÇΓöÇ */}
                         {aiWarnings.length > 0 && (
                             <div className="space-y-2 mb-4">
                                 {aiWarnings.map((warn, i) => (
@@ -3272,7 +3284,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Error ── */}
+                        {/* ΓöÇΓöÇ Error ΓöÇΓöÇ */}
                         {error && (
                             <div className={`mb-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'}`}>
                                 <div className="flex items-start gap-2">
@@ -3286,7 +3298,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="flex gap-2 mt-3 ml-7">
                                         <button onClick={() => { setError(null); handleGenerate() }}
                                             className="studio-btn-pill active px-4 py-1.5 border-none">
-                                            🔄 Try Again
+                                            ≡ƒöä Try Again
                                         </button>
                                         <button onClick={() => setError(null)}
                                             className="studio-btn-pill px-4 py-1.5 border-none">
@@ -3297,7 +3309,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Current Result (newest generation, highlighted) ── */}
+                        {/* ΓöÇΓöÇ Current Result (newest generation, highlighted) ΓöÇΓöÇ */}
                         {result && activeGenerations.length === 0 && (
                             <div className="generation-card generation-card--new mb-5">
                                 {/* Prompt text */}
@@ -3403,7 +3415,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Text on Image Card ── */}
+                        {/* ΓöÇΓöÇ Text on Image Card ΓöÇΓöÇ */}
                         {result?.copy?.headline && (
                             <div className="studio-card p-0 mb-5 overflow-hidden border border-[var(--sys-text)] animate-in fade-in slide-in-from-bottom-3 duration-500" style={{ animationDelay: '200ms' }}>
                                 {/* Header */}
@@ -3454,7 +3466,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                         <button onClick={() => { navigator.clipboard.writeText(result.copy.headline); setCopiedField('headline'); setTimeout(() => setCopiedField(null), 1500); }}
                                             className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-2 py-0.5 rounded cursor-pointer font-bold ${copiedField === 'headline' ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-primary'}`}>
-                                            {copiedField === 'headline' ? '✓' : 'Copy'}
+                                            {copiedField === 'headline' ? 'Γ£ô' : 'Copy'}
                                         </button>
                                     </div>
 
@@ -3467,7 +3479,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                             <button onClick={() => { navigator.clipboard.writeText(result.copy.subtext); setCopiedField('subtext'); setTimeout(() => setCopiedField(null), 1500); }}
                                                 className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'subtext' ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
-                                                {copiedField === 'subtext' ? '✓' : 'Copy'}
+                                                {copiedField === 'subtext' ? 'Γ£ô' : 'Copy'}
                                             </button>
                                         </div>
                                     )}
@@ -3483,7 +3495,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                             <button onClick={() => { navigator.clipboard.writeText(result.copy.ctaText); setCopiedField('cta'); setTimeout(() => setCopiedField(null), 1500); }}
                                                 className={`ml-3 opacity-0 group-hover:opacity-100 transition-all text-[10px] px-1.5 py-0.5 rounded cursor-pointer ${copiedField === 'cta' ? 'text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
-                                                {copiedField === 'cta' ? '✓' : 'Copy'}
+                                                {copiedField === 'cta' ? 'Γ£ô' : 'Copy'}
                                             </button>
                                         </div>
                                     )}
@@ -3502,8 +3514,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         )}
 
 
-                        {/* ── Generating Indicators (one per active job) ── */}
-                        {/* Each job gets its own loader with its own steps — never reset by other jobs */}
+                        {/* ΓöÇΓöÇ Generating Indicators (one per active job) ΓöÇΓöÇ */}
+                        {/* Each job gets its own loader with its own steps ΓÇö never reset by other jobs */}
                         {activeGenerations.map((job, idx) => (
                             <GlobalLoader
                                 key={job.jobId}
@@ -3518,12 +3530,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             />
                         ))}
 
-                        {/* ── Session Generation Gallery (persistent + viewMode-aware) ── */}
+                        {/* ΓöÇΓöÇ Session Generation Gallery (persistent + viewMode-aware) ΓöÇΓöÇ */}
                         {generationHistory.length > 0 && (
                             <div className="mb-5">
 
                                 {viewMode === 'grid' ? (
-                                    /* ── Grid / Tiled View ── */
+                                    /* ΓöÇΓöÇ Grid / Tiled View ΓöÇΓöÇ */
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {generationHistory.map((item, idx) => (
                                             <div key={item._id || idx} className={`group relative rounded-xl overflow-hidden border ${idx === 0 ? 'border-[var(--sys-text)]  ring-[#FF4D00]/20' : 'border-[var(--sys-border)]'} bg-[var(--sys-surface)] cursor-pointer transition-all hover:border-[var(--sys-border)] hover:scale-[1.02]`}
@@ -3560,7 +3572,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         ))}
                                     </div>
                                 ) : (
-                                    /* ── List View — grouped by prompt, full image on left ── */
+                                    /* ΓöÇΓöÇ List View ΓÇö grouped by prompt, full image on left ΓöÇΓöÇ */
                                     <div className="space-y-4">
                                         {(() => {
                                             // Group items by prompt (normalized) so regenerations appear side by side
@@ -3577,25 +3589,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 }
                                             });
 
-                                            const PAGE_SIZE_H = 8;
-                                            const totalGroups_H = groups.length;
-                                            const totalPages_H = totalGroups_H > 0 ? (1 + ((totalGroups_H - 1) >> 3)) : 1;
-                                            const startIdx_H = (historyPage - 1) * PAGE_SIZE_H;
-                                            const pagedGroups = groups.slice(startIdx_H, startIdx_H + PAGE_SIZE_H);
-                                            return pagedGroups.map((group, gIdx) => (
+                                            return groups.map((group, gIdx) => (
                                                 <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-primary/20 bg-primary/[0.04]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden transition-all hover:border-[var(--sys-border-hover)] p-4`}>
                                                     
                                                     {/* Top Row: Prompt + metadata */}
                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
                                                         {/* Prompt Text Block */}
                                                         <div className="flex-1 min-w-0 pr-4">
-                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed mb-1" title={group.prompt}>{group.prompt}</p>
-                                                             {group.items[0]?.model && (
-                                                                 <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-bg)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium">
-                                                                     <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
-                                                                     {group.items[0].model}
-                                                                 </span>
-                                                             )}
+                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed" title={group.prompt}>{group.prompt}</p>
                                                         </div>
 
                                                         {/* Actions & Metadata Block */}
@@ -3624,17 +3625,19 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         </div>
                                                     </div>
 
-                                                    {/* Bottom Row: Image Array — left-aligned, left-to-right */}
-                                                    <div className="flex flex-wrap gap-3 items-start justify-start">
+                                                    {/* Bottom Row: Image Array Gallery */}
+                                                    <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
                                                         {group.items.map((item, iIdx) => (
-                                                            <div key={item._id || iIdx} className="relative rounded-xl overflow-hidden flex-shrink-0" style={{ width: group.items.length === 1 ? '100%' : '180px' }}>
-                                                                <div className="group/img relative rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                            <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
+                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
-                                                                        className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
+                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
+                                                                    
+                                                                    {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
                                                                     
                                                                     {/* Hover Ribbon Actions inside Image */}
-                                                                    <div className="absolute inset-0 bg-black/50 transition-all opacity-0 group-hover/img:opacity-100 flex items-end justify-center pb-3 pointer-events-none group-hover/img:pointer-events-auto">
-                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden">
+                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex items-center justify-center p-1 sm:p-2 pointer-events-none group-hover/img:pointer-events-auto">
+                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform max-w-full">
                                                                             <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 View
                                                                             </button>
@@ -3651,8 +3654,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         ))}
                                                     </div>
 
-
-                                                            {/* ── MCoT Thinking Mode Toggle (Session) ── */}
+                                                            {/* ΓöÇΓöÇ MCoT Thinking Mode Toggle (Session) ΓöÇΓöÇ */}
                                                             {group.items[0]?.aiMeta?.mcotReasoning && (
                                                                 <button
                                                                     onClick={() => setExpandedReasoning(expandedReasoning === (group.items[0]._id || `g${gIdx}`) ? null : (group.items[0]._id || `g${gIdx}`))}
@@ -3664,7 +3666,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 </button>
                                                             )}
 
-                                                            {/* ── MCoT Reasoning Chain (Session) ── */}
+                                                            {/* ΓöÇΓöÇ MCoT Reasoning Chain (Session) ΓöÇΓöÇ */}
                                                             {expandedReasoning === (group.items[0]._id || `g${gIdx}`) && group.items[0]?.aiMeta?.mcotReasoning && (() => {
                                                                 const r = group.items[0].aiMeta.mcotReasoning;
                                                                 return (
@@ -3684,7 +3686,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                     </div>
                                                                                     <div className="flex-1 min-w-0">
                                                                                         <p className="text-[9px] font-bold text-[var(--sys-text)] uppercase tracking-wider mb-0.5">Brand Intel</p>
-                                                                                        <p className="text-[10px] text-[var(--sys-text)]"><span className="text-[var(--sys-text)] font-semibold">{r.brandInsight.name}</span>{r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.industry}</span>}</p>
+                                                                                        <p className="text-[10px] text-[var(--sys-text)]"><span className="text-[var(--sys-text)] font-semibold">{r.brandInsight.name}</span>{r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.brandInsight.industry}</span>}</p>
                                                                                     </div>
                                                                                 </div>
                                                                             )}
@@ -3706,7 +3708,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                     </div>
                                                                                     <div className="flex-1 min-w-0">
                                                                                         <p className="text-[9px] font-bold text-[var(--sys-bg)] uppercase tracking-wider mb-0.5">Art Direction</p>
-                                                                                        <p className="text-[10px] text-[var(--sys-text)]">{r.artDirection.mood && <span>Mood: {r.artDirection.mood} · </span>}{r.artDirection.visualStyle && <span>Style: {r.artDirection.visualStyle}</span>}</p>
+                                                                                        <p className="text-[10px] text-[var(--sys-text)]">{r.artDirection.mood && <span>Mood: {r.artDirection.mood} ┬╖ </span>}{r.artDirection.visualStyle && <span>Style: {r.artDirection.visualStyle}</span>}</p>
                                                                                     </div>
                                                                                 </div>
                                                                             )}
@@ -3738,16 +3740,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ── Generation History (from Image Bank) ── */}
+                        {/* ΓöÇΓöÇ Generation History (from Image Bank) ΓöÇΓöÇ */}
                         {(() => {
-                            const allGenerated = bankImages.filter(img => {
-                                if (img.source === 'uploaded' || img.type === 'uploaded') return false;
-                                if (img.studioOrigin && img.studioOrigin !== 'creative') return false;
-                                if (img.jobType && img.jobType !== 'GenerationJob') return false;
-                                const tags = (img.tags || []).join(' ').toLowerCase();
-                                if (tags.includes('campaign-logo') || tags.includes('photoshoot') || tags.includes('carousel')) return false;
-                                return img.source === 'ai-generated' || img.category === 'generated' || !!img.imageUrl;
-                            });
+                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded');
                             const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
                                 const tags = (img.tags || []).map(t => t.toLowerCase());
                                 const title = (img.title || '').toLowerCase();
@@ -3766,7 +3761,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             }
                             if (filtered.length === 0) return null;
 
-                            {/* ── Grid View ── */}
+                            {/* ΓöÇΓöÇ Grid View ΓöÇΓöÇ */}
                             if (viewMode === 'grid') {
                                 return (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -3811,21 +3806,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 );
                             }
 
-                            {/* ── List View (default) ── */}
+                            {/* ΓöÇΓöÇ List View (default) ΓöÇΓöÇ */}
                             return (
                                 <div className="space-y-4">
                                     {filtered.map(img => (
                                     <div key={img._id} className="generation-card">
-                                        {/* Prompt + Model */}
-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
+                                        {/* Prompt */}
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
                                             {img.prompt || img.title || 'AI Generated'}
                                         </p>
-                                        {img.model && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
-                                                {img.model}
-                                            </span>
-                                        )}
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
@@ -3907,7 +3896,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                         </div>
 
-                                        {/* ── MCoT Thinking Mode Toggle ── */}
+                                        {/* ΓöÇΓöÇ MCoT Thinking Mode Toggle ΓöÇΓöÇ */}
                                         {img.aiMeta?.mcotReasoning && (
                                             <button
                                                 onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
@@ -3919,7 +3908,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                         )}
 
-                                        {/* ── MCoT Reasoning Chain Panel ── */}
+                                        {/* ΓöÇΓöÇ MCoT Reasoning Chain Panel ΓöÇΓöÇ */}
                                         {expandedReasoning === img._id && img.aiMeta?.mcotReasoning && (() => {
                                             const r = img.aiMeta.mcotReasoning
                                             return (
@@ -3944,8 +3933,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <p className="text-[9px] font-bold text-[var(--sys-text)] uppercase tracking-wider mb-0.5">Brand Intel</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
                                                                         <span className="text-[var(--sys-text)] font-semibold">{r.brandInsight.name}</span>
-                                                                        {r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.industry}</span>}
-                                                                        {r.brandInsight.brandType && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.brandType}</span>}
+                                                                        {r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.brandInsight.industry}</span>}
+                                                                        {r.brandInsight.brandType && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.brandInsight.brandType}</span>}
                                                                     </p>
                                                                     {r.brandInsight.targetAudience && (
                                                                         <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> {r.brandInsight.targetAudience}</p>
@@ -3971,7 +3960,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-0.5">Matched Product</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)]">
                                                                         <span className="text-[var(--sys-text)] font-semibold">{r.matchedProduct.title}</span>
-                                                                        {r.matchedProduct.category && <span className="text-[var(--sys-text-muted)]"> · {r.matchedProduct.category}</span>}
+                                                                        {r.matchedProduct.category && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.matchedProduct.category}</span>}
                                                                     </p>
                                                                 </div>
                                                             </div>
@@ -4024,7 +4013,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <div className="flex-1 min-w-0">
                                                                     <p className="text-[9px] font-bold text-[var(--sys-bg)] uppercase tracking-wider mb-0.5">Art Direction</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
-                                                                        {r.artDirection.mood && <span><span className="text-[var(--sys-text)] font-semibold">Mood:</span> {r.artDirection.mood} · </span>}
+                                                                        {r.artDirection.mood && <span><span className="text-[var(--sys-text)] font-semibold">Mood:</span> {r.artDirection.mood} ┬╖ </span>}
                                                                         {r.artDirection.visualStyle && <span><span className="text-[var(--sys-text)] font-semibold">Style:</span> {r.artDirection.visualStyle}</span>}
                                                                     </p>
                                                                     {r.artDirection.lighting && (
@@ -4060,7 +4049,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         )}
 
-                                                        {/* Post-Gen Critique Score (if available — populated async) */}
+                                                        {/* Post-Gen Critique Score (if available ΓÇö populated async) */}
                                                         {img.aiMeta?.mcotScore && (
                                                             <div className="flex gap-2">
                                                                 <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -4077,7 +4066,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{String(img.aiMeta.mcotScore) + "/100"}</span>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{img.aiMeta.mcotScore}/100</span>
                                                                     </div>
                                                                     {img.aiMeta.mcotCritique?.verdict && (
                                                                         <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
@@ -4099,7 +4088,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             );
                         })()}
 
-                        {/* ── Empty State ── */}
+                        {/* ΓöÇΓöÇ Empty State ΓöÇΓöÇ */}
                         {!result && activeGenerations.length === 0 && bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type === 'creative').length === 0 && (
                             <div className="flex flex-col items-center justify-center py-16 px-4">
                                 <div className="w-16 h-16 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4">
@@ -4110,184 +4099,186 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                    </div>{/* ═══════════ END RIGHT GALLERY PANEL ═══════════ */}
+                    </div>{/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ END RIGHT GALLERY PANEL ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
 
-                    {/* ═══════════ SIDEBAR COMMAND PANEL ═══════════ */}
-                    <div data-wt="creative-prompt" key="create-sidebar" className="creative-tools-panel !border-none !bg-[var(--sys-bg)]">
-                        {/* ── Panel Tab Switcher ── */}
-                        <div className="flex border-b border-[var(--sys-border)] flex-shrink-0">
-                            <button onClick={() => setSidebarPanel('create')}
-                                className={"flex-1 py-2.5 text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all " + (sidebarPanel === 'create' ? "text-[#FF4D00] border-b-2 border-[#FF4D00] bg-[#FF4D00]/5" : "text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]")}>
-                                <span className="material-symbols-outlined align-middle mr-1" style={{fontSize:"13px"}}>auto_awesome</span>
-                                Create
-                            </button>
-
-                        </div>
-
-                        <div className="overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body p-0">
-
-                            {/* ── Section: Model ── */}
-                            <div className="px-4 pt-4 pb-3">
-                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
-                                <div className="relative">
-                                    <button onClick={() => setShowModelMenu(!showModelMenu)}
-                                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-primary)]/40 transition-all cursor-pointer group">
-                                        <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '16px' }}>auto_awesome</span>
-                                            <span className="text-[12px] font-semibold text-[var(--sys-text)]">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
-                                        </div>
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]" style={{ fontSize: '16px' }}>settings</span>
-                                    </button>
-                                    {showModelMenu && (
-                                        <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-surface)] rounded-xl shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
-                                            <div className="p-1.5 space-y-0.5 max-h-[220px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
-                                                    <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
-                                                        className={"w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-primary)]/10 text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]')}>
-                                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '14px' }}>auto_awesome</span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-[11px] font-semibold truncate">{m.name}</span>
-                                                                {m.isNew && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--sys-primary)', color: 'white' }}>NEW</span>}
+                    {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ SIDEBAR COMMAND PANEL WITH SETTINGS ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+                    <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+                            {/* ΓöÇΓöÇ NEW FREEPIK SIDEBAR BODY ΓöÇΓöÇ */}
+                            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                                
+                                {/* ΓöÇΓöÇ Model Selector ΓöÇΓöÇ */}
+                                <div className="px-5 mt-3 pb-4">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                    <div className="relative">
+                                        <button onClick={() => setShowModelMenu(!showModelMenu)} className="w-full flex items-center justify-between px-3 py-3 rounded-[14px] bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="material-symbols-outlined" style={{ color: IMAGE_MODELS.find(m => m.id === imageModel)?.color || 'var(--sys-text)', fontSize: '18px' }}>
+                                                    {IMAGE_MODELS.find(m => m.id === imageModel)?.icon || 'auto_awesome'}
+                                                </span>
+                                                <span className="text-[13px] font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-text)] transition-colors">{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'Select Model'}</span>
+                                            </div>
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]" style={{ fontSize: '18px' }}>settings</span>
+                                        </button>
+                                        {showModelMenu && (
+                                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
+                                                <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
+                                                    {IMAGE_MODELS.map(m => (
+                                                        <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
+                                                            className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
+                                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: '15px', color: m.color }}>{m.icon}</span>
                                                             </div>
-                                                            <span className="text-[9px] opacity-50 truncate block">{m.provider}</span>
-                                                        </div>
-                                                        {imageModel === m.id && <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: '14px' }}>check</span>}
-                                                    </button>
-                                                ))}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                    {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
+                                                                </div>
+                                                                <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
+                                                            </div>
+                                                            {imageModel === m.id && (
+                                                                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: m.color + '25' }}>
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: '11px', color: m.color }}>check</span>
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ΓöÇΓöÇ References Dash Grid ΓöÇΓöÇ */}
+                                <div className="px-5 pb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
+                                        <span className="text-[10px] text-[var(--sys-text-muted)] font-mono">{ (referenceImages.style ? 1 : 0) + characters.length }/14</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 relative z-0">
+                                        {/* Style Block */}
+                                        {referenceImages.style ? (
+                                            <div className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
+                                                <img loading="lazy" decoding="async" src={referenceImages.style} className="w-full h-full rounded-2xl object-cover border border-[var(--sys-border)]" />
+                                                <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
+                                                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur shadow-sm">Style</span>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">star</span>
+                                                <span className="text-[10px] font-medium leading-none">Style</span>
+                                            </button>
+                                        )}
+                                        {/* Character Blocks */}
+                                        {characters.map((char, idx) => (
+                                            <div key={idx} className="relative flex-shrink-0 group w-[4.5rem] h-[4.5rem]">
+                                                <img loading="lazy" decoding="async" src={char.image} alt={char.name} className="w-full h-full rounded-2xl object-cover border border-primary/50" />
+                                                <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--sys-bg)] text-[var(--sys-text)] border border-[var(--sys-border)] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[12px]">close</span></button>
+                                            </div>
+                                        ))}
+                                        {/* Default Add Blocks */}
+                                        {characters.length < 13 && (
+                                            <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">person</span>
+                                                <span className="text-[10px] font-medium leading-none">Character</span>
+                                            </button>
+                                        )}
+                                        {characters.length < 12 && !referenceImages.style && (
+                                            <button onClick={() => { setRefPickerSlot('character-add'); setRefPickerTab('upload') }} className="w-[4.5rem] h-[4.5rem] rounded-2xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-text)] hover:shadow-sm flex flex-col items-center justify-center transition-all group flex-shrink-0 cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                                <span className="material-symbols-outlined text-[20px] mb-1">add</span>
+                                                <span className="text-[10px] font-medium leading-none">Add</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ΓöÇΓöÇ Unified Prompt Textarea (Full Height Expansion) ΓöÇΓöÇ */}
+                                <div className="px-5 pb-3 flex flex-col flex-grow">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
+                                    <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow">
+                                        <textarea
+                                            value={prompt}
+                                            maxLength={5000}
+                                            onChange={e => {
+                                                const val = e.target.value.slice(0, 5000); setPrompt(val);
+                                                const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\w*)$/);
+                                                if (atMatch && (characters.length > 0 || referenceImages.upload || referenceImages.style)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                                                if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
+                                            }}
+                                            placeholder={activeBrand ? "Describe your imageΓÇötry @ to add references" : "Select a brand first..."}
+                                            disabled={!activeBrand || activeGenerations.length >= 3}
+                                            className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[140px]"
+                                            ref={promptTextareaRef}
+                                        />
+                                        {prompt.length > 4000 && (
+                                            <div style={{ textAlign: 'right', fontSize: '10px', padding: '0 12px 4px', color: prompt.length > 4800 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>
+                                                {prompt.length}/5000
+                                            </div>
+                                        )}
+                                        
+                                        {/* Char Tag Auto-fill Box */}
+                                        {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
+                                            <div className="absolute left-2 top-2/3 mb-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-2 z-[60] min-w-[200px] animate-fade-in">
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]/50 mb-1.5 px-2">Tag a reference</p>
+                                                {(() => {
+                                                    const tagOptions = [...characters];
+                                                    if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
+                                                    if (referenceImages.style) tagOptions.push({ name: 'Style', image: referenceImages.style });
+                                                    return tagOptions.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
+                                                        <button key={idx} onClick={() => {
+                                                            const textarea = promptTextareaRef.current; if (!textarea) return;
+                                                            const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
+                                                            const cleaned = before.replace(/@\w*$/, ''); const tagName = char.name.replace(/\s/g, '');
+                                                            setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
+                                                        }} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-black/5 transition-all text-left cursor-pointer">
+                                                            <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--sys-border)] shrink-0 bg-[var(--sys-surface)]">
+                                                                <img loading="lazy" decoding="async" src={char.image} alt="" className="w-full h-full object-cover" />
+                                                            </div>
+                                                            <div><p className="text-xs font-bold text-[var(--sys-text)]">@{char.name.replace(/\s/g, '')}</p></div>
+                                                        </button>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        )}
+
+                                        {/* Original Enhance Prompt Button & Voice */}
+                                        <div className="px-4 py-3 flex items-center justify-between border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/30">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                {/* Text Overlay Toggle for Generation */}
+                                                <button onClick={(e) => { e.stopPropagation(); setGenerateCopy(!generateCopy) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (generateCopy ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title="Add Text Overlay">
+                                                    <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[18px]' : 'left-[2px]')} />
+                                                </button>
+                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>Add Text to Image (Copy)</span>
+
+                                                {/* Brand Logo Toggle ΓÇö overlay logo at chosen position + size on the generated image.
+                                                    Backend (utils/logoOverlay.js) does the compositing server-side. */}
+                                                <span className="w-px h-4 bg-[var(--sys-border)]" aria-hidden="true" />
+                                                <button onClick={(e) => { e.stopPropagation(); setAddLogo(!addLogo) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (addLogo ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title={activeBrand?.dna?.logo?.url ? "Overlay your brand logo" : "Add a logo to your Brand DNA first"}>
+                                                    <div className={"absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform " + (addLogo ? 'left-[18px]' : 'left-[2px]')} />
+                                                </button>
+                                                <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none flex items-center gap-1" onClick={() => setAddLogo(!addLogo)}>
+                                                    <span className="material-symbols-outlined text-[13px]">verified</span>
+                                                    Add Brand Logo
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <button onClick={handleEnhancePrompt} disabled={!prompt.trim() || enhancing || !activeBrand} className={"flex items-center gap-1 bg-[var(--sys-primary)]/10 text-[var(--sys-primary)] hover:bg-[var(--sys-primary)] hover:text-white transition-all py-1.5 px-3 rounded-full text-[11px] font-bold cursor-pointer " + (!prompt.trim() ? "opacity-50 grayscale cursor-not-allowed" : "shadow-sm")} title="Enhance prompt with Brand DNA" >
+                                                    <span className={"material-symbols-outlined text-[14px] " + (enhancing ? "animate-spin" : "")}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
+                                                    {enhancing ? 'Enhancing...' : 'Enhance'}
+                                                </button>
+                                                <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="mx-4 h-px bg-[var(--sys-border)]" />
-
-                            <div className="px-4 pt-3 pb-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
-                                    <span className="text-[9px] text-[var(--sys-text-muted)] tabular-nums">{String((referenceImages.style ? 1 : 0) + characters.length) + "/14"}</span>
-                                </div>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {/* Style slot */}
-                                    {referenceImages.style ? (
-                                        <div className="relative group">
-                                            <img loading="lazy" decoding="async" src={referenceImages.style} className="w-full aspect-square rounded-xl object-cover border border-[var(--sys-border)]" />
-                                            <button onClick={() => setReferenceImages(prev => ({ ...prev, style: null }))} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-bg)] border border-[var(--sys-border)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>close</span>
-                                            </button>
-                                            <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[7px] font-bold px-1 py-px rounded bg-black/70 text-white whitespace-nowrap">Style</span>
-                                        </div>
-                                    ) : (
-                                        <button onClick={() => { setRefPickerSlot('style'); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>star</span>
-                                            <span className="text-[9px] font-medium">Style</span>
-                                        </button>
-                                    )}
-                                    {/* Character slots */}
-                                    {characters.length === 0 && (
-                                        <button onClick={() => { setRefPickerSlot('character-0'); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person</span>
-                                            <span className="text-[9px] font-medium">Character</span>
-                                        </button>
-                                    )}
-                                    {characters.map((char, idx) => (
-                                        <div key={idx} className="relative group">
-                                            <img loading="lazy" decoding="async" src={char.image} alt={char.name} className="w-full aspect-square rounded-xl object-cover border border-[var(--sys-primary)]/40" />
-                                            <button onClick={() => setCharacters(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-bg)] border border-[var(--sys-border)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>close</span>
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {/* Add slot */}
-                                    {characters.length < 13 && (
-                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
-                                            <span className="text-[9px] font-medium">Add</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="mx-4 h-px bg-[var(--sys-border)]" />
-
-                            {/* ── Section: Prompt ── */}
-                            <div className="px-4 pt-3 pb-3 flex flex-col flex-grow">
-                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
-                                <div className="flex flex-col relative bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl overflow-hidden focus-within:border-[var(--sys-primary)]/50 transition-all flex-grow">
-                                    <textarea
-                                        value={prompt}
-                                        maxLength={5000}
-                                        onChange={e => {
-                                            const val = e.target.value.slice(0, 5000); setPrompt(val);
-                                            const cursor = e.target.selectionStart; const textBefore = val.substring(0, cursor); const atMatch = textBefore.match(/@(\w*)$/);
-                                            if (atMatch && (characters.length > 0 || referenceImages.upload || referenceImages.style)) { setShowCharTags(true); setCharTagFilter(atMatch[1].toLowerCase()); } else { setShowCharTags(false); }
-                                        }}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
-                                            if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
-                                        }}
-                                        placeholder={activeBrand ? "Describe your image—try @ to add references" : "Select a brand first..."}
-                                        disabled={!activeBrand || activeGenerations.length >= 3}
-                                        className="w-full bg-transparent p-3.5 text-[13px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[120px]"
-                                        ref={promptTextareaRef}
-                                    />
-                                    {prompt.length > 4000 && (
-                                        <div className="text-right text-[9px] px-3 pb-1 text-[var(--sys-text-muted)]">{String(prompt.length) + "/5000"}</div>
-                                    )}
-                                    {/* @ Tag autocomplete */}
-                                    {showCharTags && (characters.length > 0 || referenceImages.upload || referenceImages.style) && (
-                                        <div className="absolute left-2 top-2/3 mb-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl shadow-xl p-2 z-[60] min-w-[180px] animate-fade-in">
-                                            <p className="text-[9px] text-[var(--sys-text-muted)] mb-1.5 px-2">Tag a reference</p>
-                                            {(() => {
-                                                const tagOptions = [...characters];
-                                                if (referenceImages.upload) tagOptions.push({ name: 'Reference', image: referenceImages.upload });
-                                                if (referenceImages.style) tagOptions.push({ name: 'Style', image: referenceImages.style });
-                                                return tagOptions.filter(c => !charTagFilter || c.name.toLowerCase().includes(charTagFilter)).map((char, idx) => (
-                                                    <button key={idx} onClick={() => {
-                                                        const textarea = promptTextareaRef.current; if (!textarea) return;
-                                                        const cursor = textarea.selectionStart; const before = prompt.substring(0, cursor); const after = prompt.substring(cursor);
-                                                        const cleaned = before.replace(/@\w*$/, ''); const tagName = char.name.replace(/\s/g, '');
-                                                        setPrompt(cleaned + '@' + tagName + ' ' + after); setShowCharTags(false); setTimeout(() => textarea.focus(), 50);
-                                                    }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--sys-bg)] transition-all text-left cursor-pointer">
-                                                        <div className="w-5 h-5 rounded-full overflow-hidden border border-[var(--sys-border)] shrink-0">
-                                                            <img loading="lazy" decoding="async" src={char.image} alt="" className="w-full h-full object-cover" />
-                                                        </div>
-                                                        <p className="text-[11px] font-semibold text-[var(--sys-text)]">@{char.name.replace(/\s/g, '')}</p>
-                                                    </button>
-                                                ));
-                                            })()}
-                                        </div>
-                                    )}
-                                    {/* Toolbar */}
-                                    <div className="px-3 py-2 flex items-center justify-between border-t border-[var(--sys-border)]">
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => setGenerateCopy(!generateCopy)} className={"w-7 h-4 rounded-full relative transition-colors flex-shrink-0 " + (generateCopy ? 'bg-[var(--sys-primary)]' : 'bg-[var(--sys-border)]')}>
-                                                <div className={"absolute top-[2px] w-3 h-3 rounded-full bg-white shadow-sm transition-transform " + (generateCopy ? 'left-[14px]' : 'left-[2px]')} />
-                                            </button>
-                                            <span className="text-[10px] text-[var(--sys-text-muted)] cursor-pointer" onClick={() => setGenerateCopy(!generateCopy)}>Text</span>
-                                            <span className="w-px h-3 bg-[var(--sys-border)]" />
-                                            <button onClick={() => setAddLogo(!addLogo)} className={"w-7 h-4 rounded-full relative transition-colors flex-shrink-0 " + (addLogo ? 'bg-[var(--sys-primary)]' : 'bg-[var(--sys-border)]')}>
-                                                <div className={"absolute top-[2px] w-3 h-3 rounded-full bg-white shadow-sm transition-transform " + (addLogo ? 'left-[14px]' : 'left-[2px]')} />
-                                            </button>
-                                            <span className="text-[10px] text-[var(--sys-text-muted)] cursor-pointer" onClick={() => setAddLogo(!addLogo)}>Logo</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <button onClick={handleEnhancePrompt} disabled={!prompt.trim() || enhancing || !activeBrand}
-                                                className={"flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer " + (prompt.trim() && !enhancing ? "bg-[var(--sys-primary)]/10 text-[var(--sys-primary)] hover:bg-[var(--sys-primary)] hover:text-white" : "opacity-30 text-[var(--sys-text-muted)] cursor-not-allowed")}>
-                                                <span className={"material-symbols-outlined " + (enhancing ? "animate-spin" : "")} style={{ fontSize: '12px' }}>{enhancing ? 'progress_activity' : 'auto_awesome'}</span>
-                                                {enhancing ? '...' : 'Enhance'}
-                                            </button>
-                                            <VoiceInput onResult={(text) => setPrompt(prev => prev ? prev + ' ' + text : text)} size="small" />
-                                        </div>
-                                    </div>
+                                        {/* Dynamic Text Overlay Controls */}
                                         {generateCopy && (
                                             <div className="px-4 py-3 border-t border-[var(--sys-border)] bg-[var(--sys-bg)] space-y-2">
                                                 <div className="flex items-center justify-between">
                                                     {copyLoading ? (
                                                         <span className="flex items-center gap-1.5 text-[10px] text-[var(--sys-primary)] animate-pulse">Agent is writing your copy...</span>
                                                     ) : copyIsAiSuggested ? (
-                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested — edit freely</span>
+                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested ΓÇö edit freely</span>
                                                     ) : (
                                                         <span className="text-[10px] text-[var(--sys-text-muted)]">Customize overlay text (or let AI write it)</span>
                                                     )}
@@ -4302,18 +4293,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </div>
                                         )}
 
-                                        {/* Brand Logo Controls — compact 3×3 visual position grid + tiny size pills.
+                                        {/* Brand Logo Controls ΓÇö compact 3├ù3 visual position grid + tiny size pills.
                                             Layout designed to fit in ~110px of vertical space (was ~280px). */}
                                         {addLogo && (
                                             <div className="px-4 py-2.5 border-t border-[var(--sys-border)] bg-[var(--sys-bg)]">
                                                 {!activeBrand?.dna?.logo?.url ? (
                                                     <div className="flex items-center gap-2 text-[11px] text-[var(--sys-text-muted)]">
                                                         <span className="material-symbols-outlined text-[14px] text-amber-500">warning</span>
-                                                        Add a logo in Brand DNA → Visual Identity to enable.
+                                                        Add a logo in Brand DNA ΓåÆ Visual Identity to enable.
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-start gap-3">
-                                                        {/* 3×3 visual position grid — each cell maps to a real anchor.
+                                                        {/* 3├ù3 visual position grid ΓÇö each cell maps to a real anchor.
                                                             Explicit gridTemplateColumns/Rows + per-cell width/height because Tailwind
                                                             grid-cols-3 alone collapses to 1 col when cells have no content. */}
                                                         <div>
@@ -4371,7 +4362,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         </div>
 
-                                                        {/* Right column — Size pills + tiny status line */}
+                                                        {/* Right column ΓÇö Size pills + tiny status line */}
                                                         <div className="flex-1 min-w-0">
                                                             <span className="text-[8px] text-[var(--sys-text-muted)] uppercase tracking-[0.15em] font-bold block mb-1">Size</span>
                                                             <div className="inline-flex rounded-md border border-[var(--sys-border)] bg-[var(--sys-surface)] p-[2px] gap-[2px]">
@@ -4399,7 +4390,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 })}
                                                             </div>
                                                             <p className="mt-1.5 text-[9px] text-[var(--sys-text-muted)] truncate">
-                                                                {logoPosition?.replace('-', ' ')} · {logoSize}
+                                                                {logoPosition?.replace('-', ' ')} ┬╖ {logoSize}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -4408,71 +4399,72 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         )}
                                     </div>
                                 </div>
+                            </div>
 
-
-                        </div>{/* /creative-tools-panel-body */}
-
-                        {/* ── Footer: Format + Quality + Generate ── */}
-                        <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-4 pt-3 pb-4 space-y-2.5 z-10 border-t border-[var(--sys-border)]">
-                                {/* Format + Quality row */}
-                                <div className="flex items-center gap-2">
-                                    {/* Format picker */}
-                                    <div className="relative group/fmt flex-1">
-                                        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-semibold text-[var(--sys-text)] hover:border-[var(--sys-text-muted)] transition-all cursor-pointer">
-                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '16px' }}>{selectedType === 'instagram-post' ? 'crop_square' : (selectedType ? creativeTypes.find(c => c.id === selectedType)?.icon : 'crop_square')}</span>
-                                            <span className="flex-1 text-left truncate">{selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : 'Instagram Post'}</span>
+                            {/* ΓöÇΓöÇ Soft Modifiers & Generate Plinth ΓöÇΓöÇ */}
+                            <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)]">
+                                {/* Modifier Pills */}
+                                <div className="flex items-center flex-wrap gap-2">
+                                    <div className="relative group/tray">
+                                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[15px]">crop_landscape</span>
+                                            {selectedType ? creativeTypes.find(c => c.id === selectedType)?.label?.split('(')[0].trim() : '16:9'}
                                         </button>
-                                        <div className="absolute bottom-full left-0 mb-1 pb-1 hidden group-hover/fmt:block w-[160px] z-50 animate-fade-in">
-                                            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-xl rounded-xl p-1">
-                                                {creativeTypes.map(c => (
-                                                    <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors cursor-pointer " + (selectedType === c.id ? "bg-[var(--sys-primary)]/10 text-[var(--sys-primary)]" : "text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]")}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{c.icon}</span>
-                                                        <div className="flex flex-col text-left">
-                                                            <span className="text-[11px] font-semibold">{c.label.split('(')[0]}</span>
-                                                            <span className="text-[9px] opacity-60">{c.aspectRatio}</span>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                                {selectedType === 'custom-size' && (
-                                                    <div className="pt-2 pb-1 px-2 border-t border-[var(--sys-border)] mt-1 flex items-center gap-1">
-                                                        <input type="number" placeholder="W" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-[45%] text-[10px] p-1 bg-[var(--sys-bg)] rounded border border-[var(--sys-border)] text-center text-[var(--sys-text)] font-mono outline-none" />
-                                                        <span className="text-[10px] text-[var(--sys-text-muted)]">×</span>
-                                                        <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-[var(--sys-bg)] rounded border border-[var(--sys-border)] text-center text-[var(--sys-text)] font-mono outline-none" />
+                                        <div className="absolute bottom-full left-0 mb-0 pb-2 hidden group-hover/tray:block w-[180px] z-50 animate-fade-in text-left">
+                                            <div className="bg-[var(--sys-bg)] border border-[var(--sys-border)] shadow-xl rounded-[14px] p-1.5">
+                                            {creativeTypes.map(c => (
+                                                <button key={c.id} onClick={() => setSelectedType(c.id)} className={"w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors " + (selectedType === c.id ? "bg-[var(--sys-text)] text-[var(--sys-bg)]" : "text-[var(--sys-text)] hover:bg-[var(--sys-surface)]")}>
+                                                    <span className="material-symbols-outlined text-[16px]">{c.icon}</span>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="text-[11px] font-bold">{c.label.split('(')[0]}</span>
+                                                        <span className="text-[9px] opacity-70">{c.aspectRatio}</span>
                                                     </div>
-                                                )}
+                                                </button>
+                                            ))}
+                                            {selectedType === 'custom-size' && (
+                                                <div className="pt-2 pb-1 px-2 border-t border-[var(--sys-border)] mt-1 flex items-center gap-1">
+                                                    <input type="number" placeholder="W" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+                                                    <span className="text-[10px] text-gray-500">├ù</span>
+                                                    <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+                                                </div>
+                                            )}
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Quality toggle */}
-                                    <button onClick={() => setAgenticQuality(prev => prev === 'fast' ? 'quality' : 'fast')}
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-semibold text-[var(--sys-text)] hover:border-[var(--sys-text-muted)] transition-all cursor-pointer flex-shrink-0">
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '14px' }}>{agenticQuality === 'fast' ? 'bolt' : 'hd'}</span>
-                                        {agenticQuality === 'fast' ? '1K' : '2K'}
+                                    <div className="relative group/tray">
+                                        <button onClick={() => setAgenticQuality(prev => prev === 'fast' ? 'quality' : 'fast')} className="flex items-center justify-center px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] cursor-pointer">
+                                            <span className="material-symbols-outlined text-[15px] mr-1">{agenticQuality==='fast' ? 'bolt' : 'target'}</span> {agenticQuality==='fast' ? '1K' : '2K'}
+                                        </button>
+                                    </div>
+                                    <button onClick={() => setStyle(style ? null : 'modern')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[12px] font-bold text-[var(--sys-text)] transition-all hover:border-[var(--sys-text)] ml-auto">
                                     </button>
                                 </div>
-                                {/* Generate button */}
+                                {/* Big Soft Generate */}
                                 <CreditTooltipWrapper action="creative">
                                     <button data-wt="creative-generate" onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
-                                        className={"w-full py-3 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2 " + (prompt.trim() && activeBrand ? "bg-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/90 text-white shadow-md shadow-[var(--sys-primary)]/20" : "bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-not-allowed")}>
+                                        className={"studio-btn-primary w-full !py-3.5 !rounded-2xl transition-all flex items-center justify-center gap-2 " + (prompt.trim() ? "bg-[var(--sys-text)] hover:bg-black dark:hover:bg-white text-[var(--sys-bg)]" : "bg-[var(--sys-border)] text-[var(--sys-text-muted)] outline-none")}>
                                         {activeGenerations.length > 0 ? (
-                                            <><span className="material-symbols-outlined animate-spin" style={{ fontSize: '18px' }}>progress_activity</span><span>Generating {String(activeGenerations.length) + "/3"}...</span></>
+                                            <><span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> <span className="text-[14px] font-bold">Generating {activeGenerations.length}/3...</span></>
                                         ) : (
-                                            <><span>Generate</span><span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span></>
+                                            <><span className="text-[14px] font-bold">Generate</span> <span className="material-symbols-outlined text-[18px]">auto_awesome</span></>
                                         )}
                                     </button>
                                 </CreditTooltipWrapper>
-                        </div>{/* /creative-tools-panel-footer */}
+                            </div>
 
-                    </div>{/* /creative-tools-panel */}
-                    </div>{/* /creative-split */}
-                </>
+
+                        </div>
+                    </div>
+            </>
             )}
+
+
 
 
             {/* =================== AI PHOTOSHOOT MODE =================== */}
             {studioMode === 'photoshoot' && (
                 <div className="creative-split fade-up">
-                                                {/* ── NEW FREEPIK SIDEBAR BODY (PHOTOSHOOT) ── */}
+                                                {/* ΓöÇΓöÇ NEW FREEPIK SIDEBAR BODY (PHOTOSHOOT) ΓöÇΓöÇ */}
                             <div data-wt="ps-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                                 <div className="flex items-center justify-between px-5 pt-5 pb-3">
                                     <div className="flex items-center gap-2">
@@ -4488,7 +4480,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                                 <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
                                 
-                                {/* ── Model Selector ── */}
+                                {/* ΓöÇΓöÇ Model Selector ΓöÇΓöÇ */}
                                 <div className="px-5 mt-3 pb-4">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
                                     <div className="relative">
@@ -4526,7 +4518,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Product Image ── */}
+                                {/* ΓöÇΓöÇ Product Image ΓöÇΓöÇ */}
                                 <div className="px-5 pb-4">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product / Subject</p>
                                     <div className="p-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl relative">
@@ -4546,7 +4538,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Unified Prompt Textarea (Photoshoot Brief) ── */}
+                                {/* ΓöÇΓöÇ Unified Prompt Textarea (Photoshoot Brief) ΓöÇΓöÇ */}
                                 <div className="px-5 pb-5">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><span className="material-symbols-outlined text-[13px]">edit_note</span> Scene Description</p>
                                     <div className="flex flex-col relative bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl overflow-hidden focus-within:border-[var(--sys-text)] focus-within:shadow-sm transition-all group">
@@ -4566,7 +4558,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Lighting & Camera ── */}
+                                {/* ΓöÇΓöÇ Lighting & Camera ΓöÇΓöÇ */}
                                 <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
                                     <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">highlight</span> Lighting & Shot</p>
                                     <div className="space-y-3">
@@ -4587,7 +4579,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Surface & Environment ── */}
+                                {/* ΓöÇΓöÇ Surface & Environment ΓöÇΓöÇ */}
                                 <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
                                     <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">landscape</span> Surface & Set</p>
                                     <div className="space-y-3">
@@ -4604,7 +4596,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Style & References ── */}
+                                {/* ΓöÇΓöÇ Style & References ΓöÇΓöÇ */}
                                 <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
                                     <div className="flex items-center justify-between mb-2.5">
                                         <p className="text-[10px] font-bold text-[var(--sys-text)] uppercase tracking-widest flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">palette</span> Mood & Style</p>
@@ -4645,7 +4637,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 
                                 </div>
 
-                            {/* ── Soft Modifiers & Generate Plinth ── */}
+                            {/* ΓöÇΓöÇ Soft Modifiers & Generate Plinth ΓöÇΓöÇ */}
                             <div className="creative-tools-panel-footer border-t border-[var(--sys-border)] bg-[var(--sys-surface)] p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-10 sticky bottom-0">
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="relative group/tray">
@@ -4708,7 +4700,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)]" />
                                                 <div className="absolute bottom-1.5 left-2 right-2">
-                                                    <p className="text-[var(--sys-text)] text-[10px] font-medium truncate">{img.prompt ? (img.prompt.length > 40 ? img.prompt.slice(0, 40) + '…' : img.prompt) : 'Photoshoot'}</p>
+                                                    <p className="text-[var(--sys-text)] text-[10px] font-medium truncate">{img.prompt ? (img.prompt.length > 40 ? img.prompt.slice(0, 40) + 'ΓÇª' : img.prompt) : 'Photoshoot'}</p>
                                                     <p className="text-[var(--sys-text-muted)] text-[9px]">{getTimeAgo(img.createdAt)}</p>
                                                 </div>
                                             </div>
@@ -4724,10 +4716,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     })()}
 
 
-                    {/* ═══ Full-Width Photoshoot Result ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ Full-Width Photoshoot Result ΓòÉΓòÉΓòÉ */}
                     <div className="flex-1 flex flex-col">
 
-                        {/* ═══ GEMINI EDIT IMAGE WORKSPACE (Photoshoot) ═══ */}
+                        {/* ΓòÉΓòÉΓòÉ GEMINI EDIT IMAGE WORKSPACE (Photoshoot) ΓòÉΓòÉΓòÉ */}
                         {showEditPanel && studioMode === 'photoshoot' && (
                             <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
@@ -4738,7 +4730,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <div className="flex items-center justify-between">
                                                 <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
                                                     <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
-                                                    {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">· {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
+                                                    {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">┬╖ {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
                                                 </h3>
                                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
                                                     className="w-7 h-7 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
@@ -4773,12 +4765,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {/* Right: Controls */}
                                         <div className="flex-1 flex flex-col gap-4 min-w-0">
                                             <div>
-                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-[6px]">Quick Edits — Nano Banana 2 Capabilities</p>
+                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-[6px]">Quick Edits ΓÇö Nano Banana 2 Capabilities</p>
                                                 <div className="space-y-1.5">
                                                     {[
-                                                        { label: '🎨 bg', chips: ['Remove background', 'White studio background', 'Add outdoor lifestyle background', 'Blur background'] },
-                                                        { label: '📸 product', chips: ['Add cinematic studio lighting', 'Make it look premium', 'Place on marble surface', 'Editorial product shot'] },
-                                                        { label: '🎭 style', chips: ['Make colors more vibrant', 'Add moody dark tones', 'Warm golden hour light', 'Black and white'] },
+                                                        { label: '≡ƒÄ¿ bg', chips: ['Remove background', 'White studio background', 'Add outdoor lifestyle background', 'Blur background'] },
+                                                        { label: '≡ƒô╕ product', chips: ['Add cinematic studio lighting', 'Make it look premium', 'Place on marble surface', 'Editorial product shot'] },
+                                                        { label: '≡ƒÄ¡ style', chips: ['Make colors more vibrant', 'Add moody dark tones', 'Warm golden hour light', 'Black and white'] },
                                                     ].map(g => (
                                                         <div key={g.label} className="flex flex-wrap gap-1">
                                                             {g.chips.map(chip => (
@@ -4865,7 +4857,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         )}
 
-                        {/* ══ Product Image Picker Modal ══ */}
+                        {/* ΓòÉΓòÉ Product Image Picker Modal ΓòÉΓòÉ */}
                         {productPickerOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setProductPickerOpen(false)}>
                                 <div className="bg-[#0f1729] border border-[var(--sys-border)] rounded-2xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -5029,7 +5021,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         Upload a product image, choose your scene, and let AI create a professional photoshoot.
                                         Product details are preserved while the background and styling are transformed.
                                     </p>
-                                    {/* ── Photoshoot Error Display ── */}
+                                    {/* ΓöÇΓöÇ Photoshoot Error Display ΓöÇΓöÇ */}
                                     {photoshootError && (
                                         <div className="mt-5 mx-auto max-w-md p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-left animate-fade-in">
                                             <div className="flex items-start gap-2.5">
@@ -5114,7 +5106,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </button>
                                     </div>
 
-                                    {/* ═══ AI IMAGE EDITOR PANEL ═══ */}
+                                    {/* ΓòÉΓòÉΓòÉ AI IMAGE EDITOR PANEL ΓòÉΓòÉΓòÉ */}
                                     {psEditMode && (
                                         <div className="mt-5 studio-card p-4 sm:p-5 border border-[var(--sys-text)] fade-up">
                                             <h4 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
@@ -5235,7 +5227,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <div className="mt-4 flex items-center gap-2 flex-wrap">
                                         <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-1 rounded">
                                             <span className="material-symbols-outlined text-xs align-middle mr-0.5">smart_toy</span>
-                                            Gemini AI • {photoshootResult.model}
+                                            Gemini AI ΓÇó {photoshootResult.model}
                                         </span>
                                         {photoshootSaved && (
                                             <span className="text-sm text-primary bg-[var(--sys-primary-dim)] px-2 py-1 rounded flex items-center gap-1">
@@ -5248,7 +5240,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
 
-                            {/* ── Photoshoot Library (Masonry Gallery) ── */}
+                            {/* ΓöÇΓöÇ Photoshoot Library (Masonry Gallery) ΓöÇΓöÇ */}
 
                             {(() => {
                                 const count = bankImages.filter(img => img.type === "ai-photoshoot" || img.type === "photoshoot").length;
@@ -5286,7 +5278,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             }
                             if (filtered.length === 0) return null;
 
-                            {/* ── Grid View ── */}
+                            {/* ΓöÇΓöÇ Grid View ΓöÇΓöÇ */}
                             if (viewMode === 'grid') {
                                 return (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -5331,21 +5323,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 );
                             }
 
-                            {/* ── List View (default) ── */}
+                            {/* ΓöÇΓöÇ List View (default) ΓöÇΓöÇ */}
                             return (
                                 <div className="space-y-4">
                                     {filtered.map(img => (
                                     <div key={img._id} className="generation-card">
-                                        {/* Prompt + Model */}
-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
+                                        {/* Prompt */}
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
                                             {img.prompt || img.title || 'AI Generated'}
                                         </p>
-                                        {img.model && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
-                                                {img.model}
-                                            </span>
-                                        )}
 
                                         {/* Image */}
                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
@@ -5427,7 +5413,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                         </div>
 
-                                        {/* ── MCoT Thinking Mode Toggle ── */}
+                                        {/* ΓöÇΓöÇ MCoT Thinking Mode Toggle ΓöÇΓöÇ */}
                                         {img.aiMeta?.mcotReasoning && (
                                             <button
                                                 onClick={() => setExpandedReasoning(expandedReasoning === img._id ? null : img._id)}
@@ -5439,7 +5425,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             </button>
                                         )}
 
-                                        {/* ── MCoT Reasoning Chain Panel ── */}
+                                        {/* ΓöÇΓöÇ MCoT Reasoning Chain Panel ΓöÇΓöÇ */}
                                         {expandedReasoning === img._id && img.aiMeta?.mcotReasoning && (() => {
                                             const r = img.aiMeta.mcotReasoning
                                             return (
@@ -5464,8 +5450,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <p className="text-[9px] font-bold text-[var(--sys-text)] uppercase tracking-wider mb-0.5">Brand Intel</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
                                                                         <span className="text-[var(--sys-text)] font-semibold">{r.brandInsight.name}</span>
-                                                                        {r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.industry}</span>}
-                                                                        {r.brandInsight.brandType && <span className="text-[var(--sys-text-muted)]"> · {r.brandInsight.brandType}</span>}
+                                                                        {r.brandInsight.industry && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.brandInsight.industry}</span>}
+                                                                        {r.brandInsight.brandType && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.brandInsight.brandType}</span>}
                                                                     </p>
                                                                     {r.brandInsight.targetAudience && (
                                                                         <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">ads_click</span> {r.brandInsight.targetAudience}</p>
@@ -5491,7 +5477,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                     <p className="text-[9px] font-bold text-primary uppercase tracking-wider mb-0.5">Matched Product</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)]">
                                                                         <span className="text-[var(--sys-text)] font-semibold">{r.matchedProduct.title}</span>
-                                                                        {r.matchedProduct.category && <span className="text-[var(--sys-text-muted)]"> · {r.matchedProduct.category}</span>}
+                                                                        {r.matchedProduct.category && <span className="text-[var(--sys-text-muted)]"> ┬╖ {r.matchedProduct.category}</span>}
                                                                     </p>
                                                                 </div>
                                                             </div>
@@ -5544,7 +5530,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                 <div className="flex-1 min-w-0">
                                                                     <p className="text-[9px] font-bold text-[var(--sys-bg)] uppercase tracking-wider mb-0.5">Art Direction</p>
                                                                     <p className="text-[10px] text-[var(--sys-text)] leading-relaxed">
-                                                                        {r.artDirection.mood && <span><span className="text-[var(--sys-text)] font-semibold">Mood:</span> {r.artDirection.mood} · </span>}
+                                                                        {r.artDirection.mood && <span><span className="text-[var(--sys-text)] font-semibold">Mood:</span> {r.artDirection.mood} ┬╖ </span>}
                                                                         {r.artDirection.visualStyle && <span><span className="text-[var(--sys-text)] font-semibold">Style:</span> {r.artDirection.visualStyle}</span>}
                                                                     </p>
                                                                     {r.artDirection.lighting && (
@@ -5580,7 +5566,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         )}
 
-                                                        {/* Post-Gen Critique Score (if available — populated async) */}
+                                                        {/* Post-Gen Critique Score (if available ΓÇö populated async) */}
                                                         {img.aiMeta?.mcotScore && (
                                                             <div className="flex gap-2">
                                                                 <div className="w-5 h-5 rounded-md bg-[var(--sys-text)] flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -5597,7 +5583,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                                 }}
                                                                             />
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{String(img.aiMeta.mcotScore) + "/100"}</span>
+                                                                        <span className="text-[10px] font-bold text-[var(--sys-text)]">{img.aiMeta.mcotScore}/100</span>
                                                                     </div>
                                                                     {img.aiMeta.mcotCritique?.verdict && (
                                                                         <span className={`inline-block mt-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${
@@ -5628,7 +5614,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
             {/* =================== CAMPAIGN LOGO GENERATOR =================== */}
             {studioMode === 'campaignlogo' && (
                 <div data-wt="logo-area" className="max-w-6xl mx-auto fade-up pt-6">
-                    {/* ═══ ANIMATE PANEL (logo mode) ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ ANIMATE PANEL (logo mode) ΓòÉΓòÉΓòÉ */}
                     {showAnimatePanel && (
                         <div className="mb-6 studio-card border-primary/30 shadow-lg shadow-primary/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary-dim" />
@@ -5739,7 +5725,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         </div>
                     )}
-                    {/* ═══ EDIT PANEL (logo mode) ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ EDIT PANEL (logo mode) ΓòÉΓòÉΓòÉ */}
                     {showEditPanel && studioMode === 'campaignlogo' && (
                         <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
@@ -5750,7 +5736,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-[var(--sys-text)]">Gemini AI Edit</p>
-                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Describe changes — Gemini edits the logo for you</p>
+                                        <p className="text-[10px] text-[var(--sys-text-muted)]">Describe changes ΓÇö Gemini edits the logo for you</p>
                                     </div>
                                 </div>
                                 <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }} className="studio-action-btn-sm">
@@ -5803,7 +5789,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 Campaign Logo Generator
                                 <span className="text-xs font-medium bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] px-2 py-0.5 rounded-full">AI</span>
                             </h2>
-                            <p className="text-sm text-[var(--sys-text-muted)]">Generate event & campaign logos — Diwali Sale, Summer Fest, MEGA OFFER and more</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">Generate event & campaign logos ΓÇö Diwali Sale, Summer Fest, MEGA OFFER and more</p>
                         </div>
                     </div>
 
@@ -5931,7 +5917,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                  try{
                                      const brandColors=clgColorMode==='brand'&&activeBrand?.dna?.colors?.length?activeBrand.dna.colors.map(c=>typeof c==='string'?c:c.hex||c.name||'').filter(Boolean).join(', '):clgCustomColors;
                                      const v=clgResults.length+1;
-                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} — create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster — keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography — bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
+                                     const prompt=`Generate a CAMPAIGN LOGO / EVENT BADGE design.\n\nTEXT: "${clgText}"\nSTYLE: ${clgStyle||'modern'}\n${clgOccasion?`OCCASION: ${clgOccasion}\n`:''}${clgIcon?`ICON ELEMENTS: Include ${clgIcon} visual elements\n`:''}COLORS: Use ${brandColors||'vibrant, eye-catching colors'}\nBACKGROUND: ${clgBg==='transparent'?'transparent/alpha background (PNG-ready)':clgBg}\nSHAPE: ${clgShape}\n${clgEnhance?`STYLE KEYWORDS: ${clgEnhance}\n`:''}VARIANT: ${v} ΓÇö create a unique, visually distinctive design\n\nCRITICAL RULES:\n- This is a LOGO/BADGE, not a poster ΓÇö keep it compact and icon-like\n- The text "${clgText}" must be clearly readable and be the HERO element\n- Use professional typography ΓÇö bold, impactful lettering\n- Make it suitable for use as a campaign identifier across marketing materials\n- ${clgBg==='transparent'?'Ensure the background is fully transparent':'Fill the background as specified'}\n- Do NOT add placeholder text or watermarks`;
                                      const res=await creativesAPI.generate({prompt,brandId:activeBrand?._id,type:'campaign-logo',options:{aspectRatio:'1:1',style:clgStyle||'modern',occasion:clgOccasion||'',logoText:clgText,iconElements:clgIcon||'',bgTreatment:clgBg,shape:clgShape,enhance:clgEnhance||'',brandColors,imageModel:logoImageModel}}, { timeout: 180000 });
                                      if (res.warnings?.length > 0) {
                                          setAiWarnings(prev => [...new Set([...prev, ...res.warnings])]);
@@ -5939,17 +5925,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                      const url=res.creative?.imageUrl||res.imageUrl;
                                      if(url){
                                          const newEntry = { url, title: clgText || 'Campaign Logo', createdAt: new Date().toISOString() };
-                                         // Prepend — newest always on top
-                                         // NOTE: No saveToBank needed — generate endpoint already persists
+                                         // Prepend ΓÇö newest always on top
+                                         // NOTE: No saveToBank needed ΓÇö generate endpoint already persists
                                          // with type:'campaign-logo' in the Creative model automatically.
                                          setClgResults(prev => [newEntry, ...prev.filter(r => (r.url||r) !== url)]);
                                      }
                                      else setClgError({
-                                         message: 'No image returned — try again',
+                                         message: 'No image returned ΓÇö try again',
                                          isProviderError: false
                                      });
                                  }catch(err){
-                                     console.error('❌ Logo generation error:', err);
+                                     console.error('Γ¥î Logo generation error:', err);
                                      setClgError({
                                          message: err.message,
                                          isProviderError: err.isProviderError,
@@ -5964,7 +5950,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                              {clgLoading ? (
                                  <><span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span> Generating Logo...</>
                              ) : (
-                                 <><span className="material-symbols-outlined !text-lg">auto_awesome</span>{clgResults.length > 0 ? 'Generate Another Variant' : 'Generate Campaign Logo'}<span className="text-[10px] opacity-60 ml-1">~₹0.25</span></>
+                                 <><span className="material-symbols-outlined !text-lg">auto_awesome</span>{clgResults.length > 0 ? 'Generate Another Variant' : 'Generate Campaign Logo'}<span className="text-[10px] opacity-60 ml-1">~Γé╣0.25</span></>
                              )}
                          </button>
 
@@ -5992,7 +5978,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             )}
                         </div>
 
-                        {/* Right — Results */}
+                        {/* Right ΓÇö Results */}
                         <div className="col-span-12 lg:col-span-7">
                             <div className="studio-card p-4 sm:p-5 min-h-[500px] flex flex-col">
                                 <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
@@ -6012,14 +5998,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             return (
                                                 <div key={url+i} className="rounded-xl overflow-hidden bg-[var(--sys-bg)] group relative">
                                                     <img loading="lazy" decoding="async" src={url} alt={title} className="w-full h-auto object-contain" />
-                                                     {/* Title & date badge — bottom overlay on hover */}
+                                                     {/* Title & date badge ΓÇö bottom overlay on hover */}
                                                      {(title || ts) && (
                                                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/75 to-transparent px-2.5 py-2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
                                                              <p className="text-white text-[10px] font-semibold leading-snug truncate">{title}</p>
                                                              {ts && <p className="text-white/55 text-[9px]">{ts}</p>}
                                                          </div>
                                                      )}
-                                                    {/* Action bar — appears on hover */}
+                                                    {/* Action bar ΓÇö appears on hover */}
                                                     <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2 p-3">
                                                         <div className="flex gap-2 flex-wrap justify-center">
                                                             {/* Zoom / View */}
@@ -6037,7 +6023,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </a>
                                                             {/* Use in Campaign */}
                                                             <button
-                                                                onClick={() => { creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:`Campaign Logo — ${clgText}`,source:'campaign-logo'}).catch(()=>{}); setStudioMode('campaigns'); }}
+                                                                onClick={() => { creativesAPI.saveToBank({imageUrl:url,brandId:activeBrand?._id,title:`Campaign Logo ΓÇö ${clgText}`,source:'campaign-logo'}).catch(()=>{}); setStudioMode('campaigns'); }}
                                                                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] hover:bg-orange-500/30 text-[var(--sys-primary)] text-xs font-medium transition-all cursor-pointer border border-[var(--sys-border)]"
                                                             >
                                                                 <span className="material-symbols-outlined text-sm">campaign</span>Campaign
@@ -6063,7 +6049,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                     {/* Variant badge */}
                                                     <div className="absolute top-2 left-2 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm">
-                                                        V{i+1} · {LOGO_IMAGE_MODELS.find(m => m.id === logoImageModel)?.name || logoImageModel}
+                                                        V{i+1} ┬╖ {LOGO_IMAGE_MODELS.find(m => m.id === logoImageModel)?.name || logoImageModel}
                                                     </div>
                                                 </div>
                                             );
@@ -6080,12 +6066,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 )}
                             </div>
+
+                            )}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── Logo Zoom Lightbox Modal ── */}
+            {/* ΓöÇΓöÇ Logo Zoom Lightbox Modal ΓöÇΓöÇ */}
             {logoZoomOpen && logoZoomUrl && (
                 <div
                     className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
@@ -6175,7 +6163,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                 <div className="creative-split fade-up">
                     <div className="creative-gallery">
                         <div className="studio-card p-4 sm:p-6 flex-1 flex items-center justify-center">
-                            {/* ── Loading State ── */}
+                            {/* ΓöÇΓöÇ Loading State ΓöÇΓöÇ */}
                             <GlobalLoader 
                                 isActive={carouselGenerating} 
                                 title="Generating Carousel" 
@@ -6185,7 +6173,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 thinkingContext="creative"
                             />
 
-                            {/* ── Empty State ── */}
+                            {/* ΓöÇΓöÇ Empty State ΓöÇΓöÇ */}
                             {!carouselResult && !carouselGenerating && (
                                 <div className="text-center">
                                     <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4 mx-auto">
@@ -6206,7 +6194,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             )}
 
-                            {/* ── Result State ── */}
+                            {/* ΓöÇΓöÇ Result State ΓöÇΓöÇ */}
                             {carouselResult && !carouselGenerating && (
                                 <div className="w-full space-y-4">
                                     {/* Panoramic Preview */}
@@ -6306,7 +6294,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             )}
 
-                            {/* ── Error State ── */}
+                            {/* ΓöÇΓöÇ Error State ΓöÇΓöÇ */}
                             {carouselError && (
                                 <div className="p-3 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] text-primary text-xs flex items-center gap-2 mt-4">
                                     <span className="material-symbols-outlined text-sm">error</span>
@@ -6316,9 +6304,9 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     </div>
 
-                    {/* ═══ SIDEBAR COMMAND PANEL ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ SIDEBAR COMMAND PANEL ΓòÉΓòÉΓòÉ */}
                     <div data-wt="carousel-panel" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
-                        {/* ── NEW FREEPIK SIDEBAR BODY ── */}
+                        {/* ΓöÇΓöÇ NEW FREEPIK SIDEBAR BODY ΓöÇΓöÇ */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
                                 
                             <div className="px-5 mt-3 pb-2 flex items-center justify-between">
@@ -6327,7 +6315,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </h3>
                             </div>
 
-                            {/* ── Model Selector ── */}
+                            {/* ΓöÇΓöÇ Model Selector ΓöÇΓöÇ */}
                             <div className="px-5 mt-3 pb-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
                                 <div className="relative">
@@ -6369,7 +6357,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
-                            {/* ── Slide Format & Count ── */}
+                            {/* ΓöÇΓöÇ Slide Format & Count ΓöÇΓöÇ */}
                             <div className="px-5 pb-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Layout & Slides</p>
@@ -6398,7 +6386,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
 
-                            {/* ── Background Scene Description ── */}
+                            {/* ΓöÇΓöÇ Background Scene Description ΓöÇΓöÇ */}
                             <div className="px-5 pb-3 flex flex-col flex-grow">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Background Scene</p>
@@ -6448,7 +6436,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 {carouselThemeError && <div className="mt-1 flex items-center gap-1 text-[9px] text-primary"><span className="material-symbols-outlined text-[10px]">error</span>{carouselThemeError}</div>}
                             </div>
 
-                            {/* ── Visual Target Settings ── */}
+                            {/* ΓöÇΓöÇ Visual Target Settings ΓöÇΓöÇ */}
                             <div className="px-5 pb-4">
                                 <div className="flex items-center gap-2">
                                     <div className="relative group/tray flex-1 z-[50]">
@@ -6478,7 +6466,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 </div>
                             </div>
                             
-                            {/* ── Products Tray ── */}
+                            {/* ΓöÇΓöÇ Products Tray ΓöÇΓöÇ */}
                             <div className="px-5 pb-6">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-widest font-bold flex items-center gap-1.5">Products to Composite</span>
@@ -6491,7 +6479,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <div className="relative group w-full aspect-square">
                                                     <img loading="lazy" decoding="async" src={carouselProductImages[i]} alt={`Slide ${i + 1}`} className="w-full h-full rounded-lg object-cover border border-[var(--sys-border)]" />
                                                     <button onClick={() => setCarouselProductImages(prev => { const a = [...prev]; a[i] = null; return a })}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">×</button>
+                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">├ù</button>
                                                 </div>
                                             ) : (
                                                 <label className="w-full aspect-square rounded-lg border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] flex flex-col items-center justify-center cursor-pointer bg-[var(--sys-surface)] transition-all">
@@ -6509,7 +6497,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             </div>
                         </div>{/* /creative-tools-panel-body */}
 
-                        {/* ── Soft Generate Plinth ── */}
+                        {/* ΓöÇΓöÇ Soft Generate Plinth ΓöÇΓöÇ */}
                         <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] sticky bottom-0">
                             <CreditTooltipWrapper action="creative">
                                 <button data-wt="carousel-generate" onClick={handleCarouselGenerate} disabled={!carouselPrompt.trim() || !activeBrand || carouselGenerating}
@@ -6540,23 +6528,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 Campaign Creatives
                                 <span className="text-xs font-medium bg-[var(--sys-text)] text-[var(--sys-bg)] px-2 py-0.5 rounded-full">AI Wizard</span>
                             </h2>
-                            <p className="text-sm text-[var(--sys-text-muted)]">Build coordinated campaign batches — trend-powered, AI-driven</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">Build coordinated campaign batches ΓÇö trend-powered, AI-driven</p>
                         </div>
                     </div>
 
-                    {/* Step Indicator — 3-step flow */}
+                    {/* Step Indicator ΓÇö 3-step flow */}
                     <div data-wt="camp-steps" className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
                         {[{n:1,l:'Intelligence Brief',icon:'psychology'},{n:2,l:'Copy & Style',icon:'palette'},{n:3,l:'Generate',icon:'auto_awesome'}].map((s,i)=>(
                             <Fragment key={s.n}>
                                 <button onClick={()=>s.n<campStep&&setCampStep(s.n)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${campStep===s.n?'bg-[var(--sys-text)] text-[var(--sys-bg)] border border-[var(--sys-text)]':campStep>s.n?'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)] cursor-pointer':'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)]'}`}>
-                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-[var(--sys-text)] text-[var(--sys-text)]':campStep>s.n?'bg-[var(--sys-surface)] text-[var(--sys-text)]':'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>{campStep>s.n?'✓':s.n}</span>{s.l}
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${campStep===s.n?'bg-[var(--sys-text)] text-[var(--sys-text)]':campStep>s.n?'bg-[var(--sys-surface)] text-[var(--sys-text)]':'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>{campStep>s.n?'Γ£ô':s.n}</span>{s.l}
                                 </button>
                                 {i<2&&<div className={`flex-1 min-w-[20px] h-px ${campStep>s.n?'bg-[var(--sys-primary-dim)]':'bg-[var(--sys-surface)]'}`}/>}
                             </Fragment>
                         ))}
                     </div>
 
-                    {/* ══ STEP 1: Intelligence Brief (merged Brief + Products) ══ */}
+                    {/* ΓòÉΓòÉ STEP 1: Intelligence Brief (merged Brief + Products) ΓòÉΓòÉ */}
                     {campStep === 1 && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
@@ -6578,7 +6566,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     </div>
                                 </div>
 
-                                {/* ── Keyword Intelligence Section ── */}
+                                {/* ΓöÇΓöÇ Keyword Intelligence Section ΓöÇΓöÇ */}
                                 <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-3"><span className="material-symbols-outlined text-primary text-lg">psychology</span>Keyword Intelligence <span className="text-[10px] text-primary/60 font-normal bg-[var(--sys-primary-dim)] px-2 py-0.5 rounded-full">AI Agent</span></h3>
                                     <div className="flex gap-2 mb-4">
@@ -6612,7 +6600,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         ))}
                                     </div>
 
-                                    {/* ── Product Trends Tab (NEW — AI Agent) ── */}
+                                    {/* ΓöÇΓöÇ Product Trends Tab (NEW ΓÇö AI Agent) ΓöÇΓöÇ */}
                                     {campKeywordSource==='product-trends'&&(campIntelLoading?(
                                         <div className="text-center py-8">
                                             <span className="material-symbols-outlined animate-spin text-2xl text-primary block mb-2">psychology</span>
@@ -6654,7 +6642,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                  }
                                                              }} className={`studio-btn-pill !px-3 !py-2 border-none !rounded-xl !text-xs ${campKeyword===f.feature?'active':''}`}>
                                                                  <div className="flex items-center gap-1.5">
-                                                                     <span className="text-primary text-[10px]"><span className="material-symbols-outlined !text-lg !align-middle !mr-1 !-mt-0.5">local_fire_department</span>{f.trendScore||'—'}</span>
+                                                                     <span className="text-primary text-[10px]"><span className="material-symbols-outlined !text-lg !align-middle !mr-1 !-mt-0.5">local_fire_department</span>{f.trendScore||'ΓÇö'}</span>
                                                                      <span>{f.feature}</span>
                                                                      {matchCount>0&&<span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">{matchCount}</span>}
                                                                  </div>
@@ -6695,7 +6683,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         {(campProductIntel.viralAngles||[]).slice(0,4).map((v,i)=>(
                                                             <button key={i} onClick={()=>{setCampKeyword(v.angle);if(!campName)setCampName(`${v.angle} Campaign`)}} className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${campKeyword===v.angle?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]':'border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
                                                                 <p className="text-xs text-[var(--sys-text)] font-medium">{v.angle}</p>
-                                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5">{v.format} • {v.whyViral?.slice(0,60)}</p>
+                                                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5">{v.format} ΓÇó {v.whyViral?.slice(0,60)}</p>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -6704,20 +6692,20 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                     ))}
 
-                                    {/* ── Social Trends Tab (existing, fallback) ── */}
+                                    {/* ΓöÇΓöÇ Social Trends Tab (existing, fallback) ΓöÇΓöÇ */}
                                     {campKeywordSource==='trending'&&(campTrendsLoading?<div className="text-center py-4 text-[var(--sys-text-muted)] text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Fetching social trends...</div>:<div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto">{(Array.isArray(campTrends)?campTrends:[]).slice(0,20).map((t,i)=>{const label=typeof t==='string'?t:t.topic||t.name||t.title||'';return label?<button key={i} onClick={()=>{setCampKeyword(label);if(!campName)setCampName(`${label} Campaign`)}} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campKeyword===label?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>{label}</button>:null})}</div>)}
 
-                                    {/* ── SEO Keywords Tab (existing) ── */}
+                                    {/* ΓöÇΓöÇ SEO Keywords Tab (existing) ΓöÇΓöÇ */}
                                     {campKeywordSource==='seo'&&(campTrendsLoading?<div className="text-center py-4 text-[var(--sys-text-muted)] text-sm"><span className="material-symbols-outlined animate-spin text-lg align-middle mr-1">progress_activity</span>Fetching SEO keywords...</div>:<div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto">{(Array.isArray(campSeoKws)?campSeoKws:[]).slice(0,20).map((k,i)=>{const label=typeof k==='string'?k:k.keyword||k.term||k.name||'';return label?<button key={i} onClick={()=>{setCampKeyword(label);if(!campName)setCampName(`${label} Campaign`)}} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${campKeyword===label?'border-[var(--sys-border)] bg-[var(--sys-primary-dim)] text-[var(--sys-text)]':'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>{label}</button>:null})}</div>)}
 
-                                    {/* ── Custom Tab (existing) ── */}
+                                    {/* ΓöÇΓöÇ Custom Tab (existing) ΓöÇΓöÇ */}
                                     {campKeywordSource==='custom'&&<input type="text" value={campKeyword} onChange={e=>{setCampKeyword(e.target.value);if(!campName)setCampName(`${e.target.value} Campaign`)}} placeholder="Type your keyword or campaign topic..." className="w-full px-3 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:outline-none focus:border-[var(--sys-border)]" />}
 
                                     {/* Selected Keyword Badge */}
                                     {campKeyword&&<div className="mt-3 px-3 py-1.5 rounded-lg bg-[var(--sys-text)] border border-[var(--sys-text)] text-[var(--sys-bg)] text-xs inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">check_circle</span>Selected: <strong>{campKeyword}</strong></div>}
                                 </div>
 
-                                {/* ── Suggested Products (inline — appears after keyword selection) ── */}
+                                {/* ΓöÇΓöÇ Suggested Products (inline ΓÇö appears after keyword selection) ΓöÇΓöÇ */}
                                 {campKeyword && (
                                     <div className="studio-card p-4 sm:p-5">
                                         <div className="flex items-center justify-between mb-3">
@@ -6737,7 +6725,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--sys-text)] border border-[var(--sys-text)]">
                                                                 {p.image&&<img loading="lazy" decoding="async" src={p.image} alt="" className="w-6 h-6 rounded object-cover" />}
                                                                 <span className="text-xs text-[var(--sys-text)] font-medium">{p.title}</span>
-                                                                {p.price?.amount&&<span className="text-[10px] text-primary">₹{p.price.amount.toLocaleString('en-IN')}</span>}
+                                                                {p.price?.amount&&<span className="text-[10px] text-primary">Γé╣{p.price.amount.toLocaleString('en-IN')}</span>}
                                                                 <button onClick={()=>setCampProducts(prev=>prev.filter((_,j)=>j!==i))} className="text-primary hover:text-[var(--sys-primary)] cursor-pointer"><span className="material-symbols-outlined text-xs">close</span></button>
                                                             </div>
                                                         ))}
@@ -6759,7 +6747,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                         {prod.images?.[0]?.url?<img loading="lazy" decoding="async" src={prod.images[0].url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0"/>:<div className="w-8 h-8 rounded bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0"><span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)]">inventory_2</span></div>}
                                                                         <div className="min-w-0">
                                                                             <p className="truncate font-medium">{prod.title}</p>
-                                                                            {prod.price?.amount&&<p className="text-[9px] text-primary">₹{prod.price.amount.toLocaleString('en-IN')}</p>}
+                                                                            {prod.price?.amount&&<p className="text-[9px] text-primary">Γé╣{prod.price.amount.toLocaleString('en-IN')}</p>}
                                                                         </div>
                                                                         {isSelected&&<span className="material-symbols-outlined text-primary text-sm ml-auto flex-shrink-0">check_circle</span>}
                                                                     </button>
@@ -6829,13 +6817,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </div>
                                     </div>
                                 )}
-                                {/* Next → Copy & Style */}
+                                {/* Next ΓåÆ Copy & Style */}
                                 <button disabled={!campKeyword||!campGoal} onClick={()=>{
                                     setCampStep(2);
                                     // Auto-merge features from ALL selected products
                                     const merged=[];campProducts.forEach(p=>{(p.features||[]).forEach(f=>{if(!merged.includes(f))merged.push(f)})});if(merged.length>0)setCampFeatures(merged);
                                     // Auto-set price from first product if not set
-                                    if(!campPrice){const p1=campProducts[0];if(p1?.price?.amount)setCampPrice(`₹${p1.price.amount.toLocaleString('en-IN')}`)}
+                                    if(!campPrice){const p1=campProducts[0];if(p1?.price?.amount)setCampPrice(`Γé╣${p1.price.amount.toLocaleString('en-IN')}`)}
                                     // Auto-switch strategy if multiple products
                                     if(campProducts.length>1)setCampProductStrategy('different');
                                     // Load products if not loaded for fallback
@@ -6849,7 +6837,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
 
 
-                    {/* ══ STEP 2: Copy & Style ══ */}
+                    {/* ΓòÉΓòÉ STEP 2: Copy & Style ΓòÉΓòÉ */}
                     {campStep === 2 && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                             <div className="col-span-12 lg:col-span-7 space-y-4">
@@ -6897,10 +6885,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     const fallback = Array.from({length: campCount}, (_, i) => {
                                                         const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
                                                         const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || activeBrand?.name || 'Our Products';
-                                                        const pPrice = prod?.price?.amount ? `₹${prod.price.amount.toLocaleString('en-IN')}` : (campPrice || '');
+                                                        const pPrice = prod?.price?.amount ? `Γé╣${prod.price.amount.toLocaleString('en-IN')}` : (campPrice || '');
                                                         const feat = prod?.features?.[i % Math.max(1, prod.features?.length || 1)] || campFeatures[i % Math.max(1, campFeatures.length)] || brandUSPs[i % Math.max(1, brandUSPs.length)] || '';
                                                         const angles = [
-                                                            {h: `${feat || pName} — Reimagined for You`, b: `${brandTagline || `Discover ${pName}`}. ${feat ? feat + '. ' : ''}${pPrice ? pPrice + '. ' : ''}${campCta}.`, td: `Inspired by ${campKeyword} — warm, inviting tones`},
+                                                            {h: `${feat || pName} ΓÇö Reimagined for You`, b: `${brandTagline || `Discover ${pName}`}. ${feat ? feat + '. ' : ''}${pPrice ? pPrice + '. ' : ''}${campCta}.`, td: `Inspired by ${campKeyword} ΓÇö warm, inviting tones`},
                                                             {h: `Elevate Your ${feat || 'Experience'}`, b: `${pName} from ${activeBrand?.name || 'us'}${feat ? ' with ' + feat : ''}. ${pPrice ? 'Just ' + pPrice + '. ' : ''}${campCta}.`, td: `${campKeyword}-themed mood, aspirational`},
                                                             {h: `The ${activeBrand?.name || 'Brand'} Difference`, b: `Loved by thousands. ${pName} delivers ${feat || 'excellence'}. ${pPrice ? pPrice + '. ' : ''}${campCta}.`, td: `Premium ${campKeyword} aesthetic, trust-building`},
                                                         ];
@@ -6915,7 +6903,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 const errCopies = Array.from({length: campCount}, (_, i) => {
                                                     const prod = campProducts.length > 1 ? campProducts[i % campProducts.length] : campProducts[0];
                                                     const pName = prod?.title || brandServices[i % Math.max(1, brandServices.length)] || activeBrand?.name || 'Our Products';
-                                                    return {headline: `${pName} — Made for You`, body: `${prod?.features?.[0] || activeBrand?.dna?.tagline || 'Exceptional quality'}. ${prod?.price?.amount ? '₹' + prod.price.amount.toLocaleString('en-IN') + '. ' : ''}${campCta}.`, cta: campCta, product: pName, feature: prod?.features?.[0] || '', theme_direction: `${campKeyword}-inspired visual mood`};
+                                                    return {headline: `${pName} ΓÇö Made for You`, body: `${prod?.features?.[0] || activeBrand?.dna?.tagline || 'Exceptional quality'}. ${prod?.price?.amount ? 'Γé╣' + prod.price.amount.toLocaleString('en-IN') + '. ' : ''}${campCta}.`, cta: campCta, product: pName, feature: prod?.features?.[0] || '', theme_direction: `${campKeyword}-inspired visual mood`};
                                                 });
                                                 setCampCopies(errCopies);
                                             }
@@ -6928,23 +6916,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1" style={{scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
                                             {campCopies.map((c,i)=>(
                                                 <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><span className="text-[10px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded">#{i+1}</span>{c.product&&<span className="text-[9px] text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded font-medium">📦 {c.product}</span>}{c.feature&&<span className="text-[9px] text-[var(--sys-primary)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded font-medium"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {c.feature}</span>}</div>
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap"><span className="text-[10px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded">#{i+1}</span>{c.product&&<span className="text-[9px] text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded font-medium">≡ƒôª {c.product}</span>}{c.feature&&<span className="text-[9px] text-[var(--sys-primary)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded font-medium"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {c.feature}</span>}</div>
                                                     <input value={c.headline||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],headline:e.target.value};setCampCopies(u)}} className="w-full px-2 py-1 mb-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs font-semibold focus:outline-none focus:border-[var(--sys-text)]" placeholder="Headline" />
                                                     <textarea value={c.body||''} onChange={e=>{const u=[...campCopies];u[i]={...u[i],body:e.target.value};setCampCopies(u)}} rows={2} className="w-full px-2 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:outline-none focus:border-[var(--sys-text)] resize-none" placeholder="Body copy" />
                                                 </div>
                                             ))}
                                         </div>
-                                    ):(<p className="text-[var(--sys-text-muted)] text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative{campFeatures.length>0?` — each highlighting a different feature`:''}</p>)}
+                                    ):(<p className="text-[var(--sys-text-muted)] text-xs text-center py-4">Click "Generate Copies" to create AI copy for each creative{campFeatures.length>0?` ΓÇö each highlighting a different feature`:''}</p>)}
                                 </div>
                                 {/* Product Features */}
                                 <div className="studio-card p-4 sm:p-5">
                                     <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-[var(--sys-primary)] text-lg">stars</span>Product Features<span className="text-[10px] text-[var(--sys-text-muted)] font-normal ml-1">distributed across creatives</span></h3>
-                                    <p className="text-[var(--sys-text-muted)] text-[10px] mb-3">Add key features/USPs — each creative will highlight a different feature in its copy and visual.</p>
+                                    <p className="text-[var(--sys-text-muted)] text-[10px] mb-3">Add key features/USPs ΓÇö each creative will highlight a different feature in its copy and visual.</p>
                                     <div className="flex flex-wrap gap-1.5 mb-2">
                                         {campFeatures.map((f,i)=>(
                                             <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] border-[var(--sys-border)] text-[11px] font-medium">
                                                 <span className="text-[9px] text-[var(--sys-primary)] font-bold">#{i+1}</span>{f}
-                                                <button onClick={()=>setCampFeatures(p=>p.filter((_,j)=>j!==i))} className="ml-0.5 text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer text-xs">×</button>
+                                                <button onClick={()=>setCampFeatures(p=>p.filter((_,j)=>j!==i))} className="ml-0.5 text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer text-xs">├ù</button>
                                             </span>
                                         ))}
                                     </div>
@@ -6952,18 +6940,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <input value={campFeatureInput} onChange={e=>setCampFeatureInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:outline-none focus:border-[var(--sys-border)] placeholder:text-[var(--sys-text-muted)]" placeholder="e.g. Noise cancellation, 40hr battery..." />
                                         <button disabled={!campFeatureInput.trim()} onClick={()=>{if(campFeatureInput.trim()){setCampFeatures(p=>[...p,campFeatureInput.trim()]);setCampFeatureInput('')}}} className="px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-primary)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">+ Add</button>
                                     </div>
-                                    {campFeatures.length>0&&campFeatures.length<campCount&&<p className="text-yellow-400/60 text-[10px] mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {campFeatures.length} features for {campCount} creatives — features will cycle. Add {campCount-campFeatures.length} more for unique features per creative.</p>}
-                                    {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-primary/60 text-[10px] mt-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> {campFeatures.length} features for {campCount} creatives — each creative gets a unique feature!</p>}
+                                    {campFeatures.length>0&&campFeatures.length<campCount&&<p className="text-yellow-400/60 text-[10px] mt-1.5 flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {campFeatures.length} features for {campCount} creatives ΓÇö features will cycle. Add {campCount-campFeatures.length} more for unique features per creative.</p>}
+                                    {campFeatures.length>=campCount&&campFeatures.length>0&&<p className="text-primary/60 text-[10px] mt-1.5"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">check_circle</span> {campFeatures.length} features for {campCount} creatives ΓÇö each creative gets a unique feature!</p>}
                                 </div>
                                 {/* Price Point */}
                                 <div className="studio-card p-4 sm:p-5">
-                                    <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-green-400 text-lg">payments</span>Price Point<span className="text-[10px] text-[var(--sys-text-muted)] font-normal ml-1">optional — for pricing messaging</span></h3>
+                                    <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-2"><span className="material-symbols-outlined text-green-400 text-lg">payments</span>Price Point<span className="text-[10px] text-[var(--sys-text-muted)] font-normal ml-1">optional ΓÇö for pricing messaging</span></h3>
                                     <div className="flex gap-2 mb-2">
-                                        <input value={campPrice} onChange={e=>setCampPrice(e.target.value)} className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs font-semibold focus:outline-none focus:border-green-400/30 placeholder:text-[var(--sys-text-muted)]" placeholder="e.g. ₹2,999 or Starting at ₹999" />
+                                        <input value={campPrice} onChange={e=>setCampPrice(e.target.value)} className="flex-1 px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs font-semibold focus:outline-none focus:border-green-400/30 placeholder:text-[var(--sys-text-muted)]" placeholder="e.g. Γé╣2,999 or Starting at Γé╣999" />
                                         {campPrice&&<button onClick={()=>setCampPrice('')} className="px-2 py-1 text-xs text-primary hover:text-[var(--sys-primary)] cursor-pointer">Clear</button>}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {['₹499','₹999','₹1,999','₹2,999','₹4,999','₹9,999','Starting at ₹','Flat 50% Off','Buy 1 Get 1'].map(p=>(
+                                        {['Γé╣499','Γé╣999','Γé╣1,999','Γé╣2,999','Γé╣4,999','Γé╣9,999','Starting at Γé╣','Flat 50% Off','Buy 1 Get 1'].map(p=>(
                                             <button key={p} onClick={()=>setCampPrice(p)} className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer ${campPrice===p?'border-green-400/30 bg-green-500/10 text-green-300':'border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>{p}</button>
                                         ))}
                                     </div>
@@ -7025,7 +7013,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {campStyleRef?(
                                         <div className="relative rounded-xl overflow-hidden group">
                                             <img loading="lazy" decoding="async" src={campStyleRef} alt="Style Ref" className="w-full h-20 object-cover rounded-xl" />
-                                            <button onClick={()=>setCampStyleRef(null)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px]">✕</button>
+                                            <button onClick={()=>setCampStyleRef(null)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px]">Γ£ò</button>
                                         </div>
                                     ):(
                                         <button onClick={async()=>{
@@ -7084,7 +7072,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                         </div>
                     )}
 
-                    {/* ══ STEP 3: Generate & Review ══ */}
+                    {/* ΓòÉΓòÉ STEP 3: Generate & Review ΓòÉΓòÉ */}
                     {campStep === 3 && (
                         <div className="space-y-4">
                             {/* Summary */}
@@ -7093,10 +7081,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                     <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-text-muted)] text-[10px] mb-0.5">Keyword</p><p className="text-[var(--sys-text)] text-xs font-semibold truncate">{campKeyword}</p></div>
                                     <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-text-muted)] text-[10px] mb-0.5">Goal</p><p className="text-[var(--sys-text)] text-xs font-semibold">{campGoal}</p></div>
-                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-text-muted)] text-[10px] mb-0.5">Creatives</p><p className="text-[var(--sys-text)] text-xs font-semibold">{campCount} × {campSizes.length} sizes</p></div>
+                                    <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-text-muted)] text-[10px] mb-0.5">Creatives</p><p className="text-[var(--sys-text)] text-xs font-semibold">{campCount} ├ù {campSizes.length} sizes</p></div>
                                     <div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-text-muted)] text-[10px] mb-0.5">Style</p><p className="text-[var(--sys-text)] text-xs font-semibold capitalize">{campStyle}</p></div>
                                     {campFeatures.length>0&&<div className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-center"><p className="text-[var(--sys-primary)] text-[10px] mb-0.5">Features</p><p className="border-[var(--sys-border)] text-xs font-semibold">{campFeatures.length} USPs</p></div>}
-                                    {(campPrice||campProducts.some(p=>p.price?.amount))&&<div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-center"><p className="text-green-400/60 text-[10px] mb-0.5">Price{campProducts.length>1?' Range':''}</p><p className="text-green-200 text-xs font-semibold">{campProducts.length>1&&campProducts.some(p=>p.price?.amount)?(()=>{const prices=campProducts.filter(p=>p.price?.amount).map(p=>p.price.amount);const min=Math.min(...prices);const max=Math.max(...prices);return min===max?`₹${min.toLocaleString('en-IN')}`:`₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')}`})():campPrice}</p></div>}
+                                    {(campPrice||campProducts.some(p=>p.price?.amount))&&<div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-center"><p className="text-green-400/60 text-[10px] mb-0.5">Price{campProducts.length>1?' Range':''}</p><p className="text-green-200 text-xs font-semibold">{campProducts.length>1&&campProducts.some(p=>p.price?.amount)?(()=>{const prices=campProducts.filter(p=>p.price?.amount).map(p=>p.price.amount);const min=Math.min(...prices);const max=Math.max(...prices);return min===max?`Γé╣${min.toLocaleString('en-IN')}`:`Γé╣${min.toLocaleString('en-IN')} ΓÇô Γé╣${max.toLocaleString('en-IN')}`})():campPrice}</p></div>}
                                 </div>
                             </div>
                             {/* Generate */}
@@ -7106,7 +7094,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     try{
                                         const results=[];
                                         const total=campCount*(campSizes.length||1);
-                                        const angles=['Hero product shot — front-facing, centered, dramatic lighting, product as the star','Flat lay / top-down arrangement — product with lifestyle props, styled composition','Lifestyle context — product in-use by a person or in a real environment','Close-up detail — macro focus on product texture, craftsmanship, premium details','Dramatic side angle — dynamic 45° perspective with depth of field','Contextual scene — product placed in its natural habitat or aspirational setting','Overhead bird\'s-eye — clean arrangement with negative space, editorial feel','Artistic detail — selective focus on unique feature or design element','Environmental wide — product small in a beautiful, branded scene','Dynamic action — product in motion or being interacted with, energy and movement'];
+                                        const angles=['Hero product shot ΓÇö front-facing, centered, dramatic lighting, product as the star','Flat lay / top-down arrangement ΓÇö product with lifestyle props, styled composition','Lifestyle context ΓÇö product in-use by a person or in a real environment','Close-up detail ΓÇö macro focus on product texture, craftsmanship, premium details','Dramatic side angle ΓÇö dynamic 45┬░ perspective with depth of field','Contextual scene ΓÇö product placed in its natural habitat or aspirational setting','Overhead bird\'s-eye ΓÇö clean arrangement with negative space, editorial feel','Artistic detail ΓÇö selective focus on unique feature or design element','Environmental wide ΓÇö product small in a beautiful, branded scene','Dynamic action ΓÇö product in motion or being interacted with, energy and movement'];
                                         for(let i=0;i<campCount;i++){
                                             for(const size of (campSizes.length?campSizes:['4:5'])){
                                                 const copy=campCopies[i]||{headline:campName||campKeyword,body:'',cta:campCta};
@@ -7114,14 +7102,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 const prodData=campProductStrategy==='same'?campProducts[0]:campProducts[i%campProducts.length];
                                                 const productImg=prodData?.image||null;
                                                 const prodFeatures=prodData?.features||[];
-                                                const prodPrice=prodData?.price?.amount?`₹${prodData.price.amount.toLocaleString('en-IN')}`:campPrice;
+                                                const prodPrice=prodData?.price?.amount?`Γé╣${prodData.price.amount.toLocaleString('en-IN')}`:campPrice;
                                                 const angle=angles[i%angles.length];
                                                 // Feature assignment: per-product features first, then campFeatures fallback
                                                 const featurePool=prodFeatures.length>0?prodFeatures:campFeatures;
                                                 const assignedFeature=featurePool.length>0?featurePool[i%featurePool.length]:null;
                                                 let prompt=`CAMPAIGN CREATIVE #${i+1} for ${activeBrand?.name||'Brand'}${activeBrand?.dna?.industry ? ` (${activeBrand.dna.industry})` : ''}.${prodData?.title?` Product: ${prodData.title}.`:''}
 
-CREATIVE THEME/MOOD: "${campKeyword}" — This is the CREATIVE DIRECTION for the visual. Do NOT put the word "${campKeyword}" as text on the image. Instead, visually EMBODY this theme:
+CREATIVE THEME/MOOD: "${campKeyword}" ΓÇö This is the CREATIVE DIRECTION for the visual. Do NOT put the word "${campKeyword}" as text on the image. Instead, visually EMBODY this theme:
 - If "${campKeyword}" is a SEASON (summer, winter, monsoon): Use season-appropriate colors, lighting, props, and atmosphere. Summer = warm golden tones, sunshine, outdoor vibes, bright energy. Winter = cool tones, cozy textures, warm indoor lighting.
 - If "${campKeyword}" is a TREND (fitness, wellness, eco): Use lifestyle imagery, aspirational settings, and emotionally resonant compositions that evoke the trend.
 - If "${campKeyword}" is a FESTIVAL (diwali, christmas, eid): Use festive colors, cultural motifs, celebration imagery, and joyful composition.
@@ -7131,29 +7119,29 @@ BRAND CONTEXT:
 - Brand: ${activeBrand?.name || 'Brand'}${activeBrand?.dna?.industry ? `, ${activeBrand.dna.industry}` : ''}
 ${activeBrand?.dna?.tagline ? `- Tagline: "${activeBrand.dna.tagline}"\n` : ''}${activeBrand?.dna?.voice?.personality ? `- Brand Personality: ${activeBrand.dna.voice.personality}\n` : ''}${activeBrand?.dna?.targetAudience ? `- Target Audience: ${activeBrand.dna.targetAudience}\n` : ''}${activeBrand?.dna?.colors?.primary || activeBrand?.dna?.colors?.secondary ? `- Brand Colors: Blend ${[activeBrand?.dna?.colors?.primary, activeBrand?.dna?.colors?.secondary, activeBrand?.dna?.colors?.accent].filter(Boolean).join(', ')} with the theme's mood palette\n` : ''}
 TEXT OVERLAY (keep clean and minimal):
-- Campaign Name: "${campName||campKeyword}" — display as elegant typography, NOT the largest element
+- Campaign Name: "${campName||campKeyword}" ΓÇö display as elegant typography, NOT the largest element
 - Headline: ${copy.headline}
 - Body: ${copy.body}
-${assignedFeature?`- Feature Highlight: "${assignedFeature}" — visually emphasize this through composition, callouts, or iconography\n`:''}${prodPrice?`- Price: ${prodPrice}\n`:''}CTA: ${copy.cta}
+${assignedFeature?`- Feature Highlight: "${assignedFeature}" ΓÇö visually emphasize this through composition, callouts, or iconography\n`:''}${prodPrice?`- Price: ${prodPrice}\n`:''}CTA: ${copy.cta}
 
 CAMPAIGN GOAL: ${campGoal}
 DESIGN STYLE: ${campStyle}
 
 PHOTOGRAPHY DIRECTION: ${angle}
-SCENE/SETTING: ${campScene==='auto'?`AI decides the best scene that EMBODIES the "${campKeyword}" theme for maximum emotional impact`:campScene==='studio'?'Clean professional studio with neutral/gradient backdrop, controlled lighting':campScene==='outdoor'?'Natural outdoor setting — golden hour, lush greenery, or dramatic sky':campScene==='indoor'?'Styled interior — modern, cozy, or luxurious room setting':campScene==='podium'?'Product displayed on a sleek pedestal/podium with dramatic lighting':campScene==='hands'?'Product being held in elegant hands, human touch, clean background':campScene==='model'?'Attractive person using/wearing the product in a natural, aspirational way':campScene==='flatlay'?'Top-down flat lay arrangement with curated props and styling':campScene==='lifestyle'?'Product in real-life use context — home, office, on-the-go':campScene==='urban'?'Urban street/city background with modern architecture':campScene==='nature'?'Natural landscape — beach, mountains, forest, water':'Minimalist clean backdrop with ample negative space'}
+SCENE/SETTING: ${campScene==='auto'?`AI decides the best scene that EMBODIES the "${campKeyword}" theme for maximum emotional impact`:campScene==='studio'?'Clean professional studio with neutral/gradient backdrop, controlled lighting':campScene==='outdoor'?'Natural outdoor setting ΓÇö golden hour, lush greenery, or dramatic sky':campScene==='indoor'?'Styled interior ΓÇö modern, cozy, or luxurious room setting':campScene==='podium'?'Product displayed on a sleek pedestal/podium with dramatic lighting':campScene==='hands'?'Product being held in elegant hands, human touch, clean background':campScene==='model'?'Attractive person using/wearing the product in a natural, aspirational way':campScene==='flatlay'?'Top-down flat lay arrangement with curated props and styling':campScene==='lifestyle'?'Product in real-life use context ΓÇö home, office, on-the-go':campScene==='urban'?'Urban street/city background with modern architecture':campScene==='nature'?'Natural landscape ΓÇö beach, mountains, forest, water':'Minimalist clean backdrop with ample negative space'}
 ${productImg?'Feature the provided product image as the hero element, shot from this specific angle/composition direction.\n':''}${campCampaignLogo&&campLogoPlacement!=='none'?`Campaign logo at ${campLogoPlacement} position.\n`:''}${campStyleRef?'Match the visual mood and design language of the provided style reference.\n':''}
 DESIGN RULES:
 - The VISUAL THEME inspired by "${campKeyword}" should dominate the creative's mood, color palette, and atmosphere
 - Product/subject is the visual hero, with theme elements enhancing the composition
-- Professional advertising creative — scroll-stopping, magazine-quality, emotionally resonant
+- Professional advertising creative ΓÇö scroll-stopping, magazine-quality, emotionally resonant
 - ${campStyle} design aesthetic with premium typography
-- Visual hierarchy: Theme Mood → Product/Subject → Supporting Copy → CTA
-- DO NOT literally write the word "${campKeyword}" as decorative text — let the visuals COMMUNICATE the theme
+- Visual hierarchy: Theme Mood ΓåÆ Product/Subject ΓåÆ Supporting Copy ΓåÆ CTA
+- DO NOT literally write the word "${campKeyword}" as decorative text ΓÇö let the visuals COMMUNICATE the theme
 ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callout that matches the theme\n`:''}- Aspect ratio: ${size}`;                                                const opts={aspectRatio:size,style:campStyle};
                                                 if(productImg&&productImg.startsWith('data:'))opts.baseImage=productImg;
                                                 else if(productImg)opts.productImageUrl=productImg;
                                                 if(campStyleRef)opts.referenceImages={style:campStyleRef};
-                                                // Logo overlay — use server-side overlay (addLogo flag), NOT referenceImages.logo
+                                                // Logo overlay ΓÇö use server-side overlay (addLogo flag), NOT referenceImages.logo
                                                 if(campCampaignLogo&&campLogoPlacement!=='none'){
                                                     opts.addLogo=true;
                                                     opts.logoPosition=campLogoPlacement;
@@ -7169,12 +7157,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         }
                                                         break; // success
                                                     }catch(retryErr){
-                                                        if(attempt===0){console.warn(`⚠️ Creative #${i+1} attempt 1 failed, retrying...`,retryErr.message);await new Promise(r=>setTimeout(r,1500))}
+                                                        if(attempt===0){console.warn(`ΓÜá∩╕Å Creative #${i+1} attempt 1 failed, retrying...`,retryErr.message);await new Promise(r=>setTimeout(r,1500))}
                                                         else{
                                                             console.error(` Creative #${i+1} failed after 2 attempts:`,retryErr.message);
                                                             if (retryErr.name === 'AbortError' || retryErr.message?.toLowerCase().includes('timeout') || retryErr.message?.toLowerCase().includes('failed to fetch') || retryErr.status === 504) {
                                                                 setCampError({
-                                                                    message: 'Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.',
+                                                                    message: 'Generation is taking longer than usual. Your images are likely still processing ΓÇö please check the Image Bank in a minute.',
                                                                     isProviderError: true,
                                                                     provider: 'Mantram AI'
                                                                 });
@@ -7185,17 +7173,17 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 }
                                                 if(res){
                                                     const url=res.creative?.imageUrl||res.imageUrl;
-                                                    if(url)results.push({url,copy,size,index:i,angle:angle.split('—')[0].trim(),feature:assignedFeature,product:prodData?.title||null,price:prodPrice||null});
+                                                    if(url)results.push({url,copy,size,index:i,angle:angle.split('ΓÇö')[0].trim(),feature:assignedFeature,product:prodData?.title||null,price:prodPrice||null});
                                                 }
                                                 setCampProgress(results.length/total*100);
                                             }
                                         }
                                         setCampResults(results);
                                     }catch(err){
-                                        console.error('❌ Campaign generation error:', err);
+                                        console.error('Γ¥î Campaign generation error:', err);
                                         if (err.name === 'AbortError' || err.message?.toLowerCase().includes('timeout') || err.message?.toLowerCase().includes('failed to fetch') || err.status === 504) {
                                             setCampError({
-                                                message: 'Generation is taking longer than usual. Your images are likely still processing — please check the Image Bank in a minute.',
+                                                message: 'Generation is taking longer than usual. Your images are likely still processing ΓÇö please check the Image Bank in a minute.',
                                                 isProviderError: false
                                             });
                                         } else {
@@ -7208,7 +7196,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     }
                                     finally{setCampGenerating(false)}
                                 }} className="w-full py-4 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:from-[#FF4D00] hover:via-indigo-400 hover:to-[#FF7A00] text-[var(--sys-text)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
-                                    {campGenerating?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating... {Math.round(campProgress)}%</>):(<><span className="material-symbols-outlined text-lg">rocket_launch</span>Generate All {campCount * campSizes.length} Creatives<span className="text-xs opacity-60 ml-1">~₹{(campCount*campSizes.length*0.25).toFixed(2)}</span></>)}
+                                    {campGenerating?(<><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>Generating... {Math.round(campProgress)}%</>):(<><span className="material-symbols-outlined text-lg">rocket_launch</span>Generate All {campCount * campSizes.length} Creatives<span className="text-xs opacity-60 ml-1">~Γé╣{(campCount*campSizes.length*0.25).toFixed(2)}</span></>)}
                                 </button>
                             )}
                             {campGenerating&&<div className="w-full bg-[var(--sys-surface)] rounded-full h-2 mt-4"><div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] h-2 rounded-full transition-all" style={{width:`${campProgress}%`}}/></div>}
@@ -7263,7 +7251,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <button onClick={()=>setPublishData({image:r.url,text:r.copy?.body||''})} className="px-2 py-1 rounded-lg bg-[var(--sys-text)] text-orange-50 text-[10px] font-medium hover:bg-[var(--sys-text)] transition-all cursor-pointer"><span className="material-symbols-outlined text-xs align-middle">share</span></button>
                                                     </div>
                                                 </div>
-                                                <div className="p-2"><p className="text-[var(--sys-text)] text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><div className="flex flex-wrap gap-1 mt-0.5">{r.product&&<span className="inline-block text-[8px] text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded">📦 {r.product}</span>}{r.feature&&<span className="inline-block text-[8px] text-[var(--sys-primary)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {r.feature}</span>}{r.price&&<span className="inline-block text-[8px] text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">💰 {r.price}</span>}</div><p className="text-[var(--sys-text-muted)] text-[9px]">{r.size}</p></div>
+                                                <div className="p-2"><p className="text-[var(--sys-text)] text-[10px] font-semibold truncate">{r.copy?.headline||''}</p><div className="flex flex-wrap gap-1 mt-0.5">{r.product&&<span className="inline-block text-[8px] text-[var(--sys-primary)] bg-[var(--sys-primary-dim)] px-1.5 py-0.5 rounded">≡ƒôª {r.product}</span>}{r.feature&&<span className="inline-block text-[8px] text-[var(--sys-primary)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">star</span> {r.feature}</span>}{r.price&&<span className="inline-block text-[8px] text-green-300 bg-green-500/15 px-1.5 py-0.5 rounded">≡ƒÆ░ {r.price}</span>}</div><p className="text-[var(--sys-text-muted)] text-[9px]">{r.size}</p></div>
                                             </div>
                                         ))}
                                     </div>
@@ -7273,7 +7261,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
                     )}
 
-                    {/* ══ Best Performing Library Modal ══ */}
+                    {/* ΓòÉΓòÉ Best Performing Library Modal ΓòÉΓòÉ */}
                     {bplOpen&&(
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={()=>setBplOpen(false)}>
                             <div className="bg-[var(--sys-bg)] rounded-2xl border border-[var(--sys-border)] w-full max-w-3xl max-h-[70vh] overflow-hidden" onClick={e=>e.stopPropagation()}>
@@ -7328,13 +7316,13 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <p className="text-xs text-[var(--sys-text-muted)]">Templates use your brand colors, personality, and style</p>
                         </div>
                     ) : !activeTemplate ? (
-                        /* ──────────── Template Library — Categories & Sub-Templates ──────────── */
+                        /* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Template Library ΓÇö Categories & Sub-Templates ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
                         <>
                             {!activeCategory ? (
-                                /* ═══ LEVEL 1: Category Grid ═══ */
+                                /* ΓòÉΓòÉΓòÉ LEVEL 1: Category Grid ΓòÉΓòÉΓòÉ */
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {/* ── Built-in Categories ── */}
+                                        {/* ΓöÇΓöÇ Built-in Categories ΓöÇΓöÇ */}
                                         {templateCategories.map((cat, idx) => (
                                             <button key={cat.id}
                                                 onClick={() => setActiveCategory(cat)}
@@ -7353,7 +7341,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </button>
                                         ))}
 
-                                        {/* ── Saved Custom Categories from DB ── */}
+                                        {/* ΓöÇΓöÇ Saved Custom Categories from DB ΓöÇΓöÇ */}
                                         {savedCategories.map(cc => (
                                             <button key={cc.categoryId}
                                                 onClick={() => setActiveCategory({
@@ -7390,7 +7378,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </button>
                                         ))}
 
-                                        {/* ── Create New Category Card ── */}
+                                        {/* ΓöÇΓöÇ Create New Category Card ΓöÇΓöÇ */}
                                         <button onClick={() => setShowCreateCategory(true)}
                                             className="rounded-2xl p-4 sm:p-5 text-left border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-text)]/[0.02] transition-all cursor-pointer group flex flex-col items-center justify-center min-h-[170px]">
                                             <div className="w-14 h-14 rounded-2xl bg-[var(--sys-bg)] flex items-center justify-center mb-3 group-hover:bg-[var(--sys-text)]/[0.05] group-hover:scale-110 transition-all border border-[var(--sys-border)]">
@@ -7418,7 +7406,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     </div>
                                 </>
                             ) : (
-                                /* ═══ LEVEL 2: Sub-Templates inside a Category ═══ */
+                                /* ΓòÉΓòÉΓòÉ LEVEL 2: Sub-Templates inside a Category ΓòÉΓòÉΓòÉ */
                                 <>
                                     {/* Breadcrumb */}
                                     <div className="flex items-center gap-2 mb-4">
@@ -7453,7 +7441,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                                     {/* Sub-template grid */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                        {/* ── Built-in sub-templates ── */}
+                                        {/* ΓöÇΓöÇ Built-in sub-templates ΓöÇΓöÇ */}
                                         {activeCategory.subTemplates.map(sub => (
                                             <button key={sub.id}
                                                 onClick={() => {
@@ -7476,7 +7464,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </button>
                                         ))}
 
-                                        {/* ── Saved custom sub-templates in this category ── */}
+                                        {/* ΓöÇΓöÇ Saved custom sub-templates in this category ΓöÇΓöÇ */}
                                         {savedTemplates.filter(st => st.category === activeCategory.id).map(ct => (
                                             <div key={ct.templateId}
                                                 className="studio-card p-4 text-left border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer group relative"
@@ -7528,7 +7516,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </div>
                                         ))}
 
-                                        {/* ── Add Sub-Template Card ── */}
+                                        {/* ΓöÇΓöÇ Add Sub-Template Card ΓöÇΓöÇ */}
                                         <button onClick={() => {
                                             setNewTmpl(prev => ({ ...prev, category: activeCategory.id }))
                                             setShowCreateTemplate(true)
@@ -7544,7 +7532,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </>
                             )}
 
-                            {/* ═══ CREATE TEMPLATE MODAL ═══ */}
+                            {/* ΓòÉΓòÉΓòÉ CREATE TEMPLATE MODAL ΓòÉΓòÉΓòÉ */}
                             {showCreateTemplate && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
                                     onClick={() => setShowCreateTemplate(false)}>
@@ -7558,7 +7546,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </h3>
                                                 <p className="text-sm text-[var(--sys-text-muted)] mt-1">
                                                     {activeCategory
-                                                        ? <>Adding to <span className="font-bold text-[var(--sys-text)]" style={{ color: activeCategory.color }}>{activeCategory.label}</span> — learn from an image or write a prompt formula</>
+                                                        ? <>Adding to <span className="font-bold text-[var(--sys-text)]" style={{ color: activeCategory.color }}>{activeCategory.label}</span> ΓÇö learn from an image or write a prompt formula</>
                                                         : 'Pick a category, then build a reusable design formula'}
                                                 </p>
                                             </div>
@@ -7568,7 +7556,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </button>
                                         </div>
 
-                                        {/* Category — only show picker when opened from top-level */}
+                                        {/* Category ΓÇö only show picker when opened from top-level */}
                                         {activeCategory ? (
                                             <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                                 <span className="material-symbols-outlined text-lg" style={{ color: activeCategory.color }}>{activeCategory.icon}</span>
@@ -7622,14 +7610,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 className="input-glass w-full py-2.5 text-sm" />
                                         </div>
 
-                                        {/* ── Learn from Image ── */}
+                                        {/* ΓöÇΓöÇ Learn from Image ΓöÇΓöÇ */}
                                         <div className="mb-4 p-4 rounded-2xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
                                             <h4 className="text-xs font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
                                                 <span className="material-symbols-outlined text-sm">image_search</span>
                                                 Learn from a Reference Design
                                                 <span className="text-xs font-semibold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded ml-auto">Recommended</span>
                                             </h4>
-                                            <p className="text-sm text-[var(--sys-text-muted)] mb-3">Upload a design — AI extracts style, layout, and creates a reusable formula. Future images keep the same look, only changing your content.</p>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-3">Upload a design ΓÇö AI extracts style, layout, and creates a reusable formula. Future images keep the same look, only changing your content.</p>
 
                                             {newTmpl.referenceImageUrl ? (
                                                 <div className="relative rounded-xl overflow-hidden mb-2">
@@ -7649,7 +7637,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <label className="flex flex-col items-center justify-center py-6 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] cursor-pointer transition-colors bg-[var(--sys-surface)]">
                                                     <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] mb-2">add_photo_alternate</span>
                                                     <span className="text-[11px] text-[var(--sys-text)] font-semibold">Upload a reference design</span>
-                                                    <span className="text-xs text-[var(--sys-text-muted)] mt-1">AI extracts style → auto-generates prompt formula</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] mt-1">AI extracts style ΓåÆ auto-generates prompt formula</span>
                                                     <input type="file" className="hidden" accept="image/*" onChange={e => {
                                                         const file = e.target.files?.[0]
                                                         if (file) {
@@ -7675,10 +7663,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 onChange={e => setNewTmpl(p => ({ ...p, promptFormula: e.target.value }))}
                                                 placeholder={`e.g. Create a ${newTmpl.label || 'festive sale'} post for ${activeBrand?.name || 'brand'}.\nKeep the same layout and design elements as reference.\nOnly change: {{HEADLINE}}, {{DETAILS}}`}
                                                 className="input-glass w-full py-3 text-sm resize-none font-mono" rows={5} />
-                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1 italic flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders — only these change, the design stays consistent.</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1 italic flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders ΓÇö only these change, the design stays consistent.</p>
                                         </div>
 
-                                        {/* ═══ Simple / Advanced Mode Toggle ═══ */}
+                                        {/* ΓòÉΓòÉΓòÉ Simple / Advanced Mode Toggle ΓòÉΓòÉΓòÉ */}
                                         <div className="mb-6">
                                             {/* Mode Toggle */}
                                             <div className="flex items-center justify-between mb-4">
@@ -7712,7 +7700,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 )}
                                             </div>
 
-                                            {/* ── SIMPLE MODE ── */}
+                                            {/* ΓöÇΓöÇ SIMPLE MODE ΓöÇΓöÇ */}
                                             {templateFieldsMode === 'simple' && (
                                                 <div className="space-y-4">
                                                     {/* Layout & Color info (from AI analysis) */}
@@ -7807,7 +7795,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 <div className="flex items-center justify-between mb-2">
                                                                     <span className="text-[10px] font-bold text-[var(--sys-text)]">Select from Brand Assets</span>
                                                                     <button onClick={() => setNewTmpl(p => ({ ...p, _showBrandImages: false }))}
-                                                                        className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">✕</button>
+                                                                        className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">Γ£ò</button>
                                                                 </div>
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
                                                                     {newTmpl._brandImageList.map((img, i) => (
@@ -7821,12 +7809,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     </div>
 
                                                     <p className="text-[10px] text-[var(--sys-text-muted)] italic">
-                                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Simple mode — set the main text and image. Switch to Advanced for full AI-detected element control.</span>
+                                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Simple mode ΓÇö set the main text and image. Switch to Advanced for full AI-detected element control.</span>
                                                     </p>
                                                 </div>
                                             )}
 
-                                            {/* ── ADVANCED MODE ── */}
+                                            {/* ΓöÇΓöÇ ADVANCED MODE ΓöÇΓöÇ */}
                                             {templateFieldsMode === 'advanced' && (
                                                 <div>
                                                     {/* Layout & Color info */}
@@ -7848,7 +7836,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     {(newTmpl.fields || []).length === 0 && (
                                                         <div className="py-6 text-center rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)]">
                                                             <span className="material-symbols-outlined text-2xl text-slate-700 mb-2 block">upload_file</span>
-                                                            <p className="text-xs text-[var(--sys-text-muted)]">Upload a reference image — AI will auto-detect elements</p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)]">Upload a reference image ΓÇö AI will auto-detect elements</p>
                                                             <p className="text-[10px] text-slate-700 mt-1">Or click "Add Field" to create manually</p>
                                                         </div>
                                                     )}
@@ -7995,7 +7983,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             )}
 
-                            {/* ═══ CREATE CATEGORY MODAL ═══ */}
+                            {/* ΓòÉΓòÉΓòÉ CREATE CATEGORY MODAL ΓòÉΓòÉΓòÉ */}
                             {showCreateCategory && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
                                     onClick={() => setShowCreateCategory(false)}>
@@ -8022,7 +8010,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-[var(--sys-text)] truncate">{newCat.label || 'Category Name'}</p>
-                                                <p className="text-xs text-[var(--sys-text-muted)]">Preview — this is how it'll look in your grid</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Preview ΓÇö this is how it'll look in your grid</p>
                                             </div>
                                         </div>
 
@@ -8036,7 +8024,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 autoFocus />
                                         </div>
 
-                                        {/* Icon & Color — side by side */}
+                                        {/* Icon & Color ΓÇö side by side */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                                             <div>
                                                 <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Icon</label>
@@ -8076,9 +8064,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </>
 
                     ) : (
-                        /* ──────────── Active Template Detail Panel ──────────── */
+                        /* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ Active Template Detail Panel ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-                            {/* Left — Form Fields */}
+                            {/* Left ΓÇö Form Fields */}
                             <div className="col-span-12 lg:col-span-5 space-y-4">
                                 {/* Template Header */}
                                 <div className="studio-card p-4 sm:p-5">
@@ -8092,7 +8080,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         </div>
                                     </div>
 
-                                    {/* ── Default Brand Prompt (auto-generated from brand DNA) ── */}
+                                    {/* ΓöÇΓöÇ Default Brand Prompt (auto-generated from brand DNA) ΓöÇΓöÇ */}
                                     <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10 mb-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <h5 className="text-[11px] font-bold text-primary flex items-center gap-1.5">
@@ -8136,7 +8124,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div key={field.key}>
                                                 <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block flex items-center gap-1">
                                                     {field.label}
-                                                    {field.hint && <span className="text-[var(--sys-text-muted)] font-normal">— {field.hint}</span>}
+                                                    {field.hint && <span className="text-[var(--sys-text-muted)] font-normal">ΓÇö {field.hint}</span>}
                                                 </label>
 
                                                 {field.type === 'text' && (
@@ -8397,7 +8385,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Resolution</label>
                                             <div className="flex gap-2">
                                                 {[
-                                                    { value: '512px', label: 'Draft', desc: '512px — fast preview' },
+                                                    { value: '512px', label: 'Draft', desc: '512px ΓÇö fast preview' },
                                                     { value: '1K', label: '1K', desc: 'Standard quality' },
                                                     { value: '2K', label: '2K', desc: 'High quality' },
                                                 ].map(r => (
@@ -8430,9 +8418,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                                     {templateFields._showExtraInstructions && (
                                         <div className="mt-3 space-y-3">
-                                            <p className="text-xs text-[var(--sys-text-muted)]">Tell AI what to change — gender, outfit, pose, background, add/remove elements. Our vision engine will intelligently adapt the entire image.</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Tell AI what to change ΓÇö gender, outfit, pose, background, add/remove elements. Our vision engine will intelligently adapt the entire image.</p>
 
-                                            {/* Smart suggestion chips — toggle with exclusive groups */}
+                                            {/* Smart suggestion chips ΓÇö toggle with exclusive groups */}
                                             {(() => {
                                                 const CHIPS = [
                                                     { label: 'Make model male', value: 'Change the model to a male with similar pose and expression', ms: 'face_6', group: 'gender' },
@@ -8576,7 +8564,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* Right — Preview & Result */}
+                            {/* Right ΓÇö Preview & Result */}
                             <div className="col-span-12 lg:col-span-7 space-y-4">
                                 {/* Prompt Preview */}
                                 {(templatePromptPreview || Object.keys(templateFields).length > 0) && (
@@ -8677,7 +8665,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {studioMode === 'imagebank' && (
                 <div data-wt="imagebank-area" className="fade-up">
 
-                    {/* ═══ GEMINI EDIT IMAGE WORKSPACE (Image Bank) ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ GEMINI EDIT IMAGE WORKSPACE (Image Bank) ΓòÉΓòÉΓòÉ */}
                     {showEditPanel && studioMode === 'imagebank' && (
                         <div className="mb-6 studio-card border-violet-500/30 shadow-lg shadow-violet-500/5 bg-[var(--sys-surface)] overflow-hidden animate-fade-in relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
@@ -8688,7 +8676,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <div className="flex items-center justify-between">
                                             <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-violet-400">auto_fix_high</span> Gemini Edit
-                                                {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">· {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
+                                                {editHistory.length > 0 && <span className="text-[10px] font-normal text-violet-400">┬╖ {editHistory.length} edit{editHistory.length > 1 ? 's' : ''} applied</span>}
                                             </h3>
                                             <button onClick={() => { if (!editGenerating) setShowEditPanel(false) }}
                                                 className="w-7 h-7 rounded-full bg-[var(--sys-surface-hover)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-violet-400 transition-colors cursor-pointer border border-transparent">
@@ -8739,15 +8727,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {/* Right: Controls */}
                                     <div className="flex-1 flex flex-col gap-4 min-w-0">
                                         <div>
-                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1.5">Quick Edits — Full Nano Banana 2 Capabilities</p>
+                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1.5">Quick Edits ΓÇö Full Nano Banana 2 Capabilities</p>
                                             <div className="space-y-1.5">
                                                 {[
-                                                    { label: '🎨 Background', chips: ['Remove background', 'White studio background', 'Replace bg with outdoor scene', 'Blur background', 'Add gradient background'] },
-                                                    { label: '✏️ Remove / Fix', chips: ['Remove unwanted objects', 'Remove text from image', 'Fix blemishes', 'Remove watermark'] },
-                                                    { label: '🌈 Color & Light', chips: ['Make colors vibrant', 'Add cinematic lighting', 'Golden hour warm light', 'Black and white', 'Add moody dark tones'] },
-                                                    { label: '🎭 Style', chips: ['Anime illustration style', 'Watercolor painting', 'Claymation 3D style', 'Editorial magazine style', 'Pencil sketch'] },
-                                                    { label: '📸 Commercial', chips: ['Premium product photo', 'Marble surface background', 'Add lifestyle context', 'Dramatic studio lighting'] },
-                                                    { label: '🔲 Extend', chips: ['Extend image wider', 'Extend image taller', 'Add scene around subject'] },
+                                                    { label: '≡ƒÄ¿ Background', chips: ['Remove background', 'White studio background', 'Replace bg with outdoor scene', 'Blur background', 'Add gradient background'] },
+                                                    { label: 'Γ£Å∩╕Å Remove / Fix', chips: ['Remove unwanted objects', 'Remove text from image', 'Fix blemishes', 'Remove watermark'] },
+                                                    { label: '≡ƒîê Color & Light', chips: ['Make colors vibrant', 'Add cinematic lighting', 'Golden hour warm light', 'Black and white', 'Add moody dark tones'] },
+                                                    { label: '≡ƒÄ¡ Style', chips: ['Anime illustration style', 'Watercolor painting', 'Claymation 3D style', 'Editorial magazine style', 'Pencil sketch'] },
+                                                    { label: '≡ƒô╕ Commercial', chips: ['Premium product photo', 'Marble surface background', 'Add lifestyle context', 'Dramatic studio lighting'] },
+                                                    { label: '≡ƒö▓ Extend', chips: ['Extend image wider', 'Extend image taller', 'Add scene around subject'] },
                                                 ].map(g => (
                                                     <div key={g.label}>
                                                         <p className="text-[8px] font-bold text-[var(--sys-text-muted)]/50 uppercase tracking-widest mb-0.5">{g.label}</p>
@@ -8770,7 +8758,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !editGenerating) handleEditGenerate() }}
                                                 placeholder="Describe how to edit this image... e.g. 'Remove the background', 'Make colors more vibrant', 'Add cinematic lighting'"
                                                 className="input-glass w-full py-3.5 px-4 text-[13px] resize-none focus:border-primary min-h-[100px] bg-[var(--sys-bg)]" rows={3} />
-                                            <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">⌘+Enter to apply · Edits build on each other for multi-step refinement</p>
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] mt-1">Γîÿ+Enter to apply ┬╖ Edits build on each other for multi-step refinement</p>
                                         </div>
                                         {editError && (
                                             <div className="p-3 rounded-xl border bg-rose-500/10 border-rose-500/20 text-rose-400 flex items-center gap-2 text-xs">
@@ -8842,7 +8830,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
                     )}
 
-                    {/* ── Tab Bar ── */}
+                    {/* ΓöÇΓöÇ Tab Bar ΓöÇΓöÇ */}
                     <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             {[
@@ -8895,7 +8883,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
                     )}
 
-                    {/* ═══ BRAND IMAGES TAB ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ BRAND IMAGES TAB ΓòÉΓòÉΓòÉ */}
                     {bankTab === 'brand' && (() => {
                         const allBrandImgs = activeBrand?.dna?.brandImages || activeBrand?.dna?.bannerImages || []
                         return allBrandImgs.length > 0 ? (
@@ -8942,7 +8930,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         )
                     })()}
 
-                    {/* ═══ GENERATED / UPLOADED TABS ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ GENERATED / UPLOADED TABS ΓòÉΓòÉΓòÉ */}
                     {bankTab !== 'brand' && !bankLoading && bankImages.length === 0 && (
                         <div className="studio-card p-12 text-center">
                             <span className="material-symbols-outlined text-6xl text-slate-700 mb-4 block">{bankTab === 'uploaded' ? 'upload_file' : 'auto_awesome'}</span>
@@ -8950,7 +8938,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             <p className="text-xs text-[var(--sys-text-muted)] mb-4 max-w-[calc(100%-2rem)] sm:max-w-md mx-auto mx-auto">
                                 {bankTab === 'uploaded'
                                     ? 'Upload images to use as references or base images for your designs.'
-                                    : 'Generate images in Design Studio or AI Photoshoot — they\'ll automatically appear here.'}
+                                    : 'Generate images in Design Studio or AI Photoshoot ΓÇö they\'ll automatically appear here.'}
                             </p>
                             <div className="flex gap-2 justify-center">
                                 <button onClick={() => setStudioMode('create')}
@@ -9017,7 +9005,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     const isPhotoshoot = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
                                     const isUploaded = img.type === 'uploaded';
                                     const timeAgo = getTimeAgo(img.createdAt);
-                                    const promptPreview = img.prompt ? (img.prompt.length > 80 ? img.prompt.slice(0, 80) + '…' : img.prompt) : '';
+                                    const promptPreview = img.prompt ? (img.prompt.length > 80 ? img.prompt.slice(0, 80) + 'ΓÇª' : img.prompt) : '';
                                     return (
                                         <div key={img._id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group">
                                             {/* Thumbnail */}
@@ -9105,7 +9093,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 })}
                             </div>
                         ) : (
-                            /* ── GRID VIEW ── */
+                            /* ΓöÇΓöÇ GRID VIEW ΓöÇΓöÇ */
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[70vh] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
                                 {bankImages.map((img, idx) => {
                                     const isPhotoshoot = img.type === 'ai-photoshoot' || img.type === 'photoshoot';
@@ -9120,7 +9108,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             {/* Hover overlay */}
                                             <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3">
                                                 <p className="text-[var(--sys-text)] text-xs font-bold truncate mb-0.5">{img.title || 'AI Image'}</p>
-                                                {img.prompt && <p className="text-[var(--sys-text-muted)] text-[10px] truncate mb-2" title={img.prompt}>{img.prompt.length > 50 ? img.prompt.slice(0, 50) + '…' : img.prompt}</p>}
+                                                {img.prompt && <p className="text-[var(--sys-text-muted)] text-[10px] truncate mb-2" title={img.prompt}>{img.prompt.length > 50 ? img.prompt.slice(0, 50) + 'ΓÇª' : img.prompt}</p>}
                                                 <div className="flex gap-1">
                                                     {img.prompt && (
                                                         <>
@@ -9172,7 +9160,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         )
                     })()}
 
-                    {/* ═══ LIGHTBOX / ZOOM OVERLAY ═══ */}
+                    {/* ΓòÉΓòÉΓòÉ LIGHTBOX / ZOOM OVERLAY ΓòÉΓòÉΓòÉ */}
                     {lightboxIdx !== null && bankImages[lightboxIdx] && (() => {
                         const img = bankImages[lightboxIdx]
                         return (
@@ -9227,7 +9215,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div>
                                                 <p className="text-[var(--sys-text)] font-bold text-sm">{img.title || 'AI Generated Image'}</p>
                                                 <p className="text-[var(--sys-text-muted)] text-[11px]">
-                                                    <span className="flex items-center gap-1">{img.type === 'ai-photoshoot' ? <><span className="material-symbols-outlined text-[11px]">photo_camera</span>AI Photoshoot</> : <><span className="material-symbols-outlined text-[11px]">palette</span>Design Studio</>}</span> •{' '}
+                                                    <span className="flex items-center gap-1">{img.type === 'ai-photoshoot' ? <><span className="material-symbols-outlined text-[11px]">photo_camera</span>AI Photoshoot</> : <><span className="material-symbols-outlined text-[11px]">palette</span>Design Studio</>}</span> ΓÇó{' '}
                                                     {new Date(img.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </p>
                                             </div>
@@ -9290,7 +9278,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             )}
 
 
-            {/* ═══ ZOOM LIGHTBOX (for generated result — global, all tabs) ═══ */}
+            {/* ΓòÉΓòÉΓòÉ ZOOM LIGHTBOX (for generated result ΓÇö global, all tabs) ΓòÉΓòÉΓòÉ */}
             {zoomImage && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-start pl-[5vw] md:pl-[10vw] animate-fade-in"
                     onClick={() => setZoomImage(null)}>
@@ -9335,20 +9323,20 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '1k')}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--sys-text)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
                                             <span className="material-symbols-outlined text-base text-[var(--sys-text-muted)]">image</span>
-                                            <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-[var(--sys-text-muted)]">1024px • Instant</div></div>
+                                            <div><div className="font-semibold">1K Original</div><div className="text-[10px] text-[var(--sys-text-muted)]">1024px ΓÇó Instant</div></div>
                                         </button>
                                         <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '2k')}
                                             disabled={upscalingState === '2k'}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] hover:text-primary transition-all cursor-pointer disabled:opacity-50">
                                             <span className="material-symbols-outlined text-base text-primary">hd</span>
-                                            <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' — Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">2048px • ~1s • Free</div></div>
+                                            <div><div className="font-semibold">2K HD{upscalingState === '2k' ? ' ΓÇö Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">2048px ΓÇó ~1s ΓÇó Free</div></div>
                                             {upscalingState === '2k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-primary">progress_activity</span>}
                                         </button>
                                         <button onClick={() => handleDownloadWithUpscale(upscaleMenu.url, upscaleMenu.filename, '4k')}
                                             disabled={upscalingState === '4k'}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] hover:text-primary transition-all cursor-pointer disabled:opacity-50">
                                             <span className="material-symbols-outlined text-base text-primary">4k</span>
-                                            <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' — AI Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">4096px • ~5s • AI Enhanced</div></div>
+                                            <div><div className="font-semibold">4K Ultra HD{upscalingState === '4k' ? ' ΓÇö AI Upscaling...' : ''}</div><div className="text-[10px] text-[var(--sys-text-muted)]">4096px ΓÇó ~5s ΓÇó AI Enhanced</div></div>
                                             {upscalingState === '4k' && <span className="material-symbols-outlined text-sm animate-spin ml-auto text-primary">progress_activity</span>}
                                         </button>
                                     </div>
@@ -9382,7 +9370,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
 
 
-            {/* ── Media Picker Modal ── */}
+            {/* ΓöÇΓöÇ Media Picker Modal ΓöÇΓöÇ */}
             {refPickerSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
                     onClick={() => setRefPickerSlot(null)}>
@@ -9390,7 +9378,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         style={{ width: '720px', maxWidth: '92vw', height: '520px', maxHeight: '85vh' }}
                         onClick={e => e.stopPropagation()}>
 
-                        {/* ── Left Sidebar ── */}
+                        {/* ΓöÇΓöÇ Left Sidebar ΓöÇΓöÇ */}
                         <div className="w-full md:w-[200px] flex-shrink-0 bg-[var(--sys-bg)] border-b md:border-b-0 md:border-r border-[var(--sys-border)] flex flex-col">
                             {/* Header */}
                             <div className="p-4 pb-3">
@@ -9403,7 +9391,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </p>
                             </div>
 
-                            {/* Source tabs — vertical on md+, horizontal on mobile */}
+                            {/* Source tabs ΓÇö vertical on md+, horizontal on mobile */}
                             <div className="flex flex-row md:flex-col gap-1 px-3 pb-2 md:pb-0 overflow-x-auto md:overflow-x-visible scrollbar-hide">
                                 {[
                                     { id: 'upload', icon: 'cloud_upload', label: 'Upload', subtitle: 'From device' },
@@ -9449,7 +9437,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         </div>
 
-                        {/* ── Right Content ── */}
+                        {/* ΓöÇΓöÇ Right Content ΓöÇΓöÇ */}
                         <div className="flex-1 flex flex-col min-w-0">
                             {/* Top bar with search + close */}
                             <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--sys-border)]">
@@ -9525,7 +9513,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div className="flex flex-col items-center justify-center h-60 text-center">
                                                 <span className="material-symbols-outlined text-4xl text-slate-700 mb-2">photo_library</span>
                                                 <p className="text-sm text-[var(--sys-text-muted)] font-medium">No images in your library</p>
-                                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Generate some creatives first — they'll appear here.</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Generate some creatives first ΓÇö they'll appear here.</p>
                                             </div>
                                         )}
                                     </div>
@@ -9624,7 +9612,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             <div className="p-2.5">
                                                 <p className="text-sm font-bold text-[var(--sys-text)] truncate">{p.title}</p>
                                                 {p.price?.amount > 0 && (
-                                                    <p className="text-xs font-bold text-primary mt-0.5">₹{p.price.amount.toLocaleString()}</p>
+                                                    <p className="text-xs font-bold text-primary mt-0.5">Γé╣{p.price.amount.toLocaleString()}</p>
                                                 )}
                                             </div>
                                         </button>
@@ -9633,7 +9621,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         )}
 
-                        {/* Brand Website Images — always show if available */}
+                        {/* Brand Website Images ΓÇö always show if available */}
                         {(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
                             <div className="mb-4">
                                 <p className="text-sm text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -9666,12 +9654,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         )}
 
-                        {/* Empty state — only when BOTH are empty */}
+                        {/* Empty state ΓÇö only when BOTH are empty */}
                         {productsList.length === 0 && !(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
                             <div className="text-center py-10">
                                 <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3">inbox</span>
                                 <p className="text-[var(--sys-text-muted)] text-sm">No products in your catalog.</p>
-                                <p className="text-[var(--sys-text-muted)] text-xs mt-1">Add products in Brand DNA → Products & Services</p>
+                                <p className="text-[var(--sys-text-muted)] text-xs mt-1">Add products in Brand DNA ΓåÆ Products & Services</p>
                             </div>
                         )}
                     </div>
@@ -9690,12 +9678,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 Virtual Try-On
                                 <span className="text-xs font-medium bg-[var(--sys-text)] text-[var(--sys-bg)] px-2 py-0.5 rounded-full">AI Powered</span>
                             </h2>
-                            <p className="text-sm text-[var(--sys-text-muted)]">Upload a person photo + clothing item — see them wearing it instantly</p>
+                            <p className="text-sm text-[var(--sys-text-muted)]">Upload a person photo + clothing item ΓÇö see them wearing it instantly</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-                        {/* Left — Upload Zone */}
+                        {/* Left ΓÇö Upload Zone */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Person Photo Upload */}
                             <div className="studio-card p-4 sm:p-5">
@@ -9759,23 +9747,23 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* Sample Models — Quick Start */}
+                            {/* Sample Models ΓÇö Quick Start */}
                             <div className="studio-card p-4 sm:p-5">
                                 <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-2">
                                     <span className="material-symbols-outlined text-primary text-lg">face</span>
-                                    Quick Start — Sample Models
+                                    Quick Start ΓÇö Sample Models
                                 </h3>
                                 <p className="text-xs text-[var(--sys-text-muted)] mb-3">Click to auto-generate a model photo (no upload needed)</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {[
-                                        { label: 'Woman — Indian', desc: 'Young Indian woman, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" average build', icon: 'person', gender: 'female' },
-                                        { label: 'Man — Indian', desc: 'Young Indian man, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'10" athletic build', icon: 'person', gender: 'male' },
-                                        { label: 'Woman — Western', desc: 'Young Caucasian woman, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 5\'7" slim build', icon: 'person', gender: 'female' },
-                                        { label: 'Man — Western', desc: 'Young Caucasian man, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 6\'0" athletic build', icon: 'person', gender: 'male' },
-                                        { label: 'Woman — East Asian', desc: 'Young East Asian woman, light skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" slim build', icon: 'person', gender: 'female' },
-                                        { label: 'Man — Dark Skin', desc: 'Young African man, dark skin tone, full body front pose, plain white background, professional model photo, natural lighting, 6\'1" athletic build', icon: 'person', gender: 'male' },
-                                        { label: 'Woman — Curvy', desc: 'Young woman, plus-size curvy body, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" curvy build, wearing simple neutral tank top and jeans', icon: 'person', gender: 'female' },
-                                        { label: 'Teen — Unisex', desc: 'Teenager 16-18 years old, androgynous look, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" slim build', icon: 'person', gender: 'neutral' },
+                                        { label: 'Woman ΓÇö Indian', desc: 'Young Indian woman, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" average build', icon: 'person', gender: 'female' },
+                                        { label: 'Man ΓÇö Indian', desc: 'Young Indian man, medium skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'10" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman ΓÇö Western', desc: 'Young Caucasian woman, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 5\'7" slim build', icon: 'person', gender: 'female' },
+                                        { label: 'Man ΓÇö Western', desc: 'Young Caucasian man, fair skin, full body front pose, plain white background, professional model photo, natural lighting, 6\'0" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman ΓÇö East Asian', desc: 'Young East Asian woman, light skin tone, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" slim build', icon: 'person', gender: 'female' },
+                                        { label: 'Man ΓÇö Dark Skin', desc: 'Young African man, dark skin tone, full body front pose, plain white background, professional model photo, natural lighting, 6\'1" athletic build', icon: 'person', gender: 'male' },
+                                        { label: 'Woman ΓÇö Curvy', desc: 'Young woman, plus-size curvy body, full body front pose, plain white background, professional model photo, natural lighting, 5\'5" curvy build, wearing simple neutral tank top and jeans', icon: 'person', gender: 'female' },
+                                        { label: 'Teen ΓÇö Unisex', desc: 'Teenager 16-18 years old, androgynous look, full body front pose, plain white background, professional model photo, natural lighting, 5\'6" slim build', icon: 'person', gender: 'neutral' },
                                     ].map(m => (
                                         <button key={m.label}
                                             disabled={vtoLoading}
@@ -9852,7 +9840,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {vtoLoading ? (
                                         <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Preview...</>
                                     ) : (
-                                        <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Preview<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                        <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Preview<span className="text-xs opacity-60 ml-1">~Γé╣0.25</span></>
                                     )}
                                 </button>
 
@@ -9904,7 +9892,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         {vtoHdLoading ? (
                                             <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Rendering HD... ~30s</>
                                         ) : (
-                                            <><span className="material-symbols-outlined text-lg">hd</span> Generate HD Version<span className="text-xs opacity-60 ml-1">~₹3.5</span></>
+                                            <><span className="material-symbols-outlined text-lg">hd</span> Generate HD Version<span className="text-xs opacity-60 ml-1">~Γé╣3.5</span></>
                                         )}
                                     </button>
                                 )}
@@ -9921,7 +9909,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             )}
                         </div>
 
-                        {/* Right — Result Preview */}
+                        {/* Right ΓÇö Result Preview */}
                         <div className="col-span-12 lg:col-span-7">
                             <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
@@ -9998,10 +9986,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                         </div>
                     </div>
 
-                    {/* ── Product Lifestyle Sub-mode ── */}
+                    {/* ΓöÇΓöÇ Product Lifestyle Sub-mode ΓöÇΓöÇ */}
                     {mockupSubMode === 'lifestyle' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-                        {/* Left — Controls */}
+                        {/* Left ΓÇö Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Product Upload */}
                             <div className="studio-card p-4 sm:p-5">
@@ -10013,7 +10001,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     <label className="flex flex-col items-center justify-center h-40 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] bg-[var(--sys-surface)] cursor-pointer transition-all group">
                                         <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] group-hover:text-primary transition-colors mb-2">upload</span>
                                         <span className="text-sm text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">Upload product photo</span>
-                                        <span className="text-xs text-[var(--sys-text-muted)] mt-1">Any product — cosmetics, electronics, food, etc.</span>
+                                        <span className="text-xs text-[var(--sys-text-muted)] mt-1">Any product ΓÇö cosmetics, electronics, food, etc.</span>
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                             const file = e.target.files?.[0]
                                             if (file) {
@@ -10041,7 +10029,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     Reference Scene
                                     <span className="text-[10px] font-medium bg-[var(--sys-text)] text-[var(--sys-bg)] px-1.5 py-0.5 rounded-full ml-auto">Optional</span>
                                 </h3>
-                                <p className="text-xs text-[var(--sys-text-muted)] mb-3 leading-relaxed">Upload a reference scene image — the product will be placed into this exact setting</p>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-3 leading-relaxed">Upload a reference scene image ΓÇö the product will be placed into this exact setting</p>
                                 {!mockupTemplateImage ? (
                                     <label className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] bg-[var(--sys-surface)] cursor-pointer transition-all group">
                                         <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors mb-1">add_photo_alternate</span>
@@ -10100,7 +10088,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 { label: 'Kitchen Counter', prompt: 'Clean white marble kitchen counter with soft natural morning light, fresh herbs and wooden cutting board nearby', icon: 'kitchen' },
                                                 { label: 'Rustic Wood', prompt: 'Rustic reclaimed wood table with linen napkin, vintage cutlery, warm farmhouse kitchen vibes, natural daylight', icon: 'table_restaurant' },
                                                 { label: 'Breakfast Table', prompt: 'Sunny breakfast table with fresh orange juice, croissants, fresh flowers in a vase, bright morning sunlight streaming in', icon: 'breakfast_dining' },
-                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients — tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
+                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients ΓÇö tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
                                                 { label: 'Picnic Blanket', prompt: 'Product on a checkered picnic blanket in a sunny park, fresh fruits and cheese nearby, warm outdoor golden hour light', icon: 'park' },
                                                 { label: 'Dark Food Moody', prompt: 'Dark moody food photography, product on black slate with dramatic side lighting, scattered spices and herbs, editorial food styling', icon: 'restaurant_menu' },
                                                 { label: 'Ice & Frost', prompt: 'Product surrounded by crushed ice and frost crystals on a cold surface, fresh chilled beverage photography, cool blue tones', icon: 'ac_unit' },
@@ -10115,7 +10103,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             ],
                                             home: [
                                                 { label: 'Living Room', prompt: 'Cozy modern living room with soft neutral tones, plush sofa, throw blanket, warm ambient lighting, lifestyle home photography', icon: 'living' },
-                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macramé, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
+                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macram├⌐, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
                                                 { label: 'Scandinavian Desk', prompt: 'Clean Scandinavian home office desk, light oak wood, minimalist accessories, green plant, soft diffused daylight', icon: 'desk' },
                                                 { label: 'Cozy Bedroom', prompt: 'Luxurious bedroom with crisp white linen sheets, fluffy pillows, soft morning sunlight through sheer curtains', icon: 'bed' },
                                                 { label: 'Garden Table', prompt: 'Outdoor garden table with potted succulents, terracotta pots, fresh herbs, warm afternoon sunlight, natural organic feel', icon: 'yard' },
@@ -10162,7 +10150,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 { label: 'Studio Black', prompt: 'Professional studio with seamless black background, dramatic directional lighting, high-contrast product photography', icon: 'contrast' },
                                                 { label: 'Gradient Sweep', prompt: 'Smooth gradient background transitioning from light blue to white, soft even lighting, clean e-commerce product photo style', icon: 'gradient' },
                                                 { label: 'Color Pop', prompt: 'Vibrant solid color background (matching the product accent color), flat lay style, bold graphic editorial product photo', icon: 'palette' },
-                                                { label: '360° Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
+                                                { label: '360┬░ Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
                                             ],
                                         };
                                         const filtered = mockupSceneCategory === 'all'
@@ -10227,7 +10215,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 { label: 'Kitchen Counter', prompt: 'Clean white marble kitchen counter with soft natural morning light, fresh herbs and wooden cutting board nearby', icon: 'kitchen' },
                                                 { label: 'Rustic Wood', prompt: 'Rustic reclaimed wood table with linen napkin, vintage cutlery, warm farmhouse kitchen vibes, natural daylight', icon: 'table_restaurant' },
                                                 { label: 'Breakfast Table', prompt: 'Sunny breakfast table with fresh orange juice, croissants, fresh flowers in a vase, bright morning sunlight streaming in', icon: 'breakfast_dining' },
-                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients — tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
+                                                { label: 'Fresh Ingredients', prompt: 'Product surrounded by fresh ingredients ΓÇö tomatoes, basil, olive oil, garlic on a wooden cutting board, food photography style', icon: 'restaurant' },
                                                 { label: 'Picnic Blanket', prompt: 'Product on a checkered picnic blanket in a sunny park, fresh fruits and cheese nearby, warm outdoor golden hour light', icon: 'park' },
                                                 { label: 'Dark Food Moody', prompt: 'Dark moody food photography, product on black slate with dramatic side lighting, scattered spices and herbs, editorial food styling', icon: 'restaurant_menu' },
                                                 { label: 'Ice & Frost', prompt: 'Product surrounded by crushed ice and frost crystals on a cold surface, fresh chilled beverage photography, cool blue tones', icon: 'ac_unit' },
@@ -10242,7 +10230,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             ],
                                             home: [
                                                 { label: 'Living Room', prompt: 'Cozy modern living room with soft neutral tones, plush sofa, throw blanket, warm ambient lighting, lifestyle home photography', icon: 'living' },
-                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macramé, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
+                                                { label: 'Boho Shelf', prompt: 'Bohemian-style wooden wall shelf with macram├⌐, dried pampas grass, candles, warm earthy tones, natural light', icon: 'shelves' },
                                                 { label: 'Scandinavian Desk', prompt: 'Clean Scandinavian home office desk, light oak wood, minimalist accessories, green plant, soft diffused daylight', icon: 'desk' },
                                                 { label: 'Cozy Bedroom', prompt: 'Luxurious bedroom with crisp white linen sheets, fluffy pillows, soft morning sunlight through sheer curtains', icon: 'bed' },
                                                 { label: 'Garden Table', prompt: 'Outdoor garden table with potted succulents, terracotta pots, fresh herbs, warm afternoon sunlight, natural organic feel', icon: 'yard' },
@@ -10289,7 +10277,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 { label: 'Studio Black', prompt: 'Professional studio with seamless black background, dramatic directional lighting, high-contrast product photography', icon: 'contrast' },
                                                 { label: 'Gradient Sweep', prompt: 'Smooth gradient background transitioning from light blue to white, soft even lighting, clean e-commerce product photo style', icon: 'gradient' },
                                                 { label: 'Color Pop', prompt: 'Vibrant solid color background (matching the product accent color), flat lay style, bold graphic editorial product photo', icon: 'palette' },
-                                                { label: '360° Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
+                                                { label: '360┬░ Turntable', prompt: 'Product on a sleek turntable/lazy susan, clean white cyclorama background, even studio lighting, 3D product display feel', icon: '360' },
                                             ],
                                         };
                                         const scenes = mockupSceneCategory === 'all'
@@ -10406,7 +10394,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {mockupLoading ? (
                                     <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Mockup...</>
                                 ) : (
-                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Mockup<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Mockup<span className="text-xs opacity-60 ml-1">~Γé╣0.25</span></>
                                 )}
                             </button>
 
@@ -10421,7 +10409,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             )}
                         </div>
 
-                        {/* Right — Result */}
+                        {/* Right ΓÇö Result */}
                         <div className="col-span-12 lg:col-span-7">
                             <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
@@ -10462,10 +10450,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     </div>
                     )}
 
-                    {/* ── Logo / Brand Mockup Sub-mode ── */}
+                    {/* ΓöÇΓöÇ Logo / Brand Mockup Sub-mode ΓöÇΓöÇ */}
                     {mockupSubMode === 'logo' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-                        {/* Left — Controls */}
+                        {/* Left ΓÇö Controls */}
                         <div className="col-span-12 lg:col-span-5 space-y-4">
                             {/* Logo Upload */}
                             <div className="studio-card p-4 sm:p-5">
@@ -10560,7 +10548,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 { label: 'Coffee Mug', prompt: 'Logo printed on a white ceramic coffee mug, steam rising, on a cozy wooden desk with books nearby, warm morning light mockup', icon: 'coffee' },
                                                 { label: 'Travel Tumbler', prompt: 'Logo engraved on a sleek stainless steel travel tumbler, modern desk setting, premium drinkware branding mockup', icon: 'local_drink' },
                                                 { label: 'Water Bottle', prompt: 'Logo printed on a matte sport water bottle, gym/outdoor fitness setting, active lifestyle branding mockup', icon: 'water_drop' },
-                                                { label: 'Glass Cup', prompt: 'Logo frosted/engraved on a clear glass cup, café table setting with latte art, premium café branding mockup', icon: 'local_cafe' },
+                                                { label: 'Glass Cup', prompt: 'Logo frosted/engraved on a clear glass cup, caf├⌐ table setting with latte art, premium caf├⌐ branding mockup', icon: 'local_cafe' },
                                             ],
                                             stationery: [
                                                 { label: 'Business Card', prompt: 'Logo printed on a premium thick business card with embossed texture, stack of cards on marble surface, luxury stationery mockup', icon: 'contact_page' },
@@ -10700,7 +10688,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         let prompt = `LOGO/BRAND MOCKUP: Place the logo/design from the provided image onto the following surface/product.\n\nSURFACE: ${logoSurface}`
                                         if (logoKeywords) prompt += `\n\nSTYLE KEYWORDS: ${logoKeywords}`
                                         if (logoStyleRef) prompt += `\n\nMATCH THE STYLE from the provided style reference image.`
-                                        prompt += `\n\nCRITICAL RULES:\n- Place the logo NATURALLY on the product surface — correct perspective, wrapping, and material interaction\n- The logo should look like it was actually printed/embossed/engraved on the product\n- Maintain correct color reproduction of the logo\n- Use professional product photography lighting\n- The mockup should look photorealistic, not like a flat overlay\n- Show realistic material textures (fabric weave, metal sheen, paper grain etc)\n- Make it look like a real professional product photograph`
+                                        prompt += `\n\nCRITICAL RULES:\n- Place the logo NATURALLY on the product surface ΓÇö correct perspective, wrapping, and material interaction\n- The logo should look like it was actually printed/embossed/engraved on the product\n- Maintain correct color reproduction of the logo\n- Use professional product photography lighting\n- The mockup should look photorealistic, not like a flat overlay\n- Show realistic material textures (fabric weave, metal sheen, paper grain etc)\n- Make it look like a real professional product photograph`
 
                                         // Collect image parts
                                         const images = [logoImage]
@@ -10734,7 +10722,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 {logoLoading ? (
                                     <><span className="material-symbols-outlined animate-spin text-lg">progress_activity</span> Generating Mockup...</>
                                 ) : (
-                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Logo Mockup<span className="text-xs opacity-60 ml-1">~₹0.25</span></>
+                                    <><span className="material-symbols-outlined text-lg">auto_awesome</span> Generate Logo Mockup<span className="text-xs opacity-60 ml-1">~Γé╣0.25</span></>
                                 )}
                             </button>
 
@@ -10749,7 +10737,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             )}
                         </div>
 
-                        {/* Right — Result */}
+                        {/* Right ΓÇö Result */}
                         <div className="col-span-12 lg:col-span-7">
                             <div className="studio-card p-4 sm:p-5 min-h-[400px] flex flex-col">
                                 <h3 className="font-bold text-[var(--sys-text)] text-sm flex items-center gap-2 mb-4">
@@ -10789,7 +10777,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
-            {/* ═══ UNIFIED PUBLISH MODAL (shared across all modes) ═══ */}
+            {/* ΓòÉΓòÉΓòÉ UNIFIED PUBLISH MODAL (shared across all modes) ΓòÉΓòÉΓòÉ */}
             <PublishModal
                 isOpen={!!publishData}
                 onClose={() => setPublishData(null)}
@@ -10799,7 +10787,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 brandId={activeBrand?._id}
             />
 
-            {/* ── Model Busy Warning Modal ── */}
+            {/* ΓöÇΓöÇ Model Busy Warning Modal ΓöÇΓöÇ */}
             {showBusyModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-black/60 transition-opacity" onClick={() => setShowBusyModal(false)} />
@@ -10863,12 +10851,12 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
-            {/* ══════════════════════════════════════════════════════════════════ */}
-            {/* CAMPAIGN SHOT — 1-Click Cinematic Poster Studio */}
-            {/* ══════════════════════════════════════════════════════════════════ */}
+            {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+            {/* CAMPAIGN SHOT ΓÇö 1-Click Cinematic Poster Studio */}
+            {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
             {studioMode === 'campaignshot' && (
                 <div className="creative-split fade-up">
-                    {/* ── LEFT PANEL: Controls ── */}
+                    {/* ΓöÇΓöÇ LEFT PANEL: Controls ΓöÇΓöÇ */}
                     <div data-wt="cs-tools" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[var(--sys-border)]">
@@ -10883,7 +10871,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
 
-                            {/* ── 1. Model Selector (same dropdown pattern as AI Create) ── */}
+                            {/* ΓöÇΓöÇ 1. Model Selector (same dropdown pattern as AI Create) ΓöÇΓöÇ */}
                             <div className="px-5 mt-4 pb-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
                                 <div className="relative">
@@ -10911,7 +10899,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                                 <span className="text-[11px] font-bold truncate">{m.name}</span>
                                                                 {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f' }}>NEW</span>}
                                                             </div>
-                                                            <div className="text-[9px] opacity-50 truncate">{m.provider} · {m.desc}</div>
+                                                            <div className="text-[9px] opacity-50 truncate">{m.provider} ┬╖ {m.desc}</div>
                                                         </div>
                                                         {csModel === m.id && <span className="material-symbols-outlined text-[14px]" style={{ color: m.color }}>check</span>}
                                                     </button>
@@ -10922,7 +10910,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
 
-                            {/* ── 2. Product Image Upload ── */}
+                            {/* ΓöÇΓöÇ 2. Product Image Upload ΓöÇΓöÇ */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                     <span className="material-symbols-outlined text-[13px]">add_a_photo</span> Product Image <span className="text-red-400 text-[10px]">required</span>
@@ -10952,18 +10940,18 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* ── 3. Mood Preset — dropdown ── */}
+                            {/* ΓöÇΓöÇ 3. Mood Preset ΓÇö dropdown ΓöÇΓöÇ */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Cinematic Mood</p>
                                 <div className="relative">
                                     <select value={csMoodPreset} onChange={e => setCsMoodPreset(e.target.value)}
                                         className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="dark-botanical">Dark Botanical — Deep greens, moody forest</option>
-                                        <option value="aqua-mist">Aqua Mist — Dark aqua, water droplets</option>
-                                        <option value="charcoal-industrial">Charcoal Industrial — Raw black, sharp edges</option>
-                                        <option value="warm-glow">Warm Glow — Amber, bokeh, candlelight</option>
-                                        <option value="luxury-noir">Luxury Noir — Black marble, editorial</option>
-                                        <option value="custom">Custom — Write your own brief</option>
+                                        <option value="dark-botanical">Dark Botanical ΓÇö Deep greens, moody forest</option>
+                                        <option value="aqua-mist">Aqua Mist ΓÇö Dark aqua, water droplets</option>
+                                        <option value="charcoal-industrial">Charcoal Industrial ΓÇö Raw black, sharp edges</option>
+                                        <option value="warm-glow">Warm Glow ΓÇö Amber, bokeh, candlelight</option>
+                                        <option value="luxury-noir">Luxury Noir ΓÇö Black marble, editorial</option>
+                                        <option value="custom">Custom ΓÇö Write your own brief</option>
                                     </select>
                                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
                                 </div>
@@ -10974,29 +10962,29 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* ── 4. Canvas Size — dropdown ── */}
+                            {/* ΓöÇΓöÇ 4. Canvas Size ΓÇö dropdown ΓöÇΓöÇ */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Canvas Size</p>
                                 <div className="relative">
                                     <select value={csAspectRatio} onChange={e => setCsAspectRatio(e.target.value)}
                                         className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="1:1">1:1 — Square (Instagram / Amazon)</option>
-                                        <option value="4:5">4:5 — Portrait (Instagram Feed)</option>
-                                        <option value="9:16">9:16 — Story / Reel / TikTok</option>
-                                        <option value="16:9">16:9 — Cinematic Widescreen / YouTube</option>
-                                        <option value="2:3">2:3 — Poster / Print</option>
-                                        <option value="3:4">3:4 — Pinterest / Tall Card</option>
-                                        <option value="4:3">4:3 — Landscape / Presentation</option>
-                                        <option value="21:9">21:9 — Ultra-wide Banner</option>
-                                        <option value="3:2">3:2 — Photography / DSLR</option>
-                                        <option value="custom">Custom — Enter dimensions</option>
+                                        <option value="1:1">1:1 ΓÇö Square (Instagram / Amazon)</option>
+                                        <option value="4:5">4:5 ΓÇö Portrait (Instagram Feed)</option>
+                                        <option value="9:16">9:16 ΓÇö Story / Reel / TikTok</option>
+                                        <option value="16:9">16:9 ΓÇö Cinematic Widescreen / YouTube</option>
+                                        <option value="2:3">2:3 ΓÇö Poster / Print</option>
+                                        <option value="3:4">3:4 ΓÇö Pinterest / Tall Card</option>
+                                        <option value="4:3">4:3 ΓÇö Landscape / Presentation</option>
+                                        <option value="21:9">21:9 ΓÇö Ultra-wide Banner</option>
+                                        <option value="3:2">3:2 ΓÇö Photography / DSLR</option>
+                                        <option value="custom">Custom ΓÇö Enter dimensions</option>
                                     </select>
                                     {csAspectRatio === 'custom' && (
                                         <div className="flex gap-2 mt-2">
                                             <input value={csCustomW} onChange={e => setCsCustomW(e.target.value.replace(/\D/g,''))}
                                                 className="flex-1 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[12px] text-[var(--sys-text)] outline-none focus:border-primary/40"
                                                 placeholder="Width px" maxLength={4} />
-                                            <span className="flex items-center text-[var(--sys-text-muted)] text-sm font-bold">×</span>
+                                            <span className="flex items-center text-[var(--sys-text-muted)] text-sm font-bold">├ù</span>
                                             <input value={csCustomH} onChange={e => setCsCustomH(e.target.value.replace(/\D/g,''))}
                                                 className="flex-1 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl px-3 py-2 text-[12px] text-[var(--sys-text)] outline-none focus:border-primary/40"
                                                 placeholder="Height px" maxLength={4} />
@@ -11006,7 +10994,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
 
-                            {/* ── 5. Optional Brief (non-custom moods) ── */}
+                            {/* ΓöÇΓöÇ 5. Optional Brief (non-custom moods) ΓöÇΓöÇ */}
                             {csMoodPreset !== 'custom' && (
                                 <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -11018,7 +11006,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             )}
 
-                            {/* ── 6. Taglines — optional override ── */}
+                            {/* ΓöÇΓöÇ 6. Taglines ΓÇö optional override ΓöÇΓöÇ */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                     <span className="material-symbols-outlined text-[13px]">title</span> Taglines
@@ -11026,15 +11014,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </p>
                                 <div className="space-y-2">
                                     <input type="text" value={csPrimaryTagline} onChange={e => setCsPrimaryTagline(e.target.value)}
-                                        placeholder="Primary — e.g. PURE HERBAL CARE"
+                                        placeholder="Primary ΓÇö e.g. PURE HERBAL CARE"
                                         className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-primary/40 transition-all" />
                                     <input type="text" value={csSecondaryTagline} onChange={e => setCsSecondaryTagline(e.target.value)}
-                                        placeholder="Secondary — e.g. Neem Powered Clean"
+                                        placeholder="Secondary ΓÇö e.g. Neem Powered Clean"
                                         className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-3 py-2.5 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none focus:border-primary/40 transition-all" />
                                 </div>
                             </div>
 
-                            {/* ── 7. Reference Images ── */}
+                            {/* ΓöÇΓöÇ 7. Reference Images ΓöÇΓöÇ */}
                             <div className="px-5 pb-5 border-t border-[var(--sys-border)] pt-4">
                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
                                     <span className="material-symbols-outlined text-[13px]">image_search</span> References
@@ -11090,7 +11078,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                         </div>{/* /scrollable body */}
 
-                        {/* ── Sticky Footer: Copy Toggle + Generate ── */}
+                        {/* ΓöÇΓöÇ Sticky Footer: Copy Toggle + Generate ΓöÇΓöÇ */}
                         <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-2 z-10 border-t border-[var(--sys-border)]">
                             {/* Copy toggle */}
                             <button onClick={() => setCsCopyEnabled(v => !v)}
@@ -11117,11 +11105,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </button>
                             {!activeBrand && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Select a brand first</p>}
-                            {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director → Copywriter → Image (~30–60s)</p>}
+                            {csGenerating && <p className="text-center text-[10px] text-[var(--sys-text-muted)]">Art Director ΓåÆ Copywriter ΓåÆ Image (~30ΓÇô60s)</p>}
                         </div>
                     </div>
 
-                    {/* ── RIGHT PANEL: Canvas / Result ── */}
+                    {/* ΓöÇΓöÇ RIGHT PANEL: Canvas / Result ΓöÇΓöÇ */}
                     <div className="creative-canvas-panel flex flex-col items-center justify-center p-6 sm:p-10">
                         {/* Empty state */}
                         {!csGenerating && csSlots.every(s => !s) && (
@@ -11131,7 +11119,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                                 <div>
                                     <h3 className="text-base font-bold text-[var(--sys-text)] mb-1">Campaign Shot Studio</h3>
-                                    <p className="text-[12px] text-[var(--sys-text-muted)] leading-relaxed max-w-xs">Upload your product photo, pick a cinematic mood, and get 3 AI-generated campaign posters — each with a different creative direction.</p>
+                                    <p className="text-[12px] text-[var(--sys-text-muted)] leading-relaxed max-w-xs">Upload your product photo, pick a cinematic mood, and get 3 AI-generated campaign posters ΓÇö each with a different creative direction.</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2 justify-center">
                                     {['Hero Shot', 'Lifestyle', 'Detail Close-up'].map(m => (
@@ -11147,7 +11135,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] animate-spin" style={{ animationDuration: '2s' }}>progress_activity</span>
                                 <div className="text-center">
                                     <p className="text-[13px] font-bold text-[var(--sys-text)]">AI Art Director at work...</p>
-                                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-1">Analysing brand → Building prompt → Generating image</p>
+                                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-1">Analysing brand ΓåÆ Building prompt ΓåÆ Generating image</p>
                                 </div>
                             </div>
                         )}

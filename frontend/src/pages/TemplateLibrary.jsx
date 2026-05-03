@@ -4,6 +4,8 @@ import DashboardLayout from '../components/DashboardLayout';
 
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal';
 
+import { useNavigate } from 'react-router-dom';
+
 // Lightweight role check from stored JWT
 function getStoredRole() {
     try {
@@ -18,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, studioFilter = '' }) {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const isSuperAdmin = user?.role === 'superadmin';
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -63,7 +66,34 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             setMobileTappedTemplateId(template._id);
             return;
         }
-        setSelectedTemplate(template);
+
+        const categoryName = template.categoryId?.name || '';
+        let targetRoute = null;
+        let targetMode = null;
+
+        if (categoryName === 'Video Q-Ads') {
+            targetRoute = '/video-studio';
+            targetMode = 'q-ads';
+        } else if (categoryName === 'AI Create') {
+            targetRoute = '/creative-studio';
+            targetMode = 'create';
+        } else if (categoryName === 'Campaign Shot') {
+            targetRoute = '/creative-studio';
+            targetMode = 'campaignshot';
+        } else if (categoryName === 'Carousel') {
+            targetRoute = '/content-studio';
+        }
+
+        if (targetRoute) {
+            let url = `${targetRoute}?templateId=${template._id}`;
+            if (targetMode) url += `&mode=${targetMode}`;
+            navigate(url);
+            if (overlayMode && onCloseOverlay) {
+                onCloseOverlay();
+            }
+        } else {
+            setSelectedTemplate(template);
+        }
     };
 
     const containerClasses = overlayMode

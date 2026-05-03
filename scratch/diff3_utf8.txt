@@ -1,0 +1,352 @@
+﻿diff --git a/frontend/src/pages/CreativeStudio.jsx b/frontend/src/pages/CreativeStudio.jsx
+index 767f493..3c1ed3b 100644
+--- a/frontend/src/pages/CreativeStudio.jsx
++++ b/frontend/src/pages/CreativeStudio.jsx
+@@ -1126,6 +1126,9 @@ Be specific and cinematic. Do NOT describe the image ΓÇö describe the MOTION onl
+     const [logoSize, setLogoSize] = useState('medium')
+     const [galleryFilter, setGalleryFilter] = useState('All')
+     const [viewMode, setViewMode] = useState('list')
++    const [historyPage, setHistoryPage] = useState(1)
++    const [sidebarPanel, setSidebarPanel] = useState('create')
++    const [exploreExpanded, setExploreExpanded] = useState({})
+     const [showAdvanced, setShowAdvanced] = useState(false)
+     const [floatingTray, setFloatingTray] = useState(null) // null | 'format' | 'camera' | 'references' | 'text' | 'advanced'
+     const [psTray, setPsTray] = useState(null) // null | 'product' | 'camera' | 'scene' | 'ratio' | 'refs'
+@@ -2779,47 +2782,23 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                 ))}
+                 </div>
+ 
+-                {/* ΓöÇΓöÇ Row 2: Gallery Toolbar (only in AI Create mode) ΓöÇΓöÇ */}
++                {/* ΓöÇΓöÇ Gallery Toolbar (AI Create only) ΓöÇΓöÇ */}
+                 {studioMode === 'create' && (
+-                    <div className="flex items-center justify-between px-3 pb-2 pt-0 border-t border-[var(--sys-border)]">
+-                        <div className="flex items-center gap-3">
+-                            <span className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-[0.12em] flex items-center gap-1.5 flex-shrink-0">
+-                                <span className="material-symbols-outlined text-[12px] text-[var(--sys-text)]">history</span>
+-                                {generationHistory.length > 0 ? `Generations (${generationHistory.length})` : 'Generations'}
+-                            </span>
+-                            <span className="w-px h-3 bg-[var(--sys-surface)] flex-shrink-0" />
+-                            <div className="flex items-center gap-0.5">
+-                                {['All', 'Social', 'Product', 'Promo', 'Quote', 'Event'].map(cat => (
+-                                    <button key={cat}
+-                                        onClick={() => setGalleryFilter(cat)}
+-                                        className={`gallery-cat-pill ${galleryFilter === cat ? 'active' : ''}`}
+-                                        aria-label={`Filter gallery by ${cat}`}
+-                                    >
+-                                        {cat}
+-                                    </button>
+-                                ))}
+-                            </div>
+-                        </div>
+-                        <div className="flex items-center gap-2">
+-                            {generationHistory.length > 0 && (
+-                                <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
+-                            )}
+-                            <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
+-                                <button onClick={() => setViewMode('list')}
+-                                    className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
+-                                    title="List view"
+-                                    aria-label="Switch to list view"
+-                                >
+-                                    <span className="material-symbols-outlined">view_list</span>
+-                                </button>
+-                                <button onClick={() => setViewMode('grid')}
+-                                    className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`} 
+-                                    title="Grid view"
+-                                    aria-label="Switch to grid view"
+-                                >
+-                                    <span className="material-symbols-outlined">grid_view</span>
+-                                </button>
+-                            </div>
++                    <div className="flex items-center justify-end px-3 pb-2 pt-0 border-t border-[var(--sys-border)] gap-2">
++                        {generationHistory.length > 0 && (
++                            <button onClick={() => setGenerationHistory([])} className="studio-btn-ghost text-[10px] py-1 border-none">Clear</button>
++                        )}
++                        <div className="flex rounded-md border border-[var(--sys-border)] overflow-hidden">
++                            <button onClick={() => setViewMode('list')}
++                                className={`studio-action-btn-sm ${viewMode === 'list' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
++                                title="List view" aria-label="Switch to list view">
++                                <span className="material-symbols-outlined">view_list</span>
++                            </button>
++                            <button onClick={() => setViewMode('grid')}
++                                className={`studio-action-btn-sm ${viewMode === 'grid' ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/30' : ''}`}
++                                title="Grid view" aria-label="Switch to grid view">
++                                <span className="material-symbols-outlined">grid_view</span>
++                            </button>
+                         </div>
+                     </div>
+                 )}
+@@ -2857,37 +2836,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                     {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ GALLERY (full-width ΓÇö settings moved to floating bar) ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+                     <div className="creative-gallery relative" data-wt="creative-gallery">
+ 
+-                        {/* ΓöÇΓöÇ Quick Prompt Bar (always visible at top) ΓöÇΓöÇ */}
+-                        <div className="sticky top-0 z-20 bg-[var(--sys-bg)]/90 backdrop-blur-lg border-b border-[var(--sys-border)] px-4 py-2.5">
+-                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+-                                <span className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest whitespace-nowrap flex-shrink-0">Quick Prompt</span>
+-                                <span className="w-px h-3 bg-[var(--sys-border)] flex-shrink-0" />
+-                                <button onClick={() => setShowTemplateLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-primary)] text-white hover:bg-[var(--sys-primary)]/90 transition-all cursor-pointer flex-shrink-0 font-semibold shadow-sm">
+-                                    <span className="material-symbols-outlined text-[14px]">grid_view</span>
+-                                    <span className="text-[11px] whitespace-nowrap">Start from Template</span>
+-                                </button>
+-                                {[
+-                                    { icon: 'share', label: 'Social Post', color: '#6366f1', prompt: `Create a visually stunning social media post for ${activeBrand?.name || 'the brand'}. Make it eye-catching, on-brand, and shareable.` },
+-                                    { icon: 'inventory_2', label: 'Product Shot', color: '#f59e0b', prompt: `Create a premium product showcase for ${activeBrand?.name || 'the brand'}. Feature the product prominently with brand colors.` },
+-                                    { icon: 'local_offer', label: 'Sale / Offer', color: '#ef4444', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'sales')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create a bold promotional sale creative for ${activeBrand?.name || 'the brand'}. Feature a big discount offer, urgency-driven design, eye-catching colors.`; })() },
+-                                    { icon: 'format_quote', label: 'Quote', color: '#10b981', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'quotes')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an elegant quote card for ${activeBrand?.name || 'the brand'}. Large quotation marks, brand colors, professional typography.`; })() },
+-                                    { icon: 'campaign', label: 'Announcement', color: 'var(--sys-text)', prompt: (() => { const tmpl = templateCategories.find(c => c.id === 'announcement')?.subTemplates?.[0]; return tmpl?.buildPrompt?.(activeBrand || { name: 'the brand', dna: {} }, {}) || `Create an announcement creative for ${activeBrand?.name || 'the brand'}. Bold, attention-grabbing design.`; })() },
+-                                    { icon: 'auto_stories', label: 'Brand Story', color: '#f97316', prompt: `Create a compelling brand story visual for ${activeBrand?.name || 'the brand'}. Tell the brand narrative through imagery.` },
+-                                ].map(chip => (
+-                                    <button key={chip.label} onClick={() => setPrompt(chip.prompt)}
+-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text-muted)] hover:shadow-sm transition-all cursor-pointer flex-shrink-0 group">
+-                                        <span className="material-symbols-outlined text-[14px] transition-transform group-hover:scale-110" style={{ color: chip.color }}>{chip.icon}</span>
+-                                        <span className="text-[11px] font-semibold text-[var(--sys-text)] whitespace-nowrap">{chip.label}</span>
+-                                    </button>
+-                                ))}
+-                            </div>
+-                        </div>
+ 
+-                        {/* ΓòÉΓòÉΓòÉ TEMPLATE SUGGESTION ROW ΓÇö section=ai_create ΓòÉΓòÉΓòÉ */}
+-                        <TemplateSuggestionRow
+-                            brandId={activeBrand?._id}
+-                            onSelect={(t) => { setShowTemplateLibrary(true) }}
+-                        />
+ 
+                         {/* ΓòÉΓòÉΓòÉ NATIVE ANIMATE WORKSPACE (MAIN UI) ΓòÉΓòÉΓòÉ */}
+                         {showAnimatePanel && (
+@@ -3589,14 +3538,25 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                 }
+                                             });
+ 
+-                                            return groups.map((group, gIdx) => (
++                                            const PAGE_SIZE_H = 8;
++                                            const totalGroups_H = groups.length;
++                                            const totalPages_H = totalGroups_H > 0 ? (1 + ((totalGroups_H - 1) >> 3)) : 1;
++                                            const startIdx_H = (historyPage - 1) * PAGE_SIZE_H;
++                                            const pagedGroups = groups.slice(startIdx_H, startIdx_H + PAGE_SIZE_H);
++                                            return pagedGroups.map((group, gIdx) => (
+                                                 <div key={gIdx} className={`rounded-xl border ${gIdx === 0 ? 'border-primary/20 bg-primary/[0.04]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'} overflow-hidden transition-all hover:border-[var(--sys-border-hover)] p-4`}>
+                                                     
+                                                     {/* Top Row: Prompt + metadata */}
+                                                     <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 pb-4 border-b border-[var(--sys-border)]">
+                                                         {/* Prompt Text Block */}
+                                                         <div className="flex-1 min-w-0 pr-4">
+-                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed" title={group.prompt}>{group.prompt}</p>
++                                                            <p className="text-sm font-medium text-[var(--sys-text)] truncate leading-relaxed mb-1" title={group.prompt}>{group.prompt}</p>
++                                                             {group.items[0]?.model && (
++                                                                 <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-bg)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium">
++                                                                     <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
++                                                                     {group.items[0].model}
++                                                                 </span>
++                                                             )}
+                                                         </div>
+ 
+                                                         {/* Actions & Metadata Block */}
+@@ -3625,19 +3585,17 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                         </div>
+                                                     </div>
+ 
+-                                                    {/* Bottom Row: Image Array Gallery */}
+-                                                    <div className="flex gap-4 overflow-x-auto snap-x scrollbar-hide pb-2">
++                                                    {/* Bottom Row: Image Array ΓÇö left-aligned, left-to-right */}
++                                                    <div className="flex flex-wrap gap-3 items-start justify-start">
+                                                         {group.items.map((item, iIdx) => (
+-                                                            <div key={item._id || iIdx} className="relative rounded-xl shrink-0 snap-start overflow-hidden" style={{ width: group.items.length === 1 ? '100%' : group.items.length === 2 ? '48%' : '32%' }}>
+-                                                                <div className="group/img relative w-fit h-full rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
++                                                            <div key={item._id || iIdx} className="relative rounded-xl overflow-hidden flex-shrink-0" style={{ width: group.items.length === 1 ? '100%' : '180px' }}>
++                                                                <div className="group/img relative rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
+-                                                                        className="w-auto h-[220px] max-w-full object-contain object-left block bg-[var(--sys-surface)] aspect-video sm:aspect-auto" />
+-                                                                    
+-                                                                    {item._idx === 0 && <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-[var(--sys-bg)] shadow flex items-center justify-center pointer-events-none"></span>}
++                                                                        className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
+                                                                     
+                                                                     {/* Hover Ribbon Actions inside Image */}
+-                                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-md transition-all opacity-0 group-hover/img:opacity-100 flex items-center justify-center p-1 sm:p-2 pointer-events-none group-hover/img:pointer-events-auto">
+-                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden scale-95 group-hover/img:scale-100 transition-transform max-w-full">
++                                                                    <div className="absolute inset-0 bg-black/50 transition-all opacity-0 group-hover/img:opacity-100 flex items-end justify-center pb-3 pointer-events-none group-hover/img:pointer-events-auto">
++                                                                        <div className="flex bg-[var(--sys-surface)]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[var(--sys-border)] overflow-hidden">
+                                                                             <button onClick={(e) => { e.stopPropagation(); setZoomImage(item.imageUrl); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
+                                                                                 View
+                                                                             </button>
+@@ -3654,6 +3612,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                         ))}
+                                                     </div>
+ 
++
+                                                             {/* ΓöÇΓöÇ MCoT Thinking Mode Toggle (Session) ΓöÇΓöÇ */}
+                                                             {group.items[0]?.aiMeta?.mcotReasoning && (
+                                                                 <button
+@@ -3742,7 +3701,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+ 
+                         {/* ΓöÇΓöÇ Generation History (from Image Bank) ΓöÇΓöÇ */}
+                         {(() => {
+-                            const allGenerated = bankImages.filter(img => img.source === 'ai-generated' || img.category === 'generated' || img.type !== 'uploaded');
++                            const allGenerated = bankImages.filter(img => {
++                                if (img.source === 'uploaded' || img.type === 'uploaded') return false;
++                                if (img.studioOrigin && img.studioOrigin !== 'creative') return false;
++                                if (img.jobType && img.jobType !== 'GenerationJob') return false;
++                                const tags = (img.tags || []).join(' ').toLowerCase();
++                                if (tags.includes('campaign-logo') || tags.includes('photoshoot') || tags.includes('carousel')) return false;
++                                return img.source === 'ai-generated' || img.category === 'generated' || !!img.imageUrl;
++                            });
+                             const filtered = galleryFilter === 'All' ? allGenerated : allGenerated.filter(img => {
+                                 const tags = (img.tags || []).map(t => t.toLowerCase());
+                                 const title = (img.title || '').toLowerCase();
+@@ -3811,10 +3777,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                 <div className="space-y-4">
+                                     {filtered.map(img => (
+                                     <div key={img._id} className="generation-card">
+-                                        {/* Prompt */}
+-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
++                                        {/* Prompt + Model */}
++                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
+                                             {img.prompt || img.title || 'AI Generated'}
+                                         </p>
++                                        {img.model && (
++                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
++                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
++                                                {img.model}
++                                            </span>
++                                        )}
+ 
+                                         {/* Image */}
+                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">
+@@ -4101,12 +4073,12 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+ 
+                     </div>{/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ END RIGHT GALLERY PANEL ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+ 
+-                    {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ SIDEBAR COMMAND PANEL WITH SETTINGS ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
++                    {/* ╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë SIDEBAR COMMAND PANEL WITH SETTINGS ╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë╬ô├▓├ë */}
+                     <div data-wt="creative-prompt" className="creative-tools-panel !border-none !bg-[var(--sys-surface)]">
+-                            {/* ΓöÇΓöÇ NEW FREEPIK SIDEBAR BODY ΓöÇΓöÇ */}
++                            {/* ╬ô├╢├ç╬ô├╢├ç NEW FREEPIK SIDEBAR BODY ╬ô├╢├ç╬ô├╢├ç */}
+                             <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide creative-tools-panel-body !flex !flex-col !h-full p-0">
+                                 
+-                                {/* ΓöÇΓöÇ Model Selector ΓöÇΓöÇ */}
++                                {/* ╬ô├╢├ç╬ô├╢├ç Model Selector ╬ô├╢├ç╬ô├╢├ç */}
+                                 <div className="px-5 mt-3 pb-4">
+                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Model</p>
+                                     <div className="relative">
+@@ -4148,7 +4120,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                     </div>
+                                 </div>
+ 
+-                                {/* ΓöÇΓöÇ References Dash Grid ΓöÇΓöÇ */}
++                                {/* ╬ô├╢├ç╬ô├╢├ç References Dash Grid ╬ô├╢├ç╬ô├╢├ç */}
+                                 <div className="px-5 pb-4">
+                                     <div className="flex items-center justify-between mb-2">
+                                         <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">References</p>
+@@ -4191,7 +4163,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                     </div>
+                                 </div>
+ 
+-                                {/* ΓöÇΓöÇ Unified Prompt Textarea (Full Height Expansion) ΓöÇΓöÇ */}
++                                {/* ╬ô├╢├ç╬ô├╢├ç Unified Prompt Textarea (Full Height Expansion) ╬ô├╢├ç╬ô├╢├ç */}
+                                 <div className="px-5 pb-3 flex flex-col flex-grow">
+                                     <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
+                                     <div className="flex flex-col relative bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-[16px] overflow-hidden focus-within:border-primary/50 focus-within:shadow-md transition-all flex-grow">
+@@ -4207,7 +4179,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                 if (e.key === 'Enter' && !e.shiftKey && !showCharTags) { e.preventDefault(); handleGenerate() }
+                                                 if (e.key === 'Escape') { setShowCharTags(false); setFloatingTray(null) }
+                                             }}
+-                                            placeholder={activeBrand ? "Describe your imageΓÇötry @ to add references" : "Select a brand first..."}
++                                            placeholder={activeBrand ? "Describe your image╬ô├ç├╢try @ to add references" : "Select a brand first..."}
+                                             disabled={!activeBrand || activeGenerations.length >= 3}
+                                             className="w-full bg-transparent p-4 text-[14px] leading-relaxed text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none flex-grow min-h-[140px]"
+                                             ref={promptTextareaRef}
+@@ -4252,7 +4224,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                 </button>
+                                                 <span className="text-[12px] font-bold text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer select-none" onClick={() => setGenerateCopy(!generateCopy)}>Add Text to Image (Copy)</span>
+ 
+-                                                {/* Brand Logo Toggle ΓÇö overlay logo at chosen position + size on the generated image.
++                                                {/* Brand Logo Toggle ╬ô├ç├╢ overlay logo at chosen position + size on the generated image.
+                                                     Backend (utils/logoOverlay.js) does the compositing server-side. */}
+                                                 <span className="w-px h-4 bg-[var(--sys-border)]" aria-hidden="true" />
+                                                 <button onClick={(e) => { e.stopPropagation(); setAddLogo(!addLogo) }} className={"w-9 h-5 rounded-full relative transition-colors shadow-inner " + (addLogo ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700')} title={activeBrand?.dna?.logo?.url ? "Overlay your brand logo" : "Add a logo to your Brand DNA first"}>
+@@ -4278,7 +4250,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                     {copyLoading ? (
+                                                         <span className="flex items-center gap-1.5 text-[10px] text-[var(--sys-primary)] animate-pulse">Agent is writing your copy...</span>
+                                                     ) : copyIsAiSuggested ? (
+-                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested ΓÇö edit freely</span>
++                                                        <span className="flex items-center gap-1 text-[10px] text-[var(--sys-primary)]"><span className="material-symbols-outlined text-[9px]">auto_awesome</span> AI suggested ╬ô├ç├╢ edit freely</span>
+                                                     ) : (
+                                                         <span className="text-[10px] text-[var(--sys-text-muted)]">Customize overlay text (or let AI write it)</span>
+                                                     )}
+@@ -4293,18 +4265,18 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                             </div>
+                                         )}
+ 
+-                                        {/* Brand Logo Controls ΓÇö compact 3├ù3 visual position grid + tiny size pills.
++                                        {/* Brand Logo Controls ╬ô├ç├╢ compact 3Γö£├╣3 visual position grid + tiny size pills.
+                                             Layout designed to fit in ~110px of vertical space (was ~280px). */}
+                                         {addLogo && (
+                                             <div className="px-4 py-2.5 border-t border-[var(--sys-border)] bg-[var(--sys-bg)]">
+                                                 {!activeBrand?.dna?.logo?.url ? (
+                                                     <div className="flex items-center gap-2 text-[11px] text-[var(--sys-text-muted)]">
+                                                         <span className="material-symbols-outlined text-[14px] text-amber-500">warning</span>
+-                                                        Add a logo in Brand DNA ΓåÆ Visual Identity to enable.
++                                                        Add a logo in Brand DNA ╬ô├Ñ├å Visual Identity to enable.
+                                                     </div>
+                                                 ) : (
+                                                     <div className="flex items-start gap-3">
+-                                                        {/* 3├ù3 visual position grid ΓÇö each cell maps to a real anchor.
++                                                        {/* 3Γö£├╣3 visual position grid ╬ô├ç├╢ each cell maps to a real anchor.
+                                                             Explicit gridTemplateColumns/Rows + per-cell width/height because Tailwind
+                                                             grid-cols-3 alone collapses to 1 col when cells have no content. */}
+                                                         <div>
+@@ -4362,7 +4334,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                             </div>
+                                                         </div>
+ 
+-                                                        {/* Right column ΓÇö Size pills + tiny status line */}
++                                                        {/* Right column ╬ô├ç├╢ Size pills + tiny status line */}
+                                                         <div className="flex-1 min-w-0">
+                                                             <span className="text-[8px] text-[var(--sys-text-muted)] uppercase tracking-[0.15em] font-bold block mb-1">Size</span>
+                                                             <div className="inline-flex rounded-md border border-[var(--sys-border)] bg-[var(--sys-surface)] p-[2px] gap-[2px]">
+@@ -4390,7 +4362,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                                                 })}
+                                                             </div>
+                                                             <p className="mt-1.5 text-[9px] text-[var(--sys-text-muted)] truncate">
+-                                                                {logoPosition?.replace('-', ' ')} ┬╖ {logoSize}
++                                                                {logoPosition?.replace('-', ' ')} Γö¼Γòû {logoSize}
+                                                             </p>
+                                                         </div>
+                                                     </div>
+@@ -4401,7 +4373,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                 </div>
+                             </div>
+ 
+-                            {/* ΓöÇΓöÇ Soft Modifiers & Generate Plinth ΓöÇΓöÇ */}
++                            {/* ╬ô├╢├ç╬ô├╢├ç Soft Modifiers & Generate Plinth ╬ô├╢├ç╬ô├╢├ç */}
+                             <div className="creative-tools-panel-footer !bg-[var(--sys-bg)] !border-none px-5 pt-3 pb-5 space-y-3 z-10 border-t border-[var(--sys-border)]">
+                                 {/* Modifier Pills */}
+                                 <div className="flex items-center flex-wrap gap-2">
+@@ -4424,7 +4396,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                             {selectedType === 'custom-size' && (
+                                                 <div className="pt-2 pb-1 px-2 border-t border-[var(--sys-border)] mt-1 flex items-center gap-1">
+                                                     <input type="number" placeholder="W" value={customWidth} onChange={(e) => setCustomWidth(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+-                                                    <span className="text-[10px] text-gray-500">├ù</span>
++                                                    <span className="text-[10px] text-gray-500">Γö£├╣</span>
+                                                     <input type="number" placeholder="H" value={customHeight} onChange={(e) => setCustomHeight(e.target.value)} className="w-[45%] text-[10px] p-1 bg-black/10 rounded border border-black/20 text-center text-black font-mono outline-none" />
+                                                 </div>
+                                             )}
+@@ -5328,10 +5300,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                                 <div className="space-y-4">
+                                     {filtered.map(img => (
+                                     <div key={img._id} className="generation-card">
+-                                        {/* Prompt */}
+-                                        <p className="text-xs text-[var(--sys-text-muted)] mb-2 line-clamp-2 leading-relaxed">
++                                        {/* Prompt + Model */}
++                                        <p className="text-xs text-[var(--sys-text-muted)] mb-1.5 line-clamp-2 leading-relaxed">
+                                             {img.prompt || img.title || 'AI Generated'}
+                                         </p>
++                                        {img.model && (
++                                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded-md font-medium mb-2">
++                                                <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>auto_awesome</span>
++                                                {img.model}
++                                            </span>
++                                        )}
+ 
+                                         {/* Image */}
+                                         <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] mb-2.5 group">

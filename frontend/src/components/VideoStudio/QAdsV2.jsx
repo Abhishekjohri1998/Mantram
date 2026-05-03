@@ -518,7 +518,7 @@ function GridVideo({ project, onReuse }) {
     </div>
 }
 
-export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) {
+export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId }) {
     const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
     const [templates, setTemplates] = useState([])
@@ -640,6 +640,17 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete }) 
             if (template.savedVideoSettings.presetId) setSelP(template.savedVideoSettings.presetId)
         }
     }, [])
+
+    const hasHydratedRef = useRef(false);
+    useEffect(() => {
+        if (initialTemplateId && templates.length > 0 && !hasHydratedRef.current) {
+            const matched = templates.find(t => t._id === initialTemplateId);
+            if (matched) {
+                handleTemplateClick(matched);
+                hasHydratedRef.current = true;
+            }
+        }
+    }, [initialTemplateId, templates, handleTemplateClick]);
 
     const handleAvatarUpload = useCallback(async file => {
         setAvatarBusy(true); setError(null)
