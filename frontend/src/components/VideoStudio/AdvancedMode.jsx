@@ -1306,7 +1306,23 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         <div className="vm-library">
                             <div className="vm-library-head">
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_library</span> Image Library</span>
-                                <button onClick={() => setShowLibrary(false)}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span></button>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button 
+                                        onClick={() => {
+                                            setShowLibrary(false);
+                                            if (libraryFor === 'first') firstFrameRef.current?.click();
+                                            else if (libraryFor === 'last') lastFrameRef.current?.click();
+                                            else if (libraryFor === 'ref') refImgRef.current?.click();
+                                            else if (libraryFor === 'i2v') i2vRef.current?.click();
+                                        }}
+                                        style={{ fontSize: '11px', background: 'var(--sys-primary)', color: '#111', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>upload</span> Upload
+                                    </button>
+                                    <button onClick={() => setShowLibrary(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', color: 'var(--sys-text)' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                                    </button>
+                                </div>
                             </div>
                             {libraryLoading ? <p style={{ fontSize: '12px', color: 'var(--sys-text-muted)', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
                                 : libraryImages.length === 0 ? <p style={{ fontSize: '12px', color: 'var(--sys-text-muted)', textAlign: 'center', padding: '12px 0' }}>No images yet</p>
