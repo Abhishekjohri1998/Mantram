@@ -30,7 +30,7 @@ function buildSystemPrompt({ brandContext, preset, trendingContext, competitorCo
     const hasTrending = !!trendingContext;
     const hasCompetitor = !!competitorContext;
 
-    return `You are a professional ad director and Seedance 2.0 prompt engineer. Your job is to take a product brief and brand context and write three production-ready cinematic paragraphs that function as directing instructions for an AI video model.
+    return `You are a professional ad director and Seedance 2.0 prompt engineer. Your job is to take a product brief and brand context and write ONE production-ready cinematic paragraph that functions as directing instructions for an AI video model.
 
 You write exactly like a cinematographer writing a shot note — specific, physical, present tense, no interpretation, no abstraction, no emotion words. You describe only what the camera sees and the microphone hears.
 
@@ -87,7 +87,7 @@ FORBIDDEN ELEMENTS: ${(preset.forbiddenElements || []).join('; ')}
   → These must NOT appear in any variant.
 
 DIRECTOR MANDATE: ${preset.directorBrief}
-  → This is the core creative intention. Honor it precisely in all three variants.
+  → This is the core creative intention. Honor it precisely in the variant.
 
 ═══════════════════════════════════════════════════════
 SECTION 5 — ENGINE RULES
@@ -172,17 +172,12 @@ Never alter the product's appearance from an uploaded image. Never alter avatar 
 ═══════════════════════════════════════════════════════
 SECTION 11 — VARIANT PRODUCTION
 ═══════════════════════════════════════════════════════
-Produce THREE paragraph variants. Each uses the same preset, same brand DNA, same brief. But each variant has a MEANINGFULLY DIFFERENT camera approach within the rules of the preset:
-- Different environment within the preset's environment type
-- Different opening beat (product reveal order, hook type)
-- Different physical blocking for avatar
+Produce ONE paragraph variant. It uses the preset, the brand DNA, and the brief to construct a cinematic approach within the rules of the preset.
 
-The three variants are separated by a blank line and labeled exactly:
+The variant is labeled exactly:
 Variant A
-Variant B
-Variant C
 
-These labels are for the UI only and are stripped before sending to Seedance.
+This label is for the UI only and is stripped before sending to Seedance.
 
 ═══════════════════════════════════════════════════════
 SECTION 12 — OUTPUT FORMAT
@@ -192,12 +187,6 @@ OUTPUT IS:
 2. A blank line
 3. "Variant A" label
 4. The first paragraph — one continuous flowing prose paragraph. Present tense. Active voice. Concrete physical description. 150–220 words. NO section labels, NO headers, NO bullet points, NO timecodes, NO numbered shots, NO JSON, NO markdown inside the paragraph.
-5. A blank line
-6. "Variant B" label
-7. Second paragraph — same structure, different camera approach
-8. A blank line  
-9. "Variant C" label
-10. Third paragraph — same structure, different camera approach
 
 VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The paragraph reads like a note from the director to the camera operator — specific, physical, actionable.`;
 }
@@ -224,7 +213,7 @@ GENERATION SETTINGS:
   Custom Dialogue: ${settings?.customDialogue || 'None'}
   Avatar provided: ${hasAvatar ? 'Yes — extract appearance from image, write them into scene specifically' : 'No — use functional label only, do not invent appearance'}
 
-Write all three Seedance 2.0 prompt variants now. Remember: in medias res. The ad is already in progress when the camera starts.`;
+Write the Seedance 2.0 prompt variant now. Remember: in medias res. The ad is already in progress when the camera starts.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -409,7 +398,7 @@ export async function runQAdsAgent({
     const issues = validateVariants(variants);
     if (issues.length > 0) {
         console.warn(`[Q-Ads Agent] Validation issues found: ${issues.join('; ')}. Retrying once...`);
-        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED. Issues found: ${issues.join('; ')}.\nReturn ONLY three valid prose paragraphs labeled Variant A, Variant B, Variant C. No other text.`;
+        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED. Issues found: ${issues.join('; ')}.\nReturn ONLY one valid prose paragraph labeled Variant A. No other text.`;
         try {
             rawOutput = await callMultimodalAgent(
                 retrySystem,

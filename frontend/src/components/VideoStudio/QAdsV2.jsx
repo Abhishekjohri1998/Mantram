@@ -723,7 +723,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 setProductData(pData); setProductImgs(pImgs)
             }
 
-            setPromptStage('Writing 3 cinematic variants...')
+            setPromptStage('Writing cinematic variant...')
             const res = await api('/video-studio/ugc-pro/qads/v2/generate-prompts', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -838,7 +838,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Claude is channeling 13 engine rules + your brand DNA</div>
             </div>}
 
-            {/* 3 Variant Cards */}
+            {/* 1 Variant Card */}
             {variants.length > 0 && !isGeneratingPrompts && (
                 <div style={{ display: 'flex', gap: 12, marginBottom: 8, overflowX: 'auto', paddingBottom: 4 }}>
                     {variants.map(v => {
@@ -942,7 +942,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     <button className="scott-generate" onClick={generatePrompts} disabled={isGeneratingPrompts || (!productUrl && !productImgs.length)} style={{ height: 56, padding: '0 20px', fontSize: 13 }}>
                         {isGeneratingPrompts
                             ? <><span className="material-symbols-outlined spin" style={{ fontSize: 16 }}>autorenew</span> Writing...</>
-                            : <>GET 3 VARIANTS <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span></>}
+                            : <>GET 1 VARIANT <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span></>}
                     </button>
                 </div>
             </div>
