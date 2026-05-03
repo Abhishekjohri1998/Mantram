@@ -3,7 +3,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      jsxRuntime: 'automatic',
+      // CreativeStudio.jsx uses esbuild-compatible JSX patterns (not Babel)
+      exclude: [/CreativeStudio\.jsx$/],
+    }),
+    tailwindcss()
+  ],
+  esbuild: {
+    // Use esbuild for JSX transformation for excluded files
+    jsx: 'automatic',
+  },
   base: '/',
   build: {
     target: 'es2020',

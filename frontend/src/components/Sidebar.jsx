@@ -10,6 +10,7 @@ const navItems = [
     { icon: 'edit_note', label: 'Content Studio', to: '/content-studio', studioKey: 'contentStudio' },
     { icon: 'auto_fix_high', label: 'Creative Studio', to: '/creative-studio', studioKey: 'creativeStudio' },
     { icon: 'draw', label: 'AI Canvas', to: '/ai-canvas', studioKey: 'creativeStudio' },
+    { icon: 'grid_view', label: 'Explore', to: '/templates', studioKey: 'creativeStudio' },
     { icon: 'bolt', label: 'Pulse Studio', to: '/pulse-studio', badge: 'NEW' },
     { icon: 'movie', label: 'Video Studio', to: '/video-studio', studioKey: 'videoStudio' },
     { icon: 'play_circle', label: 'YouTube Studio', to: '/youtube-studio', studioKey: 'videoStudio' },
