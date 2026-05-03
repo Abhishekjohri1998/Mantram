@@ -243,8 +243,11 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             
             console.log(`🎬 [Superadmin Video] Submitting generation. Refs: ${allRefs.length} (Avatar: ${avatarUrl ? 'Yes' : 'No'}, Products: ${imageUrls.length})`);
 
+            // Clean the prompt to remove @Image tags so the video generator doesn't get confused
+            let cleanPrompt = finalPrompt.replace(/@Image\d+/g, '').replace(/\s{2,}/g, ' ').trim();
+
             const genResult = await submitVideoGeneration({
-                prompt: finalPrompt,
+                prompt: cleanPrompt,
                 model: selectedModel,
                 duration: Math.min(parseInt(duration || 8), 15),
                 aspectRatio: format || '9:16',
