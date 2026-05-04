@@ -1967,7 +1967,8 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     // ⚡ OPT 5: HEAD-check before full download — skip 404s instantly (saves 5-15s)
                     try {
                         const headResp = await presignedFetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-                        if (headResp && !headResp.ok) {
+                        // S3 presigned URLs are signed for GET. A HEAD request will return 403 SignatureDoesNotMatch.
+                        if (headResp && !headResp.ok && headResp.status !== 403 && headResp.status !== 405) {
                             console.warn(`⚡ Skipping dead ref URL (HTTP ${headResp.status}): ${url.substring(0, 60)}`);
                             return null;
                         }
