@@ -223,6 +223,7 @@ export const templates = {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/templates?${query}`);
     },
+    get: (id) => apiFetch(`/templates/${id}`),
     use: (id, data) => apiFetch(`/templates/${id}/use`, { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
 };
 
