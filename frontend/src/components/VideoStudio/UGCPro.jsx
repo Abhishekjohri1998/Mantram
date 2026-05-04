@@ -135,7 +135,7 @@ function Dropdown({ value, onChange, options, label }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
-export default function UGCPro({ activeBrand, projects = [] }) {
+export default function UGCPro({ activeBrand, projects = [], canCreateVideo = true, onUpgradeRequired }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const [analyzing, setAnalyzing] = useState(false)
@@ -261,6 +261,7 @@ export default function UGCPro({ activeBrand, projects = [] }) {
 
     // ── Generate Video ──
     const handleGenerate = useCallback(async () => {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!avatarUrl) { setError('Upload or generate an avatar first'); return }
         if (!productData) { setError('Analyze a product first — paste a link or upload images'); return }
         setLoading(true); setError(null)

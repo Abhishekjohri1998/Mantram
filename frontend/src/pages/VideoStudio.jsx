@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
+import { useCredits } from '../context/CreditContext'
 import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import GlobalLoader from '../components/GlobalLoader'
@@ -12,6 +13,7 @@ import UGCPro from '../components/VideoStudio/UGCPro'
 import QAds from '../components/VideoStudio/QAds'
 import QAdsV2 from '../components/VideoStudio/QAdsV2'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
+import VideoUpgradeModal from '../components/VideoUpgradeModal'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow'
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal'
@@ -116,9 +118,19 @@ const LazyVideoThumbnail = ({ src, poster }) => {
     )
 }
 
+// Plans that are allowed to create videos (professional and above)
+const VIDEO_ALLOWED_PLANS = ['professional', 'agency', 'enterprise']
+
 export default function VideoStudio() {
     const { user } = useAuth()
     const { activeBrand, brands } = useBrand()
+    const { balance } = useCredits()
+
+    // Plan gate: only Professional, Agency, Enterprise, or admin/superadmin can create videos
+    const userPlan = balance?.plan || 'free'
+    const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
+    const canCreateVideo = isAdmin || VIDEO_ALLOWED_PLANS.includes(userPlan)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
     // ── State ──
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
@@ -481,6 +493,7 @@ export default function VideoStudio() {
     // STEP 1: Start — Submit brief + images → get concepts
     // ══════════════════════════════════════════════════════════════════════════
     async function handleStart() {
+        if (!canCreateVideo) { setShowUpgradeModal(true); return; }
         if (!activeBrand?._id) {
             setError({
                 message: 'Select a brand from the top bar before creating a video',
@@ -632,6 +645,7 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     // ══════════════════════════════════════════════════════════════════════════
     async function handleGenerateImages() {
+        if (!canCreateVideo) { setShowUpgradeModal(true); return; }
         setLoading(true); setError('')
         try {
             const data = await api(`/video-studio/${projectId}/generate-images`, {
@@ -674,6 +688,7 @@ export default function VideoStudio() {
     }
 
     async function handleGenerateVideo() {
+        if (!canCreateVideo) { setShowUpgradeModal(true); return; }
         setLoading(true); setError('')
         try {
             const data = await api(`/video-studio/${projectId}/generate`, {
@@ -741,6 +756,7 @@ export default function VideoStudio() {
     // STEP 7: Edit prompt → re-generate
     // ══════════════════════════════════════════════════════════════════════════
     async function handleEditAndRegenerate() {
+        if (!canCreateVideo) { setShowUpgradeModal(true); return; }
         setLoading(true); setError('')
         try {
             const data = await api(`/video-studio/${projectId}/edit`, {
@@ -1155,7 +1171,7 @@ export default function VideoStudio() {
 
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} />
+                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
@@ -1165,17 +1181,17 @@ export default function VideoStudio() {
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
                 {studioMode === 'ugc-pro' && (
-                    <UGCPro activeBrand={activeBrand} projects={projects} />
+                    <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {studioMode === 'q-ads' && (
-                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} />
+                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
                 {studioMode === 'agent' && (
-                    <VideoAgent activeBrand={activeBrand} />
+                    <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
                 {/* ── STORYBOARD MODE ── */}
@@ -2346,6 +2362,11 @@ export default function VideoStudio() {
                     onClose={() => setShowTemplateModal(false)}
                     template={selectedTemplate}
                 />
+            )}
+
+            {/* ── Plan Upgrade Modal ── */}
+            {showUpgradeModal && (
+                <VideoUpgradeModal onClose={() => setShowUpgradeModal(false)} />
             )}
         </DashboardLayout >
     )

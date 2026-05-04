@@ -277,7 +277,7 @@ const PosterThumbnail = ({ src, poster }) => {
 // Keep old name as alias for backward compatibility
 const LazyVideoThumbnail = PosterThumbnail
 
-export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false }) {
+export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false, canCreateVideo = true, onUpgradeRequired }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
     const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
@@ -712,6 +712,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
 
     // ── Generate — adds a job instead of replacing the panel ──
     async function handleGenerate() {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!canGenerate) { setError(`Max ${MAX_CONCURRENT} concurrent generations. Wait for one to finish.`); return }
         if (!prompt.trim()) { setError('Write your ad idea first'); return }
         setLoading(true); setError('')
@@ -757,6 +758,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     }
 
     async function handleI2VGenerate() {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!canGenerate) { setError(`Max ${MAX_CONCURRENT} concurrent generations`); return }
         if (!i2vImage?.url) { setError('Upload an image first'); return }
         setLoading(true); setError('')

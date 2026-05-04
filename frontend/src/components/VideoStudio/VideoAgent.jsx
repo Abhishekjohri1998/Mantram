@@ -31,7 +31,7 @@ const MODEL_INFO = {
     'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: '🐴', tier: 'Pro' },
 }
 
-export default function VideoAgent({ activeBrand }) {
+export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgradeRequired }) {
     // Chat
     const [messages, setMessages] = useState([{
         role: 'agent', timestamp: Date.now(),
@@ -126,6 +126,7 @@ export default function VideoAgent({ activeBrand }) {
     async function handleSend(promptOverride) {
         const prompt = promptOverride || input.trim()
         if (!prompt || isThinking || generating) return
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
 
         setInput('')
         setMessages(prev => [...prev, {
@@ -224,6 +225,7 @@ export default function VideoAgent({ activeBrand }) {
 
     // ── Approve storyboard → generate first frames ──
     async function handleApproveFirstFrames(sessionId) {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         setGeneratingFrames(true)
         setMessages(prev => [...prev, {
             role: 'user', content: '✅ Storyboard approved! Generate preview frames...', timestamp: Date.now(),
@@ -264,6 +266,7 @@ export default function VideoAgent({ activeBrand }) {
 
     // ── Approve frames → generate actual videos ──
     async function handleApproveGenerate(sessionId) {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         setMessages(prev => [...prev, {
             role: 'user', content: '✅ Frames approved! Start generating videos...', timestamp: Date.now(),
         }])

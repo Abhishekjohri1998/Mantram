@@ -518,7 +518,7 @@ function GridVideo({ project, onReuse }) {
     </div>
 }
 
-export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId }) {
+export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId, canCreateVideo = true, onUpgradeRequired }) {
     const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
     const [templates, setTemplates] = useState([])
@@ -706,6 +706,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
     // Step 1 — Generate 3 prompt variants (single Claude call)
     const generatePrompts = useCallback(async () => {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!selP) { setError('Select a format first.'); return }
         setIsGeneratingPrompts(true); setError(null); setVariants([]); setLegend(''); setVideoJobs({})
 
@@ -749,6 +750,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
         const vid = variant.variantId
         setVideoJobs(prev => ({ ...prev, [vid]: { status: 'generating', progress: 3 } }))
         setError(null)
