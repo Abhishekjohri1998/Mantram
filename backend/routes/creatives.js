@@ -1469,8 +1469,23 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         }
     }
 
+    let finalImageSize = imageSize;
+    if (!useLaoZhang) {
+        if (mappedModelId === 'dall-e-3') {
+            if (finalImageSize !== '1024x1024' && finalImageSize !== '1024x1792' && finalImageSize !== '1792x1024') {
+                const [wStr, hStr] = aspectRatio.split(':');
+                const w = parseFloat(wStr) || 1, h = parseFloat(hStr) || 1;
+                if (w > h) finalImageSize = '1792x1024';
+                else if (w < h) finalImageSize = '1024x1792';
+                else finalImageSize = '1024x1024';
+            }
+        } else if (mappedModelId === 'dall-e-2') {
+            finalImageSize = '1024x1024';
+        }
+    }
+
     console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId} -> ${mappedModelId}) ══════`);
-    console.log(`🎨 Model: ${mappedModelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
+    console.log(`🎨 Model: ${mappedModelId} | Quality: ${quality} | Size: ${finalImageSize} | Format: ${finalFormat}`);
     console.log(`🌐 Endpoint: ${baseUrl}/${endpoint} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
     if (useEditsEndpoint) console.log(`🖼️  Reference images: ${refBuffers.length}`);
     console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
@@ -1512,7 +1527,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         }
         formData.append('prompt', editPrompt);
         formData.append('n', '1');
-        formData.append('size', imageSize);
+        formData.append('size', finalImageSize);
         if (quality && quality !== 'medium' && quality !== 'standard') {
             formData.append('quality', quality);
         }
@@ -1536,7 +1551,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             model: mappedModelId,
             prompt: promptText,
             n: 1,
-            size: imageSize,
+            size: finalImageSize,
         };
 
         if (useLaoZhang) {
