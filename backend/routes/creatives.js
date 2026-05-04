@@ -1371,8 +1371,7 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // Otherwise uses /images/generations (JSON body).
 export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
-    const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
-    const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';
+    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
@@ -1461,8 +1460,17 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     const useEditsEndpoint = refBuffers.length > 0;
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
-    console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId}) ══════`);
-    console.log(`🎨 Model: ${modelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
+    let mappedModelId = modelId;
+    if (!useLaoZhang) {
+        if (modelId === 'gpt-image-2') {
+            mappedModelId = useEditsEndpoint ? 'dall-e-2' : 'dall-e-3'; // DALL-E 3 doesn't support /edits natively
+        } else if (modelId === 'gpt-image-1') {
+            mappedModelId = 'dall-e-2';
+        }
+    }
+
+    console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId} -> ${mappedModelId}) ══════`);
+    console.log(`🎨 Model: ${mappedModelId} | Quality: ${quality} | Size: ${imageSize} | Format: ${finalFormat}`);
     console.log(`🌐 Endpoint: ${baseUrl}/${endpoint} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
     if (useEditsEndpoint) console.log(`🖼️  Reference images: ${refBuffers.length}`);
     console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
@@ -1484,7 +1492,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             });
         }
 
-        formData.append('model', modelId);
+        formData.append('model', mappedModelId);
         // ── Truncate prompt for /images/edits — LaoZhang proxy & OpenAI edits have stricter prompt limits ──
         // The /images/edits endpoint has a ~4000 char limit (LaoZhang even stricter at ~3500).
         // GPT-image already understands reference images from the multipart attachments,
@@ -1525,7 +1533,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     } else {
         // ── JSON path: /images/generations (no ref images) ──
         const body = {
-            model: modelId,
+            model: mappedModelId,
             prompt: promptText,
             n: 1,
             size: imageSize,
