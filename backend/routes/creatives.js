@@ -1537,14 +1537,18 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             prompt: promptText,
             n: 1,
             size: imageSize,
-            output_format: finalFormat,
-            background,
         };
+
+        if (useLaoZhang) {
+            body.output_format = finalFormat;
+            body.background = background;
+            if (finalFormat === 'webp' || finalFormat === 'jpeg') {
+                body.output_compression = 85;
+            }
+        }
+
         if (quality && quality !== 'medium' && quality !== 'standard') {
             body.quality = quality;
-        }
-        if (finalFormat === 'webp' || finalFormat === 'jpeg') {
-            body.output_compression = 85;
         }
 
         response = await fetch(`${baseUrl}/${endpoint}`, {
