@@ -175,6 +175,7 @@ const TemplateManager = () => {
     ];
     const IMAGE_MODELS = [
         { value: 'gemini-image', label: 'Gemini Image', type: 'image' },
+        { value: 'gpt-image-2', label: 'GPT Image 2', type: 'image' },
     ];
     const ALL_MODELS = [...VIDEO_MODELS, ...IMAGE_MODELS];
     const isVideoModel = (m) => VIDEO_MODELS.some(vm => m.includes(vm.value));
