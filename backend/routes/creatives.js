@@ -1496,6 +1496,22 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
 
     let response;
 
+    // ── Truncate prompt for OpenAI limits (max 4000 chars) ──
+    // The API has a ~4000 char limit (LaoZhang even stricter at ~3500).
+    let finalPrompt = promptText;
+    if (finalPrompt.length > 3500) {
+        // Strip verbose REFERENCE IMAGE blocks
+        finalPrompt = finalPrompt
+            .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        // If still too long, hard truncate
+        if (finalPrompt.length > 3500) {
+            finalPrompt = finalPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
+        }
+        console.log(`📏 Prompt condensed for OpenAI API: ${promptText.length} → ${finalPrompt.length} chars`);
+    }
+
     if (useEditsEndpoint) {
         // ── MULTIPART/FORM-DATA path: /images/edits ──
         // Uses the 'form-data' package (imported at top) for multipart encoding
@@ -1512,24 +1528,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         }
 
         formData.append('model', mappedModelId);
-        // ── Truncate prompt for /images/edits — LaoZhang proxy & OpenAI edits have stricter prompt limits ──
-        // The /images/edits endpoint has a ~4000 char limit (LaoZhang even stricter at ~3500).
-        // GPT-image already understands reference images from the multipart attachments,
-        // so verbose per-image labels aren't needed — condense to essential creative direction only.
-        let editPrompt = promptText;
-        if (editPrompt.length > 3500) {
-            // Strip verbose REFERENCE IMAGE blocks (GPT-image infers purpose from attached images)
-            editPrompt = editPrompt
-                .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-            // If still too long, hard truncate
-            if (editPrompt.length > 3500) {
-                editPrompt = editPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
-            }
-            console.log(`📏 Prompt condensed for /images/edits: ${promptText.length} → ${editPrompt.length} chars`);
-        }
-        formData.append('prompt', editPrompt);
+        formData.append('prompt', finalPrompt);
         formData.append('n', '1');
         formData.append('size', finalImageSize);
         if (quality && quality !== 'medium' && quality !== 'standard') {
@@ -1553,7 +1552,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         // ── JSON path: /images/generations (no ref images) ──
         const body = {
             model: mappedModelId,
-            prompt: promptText,
+            prompt: finalPrompt,
             n: 1,
             size: finalImageSize,
         };
