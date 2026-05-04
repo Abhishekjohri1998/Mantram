@@ -273,6 +273,11 @@ connectDB().then(() => {
         startSubscriptionManager();
     }).catch(err => console.error('❌ Failed to load subscriptionManager.js:', err));
 
+    // Start video archival sweep (catches videos missed by inline S3 upload — configurable via VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS)
+    import('./services/videoArchivalSweep.js').then(({ startVideoArchivalSweep }) => {
+        startVideoArchivalSweep();
+    }).catch(err => console.error('❌ Failed to load videoArchivalSweep.js:', err));
+
 }).catch(err => {
     console.error('❌ Critical failure during background agent initialization:', err.message);
 });

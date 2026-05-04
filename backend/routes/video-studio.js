@@ -84,6 +84,7 @@ async function signVideoProjectAssets(data) {
         if (project.generation.videoUrl) project.generation.videoUrl = await getSignedUrlIfNeeded(project.generation.videoUrl);
         if (project.generation.s3VideoUrl) project.generation.s3VideoUrl = await getSignedUrlIfNeeded(project.generation.s3VideoUrl);
         if (project.generation.thumbnailUrl) project.generation.thumbnailUrl = await getSignedUrlIfNeeded(project.generation.thumbnailUrl);
+        if (project.generation.s3ThumbnailUrl) project.generation.s3ThumbnailUrl = await getSignedUrlIfNeeded(project.generation.s3ThumbnailUrl);
     }
 
     // Sign input images
@@ -5330,10 +5331,9 @@ router.get('/', protect, async (req, res) => {
                                     finalVideoUrl: hStatus.videoUrl,
                                 });
                                 if (hStatus.videoUrl) {
-                                    const s3Key = `video-studio/generations/${p._id}-${Date.now()}.mp4`;
-                                    mirrorUrlToS3(hStatus.videoUrl, s3Key).then(s3Url => {
-                                        VideoProject.findByIdAndUpdate(p._id, { finalVideoUrl: s3Url, 'generation.videoUrl': s3Url }).exec();
-                                    }).catch(() => {});
+                                    downloadAndUploadVideoToS3(p._id.toString(), hStatus.videoUrl)
+                                        .then(s3Url => { if (s3Url) console.log(`✅ [HeyGen-S3] Archived ${p._id}: ${s3Url.substring(0, 80)}`); })
+                                        .catch(() => {});
                                 }
                                 console.log(`✅ HeyGen synced ${p._id}: completed`);
                             } else if (hStatus.status === 'FAILED') {
@@ -5365,6 +5365,12 @@ router.get('/', protect, async (req, res) => {
                                 'generation.progress': updated.generation.progress || 100,
                                 'generation.provider': provider,
                             });
+                            // 🛡️ CRITICAL: Archive completed video to S3 before provider CDN expires (1-7 days)
+                            if (updated.generation.status === 'COMPLETED' && updated.generation.videoUrl && !updated.generation.videoUrl.includes('amazonaws.com')) {
+                                downloadAndUploadVideoToS3(p._id.toString(), updated.generation.videoUrl)
+                                    .then(s3Url => { if (s3Url) console.log(`✅ [AutoSync-S3] Archived ${p._id}: ${s3Url.substring(0, 80)}`); })
+                                    .catch(e => console.warn(`⚠️ [AutoSync-S3] Archive failed for ${p._id}:`, e.message));
+                            }
                             console.log(`✅ Synced project ${p._id}: ${newStatus} — videoUrl: ${updated.generation.videoUrl ? 'YES' : 'no'}`);
                         } else {
                             console.log(`⏳ Project ${p._id} still ${updated.generation?.status || 'unknown'}`);
@@ -5396,6 +5402,10 @@ router.get('/', protect, async (req, res) => {
                 // Sign generation.s3VideoUrl
                 if (p.generation?.s3VideoUrl && p.generation.s3VideoUrl.includes('amazonaws.com')) {
                     p.generation.s3VideoUrl = await getSignedUrlIfNeeded(p.generation.s3VideoUrl);
+                }
+                // Sign generation.s3ThumbnailUrl
+                if (p.generation?.s3ThumbnailUrl && p.generation.s3ThumbnailUrl.includes('amazonaws.com')) {
+                    p.generation.s3ThumbnailUrl = await getSignedUrlIfNeeded(p.generation.s3ThumbnailUrl);
                 }
             }));
         } catch (signErr) {
@@ -5691,54 +5701,111 @@ router.delete('/:id', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Download a video from an ephemeral CDN URL and upload to S3 with structured path.
+ * Downloads a video from a provider CDN URL and uploads it to S3.
+ * Called after video generation completes — ensures the video persists
+ * beyond the provider's 1-7 day retention window.
+ *
+ * RETRY: 3 attempts with exponential backoff (5s, 10s, 15s).
+ * Also archives thumbnails and first-frame images when available.
+ *
  * S3 key: videos/{userId}/{projectId}.mp4
- * Updates the project in DB with the permanent S3 URL.
+ * Updates the project in DB with the permanent S3 URL + s3ArchivedAt timestamp.
  * Returns the S3 URL if successful, null otherwise.
  */
 export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
     if (!videoUrl || !videoUrl.startsWith('http')) return null;
-    try {
-        console.log(`📥 Downloading video for S3 upload: ${videoUrl.substring(0, 80)}...`);
-        const resp = await fetch(videoUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            redirect: 'follow',
-        });
-        if (!resp.ok) {
-            console.warn(`⚠️ Video download failed (${resp.status}): ${videoUrl.substring(0, 80)}`);
-            return null;
+    // Skip if already an S3 URL
+    if (videoUrl.includes('amazonaws.com')) return videoUrl;
+
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            console.log(`📥 [Attempt ${attempt}/${MAX_RETRIES}] Downloading video for S3 upload: ${videoUrl.substring(0, 80)}...`);
+            const resp = await fetch(videoUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                redirect: 'follow',
+                signal: AbortSignal.timeout(120000), // 2-minute timeout for large videos
+            });
+            if (!resp.ok) {
+                console.warn(`⚠️ Video download failed (${resp.status}): ${videoUrl.substring(0, 80)}`);
+                if (resp.status === 404 || resp.status === 410) {
+                    // CDN URL expired — no point retrying
+                    console.error(`❌ Video CDN URL expired (${resp.status}) for project ${projectId}. Cannot archive.`);
+                    return null;
+                }
+                throw new Error(`Download HTTP ${resp.status}`);
+            }
+            const arrayBuf = await resp.arrayBuffer();
+            const buffer = Buffer.from(arrayBuf);
+            if (buffer.length < 1000) {
+                console.warn(`⚠️ Video download too small (${buffer.length} bytes), likely expired`);
+                return null;
+            }
+
+            // Load the project to get user context for S3 path
+            const project = await VideoProject.findById(projectId)
+                .select('user generation.thumbnailUrl firstFrameUrl')
+                .lean();
+            const userId = project?.user?.toString() || 'unknown';
+
+            // S3 key: videos/{userId}/{projectId}.mp4
+            const s3Key = `videos/${userId}/${projectId}.mp4`;
+            console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
+            const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
+            console.log(`✅ Video uploaded to S3: ${s3Url}`);
+
+            // Save permanent S3 URL + archival timestamp
+            // DO NOT overwrite generation.videoUrl (keep original CDN URL as backup)
+            const dbUpdate = {
+                'generation.s3VideoUrl': s3Url,
+                'generation.s3ArchivedAt': new Date(),
+                finalVideoUrl: s3Url,
+            };
+
+            // 🖼️ Archive thumbnail to S3 (fire-and-forget, non-blocking)
+            const thumbUrl = project?.generation?.thumbnailUrl;
+            if (thumbUrl && thumbUrl.startsWith('http') && !thumbUrl.includes('amazonaws.com')) {
+                mirrorUrlToS3(thumbUrl, `videos/${userId}/${projectId}-thumb.jpg`, 'image/jpeg')
+                    .then(s3Thumb => {
+                        if (s3Thumb) {
+                            VideoProject.findByIdAndUpdate(projectId, { 'generation.s3ThumbnailUrl': s3Thumb }).exec();
+                            console.log(`  🖼️ Thumbnail archived: ${s3Thumb.substring(0, 60)}`);
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            // 🖼️ Archive first-frame image to S3 (fire-and-forget, non-blocking)
+            const firstFrameUrl = project?.firstFrameUrl;
+            if (firstFrameUrl && firstFrameUrl.startsWith('http') && !firstFrameUrl.includes('amazonaws.com')) {
+                mirrorUrlToS3(firstFrameUrl, `videos/${userId}/${projectId}-firstframe.jpg`, 'image/jpeg')
+                    .then(s3FF => {
+                        if (s3FF) {
+                            VideoProject.findByIdAndUpdate(projectId, { firstFrameUrl: s3FF }).exec();
+                            console.log(`  🖼️ First-frame archived: ${s3FF.substring(0, 60)}`);
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            await VideoProject.findByIdAndUpdate(projectId, dbUpdate);
+
+            return s3Url;
+        } catch (e) {
+            console.warn(`⚠️ Video S3 upload attempt ${attempt}/${MAX_RETRIES} failed:`, e.message);
+            if (attempt < MAX_RETRIES) {
+                const delay = attempt * 5000; // 5s, 10s, 15s exponential backoff
+                console.log(`🔄 Retrying S3 upload in ${delay / 1000}s...`);
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                console.error(`❌ S3 upload exhausted ${MAX_RETRIES} retries for project ${projectId}`);
+                // S3 failed — keep the original provider video URL (CDN)
+                console.log(`📎 Keeping original video URL: ${videoUrl.substring(0, 80)}...`);
+                return null;
+            }
         }
-        const arrayBuf = await resp.arrayBuffer();
-        const buffer = Buffer.from(arrayBuf);
-        if (buffer.length < 1000) {
-            console.warn(`⚠️ Video download too small (${buffer.length} bytes), likely expired`);
-            return null;
-        }
-
-        // Load the project to get user context for S3 path
-        const project = await VideoProject.findById(projectId).select('user').lean();
-        const userId = project?.user?.toString() || 'unknown';
-
-        // S3 key: videos/{userId}/{projectId}.mp4
-        const s3Key = `videos/${userId}/${projectId}.mp4`;
-        console.log(`☁️ Uploading video to S3: ${s3Key} (${Math.round(buffer.length / 1024)}KB)...`);
-        const s3Url = await uploadToS3(buffer, s3Key, 'video/mp4');
-        console.log(`✅ Video uploaded to S3: ${s3Url}`);
-
-        // Save permanent S3 URL — write to s3VideoUrl + finalVideoUrl
-        // DO NOT overwrite generation.videoUrl (keep original CDN URL as backup)
-        await VideoProject.findByIdAndUpdate(projectId, {
-            'generation.s3VideoUrl': s3Url,
-            finalVideoUrl: s3Url,
-        });
-
-        return s3Url;
-    } catch (e) {
-        console.warn(`⚠️ Video S3 upload error:`, e.message);
-        // S3 failed — keep the original provider video URL (xAI/PiAPI CDN)
-        console.log(`📎 Keeping original video URL: ${videoUrl.substring(0, 80)}...`);
-        return null; // Return null so caller knows S3 failed (not the CDN URL)
     }
+    return null;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

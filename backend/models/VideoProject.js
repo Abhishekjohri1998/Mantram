@@ -128,6 +128,8 @@ const videoProjectSchema = new mongoose.Schema({
         provider: { type: String, enum: ['fal', 'grok', 'kie', 'heygen', 'piapi', 'muapi', 'laozhang', 'atlascloud'], default: 'fal' },
         videoUrl: { type: String, default: '' },
         s3VideoUrl: { type: String, default: '' },
+        s3ThumbnailUrl: { type: String, default: '' },  // Permanent S3 copy of thumbnail
+        s3ArchivedAt: { type: Date },                    // When the video was permanently archived to S3
         thumbnailUrl: { type: String, default: '' },
         audioUrl: { type: String, default: '' },
         progress: { type: Number, default: 0 },  // 0-100
