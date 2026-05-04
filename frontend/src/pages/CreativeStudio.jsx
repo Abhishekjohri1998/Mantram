@@ -1711,7 +1711,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev);
                 next.delete('templateId');
-                next.delete('mode');
+                // IMPORTANT: Do NOT delete 'mode' — studioMode is derived from searchParams.get('mode')
                 return next;
             }, { replace: true });
         }
