@@ -1369,7 +1369,7 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // Routes through LaoZhang proxy for gpt-image-2 (direct OpenAI requires org verification).
 // When reference images are provided, uses /images/edits (multipart/form-data).
 // Otherwise uses /images/generations (JSON body).
-async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
+export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
     const forceLaoZhang = modelId === 'gpt-image-2' && process.env.LAOZHANG_API_KEY;
     const useLaoZhang = forceLaoZhang || process.env.OPENAI_USE_LZ === 'true';

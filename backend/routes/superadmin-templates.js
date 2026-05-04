@@ -291,8 +291,6 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             });
         } else {
             // ── IMAGE GENERATION ──
-            const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
-            
             const allRefs = [];
             if (avatarUrl) allRefs.push(avatarUrl);
             allRefs.push(...parsedProductImgs);
@@ -306,7 +304,7 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 .replace(/<<<image_1>>>/g, '@Image1')
                 .replace(/<<<image_2>>>/g, '@Image2');
             
-            // Build context prefix so Gemini knows what the inline images represent
+            // Build context prefix so the model knows what the inline images represent
             const contextParts = [];
             
             if (validRefs.length > 0) {
@@ -331,14 +329,32 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 ? `${contextParts.join('\n')}\n\nScene description: ${cleanPrompt}`
                 : cleanPrompt;
 
-            console.log(`🎨 Enriched prompt for Gemini:\n${enrichedPrompt.substring(0, 500)}...`);
+            console.log(`🎨 Enriched prompt:\n${enrichedPrompt.substring(0, 500)}...`);
 
-            const result = await geminiImageGenerate(enrichedPrompt, [], 0.5, {
-                aspectRatio: format || '1:1',
-                referenceImageUrls: validRefs,
-            });
+            let result;
+            if (selectedModel === 'gpt-image-2') {
+                console.log(`🎨 Using GPT Image 2 (OpenAI via LaoZhang)...`);
+                const { openaiImageGenerate } = await import('./creatives.js');
+                const generationData = await openaiImageGenerate(
+                    enrichedPrompt,
+                    format || '1:1',
+                    'standard',
+                    'gpt-image-2',
+                    'webp',
+                    'opaque',
+                    validRefs
+                );
+                result = { imageUrl: generationData.imageUrl };
+            } else {
+                console.log(`🎨 Using Gemini Native...`);
+                const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+                result = await geminiImageGenerate(enrichedPrompt, [], 0.5, {
+                    aspectRatio: format || '1:1',
+                    referenceImageUrls: validRefs,
+                });
+            }
 
-            if (!result.imageUrl) {
+            if (!result || !result.imageUrl) {
                 return res.status(500).json({ success: false, error: 'Image generation failed — no image returned' });
             }
 
