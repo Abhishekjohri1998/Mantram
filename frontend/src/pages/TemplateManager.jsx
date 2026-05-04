@@ -922,7 +922,28 @@ const TemplateManager = () => {
                                     <input value={genForm.name} onChange={e => setGenForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }} placeholder="e.g., Luxury Watch Showcase" />
                                 </label>
                                 <label style={{ ...labelStyle, flex: 1 }}>Category *
-                                    <select value={genForm.categoryId} onChange={e => setGenForm(f => ({ ...f, categoryId: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }}>
+                                    <select value={genForm.categoryId} onChange={e => {
+                                        const cId = e.target.value;
+                                        const c = categories.find(cat => cat._id === cId);
+                                        const cName = c ? c.name.toLowerCase() : '';
+                                        const isVidCat = cName.includes('video') || cName.includes('animation') || cName.includes('ugc');
+                                        const isImgCat = cName.includes('image') || cName.includes('photo') || cName.includes('carousel') || cName.includes('campaign') || cName.includes('logo') || cName.includes('creative');
+                                        
+                                        setGenForm(f => {
+                                            let newF = { ...f, categoryId: cId };
+                                            // Auto-switch model and section if category explicitly restricts it
+                                            if (isVidCat && !isVideoModel(newF.model)) {
+                                                newF.model = VIDEO_MODELS[0].value;
+                                                newF.studioOrigin = 'video';
+                                                newF.studioSection = 'video_qads';
+                                            } else if (isImgCat && isVideoModel(newF.model)) {
+                                                newF.model = IMAGE_MODELS[0].value;
+                                                newF.studioOrigin = 'creative';
+                                                newF.studioSection = 'ai_create';
+                                            }
+                                            return newF;
+                                        });
+                                    }} style={{ ...inputStyle, marginTop: 6 }}>
                                         <option value="">Select Category</option>
                                         {categories.filter(c => c.isActive !== false).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                                     </select>
@@ -936,17 +957,32 @@ const TemplateManager = () => {
                                         const isVid = isVideoModel(m);
                                         setGenForm(f => ({ ...f, model: m, studioOrigin: isVid ? 'video' : 'creative', studioSection: isVid ? 'video_qads' : 'ai_create' }));
                                     }} style={{ ...inputStyle, marginTop: 6 }}>
-                                        <optgroup label="Video Models">
-                                            {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                        </optgroup>
-                                        <optgroup label="Image Models">
-                                            {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                        </optgroup>
+                                        {(() => {
+                                            const c = categories.find(cat => cat._id === genForm.categoryId);
+                                            const cName = c ? c.name.toLowerCase() : '';
+                                            const isVidCat = cName.includes('video') || cName.includes('animation') || cName.includes('ugc');
+                                            const isImgCat = cName.includes('image') || cName.includes('photo') || cName.includes('carousel') || cName.includes('campaign') || cName.includes('logo') || cName.includes('creative');
+                                            
+                                            return (
+                                                <>
+                                                    {(!isImgCat) && (
+                                                        <optgroup label="Video Models">
+                                                            {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                        </optgroup>
+                                                    )}
+                                                    {(!isVidCat) && (
+                                                        <optgroup label="Image Models">
+                                                            {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                        </optgroup>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </select>
                                 </label>
                                 <label style={{ ...labelStyle, flex: 1 }}>Studio Section
                                     <select value={genForm.studioSection} onChange={e => setGenForm(f => ({ ...f, studioSection: e.target.value }))} style={{ ...inputStyle, marginTop: 6 }}>
-                                        {STUDIO_SECTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        {STUDIO_SECTIONS.filter(s => (SECTIONS_BY_STUDIO[genForm.studioOrigin] || []).includes(s.value)).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                     </select>
                                 </label>
                             </div>
