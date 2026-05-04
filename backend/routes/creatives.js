@@ -1505,7 +1505,9 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         formData.append('prompt', editPrompt);
         formData.append('n', '1');
         formData.append('size', imageSize);
-        formData.append('quality', quality);
+        if (quality && quality !== 'medium' && quality !== 'standard') {
+            formData.append('quality', quality);
+        }
 
         // form-data produces a Node stream — convert to Buffer for native fetch
         const formBuffer = formData.getBuffer();
@@ -1527,10 +1529,12 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             prompt: promptText,
             n: 1,
             size: imageSize,
-            quality,
             output_format: finalFormat,
             background,
         };
+        if (quality && quality !== 'medium' && quality !== 'standard') {
+            body.quality = quality;
+        }
         if (finalFormat === 'webp' || finalFormat === 'jpeg') {
             body.output_compression = 85;
         }
