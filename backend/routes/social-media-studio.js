@@ -567,6 +567,11 @@ router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), r
         const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         const monthName = monthNames[targetMonth - 1];
 
+        // Ensure we don't generate posts for past dates if it's the current month
+        const today = new Date();
+        const isCurrentMonth = today.getMonth() + 1 === targetMonth && today.getFullYear() === targetYear;
+        const startingDate = isCurrentMonth ? today.getDate() : 1;
+
         const systemPrompt = `You are a Social Media Content Calendar expert. Generate a detailed daily content calendar for ${monthName} ${targetYear}.
 
 BRAND CONTEXT:
@@ -576,7 +581,10 @@ Platforms: ${platforms.join(', ')}
 Posts per week: ${postsPerWeek || 'recommend optimal'}
 Content themes: ${themes || 'Use brand-appropriate themes'}
 
-Generate a FULL month calendar with specific post ideas for each day. Include:
+Generate a calendar with specific post ideas for each day starting from ${monthName} ${startingDate}, ${targetYear} to the end of the month.
+🚨 CRITICAL RULE: DO NOT generate any posts or schedules for dates prior to ${monthName} ${startingDate}, ${targetYear}.
+
+Include:
 - Platform-specific post ideas
 - Content type (reel, carousel, story, post, thread, article)
 - Caption theme/hook (not full caption — just the angle)
@@ -618,7 +626,7 @@ Respond in STRICT JSON:
   "contentMixSummary": { "reels": 8, "carousels": 5, "stories": 10, "posts": 4, "threads": 3 }
 }`;
 
-        const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')}. ${themes ? `Themes: ${themes}` : ''}`;
+        const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')} starting from ${monthName} ${startingDate}. ${themes ? `Themes: ${themes}` : ''}`;
 
         const elapsed = Date.now() - (req.startTime || Date.now());
         const remainingBudget = Math.max(300000, 600000 - elapsed);
