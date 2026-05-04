@@ -1457,15 +1457,19 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         console.log(`📦 ${refBuffers.length} base64 reference images ready (no HTTP URLs)`);
     }
 
-    const useEditsEndpoint = refBuffers.length > 0;
+    let useEditsEndpoint = refBuffers.length > 0;
+
+    if (!useLaoZhang && useEditsEndpoint) {
+        console.log(`⚠️ Direct OpenAI no longer supports /images/edits (dall-e-2 is dead). Ignoring ref images.`);
+        useEditsEndpoint = false;
+    }
+
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
     let mappedModelId = modelId;
     if (!useLaoZhang) {
-        if (modelId === 'gpt-image-2') {
-            mappedModelId = useEditsEndpoint ? 'dall-e-2' : 'dall-e-3'; // DALL-E 3 doesn't support /edits natively
-        } else if (modelId === 'gpt-image-1') {
-            mappedModelId = 'dall-e-2';
+        if (modelId === 'gpt-image-2' || modelId === 'gpt-image-1') {
+            mappedModelId = 'dall-e-3'; // Force dall-e-3 since dall-e-2 is gone
         }
     }
 
