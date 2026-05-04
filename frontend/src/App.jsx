@@ -109,9 +109,12 @@ function AppInner() {
   );
 }
 
+import RouteTracker from './components/RouteTracker'
+
 function App() {
   return (
     <BrowserRouter>
+      <RouteTracker />
       <ShopifyProvider>
         <AuthProvider>
           <BrandProvider>
