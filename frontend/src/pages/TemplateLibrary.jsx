@@ -28,6 +28,8 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     const [studioOrigin, setStudioOrigin] = useState(studioFilter); // 'creative', 'video', 'content'
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [mobileTappedTemplateId, setMobileTappedTemplateId] = useState(null);
+    // Image/Video Preview Lightbox
+    const [previewModal, setPreviewModal] = useState({ open: false, src: '', type: 'image', name: '' });
 
     useEffect(() => {
         loadTemplates();
@@ -316,14 +318,40 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                         <div style={{
                                             position: 'absolute', inset: 0,
                                             background: 'rgba(0,0,0,0.35)',
-                                            display: 'flex', alignItems: 'flex-end', padding: 12
+                                            display: 'flex', alignItems: 'flex-end', padding: 12,
+                                            gap: 8,
                                         }}
                                         className={`transition-opacity duration-200 ${isTapped ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'}`}
                                         >
+                                            {/* Preview button */}
+                                            <div
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const src = template.previewType === 'video'
+                                                        ? (template.previewVideoUrl || template.previewUrl)
+                                                        : (template.previewUrl || template.previewImageUrl);
+                                                    if (src) setPreviewModal({ open: true, src, type: template.previewType === 'video' ? 'video' : 'image', name: template.name });
+                                                }}
+                                                style={{
+                                                    width: 36, height: 36, borderRadius: 8,
+                                                    background: 'rgba(255,255,255,0.15)',
+                                                    backdropFilter: 'blur(4px)',
+                                                    border: '1px solid rgba(255,255,255,0.2)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', flexShrink: 0,
+                                                    transition: 'background 0.2s',
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                                                title="Preview"
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#fff' }}>zoom_in</span>
+                                            </div>
+                                            {/* Use template button */}
                                             <div style={{
-                                                width: '100%', background: '#E84118', color: '#fff',
+                                                flex: 1, background: '#E84118', color: '#fff',
                                                 fontSize: 11, fontWeight: 600, textAlign: 'center',
-                                                padding: '7px 0', borderRadius: 8
+                                                padding: '7px 0', borderRadius: 8,
                                             }}>
                                                 Use this template
                                             </div>
@@ -361,6 +389,73 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                     onClose={() => setSelectedTemplate(null)} 
                 />
             )}
+
+            {/* ===== IMAGE/VIDEO PREVIEW LIGHTBOX ===== */}
+            {previewModal.open && (
+                <div
+                    onClick={() => setPreviewModal({ open: false, src: '', type: 'image', name: '' })}
+                    style={{
+                        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 10000, cursor: 'zoom-out',
+                        animation: 'fadeIn 0.2s ease-out',
+                    }}>
+                    {/* Close button */}
+                    <button
+                        onClick={() => setPreviewModal({ open: false, src: '', type: 'image', name: '' })}
+                        style={{
+                            position: 'absolute', top: 20, right: 20,
+                            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '50%', width: 40, height: 40,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', zIndex: 10001,
+                        }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#fff' }}>close</span>
+                    </button>
+                    {/* Template name */}
+                    {previewModal.name && (
+                        <div style={{
+                            position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                            padding: '8px 20px', borderRadius: 10,
+                            color: '#fff', fontSize: 14, fontWeight: 600,
+                            border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                            {previewModal.name}
+                        </div>
+                    )}
+                    {/* Media content */}
+                    <div onClick={e => e.stopPropagation()} style={{ cursor: 'default', maxWidth: '90vw', maxHeight: '85vh' }}>
+                        {previewModal.type === 'video' ? (
+                            <video
+                                src={previewModal.src}
+                                controls autoPlay loop
+                                style={{
+                                    maxWidth: '90vw', maxHeight: '85vh',
+                                    borderRadius: 12,
+                                    boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                            />
+                        ) : (
+                            <img
+                                src={previewModal.src}
+                                alt={previewModal.name}
+                                style={{
+                                    maxWidth: '90vw', maxHeight: '85vh',
+                                    borderRadius: 12, objectFit: 'contain',
+                                    boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <style dangerouslySetInnerHTML={{__html: `
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            `}} />
         </div>
     );
 

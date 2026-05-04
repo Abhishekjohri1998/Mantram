@@ -99,6 +99,8 @@ const TemplateManager = () => {
 
     // Modal
     const [modal, setModal] = useState({ open: false, data: null });
+    // Image Preview Lightbox
+    const [previewModal, setPreviewModal] = useState({ open: false, src: '', type: 'image', name: '' });
     const [tags, setTags] = useState([]);
     const [deletingId, setDeletingId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -672,7 +674,7 @@ const TemplateManager = () => {
                                                 setSelectedIds(s);
                                             }} />
                                         </td>
-                                        {/* Preview with hover popup — video or image */}
+                                        {/* Preview with hover popup + click-to-lightbox */}
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ position: 'relative', width: 56, height: 56 }}
                                                 onMouseEnter={e => { const p = e.currentTarget.querySelector('.tmpl-pop'); if (p) p.style.display = 'block'; }}
@@ -682,15 +684,25 @@ const TemplateManager = () => {
                                                 ) : previewSrc === 'failed' ? (
                                                     <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: '#ef4444' }}>error</span></div>
                                                 ) : previewSrc ? (
-                                                    t.previewType === 'video' ? (
-                                                        <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
-                                                    ) : (
-                                                        <img src={previewSrc} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />
-                                                    )
+                                                    <div
+                                                        onClick={() => setPreviewModal({ open: true, src: t.previewType === 'video' ? (t.previewVideoUrl || previewSrc) : previewSrc, type: t.previewType === 'video' ? 'video' : 'image', name: t.name })}
+                                                        style={{ cursor: 'pointer', position: 'relative', width: 56, height: 56 }}
+                                                        title="Click to preview">
+                                                        {t.previewType === 'video' ? (
+                                                            <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+                                                        ) : (
+                                                            <img src={previewSrc} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />
+                                                        )}
+                                                        <div style={{ position: 'absolute', inset: 0, borderRadius: 8, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+                                                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; e.currentTarget.querySelector('.zoom-icon').style.opacity = '1'; }}
+                                                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0)'; e.currentTarget.querySelector('.zoom-icon').style.opacity = '0'; }}>
+                                                            <span className="material-symbols-outlined zoom-icon" style={{ fontSize: 22, color: '#fff', opacity: 0, transition: 'opacity 0.2s' }}>zoom_in</span>
+                                                        </div>
+                                                    </div>
                                                 ) : (
                                                     <div style={{ width: 56, height: 56, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)' }}>image</span></div>
                                                 )}
-                                                {previewSrc && previewSrc !== 'pending' && (
+                                                {previewSrc && previewSrc !== 'pending' && previewSrc !== 'failed' && (
                                                     <div className="tmpl-pop" style={{ display: 'none', position: 'absolute', top: 0, left: 64, width: 200, height: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>
                                                         {t.previewType === 'video' ? (
                                                             <video src={t.previewVideoUrl || previewSrc} muted autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1152,6 +1164,68 @@ const TemplateManager = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* ===== IMAGE/VIDEO PREVIEW LIGHTBOX ===== */}
+            {previewModal.open && (
+                <div
+                    onClick={() => setPreviewModal({ open: false, src: '', type: 'image', name: '' })}
+                    style={{
+                        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 2000, cursor: 'zoom-out',
+                        animation: 'fadeIn 0.2s ease-out',
+                    }}>
+                    {/* Close button */}
+                    <button
+                        onClick={() => setPreviewModal({ open: false, src: '', type: 'image', name: '' })}
+                        style={{
+                            position: 'absolute', top: 20, right: 20,
+                            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '50%', width: 40, height: 40,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', zIndex: 2001,
+                        }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#fff' }}>close</span>
+                    </button>
+                    {/* Template name */}
+                    {previewModal.name && (
+                        <div style={{
+                            position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                            padding: '8px 20px', borderRadius: 10,
+                            color: '#fff', fontSize: 14, fontWeight: 600,
+                            border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                            {previewModal.name}
+                        </div>
+                    )}
+                    {/* Media content */}
+                    <div onClick={e => e.stopPropagation()} style={{ cursor: 'default', maxWidth: '90vw', maxHeight: '85vh' }}>
+                        {previewModal.type === 'video' ? (
+                            <video
+                                src={previewModal.src}
+                                controls autoPlay loop
+                                style={{
+                                    maxWidth: '90vw', maxHeight: '85vh',
+                                    borderRadius: 12,
+                                    boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                            />
+                        ) : (
+                            <img
+                                src={previewModal.src}
+                                alt={previewModal.name}
+                                style={{
+                                    maxWidth: '90vw', maxHeight: '85vh',
+                                    borderRadius: 12, objectFit: 'contain',
+                                    boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
             )}
