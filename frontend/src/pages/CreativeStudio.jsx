@@ -1635,7 +1635,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         const templateId = searchParams.get('templateId');
         const mode = searchParams.get('mode');
         
-        if (mode && ['create', 'photoshoot', 'product', 'magic', 'tryon', 'mockups', 'agent', 'campaignshot', 'imagebank', 'inpaint'].includes(mode)) {
+        if (mode && ['create', 'photoshoot', 'product', 'magic', 'tryon', 'mockups', 'agent', 'campaignshot', 'imagebank', 'inpaint', 'carousel', 'campaigns', 'campaignlogo', 'templates'].includes(mode)) {
             setStudioMode(mode);
         }
 

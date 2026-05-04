@@ -67,20 +67,49 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             return;
         }
 
-        const categoryName = template.categoryId?.name || '';
+        const categoryName = (template.categoryId?.name || '').toLowerCase().trim();
+        const studioOrigin = (template.studioOrigin || '').toLowerCase().trim();
         let targetRoute = null;
         let targetMode = null;
 
-        if (categoryName === 'Video Q-Ads') {
+        // ── Video Studio categories ──
+        if (categoryName === 'video q-ads' || categoryName === 'video qads' || studioOrigin === 'video') {
             targetRoute = '/video-studio';
             targetMode = 'q-ads';
-        } else if (categoryName === 'AI Create') {
+        }
+        // ── Creative Studio categories ──
+        else if (categoryName === 'ai create' || categoryName === 'ai creative') {
             targetRoute = '/creative-studio';
             targetMode = 'create';
-        } else if (categoryName === 'Campaign Shot') {
+        } else if (categoryName === 'campaign shot' || categoryName === 'campaignshot') {
             targetRoute = '/creative-studio';
             targetMode = 'campaignshot';
-        } else if (categoryName === 'Carousel') {
+        } else if (categoryName === 'carousel' || categoryName === 'carousels') {
+            targetRoute = '/creative-studio';
+            targetMode = 'carousel';
+        } else if (categoryName === 'campaigns' || categoryName === 'campaign') {
+            targetRoute = '/creative-studio';
+            targetMode = 'campaigns';
+        } else if (categoryName === 'logo' || categoryName === 'logo gen' || categoryName === 'campaign logo') {
+            targetRoute = '/creative-studio';
+            targetMode = 'campaignlogo';
+        } else if (categoryName === 'photoshoot' || categoryName === 'ai photoshoot') {
+            targetRoute = '/creative-studio';
+            targetMode = 'photoshoot';
+        } else if (categoryName === 'try-on' || categoryName === 'tryon' || categoryName === 'virtual try-on') {
+            targetRoute = '/creative-studio';
+            targetMode = 'tryon';
+        } else if (categoryName === 'mockups' || categoryName === 'mockup') {
+            targetRoute = '/creative-studio';
+            targetMode = 'mockups';
+        }
+        // ── Fallback: route to Creative Studio 'create' for any image-oriented template ──
+        else if (studioOrigin === 'creative' || studioOrigin === 'image') {
+            targetRoute = '/creative-studio';
+            targetMode = 'create';
+        }
+        // ── Content Studio categories ──
+        else if (studioOrigin === 'content') {
             targetRoute = '/content-studio';
         }
 
