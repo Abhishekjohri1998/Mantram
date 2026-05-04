@@ -1645,13 +1645,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 templates.get(templateId).then(res => {
                     const tpl = res.template;
                     if (tpl) {
-                        setPrompt(tpl.promptTemplate || tpl.savedPrompt || '');
-                        
+                        const tplPrompt = tpl.promptTemplate || tpl.savedPrompt || '';
                         const assets = tpl.templateAssets || [];
                         const prodImg = assets.find(a => a.role === 'product')?.url || tpl.savedProductImageUrls?.[0] || '';
                         const avatarImg = assets.find(a => a.role === 'avatar')?.url || tpl.savedAvatarUrl || '';
                         const templateImg = assets.find(a => a.role === 'template')?.url || '';
-                        
+                        const refImg = assets.find(a => a.role === 'reference')?.url || '';
+                        const bgImg = assets.find(a => a.role === 'background')?.url || '';
+
+                        // ── Always set shared asset state ──
                         if (prodImg) {
                             setCsProductImage(prodImg);
                             setProductImage(prodImg);
@@ -1665,6 +1667,43 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         if (templateImg) {
                             setMockupTemplateImage(templateImg);
                         }
+
+                        // ── Mode-specific state hydration ──
+                        const effectiveMode = mode || 'create';
+
+                        if (effectiveMode === 'carousel') {
+                            // Carousel uses carouselPrompt
+                            setCarouselPrompt(tplPrompt);
+                        } else if (effectiveMode === 'campaigns') {
+                            // Campaigns uses campKeyword + campName
+                            setCampKeyword(tplPrompt);
+                            setCampName(tpl.name || '');
+                        } else if (effectiveMode === 'campaignshot') {
+                            // Campaign Shot uses csBrief for the scene prompt
+                            setCsBrief(tplPrompt);
+                            if (csMoodPreset !== 'custom') setCsMoodPreset('custom');
+                            if (refImg) setCsRefImage(refImg);
+                        } else if (effectiveMode === 'campaignlogo') {
+                            // Campaign Logo uses clgText
+                            setClgText(tplPrompt);
+                        } else if (effectiveMode === 'photoshoot') {
+                            // Photoshoot uses photoshootBrief
+                            setPhotoshootBrief(tplPrompt);
+                        } else {
+                            // AI Create and all other modes use prompt
+                            setPrompt(tplPrompt);
+                        }
+
+                        // Set style/design reference if available
+                        if (refImg && effectiveMode !== 'campaignshot') {
+                            setCsRefImage(refImg);
+                        }
+                        if (bgImg) {
+                            setDesignBaseImage(bgImg);
+                        }
+
+                        // Close quick-start panel if open
+                        setShowQuickStart(false);
                     }
                 }).catch(err => console.error("[CreativeStudio] Failed to load template", err));
             }).catch(() => {});

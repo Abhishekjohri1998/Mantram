@@ -103,6 +103,17 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             targetRoute = '/creative-studio';
             targetMode = 'mockups';
         }
+        // ── Fallback: use studioSection to determine mode ──
+        else if (template.studioSection) {
+            const section = template.studioSection.toLowerCase().trim();
+            targetRoute = '/creative-studio';
+            if (section === 'carousel') targetMode = 'carousel';
+            else if (section === 'campaign_shot') targetMode = 'campaignshot';
+            else if (section === 'campaign') targetMode = 'campaigns';
+            else if (section === 'ai_create') targetMode = 'create';
+            else if (section === 'avatar') targetMode = 'photoshoot';
+            else targetMode = 'create';
+        }
         // ── Fallback: route to Creative Studio 'create' for any image-oriented template ──
         else if (studioOrigin === 'creative' || studioOrigin === 'image') {
             targetRoute = '/creative-studio';
@@ -111,6 +122,11 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
         // ── Content Studio categories ──
         else if (studioOrigin === 'content') {
             targetRoute = '/content-studio';
+        }
+        // ── Ultimate fallback: route to Creative Studio ──
+        else {
+            targetRoute = '/creative-studio';
+            targetMode = 'create';
         }
 
         if (targetRoute) {

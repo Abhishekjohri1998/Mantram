@@ -134,8 +134,8 @@ router.get('/:id', protect, async (req, res) => {
         if (!template) {
             return res.status(404).json({ success: false, error: 'Template not found' });
         }
-        // Remove prompt fields from user-facing single template response too
-        const { savedPrompt, promptTemplate, generationParams, ...safeTemplate } = template;
+        // Include prompt fields so template hydration (pre-filling studio prompt) works
+        const { generationParams, ...safeTemplate } = template;
         res.json({ success: true, template: safeTemplate });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
