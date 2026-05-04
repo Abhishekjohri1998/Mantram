@@ -57,7 +57,7 @@ export default function VideoUpgradeModal({ onClose }) {
                 {/* CTA Buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <button
-                        onClick={() => { onClose(); navigate('/credits'); }}
+                        onClick={() => { onClose(); navigate('/credits?tab=plans'); }}
                         style={{
                             background: '#FF4D00', color: '#fff', border: 'none',
                             borderRadius: 14, padding: '14px 24px',

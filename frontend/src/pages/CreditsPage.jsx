@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { credits as creditsAPI, payments as paymentsAPI, rewards as rewardsAPI } from '../services/api'
@@ -45,13 +46,17 @@ const CANCEL_REASONS = [
 ]
 
 export default function CreditsPage() {
+    const [searchParams] = useSearchParams()
     const [summary, setSummary] = useState(null)
     const [usage, setUsage] = useState([])
     const [usageTotal, setUsageTotal] = useState(0)
     const [page, setPage] = useState(1)
     const [pages, setPages] = useState(1)
     const [loading, setLoading] = useState(true)
-    const [tab, setTab] = useState('overview')
+    const [tab, setTab] = useState(() => {
+        const urlTab = searchParams.get('tab')
+        return ['overview', 'plans', 'topup', 'rewards', 'history'].includes(urlTab) ? urlTab : 'overview'
+    })
 
     // Top-up state (Kling-style promo + standard sections)
     const [promoPacks, setPromoPacks] = useState([])
