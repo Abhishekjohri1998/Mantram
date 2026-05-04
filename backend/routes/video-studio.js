@@ -82,6 +82,7 @@ async function signVideoProjectAssets(data) {
     // Sign generation object
     if (project.generation) {
         if (project.generation.videoUrl) project.generation.videoUrl = await getSignedUrlIfNeeded(project.generation.videoUrl);
+        if (project.generation.s3VideoUrl) project.generation.s3VideoUrl = await getSignedUrlIfNeeded(project.generation.s3VideoUrl);
         if (project.generation.thumbnailUrl) project.generation.thumbnailUrl = await getSignedUrlIfNeeded(project.generation.thumbnailUrl);
     }
 
@@ -5377,7 +5378,30 @@ router.get('/', protect, async (req, res) => {
             console.warn('⚠️ Auto-sync phase failed (non-fatal):', autoSyncErr.message);
         }
 
-        // Return projects directly — video URLs are CDN/Atlas links that don't need S3 signing.
+        // ── Sign S3 video URLs before returning ──
+        // S3 bucket uses "Bucket owner enforced" (ACLs disabled), so raw S3 path-style
+        // URLs are inaccessible. We must presign them. CDN URLs pass through unchanged.
+        // This is critical because downloadAndUploadVideoToS3 overwrites finalVideoUrl
+        // with an S3 URL, and the original CDN URL expires after 12-24 hours.
+        try {
+            await Promise.all(projects.map(async (p) => {
+                // Sign finalVideoUrl
+                if (p.finalVideoUrl && p.finalVideoUrl.includes('amazonaws.com')) {
+                    p.finalVideoUrl = await getSignedUrlIfNeeded(p.finalVideoUrl);
+                }
+                // Sign generation.videoUrl (may also be S3 after sync)
+                if (p.generation?.videoUrl && p.generation.videoUrl.includes('amazonaws.com')) {
+                    p.generation.videoUrl = await getSignedUrlIfNeeded(p.generation.videoUrl);
+                }
+                // Sign generation.s3VideoUrl
+                if (p.generation?.s3VideoUrl && p.generation.s3VideoUrl.includes('amazonaws.com')) {
+                    p.generation.s3VideoUrl = await getSignedUrlIfNeeded(p.generation.s3VideoUrl);
+                }
+            }));
+        } catch (signErr) {
+            console.warn('⚠️ URL signing phase failed (non-fatal):', signErr.message);
+        }
+
         res.json({ success: true, projects, total });
     } catch (error) {
         console.error('❌ GET /api/video-studio failed:', error);

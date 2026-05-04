@@ -985,10 +985,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
 
                 {/* Completed videos — uses CDN URLs directly (no proxy DB queries) */}
                 {gridVideos.slice(0, Math.max(0, 16 - jobs.length)).map((p, i) => {
-                    // Use CDN URL directly from API response — eliminates N+1 DB proxy queries
+                    // Use signed URL from API response, with proxy fallback for safety
                     const cdnUrl = p.generation?.videoUrl || p.finalVideoUrl || ''
                     const proxyUrl = p._id ? `${API_BASE}/video-studio/${p._id}/video` : ''
-                    const videoSrc = cdnUrl || proxyUrl
+                    // If CDN URL is an unsigned S3 URL (no X-Amz-Signature), fall back to proxy
+                    const isUnsignedS3 = cdnUrl.includes('amazonaws.com') && !cdnUrl.includes('X-Amz-Signature')
+                    const videoSrc = (cdnUrl && !isUnsignedS3) ? cdnUrl : proxyUrl
                     const ac = p.advancedConfig || {}
                     const promptText = ac.enhancedPrompt || ac.prompt || p.input?.brief || p.title || ''
                     const posterUrl = p.generation?.thumbnailUrl || p.thumbUrl || ac.firstImageUrl || ''
