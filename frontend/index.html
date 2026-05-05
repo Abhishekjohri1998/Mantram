@@ -90,15 +90,10 @@
       rel="stylesheet" />
   </noscript>
 
-  <!-- Material Symbols — deferred -->
-  <link rel="preload" as="style"
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-    onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-      rel="stylesheet" />
-  </noscript>
+  <!-- Material Symbols — Synchronous with display=block to prevent FOUT (icon text flashing) -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
+    rel="stylesheet" />
 
   <!-- External Scripts -->
   <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
