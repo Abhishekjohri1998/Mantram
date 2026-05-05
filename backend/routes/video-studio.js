@@ -5728,9 +5728,16 @@ export async function downloadAndUploadVideoToS3(projectId, videoUrl) {
             });
             if (!resp.ok) {
                 console.warn(`⚠️ Video download failed (${resp.status}): ${videoUrl.substring(0, 80)}`);
-                if (resp.status === 404 || resp.status === 410) {
+                if (resp.status === 403 || resp.status === 404 || resp.status === 410) {
                     // CDN URL expired — no point retrying
                     console.error(`❌ Video CDN URL expired (${resp.status}) for project ${projectId}. Cannot archive.`);
+                    
+                    // Mark as expired in DB so the sweep stops trying infinitely
+                    await VideoProject.findByIdAndUpdate(projectId, {
+                        'generation.s3VideoUrl': 'EXPIRED',
+                        'generation.s3ArchivedAt': new Date()
+                    }).catch(() => {});
+                    
                     return null;
                 }
                 throw new Error(`Download HTTP ${resp.status}`);
