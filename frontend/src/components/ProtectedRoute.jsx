@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
     // Check role if allowedRoles is provided
     if (allowedRoles && !allowedRoles.includes(user?.role)) {
-        return <Navigate to="/dashboard" replace />
+        return <Navigate to="/templates" replace />
     }
 
     // --- Onboarding Enforcement ---

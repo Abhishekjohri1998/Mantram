@@ -26,7 +26,7 @@ export default function Auth() {
     const [forgotLoading, setForgotLoading] = useState(false)
     const pollingRef = useRef(null)
 
-    const redirect = searchParams.get('redirect') || '/dashboard'
+    const redirect = searchParams.get('redirect') || '/templates'
     const plan = searchParams.get('plan')
     const scanUrl = searchParams.get('scanUrl')
     const emailParam = searchParams.get('email')
@@ -73,7 +73,7 @@ export default function Auth() {
             if (pollingRef.current) clearInterval(pollingRef.current)
             let dest = redirect
             
-            if (dest === '/dashboard') {
+            if (dest === '/templates' || dest === '/dashboard') {
                 const hasBrand = (user?.brandCount ?? 0) > 0;
                 const hasPendingBrand = !!localStorage.getItem('mantram_pending_brand');
                 if (!hasBrand && !hasPendingBrand) {
@@ -118,7 +118,7 @@ export default function Auth() {
             
             // Logic for "New user vs Older user" redirection
             // If the destination is the default dashboard...
-            if (dest === '/dashboard') {
+            if (dest === '/templates' || dest === '/dashboard') {
                 const hasBrand = (res?.user?.brandCount ?? 0) > 0;
                 const hasPendingBrand = !!localStorage.getItem('mantram_pending_brand');
                 if (!hasBrand && !hasPendingBrand) {

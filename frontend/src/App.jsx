@@ -149,7 +149,7 @@ function App() {
                     <Route path="/brands" element={<ProtectedRoute><BrandManagement /></ProtectedRoute>} />
                     <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
-                    <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/home" element={<Navigate to="/templates" replace />} />
                     <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminDashboard /></ProtectedRoute>} />
                     <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
                     <Route path="/content-studio" element={<ProtectedRoute><ContentStudio /></ProtectedRoute>} />
@@ -186,8 +186,8 @@ function App() {
 
                          <Route path="/avatar-generator" element={<ProtectedRoute><AvatarGenerator /></ProtectedRoute>} />
 
-                {/* Catch-all: redirect unknown routes to dashboard (prevents blank screens from stale links) */}
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* Catch-all: redirect unknown routes to Explore (prevents blank screens from stale links) */}
+                    <Route path="*" element={<Navigate to="/templates" replace />} />
                   </Routes>
                 </Suspense>
 
