@@ -725,6 +725,7 @@ router.get('/google/callback', async (req, res) => {
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
                 approvalStatus: 'pending'
+            });
             // --- NEW: Assign Free Subscription for Google Signup ---
             await assignDefaultSubscription(user);
             
