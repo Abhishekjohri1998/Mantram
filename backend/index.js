@@ -165,15 +165,15 @@ const BOT_SCAN_PATHS = [
     'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin', 'sdk/weblanguage',
     'pdown', 'web-language', 'scripts', 'docker-compose', 'artisan', 'sidekiq', 'phpinfo',
     'k8s/', 'node_modules/', 'portal/', 'old/', 'temp/', 'lib/', 'helper/',
-    'backup', 'database', 'credentials', 'secrets', 'debug', 'remote-sync',
+    'backup', 'database', 'credentials', 'secrets', 'debug', 'remote-sync', '.dockerfunc'
 ];
 
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
     const origin = req.headers.origin || '';
 
-    // Detect bot scans: no origin + matches known scanner patterns
-    const isBotScan = !origin && (
+    // Detect bot scans: matches known scanner patterns
+    const isBotScan = (
         BOT_SCAN_EXTENSIONS.some(ext => path.endsWith(ext)) ||
         BOT_SCAN_PATHS.some(p => path.includes(p)) ||
         /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.\~]*$/i.test(path) ||
@@ -182,6 +182,7 @@ app.use((req, res, next) => {
     );
 
     if (isBotScan) {
+        req.isBotScan = true;
         // Silently drop — don't log, don't process
         return res.status(444).end();
     }

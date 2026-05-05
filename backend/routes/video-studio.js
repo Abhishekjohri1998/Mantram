@@ -5832,11 +5832,17 @@ router.get('/:id/video', async (req, res) => {
             return res.status(404).send('Video not found');
         }
 
+        // Check if explicitly marked as EXPIRED to avoid infinite retry loops
+        if (project.generation?.s3VideoUrl === 'EXPIRED') {
+            console.warn(`⚠️ [Proxy] Video explicitly marked as expired for project ${req.params.id}`);
+            return res.status(410).send('Video expired from provider CDN');
+        }
+
         // ✅ FIX: Prefer permanent S3 URL (finalVideoUrl or s3VideoUrl) over expiring CDN URL.
         // S3 URLs don't expire (they're stored as public-path URLs, not presigned).
         // Fall back to CDN URL only when no S3 copy exists yet.
         const finalUrl = project.finalVideoUrl || project.generation?.s3VideoUrl;
-        if (finalUrl && finalUrl.includes('amazonaws.com')) {
+        if (finalUrl && finalUrl !== 'EXPIRED' && finalUrl.includes('amazonaws.com')) {
             // It's an S3 URL — generate a fresh presigned URL (7-day TTL)
             const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
             const signed = await getSignedUrlIfNeeded(finalUrl).catch(() => finalUrl);

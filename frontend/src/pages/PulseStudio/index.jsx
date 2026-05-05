@@ -202,7 +202,7 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: buttonColor }}>link</span>
                         Product Data Source
                     </label>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: urlContext ? 12 : 0 }}>
+                    <div className={`flex flex-col sm:flex-row gap-3 ${urlContext ? 'mb-3' : ''}`}>
                         <input 
                             value={urlInput} 
                             onChange={e => setUrlInput(e.target.value)} 
@@ -242,7 +242,7 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                     />
                     )}
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                    <div className="flex flex-wrap items-center gap-3 mt-3">
                         <label style={{ cursor: 'pointer', background: 'color-mix(in srgb, var(--sys-text) 5%, var(--sys-surface))', border: '1px dashed var(--sys-border)', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--sys-text)', transition: 'all 0.2s', fontWeight: 600 }} onMouseEnter={e => e.currentTarget.style.borderColor = buttonColor} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
                             Upload Product Reference Image
@@ -356,7 +356,7 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
                 <div style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>Click text to edit • ✦ to AI rephrase</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: image ? '1fr 1fr' : '1fr', gap: 0 }}>
+            <div className={`grid ${image ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} gap-0`}>
                 {/* Content Side */}
                 <div style={{ padding: 24 }}>
                     {slide.headline && <EditableText field="headline" value={slide.headline} tag="h3" style={{ fontSize: 22, fontWeight: 800, color: 'var(--sys-text)', margin: '0 0 12px', lineHeight: 1.3 }} />}
@@ -627,7 +627,7 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     if (gen.result) {
         return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) 1fr', gap: 24 }}>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_1fr] gap-6">
                 {/* Visual Preview */}
                 <div>
                     <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', border: '1px solid var(--sys-border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
@@ -727,7 +727,7 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     if (gen.result) {
         return (
-            <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'mobile' ? '375px 1fr' : '1fr 300px', gap: 32 }}>
+            <div className={`grid gap-8 ${viewMode === 'mobile' ? 'grid-cols-1 xl:grid-cols-[375px_1fr]' : 'grid-cols-1 xl:grid-cols-[1fr_300px]'}`}>
                 <div>
                     <div style={{ background: viewMode === 'mobile' ? '#000' : '#111', borderRadius: viewMode === 'mobile' ? 44 : 12, border: viewMode === 'mobile' ? '8px solid #1A1A1A' : 'none', overflow: 'hidden', height: 600, display: 'flex', justifyContent: 'center' }}>
                         <iframe srcDoc={gen.result.html} style={{ width: viewMode === 'mobile' ? '100%' : '600px', height: '100%', border: 'none', background: '#FFF' }} sandbox="allow-scripts allow-top-navigation"></iframe>
@@ -847,7 +847,18 @@ const MODULE_TYPE_CONFIG = {
     image_highlights:{ label: 'Image + Highlights',   icon: 'checklist',    color: '#6366F1', amazon: '300×300px' },
     header_overlay:  { label: 'Header Banner',        icon: 'crop_landscape',color: '#EC4899', amazon: '970×300px' },
     brand_story:     { label: 'Brand Story',          icon: 'auto_stories', color: '#8B5CF6', amazon: '970×600px' },
+    // Premium A++ Modules
+    premium_hero:        { label: 'Premium Hero Banner', icon: 'panorama', color: '#F59E0B', amazon: '1464×600px' },
+    premium_banner:      { label: 'Premium Full-Width Banner', icon: 'crop_landscape', color: '#F59E0B', amazon: '1464×300px' },
+    premium_image_text:  { label: 'Premium Image & Text', icon: 'view_sidebar', color: '#F59E0B', amazon: '732×375px' },
+    carousel:            { label: 'Image Carousel', icon: 'view_carousel', color: '#F59E0B', amazon: '1464×600px ×3' },
+    hotspot:             { label: 'Interactive Hotspot Image', icon: 'touch_app', color: '#F59E0B', amazon: '1464×600px' },
+    video_module:        { label: 'Video Module', icon: 'play_circle', color: '#F59E0B', amazon: '1464×600px' },
+    qa_panel:            { label: 'Q&A Panel', icon: 'question_answer', color: '#F59E0B', amazon: '1464px wide' },
+    enhanced_comparison: { label: 'Enhanced Comparison Chart', icon: 'compare', color: '#F59E0B', amazon: '1464×300px' },
+    premium_brand_story: { label: 'Premium Brand Story', icon: 'auto_stories', color: '#F59E0B', amazon: '1464×600px' },
 }
+
 
 function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImage, rephrasing, regenning, productImages, brandColors }) {
     const cfg = MODULE_TYPE_CONFIG[module.type] || { label: module.type, icon: 'layers', color: '#7c3aed', amazon: '' }
@@ -906,7 +917,7 @@ function AplusModuleCard({ module, idx, image, onUpdate, onRephrase, onRegenImag
             {/* Module Content — collapsible */}
             {expanded && (
                 <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--sys-border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: image ? '1fr 280px' : '1fr', gap: 20, paddingTop: 20 }}>
+                    <div className={`grid gap-5 pt-5 ${image ? 'grid-cols-1 lg:grid-cols-[1fr_280px]' : 'grid-cols-1'}`}>
                         {/* Text Fields */}
                         <div>
                             {module.headline   !== undefined && <Field field="headline"    value={module.headline}    label="Headline" />}
@@ -1633,7 +1644,7 @@ function QuickPostPanel({
             {/* Step 1: Post Type */}
             <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Post Type</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {QP_TYPES.map(t => (
                         <div key={t.id} onClick={() => setQpType(t.id)} style={{
                             borderRadius: 10, border: `1.5px solid ${qpType === t.id ? '#A78BFA' : 'rgba(255,255,255,0.08)'}`,
@@ -1656,7 +1667,7 @@ function QuickPostPanel({
                     Output Sizes
                     <span style={{ marginLeft: 8, fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>select multiple — generated in parallel</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {QP_SIZES.map(s => {
                         const active = qpRatios.has(s.id)
                         return (
@@ -2210,7 +2221,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--sys-text-muted)' }}>{plan.contentStrategy}</div>
                     </div>
-                     <div style={{ display: 'flex', gap: 8 }}>
+                     <div className="flex flex-wrap gap-2">
                         <button onClick={handleCopyExportText} style={{ background: exportCopied ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)', border: '1px solid ' + (exportCopied ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.15)'), color: exportCopied ? '#22C55E' : '#FFF', padding: '10px 18px', borderRadius: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{exportCopied ? 'check' : 'content_copy'}</span>
                             {exportCopied ? 'Copied!' : 'Copy All Text'}
@@ -2245,7 +2256,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B' }}>upload</span>
                         Upload to Amazon Seller Central
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div style={{ background: 'color-mix(in srgb, var(--sys-text) 4%, var(--sys-surface))', borderRadius: 10, padding: 16, border: '1px solid var(--sys-border)' }}>
                             <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#F59E0B' }}>content_copy</span>
@@ -2364,7 +2375,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                         )}
                     </div>
                     {/* Mood boards — 2x2 grid for larger display */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                         {Object.values(activeMoods).map(mood => {
                             const aiImg = moodImages[mood.id]
                             const isSelected = selectedMood === mood.id
@@ -3416,7 +3427,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
             {/* ─── Input Row ──────────────────────────── */}
             {step !== 'ready' && (
                 <div className="glass-panel" style={{ borderRadius: 12, padding: 16, marginBottom: step === 'analyzing' ? 12 : 0 }}>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <div className="flex flex-col md:flex-row gap-2 mb-[10px]">
                         <div style={{ position: 'relative', flex: 1 }}>
                             <span className="material-symbols-outlined" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--sys-text-muted)', pointerEvents: 'none' }}>link</span>
                             <input
@@ -3432,8 +3443,8 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
                         <button
                             onClick={handleAnalyze}
                             disabled={!productUrl || step === 'analyzing'}
-                            className="btn-primary"
-                            style={{ borderRadius: 8, gap: 6, flexShrink: 0, cursor: (!productUrl || step === 'analyzing') ? 'not-allowed' : 'pointer', opacity: (!productUrl || step === 'analyzing') ? 0.6 : 1 }}
+                            className="btn-primary flex items-center justify-center"
+                            style={{ borderRadius: 8, gap: 6, flexShrink: 0, padding: '12px 16px', cursor: (!productUrl || step === 'analyzing') ? 'not-allowed' : 'pointer', opacity: (!productUrl || step === 'analyzing') ? 0.6 : 1 }}
                         >
                             {step === 'analyzing' ? (
                                 <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />Analyzing...</>
@@ -3513,7 +3524,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
                                 : <span style={{ color: 'var(--sys-text-muted)', textTransform: 'none', letterSpacing: 0, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 11 }}>hourglass_empty</span>Generating...</span>
                             }
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                             {Object.values(activeMoods).map(mood => {
                                 const aiImg = moodImages[mood.id]
                                 const isSelected = selectedMood === mood.id
@@ -3701,10 +3712,10 @@ export default function PulseStudio() {
                 @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
                 @keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
             `}</style>
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 24px' }}>
+            <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-5">
 
                 {/* ── Top Bar ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="glass-panel" style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-primary)' }}>auto_awesome</span>
@@ -3725,7 +3736,7 @@ export default function PulseStudio() {
                 </div>
 
                 {/* ── Two-column layout: discovery left, actions right ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: phase === 'discover' ? '1fr' : '420px 1fr', gap: 24, alignItems: 'start', transition: 'all 0.3s' }}>
+                <div className={`grid gap-6 items-start transition-all duration-300 ${phase === 'discover' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[420px_1fr]'}`}>
 
                     {/* ── LEFT: Product Discovery ── */}
                     <div>
@@ -3770,7 +3781,7 @@ export default function PulseStudio() {
                             </div>
 
                             {/* Action card grid — 2×3 */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                                 {ACTIONS.map(action => (
                                     <ActionCard
                                         key={action.id}
