@@ -744,6 +744,7 @@ router.post('/aplus/generate', protect, async (req, res) => {
 
         const isPremium = listingTier === 'premium';
         const creditCost = isPremium ? CREDITS.aplusPlus : CREDITS.aplus;
+        console.log(`🔷 A+ Generate: listingTier=${listingTier}, isPremium=${isPremium}, creditCost=${creditCost}, modules=${moduleCount}`);
 
         // ── Credit balance pre-flight check ───────────────────────────────────────
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);

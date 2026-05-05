@@ -1864,6 +1864,11 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
     const [moduleCount, setModuleCount] = useState(7)
     const [listingTier, setListingTier] = useState(forceTier || 'standard')  // 'standard' | 'premium'
 
+    // Sync forceTier prop → state (parent switches between A+ / A++ actions)
+    useEffect(() => {
+        if (forceTier) setListingTier(forceTier)
+    }, [forceTier])
+
     const gen = useGenerate(APLUS_STAGES)
     const [editedModules, setEditedModules] = useState([])
     const [editedImages, setEditedImages] = useState({})
@@ -3795,6 +3800,7 @@ export default function PulseStudio() {
                                         <div style={{ padding: 16 }}>
                                             {(activeAction === 'aplus' || activeAction === 'aptwo') && (
                                                 <APlusTool
+                                                    key={activeAction} // Remount on A+ ↔ A++ switch
                                                     brandId={brandId}
                                                     onContextReady={() => {}}
                                                     externalContext={activeProductContext}
