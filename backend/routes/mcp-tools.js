@@ -246,19 +246,29 @@ const TOOLS = {
         if (!prompt) throw new Error('queue_generation: prompt is required');
 
         const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-        const resp = await fetch(`${baseUrl}/api/video-studio/advanced/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ctx.internalToken}`,
-            },
-            body: JSON.stringify({
-                model, prompt, duration, aspectRatio, qualityMode,
-                brandId: ctx.brand?._id,
-                source: 'skill_execution',
-            }),
-            signal: AbortSignal.timeout(30000), // just queuing, not waiting for result
-        });
+        try {
+            const resp = await fetch(`${baseUrl}/api/video-studio/advanced/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${ctx.internalToken}`,
+                },
+                body: JSON.stringify({
+                    model, prompt, duration, aspectRatio, qualityMode,
+                    brandId: ctx.brand?._id,
+                    source: 'skill_execution',
+                    allowDiskUse: true,
+                }),
+                signal: AbortSignal.timeout(30000), // just queuing, not waiting for result
+            });
+            
+            if (!resp.ok) {
+                throw new Error(`Video generation request failed: ${resp.status}`);
+            }
+        } catch (error) {
+            console.error('MCP queue_generation error:', error.message);
+            throw new Error(`Failed to queue video generation: ${error.message}`);
+        }
 
         const data = await resp.json();
         console.log(`✅ MCP queue_generation: projectId=${data.projectId}`);
