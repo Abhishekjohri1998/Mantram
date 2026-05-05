@@ -158,16 +158,36 @@ app.use(cors(corsOptions));
 app.set('trust proxy', 1);
 
 // ── TOP-LEVEL DIAGNOSTICS & LOGGING ───────────────────────────
+// Bot scanner patterns — expanded to silence vulnerability scanners
+const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log'];
+const BOT_SCAN_PATHS = [
+    'wp-admin', 'wp-content', 'vendor', 'phpunit', '.env', '.git', '.ssh', '.ssl', '.well-known',
+    'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin', 'sdk/weblanguage',
+    'pdown', 'web-language', 'scripts', 'docker-compose', 'artisan', 'sidekiq', 'phpinfo',
+    'k8s/', 'node_modules/', 'portal/', 'old/', 'temp/', 'lib/', 'helper/',
+    'backup', 'database', 'credentials', 'secrets', 'debug', 'remote-sync',
+];
+
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
-    req.isBotScan = [
-        '.php', '.xml', 'wp-admin', 'vendor', 'phpunit', '.env', '.git', 
-        'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', 'admin',
-        'sdk/weblanguage', 'pdown', 'web-language', 'scripts'
-    ].some(p => path.includes(p.toLowerCase()));
+    const origin = req.headers.origin || '';
 
-    if (!req.isBotScan && !['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {
-        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${req.headers.origin || 'none'}`);
+    // Detect bot scans: no origin + matches known scanner patterns
+    const isBotScan = !origin && (
+        BOT_SCAN_EXTENSIONS.some(ext => path.endsWith(ext)) ||
+        BOT_SCAN_PATHS.some(p => path.includes(p)) ||
+        /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.\~]*$/i.test(path) ||
+        /~$/.test(path) ||
+        /\/\/(index|test|db)\.\w+/.test(path)
+    );
+
+    if (isBotScan) {
+        // Silently drop — don't log, don't process
+        return res.status(444).end();
+    }
+
+    if (!['/api/health', '/health', '/favicon.ico', '/robots.txt'].includes(path)) {
+        console.log(`[INCOMING] ${req.method} ${req.path} | Origin: ${origin || 'none'}`);
     }
     
     // Start time for AI budgeting

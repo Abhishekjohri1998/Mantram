@@ -303,17 +303,23 @@ async function generateModuleImage(prompt, moduleSpec, productImages = [], brand
         ? designContext.productRefImages
         : productImages;
 
+    // Per-image timeout — prevents one stuck image from blocking the pipeline
+    const IMAGE_TIMEOUT_MS = 60_000;
+
     try {
-        let result;
-        if (refImages.length > 0) {
-            result = await laozhangMultimodalImageGenerate(fullPrompt, refImages.slice(0, 2), {
+        const imagePromise = refImages.length > 0
+            ? laozhangMultimodalImageGenerate(fullPrompt, refImages.slice(0, 2), {
+                model: 'gemini-3.1-flash-image-preview', size
+            })
+            : laozhangImageGenerate(fullPrompt, {
                 model: 'gemini-3.1-flash-image-preview', size
             });
-        } else {
-            result = await laozhangImageGenerate(fullPrompt, {
-                model: 'gemini-3.1-flash-image-preview', size
-            });
-        }
+
+        const result = await Promise.race([
+            imagePromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`Image generation timed out after ${IMAGE_TIMEOUT_MS / 1000}s`)), IMAGE_TIMEOUT_MS))
+        ]);
+
         if (result?.imageUrl) {
             console.log(`   A+: Image generated [${moduleType}] at ${size} (${tier})${designContext ? ' PDI-guided' : ''}`);
             return result.imageUrl;
@@ -500,26 +506,34 @@ export async function generateAplusListing({
         ...(referenceImages || [])
     ].filter(Boolean).slice(0, 8);
 
-    // ── PDI: Resolve Design Context ────────────────────────────────────────────
+    // ── PARALLEL INTELLIGENCE — PDI + MCoT + Competitive Intel ───────────────
+    // These three steps are independent of each other and only depend on
+    // product data from step 2. Running them in parallel saves ~20-30s.
+
     let activeDesignContext = designContext;
     let activeProductDNA = productDNA;
-
-    if (!activeDesignContext && allProductImages.length > 0) {
-        console.log(`A+: Running inline PDI analysis on ${allProductImages.length} images...`);
-        activeProductDNA = await analyzeProductDesign(allProductImages, product || {}, brief);
-        activeDesignContext = buildDesignContext(activeProductDNA, activeProductDNA.defaultMoodDirection || 'editorial');
-    }
-
-    // For image generation: use PDI's curated roster (diversity-ranked) or first 4 images
-    const productImages = activeProductDNA?.productRefImages?.slice(0, 4)
-        || allProductImages.slice(0, 4);
-
-    // ── MCoT Visual Intelligence ───────────────────────────────────────────────
     let visualIntelligence = '';
-    if (productImages.length > 0) {
-        console.log(`A+: MCoT visual analysis of ${productImages.length} product images...`);
-        const mcotResult = await callMultimodalAgent(
-            `You are an Amazon product listing expert and visual analyst. Analyze these product images deeply.
+    let competitiveIntel = '';
+
+    console.log(`A+: Starting parallel intelligence (PDI + MCoT + Competitive Intel)...`);
+    const intelT0 = Date.now();
+
+    const [pdiResult, mcotResult, compResult] = await Promise.allSettled([
+        // ── PDI: Product Design Intelligence ────────────────────────────────
+        (async () => {
+            if (activeDesignContext || allProductImages.length === 0) return null;
+            console.log(`   A+: [PDI] Running inline analysis on ${allProductImages.length} images...`);
+            const dna = await analyzeProductDesign(allProductImages, product || {}, brief);
+            const ctx = buildDesignContext(dna, dna.defaultMoodDirection || 'editorial');
+            return { dna, ctx };
+        })(),
+
+        // ── MCoT Visual Intelligence ────────────────────────────────────────
+        (async () => {
+            if (allProductImages.length === 0) return null;
+            console.log(`   A+: [MCoT] Visual analysis of ${allProductImages.length} product images...`);
+            const result = await callMultimodalAgent(
+                `You are an Amazon product listing expert and visual analyst. Analyze these product images deeply.
 Return a JSON object with: {
   "productCategory": "type of product",
   "visualStyle": "aesthetic, materials, finish, colors",
@@ -531,29 +545,58 @@ Return a JSON object with: {
   "competitivePosition": "premium | budget | value | specialized",
   "rufusKeywords": ["natural-language phrase a buyer would use to find this", "phrase 2", "phrase 3"]
 }`,
-            `Product: ${product?.title || 'Unknown'}. Brief: ${brief}. Listing tier: ${isPremium ? 'Premium A++' : 'Standard A+'}.`,
-            productImages,
-            { temperature: 0.3, maxTokens: 1200 }
-        );
-        visualIntelligence = JSON.stringify(mcotResult);
-        console.log(`   A+: MCoT visual analysis complete`);
+                `Product: ${product?.title || 'Unknown'}. Brief: ${brief}. Listing tier: ${isPremium ? 'Premium A++' : 'Standard A+'}.`,
+                allProductImages.slice(0, 4),
+                { temperature: 0.3, maxTokens: 1200 }
+            );
+            return result;
+        })(),
+
+        // ── Competitive Intel ───────────────────────────────────────────────
+        (async () => {
+            if (!product?.title && !brief) return null;
+            try {
+                console.log(`   A+: [CompIntel] Fetching competitive intel...`);
+                const searchQuery = `Amazon A+ content best examples "${product?.title || brief}" category listing features 2025`;
+                const searchResult = await webSearch(searchQuery, 'quick');
+                return typeof searchResult === 'string'
+                    ? searchResult.substring(0, 800)
+                    : JSON.stringify(searchResult).substring(0, 800);
+            } catch (err) {
+                console.warn(`   A+: [CompIntel] web_search skipped: ${err.message}`);
+                return null;
+            }
+        })(),
+    ]);
+
+    // ── Collect parallel results ────────────────────────────────────────────
+    if (pdiResult.status === 'fulfilled' && pdiResult.value) {
+        activeProductDNA = pdiResult.value.dna;
+        activeDesignContext = pdiResult.value.ctx;
+        console.log(`   A+: [PDI] Complete ✅`);
+    } else if (pdiResult.status === 'rejected') {
+        console.warn(`   A+: [PDI] Failed: ${pdiResult.reason?.message}`);
     }
 
-    // ── 3. Competitive Intel ───────────────────────────────────────────────────
-    let competitiveIntel = '';
-    if (product?.title || brief) {
-        try {
-            console.log(`A+: Fetching competitive intel...`);
-            const searchQuery = `Amazon A+ content best examples "${product?.title || brief}" category listing features 2025`;
-            const searchResult = await webSearch(searchQuery, 'quick');
-            competitiveIntel = typeof searchResult === 'string'
-                ? searchResult.substring(0, 800)
-                : JSON.stringify(searchResult).substring(0, 800);
-            console.log(`   A+: Competitive intel fetched`);
-        } catch (err) {
-            console.warn(`   A+: web_search skipped: ${err.message}`);
-        }
+    if (mcotResult.status === 'fulfilled' && mcotResult.value) {
+        visualIntelligence = JSON.stringify(mcotResult.value);
+        console.log(`   A+: [MCoT] Complete ✅`);
+    } else if (mcotResult.status === 'rejected') {
+        console.warn(`   A+: [MCoT] Failed: ${mcotResult.reason?.message}`);
     }
+
+    if (compResult.status === 'fulfilled' && compResult.value) {
+        competitiveIntel = compResult.value;
+        console.log(`   A+: [CompIntel] Complete ✅`);
+    } else if (compResult.status === 'rejected') {
+        console.warn(`   A+: [CompIntel] Failed: ${compResult.reason?.message}`);
+    }
+
+    console.log(`A+: Parallel intelligence complete in ${Math.round((Date.now() - intelT0) / 1000)}s`);
+
+    // For image generation: use PDI's curated roster (diversity-ranked) or first 4 images
+    const productImages = activeProductDNA?.productRefImages?.slice(0, 4)
+        || allProductImages.slice(0, 4);
 
     // ── 4. Strategy Agent (Claude) ─────────────────────────────────────────────
     console.log(`A+: Strategy Agent planning ${effectiveModuleCount} modules (${isPremium ? 'Premium A++' : 'Standard A+'})...`);
