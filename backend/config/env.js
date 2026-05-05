@@ -147,6 +147,15 @@ export default {
         clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
         callbackUrl: process.env.LINKEDIN_CALLBACK_URL || `${process.env.BACKEND_URL || 'https://api.mantram.ai'}/api/social/auth/linkedin/callback`,
     },
+
+    // Twitter / X
+    twitter: {
+        apiKey: process.env.TWITTER_API_KEY,
+        apiSecret: process.env.TWITTER_API_SECRET,
+        bearerToken: process.env.TWITTER_BEARER_TOKEN,
+        accessToken: process.env.TWITTER_ACCESS_TOKEN,
+        accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+    },
     
     // Google PageSpeed Insights
     pagespeed: {

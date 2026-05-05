@@ -18,6 +18,7 @@ import {
     fetchLinkedInProfile,
     publishToLinkedIn,
     publishCarouselToLinkedIn,
+    publishToTwitter,
     fetchRecentPosts,
     fetchPostAnalytics
 } from '../services/socialService.js';
@@ -63,7 +64,7 @@ function getSafeRedirectUrl(base64Origin) {
 router.get('/auth/:platform', protect, (req, res) => {
     try {
         const { platform } = req.params;
-        if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin') {
+        if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin' && platform !== 'twitter') {
             return res.status(400).json({ success: false, error: 'Invalid platform' });
         }
 
@@ -79,6 +80,28 @@ router.get('/auth/:platform', protect, (req, res) => {
         if (!origin) origin = config.frontendUrl[0];
 
         const state = signState(`${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`);
+
+        // Twitter/X uses app-level OAuth 1.0a tokens — auto-connect instead of redirect
+        if (platform === 'twitter') {
+            const { apiKey, accessToken } = config.twitter;
+            if (!apiKey || !accessToken) {
+                return res.status(400).json({ success: false, error: 'Twitter API credentials not configured on server' });
+            }
+            // Auto-register the Twitter account for this user
+            await SocialAccount.findOneAndUpdate(
+                { user: req.user._id, platform: 'twitter', accountId: 'mantram_x' },
+                {
+                    user: req.user._id,
+                    platform: 'twitter',
+                    accountId: 'mantram_x',
+                    accountName: 'Mantram AI (X)',
+                    accessToken: accessToken,
+                    isActive: true,
+                },
+                { upsert: true, returnDocument: 'after' }
+            );
+            return res.json({ success: true, autoConnected: true, message: 'Twitter/X account connected!' });
+        }
 
         const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
         res.json({ success: true, authUrl });
@@ -556,15 +579,20 @@ router.post('/publish', protect, async (req, res) => {
                         postId = await publishCarouselToInstagram(account.accountId, account.accessToken, postText, carouselUrls);
                     } else if (account.platform === 'linkedin') {
                         postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, postText, carouselUrls);
+                    } else if (account.platform === 'twitter') {
+                        // Twitter doesn't support carousel — post first image
+                        postId = await publishToTwitter(postText, carouselUrls[0], null);
                     }
                 } else {
-                    // Single image publish
+                    // Single image/video publish
                     if (account.platform === 'facebook') {
                         postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
                     } else if (account.platform === 'instagram') {
                         postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
                     } else if (account.platform === 'linkedin') {
-                        postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl);
+                        postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
+                    } else if (account.platform === 'twitter') {
+                        postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl);
                     }
                 }
 

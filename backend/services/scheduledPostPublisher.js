@@ -20,6 +20,7 @@ import {
     publishToFacebook,
     publishToInstagram,
     publishToLinkedIn,
+    publishToTwitter,
     publishCarouselToInstagram,
     publishCarouselToFacebook,
     publishCarouselToLinkedIn,
@@ -195,7 +196,9 @@ async function publishScheduledPost(post) {
             } else if (post.platform === 'instagram') {
                 postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
             } else if (post.platform === 'linkedin') {
-                postId = await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl);
+                postId = await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
+            } else if (post.platform === 'twitter') {
+                postId = await publishToTwitter(caption, absoluteImageUrl, absoluteVideoUrl);
             } else {
                 post.status = 'failed';
                 post.error = `Unsupported platform: ${post.platform}`;

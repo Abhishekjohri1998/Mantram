@@ -502,40 +502,60 @@ export const publishCarouselToFacebook = async (pageId, accessToken, text, image
  */
 export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, imageUrls) => {
     try {
-        // LinkedIn multi-image uses the same ugcPosts API with multiple media entries
-        const media = imageUrls.map(url => ({
-            status: 'READY',
-            originalUrl: url,
-            description: { text: text.substring(0, 200) },
-        }));
+        const LI_VERSION = '202401';
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'LinkedIn-Version': LI_VERSION,
+            'X-Restli-Protocol-Version': '2.0.0',
+        };
+        const authorUrn = `urn:li:person:${personUrn}`;
 
-        const body = {
-            author: `urn:li:person:${personUrn}`,
+        // Upload each image and collect URNs
+        const imageUrns = [];
+        for (const url of imageUrls) {
+            try {
+                const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
+                    initializeUploadRequest: { owner: authorUrn }
+                }, { headers });
+                const { uploadUrl, image: imageUrn } = initResp.data.value;
+
+                const imgResp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+                await axios.put(uploadUrl, imgResp.data, {
+                    headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
+                    maxContentLength: 50 * 1024 * 1024,
+                });
+                imageUrns.push(imageUrn);
+                console.log(`[SOCIAL] LinkedIn carousel image uploaded: ${imageUrn}`);
+            } catch (imgErr) {
+                console.warn(`[SOCIAL] LinkedIn carousel image upload failed: ${imgErr.message}`);
+            }
+        }
+
+        if (imageUrns.length === 0) throw new Error('No images could be uploaded to LinkedIn');
+
+        // Create multi-image post using Posts API
+        const postBody = {
+            author: authorUrn,
+            commentary: text,
+            visibility: 'PUBLIC',
+            distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
             lifecycleState: 'PUBLISHED',
-            specificContent: {
-                'com.linkedin.ugc.ShareContent': {
-                    shareCommentary: { text },
-                    shareMediaCategory: 'IMAGE',
-                    media,
+            content: {
+                multiImage: {
+                    images: imageUrns.map(urn => ({ id: urn, altText: '' })),
                 },
-            },
-            visibility: {
-                'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
             },
         };
 
-        const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', body, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-                'X-Restli-Protocol-Version': '2.0.0',
-            }
-        });
-
-        console.log(`[SOCIAL] ✅ LinkedIn multi-image post published! ID: ${response.data.id}`);
-        return response.data.id;
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+        const postId = response.headers['x-restli-id'] || response.data?.id || '';
+        console.log(`[SOCIAL] ✅ LinkedIn multi-image post published! ID: ${postId}`);
+        return postId;
     } catch (error) {
-        throw new Error(error.response?.data?.message || 'Failed to publish multi-image to LinkedIn');
+        const errData = error.response?.data;
+        console.error('[SOCIAL] LinkedIn Carousel Error:', errData || error.message);
+        throw new Error(errData?.message || error.message || 'Failed to publish multi-image to LinkedIn');
     }
 };
 
@@ -588,7 +608,8 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    const scopes = ['w_member_social', 'r_liteprofile', 'r_emailaddress'].join(' ');
+    // Updated scopes: r_liteprofile → openid+profile, r_emailaddress → email
+    const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
     return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;
@@ -614,49 +635,105 @@ export const exchangeLinkedInCodeForToken = async (code) => {
 };
 
 export const fetchLinkedInProfile = async (accessToken) => {
-    const url = 'https://api.linkedin.com/v2/me';
+    // Use OpenID Connect userinfo endpoint (replaces deprecated /v2/me for lite profiles)
+    const url = 'https://api.linkedin.com/v2/userinfo';
     const response = await axios.get(url, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+        }
     });
-    return response.data;
+    // Map OpenID fields to match the shape our callback expects
+    const data = response.data;
+    return {
+        id: data.sub,  // OpenID subject = LinkedIn member ID
+        localizedFirstName: data.given_name || data.name?.split(' ')[0] || '',
+        localizedLastName: data.family_name || data.name?.split(' ').slice(1).join(' ') || '',
+        profilePicture: data.picture || '',
+    };
 };
 
-export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl) => {
+export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, videoUrl) => {
     try {
-        const url = 'https://api.linkedin.com/v2/ugcPosts';
-        const body = {
-            author: `urn:li:person:${personUrn}`,
-            lifecycleState: 'PUBLISHED',
-            specificContent: {
-                'com.linkedin.ugc.ShareContent': {
-                    shareCommentary: { text },
-                    shareMediaCategory: imageUrl ? 'IMAGE' : 'NONE',
-                },
-            },
-            visibility: {
-                'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-            },
+        const LI_VERSION = '202401';
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'LinkedIn-Version': LI_VERSION,
+            'X-Restli-Protocol-Version': '2.0.0',
         };
+        const authorUrn = `urn:li:person:${personUrn}`;
 
-        if (imageUrl) {
-            body.specificContent['com.linkedin.ugc.ShareContent'].media = [{
-                status: 'READY',
-                originalUrl: imageUrl,
-                description: { text: text.substring(0, 200) },
-            }];
+        // ── Helper: Upload image to LinkedIn and get asset URN ──
+        async function uploadImageToLinkedIn(imgUrl) {
+            // Step 1: Initialize upload
+            const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
+                initializeUploadRequest: { owner: authorUrn }
+            }, { headers });
+            const { uploadUrl, image: imageUrn } = initResp.data.value;
+
+            // Step 2: Download image and upload binary to LinkedIn
+            const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000 });
+            await axios.put(uploadUrl, imgResp.data, {
+                headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
+                maxContentLength: 50 * 1024 * 1024,
+            });
+            console.log(`[SOCIAL] ✅ LinkedIn image uploaded: ${imageUrn}`);
+            return imageUrn;
         }
 
-        const response = await axios.post(url, body, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-                'X-Restli-Protocol-Version': '2.0.0',
-            }
-        });
+        // ── Helper: Upload video to LinkedIn ──
+        async function uploadVideoToLinkedIn(vidUrl) {
+            // Step 1: Initialize upload
+            const initResp = await axios.post('https://api.linkedin.com/rest/videos?action=initializeUpload', {
+                initializeUploadRequest: { owner: authorUrn, fileSizeBytes: 0, uploadCaptions: false, uploadThumbnail: false }
+            }, { headers });
+            const { uploadUrl: vidUploadUrl, video: videoUrn } = (initResp.data.value || initResp.data);
 
-        return response.data.id;
+            // Step 2: Download video and upload binary
+            const vidResp = await axios.get(vidUrl, { responseType: 'arraybuffer', timeout: 120000 });
+            await axios.put(vidUploadUrl, vidResp.data, {
+                headers: { 'Content-Type': 'video/mp4' },
+                maxContentLength: 200 * 1024 * 1024,
+            });
+            console.log(`[SOCIAL] ✅ LinkedIn video uploaded: ${videoUrn}`);
+            return videoUrn;
+        }
+
+        // Build the post body using the current Posts API
+        const postBody = {
+            author: authorUrn,
+            commentary: text,
+            visibility: 'PUBLIC',
+            distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
+            lifecycleState: 'PUBLISHED',
+        };
+
+        if (videoUrl) {
+            // Video post
+            try {
+                const videoUrn = await uploadVideoToLinkedIn(videoUrl);
+                postBody.content = { media: { title: 'Video', id: videoUrn } };
+            } catch (vidErr) {
+                console.warn(`[SOCIAL] LinkedIn video upload failed, posting as text+link: ${vidErr.message}`);
+                postBody.commentary = `${text}\n\n🎥 ${videoUrl}`;
+            }
+        } else if (imageUrl) {
+            // Image post
+            const imageUrn = await uploadImageToLinkedIn(imageUrl);
+            postBody.content = { media: { title: 'Image', id: imageUrn } };
+        }
+
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+
+        // Posts API returns 201 with the post URN in the x-restli-id header
+        const postId = response.headers['x-restli-id'] || response.data?.id || '';
+        console.log(`[SOCIAL] ✅ LinkedIn post published: ${postId}`);
+        return postId;
     } catch (error) {
-        throw new Error(error.response?.data?.message || 'Failed to publish to LinkedIn');
+        const errData = error.response?.data;
+        const msg = errData?.message || errData?.error?.message || error.message;
+        console.error('[SOCIAL] LinkedIn Publish Error:', errData || error.message);
+        throw new Error(msg || 'Failed to publish to LinkedIn');
     }
 };
 
@@ -704,5 +781,143 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
         console.error(`Failed to fetch analytics for ${platform} post ${postId}:`, error.response?.data || error.message);
         // Don't throw, just return null so the UI can handle it gracefully
         return null;
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// TWITTER / X — OAuth 1.0a signed requests
+// ═══════════════════════════════════════════════════════════════════════
+
+import crypto from 'crypto';
+
+/**
+ * Generate OAuth 1.0a signature for Twitter API requests
+ */
+function twitterOAuthSign(method, url, params, consumerSecret, tokenSecret) {
+    const sortedParams = Object.keys(params).sort().map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`).join('&');
+    const baseString = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
+    const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
+    return crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+}
+
+function twitterAuthHeader(method, url, extraParams, consumerKey, consumerSecret, accessToken, accessTokenSecret) {
+    const oauthParams = {
+        oauth_consumer_key: consumerKey,
+        oauth_nonce: crypto.randomBytes(16).toString('hex'),
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_token: accessToken,
+        oauth_version: '1.0',
+    };
+    const allParams = { ...oauthParams, ...extraParams };
+    oauthParams.oauth_signature = twitterOAuthSign(method, url, allParams, consumerSecret, accessTokenSecret);
+    const headerStr = Object.keys(oauthParams).sort().map(k => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`).join(', ');
+    return `OAuth ${headerStr}`;
+}
+
+/**
+ * Publish a tweet to Twitter/X with optional image or video
+ */
+export const publishToTwitter = async (text, imageUrl, videoUrl) => {
+    const { apiKey, apiSecret, accessToken, accessTokenSecret } = config.twitter;
+    if (!apiKey || !accessToken) throw new Error('Twitter API credentials not configured');
+
+    try {
+        let mediaId = null;
+
+        // ── Upload media if provided ──
+        const mediaUrl = videoUrl || imageUrl;
+        if (mediaUrl) {
+            // Download media
+            const mediaResp = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 60000 });
+            const mediaBuffer = Buffer.from(mediaResp.data);
+            const mediaBase64 = mediaBuffer.toString('base64');
+            const isVideo = !!videoUrl;
+            const mediaType = isVideo ? 'video/mp4' : (mediaResp.headers['content-type'] || 'image/png');
+
+            if (isVideo) {
+                // Chunked upload for video (INIT → APPEND → FINALIZE)
+                const initUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+
+                // INIT
+                const initParams = { command: 'INIT', total_bytes: mediaBuffer.length.toString(), media_type: mediaType, media_category: 'tweet_video' };
+                const initAuth = twitterAuthHeader('POST', initUrl, initParams, apiKey, apiSecret, accessToken, accessTokenSecret);
+                const initResp = await axios.post(initUrl, new URLSearchParams(initParams), {
+                    headers: { 'Authorization': initAuth, 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+                mediaId = initResp.data.media_id_string;
+
+                // APPEND (single chunk for simplicity — works for <15MB)
+                const formData = new URLSearchParams();
+                formData.append('command', 'APPEND');
+                formData.append('media_id', mediaId);
+                formData.append('segment_index', '0');
+                formData.append('media_data', mediaBase64);
+                const appendAuth = twitterAuthHeader('POST', initUrl, { command: 'APPEND', media_id: mediaId, segment_index: '0' }, apiKey, apiSecret, accessToken, accessTokenSecret);
+                await axios.post(initUrl, formData, {
+                    headers: { 'Authorization': appendAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    maxContentLength: 200 * 1024 * 1024,
+                });
+
+                // FINALIZE
+                const finParams = { command: 'FINALIZE', media_id: mediaId };
+                const finAuth = twitterAuthHeader('POST', initUrl, finParams, apiKey, apiSecret, accessToken, accessTokenSecret);
+                const finResp = await axios.post(initUrl, new URLSearchParams(finParams), {
+                    headers: { 'Authorization': finAuth, 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                // Poll for processing completion
+                if (finResp.data.processing_info) {
+                    let processing = true;
+                    let checks = 0;
+                    while (processing && checks < 60) {
+                        const waitSec = finResp.data.processing_info?.check_after_secs || 5;
+                        await new Promise(r => setTimeout(r, waitSec * 1000));
+                        const statusParams = { command: 'STATUS', media_id: mediaId };
+                        const statusAuth = twitterAuthHeader('GET', initUrl, statusParams, apiKey, apiSecret, accessToken, accessTokenSecret);
+                        const statusResp = await axios.get(`${initUrl}?command=STATUS&media_id=${mediaId}`, {
+                            headers: { 'Authorization': statusAuth }
+                        });
+                        const state = statusResp.data.processing_info?.state;
+                        if (state === 'succeeded' || !statusResp.data.processing_info) processing = false;
+                        else if (state === 'failed') throw new Error('Twitter video processing failed');
+                        checks++;
+                    }
+                }
+                console.log(`[SOCIAL] ✅ Twitter video uploaded: ${mediaId}`);
+            } else {
+                // Simple image upload
+                const uploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+                const uploadParams = { media_data: mediaBase64 };
+                const auth = twitterAuthHeader('POST', uploadUrl, {}, apiKey, apiSecret, accessToken, accessTokenSecret);
+                const uploadResp = await axios.post(uploadUrl, new URLSearchParams(uploadParams), {
+                    headers: { 'Authorization': auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    maxContentLength: 50 * 1024 * 1024,
+                });
+                mediaId = uploadResp.data.media_id_string;
+                console.log(`[SOCIAL] ✅ Twitter image uploaded: ${mediaId}`);
+            }
+        }
+
+        // ── Create tweet via v2 API ──
+        const tweetUrl = 'https://api.twitter.com/2/tweets';
+        const tweetBody = { text };
+        if (mediaId) {
+            tweetBody.media = { media_ids: [mediaId] };
+        }
+
+        const tweetAuth = twitterAuthHeader('POST', tweetUrl, {}, apiKey, apiSecret, accessToken, accessTokenSecret);
+        const tweetResp = await axios.post(tweetUrl, tweetBody, {
+            headers: { 'Authorization': tweetAuth, 'Content-Type': 'application/json' }
+        });
+
+        const tweetId = tweetResp.data?.data?.id;
+        console.log(`[SOCIAL] ✅ Tweet published: ${tweetId}`);
+        return tweetId;
+    } catch (error) {
+        const errData = error.response?.data;
+        console.error('[SOCIAL] Twitter Publish Error:', errData || error.message);
+        const msg = errData?.detail || errData?.errors?.[0]?.message || errData?.title || error.message;
+        throw new Error(msg || 'Failed to publish to Twitter/X');
     }
 };
