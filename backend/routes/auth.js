@@ -3,8 +3,6 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import User from '../models/User.js';
 import Brand from '../models/Brand.js';
-import Waitlist from '../models/Waitlist.js';
-
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import Subscription from '../models/Subscription.js';
 import { protect, generateToken } from '../middleware/auth.js';
@@ -107,10 +105,6 @@ router.post('/register', async (req, res) => {
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
         
-        // Auto-approve if they were invited via waitlist
-        const waitlistEntry = await Waitlist.findOne({ email: email.toLowerCase() });
-        const autoApprove = waitlistEntry?.status === 'invited';
-
         // Generate creative user ID
         const userId = await User.generateUserId();
 
@@ -171,10 +165,6 @@ router.post('/register', async (req, res) => {
         // --- NEW: Assign Free Subscription ---
         await assignDefaultSubscription(user);
 
-
-        
-        // Update waitlist status if exists
-        await Waitlist.findOneAndUpdate({ email: email.toLowerCase() }, { status: 'registered' });
 
         // Send dual notification emails (User & Admin)
         try {
@@ -725,11 +715,6 @@ router.get('/google/callback', async (req, res) => {
         let user = await User.findOne({ email: profileData.email });
 
         if (!user) {
-            // Signup flow
-            // Auto-approve if they were invited via waitlist
-            const waitlistEntry = await Waitlist.findOne({ email: profileData.email.toLowerCase() });
-            const autoApprove = waitlistEntry?.status === 'invited';
-
             const userId = await User.generateUserId();
             user = await User.create({
                 name: profileData.name || 'Google User',
@@ -740,10 +725,6 @@ router.get('/google/callback', async (req, res) => {
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
                 approvalStatus: 'pending'
-            });
-            // Update waitlist status if exists
-            await Waitlist.findOneAndUpdate({ email: profileData.email.toLowerCase() }, { status: 'registered' });
-            
             // --- NEW: Assign Free Subscription for Google Signup ---
             await assignDefaultSubscription(user);
             

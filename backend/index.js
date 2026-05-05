@@ -51,7 +51,7 @@ import fidatoRoutes from './routes/fidato.js';
 import nexusRoutes from './routes/nexus.js';
 import intelMissionRoutes from './routes/intelMissions.js';
 import paymentRoutes from './routes/payments.js';
-import waitlistRoutes from './routes/waitlist.js';
+
 import skillsRoutes from './routes/skills.js';
 import mcpToolsRoutes from './routes/mcp-tools.js';
 import canvasDirectRoutes from './routes/canvas-direct.js';
@@ -377,7 +377,7 @@ app.use('/api/nexus', nexusRoutes);
 app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/social', socialRoutes);
-app.use('/api/waitlist', waitlistRoutes);
+
 app.use('/api/skills', skillsRoutes);
 app.use('/api/mcp-tools', mcpToolsRoutes);
 app.use('/api/fidato', canvasDirectRoutes);
