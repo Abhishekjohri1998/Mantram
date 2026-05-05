@@ -155,6 +155,8 @@ export default {
         bearerToken: process.env.TWITTER_BEARER_TOKEN,
         accessToken: process.env.TWITTER_ACCESS_TOKEN,
         accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+        clientId: process.env.TWITTER_CLIENT_ID,
+        clientSecret: process.env.TWITTER_CLIENT_SECRET,
     },
     
     // Google PageSpeed Insights
