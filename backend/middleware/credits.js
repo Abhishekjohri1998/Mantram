@@ -7,8 +7,10 @@
  * Falls back to defaults if DB settings not found.
  * 
  * Video credits are DYNAMIC — calculated per request based on model, duration,
- * resolution, and quality mode using: credits = ceil(USD_cost × 34)
+ * resolution, and quality mode using: credits = ceil(USD_cost × 70)
  * This ensures ≥50% margin at the ₹5/credit floor price.
+ * 
+ * Dynamic actions: videoGenerate, ugcProGenerate, qAdsGenerate
  */
 
 import mongoose from 'mongoose';
@@ -88,6 +90,8 @@ const DEFAULT_CREDIT_COSTS = {
     videoBrainstorm: 2,
     videoGenerate: 'dynamic',      // DYNAMIC — calculated per request
     videoEdit: 20,                 // ↑ from 10 (re-renders video via PiAPI)
+    // NOTE: ugcProGenerate and qAdsGenerate also use dynamic pricing below
+    // (they were previously hardcoded at 40 and 8, severely undercharging for Seedance 2.0)
     socialMedia: 3,
     socialMediaCalendar: 3,
     socialMediaAudit: 4,
@@ -105,14 +109,14 @@ const DEFAULT_CREDIT_COSTS = {
     voiceTranscribe: 1,
     promptEnhance: 1,
     imageEnhance: 2,
-    ugcProGenerate: 40,            // Seedance 2.0 via Atlas Cloud (base cost, chained adds 10 per segment)
+    ugcProGenerate: 'dynamic',     // DYNAMIC — Seedance 2.0 via Atlas Cloud (was 40, severely undercharged)
     ugcProAnalyze: 1,              // Product intelligence analysis
     monthlyStrategy: 15,           // Full strategy + 30-day calendar + all briefs in one Claude call
     monthlyBrief: 0,               // Brief execution charged at target studio's own rate
     qAdsPrompt:    4,              // Q-Ads single Claude call — brand DNA + MCP + 3 cinematic variants
     qAdsEnhance:   2,              // Q-Ads Stage 1 legacy — kept for backward compat
     qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
-    qAdsGenerate:  8,              // Q-Ads Seedance 2.0 video generation (per variant)
+    qAdsGenerate:  'dynamic',      // DYNAMIC — Seedance 2.0 video generation (was 8, severely undercharged)
     avatarGenerate: 4,             // Avatar Studio — 3 variants via LaoZhang NanoBanana 2 (free for superadmin)
 };
 
@@ -180,13 +184,25 @@ export const requireCredits = (actionOrCost = 1) => {
                 const rawCost = costs[actionOrCost];
 
                 // Dynamic video credits — calculated per request
-                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
-                    const { model = 'kling-3.0', duration = 5,
-                        resolution = '1080p', qualityMode = 'fast' } = req.body;
-                    const estimate = estimateCost(model, duration, resolution, qualityMode);
+                // Applies to: videoGenerate, ugcProGenerate, qAdsGenerate
+                const DYNAMIC_VIDEO_ACTIONS = ['videoGenerate', 'ugcProGenerate', 'qAdsGenerate'];
+                if (rawCost === 'dynamic' && DYNAMIC_VIDEO_ACTIONS.includes(actionOrCost)) {
+                    // UGC Pro and Q-Ads always use seedance-2.0 via Atlas Cloud
+                    const defaultModel = (actionOrCost === 'ugcProGenerate' || actionOrCost === 'qAdsGenerate')
+                        ? 'seedance-2.0' : 'kling-3.0';
+                    const defaultDuration = (actionOrCost === 'qAdsGenerate') ? 8 : 5;
+                    const { model = defaultModel, duration = defaultDuration,
+                        resolution = '720p', qualityMode = 'fast' } = req.body;
+                    // Parse duration from settings for UGC Pro / Q-Ads
+                    let parsedDuration = parseInt(duration) || defaultDuration;
+                    if (req.body.settings) {
+                        const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
+                        if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
+                    }
+                    const estimate = estimateCost(model || defaultModel, parsedDuration, resolution, qualityMode);
                     // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
                     cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
+                    console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${model || defaultModel} ${parsedDuration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
                 }

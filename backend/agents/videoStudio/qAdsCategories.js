@@ -398,12 +398,16 @@ Rules you MUST follow:
     }
 }
 
+import { estimateCost } from './falClient.js';
+
 /**
- * Credit cost for Q-Ads
+ * Credit cost for Q-Ads — now uses real estimateCost() for Atlas Cloud pricing.
+ * Previously hardcoded at 15/25/35, which severely undercharged for Seedance 2.0.
+ * Now matches the dynamic pricing in credits.js middleware.
  */
 export function getQAdsCreditCost(duration) {
     const d = parseInt(duration) || 8;
-    if (d <= 10) return 15;
-    if (d <= 20) return 25;
-    return 35;
+    // Q-Ads always uses seedance-2.0 on Atlas Cloud at 720p
+    const estimate = estimateCost('seedance-2.0', d, '720p', 'fast');
+    return Math.max(Math.ceil(estimate.usd * 70), 5);
 }
