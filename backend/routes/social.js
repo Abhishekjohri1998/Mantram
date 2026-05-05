@@ -61,7 +61,7 @@ function getSafeRedirectUrl(base64Origin) {
  * @desc    Initiate Social OAuth flow (facebook or instagram)
  * @access  Private
  */
-router.get('/auth/:platform', protect, (req, res) => {
+router.get('/auth/:platform', protect, async (req, res) => {
     try {
         const { platform } = req.params;
         if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin' && platform !== 'twitter') {
