@@ -40,12 +40,15 @@ export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.10, quality: 0.25 },
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
-    'seedance-1.0': { fast: 0.05, quality: 0.08 },
-    'seedance-2.0': { fast: 0.05, quality: 0.10 },
+    'seedance-1.0': { fast: 0.08, quality: 0.12 },
+    // Seedance 2.0 — Atlas Cloud actual billing: ~$2.10/15s = $0.14/sec at 720p.
+    // Base rate $0.20 × 0.7 (720p mult) = $0.14/sec effective. Previous $0.05 was undercharging.
+    'seedance-2.0': { fast: 0.20, quality: 0.30 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
-    'happyhorse-1.0': { fast: 0.06, quality: 0.10 },
+    // HappyHorse — also Atlas Cloud. Adjusted from $0.06 to reflect actual billing.
+    'happyhorse-1.0': { fast: 0.12, quality: 0.18 },
 };
 
 const DURATION_LIMITS = {
