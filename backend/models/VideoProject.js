@@ -159,6 +159,12 @@ const videoProjectSchema = new mongoose.Schema({
     finalVideoUrl: { type: String, default: '' },
     creditsUsed: { type: Number, default: 0 },
 
+    // ── Cost Optimization Fields ──
+    contentHash: { type: String, index: true, sparse: true },       // MD5 dedup key
+    idempotencyKey: { type: String, index: true, sparse: true },    // Runaway-request guard
+    isDraft: { type: Boolean, default: true },                      // Draft=720p, Final=1080p
+    abandonedAt: { type: Date },                                    // Lifecycle sweep marker
+
 }, { timestamps: true });
 
 // Indexes — compound indexes for the listing endpoint's sort/filter patterns

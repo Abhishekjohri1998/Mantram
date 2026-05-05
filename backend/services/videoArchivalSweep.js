@@ -166,12 +166,42 @@ export function startVideoArchivalSweep() {
     // Run initial sweep after a short delay (let server finish booting)
     setTimeout(() => {
         runSweep().catch(e => console.error('📦 [VideoArchival] Initial sweep failed:', e.message));
+        markAbandonedDrafts().catch(e => console.error('📦 [VideoArchival] Initial abandoned sweep failed:', e.message));
     }, 60000); // 1 minute after boot
 
     // Schedule periodic sweeps
     setInterval(() => {
         runSweep().catch(e => console.error('📦 [VideoArchival] Sweep failed:', e.message));
+        markAbandonedDrafts().catch(e => console.error('📦 [VideoArchival] Abandoned sweep failed:', e.message));
     }, intervalMs);
 }
 
+/**
+ * Mark abandoned draft projects for lifecycle cleanup.
+ * Targets: isDraft=true projects that are failed or stuck generating for >7 days.
+ * These will be picked up by S3 lifecycle rules for automatic deletion.
+ */
+export async function markAbandonedDrafts() {
+    await loadDeps();
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+
+    try {
+        const abandoned = await VideoProject.updateMany(
+            {
+                isDraft: true,
+                status: { $in: ['failed', 'advanced-generating'] },
+                createdAt: { $lt: cutoff },
+                abandonedAt: { $exists: false },
+            },
+            { $set: { abandonedAt: new Date() } }
+        );
+        if (abandoned.modifiedCount > 0) {
+            console.log(`🗑️ [Sweep] Marked ${abandoned.modifiedCount} abandoned draft project(s)`);
+        }
+    } catch (e) {
+        console.warn(`⚠️ [Sweep] Abandoned draft marking failed: ${e.message}`);
+    }
+}
+
 export { runSweep };
+

@@ -59,8 +59,26 @@ import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 import { getPresets } from '../utils/qAdsCache.js';
 import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
+import { buildVideoHash } from '../utils/videoHash.js';
+import { checkPromptSafety } from '../utils/promptSafety.js';
+import redis from '../utils/redisClient.js';
 
 const router = Router();
+
+// ── Cost Optimization: Dedup Cache Guard ─────────────────────────────────────
+/**
+ * Checks if an identical generation already completed (within 72h).
+ * Returns the cached VideoProject document or null.
+ */
+async function findCachedGeneration(hash) {
+    if (!hash) return null;
+    return VideoProject.findOne({
+        contentHash: hash,
+        status: { $in: ['completed', 'done'] },
+        'generation.s3VideoUrl': { $exists: true, $ne: '' },
+        createdAt: { $gte: new Date(Date.now() - 72 * 60 * 60 * 1000) }
+    }).lean();
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -115,13 +133,47 @@ async function signVideoProjectAssets(data) {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredits('videoGenerate'), async (req, res) => {
     try {
-        const { imageUrl, prompt, duration, aspectRatio, qualityMode, brandId, referenceImages } = req.body;
+        const { imageUrl, prompt, duration, aspectRatio, qualityMode, brandId, referenceImages, idempotencyKey } = req.body;
 
         if (!imageUrl) {
             return res.status(400).json({ success: false, error: 'An image is required for Image-to-Video' });
         }
 
-        console.log(`🖼️→🎬 I2V request: quality=${qualityMode}, duration=${duration}`);
+        // ── COST OPT 1: IDEMPOTENCY GUARD ─────────────────────────────────────
+        if (idempotencyKey) {
+            const existing = await VideoProject.findOne({
+                user: req.user._id, idempotencyKey,
+                status: { $in: ['advanced-generating', 'generating', 'completed', 'done'] },
+                createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
+            }).lean();
+            if (existing) {
+                console.log(`🔐 [Idempotency/I2V] Key ${idempotencyKey} already active → reconnecting to ${existing._id}`);
+                if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'videoIdempotency', 'Idempotency: I2V already in progress', 'video');
+                return res.json({ success: true, reconnected: true, project: { _id: existing._id, status: existing.status, generation: { progress: existing.generation?.progress || 5 } } });
+            }
+        }
+
+        // ── COST OPT 2: DEDUP CACHE GUARD ─────────────────────────────────────
+        const isDraftI2V = req.body.isDraft !== false;
+        const effectiveResI2V = isDraftI2V ? '720p' : '1080p';
+        const contentHashI2V = buildVideoHash({ prompt: prompt || 'i2v', model: 'seedance-2.0', duration, resolution: effectiveResI2V, imageUrl, aspectRatio });
+        const cachedI2V = await findCachedGeneration(contentHashI2V);
+        if (cachedI2V) {
+            console.log(`⚡ [Dedup/I2V] Cache hit for hash ${contentHashI2V} → returning ${cachedI2V._id}`);
+            if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'videoDedup', 'Dedup: Identical I2V video exists', 'video');
+            return res.json({ success: true, cached: true, project: { _id: cachedI2V._id, status: 'completed', finalVideoUrl: cachedI2V.generation?.s3VideoUrl || cachedI2V.finalVideoUrl, generation: { videoUrl: cachedI2V.generation?.s3VideoUrl, progress: 100 } } });
+        }
+
+        // ── COST OPT 3: PRE-FLIGHT SAFETY CHECK ──────────────────────────────
+        if (prompt) {
+            const safetyI2V = await checkPromptSafety(prompt);
+            if (!safetyI2V.safe) {
+                if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'videoSafetyBlock', `Safety block: ${safetyI2V.reason}`, 'video');
+                return res.status(400).json({ success: false, error: 'This prompt cannot be processed. Please revise and try again.', safetyBlock: true });
+            }
+        }
+
+        console.log(`🖼️→🎬 I2V request: quality=${qualityMode}, duration=${duration}, draft=${isDraftI2V}, res=${effectiveResI2V}`);
 
         // 1. ENHANCE PROMPT (Mandatory 5,000 words)
         // ══════════════════════════════════════════════════════════════════════════════
@@ -153,9 +205,12 @@ router.post(['/advanced/i2v', '/advanced/image-to-video'], protect, requireCredi
             },
             routing: {
                 selectedModel: 'seedance-2.0',
-                resolution: '1080p',
+                resolution: effectiveResI2V,
                 mode: qualityMode || 'fast',
             },
+            contentHash: contentHashI2V,
+            idempotencyKey: idempotencyKey || null,
+            isDraft: isDraftI2V,
         });
 
         // 3. Submit to dynamic routing engine (MuAPI/LaoZhang/Kie.ai/PiAPI) asynchronously
@@ -332,7 +387,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             prompt, model, duration, resolution, aspectRatio,
             firstImageUrl, lastImageUrl, referenceImages,
             generateAudio, qualityMode, brandId, shots,
-            refAudio, refVideo
+            refAudio, refVideo, idempotencyKey
         } = req.body;
 
         // 🔍 DIAGNOSTIC: Log start of handler
@@ -342,26 +397,87 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             return res.status(400).json({ success: false, error: 'Prompt is required' });
         }
 
-        console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}`);
+        // ── COST OPT 1: IDEMPOTENCY GUARD ─────────────────────────────────────
+        if (idempotencyKey) {
+            const existing = await VideoProject.findOne({
+                user: req.user._id,
+                idempotencyKey,
+                status: { $in: ['advanced-generating', 'generating', 'completed', 'done'] },
+                createdAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
+            }).lean();
+            if (existing) {
+                console.log(`🔐 [Idempotency] Key ${idempotencyKey} already active → reconnecting to ${existing._id}`);
+                if (req.creditsDeducted > 0) {
+                    await refundCredits(req.user._id, req.creditsDeducted, 'videoIdempotency',
+                        'Idempotency: Request already in progress', 'video');
+                }
+                return res.json({
+                    success: true, reconnected: true,
+                    project: { _id: existing._id, status: existing.status, generation: { progress: existing.generation?.progress || 5 } },
+                });
+            }
+        }
 
-        // 1. SMART ENHANCE PROMPT — model-native, concise prompt via MCoT pipeline
-        // Uses same pipeline as /enhance-prompt endpoint (buildEnhanceSystemPrompt + callAgent)
+        // ── COST OPT 2: DEDUP CACHE GUARD ─────────────────────────────────────
+        const isDraft = req.body.isDraft !== false; // default true
+        const effectiveResolution = isDraft ? (resolution || '720p') : (resolution || '1080p');
+        const contentHash = buildVideoHash({ prompt, model, duration, resolution: effectiveResolution, imageUrl: firstImageUrl, aspectRatio });
+        const cached = await findCachedGeneration(contentHash);
+        if (cached) {
+            console.log(`⚡ [Dedup] Cache hit for hash ${contentHash} → returning ${cached._id}`);
+            if (req.creditsDeducted > 0) {
+                await refundCredits(req.user._id, req.creditsDeducted, 'videoDedup',
+                    'Dedup: Identical video already exists', 'video');
+            }
+            return res.json({
+                success: true, cached: true,
+                project: {
+                    _id: cached._id, status: 'completed',
+                    finalVideoUrl: cached.generation?.s3VideoUrl || cached.finalVideoUrl,
+                    generation: { videoUrl: cached.generation?.s3VideoUrl, progress: 100 },
+                }
+            });
+        }
+
+        // ── COST OPT 3: PRE-FLIGHT SAFETY CHECK ──────────────────────────────
+        const safetyResult = await checkPromptSafety(prompt);
+        if (!safetyResult.safe) {
+            console.warn(`🛡️ [Safety] Blocked prompt: ${safetyResult.reason}`);
+            if (req.creditsDeducted > 0) {
+                await refundCredits(req.user._id, req.creditsDeducted, 'videoSafetyBlock',
+                    `Safety block: ${safetyResult.reason}`, 'video');
+            }
+            return res.status(400).json({ success: false, error: 'This prompt cannot be processed. Please revise and try again.', safetyBlock: true });
+        }
+
+        console.log(`📸 Advanced generate: ${(referenceImages || []).length} ref images, firstImage: ${firstImageUrl ? 'yes' : 'no'}, model: ${model}, quality: ${qualityMode}, draft: ${isDraft}, res: ${effectiveResolution}`);
+
+        // 1. SMART ENHANCE PROMPT — with Redis cache to avoid redundant Gemini calls
         // ══════════════════════════════════════════════════════════════════════════════
         console.log(`✨ [ADVANCED] Enhancing prompt for model: ${model || 'seedance-2.0'}`);
         let finalPrompt = prompt.trim();
+        const promptCacheKey = `enhance:${contentHash}`;
         try {
-            const { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } = await import('../agents/videoStudio/promptEnhancer.js');
-            const { callAgent: callAgt } = await import('../agents/shared/agentUtils.js');
-            const { loadBrandContext: loadCtx } = await import('../agents/shared/agentUtils.js');
-            const { brandContext } = await loadCtx(brandId);
-            const sysPrompt = buildEnhanceSystemPrompt(model || 'seedance-2.0', 'shortvideo', Number(duration) || 5, aspectRatio || '16:9', brandContext);
-            const usrPrompt = buildEnhanceUserPrompt(prompt.trim(), null, 'shortvideo');
-            const enhanced = await callAgt(sysPrompt, usrPrompt, 0.65, 2000, { timeoutMs: 30000 });
-            if (enhanced?.enhancedPrompt) {
-                finalPrompt = enhanced.enhancedPrompt;
-                console.log(`✅ [ADVANCED] Enhanced prompt (${finalPrompt.split(' ').length} words): "${finalPrompt.substring(0, 100)}..."`);
+            const cachedEnhanced = await redis.get(promptCacheKey);
+            if (cachedEnhanced) {
+                finalPrompt = cachedEnhanced;
+                console.log(`⚡ [PromptCache] Hit for hash ${contentHash} (${finalPrompt.split(' ').length} words)`);
             } else {
-                console.warn('⚠️ [ADVANCED] Enhancement returned empty — using raw prompt');
+                const { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } = await import('../agents/videoStudio/promptEnhancer.js');
+                const { callAgent: callAgt } = await import('../agents/shared/agentUtils.js');
+                const { loadBrandContext: loadCtx } = await import('../agents/shared/agentUtils.js');
+                const { brandContext } = await loadCtx(brandId);
+                const sysPrompt = buildEnhanceSystemPrompt(model || 'seedance-2.0', 'shortvideo', Number(duration) || 5, aspectRatio || '16:9', brandContext);
+                const usrPrompt = buildEnhanceUserPrompt(prompt.trim(), null, 'shortvideo');
+                const enhanced = await callAgt(sysPrompt, usrPrompt, 0.65, 2000, { timeoutMs: 30000 });
+                if (enhanced?.enhancedPrompt) {
+                    finalPrompt = enhanced.enhancedPrompt;
+                    // Cache for 24 hours
+                    await redis.set(promptCacheKey, finalPrompt, { ex: 86400 }).catch(() => {});
+                    console.log(`✅ [ADVANCED] Enhanced prompt (${finalPrompt.split(' ').length} words): "${finalPrompt.substring(0, 100)}..."`);
+                } else {
+                    console.warn('⚠️ [ADVANCED] Enhancement returned empty — using raw prompt');
+                }
             }
         } catch (enhErr) {
             console.warn('⚠️ [ADVANCED] Enhancement failed (non-blocking) — using raw prompt:', enhErr.message);
@@ -388,10 +504,13 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             },
             routing: {
                 selectedModel: model || 'kling-3.0',
-                resolution: resolution || '1080p',
+                resolution: effectiveResolution,
                 mode: qualityMode || 'fast',
             },
             creditsUsed: req.creditsDeducted || 0,
+            contentHash,
+            idempotencyKey: idempotencyKey || null,
+            isDraft,
         });
 
         // 3. Plan duration if needed
@@ -405,7 +524,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             prompt: finalPrompt, // Use enhanced prompt
             model: model || 'kling-3.0',
             duration: duration || 5,
-            resolution: resolution || '1080p',
+            resolution: effectiveResolution,
             qualityMode: qualityMode || 'fast',
             firstImageUrl: firstImageUrl || '',
             generateAudio: generateAudio !== false,
