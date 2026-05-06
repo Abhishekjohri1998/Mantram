@@ -63,61 +63,65 @@ export const PROVIDER_MULTIPLIERS = {
 };
 
 // Default credit costs (used when SystemSettings has no override)
+// ⚡ Updated May 2026 — recalibrated for 80% gross margin target
+// Formula: credits_required = API_cost_INR × 5  (so 80% of revenue is gross profit)
+// Exchange rate: ₹93.21/USD (update quarterly)
 const DEFAULT_CREDIT_COSTS = {
     content: 3,
     contentRefine: 2,
-    creative: 5,
-    photoshoot: 10,               // ↑ from 8 (multi-image + AI calls)
-    seoHealthCheck: 5,             // ↑ from 3 (crawls 600+ pages, heavy)
+    creative: 8,                   // ↑ from 5 — Gemini Flash image ≈ ₹6.24; 8cr × ₹5 = ₹40 → 84% margin
+    photoshoot: 25,               // ↑ from 10 — 4×Gemini images ≈ ₹25; 25cr × ₹5 = ₹125 → 80% margin
+    seoHealthCheck: 5,             // Crawls 600+ pages, heavy compute
     seoTraffic: 3,
     seoCompetitors: 3,
     seoAiVisibility: 3,
     seoAsk: 1,
     seoAuditPage: 1,
     seoCompetitorDiscover: 1,
-    seoBacklinks: 5,               // ↑ from 4 (heavy analysis)
-    seoWarRoom: 5,                 // ↑ from 4 (heavy analysis)
+    seoBacklinks: 5,
+    seoWarRoom: 5,
     seoLlmProbe: 3,
     seoAutoFix: 2,
     seoPromptMining: 3,
     seoGenerateFix: 1,
-    brainstorm: 3,                 // ↓ from 4 (1 text call — lower cost)
-    brainstormRefine: 1,           // ↓ from 2 (lightweight)
-    brainstormChat: 1,             // ↓ from 2 (single short response)
+    brainstorm: 3,
+    brainstormRefine: 1,
+    brainstormChat: 1,
     brainstormScreenplay: 5,
     research: 3,                   // Research Studio — web search + AI synthesis
     trendRefresh: 1,
     videoBrainstorm: 2,
-    videoGenerate: 'dynamic',      // DYNAMIC — calculated per request
-    videoEdit: 20,                 // ↑ from 10 (re-renders video via PiAPI)
-    // NOTE: ugcProGenerate and qAdsGenerate also use dynamic pricing below
-    // (they were previously hardcoded at 40 and 8, severely undercharging for Seedance 2.0)
+    videoGenerate: 'dynamic',      // DYNAMIC — ceil(USD_cost × 170) ensures 89% gross margin
+    videoEdit: 20,
+
     socialMedia: 3,
     socialMediaCalendar: 3,
     socialMediaAudit: 4,
     socialMediaCompetitor: 4,
     socialMediaScore: 2,
-    canvasGenerate: 3,             // ↑ from 2 (same image model cost)
+    canvasGenerate: 3,
     canvasBgRemove: 2,
-    canvasExtend: 3,               // ↑ from 2
+    canvasExtend: 3,
     fidatoCanvas: 2,               // Fidato Canvas AI Director (Gemini fallback)
     fidatoCanvasClaude: 4,         // Fidato Canvas with Claude tool-use (premium)
-    creativeCampaign: 8,           // Multi-platform campaign (multiple image gens)
+    creativeCampaign: 15,          // ↑ from 8 — Multi-platform campaign (4–6 image gens)
     creativeCritique: 1,           // MCoT post-gen quality critique
-    adCreative: 5,
-    voiceClone: 5,                 // ↑ from 3 (Minimax cost + storage)
+    adCreative: 8,                 // ↑ from 5 — aligns with creative image cost
+    voiceClone: 5,
     voiceTranscribe: 1,
     promptEnhance: 1,
     imageEnhance: 2,
-    ugcProGenerate: 'dynamic',     // DYNAMIC — Seedance 2.0 via Atlas Cloud (was 40, severely undercharged)
+    ugcProGenerate: 'dynamic',     // DYNAMIC — Seedance 2.0 via Atlas Cloud; ceil(USD × 170) → 89% margin
+
     ugcProAnalyze: 1,              // Product intelligence analysis
-    monthlyStrategy: 15,           // Full strategy + 30-day calendar + all briefs in one Claude call
+    monthlyStrategy: 25,           // ↑ from 15 — Full Claude strategy pipeline (value-based pricing)
     monthlyBrief: 0,               // Brief execution charged at target studio's own rate
     qAdsPrompt:    4,              // Q-Ads single Claude call — brand DNA + MCP + 3 cinematic variants
     qAdsEnhance:   2,              // Q-Ads Stage 1 legacy — kept for backward compat
     qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
-    qAdsGenerate:  'dynamic',      // DYNAMIC — Seedance 2.0 video generation (was 8, severely undercharged)
-    avatarGenerate: 4,             // Avatar Studio — 3 variants via LaoZhang NanoBanana 2 (free for superadmin)
+    qAdsGenerate:  'dynamic',      // DYNAMIC — Q-Ads Seedance 2.0 video; ceil(USD × 170) → 81%+ margin
+    avatarGenerate: 6,             // ↑ from 4 — Avatar Studio: 3 variants via LaoZhang NanoBanana 2
+
 };
 
 // Cache for credit costs (refresh every 5 minutes)

@@ -867,7 +867,7 @@ export default function CreditsPage() {
                                     <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {packages.map((pkg) => {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
@@ -877,12 +877,79 @@ export default function CreditsPage() {
                                         const monthlyPrice = pkg.pricing?.monthly || 0;
                                         const savings = billingCycle !== 'monthly' && monthlyPrice > 0 && price > 0 ? Math.round((1 - monthlyEquiv / monthlyPrice) * 100) : 0;
 
+                                        // ── Contact-for-pricing card (Agency / Enterprise) ──
+                                        if (pkg.contactForPricing) {
+                                            return (
+                                                <div key={pkg._id} className="glass-panel p-6 rounded-2xl border border-[var(--sys-border)] flex flex-col relative overflow-hidden hover:scale-[1.02] transition-all"
+                                                    style={{ borderColor: `${pkg.color}40` }}>
+                                                    {/* Subtle gradient shimmer */}
+                                                    <div className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                                                        style={{ background: `radial-gradient(ellipse at top left, ${pkg.color}, transparent 70%)` }} />
+
+                                                    <div className="flex-1 relative">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="material-symbols-outlined text-2xl" style={{ color: pkg.color }}>{pkg.icon}</span>
+                                                                <h3 className="text-xl font-bold text-[var(--sys-text)]">{pkg.name}</h3>
+                                                            </div>
+                                                            {pkg.badge && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                                                                    style={{ backgroundColor: pkg.color }}>
+                                                                    {pkg.badge}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-[var(--sys-text-muted)] mb-6">{pkg.description || pkg.tagline}</p>
+
+                                                        {/* Price row — "Custom Pricing" */}
+                                                        <div className="mb-6 flex items-center gap-3">
+                                                            <div className="px-4 py-2 rounded-xl border text-sm font-black tracking-wide"
+                                                                style={{ borderColor: `${pkg.color}50`, color: pkg.color, backgroundColor: `${pkg.color}10` }}>
+                                                                Custom Pricing
+                                                            </div>
+                                                            <span className="text-xs text-[var(--sys-text-muted)]">Starting from {pkg.credits?.monthly?.toLocaleString()} credits/mo</span>
+                                                        </div>
+
+                                                        {/* Features list */}
+                                                        <ul className="space-y-2.5 mb-8">
+                                                            {pkg.features?.map((f, j) => (
+                                                                <li key={j} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
+                                                                    <span className="material-symbols-outlined text-lg" style={{ color: pkg.color }}>check_circle</span>
+                                                                    {typeof f === 'object' ? (f.name || 'Feature') : f}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+
+                                                    {/* CTA — Contact Sales */}
+                                                    <a
+                                                        href={`mailto:${pkg.contactEmail || 'sales@mantram.ai'}?subject=Mantram AI ${pkg.name} Plan Enquiry&body=Hi, I'm interested in the ${pkg.name} plan. Please share pricing details.`}
+                                                        className="w-full py-3 rounded-xl font-bold text-sm text-center block transition-all text-white hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]"
+                                                        style={{ backgroundColor: pkg.color }}
+                                                    >
+                                                        <span className="material-symbols-outlined text-base align-middle mr-1.5">mail</span>
+                                                        Contact Sales
+                                                    </a>
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] text-center mt-2">
+                                                        {pkg.contactEmail || 'sales@mantram.ai'} · We respond within 24 hrs
+                                                    </p>
+                                                </div>
+                                            );
+                                        }
+
+                                        // ── Standard plan card ──
                                         return (
                                             <div key={pkg._id} className={`glass-panel p-6 rounded-2xl border transition-all hover:scale-[1.02] flex flex-col ${isCurrent ? 'border-primary  ring-primary/20 bg-primary/5' : 'border-[var(--sys-border)]'}`}>
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h3 className="text-xl font-bold text-[var(--sys-text)]">{pkg.name}</h3>
                                                         {isCurrent && <span className="px-2 py-0.5 rounded-full bg-primary text-[10px] font-black uppercase text-white tracking-wider">Current Plan</span>}
+                                                        {!isCurrent && pkg.badge && (
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                                                                style={{ backgroundColor: pkg.color || '#6366f1' }}>
+                                                                {pkg.badge}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <p className="text-sm text-[var(--sys-text-muted)] mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
@@ -938,6 +1005,7 @@ export default function CreditsPage() {
                                         )
                                     })}
                                 </div>
+
                             )}
                         </div>
                     ) : (
