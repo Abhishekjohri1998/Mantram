@@ -14,7 +14,7 @@ export const useSidebar = () => useContext(SidebarContext)
 
 export default function DashboardLayout({ children, title, subtitle }) {
     const [mobileOpen, setMobileOpen] = useState(false)
-    const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('mantram-sidebar-collapsed') === 'true')
+    const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('mantram-sidebar-collapsed') !== 'false')
     const [globalCalendarOpen, setGlobalCalendarOpen] = useState(false)
 
     // Mount global job poller — runs for lifetime of dashboard session
