@@ -10,8 +10,8 @@ const subscriptionPackageSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     tagline: { type: String, default: '' }, // short marketing line
 
-    // Tier level for ordering
-    tier: { type: Number, default: 1 }, // 1=basic, 2=pro, 3=enterprise
+    // Tier level for ordering (0=free, 1=creator, 2=professional, 3=business, 4=agency, 5=enterprise)
+    tier: { type: Number, default: 1 },
 
     // Studio Access — which studios are included
     studios: {
@@ -36,12 +36,13 @@ const subscriptionPackageSchema = new mongoose.Schema({
     },
 
     // Per-studio credit costs (override global defaults if set)
+    // Updated May 2026 — aligned with 80% gross margin recalibration
     creditCosts: {
-        content: { type: Number, default: 2 },
-        creative: { type: Number, default: 5 },
+        content: { type: Number, default: 3 },
+        creative: { type: Number, default: 8 },
         seo: { type: Number, default: 3 },
         brainstorm: { type: Number, default: 3 },
-        photoshoot: { type: Number, default: 10 },
+        photoshoot: { type: Number, default: 25 },
     },
 
     // Limits
@@ -82,6 +83,10 @@ const subscriptionPackageSchema = new mongoose.Schema({
     // AI generation metadata
     generatedByAI: { type: Boolean, default: false },
     aiRationale: { type: String, default: '' }, // why AI created this package
+
+    // Contact-for-pricing (Agency & Enterprise — no Razorpay flow)
+    contactForPricing: { type: Boolean, default: false }, // if true, UI shows "Contact Sales" instead of price
+    contactEmail: { type: String, default: '' }, // email to contact for pricing
 
     // Stats
     subscriberCount: { type: Number, default: 0 },
