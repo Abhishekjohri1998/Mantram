@@ -4,7 +4,10 @@ import SEOHead from '../components/SEOHead'
 
 import Nav from '../components/landing/Nav'
 import Hero from '../components/landing/Hero'
-import TrustStrip from '../components/landing/TrustStrip'
+import FeaturedVideos from '../components/landing/FeaturedVideos'
+import ActionDemo from '../components/landing/ActionDemo'
+import TrustLogos from '../components/landing/TrustLogos'
+import IntelligenceLayer from '../components/landing/IntelligenceLayer'
 import Problem from '../components/landing/Problem'
 import BrandDNA from '../components/landing/BrandDNA'
 import Fidato from '../components/landing/Fidato'
@@ -53,7 +56,7 @@ export default function Landing() {
                 aiSummary="Mantram AI is an agentic AI marketing operating system with 14 studios — Research, Brainstorm, Monthly Strategy, Content, Creative, Video, YouTube, Avatar, Brand, Social Media, Performance Marketing, Funnel, SEO, Retention. Brand DNA captured from a website scan is shared across all studios. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, HeyGen Avatars. Currently in early access (no free tier, credit-pack pricing from ₹149)."
             />
 
-            <div className="relative" style={{ background: BRAND.bg, color: 'var(--sys-text)' }}>
+            <div className="relative" style={{ background: '#0b0b0c', color: 'white' }}>
                 <CursorGlow />
 
                 <Nav
@@ -64,7 +67,11 @@ export default function Landing() {
 
                 <main role="main" className="relative z-[2]">
                     <Hero onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
-                    <TrustStrip />
+                    <FeaturedVideos />
+                    <ActionDemo />
+                    <TrustLogos />
+                    <IntelligenceLayer />
+                    
                     <Problem />
                     <BrandDNA />
                     <Fidato />

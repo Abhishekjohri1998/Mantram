@@ -37,14 +37,16 @@ export default function Nav({ onEarlyAccess, onAgencyDemo, isAuthenticated }) {
                     </span>
                 </Link>
 
-                <div className="hidden md:flex items-center gap-8 text-sm">
-                    <button onClick={() => scrollTo('studios')} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Studios</button>
-                    <button onClick={() => scrollTo('brand-dna')} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Brand DNA</button>
-                    <button onClick={() => scrollTo('fidato')} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Fidato</button>
-                    <button onClick={() => scrollTo('pricing')} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">Pricing</button>
+                <div className="hidden lg:flex items-center gap-6 text-[13px] font-medium">
+                    <button onClick={() => scrollTo('studios')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Studios</button>
+                    <button onClick={() => scrollTo('templates')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Templates</button>
+                    <button onClick={() => scrollTo('how-it-works')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">How it works</button>
+                    <button onClick={() => scrollTo('case-studies')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Case Studies</button>
+                    <button onClick={() => scrollTo('pricing')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Pricing</button>
+                    <button onClick={onAgencyDemo} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">For Agencies</button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                     {isAuthenticated ? (
                         <Link
                             to="/dashboard"
@@ -56,18 +58,24 @@ export default function Nav({ onEarlyAccess, onAgencyDemo, isAuthenticated }) {
                     ) : (
                         <>
                             <button
-                                onClick={onAgencyDemo}
-                                className="hidden sm:inline-flex text-sm font-semibold py-2.5 px-5 rounded-full transition-all hover:scale-105 cursor-pointer"
-                                style={{ color: BRAND.secondary, border: `1px solid ${BRAND.secondary}40` }}
+                                className="hidden sm:inline-flex text-[13px] font-medium transition-colors hover:text-white cursor-pointer"
+                                style={{ color: '#a1a1aa' }}
                             >
-                                For Agencies
+                                Sign in
                             </button>
                             <button
                                 onClick={onEarlyAccess}
-                                className="text-sm font-bold py-2.5 px-5 rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                className="hidden sm:inline-flex text-[13px] font-medium py-2 px-4 rounded-full transition-all hover:bg-white/5 cursor-pointer"
+                                style={{ color: 'white', border: `1px solid rgba(255,255,255,0.15)` }}
+                            >
+                                Join waitlist
+                            </button>
+                            <button
+                                onClick={onEarlyAccess}
+                                className="text-[13px] font-bold py-2 px-5 rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
                                 style={{ background: BRAND.primary, color: 'white' }}
                             >
-                                Get Early Access
+                                Book a Demo <span aria-hidden="true">→</span>
                             </button>
                         </>
                     )}
