@@ -97,9 +97,10 @@ function useGenerate(stagesList) {
 
 // ── UI Components ──────────────────────────────────────────────────────────
 
+
 const IMAGE_MODELS = [
-    { id: 'gemini-3.1-flash-image-preview', label: 'NanoBanana 2', desc: 'Fast, creative (Gemini Flash)', icon: '✦' },
-    { id: 'gpt-image-2', label: 'GPT Image 2', desc: 'Photorealistic, premium (OpenAI)', icon: '◆' },
+    { id: 'gemini-3.1-flash-image-preview', label: 'Gemini', desc: 'Fast, creative (Gemini Flash)', icon: '✦' },
+    { id: 'gpt-image-2', label: 'GPT-2', desc: 'Photorealistic, premium (OpenAI)', icon: '◆' },
 ]
 
 function ImageModelSelector({ imageModel, setImageModel, buttonColor = '#7c3aed' }) {
@@ -315,6 +316,7 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
             </div>
             {/* Image Model Selector */}
             <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor={buttonColor} />
+            <DesignModelSelector buttonColor={buttonColor} />
             <button
                 onClick={onGenerate}
                 disabled={loading}
@@ -1584,7 +1586,7 @@ function QuickPostPanel({
     qpLogoOn, setQpLogoOn, qpLogoPos, setQpLogoPos,
     qpLoading, setQpLoading, qpResult, setQpResult,
     qpError, setQpError, qpCompositeUrls, setQpCompositeUrls,
-    canvasRef, imageModel, setImageModel
+    canvasRef, imageModel, setImageModel, designModel, setDesignModel
 }) {
     const { activeBrand } = useBrand()
     const logoUrl = activeBrand?.logoUrl || activeBrand?.logo || null
@@ -3689,6 +3691,7 @@ export default function PulseStudio() {
     const [urlContext, setUrlContext]               = useState('')
     const [referenceImage, setReferenceImage]       = useState(null)
     const [imageModel, setImageModel]               = useState('gemini-3.1-flash-image-preview')
+    const [designModel, setDesignModel]             = useState('claude-sonnet-4-6')
 
     // QP state lives here so it persists when switching cards
     const [qpType, setQpType]     = useState('promo')
