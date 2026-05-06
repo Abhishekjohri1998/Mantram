@@ -1545,67 +1545,77 @@ export default function BrainstormStudio() {
         <div className="bs-layout-split">
           {/* Left Sidebar: Strategy Modes Navigation */}
           <div className="bs-layout-sidebar">
-            {/* Studio switcher tabs */}
-            <div className="bs-sidebar-section" style={{ paddingBottom: 0 }}>
-              <div style={{ display: 'flex', gap: 4, marginBottom: '0.75rem' }}>
-                <button
-                  className={`bs-mode-item ${studioView === 'brainstorm' ? 'active' : ''}`}
-                  onClick={() => setStudioView('brainstorm')}
-                  style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}
-                >
-                  <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: '#a78bfa', fontSize: 16 }}>psychology</span>
-                  <div className="bs-mode-item-text"><div className="bs-mode-item-label" style={{ fontSize: '0.72rem' }}>Brainstorm</div></div>
-                </button>
-                <button
-                  className={`bs-mode-item ${studioView === 'monthly' ? 'active' : ''}`}
-                  onClick={() => setStudioView('monthly')}
-                  style={{ flex: 1, justifyContent: 'center', padding: '0.45rem' }}
-                >
-                  <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: '#38bdf8', fontSize: 16 }}>calendar_month</span>
-                  <div className="bs-mode-item-text"><div className="bs-mode-item-label" style={{ fontSize: '0.72rem' }}>Monthly</div></div>
-                </button>
-              </div>
+
+            {/* ── View Switcher — Prominent pill bar ── */}
+            <div className="bs-view-switcher">
+              <button
+                className={`bs-view-tab ${studioView === 'brainstorm' ? 'active' : ''}`}
+                onClick={() => setStudioView('brainstorm')}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>psychology</span>
+                Brainstorm
+              </button>
+              <button
+                className={`bs-view-tab ${studioView === 'monthly' ? 'active' : ''}`}
+                onClick={() => setStudioView('monthly')}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>calendar_month</span>
+                Monthly Strategy
+                <span className="bs-view-tab-badge">AI</span>
+              </button>
             </div>
 
-            {studioView === 'brainstorm' && (
-            <div className="bs-sidebar-section">
-              <div className="bs-sidebar-title">STRATEGY MODE</div>
-              <div className="bs-mode-list">
-                {STRATEGY_MODES_LIST.map(mode => (
-                  <button
-                    key={mode.id}
-                    className={`bs-mode-item ${smActiveMode?.id === mode.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setSmActiveMode(mode)
-                      setSmResult(null)
-                      setSmError(null)
-                      setSmInputs({})
-                    }}
-                  >
-                    <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: mode.color }}>{mode.icon}</span>
-                    <div className="bs-mode-item-text">
-                      <div className="bs-mode-item-label">{mode.label}</div>
-                      <div className="bs-mode-item-desc">{mode.desc}</div>
-                    </div>
-                  </button>
-                ))}
+            {studioView === 'brainstorm' && (<>
+              {/* ── Quick Start — TOP of sidebar, always visible ── */}
+              <div className="bs-sidebar-section bs-sidebar-section--quick" style={{ paddingTop: '1rem' }}>
+                <div className="bs-sidebar-title">⚡ QUICK START</div>
+                <div className="bs-quick-list">
+                  {TOPICS.slice(0, 4).map(t => (
+                    <button key={t.id} className="bs-quick-item" onClick={() => sendMessage(t.hint)}>
+                      <span className="material-symbols-outlined bs-quick-icon">{t.icon}</span>
+                      <span>{t.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            )}
 
-            {studioView === 'brainstorm' && (
-            <div className="bs-sidebar-section bs-sidebar-section--quick">
-              <div className="bs-sidebar-title">QUICK START</div>
-              <div className="bs-quick-list">
-                {TOPICS.slice(0, 4).map(t => (
-                  <button key={t.id} className="bs-quick-item" onClick={() => sendMessage(t.hint)}>
-                    <span className="material-symbols-outlined bs-quick-icon">{t.icon}</span>
-                    <span>{t.label}</span>
-                  </button>
-                ))}
+              {/* ── Strategy Goals ── */}
+              <div className="bs-sidebar-divider" />
+              <div className="bs-sidebar-section" style={{ paddingTop: '0.75rem' }}>
+                <div className="bs-sidebar-title">STRATEGY GOALS</div>
+                <div className="bs-mode-list">
+                  {STRATEGY_MODES_LIST.map(mode => (
+                    <button
+                      key={mode.id}
+                      className={`bs-mode-item ${smActiveMode?.id === mode.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setSmActiveMode(mode)
+                        setSmResult(null)
+                        setSmError(null)
+                        setSmInputs({})
+                      }}
+                    >
+                      <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: mode.color }}>{mode.icon}</span>
+                      <div className="bs-mode-item-text">
+                        <div className="bs-mode-item-label">{mode.label}</div>
+                        <div className="bs-mode-item-desc">{mode.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            )}
+
+              {/* ── Sessions footer ── */}
+              {sessionList.length > 0 && (
+                <div className="bs-sidebar-sessions">
+                  <button className="bs-sidebar-sessions-btn" onClick={() => setSidebarOpen(o => !o)}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>history</span>
+                    Sessions
+                    <span className="bs-sidebar-sessions-count">{sessionList.length}</span>
+                  </button>
+                </div>
+              )}
+            </>)}
           </div>
 
           {/* Right Main Panel: Hero Preview or Result */}
@@ -1640,20 +1650,18 @@ export default function BrainstormStudio() {
               </div>
             ) : isHeroScreen ? (
               <>
-                {/* Hero Content */}
+                {/* Hero Content — scrollable middle */}
                 <div className="bs-hero-content">
                   {/* Fidato Greeting Block */}
                   <div className="bs-hero-greeting-block">
                     <div className="bs-hero-avatar">F</div>
                     <div className="bs-hero-greeting-text">
                       <div className="bs-hero-greeting-meta">Fidato • {activeBrand?.name || 'AI'} • {smActiveMode?.label}</div>
-                      <div className="bs-hero-greeting-message">
-                        {messages[0]?.content}
-                      </div>
+                      <div className="bs-hero-greeting-message">{messages[0]?.content}</div>
                     </div>
                   </div>
 
-                  {/* What I'll Build Box */}
+                  {/* What I'll Build */}
                   {smActiveMode && (
                     <div className="bs-preview-box">
                       <div className="bs-preview-title">WHAT I'LL BUILD FOR YOU</div>
@@ -1670,7 +1678,7 @@ export default function BrainstormStudio() {
                     </div>
                   )}
 
-                  {/* Research Modules Box */}
+                  {/* Research Modules */}
                   {smActiveMode && (
                     <div className="bs-research-box">
                       <div className="bs-preview-title">RESEARCH MODULES RUNNING</div>
@@ -1691,13 +1699,12 @@ export default function BrainstormStudio() {
                   )}
                 </div>
 
-                {/* Bottom Action Bar */}
-                <div className="bs-hero-action-bar">
-                  {smError && <div className="bs-error-banner" style={{marginBottom: '1rem'}}><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {smError}</div>}
-                  
+                {/* ── Sticky Action Bar — always visible ── */}
+                <div className="bs-hero-action-bar bs-hero-action-bar--sticky">
+                  {smError && <div className="bs-error-banner" style={{marginBottom: '0.75rem'}}><span className="material-symbols-outlined" style={{fontSize:'15px',verticalAlign:'middle'}}>warning</span> {smError}</div>}
+
                   {smLoading ? (
                     <div className="bs-stream-loading">
-                      {/* Phase label */}
                       <div className="bs-stream-phase-label">
                         <span className="material-symbols-outlined bs-stream-spin">
                           {smStreamPhase === 'writing' ? 'edit_note' : 'travel_explore'}
@@ -1711,15 +1718,10 @@ export default function BrainstormStudio() {
                           <span className="bs-stream-word-pulse">{smTokenCount} words</span>
                         )}
                       </div>
-
-                      {/* Live research tool chips */}
                       {smStreamTools.length > 0 && (
                         <div className="bs-stream-chips">
                           {smStreamTools.map(t => (
-                            <div
-                              key={t.tool}
-                              className={`bs-stream-chip ${t.status === 'done' ? 'bs-stream-chip--done' : 'bs-stream-chip--active'}`}
-                            >
+                            <div key={t.tool} className={`bs-stream-chip ${t.status === 'done' ? 'bs-stream-chip--done' : 'bs-stream-chip--active'}`}>
                               <span className={`material-symbols-outlined bs-stream-chip-icon ${t.status === 'working' ? 'bs-stream-spin' : ''}`}>
                                 {t.status === 'done' ? 'check_circle' : 'progress_activity'}
                               </span>
@@ -1728,22 +1730,16 @@ export default function BrainstormStudio() {
                           ))}
                         </div>
                       )}
-
-                      {/* Progress bar */}
                       <div className="bs-stream-progress-track">
-                        <div
-                          className="bs-stream-progress-fill"
-                          style={{
-                            width: smStreamPhase === 'writing'
-                              ? `${Math.min(95, 60 + (smTokenCount / 8))}%`
-                              : smStreamTools.length > 0
-                                ? `${Math.min(55, (smStreamTools.filter(t => t.status === 'done').length / Math.max(1, smStreamTools.length)) * 55)}%`
-                                : '5%',
-                          }}
-                        />
+                        <div className="bs-stream-progress-fill" style={{
+                          width: smStreamPhase === 'writing'
+                            ? `${Math.min(95, 60 + (smTokenCount / 8))}%`
+                            : smStreamTools.length > 0
+                              ? `${Math.min(55, (smStreamTools.filter(t => t.status === 'done').length / Math.max(1, smStreamTools.length)) * 55)}%`
+                              : '5%',
+                        }} />
                       </div>
                     </div>
-
                   ) : (
                     <div className="bs-action-buttons">
                       <button className="bs-btn-customise" onClick={() => {
@@ -1751,46 +1747,42 @@ export default function BrainstormStudio() {
                         if (inputField) inputField.focus();
                         setInput(`I want to build a ${smActiveMode?.label} strategy, but let's customize it first. `)
                       }}>
+                        <span className="material-symbols-outlined" style={{fontSize:16,verticalAlign:'middle',marginRight:4}}>tune</span>
                         Customise first
                       </button>
                       <button className="bs-btn-generate" onClick={handleStrategyMode}>
+                        <span className="material-symbols-outlined" style={{fontSize:16,verticalAlign:'middle',marginRight:4}}>bolt</span>
                         Generate full strategy
                       </button>
                     </div>
                   )}
-                  
-                  {/* Hidden input for "Customise first" flow to transition to chat */}
                   <div style={{ display: 'none' }}>
                     <textarea className="bs-input" value={input} onChange={e => setInput(e.target.value)} />
                   </div>
                 </div>
               </>
             ) : (
-              /* Legacy Chat / Result View (Appears after interaction) */
+              /* Chat / Result View */
               <div className="bs-layout-legacy">
-                {/* Phase bar */}
-                <div data-wt="bs-phase" className="bs-phase-bar">
-                  <button className="bs-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Session history">
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>menu</span>
-                    {sessionList.length > 0 && <span className="bs-sidebar-count">{sessionList.length}</span>}
-                  </button>
-                  <div className="bs-phase-inner">
-                    {Object.entries(PHASES).map(([key, p]) => (
-                      <div key={key} className={`bs-phase-step ${phase === key ? 'active' : ''}`}
-                        style={{ '--phase-color': p.color }}>
-                        <span className="material-symbols-outlined text-[1em]">{p.icon}</span>
-                        <span>{p.label}</span>
-                      </div>
-                    ))}
+                {/* ── Slim Phase Bar — single active pill + controls ── */}
+                <div data-wt="bs-phase" className="bs-phase-bar bs-phase-bar--slim">
+                  <div className="bs-phase-pill" style={{ '--phase-color': phaseInfo.color }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{phaseInfo.icon}</span>
+                    {phaseInfo.label}
                   </div>
                   {langInfo && (
-                    <div className="bs-lang-badge" title={`Generating creative copy in ${langInfo.label}`}>
+                    <div className="bs-lang-badge" title={`Copy in ${langInfo.label}`}>
                       {langInfo.flag} {langInfo.label}
                     </div>
                   )}
-                  <button className="bs-new-session-btn" onClick={resetSession} title="Start new session">
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
-                    New Session
+                  <div style={{ flex: 1 }} />
+                  <button className="bs-topbar-btn" onClick={() => setSidebarOpen(o => !o)} title="Session history">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>history</span>
+                    {sessionList.length > 0 && <span className="bs-sidebar-count" style={{ marginLeft: 2 }}>{sessionList.length}</span>}
+                  </button>
+                  <button className="bs-topbar-btn bs-topbar-btn--new" onClick={resetSession} title="New session">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                    New
                   </button>
                 </div>
 
