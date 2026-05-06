@@ -8,17 +8,11 @@ import FeaturedVideos from '../components/landing/FeaturedVideos'
 import ActionDemo from '../components/landing/ActionDemo'
 import TrustLogos from '../components/landing/TrustLogos'
 import IntelligenceLayer from '../components/landing/IntelligenceLayer'
-import Problem from '../components/landing/Problem'
-import BrandDNA from '../components/landing/BrandDNA'
-import Fidato from '../components/landing/Fidato'
-import Architecture from '../components/landing/Architecture'
-import AISearchSection from '../components/landing/AISearchSection'
-import Studios from '../components/landing/Studios'
-import LiveIntelligence from '../components/landing/LiveIntelligence'
-import ForWho from '../components/landing/ForWho'
-import Workflow from '../components/landing/Workflow'
+import StudiosShowcase from '../components/landing/StudiosShowcase'
+import HowItWorks from '../components/landing/HowItWorks'
+import CaseStudies from '../components/landing/CaseStudies'
+import Testimonial from '../components/landing/Testimonial'
 import Pricing from '../components/landing/Pricing'
-import Compliance from '../components/landing/Compliance'
 import FAQ from '../components/landing/FAQ'
 import FinalCTA from '../components/landing/FinalCTA'
 import Footer from '../components/landing/Footer'
@@ -71,18 +65,11 @@ export default function Landing() {
                     <ActionDemo />
                     <TrustLogos />
                     <IntelligenceLayer />
-                    
-                    <Problem />
-                    <BrandDNA />
-                    <Fidato />
-                    <Architecture />
-                    <AISearchSection />
-                    <LiveIntelligence />
-                    <Studios />
-                    <ForWho onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
-                    <Workflow />
-                    <Pricing onEarlyAccess={openEarlyAccess} />
-                    <Compliance />
+                    <StudiosShowcase />
+                    <HowItWorks />
+                    <CaseStudies />
+                    <Testimonial />
+                    <Pricing onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
                     <FAQ />
                     <FinalCTA onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
                 </main>
