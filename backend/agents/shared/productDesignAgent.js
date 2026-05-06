@@ -887,6 +887,7 @@ IMPORTANT: Do NOT recolor, stylize, cartoon-ize, or distort the product. It must
         console.log(`\u2705 QuickPost: Complete graphic generated \u2014 ${postImageUrl?.substring(0, 60)}...`);
     } catch (e) {
         console.error(`\u274c QuickPost: Graphic generation failed: ${e.message}`);
+        throw new Error(`Graphic generation failed: ${e.message}`);
     }
 
     return {

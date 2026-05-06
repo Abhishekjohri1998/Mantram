@@ -463,7 +463,7 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
 
 function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext, imageModel, setImageModel }) {
     const [brief, setBrief] = useState('')
-    const gen = useGenerate(DECK_STAGES)
+    const gen = useGenerate(DECK_STAGES.map(s => s.replace('NanoBanana 2', IMAGE_MODELS.find(m => m.id === imageModel)?.label || 'NanoBanana 2')))
     const [editedPlan, setEditedPlan] = useState(null)
     const [editedImages, setEditedImages] = useState({})
     const [rephrasing, setRephrasing] = useState(false)
@@ -1801,7 +1801,7 @@ function QuickPostPanel({
                 {qpLoading ? (
                     <>
                         <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.2)', borderTop: '2px solid #FFF', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                        Claude extracting copy · NanoBanana generating background...
+                        Claude extracting copy · {IMAGE_MODELS.find(m => m.id === imageModel)?.label || 'NanoBanana 2'} generating background...
                     </>
                 ) : (
                     <>
@@ -1917,7 +1917,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier, imageM
         if (forceTier) setListingTier(forceTier)
     }, [forceTier])
 
-    const gen = useGenerate(APLUS_STAGES)
+    const gen = useGenerate(APLUS_STAGES.map(s => s.replace('NanoBanana 2', IMAGE_MODELS.find(m => m.id === imageModel)?.label || 'NanoBanana 2')))
     const [editedModules, setEditedModules] = useState([])
     const [editedImages, setEditedImages] = useState({})
     const [productImages, setProductImages] = useState([])
