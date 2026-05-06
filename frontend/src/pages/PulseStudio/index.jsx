@@ -3279,6 +3279,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
     const [productUrl, setProductUrl] = useState('')
     const [step, setStep]             = useState('input')   // 'input' | 'analyzing' | 'ready'
     const [error, setError]           = useState('')
+    const [imageModel, setImageModel] = useState('gemini-3.1-flash-image-preview')
     const [analyzedProduct, setAnalyzedProduct] = useState(null)
     const [productImages, setProductImages]     = useState([])
     const [productDNA, setProductDNA]           = useState(null)
@@ -3327,7 +3328,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
                 // Generate mood board in background
                 apiFetch('/brand-studio/mood-board', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ productDNA: data.productDNA, productData: product, brandId })
+                    body: JSON.stringify({ productDNA: data.productDNA, productData: product, brandId, imageModel })
                 }).then(mb => {
                     if (mb.success) {
                         if (mb.moodDirections && Object.keys(mb.moodDirections).length >= 2) {
@@ -3507,6 +3508,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
                         Upload Product Images (JPG, PNG — up to 8)
                         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
                     </label>
+                    <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor="var(--sys-primary)" />
                     {error && <div style={{ marginTop: 10, color: 'var(--sys-primary)', fontSize: 12, padding: '8px 12px', background: 'var(--sys-primary-dim)', borderRadius: 8, border: '1px solid var(--sys-border)' }}>{error}</div>}
                 </div>
             )}

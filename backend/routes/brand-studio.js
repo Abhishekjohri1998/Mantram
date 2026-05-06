@@ -267,7 +267,7 @@ router.post('/quick-post', protect, async (req, res) => {
 // Cost: 5 credits (1 for mood generation + 4 for mood images)
 router.post('/mood-board', protect, async (req, res) => {
     try {
-        const { productDNA, productData, brandId } = req.body;
+        const { productDNA, productData, brandId, imageModel } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         // Credit check (5 credits: 1 for custom mood generation + 4 for images)
@@ -287,7 +287,7 @@ router.post('/mood-board', protect, async (req, res) => {
         const customMoodDirections = await generateProductMoodDirections(productDNA, productData || {}, brandContext);
 
         // Step 2: Generate mood board images using the custom directions
-        const result = await generateMoodBoardImages(productDNA, brandContext, customMoodDirections);
+        const result = await generateMoodBoardImages(productDNA, brandContext, customMoodDirections, imageModel);
         await deductCredits(req.user._id, MOOD_CREDITS, 'pulse-mood-board');
 
         res.json({

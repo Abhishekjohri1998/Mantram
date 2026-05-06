@@ -372,7 +372,7 @@ function buildFallbackProductDNA(productData, brief) {
  * @param {object} customMoodDirs    - AI-generated moods from generateProductMoodDirections (or FALLBACK)
  * @returns {{ moods: MoodImage[], moodDirections: object }}
  */
-export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null) {
+export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null, imageModel = 'gemini-3.1-flash-image-preview') {
     const moodDirections = customMoodDirs || FALLBACK_MOOD_DIRECTIONS;
     console.log(`PDI: Generating ${Object.keys(moodDirections).length} product-world mood boards...`);
 
@@ -498,12 +498,12 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
             let result;
             if (hasRefImages && laozhangMultimodalImageGenerate) {
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
-                    model: 'gemini-3.1-flash-image-preview',
+                    model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             } else {
                 result = await laozhangImageGenerate(prompt, {
-                    model: 'gemini-3.1-flash-image-preview',
+                    model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             }
