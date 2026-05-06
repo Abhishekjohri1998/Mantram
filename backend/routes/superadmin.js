@@ -2752,36 +2752,64 @@ router.post('/packages/seed-defaults', async (req, res) => {
         }
         if (req.body.force) await SubscriptionPackage.deleteMany({});
 
+        // ════ May 2026 Refresh — Magnific-inspired 80%+ margin strategy ════
         const defaults = [
             {
-                name: 'Starter', slug: 'starter', tagline: 'Get started with AI marketing', tier: 1,
-                studios: { contentStudio: true, creativeStudio: false, seoStudio: false, brainstormStudio: true },
-                credits: { monthly: 50, rollover: false, bonusOnSignup: 10 },
-                limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 20, maxScheduledPosts: 5, socialIntegrations: 1 },
-                features: [{ name: 'Content Studio', included: true }, { name: 'Brainstorm Studio', included: true }, { name: '50 Monthly Credits', included: true }, { name: 'Creative Studio', included: false }, { name: 'SEO Studio', included: false }],
-                pricing: { monthly: 999, quarterly: 2699, yearly: 9599 }, badge: '', color: '#64748b', icon: 'rocket_launch', isDefault: true, displayOrder: 1,
+                name: 'Free', slug: 'free', tagline: 'Explore AI marketing for free', tier: 0,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: false, brainstormStudio: true, videoStudio: false, socialMediaStudio: true },
+                credits: { monthly: 100, rollover: false, bonusOnSignup: 0 },
+                limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 10, maxScheduledPosts: 3, socialIntegrations: 1 },
+                features: [{ name: '100 Credits / month', included: true }, { name: '1 Brand Profile', included: true }, { name: 'Content & Brainstorm Studio', included: true }, { name: 'Creative Studio (watermarked)', included: true }, { name: 'Community Support', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'FREE', color: '#94a3b8', icon: 'person', isDefault: true, watermarkEnabled: true, displayOrder: 0, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Professional', slug: 'professional', tagline: 'Scale your brand with AI', tier: 2,
-                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true },
-                credits: { monthly: 200, rollover: true, bonusOnSignup: 50 },
+                name: 'Creator', slug: 'creator', tagline: 'For solopreneurs & freelancers', tier: 1,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: false, socialMediaStudio: true },
+                credits: { monthly: 200, rollover: false, bonusOnSignup: 25 },
+                limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 50, maxScheduledPosts: 20, socialIntegrations: 2 },
+                features: [{ name: '200 Credits / month', included: true }, { name: '+25 Bonus on signup', included: true }, { name: '1 Brand Profile', included: true }, { name: 'Content, Brainstorm & SEO Studios', included: true }, { name: 'Creative Studio (no watermark)', included: true }, { name: 'Email Support', included: true }],
+                pricing: { monthly: 1499, quarterly: 3999, yearly: 14990, currency: 'INR' }, badge: '', color: '#6366f1', icon: 'rocket_launch', watermarkEnabled: false, displayOrder: 1, contactForPricing: false,
+                createdBy: req.user._id,
+            },
+            {
+                name: 'Professional', slug: 'professional', tagline: 'For growing D2C brands & teams', tier: 2,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true },
+                credits: { monthly: 600, rollover: true, bonusOnSignup: 75 },
                 limits: { maxBrands: 3, maxTeamMembers: 3, maxProducts: 200, maxScheduledPosts: 50, socialIntegrations: 5 },
-                features: [{ name: 'All 4 Studios', included: true }, { name: '200 Monthly Credits', included: true }, { name: 'Credit Rollover', included: true }, { name: '3 Team Members', included: true }, { name: 'AI Photoshoot', included: true }],
-                pricing: { monthly: 2499, quarterly: 6749, yearly: 23999 }, badge: 'POPULAR', color: '#6366f1', icon: 'trending_up', displayOrder: 2,
+                features: [{ name: '600 Credits / month + rollover', included: true }, { name: '+75 Bonus on signup', included: true }, { name: '3 Brand Profiles', included: true }, { name: 'All Studios incl. Video & Q-Ads', included: true }, { name: '3 Team Seats', included: true }, { name: 'Priority Email Support', included: true }],
+                pricing: { monthly: 3499, quarterly: 9499, yearly: 34990, currency: 'INR' }, badge: 'POPULAR', color: '#FF4D00', icon: 'trending_up', watermarkEnabled: false, displayOrder: 2, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Enterprise', slug: 'enterprise', tagline: 'Unlimited AI power for agencies', tier: 3,
-                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true },
-                credits: { monthly: 999999, rollover: true, bonusOnSignup: 200 },
-                creditCosts: { content: 1, creative: 3, seo: 2, brainstorm: 1, photoshoot: 5 },
-                limits: { maxBrands: 999, maxTeamMembers: 10, maxProducts: 999, maxScheduledPosts: 999, socialIntegrations: 10 },
-                features: [{ name: 'Unlimited Credits', included: true }, { name: 'Reduced Credit Costs', included: true }, { name: '10 Team Members', included: true }, { name: 'Priority Support', included: true }, { name: 'White-Label Reports', included: true }],
-                pricing: { monthly: 6999, quarterly: 18899, yearly: 67199 }, badge: 'BEST VALUE', color: '#f59e0b', icon: 'diamond', displayOrder: 3,
+                name: 'Business', slug: 'business', tagline: 'For established brands & agencies', tier: 3,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 2000, rollover: true, bonusOnSignup: 250 },
+                limits: { maxBrands: 10, maxTeamMembers: 10, maxProducts: 1000, maxScheduledPosts: 200, socialIntegrations: 10 },
+                features: [{ name: '2,000 Credits / month + 2-month rollover', included: true }, { name: '+250 Bonus on signup', included: true }, { name: '10 Brands + D2C Analytics', included: true }, { name: 'All Studios + Avatar + Skills Hub', included: true }, { name: '10 Team Seats', included: true }, { name: 'Priority WhatsApp Support', included: true }],
+                pricing: { monthly: 7999, quarterly: 21999, yearly: 79990, currency: 'INR' }, badge: 'BEST VALUE', color: '#f59e0b', icon: 'business_center', watermarkEnabled: false, displayOrder: 3, contactForPricing: false,
+                createdBy: req.user._id,
+            },
+            {
+                name: 'Agency', slug: 'agency', tagline: 'For performance marketing agencies', tier: 4,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 10000, rollover: true, bonusOnSignup: 1000 },
+                limits: { maxBrands: 999, maxTeamMembers: 50, maxProducts: 9999, maxScheduledPosts: 9999, socialIntegrations: 50 },
+                features: [{ name: 'Custom Credit Pool (from 10,000/mo)', included: true }, { name: 'Unlimited Brand Profiles', included: true }, { name: 'All Studios + API Access', included: true }, { name: 'Up to 50 Team Seats', included: true }, { name: 'White-Label Reports', included: true }, { name: 'Dedicated Account Manager', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'FOR AGENCIES', color: '#ec4899', icon: 'groups', watermarkEnabled: false, displayOrder: 4, contactForPricing: true, contactEmail: 'sales@mantram.ai',
+                createdBy: req.user._id,
+            },
+            {
+                name: 'Enterprise', slug: 'enterprise', tagline: 'Unlimited AI power for enterprises', tier: 5,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 999999, rollover: true, bonusOnSignup: 0 },
+                limits: { maxBrands: 999, maxTeamMembers: 999, maxProducts: 99999, maxScheduledPosts: 99999, socialIntegrations: 999 },
+                features: [{ name: 'Unlimited Credits & Rollover', included: true }, { name: 'Unlimited Brand Profiles', included: true }, { name: 'All Studios + Custom Integrations', included: true }, { name: 'Unlimited Team Members', included: true }, { name: 'Full White-Label + Custom Domain', included: true }, { name: '24/7 Dedicated Support + SLA', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'ENTERPRISE', color: '#7c3aed', icon: 'diamond', watermarkEnabled: false, displayOrder: 5, contactForPricing: true, contactEmail: 'enterprise@mantram.ai',
                 createdBy: req.user._id,
             },
         ];
+
 
         const created = await SubscriptionPackage.insertMany(defaults);
         res.json({ success: true, packages: created, message: `${created.length} default packages created` });
