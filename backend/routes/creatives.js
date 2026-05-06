@@ -3046,7 +3046,7 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
             body: JSON.stringify({
                 contents,
                 generationConfig: {
-                    responseModalities: ['TEXT', 'IMAGE'],
+                    responseModalities: ['IMAGE', 'TEXT'],
                     temperature: 0.4,
                 },
             }),
@@ -3071,12 +3071,44 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
             throw new Error(`Image editing failed: ${data.error.message}`);
         }
 
-        // Extract the edited image
-        const resParts = data.candidates?.[0]?.content?.parts || [];
+        // ── Debug: log response structure ──
+        const candidate = data.candidates?.[0];
+        const finishReason = candidate?.finishReason || 'UNKNOWN';
+        const safetyRatings = candidate?.safetyRatings || [];
+        const promptFeedback = data.promptFeedback;
+
+        console.log(`📋 Gemini edit response: finishReason=${finishReason}, candidates=${data.candidates?.length || 0}`);
+        if (promptFeedback?.blockReason) {
+            console.error(`🚫 Gemini BLOCKED edit: blockReason=${promptFeedback.blockReason}`);
+            return res.status(400).json({
+                success: false,
+                error: `Image editing was blocked by the AI safety filter (${promptFeedback.blockReason}). Try a different edit instruction.`
+            });
+        }
+        if (finishReason === 'SAFETY') {
+            const blockedCategories = safetyRatings
+                .filter(r => r.probability === 'HIGH' || r.blocked)
+                .map(r => r.category?.replace('HARM_CATEGORY_', ''))
+                .join(', ');
+            console.error(`🚫 Gemini edit blocked by safety: ${blockedCategories}`);
+            return res.status(400).json({
+                success: false,
+                error: `Image editing was blocked by AI safety filters${blockedCategories ? ` (${blockedCategories})` : ''}. Try rephrasing your edit instruction.`
+            });
+        }
+
+        // Extract the edited image — check ALL candidates, not just the first
+        const allParts = [];
+        for (const cand of (data.candidates || [])) {
+            for (const part of (cand?.content?.parts || [])) {
+                allParts.push(part);
+            }
+        }
+
         let editedImageUrl = null;
         let editDescription = '';
 
-        for (const part of resParts) {
+        for (const part of allParts) {
             if (part.inlineData?.mimeType?.startsWith('image/') && !part.thought) {
                 editedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
             }
@@ -3085,9 +3117,64 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
             }
         }
 
+        // ── Retry once with a more explicit prompt if no image returned ──
+        if (!editedImageUrl && finishReason !== 'SAFETY') {
+            console.warn('⚠️ Gemini returned no image on first attempt. Retrying with explicit instruction...');
+            console.log('   Parts received:', allParts.map(p => ({
+                hasImage: !!p.inlineData,
+                hasText: !!p.text,
+                thought: !!p.thought,
+                mime: p.inlineData?.mimeType
+            })));
+
+            // Retry with a stronger instruction that demands image output
+            const retryContents = [
+                { role: 'user', parts: [
+                    { inlineData: { mimeType: sourceMime, data: sourceBase64 } },
+                    { text: `Edit this image: ${editPrompt}\n\nYou MUST output the complete modified image. Do not respond with text only — generate and return the edited image.` }
+                ]}
+            ];
+
+            try {
+                const retryResp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: retryContents,
+                        generationConfig: {
+                            responseModalities: ['IMAGE', 'TEXT'],
+                            temperature: 0.4,
+                        },
+                    }),
+                });
+                const retryData = await retryResp.json();
+
+                if (!retryData.error) {
+                    for (const cand of (retryData.candidates || [])) {
+                        for (const part of (cand?.content?.parts || [])) {
+                            if (part.inlineData?.mimeType?.startsWith('image/') && !part.thought && !editedImageUrl) {
+                                editedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                                console.log('✅ Retry succeeded — got edited image');
+                            }
+                            if (part.text && !part.thought) editDescription += part.text;
+                        }
+                    }
+                }
+            } catch (retryErr) {
+                console.warn('⚠️ Retry also failed:', retryErr.message);
+            }
+        }
+
         if (!editedImageUrl) {
-            console.error('❌ Gemini returned no image. Parts:', resParts.map(p => ({ hasImage: !!p.inlineData, hasText: !!p.text, thought: !!p.thought })));
-            return res.status(500).json({ success: false, error: 'Image editing failed — the AI did not return an edited image. Try a different edit instruction.' });
+            console.error('❌ Gemini returned no image after retry. finishReason:', finishReason,
+                'Parts:', allParts.map(p => ({ hasImage: !!p.inlineData, hasText: !!p.text, thought: !!p.thought })));
+            const textResponse = editDescription.trim();
+            return res.status(500).json({
+                success: false,
+                error: textResponse
+                    ? `Image editing failed — the AI responded with text instead of an image: "${textResponse.substring(0, 200)}"`
+                    : 'Image editing failed — the AI did not return an edited image. Try a different edit instruction.'
+            });
         }
 
         // ── Upload to S3 ──
