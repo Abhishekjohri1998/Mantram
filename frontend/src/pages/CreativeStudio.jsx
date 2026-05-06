@@ -11187,16 +11187,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </div>
                         )}
 
-                        {/* Loading state */}
-                        {csGenerating && (
-                            <div className="flex flex-col items-center justify-center gap-4">
-                                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] animate-spin" style={{ animationDuration: '2s' }}>progress_activity</span>
-                                <div className="text-center">
-                                    <p className="text-[13px] font-bold text-[var(--sys-text)]">AI Art Director at work...</p>
-                                    <p className="text-[11px] text-[var(--sys-text-muted)] mt-1">Analysing brand → Building prompt → Generating image</p>
-                                </div>
-                            </div>
-                        )}
+                        <GlobalLoader 
+                            isActive={csGenerating} 
+                            title="AI Art Director at work..." 
+                            currentStage="Analysing brand → Building prompt → Generating image"
+                            icon="movie_filter"
+                            estimatedDuration={45}
+                            thinkingContext="creative"
+                        />
 
                         {/* Result */}
                         {csResult && !csGenerating && (
