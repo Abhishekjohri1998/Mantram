@@ -193,9 +193,22 @@ export async function getLaozhangVideoStatus(requestId) {
 // IMAGE GENERATION — via /v1/images/generations (OpenAI compatible)
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Per-model image generation timeouts (ms) — GPT Image 2 is significantly slower than Gemini Flash
+const IMAGE_MODEL_TIMEOUTS = {
+    'gpt-image-2':    180_000,   // OpenAI: ~60-120s typical, allow 180s
+    'gpt-image-1':    120_000,
+    'dall-e-3':       120_000,
+    default:           90_000,   // Gemini Flash / NanoBanana 2
+};
+
+function getImageTimeout(model) {
+    return IMAGE_MODEL_TIMEOUTS[model] || IMAGE_MODEL_TIMEOUTS.default;
+}
+
 export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
-    console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}`);
+    const timeoutMs = getImageTimeout(model);
+    console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
 
     // LaoZhang's OpenAI-compatible /generations endpoint silently drops non-square sizes that DALL-E wouldn't accept.
     // To ensure NanoBanana 2 (Gemini-3.1) respects custom boundaries like 1080x1350 or 100x900, we must force it in prompt.
@@ -208,7 +221,7 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
-        signal: AbortSignal.timeout(90000),
+        signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
@@ -237,9 +250,10 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
 export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
+    const timeoutMs = getImageTimeout(model);
     if (!imageUrls || imageUrls.length === 0) return laozhangImageGenerate(prompt, { model, size });
 
-    console.log(`🖼️  [LaoZhang-Multimodal] Image gen: ${model}, ${imageUrls.length} ref URLs, size=${size}`);
+    console.log(`🖼️  [LaoZhang-Multimodal] Image gen: ${model}, ${imageUrls.length} ref URLs, size=${size}, timeout=${timeoutMs/1000}s`);
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
     for (const url of imageUrls) console.log(`   🔗 ref: ${url.substring(0, 100)}...`);
 
@@ -280,7 +294,7 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
-        signal: AbortSignal.timeout(90000),
+        signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
