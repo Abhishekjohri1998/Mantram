@@ -39,6 +39,8 @@ const QUICK_ACTIONS = [
     { label: 'Avatar 2.0', icon: 'face_retouching_natural', to: '/avatar-generator' },
 ];
 
+const TOP_TABS = ['Recommended', 'Follows', 'Events'];
+
 const SUB_TABS = ['For You','Shorts','3.0 Model','Motion Control','Creatives'];
 
 // ── Styles (injected) ──
@@ -77,6 +79,8 @@ const EXPLORE_CSS = `
 .explore-search { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-bottom: 6px; }
 .explore-search input { background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 8px; padding: 7px 12px 7px 34px; font-size: 13px; color: var(--sys-text); outline: none; width: 200px; transition: border-color 0.2s; }
 .explore-search input:focus { border-color: var(--sys-primary); }
+.publish-btn { margin-left: 10px; padding: 7px 20px; border-radius: 8px; border: 1.5px solid var(--sys-primary); background: transparent; color: var(--sys-primary); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0; }
+.publish-btn:hover { background: var(--sys-primary); color: #fff; }
 .explore-search .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--sys-text-muted); pointer-events: none; }
 
 /* Sub-tabs */
@@ -280,9 +284,9 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                     </div>
                 )}
 
-                {/* ═══ Top Tabs + Search ═══ */}
+                {/* ═══ Top Tabs + Search + Publish ═══ */}
                 <div className="explore-tabs">
-                    {['Recommended'].map(tab => (
+                    {TOP_TABS.map(tab => (
                         <button key={tab} className={`explore-tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
                             {tab}
                         </button>
@@ -294,6 +298,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                             onChange={e => setSearch(e.target.value)}
                         />
                     </div>
+                    <button className="publish-btn" onClick={() => navigate('/social-media-studio')}>Publish</button>
                 </div>
 
                 {/* ═══ Sub-tabs ═══ */}
