@@ -19,18 +19,17 @@ export default function Hero({ onEarlyAccess, onAgencyDemo }) {
             <div className="max-w-4xl mx-auto px-4 md:px-6 flex flex-col items-center" ref={revealContent}>
                 {/* Top Pill */}
                 <div 
-                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8"
-                    style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8 border border-[#FF5A1F]/30 bg-[#FF5A1F]/5"
                 >
-                    <span className="text-[11px] font-bold tracking-widest text-[#a1a1aa]">
+                    <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F]">
                         ★ NEW • 16 STUDIOS • 240+ TEMPLATES • BRAND-NATIVE AI
                     </span>
                 </div>
 
                 {/* H1 */}
-                <h1 className="text-5xl md:text-7xl lg:text-[84px] font-bold tracking-tight leading-[1.05] mb-8 text-white font-serif">
+                <h1 className="text-5xl md:text-7xl lg:text-[84px] tracking-tight leading-[1.05] mb-8 text-white font-serif font-normal">
                     One creative team.<br />
-                    <span className="italic" style={{ color: BRAND.primary }}>Sixteen studios.</span><br />
+                    <span className="italic text-[#FF5A1F]">Sixteen studios.</span><br />
                     Infinite output.
                 </h1>
 
@@ -40,7 +39,7 @@ export default function Hero({ onEarlyAccess, onAgencyDemo }) {
                 </p>
 
                 {/* CTAs */}
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mb-12">
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
                     <button 
                         onClick={onEarlyAccess}
                         className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
@@ -51,36 +50,33 @@ export default function Hero({ onEarlyAccess, onAgencyDemo }) {
                     
                     <button 
                         onClick={onEarlyAccess}
-                        className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2"
-                        style={{ border: '1px solid rgba(255,255,255,0.2)' }}
+                        className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2 border border-white/20"
                     >
                         Join the waitlist
                     </button>
                     
                     <button 
                         onClick={onAgencyDemo}
-                        className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2 group"
-                        style={{ border: '1px solid rgba(255,255,255,0.2)' }}
+                        className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-[#a1a1aa] hover:text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2 border border-white/10 group"
                     >
                         <Play className="w-4 h-4 text-[#a1a1aa] group-hover:text-white transition-colors" fill="currentColor" />
                         Watch the 90-second tour
                     </button>
                 </div>
 
-                {/* Trust Checks */}
-                <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3 text-[13px] text-[#a1a1aa] font-medium">
-                    <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Brand-locked outputs
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" /> 100+ enterprise brands
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" /> SOC 2 · GDPR ready
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" /> Live in 5 minutes
-                    </span>
+                {/* Waitlist Input */}
+                <div className="flex flex-col sm:flex-row items-center w-full max-w-md mx-auto mt-8 bg-[#121214] border border-white/10 rounded-full p-1 sm:pl-6 focus-within:border-[#FF5A1F]/50 transition-colors">
+                    <input 
+                        type="email" 
+                        placeholder="you@brand.com" 
+                        className="bg-transparent border-none text-white text-sm outline-none w-full flex-1 px-4 sm:px-0 py-3 sm:py-0 placeholder:text-[#a1a1aa]"
+                    />
+                    <button 
+                        onClick={onEarlyAccess}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-sm text-white transition-all hover:scale-105 active:scale-95 bg-[#FF5A1F]"
+                    >
+                        Join waitlist <span aria-hidden="true" className="ml-1">→</span>
+                    </button>
                 </div>
             </div>
         </section>

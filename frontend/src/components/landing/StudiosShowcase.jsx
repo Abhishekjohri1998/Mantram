@@ -61,7 +61,7 @@ function ShowcaseRow({ showcase, index }) {
                     {showcase.eyebrow}
                 </span>
                 
-                <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white font-serif mb-6 leading-[1.1]">
+                <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
                     {showcase.title}
                 </h2>
                 

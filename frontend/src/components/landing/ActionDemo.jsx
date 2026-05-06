@@ -26,7 +26,7 @@ export default function ActionDemo() {
                     <span className="text-[11px] font-bold tracking-widest text-[#a1a1aa] uppercase mb-4">
                         Watch Mantram in action
                     </span>
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white font-serif max-w-4xl">
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-4xl">
                         90 seconds. One campaign. <br />
                         <span className="italic" style={{ color: BRAND.primary }}>From prompt to publish.</span>
                     </h2>

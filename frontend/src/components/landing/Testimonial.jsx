@@ -21,7 +21,7 @@ export default function Testimonial() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-8 border-t border-white/10 pt-8">
                         {/* Profile */}
                         <div className="flex items-center gap-4 shrink-0">
-                            <div className="w-12 h-12 rounded-full bg-[#FF5A1F] flex items-center justify-center text-white font-serif font-bold text-lg">
+                            <div className="w-12 h-12 rounded-full bg-[#FF5A1F] flex items-center justify-center text-white font-serif text-lg">
                                 PM
                             </div>
                             <div>

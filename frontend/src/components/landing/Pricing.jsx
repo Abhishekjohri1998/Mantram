@@ -15,7 +15,7 @@ export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
                     <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-4 block">
                         Pricing
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white font-serif max-w-3xl leading-[1.1]">
+                    <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif max-w-3xl leading-[1.1]">
                         Pick the pack. <span className="italic" style={{ color: BRAND.primary }}>Scale on your terms.</span>
                     </h2>
                 </div>

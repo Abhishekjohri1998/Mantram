@@ -25,7 +25,7 @@ export default function TrustLogos() {
                 {/* Using a marquee or flex-wrap for the logos */}
                 <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
                     {BRANDS.map((brand, i) => (
-                        <div key={i} className="text-xl md:text-2xl font-bold font-serif tracking-tight text-white/80 hover:text-white transition-colors cursor-default">
+                        <div key={i} className="text-xl md:text-2xl font-serif tracking-tight text-white/80 hover:text-white transition-colors cursor-default">
                             {brand}
                         </div>
                     ))}

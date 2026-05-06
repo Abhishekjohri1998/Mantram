@@ -50,7 +50,7 @@ export default function CaseStudies() {
                         <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-4 block">
                             Case Studies
                         </span>
-                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white font-serif leading-[1.1]">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif leading-[1.1]">
                             Not claims. <span className="italic" style={{ color: BRAND.primary }}>Actual results.</span>
                         </h2>
                     </div>
@@ -94,7 +94,7 @@ export default function CaseStudies() {
                                 <div className="flex items-end gap-8 pt-6">
                                     {item.stats.map((stat, idx) => (
                                         <div key={idx} className="flex flex-col">
-                                            <span className="text-white font-serif text-3xl font-bold mb-1 tracking-tight">
+                                            <span className="text-white font-serif text-3xl mb-1 tracking-tight">
                                                 {stat.value}
                                             </span>
                                             <span className="text-[10px] font-bold tracking-wider text-[#a1a1aa] uppercase">

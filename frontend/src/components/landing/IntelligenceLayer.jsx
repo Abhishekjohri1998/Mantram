@@ -37,7 +37,7 @@ export default function IntelligenceLayer() {
                     <span className="text-[11px] font-bold tracking-widest text-[#a1a1aa] uppercase mb-6 block">
                         The Intelligence Layer
                     </span>
-                    <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white font-serif mb-6 leading-[1.1]">
+                    <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
                         Powered by every frontier model.<br />
                         <span className="italic" style={{ color: BRAND.primary }}>Not a wrapper. An orchestrator.</span>
                     </h2>
