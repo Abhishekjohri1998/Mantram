@@ -1371,7 +1371,11 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // Otherwise uses /images/generations (JSON body).
 export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
     // ── Choose API endpoint ──
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+    // Auto-prefer LaoZhang for gpt-image-1/2 when key is available.
+    // Direct OpenAI remaps these to dall-e-3 which drops ref images and is slower.
+    const isGptImageModel = modelId === 'gpt-image-1' || modelId === 'gpt-image-2';
+    const lzKeyAvailable = !!process.env.LAOZHANG_API_KEY;
+    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (isGptImageModel && lzKeyAvailable);
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
