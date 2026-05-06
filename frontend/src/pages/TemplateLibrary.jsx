@@ -13,22 +13,23 @@ function pickColor(i) { return MOCK_COLORS[i % MOCK_COLORS.length]; }
 function fmtLikes(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n); }
 function randDuration(seed) { const m = ((seed * 7 + 3) % 3); const s = ((seed * 13 + 5) % 50); return `${m}:${String(s).padStart(2,'0')}`; }
 
-const HERO_BANNERS = [
-    {
-        title: 'Mantram Elite Creators Program',
-        cta: 'Applications Now Open',
-        gradient: 'linear-gradient(135deg, #0a1a0f 0%, #0d2818 40%, #0f1a12 100%)',
-        accent: '#00D4AA',
-        particles: true,
-    },
-    {
-        title: 'Mantram Native 4K,\nOne-Click Output',
-        subtitle: 'hero • creator portrait',
-        cta: 'Limited-Time Up to 20%\nOff for Subscribers',
-        gradient: 'linear-gradient(135deg, #2a1810 0%, #3d2215 40%, #1a0f08 100%)',
-        accent: '#E84118',
-        badge: '4K',
-    },
+const TOP_BANNER = {
+    title: 'Mantram AI — The All-In-One AI Marketing Platform',
+    subtitle: 'Create stunning content, automate campaigns, and grow your brand with AI-powered studios',
+    cta: 'Explore All Studios',
+    gradient: 'linear-gradient(135deg, #0a0a1a 0%, #0d1a2e 30%, #1a0d2e 60%, #0a1a0f 100%)',
+};
+
+const LEFT_SLIDES = [
+    { title: 'Mantram Elite Creators Program', cta: 'Applications Now Open', gradient: 'linear-gradient(135deg, #0a1a0f 0%, #0d2818 40%, #0f1a12 100%)', accent: '#00D4AA', particles: true },
+    { title: 'AI Canvas — Design\nWithout Limits', cta: 'Try Canvas Now', gradient: 'linear-gradient(135deg, #0d0d2e 0%, #1a0d3d 40%, #0d0d1a 100%)', accent: '#7c3aed', particles: true },
+    { title: 'Video Studio 2.0\nCinematic AI Ads', cta: 'Create Your First Video', gradient: 'linear-gradient(135deg, #1a0a0a 0%, #2e0d15 40%, #1a0a0a 100%)', accent: '#E84118', particles: true },
+];
+
+const RIGHT_SLIDES = [
+    { title: 'Mantram Native 4K,\nOne-Click Output', subtitle: 'hero • creator portrait', cta: 'Limited-Time Up to 20%\nOff for Subscribers', gradient: 'linear-gradient(135deg, #2a1810 0%, #3d2215 40%, #1a0f08 100%)', accent: '#E84118', badge: '4K' },
+    { title: 'GPT Image 2\nPhotorealistic Creatives', subtitle: 'powered by OpenAI', cta: 'Now Available in\nCreative Studio', gradient: 'linear-gradient(135deg, #0d1a1a 0%, #0d2e2e 40%, #0a1a1a 100%)', accent: '#14B8A6', badge: 'NEW' },
+    { title: 'Pulse Studio\nBrand-First Design', subtitle: 'product intelligence', cta: 'From URL to Campaign\nin 60 Seconds', gradient: 'linear-gradient(135deg, #1a1a0a 0%, #2e2e0d 40%, #1a1a0a 100%)', accent: '#F59E0B', badge: 'HOT' },
 ];
 
 const QUICK_ACTIONS = [
@@ -47,28 +48,48 @@ const SUB_TABS = ['For You','Shorts','3.0 Model','Motion Control','Creatives'];
 const EXPLORE_CSS = `
 .explore-root { max-width: 1600px; margin: 0 auto; padding: 0 20px 80px; width: 100%; }
 
-/* Hero */
+/* Top Banner */
+.top-banner { width: 100%; border-radius: 14px; padding: 32px 40px; margin-bottom: 16px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.top-banner-glow { position: absolute; top: -40%; right: -10%; width: 400px; height: 400px; border-radius: 50%; filter: blur(80px); pointer-events: none; opacity: 0.15; }
+.top-banner h2 { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
+.top-banner h2 span { color: var(--sys-primary); }
+.top-banner p { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 6px; max-width: 600px; line-height: 1.5; }
+.top-banner-cta { padding: 10px 24px; background: var(--sys-primary); color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0; }
+.top-banner-cta:hover { filter: brightness(1.15); transform: translateY(-1px); }
+@media (max-width: 768px) { .top-banner { flex-direction: column; align-items: flex-start; padding: 24px; } }
+
+/* Hero Carousel */
 .explore-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 @media (max-width: 768px) { .explore-hero { grid-template-columns: 1fr; } }
-.hero-card { border-radius: 14px; padding: 28px 32px; min-height: 150px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid rgba(255,255,255,0.06); }
-.hero-card h2 { font-family: 'Georgia', serif; font-size: 22px; font-weight: 700; color: #fff; white-space: pre-line; line-height: 1.3; margin-bottom: 14px; font-style: italic; }
-.hero-cta { display: inline-flex; padding: 8px 18px; background: #fff; color: #111; font-size: 12px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; width: fit-content; }
+.hero-carousel { border-radius: 14px; position: relative; overflow: hidden; min-height: 160px; border: 1px solid rgba(255,255,255,0.06); }
+.hero-carousel-track { position: relative; width: 100%; height: 100%; min-height: 160px; }
+.hero-slide { position: absolute; inset: 0; padding: 28px 32px; display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; transition: opacity 0.8s ease, transform 0.8s ease; transform: translateX(12px); pointer-events: none; }
+.hero-slide.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+.hero-slide h2 { font-family: 'Georgia', serif; font-size: 22px; font-weight: 700; color: #fff; white-space: pre-line; line-height: 1.3; margin-bottom: 14px; font-style: italic; }
+.hero-cta { display: inline-flex; padding: 8px 18px; background: #fff; color: #111; font-size: 12px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; width: fit-content; transition: transform 0.2s; }
+.hero-cta:hover { transform: scale(1.03); }
 .hero-subtitle { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 500; position: absolute; top: 16px; right: 20px; text-transform: lowercase; letter-spacing: 0.05em; }
 .hero-badge { position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 800; color: #fff; backdrop-filter: blur(4px); }
-.hero-cta-sub { font-size: 12px; color: rgba(255,255,255,0.7); white-space: pre-line; line-height: 1.4; margin-top: auto; }
+.hero-cta-sub { font-size: 12px; color: rgba(255,255,255,0.7); white-space: pre-line; line-height: 1.4; }
 .hero-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .hero-particles span { position: absolute; width: 6px; height: 6px; border-radius: 50%; animation: heroPulse 3s ease-in-out infinite; }
 @keyframes heroPulse { 0%,100% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 0.6; transform: scale(1.2); } }
+.hero-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 10; }
+.hero-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.25); border: none; cursor: pointer; padding: 0; transition: all 0.3s; }
+.hero-dot.active { background: #fff; width: 18px; border-radius: 3px; }
 
 /* Quick Actions */
 .qa-strip { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .qa-strip::-webkit-scrollbar { display: none; }
-.qa-primary { display: flex; align-items: center; gap: 10px; background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 28px; padding: 8px 12px 8px 16px; flex-shrink: 0; cursor: pointer; }
+.qa-primary { display: flex; align-items: center; gap: 10px; background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 14px; padding: 10px 14px 10px 16px; flex-shrink: 0; cursor: pointer; position: relative; overflow: hidden; }
+.qa-primary::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--sys-primary), #00D4AA); border-radius: 14px 0 0 14px; }
 .qa-primary-label { font-size: 13px; font-weight: 700; color: var(--sys-text); white-space: nowrap; }
-.qa-primary-btn { background: var(--sys-primary); color: #fff; border: none; border-radius: 20px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.qa-pill { display: flex; align-items: center; gap: 8px; background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 28px; padding: 10px 16px; flex-shrink: 0; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 600; color: var(--sys-text); white-space: nowrap; text-decoration: none; }
+.qa-primary-btn { background: var(--sys-primary); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+.qa-primary-btn:hover { filter: brightness(1.15); }
+.qa-pill { display: flex; align-items: center; gap: 8px; background: var(--sys-surface); border: 1px solid var(--sys-border); border-radius: 14px; padding: 10px 16px; flex-shrink: 0; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 600; color: var(--sys-text); white-space: nowrap; text-decoration: none; }
 .qa-pill:hover { border-color: var(--sys-primary); background: var(--sys-primary-dim); }
-.qa-pill .material-symbols-outlined { font-size: 18px; }
+.qa-pill .material-symbols-outlined { font-size: 18px; color: var(--sys-primary); }
+.qa-pill .qa-arrow { font-size: 16px; color: var(--sys-text-muted); }
 .qa-badge { font-size: 9px; font-weight: 800; background: var(--sys-primary); color: #fff; padding: 2px 6px; border-radius: 10px; text-transform: uppercase; margin-left: -4px; }
 
 /* Tabs */
@@ -133,6 +154,20 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     const [activeTab, setActiveTab] = useState('Recommended');
     const [activeSubTab, setActiveSubTab] = useState('For You');
     const [previewModal, setPreviewModal] = useState({ open: false, src: '', type: 'image', name: '' });
+
+    // Carousel state
+    const [leftIdx, setLeftIdx] = useState(0);
+    const [rightIdx, setRightIdx] = useState(0);
+    const [carouselPaused, setCarouselPaused] = useState(false);
+
+    useEffect(() => {
+        if (carouselPaused) return;
+        const timer = setInterval(() => {
+            setLeftIdx(prev => (prev + 1) % LEFT_SLIDES.length);
+            setRightIdx(prev => (prev + 1) % RIGHT_SLIDES.length);
+        }, 5000);
+        return () => clearInterval(timer);
+    }, [carouselPaused]);
 
     useEffect(() => { loadTemplates(); }, [studioOrigin]);
 
@@ -236,32 +271,63 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             )}
 
             <div className={overlayMode ? 'p-5 overflow-y-auto flex-1' : ''}>
-                {/* ═══ Hero Banners ═══ */}
+                {/* ═══ Full-Width Top Banner ═══ */}
                 {!overlayMode && (
-                    <div className="explore-hero">
-                        {HERO_BANNERS.map((b, i) => (
-                            <div key={i} className="hero-card" style={{ background: b.gradient }}>
-                                {b.particles && (
-                                    <div className="hero-particles">
-                                        {[...Array(8)].map((_, j) => (
-                                            <span key={j} style={{
-                                                background: b.accent,
-                                                left: `${20 + j * 10}%`, top: `${60 + (j % 3) * 12}%`,
-                                                animationDelay: `${j * 0.4}s`,
-                                            }} />
-                                        ))}
+                    <div className="top-banner" style={{ background: TOP_BANNER.gradient }}>
+                        <div className="top-banner-glow" style={{ background: 'var(--sys-primary)' }} />
+                        <div>
+                            <h2>Mantram <span>AI</span> — The All-In-One AI Marketing Platform</h2>
+                            <p>{TOP_BANNER.subtitle}</p>
+                        </div>
+                        <button className="top-banner-cta" onClick={() => navigate('/dashboard')}>{TOP_BANNER.cta}</button>
+                    </div>
+                )}
+
+                {/* ═══ Hero Carousel Banners ═══ */}
+                {!overlayMode && (
+                    <div className="explore-hero" onMouseEnter={() => setCarouselPaused(true)} onMouseLeave={() => setCarouselPaused(false)}>
+                        {/* Left Carousel */}
+                        <div className="hero-carousel">
+                            <div className="hero-carousel-track">
+                                {LEFT_SLIDES.map((b, i) => (
+                                    <div key={i} className={`hero-slide ${i === leftIdx ? 'active' : ''}`} style={{ background: b.gradient }}>
+                                        {b.particles && (
+                                            <div className="hero-particles">
+                                                {[...Array(8)].map((_, j) => (
+                                                    <span key={j} style={{ background: b.accent, left: `${20 + j * 10}%`, top: `${60 + (j % 3) * 12}%`, animationDelay: `${j * 0.4}s` }} />
+                                                ))}
+                                            </div>
+                                        )}
+                                        <h2>{b.title}</h2>
+                                        <button className="hero-cta">{b.cta}</button>
                                     </div>
-                                )}
-                                {b.badge && <div className="hero-badge">{b.badge}</div>}
-                                {b.subtitle && <div className="hero-subtitle">{b.subtitle}</div>}
-                                <h2>{b.title}</h2>
-                                {i === 0 ? (
-                                    <button className="hero-cta">{b.cta}</button>
-                                ) : (
-                                    <div className="hero-cta-sub">{b.cta}</div>
-                                )}
+                                ))}
                             </div>
-                        ))}
+                            <div className="hero-dots">
+                                {LEFT_SLIDES.map((_, i) => (
+                                    <button key={i} className={`hero-dot ${i === leftIdx ? 'active' : ''}`} onClick={() => setLeftIdx(i)} />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Right Carousel */}
+                        <div className="hero-carousel">
+                            <div className="hero-carousel-track">
+                                {RIGHT_SLIDES.map((b, i) => (
+                                    <div key={i} className={`hero-slide ${i === rightIdx ? 'active' : ''}`} style={{ background: b.gradient }}>
+                                        {b.badge && <div className="hero-badge">{b.badge}</div>}
+                                        {b.subtitle && <div className="hero-subtitle">{b.subtitle}</div>}
+                                        <h2>{b.title}</h2>
+                                        <div className="hero-cta-sub">{b.cta}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="hero-dots">
+                                {RIGHT_SLIDES.map((_, i) => (
+                                    <button key={i} className={`hero-dot ${i === rightIdx ? 'active' : ''}`} onClick={() => setRightIdx(i)} />
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -278,7 +344,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                 <span className="material-symbols-outlined">{a.icon}</span>
                                 {a.label}
                                 {a.badge && <span className="qa-badge">{a.badge}</span>}
-                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>arrow_forward</span>
+                                <span className="material-symbols-outlined qa-arrow">arrow_forward</span>
                             </a>
                         ))}
                     </div>
