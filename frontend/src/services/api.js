@@ -645,6 +645,13 @@ export const superadmin = {
     createCoupon: (data) => apiFetch('/superadmin/coupons', { method: 'POST', body: JSON.stringify(data) }),
     updateCoupon: (id, data) => apiFetch(`/superadmin/coupons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteCoupon: (id) => apiFetch(`/superadmin/coupons/${id}`, { method: 'DELETE' }),
+
+    // Retention Offers
+    getRetentionOffers: () => apiFetch('/superadmin/retention-offers'),
+    createRetentionOffer: (data) => apiFetch('/superadmin/retention-offers', { method: 'POST', body: JSON.stringify(data) }),
+    updateRetentionOffer: (id, data) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteRetentionOffer: (id) => apiFetch(`/superadmin/retention-offers/${id}`, { method: 'DELETE' }),
+
     // Brands
     getBrands: (params = {}) => {
         const query = new URLSearchParams(params).toString();

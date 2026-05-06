@@ -19,6 +19,10 @@ export default function SuperAdminDashboard() {
     const [waitlist, setWaitlist] = useState([])
     const [totalUsers, setTotalUsers] = useState(0)
     const [coupons, setCoupons] = useState([])
+    const [retentionOffers, setRetentionOffers] = useState([])
+    const [showRetentionForm, setShowRetentionForm] = useState(false)
+    const [editingRetention, setEditingRetention] = useState(null)
+    const [retentionForm, setRetentionForm] = useState({ name: '', description: '', triggerCondition: 'churn_risk', discountType: 'percentage', discountValue: 0, bonusCredits: 0, validForDays: 30, maxUses: 0, isActive: true })
     const [brands, setBrands] = useState([])
     const [totalBrands, setTotalBrands] = useState(0)
     const [content, setContent] = useState([])
@@ -149,6 +153,8 @@ export default function SuperAdminDashboard() {
             { id: 'packages', label: 'Plans & Packages', icon: 'inventory_2' },
             { id: 'creditPacks', label: 'Credit Store', icon: 'shopping_cart' },
             { id: 'coupons', label: 'Coupons', icon: 'confirmation_number' },
+            { id: 'retentionOffers', label: 'Retention Offers', icon: 'favorite' },
+            { id: 'storeConfig', label: 'Store Config', icon: 'storefront' },
             { id: 'pricing', label: 'Pricing Strategy', icon: 'calculate' },
         ]},
         { label: 'AI Operations', icon: 'smart_toy', items: [
@@ -180,6 +186,8 @@ export default function SuperAdminDashboard() {
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
+        if (tab === 'retentionOffers') loadRetentionOffers()
+        if (tab === 'storeConfig') { loadSettings(); loadCreditCosts() }
         if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadVideoProviders(); loadImageProviders() }
         if (tab === 'studios') { loadStudioVisibility() }
@@ -196,6 +204,7 @@ export default function SuperAdminDashboard() {
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
     const loadWaitlist = async () => { try { const d = await API.getWaitlist(); setWaitlist(d.waitlist || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
+    const loadRetentionOffers = async () => { try { const d = await API.getRetentionOffers(); setRetentionOffers(d.offers || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
     const loadContent = async () => { try { const d = await API.getContent({ limit: 50 }); setContent(d.content || []); setTotalContent(d.total || 0) } catch (e) { console.error(e) } }
     const loadAIHealth = async () => { try { const d = await API.getAIHealth(); setAiHealth(d.aiHealth) } catch (e) { console.error(e) } }
@@ -436,6 +445,36 @@ export default function SuperAdminDashboard() {
     }
     const handleToggleCoupon = async (id, isActive) => { try { await API.updateCoupon(id, { isActive: !isActive }); loadCoupons() } catch { showToast('Failed', 'error') } }
     const handleDeleteCoupon = async (id) => { if (!confirm('Delete coupon?')) return; try { await API.deleteCoupon(id); showToast('Deleted'); loadCoupons() } catch { showToast('Failed', 'error') } }
+
+    // Retention Offers
+    const handleSaveRetentionOffer = async (e) => {
+        e.preventDefault();
+        try {
+            const payload = {
+                ...retentionForm,
+                discountValue: Number(retentionForm.discountValue) || 0,
+                bonusCredits: Number(retentionForm.bonusCredits) || 0,
+                validForDays: Number(retentionForm.validForDays) || 30,
+                maxUses: Number(retentionForm.maxUses) || 0
+            };
+            if (editingRetention) {
+                await API.updateRetentionOffer(editingRetention._id, payload);
+                showToast('Retention offer updated');
+            } else {
+                await API.createRetentionOffer(payload);
+                showToast('Retention offer created');
+            }
+            setShowRetentionForm(false);
+            setEditingRetention(null);
+            setRetentionForm({ name: '', description: '', triggerCondition: 'churn_risk', discountType: 'percentage', discountValue: 0, bonusCredits: 0, validForDays: 30, maxUses: 0, isActive: true });
+            loadRetentionOffers();
+        } catch (e) {
+            showToast(e.error || e.message || 'Failed', 'error');
+        }
+    }
+    const handleDeleteRetentionOffer = async (id) => { if (!confirm('Delete retention offer?')) return; try { await API.deleteRetentionOffer(id); showToast('Deleted'); loadRetentionOffers() } catch { showToast('Failed', 'error') } }
+    const handleToggleRetentionOffer = async (id, isActive) => { try { await API.updateRetentionOffer(id, { isActive: !isActive }); loadRetentionOffers() } catch { showToast('Failed', 'error') } }
+
     const handleToggleSetting = async (key, val) => { try { await API.updateSystemSettings({ [key]: val }); showToast('Updated'); loadSettings() } catch { showToast('Failed', 'error') } }
 
     const platformIcons = { instagram: 'photo_camera', facebook: 'thumb_up', linkedin: 'work', twitter: 'tag', shopify: 'storefront', 'google-analytics': 'bar_chart', 'meta-ads': 'smartphone', 'google-ads': 'search', meta: 'smartphone', google: 'search' }
@@ -2053,6 +2092,181 @@ export default function SuperAdminDashboard() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+                )}
+
+                {/* ════════════ RETENTION OFFERS ════════════ */}
+                {tab === 'retentionOffers' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">favorite</span>
+                                    Retention Offers
+                                </h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Manage automated discount flows to reduce churn</p>
+                            </div>
+                            <button onClick={() => { setEditingRetention(null); setRetentionForm({ name: '', description: '', triggerCondition: 'churn_risk', discountType: 'percentage', discountValue: 0, bonusCredits: 0, validForDays: 30, maxUses: 0, isActive: true }); setShowRetentionForm(true) }}
+                                className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">
+                                + New Offer
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                            {retentionOffers.map(o => (
+                                <div key={o._id} className={`glass-panel rounded-2xl overflow-hidden border transition-all ${o.isActive ? 'border-[var(--sys-border)]' : 'border-[var(--sys-border)] opacity-60'}`}>
+                                    <div className="p-4 border-b border-[var(--sys-border)]" style={{ background: `var(--sys-primary-dim)` }}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-black text-primary uppercase tracking-wider">{o.name}</h4>
+                                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${o.isActive ? 'bg-[var(--sys-surface)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)]'}`}>{o.isActive ? 'Active' : 'Inactive'}</span>
+                                        </div>
+                                        <p className="text-2xl font-black text-[var(--sys-text)]">
+                                            {o.discountType === 'percentage' ? `${o.discountValue}% OFF` : `₹${o.discountValue} OFF`}
+                                        </p>
+                                        {o.bonusCredits > 0 && <p className="text-xs font-bold text-[var(--sys-text-muted)] mt-1">+ {o.bonusCredits} Bonus Credits</p>}
+                                    </div>
+                                    <div className="p-4 space-y-2">
+                                        <div className="flex justify-between"><span className="text-[10px] uppercase font-bold text-[var(--sys-text-muted)]">Condition</span><span className="text-xs font-bold text-[var(--sys-text)]">{o.triggerCondition}</span></div>
+                                        <div className="flex justify-between"><span className="text-[10px] uppercase font-bold text-[var(--sys-text-muted)]">Validity</span><span className="text-xs font-bold text-[var(--sys-text)]">{o.validForDays} Days</span></div>
+                                        <div className="flex justify-between"><span className="text-[10px] uppercase font-bold text-[var(--sys-text-muted)]">Used</span><span className="text-xs font-bold text-[var(--sys-text)]">{o.usedCount} {o.maxUses > 0 ? `/ ${o.maxUses}` : ''}</span></div>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic">{o.description}</p>
+                                    </div>
+                                    <div className="p-3 border-t border-[var(--sys-border)] flex gap-2">
+                                        <button onClick={() => { setEditingRetention(o); setRetentionForm(o); setShowRetentionForm(true); }} className="flex-1 py-1.5 rounded-lg bg-[var(--sys-surface)] text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">Edit</button>
+                                        <button onClick={() => handleToggleRetentionOffer(o._id, o.isActive)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">{o.isActive ? 'pause' : 'play_arrow'}</span></button>
+                                        <button onClick={() => handleDeleteRetentionOffer(o._id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-lg">delete</span></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {showRetentionForm && (
+                            <div className="fixed inset-0 bg-[var(--sys-surface)] flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && setShowRetentionForm(false)}>
+                                <div className="bg-[#08080C] border border-[var(--sys-border)] rounded-2xl w-full max-w-lg p-5 shadow-2xl">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider">{editingRetention ? 'Edit Retention Offer' : 'New Retention Offer'}</h4>
+                                        <button onClick={() => setShowRetentionForm(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]"><span className="material-symbols-outlined">close</span></button>
+                                    </div>
+                                    <form onSubmit={handleSaveRetentionOffer} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Name *</label><input required value={retentionForm.name} onChange={e => setRetentionForm({ ...retentionForm, name: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Trigger *</label>
+                                                <select value={retentionForm.triggerCondition} onChange={e => setRetentionForm({ ...retentionForm, triggerCondition: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none">
+                                                    <option value="churn_risk">Churn Risk (Cancellation Flow)</option>
+                                                    <option value="abandoned_cart">Abandoned Cart</option>
+                                                    <option value="inactive_30d">Inactive (30 Days)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Type *</label>
+                                                <select value={retentionForm.discountType} onChange={e => setRetentionForm({ ...retentionForm, discountType: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none">
+                                                    <option value="percentage">Percentage (%)</option>
+                                                    <option value="fixed">Fixed Rate (₹)</option>
+                                                </select>
+                                            </div>
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Value *</label><input type="number" required value={retentionForm.discountValue} onChange={e => setRetentionForm({ ...retentionForm, discountValue: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Bonus Credits</label><input type="number" value={retentionForm.bonusCredits} onChange={e => setRetentionForm({ ...retentionForm, bonusCredits: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Valid Days</label><input type="number" required value={retentionForm.validForDays} onChange={e => setRetentionForm({ ...retentionForm, validForDays: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                            <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Max Uses</label><input type="number" value={retentionForm.maxUses} onChange={e => setRetentionForm({ ...retentionForm, maxUses: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                        </div>
+                                        <div><label className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1 block">Description</label><input value={retentionForm.description} onChange={e => setRetentionForm({ ...retentionForm, description: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-sm outline-none" /></div>
+                                        <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={retentionForm.isActive} onChange={e => setRetentionForm({ ...retentionForm, isActive: e.target.checked })} className="accent-primary" /><span className="text-xs text-[var(--sys-text-muted)]">Active</span></label>
+                                        <div className="flex gap-3 pt-2">
+                                            <button type="button" onClick={() => setShowRetentionForm(false)} className="flex-1 py-3 bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider rounded-xl border border-[var(--sys-border)]">Cancel</button>
+                                            <button type="submit" className="flex-1 py-3 bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl">{editingRetention ? 'Save Changes' : 'Create Offer'}</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════ STORE CONFIG ════════════ */}
+                {tab === 'storeConfig' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">storefront</span>
+                                    Store Configuration
+                                </h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">Manage global visibility and dynamic credit costs</p>
+                            </div>
+                        </div>
+
+                        {/* Store Visibility */}
+                        <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                            <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary text-lg">visibility</span>
+                                Store Visibility
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-[var(--sys-surface)] p-4 rounded-xl border border-[var(--sys-border)]">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-bold text-[var(--sys-text)]">Subscription Plans</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">Show subscription tiers on the billing page</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" checked={systemSettings?.show_subscription_plans ?? true} onChange={(e) => handleToggleSetting('show_subscription_plans', e.target.checked)} />
+                                            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="bg-[var(--sys-surface)] p-4 rounded-xl border border-[var(--sys-border)]">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-bold text-[var(--sys-text)]">Credit Packs</p>
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">Allow users to purchase top-up credits</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" checked={systemSettings?.show_credit_packs ?? true} onChange={(e) => handleToggleSetting('show_credit_packs', e.target.checked)} />
+                                            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Credit Costs */}
+                        <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-black text-[var(--sys-text)] uppercase tracking-wider flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary text-lg">monetization_on</span>
+                                    Dynamic Credit Costs
+                                </h4>
+                                <div className="flex gap-2">
+                                    {editingCosts ? (
+                                        <>
+                                            <button onClick={() => setEditingCosts(null)} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold hover:bg-[var(--sys-surface)] transition-all border border-[var(--sys-border)] cursor-pointer">Cancel</button>
+                                            <button onClick={async () => { try { await API.updateSystemSettings({ creditCosts: editingCosts }); setCreditCosts(editingCosts); setEditingCosts(null); showToast('Costs updated'); } catch { showToast('Failed', 'error'); } }} className="px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold transition-all cursor-pointer">Save Costs</button>
+                                        </>
+                                    ) : (
+                                        <button onClick={() => setEditingCosts({ ...creditCosts })} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold hover:bg-[var(--sys-surface)] transition-all border border-[var(--sys-border)] cursor-pointer">Edit Costs</button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                {Object.entries(editingCosts || creditCosts || {}).map(([key, value]) => {
+                                    if (value === 'dynamic') return null;
+                                    return (
+                                        <div key={key} className={`p-3 rounded-xl border ${editingCosts ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]' : 'border-transparent bg-[var(--sys-surface)]'}`}>
+                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase truncate mb-1" title={key}>{key}</p>
+                                            {editingCosts ? (
+                                                <input type="number" min="0" value={value} onChange={e => setEditingCosts({ ...editingCosts, [key]: Number(e.target.value) })} className="w-full bg-transparent text-sm font-black text-[var(--sys-text)] outline-none" />
+                                            ) : (
+                                                <p className="text-sm font-black text-[var(--sys-text)]">{value} <span className="text-[10px] font-normal text-[var(--sys-text-muted)]">cr</span></p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
                     </div>
                 )}
