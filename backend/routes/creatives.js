@@ -1488,8 +1488,18 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         }
     }
 
+    // ── Map quality values for DALL-E 3 compatibility ──
+    // gpt-image-1/2 uses: 'low' | 'medium' | 'high'
+    // dall-e-3 uses: 'standard' | 'hd'
+    // When we remap to dall-e-3, we must also remap the quality parameter.
+    let finalQuality = quality;
+    if (mappedModelId === 'dall-e-3' || mappedModelId === 'dall-e-2') {
+        if (quality === 'high') finalQuality = 'hd';
+        else if (quality === 'medium' || quality === 'low') finalQuality = 'standard';
+    }
+
     console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId} -> ${mappedModelId}) ══════`);
-    console.log(`🎨 Model: ${mappedModelId} | Quality: ${quality} | Size: ${finalImageSize} | Format: ${finalFormat}`);
+    console.log(`🎨 Model: ${mappedModelId} | Quality: ${finalQuality} | Size: ${finalImageSize} | Format: ${finalFormat}`);
     console.log(`🌐 Endpoint: ${baseUrl}/${endpoint} (${useLaoZhang ? 'LaoZhang proxy' : 'Direct OpenAI'})`);
     if (useEditsEndpoint) console.log(`🖼️  Reference images: ${refBuffers.length}`);
     console.log(`📝 Prompt (first 200 chars): ${(promptText || '').substring(0, 200)}...`);
@@ -1531,8 +1541,8 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         formData.append('prompt', finalPrompt);
         formData.append('n', '1');
         formData.append('size', finalImageSize);
-        if (quality && quality !== 'medium' && quality !== 'standard') {
-            formData.append('quality', quality);
+        if (finalQuality && finalQuality !== 'standard') {
+            formData.append('quality', finalQuality);
         }
 
         // form-data produces a Node stream — convert to Buffer for native fetch
@@ -1565,8 +1575,8 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             }
         }
 
-        if (quality && quality !== 'medium' && quality !== 'standard') {
-            body.quality = quality;
+        if (finalQuality && finalQuality !== 'standard') {
+            body.quality = finalQuality;
         }
 
         response = await fetch(`${baseUrl}/${endpoint}`, {
