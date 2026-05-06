@@ -12,6 +12,26 @@ import Brand from '../models/Brand.js';
 const router = express.Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GET /api/templates/public/homepage
+// Unprotected route for the marketing landing page
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/public/homepage', async (req, res) => {
+    try {
+        const templates = await Template.find({ isActive: true, isPublished: true, studioSection: 'homepage' })
+            .select('name previewUrl previewImageUrl previewVideoUrl previewType studioOrigin')
+            .populate('categoryId', 'name color iconEmoji')
+            .sort({ isFeatured: -1, createdAt: -1 })
+            .limit(10)
+            .lean();
+            
+        res.json({ success: true, templates });
+    } catch (error) {
+        console.error('GET /api/templates/public/homepage error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // GET /api/templates
 // User-facing browse — published only, prompt fields excluded
 // Supports ?studioSection=ai_create, ?brandId=xxx (brand-aware templates first)

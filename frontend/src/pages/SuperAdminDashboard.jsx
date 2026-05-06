@@ -4694,7 +4694,7 @@ function AdminImageStudio() {
                         <img src={selectedUrl} alt="" style={{ width:'100%', height:140, objectFit:'cover', objectPosition:'top', borderRadius:12, marginBottom:14 }} />
                         <input value={saveName} onChange={e=>setSaveName(e.target.value)} placeholder="Template name…" style={{ ...S.input, marginBottom:10 }} />
                         <select value={saveSection} onChange={e=>setSaveSection(e.target.value)} style={{ ...S.input, marginBottom:10 }}>
-                            {[{v:'ai_create',l:'AI Create'},{v:'carousel',l:'Carousel'},{v:'campaign',l:'Campaign'},{v:'campaign_shot',l:'Campaign Shot'},{v:'video_ugc',l:'Video UGC'},{v:'video_qads',l:'Video Q-Ads'},{v:'avatar',l:'Avatar'},{v:'general',l:'General'}].map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
+                            {[{v:'ai_create',l:'AI Create'},{v:'carousel',l:'Carousel'},{v:'campaign',l:'Campaign'},{v:'campaign_shot',l:'Campaign Shot'},{v:'video_ugc',l:'Video UGC'},{v:'video_qads',l:'Video Q-Ads'},{v:'avatar',l:'Avatar'},{v:'general',l:'General'},{v:'homepage',l:'Homepage'}].map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
                         </select>
                         <select value={saveCategoryId} onChange={e=>setSaveCategoryId(e.target.value)} style={{ ...S.input, marginBottom:14 }}>
                             <option value="">No Category</option>
