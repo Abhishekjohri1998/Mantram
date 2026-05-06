@@ -13,7 +13,7 @@ import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import { injectDesignContext } from '../shared/productDesignAgent.js';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
-const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
 // ── Claude Creative Director System Prompt ─────────────────────────
 const DECK_SYSTEM = (brandContext, urlBlock) => `You are a world-class strategic creative director at a top-tier agency.
@@ -101,7 +101,7 @@ JSON SCHEMA:
 }`;
 
 // ── Image Generator ────────────────────────────────────────────────
-async function generateImage(prompt, slideType, brandContext, referenceImage, tokens, designContext = null) {
+async function generateImage(prompt, slideType, brandContext, referenceImage, tokens, designContext = null, imageModel = DEFAULT_IMAGE_MODEL) {
     if (!prompt) return null;
     let style = "contemporary premium aesthetic, photorealistic, 8k, cinematic lighting.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout, dramatic lighting.";
@@ -117,15 +117,16 @@ async function generateImage(prompt, slideType, brandContext, referenceImage, to
     try {
         const size = slideType === 'hero' || slideType === 'cta' ? '1792x1024' : '1024x768';
         const primaryRef = referenceImage || refImages[0] || null;
+        const model = imageModel || DEFAULT_IMAGE_MODEL;
         if (primaryRef) {
             const allRefs = [primaryRef, ...refImages.filter(r => r !== primaryRef)].slice(0, 2);
             const r = await laozhangMultimodalImageGenerate(fullPrompt, allRefs, {
-                model: IMAGE_MODEL, size,
+                model, size,
             });
             return r?.imageUrl || null;
         } else {
             const r = await laozhangImageGenerate(fullPrompt, {
-                model: IMAGE_MODEL, size,
+                model, size,
             });
             return r?.imageUrl || null;
         }
@@ -594,7 +595,7 @@ ${slideSections}
 }
 
 // ── Main Export ────────────────────────────────────────────────
-export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch Deck', slideCount = 8, urlContext, referenceImage, designContext = null }) {
+export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch Deck', slideCount = 8, urlContext, referenceImage, designContext = null, imageModel }) {
     const { brandContext } = await loadBrandContext(brandId);
     const tokens = generateBrandTokens('#6366F1', brandContext);
 
@@ -611,7 +612,7 @@ export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch D
     // Generate images for ALL slides in parallel
     console.log(`📊 Pulse Deck: Generating visuals for all slides via NanoBanana 2${designContext ? ' (PDI-guided)' : ''}...`);
     const imagePromises = plan.slides.map(async (slide) => {
-        const imgUrl = await generateImage(slide.imagePrompt, slide.type, brandContext, referenceImage, tokens, designContext);
+        const imgUrl = await generateImage(slide.imagePrompt, slide.type, brandContext, referenceImage, tokens, designContext, imageModel);
         return { key: slide.id, url: imgUrl };
     });
 

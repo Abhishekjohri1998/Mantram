@@ -97,7 +97,12 @@ function useGenerate(stagesList) {
 
 // ── UI Components ──────────────────────────────────────────────────────────
 
-function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage, setReferenceImage, onGenerate, loading, buttonColor, toolName, credits, productContext }) {
+const IMAGE_MODELS = [
+    { id: 'gemini-3.1-flash-image-preview', label: 'NanoBanana 2', desc: 'Fast, creative (Gemini Flash)', icon: '✦' },
+    { id: 'gpt-image-2', label: 'GPT Image 2', desc: 'Photorealistic, premium (OpenAI)', icon: '◆' },
+]
+
+function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage, setReferenceImage, onGenerate, loading, buttonColor, toolName, credits, productContext, imageModel, setImageModel }) {
     const [urlInput, setUrlInput] = useState('')
     const [fetchingUrl, setFetchingUrl] = useState(false)
 
@@ -280,6 +285,30 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                     ✦ Mantram will apply both Brand DNA and Product context
                 </span>
             </div>
+            {/* Image Model Selector */}
+            <div style={{ marginTop: 16, padding: 14, background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Image Model</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    {IMAGE_MODELS.map(m => (
+                        <button
+                            key={m.id}
+                            onClick={() => setImageModel(m.id)}
+                            style={{
+                                flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                                background: imageModel === m.id ? `${buttonColor}15` : 'var(--sys-surface)',
+                                border: `1.5px solid ${imageModel === m.id ? buttonColor : 'var(--sys-border)'}`,
+                                transition: 'all 0.2s', textAlign: 'left',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 14, color: imageModel === m.id ? buttonColor : 'var(--sys-text-muted)' }}>{m.icon}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: imageModel === m.id ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>{m.label}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 3 }}>{m.desc}</div>
+                        </button>
+                    ))}
+                </div>
+            </div>
             <button
                 onClick={onGenerate}
                 disabled={loading}
@@ -426,7 +455,7 @@ function SlideEditor({ slide, idx, image, onUpdate, onRephraseField, onRegenImag
     )
 }
 
-function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
+function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext, imageModel, setImageModel }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(DECK_STAGES)
     const [editedPlan, setEditedPlan] = useState(null)
@@ -440,7 +469,7 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/deck/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, deckType: 'Campaign Pitch', slideCount: 8, urlContext, referenceImage, productContext: productContext || undefined })
+                body: JSON.stringify({ brandId, brief, deckType: 'Campaign Pitch', slideCount: 8, urlContext, referenceImage, productContext: productContext || undefined, imageModel: imageModel || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -593,14 +622,14 @@ function DeckTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#7c3aed" toolName="Deck" credits={20} productContext={productContext} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#7c3aed" toolName="Deck" credits={20} productContext={productContext} imageModel={imageModel} setImageModel={setImageModel} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="slideshow" />
         </div>
     )
 }
 
 // ── Pulse Page Tool ──────────────────────────────────────────────────────────
-function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
+function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext, imageModel, setImageModel }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(PAGE_STAGES)
     const [shopDomain, setShopDomain] = useState('')
@@ -612,7 +641,7 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/landing-page/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, pageType: 'campaign', urlContext, referenceImage, productContext: productContext || undefined })
+                body: JSON.stringify({ brandId, brief, pageType: 'campaign', urlContext, referenceImage, productContext: productContext || undefined, imageModel: imageModel || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -696,14 +725,14 @@ function PageTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#10b981" toolName="Page" credits={18} productContext={productContext} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#10b981" toolName="Page" credits={18} productContext={productContext} imageModel={imageModel} setImageModel={setImageModel} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="web" />
         </div>
     )
 }
 
 // ── Pulse Mail Tool ──────────────────────────────────────────────────────────
-function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext }) {
+function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setReferenceImage, productContext, imageModel, setImageModel }) {
     const [brief, setBrief] = useState('')
     const gen = useGenerate(MAIL_STAGES)
     const [viewMode, setViewMode] = useState('mobile')
@@ -714,7 +743,7 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
         try {
             const data = await apiFetch('/brand-studio/email/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandId, brief, emailType: 'Campaign', urlContext, referenceImage, productContext: productContext || undefined })
+                body: JSON.stringify({ brandId, brief, emailType: 'Campaign', urlContext, referenceImage, productContext: productContext || undefined, imageModel: imageModel || undefined })
             })
             if (!data.success) throw new Error(data.error)
             gen.setResult(data)
@@ -775,7 +804,7 @@ function MailTool({ brandId, urlContext, setUrlContext, referenceImage, setRefer
 
     return (
         <div style={{ position: 'relative' }}>
-            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#0ea5e9" toolName="Mail" credits={12} productContext={productContext} />
+            <InputForm brief={brief} setBrief={setBrief} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} onGenerate={handleGenerate} loading={gen.loading} buttonColor="#0ea5e9" toolName="Mail" credits={12} productContext={productContext} imageModel={imageModel} setImageModel={setImageModel} />
             <GenerationOverlay loading={gen.loading} progress={gen.progress} stageText={gen.stageText} icon="mail" />
         </div>
     )
@@ -3646,6 +3675,7 @@ export default function PulseStudio() {
     // Shared state passed into tools
     const [urlContext, setUrlContext]               = useState('')
     const [referenceImage, setReferenceImage]       = useState(null)
+    const [imageModel, setImageModel]               = useState('gemini-3.1-flash-image-preview')
 
     // QP state lives here so it persists when switching cards
     const [qpType, setQpType]     = useState('promo')
@@ -3838,13 +3868,13 @@ export default function PulseStudio() {
                                                 />
                                             )}
                                             {activeAction === 'deck' && (
-                                                <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                                <DeckTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} imageModel={imageModel} setImageModel={setImageModel} />
                                             )}
                                             {activeAction === 'mail' && (
-                                                <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                                <MailTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} imageModel={imageModel} setImageModel={setImageModel} />
                                             )}
                                             {activeAction === 'page' && (
-                                                <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} />
+                                                <PageTool brandId={brandId} urlContext={urlContext} setUrlContext={setUrlContext} referenceImage={referenceImage} setReferenceImage={setReferenceImage} productContext={sharedContext} imageModel={imageModel} setImageModel={setImageModel} />
                                             )}
                                         </div>
                                     </div>

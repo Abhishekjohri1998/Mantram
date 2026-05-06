@@ -319,7 +319,7 @@ router.post('/design-context', protect, async (req, res) => {
 // ── POST /api/brand-studio/deck/generate ─────────────────────
 router.post('/deck/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, deckType, slideCount, urlContext, referenceImage, designContext } = req.body;
+        const { brandId, brief, deckType, slideCount, urlContext, referenceImage, designContext, imageModel } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
@@ -332,6 +332,7 @@ router.post('/deck/generate', protect, async (req, res) => {
             slideCount: parseInt(slideCount || 8),
             urlContext, referenceImage,
             designContext: designContext || null,   // PDI design context
+            imageModel: imageModel || undefined,     // User-selected image model
         });
 
         if (!result.success) throw new Error('Deck generation failed');
@@ -388,10 +389,10 @@ router.post('/deck/rephrase', protect, async (req, res) => {
 // ── POST /api/brand-studio/deck/regenerate-image ─────────────
 router.post('/deck/regenerate-image', protect, async (req, res) => {
     try {
-        const { imagePrompt, slideType, referenceImage } = req.body;
+        const { imagePrompt, slideType, referenceImage, imageModel } = req.body;
         if (!imagePrompt) return res.status(400).json({ success: false, error: 'imagePrompt required' });
         const { laozhangImageGenerate, laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
-        const model = 'gemini-3.1-flash-image-preview';
+        const model = imageModel || 'gemini-3.1-flash-image-preview';
         const size = (slideType === 'hero' || slideType === 'cta') ? '1792x1024' : '1024x768';
         const style = 'contemporary premium aesthetic, photorealistic, 8k, cinematic lighting. Do NOT render any text, words, or typography.';
         let imageUrl;
@@ -413,14 +414,14 @@ router.post('/deck/regenerate-image', protect, async (req, res) => {
 // ── POST /api/brand-studio/email/generate ────────────────────
 router.post('/email/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, emailType, urlContext, referenceImage, designContext } = req.body;
+        const { brandId, brief, emailType, urlContext, referenceImage, designContext, imageModel } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.email) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.email });
 
-        const result = await generateEmail({ brandId, brief, emailType: emailType || 'campaign', urlContext, referenceImage, designContext: designContext || null });
+        const result = await generateEmail({ brandId, brief, emailType: emailType || 'campaign', urlContext, referenceImage, designContext: designContext || null, imageModel: imageModel || undefined });
         if (!result.success) throw new Error('Email generation failed');
         await deductCredits(req.user._id, CREDITS.email, 'pulse-mail');
 
@@ -477,14 +478,14 @@ router.post('/email/export', protect, async (req, res) => {
 // ── POST /api/brand-studio/landing-page/generate ─────────────
 router.post('/landing-page/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, pageType, urlContext, referenceImage, designContext } = req.body;
+        const { brandId, brief, pageType, urlContext, referenceImage, designContext, imageModel } = req.body;
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.landing) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.landing });
 
-        const result = await generateLandingPage({ brandId, brief, pageType, urlContext, referenceImage, designContext: designContext || null });
+        const result = await generateLandingPage({ brandId, brief, pageType, urlContext, referenceImage, designContext: designContext || null, imageModel: imageModel || undefined });
         if (!result.success) throw new Error('Page generation failed');
         await deductCredits(req.user._id, CREDITS.landing, 'pulse-page');
 

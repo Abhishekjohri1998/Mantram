@@ -175,7 +175,8 @@ function buildBrandImagePrompt(basePrompt, type, brandContext, tokens, designCon
     }
 }
 
-async function generatePageImages(plan, brandContext, referenceImage, tokens, designContext) {
+async function generatePageImages(plan, brandContext, referenceImage, tokens, designContext, imageModel) {
+    const model = imageModel || 'gemini-3.1-flash-image-preview';
     const tasks = [];
     for (const s of (plan.sections || [])) {
         if (!s.imagePrompt) continue;
@@ -193,10 +194,10 @@ async function generatePageImages(plan, brandContext, referenceImage, tokens, de
     const results = await Promise.allSettled(
         tasks.map(async ({ key, prompt, size }) => {
             if (referenceImage) {
-                const r = await laozhangMultimodalImageGenerate(prompt, [referenceImage], { model: 'gemini-3.1-flash-image-preview', size });
+                const r = await laozhangMultimodalImageGenerate(prompt, [referenceImage], { model, size });
                 return { key, url: r?.imageUrl || null };
             } else {
-                const r = await laozhangImageGenerate(prompt, { model: 'gemini-3.1-flash-image-preview', size });
+                const r = await laozhangImageGenerate(prompt, { model, size });
                 return { key, url: r?.imageUrl || null };
             }
         })
@@ -596,7 +597,7 @@ export function generateEmbedCode(hostedUrl) {
 }
 
 // ── Main Export ────────────────────────────────────────────────
-export async function generateLandingPage({ brandId, brief, pageType = 'campaign', urlContext, referenceImage, designContext }) {
+export async function generateLandingPage({ brandId, brief, pageType = 'campaign', urlContext, referenceImage, designContext, imageModel }) {
     const { brandContext } = await loadBrandContext(brandId);
     
     // Brand Token System initialization
@@ -625,7 +626,7 @@ export async function generateLandingPage({ brandId, brief, pageType = 'campaign
     // Inject IDs matching our robust template set to avoid missing section bugs
     plan.sections.forEach((s, idx) => { s.id = SECTION_TEMPLATE[idx]?.id || s.id; });
 
-    const images = await generatePageImages(plan, brandContext, referenceImage, tokens, designContext);
+    const images = await generatePageImages(plan, brandContext, referenceImage, tokens, designContext, imageModel);
 
     console.log('Assembling interactive robust page...');
     const slug = plan.seo?.slug || uuidv4().substring(0,8);

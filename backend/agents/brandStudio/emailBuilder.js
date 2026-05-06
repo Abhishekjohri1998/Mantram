@@ -65,8 +65,9 @@ JSON SCHEMA:
   }
 }`;
 
-async function generateSectionImage(prompt, type, brandContext, referenceImage, tokens, designContext) {
+async function generateSectionImage(prompt, type, brandContext, referenceImage, tokens, designContext, imageModel) {
     if (!prompt) return null;
+    const model = imageModel || 'gemini-3.1-flash-image-preview';
     let style = "contemporary premium aesthetic.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout.";
     if (tokens?.colors?.primary) style += ` Use a prominent color accent matching the hex code ${tokens.colors.primary}.`;
@@ -85,13 +86,13 @@ async function generateSectionImage(prompt, type, brandContext, referenceImage, 
         const finalPrompt = `${prompt}. ${style}`;
         if (referenceImage) {
             const r = await laozhangMultimodalImageGenerate(finalPrompt, [referenceImage], {
-                model: 'gemini-3.1-flash-image-preview',
+                model,
                 size,
             });
             return r?.imageUrl || null;
         } else {
             const r = await laozhangImageGenerate(finalPrompt, {
-                model: 'gemini-3.1-flash-image-preview',
+                model,
                 size,
             });
             return r?.imageUrl || null;
@@ -226,7 +227,7 @@ function buildMJML(plan, heroImage, tokens) {
     return mjmlContent;
 }
 
-export async function generateEmail({ brandId, brief, emailType = 'campaign', urlContext, referenceImage, designContext }) {
+export async function generateEmail({ brandId, brief, emailType = 'campaign', urlContext, referenceImage, designContext, imageModel }) {
     const { brandContext } = await loadBrandContext(brandId);
     const tokens = generateBrandTokens('#6366F1', brandContext);
     
@@ -247,7 +248,7 @@ export async function generateEmail({ brandId, brief, emailType = 'campaign', ur
     if (!plan?.sections?.hero) throw new Error('Email generic failure — invalid sections.');
 
     console.log(`Generating Hero visual via NanoBanana...`);
-    const heroImage = await generateSectionImage(plan.sections.hero.imagePrompt, 'hero', brandContext, referenceImage, tokens, designContext);
+    const heroImage = await generateSectionImage(plan.sections.hero.imagePrompt, 'hero', brandContext, referenceImage, tokens, designContext, imageModel);
 
     const mjmlSrc = buildMJML(plan, heroImage, tokens);
     const { html, errors } = await mjml(mjmlSrc, { validationLevel: 'soft' });
