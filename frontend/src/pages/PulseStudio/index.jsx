@@ -102,6 +102,34 @@ const IMAGE_MODELS = [
     { id: 'gpt-image-2', label: 'GPT Image 2', desc: 'Photorealistic, premium (OpenAI)', icon: '◆' },
 ]
 
+function ImageModelSelector({ imageModel, setImageModel, buttonColor = '#7c3aed' }) {
+    return (
+        <div style={{ marginTop: 16, marginBottom: 20, padding: 14, background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Image Model</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+                {IMAGE_MODELS.map(m => (
+                    <button
+                        key={m.id}
+                        onClick={() => setImageModel(m.id)}
+                        style={{
+                            flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                            background: imageModel === m.id ? `${buttonColor}15` : 'var(--sys-surface)',
+                            border: `1.5px solid ${imageModel === m.id ? buttonColor : 'var(--sys-border)'}`,
+                            transition: 'all 0.2s', textAlign: 'left',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 14, color: imageModel === m.id ? buttonColor : 'var(--sys-text-muted)' }}>{m.icon}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: imageModel === m.id ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>{m.label}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 3 }}>{m.desc}</div>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage, setReferenceImage, onGenerate, loading, buttonColor, toolName, credits, productContext, imageModel, setImageModel }) {
     const [urlInput, setUrlInput] = useState('')
     const [fetchingUrl, setFetchingUrl] = useState(false)
@@ -286,29 +314,7 @@ function InputForm({ brief, setBrief, urlContext, setUrlContext, referenceImage,
                 </span>
             </div>
             {/* Image Model Selector */}
-            <div style={{ marginTop: 16, padding: 14, background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Image Model</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    {IMAGE_MODELS.map(m => (
-                        <button
-                            key={m.id}
-                            onClick={() => setImageModel(m.id)}
-                            style={{
-                                flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                                background: imageModel === m.id ? `${buttonColor}15` : 'var(--sys-surface)',
-                                border: `1.5px solid ${imageModel === m.id ? buttonColor : 'var(--sys-border)'}`,
-                                transition: 'all 0.2s', textAlign: 'left',
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 14, color: imageModel === m.id ? buttonColor : 'var(--sys-text-muted)' }}>{m.icon}</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: imageModel === m.id ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>{m.label}</span>
-                            </div>
-                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 3 }}>{m.desc}</div>
-                        </button>
-                    ))}
-                </div>
-            </div>
+            <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor={buttonColor} />
             <button
                 onClick={onGenerate}
                 disabled={loading}
@@ -1578,7 +1584,7 @@ function QuickPostPanel({
     qpLogoOn, setQpLogoOn, qpLogoPos, setQpLogoPos,
     qpLoading, setQpLoading, qpResult, setQpResult,
     qpError, setQpError, qpCompositeUrls, setQpCompositeUrls,
-    canvasRef,
+    canvasRef, imageModel, setImageModel
 }) {
     const { activeBrand } = useBrand()
     const logoUrl = activeBrand?.logoUrl || activeBrand?.logo || null
@@ -1609,6 +1615,7 @@ function QuickPostPanel({
                     postType: qpType,
                     aspectRatios: ratioList,   // send array → parallel generation
                     brandId,
+                    imageModel: imageModel || undefined,
                 }),
             })
             if (!data.success) throw new Error(data.error || 'Generation failed')
@@ -1783,6 +1790,7 @@ function QuickPostPanel({
             </div>
 
             {/* Generate Button */}
+            <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor="#7c3aed" />
             <button onClick={handleGenerate} disabled={qpLoading} style={{
                 width: '100%', padding: '14px 24px', borderRadius: 12, border: 'none',
                 background: qpLoading ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #7c3aed 0%, #F59E0B 180%)',
@@ -1894,7 +1902,7 @@ function QuickPostPanel({
     )
 }
 
-function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
+function APlusTool({ brandId, onContextReady, externalContext, forceTier, imageModel, setImageModel }) {
     const [inputMode, setInputMode] = useState('url') // url | catalog | sample
     const [productUrl, setProductUrl] = useState('')
     const [analyzedProduct, setAnalyzedProduct] = useState(null)
@@ -2135,6 +2143,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     referenceImages: referenceImages.length ? referenceImages : null,
                     designContext: designContext || null,
                     productDNA: productDNA || null,
+                    imageModel: imageModel || undefined,
                 })
             })
             if (!data.success) throw new Error(data.error)
@@ -2520,6 +2529,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     </div>
                 </div>
 
+                <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor="#7c3aed" />
                 <button onClick={handleGenerate} disabled={gen.loading} style={{
                     width: '100%', padding: '15px 32px', borderRadius: 12, border: 'none', color: 'var(--sys-text)', fontSize: 16, fontWeight: 800,
                     background: 'linear-gradient(135deg, #7c3aed 0%, #F59E0B 150%)',
@@ -2699,7 +2709,9 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
 
             {/* Generate CTA */}
             {pdiStep === 'input' && brief && (
-                <button onClick={handleGenerate} disabled={gen.loading || (!brief && !analyzedProduct)}
+                <>
+                    <ImageModelSelector imageModel={imageModel} setImageModel={setImageModel} buttonColor={listingTier === 'premium' ? '#F59E0B' : '#7c3aed'} />
+                    <button onClick={handleGenerate} disabled={gen.loading || (!brief && !analyzedProduct)}
                     style={{
                         width: '100%', padding: '15px 32px', borderRadius: 12,
                         background: listingTier === 'premium'
@@ -2714,6 +2726,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier }) {
                     <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{listingTier === 'premium' ? 'diamond' : 'stars'}</span>
                     {listingTier === 'premium' ? 'Generate Premium A++ — 25 credits' : 'Generate A+ Listing — 15 credits'}
                 </button>
+                </>
             )}
 
             {pdiStep === 'input' && !brief && (
@@ -3846,6 +3859,7 @@ export default function PulseStudio() {
                                                     onContextReady={() => {}}
                                                     externalContext={activeProductContext}
                                                     forceTier={activeAction === 'aptwo' ? 'premium' : 'standard'}
+                                                    imageModel={imageModel} setImageModel={setImageModel}
                                                 />
                                             )}
                                             {activeAction === 'quick_post' && (
@@ -3865,6 +3879,7 @@ export default function PulseStudio() {
                                                     qpError={qpError} setQpError={setQpError}
                                                     qpCompositeUrls={qpCompositeUrls} setQpCompositeUrls={setQpCompositeUrls}
                                                     canvasRef={canvasRef}
+                                                    imageModel={imageModel} setImageModel={setImageModel}
                                                 />
                                             )}
                                             {activeAction === 'deck' && (

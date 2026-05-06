@@ -189,7 +189,7 @@ router.post('/product-intelligence', protect, async (req, res) => {
 // Cost: 8 credits (single) / 12 credits (multi-size batch)
 router.post('/quick-post', protect, async (req, res) => {
     try {
-        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, aspectRatios, brandId } = req.body;
+        const { productDNA, productData, selectedMoodId, productMoodDirections, postType, aspectRatio, aspectRatios, brandId, imageModel } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         // Support both single ratio (aspectRatio) and multi-ratio batch (aspectRatios[])
@@ -231,6 +231,7 @@ router.post('/quick-post', protect, async (req, res) => {
                     postType || 'promo',
                     ratio,
                     brandContext,
+                    imageModel,
                 )
             )
         );
@@ -738,6 +739,7 @@ router.post('/aplus/generate', protect, async (req, res) => {
             brandId, productUrl, productData, referenceImages,
             brief, moduleCount = 7, designContext, productDNA,
             listingTier = 'standard',  // 'standard' | 'premium'
+            imageModel,
         } = req.body;
 
         if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
@@ -756,6 +758,7 @@ router.post('/aplus/generate', protect, async (req, res) => {
             listingTier,
             designContext: designContext || null,
             productDNA: productDNA || null,
+            imageModel: imageModel || undefined,
         });
 
         // ── Deduct credits ──────────────────────────────────────────────────

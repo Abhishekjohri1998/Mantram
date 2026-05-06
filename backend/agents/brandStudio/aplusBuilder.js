@@ -279,7 +279,7 @@ async function scrapeProductUrl(url) {
 }
 
 // ── Image Generation for A+ / A++ Modules ──────────────────────────────────────
-async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = [], designContext = null) {
+async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = [], designContext = null, imageModel = 'gemini-3.1-flash-image-preview') {
     // Q&A and text-only modules skip image gen
     if (!moduleSpec.width || !moduleSpec.height) return null;
 
@@ -309,10 +309,10 @@ async function generateModuleImage(prompt, moduleSpec, productImages = [], brand
     try {
         const imagePromise = refImages.length > 0
             ? laozhangMultimodalImageGenerate(fullPrompt, refImages.slice(0, 2), {
-                model: 'gemini-3.1-flash-image-preview', size
+                model: imageModel || 'gemini-3.1-flash-image-preview', size
             })
             : laozhangImageGenerate(fullPrompt, {
-                model: 'gemini-3.1-flash-image-preview', size
+                model: imageModel || 'gemini-3.1-flash-image-preview', size
             });
 
         const result = await Promise.race([
@@ -480,6 +480,7 @@ export async function generateAplusListing({
     listingTier = 'standard',   // 'standard' | 'premium'
     designContext = null,        // PDI locked design directive from frontend
     productDNA = null,
+    imageModel = 'gemini-3.1-flash-image-preview', // User-selected image model
 }) {
     const isPremium = listingTier === 'premium';
     console.log(`A+ Builder: Starting ${isPremium ? 'Premium A++' : 'Standard A+'} generation pipeline...`);
@@ -649,7 +650,7 @@ Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
                 return module.slides.map(async (slide, idx) => {
                     const imgUrl = await generateModuleImage(
                         slide.imagePrompt || module.imagePrompt || `${module.headline} — slide ${idx + 1} lifestyle scene`,
-                        spec, productImages, brandColors, activeDesignContext
+                        spec, productImages, brandColors, activeDesignContext, imageModel
                     );
                     return { moduleId: `${module.id}_slide_${idx}`, imageUrl: imgUrl };
                 });
@@ -659,7 +660,7 @@ Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
             return [async () => {
                 const imgUrl = await generateModuleImage(
                     module.imagePrompt || module.headline,
-                    spec, productImages, brandColors, activeDesignContext
+                    spec, productImages, brandColors, activeDesignContext, imageModel
                 );
                 return { moduleId: module.id, imageUrl: imgUrl };
             }].map(fn => fn());

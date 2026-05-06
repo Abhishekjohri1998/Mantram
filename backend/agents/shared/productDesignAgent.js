@@ -670,7 +670,7 @@ export function injectDesignContext(basePrompt, designContext) {
  * @param {string} brandContext       — brand DNA string
  * @returns {{ postImageUrl, backgroundUrl, copy, palette }}
  */
-export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '') {
+export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '', imageModel = 'gemini-3.1-flash-image-preview') {
     console.log(`🎯 QuickPost: type=${postType} | ratio=${aspectRatio} | product="${productData?.title || 'unknown'}"`);
 
     const productTitle = productData?.title || productDNA?.productCategory || 'Product';
@@ -874,12 +874,12 @@ IMPORTANT: Do NOT recolor, stylize, cartoon-ize, or distort the product. It must
         let result;
         if (refImages.length > 0) {
             result = await laozhangMultimodalImageGenerate(designPrompt, refImages, {
-                model: 'gemini-3.1-flash-image-preview',
+                model: imageModel || 'gemini-3.1-flash-image-preview',
                 size: imageSize,
             });
         } else {
             result = await laozhangImageGenerate(designPrompt, {
-                model: 'gemini-3.1-flash-image-preview',
+                model: imageModel || 'gemini-3.1-flash-image-preview',
                 size: imageSize,
             });
         }
