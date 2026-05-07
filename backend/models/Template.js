@@ -20,7 +20,7 @@ const templateSchema = new mongoose.Schema({
     // ── Studio Section — scopes which studio section shows this template ──────
     studioSection: {
         type: String,
-        enum: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'avatar', 'video_ugc', 'video_qads', 'general'],
+        enum: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'avatar', 'video_ugc', 'video_qads', 'general', 'homepage'],
         default: 'general'
     },
     description: {

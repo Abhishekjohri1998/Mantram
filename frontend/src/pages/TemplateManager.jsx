@@ -61,6 +61,18 @@ function PromptBlock({ text }) {
     );
 }
 
+const SECTION_OPTIONS = [
+    { value: 'ai_create',    label: 'AI Create' },
+    { value: 'carousel',     label: 'Carousel' },
+    { value: 'campaign',     label: 'Campaign' },
+    { value: 'campaign_shot',label: 'Campaign Shot' },
+    { value: 'video_ugc',    label: 'Video UGC' },
+    { value: 'video_qads',   label: 'Video Q-Ads' },
+    { value: 'avatar',       label: 'Avatar Studio' },
+    { value: 'general',      label: 'General / Uncategorized' },
+    { value: 'homepage',     label: 'Homepage Featured' },
+];
+
 const STUDIO_SECTIONS = [
     { value: 'ai_create',    label: 'AI Create' },
     { value: 'carousel',     label: 'Carousel' },
@@ -71,12 +83,13 @@ const STUDIO_SECTIONS = [
     { value: 'video_qads',   label: 'Video Q-Ads' },
     { value: 'avatar',       label: 'Avatar' },
     { value: 'general',      label: 'General' },
+    { value: 'homepage',     label: 'Homepage Featured' },
 ];
 
 // Studio → allowed sections mapping
 const SECTIONS_BY_STUDIO = {
-    creative: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'logo', 'avatar', 'general'],
-    video:    ['video_ugc', 'video_qads', 'general'],
+    creative: ['ai_create', 'carousel', 'campaign', 'campaign_shot', 'logo', 'avatar', 'general', 'homepage'],
+    video:    ['video_ugc', 'video_qads', 'general', 'homepage'],
     content:  ['general'],
 };
 
