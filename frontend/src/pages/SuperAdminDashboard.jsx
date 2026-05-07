@@ -132,6 +132,13 @@ export default function SuperAdminDashboard() {
     const [studioLabels, setStudioLabels] = useState({})
     // Per-user studio access modal
     const [userStudioModal, setUserStudioModal] = useState(null)
+    // User Intelligence Analytics state
+    const [userSegment, setUserSegment] = useState('all')
+    const [userSort, setUserSort] = useState('lastActive')
+    const [userSortOrder, setUserSortOrder] = useState('desc')
+    const [segmentCounts, setSegmentCounts] = useState({})
+    const [userDrawer, setUserDrawer] = useState(null)
+    const [usersLoading, setUsersLoading] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
@@ -181,7 +188,7 @@ export default function SuperAdminDashboard() {
     }, [search])
 
     useEffect(() => {
-        if (tab === 'users' || tab === 'ai-credits') loadUsers()
+        if (tab === 'users' || tab === 'ai-credits') { loadUsers(); if (tab === 'users') loadSegmentCounts() }
         if (tab === 'tokenUsage' || tab === 'overview') loadTokenUsage()
         if (tab === 'approvals') loadPendingUsers()
         if (tab === 'waitlist') loadWaitlist()
@@ -197,9 +204,24 @@ export default function SuperAdminDashboard() {
         if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice) }
         if (tab === 'creditPacks') loadCreditPacks()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
+    // Reload users when segment/sort changes while on users tab
+    useEffect(() => { if (tab === 'users') loadUsers() }, [userSegment, userSort, userSortOrder])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
-    const loadUsers = async () => { try { const d = await API.getUsers({ page: userPage, limit: 20, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch (e) { console.error(e) } }
+    const loadUsers = async () => {
+        setUsersLoading(true)
+        try {
+            const d = await API.getUserAnalytics({ page: userPage, limit: 25, search: debouncedSearch, plan: planFilter, segment: userSegment, sort: userSort, order: userSortOrder })
+            setUsers(d.users || [])
+            setTotalUsers(d.total || 0)
+        } catch (e) {
+            // fallback to basic list if analytics endpoint not yet deployed
+            try { const d = await API.getUsers({ page: userPage, limit: 25, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch {}
+        } finally { setUsersLoading(false) }
+    }
+    const loadSegmentCounts = async () => {
+        try { const d = await API.getUserSegmentCounts(); setSegmentCounts(d.counts || {}) } catch {}
+    }
     const loadLogs = async () => { setLogsLoading(true); try { const d = await API.getSystemLogs({ page: logsPage, limit: 50 }); setLogs(d.logs || []); setTotalLogs(d.total || 0) } catch (e) { console.error(e) } finally { setLogsLoading(false) } }
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
     const loadWaitlist = async () => { try { const d = await API.getWaitlist(); setWaitlist(d.waitlist || []) } catch (e) { console.error(e) } }
@@ -1048,13 +1070,30 @@ export default function SuperAdminDashboard() {
 
                 {/* ════════════ USERS ════════════ */}
                 {tab === 'users' && (
-                    <div>
-                        <div className="flex gap-3 mb-5">
+                    <div className="space-y-6">
+                        {/* Intelligence Segment Header */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">group</span>
+                                    User Intelligence Dashboard
+                                </h3>
+                                <p className="text-sm text-[var(--sys-text-muted)]">Granular oversight of platform inhabitants, roles, and behavioral metrics.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={loadUsers} className="p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer" title="Refresh"><span className="material-symbols-outlined text-sm">refresh</span></button>
+                                <button className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all cursor-pointer">
+                                    <span className="material-symbols-outlined text-sm">add</span> Add User
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search & Filter Bar */}
+                        <div className="flex gap-3">
                             <div className="flex-1 relative">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] text-lg">search</span>
                                 <input type="text" value={search} onChange={e => { setSearch(e.target.value); setUserPage(1) }} placeholder="Search name, email, company..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none focus:border-primary/50" />
                             </div>
-                            <button onClick={loadUsers} className="p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-all cursor-pointer" title="Refresh Users"><span className="material-symbols-outlined text-sm">refresh</span></button>
                             <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); setUserPage(1) }} className="px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm outline-none cursor-pointer">
                                 <option value="">All Plans</option>
                                 {packages.map(p => (

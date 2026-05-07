@@ -90,6 +90,10 @@ const userSchema = new mongoose.Schema({
         contentGenerated: { type: Number, default: 0 },
         creativesGenerated: { type: Number, default: 0 },
         brandsCreated: { type: Number, default: 0 },
+        // Analytics fields — incremented by platform events
+        sessionDurationMins: { type: Number, default: 0 }, // cumulative minutes on platform
+        downloadCount: { type: Number, default: 0 },        // total asset downloads (images + videos)
+        shareCount: { type: Number, default: 0 },           // total shares / exports
     },
 
     // Active Skills (Model A — persistent behavioral instructions injected into Fidato)

@@ -159,6 +159,10 @@ const videoProjectSchema = new mongoose.Schema({
     finalVideoUrl: { type: String, default: '' },
     creditsUsed: { type: Number, default: 0 },
 
+    // ── Analytics counters ──
+    downloadCount: { type: Number, default: 0 },  // incremented on each download
+    fileSizeMB: { type: Number, default: 0 },      // estimated: duration_secs * 0.5
+
     // ── Cost Optimization Fields ──
     contentHash: { type: String, index: true, sparse: true },       // MD5 dedup key
     idempotencyKey: { type: String, index: true, sparse: true },    // Runaway-request guard
