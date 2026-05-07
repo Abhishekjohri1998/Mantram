@@ -1101,81 +1101,131 @@ export default function SuperAdminDashboard() {
                                 ))}
                             </select>
                         </div>
-                        <p className="text-xs text-[var(--sys-text-muted)] mb-3">{totalUsers} users</p>
-                        <div className="space-y-2">{users.map(u => (
-                            <div key={u._id} className="glass-panel rounded-2xl p-4 hover:bg-[var(--sys-surface)] transition-all">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">{u.name?.[0]?.toUpperCase()}</div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-base font-bold text-[var(--sys-text)] truncate">{u.name}</p>
-                                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold capitalize ${
-                                                    u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
-                                                    u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
-                                                    u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
-                                                    'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
-                                                }`}>Plan: {u.plan}</span>
-                                                <span className="text-xs px-1.5 py-0.5 rounded font-bold border border-[var(--sys-border)] text-[var(--sys-text-muted)] uppercase tracking-tighter text-[9px]">{u.role}</span>
-                                                {(!u.approvalStatus || u.approvalStatus === 'pending') && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-primary-dim)] text-primary">PENDING</span>}
-                                                {u.approvalStatus === 'rejected' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-primary-dim)] text-primary">REJECTED</span>}
-                                            </div>
-                                            <p className="text-[11px] text-[var(--sys-text-muted)] truncate">{u.email} {u.company ? `• ${u.company}` : ''}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-center mx-4 shrink-0 flex items-center gap-4">
-                                        <div className="text-right">
-                                            <p className="text-xs font-bold text-[var(--sys-text)] mb-1">{u.credits?.used || 0} / {u.credits?.total + (u.credits?.bonus || 0)} used</p>
-                                            <div className="w-24 h-1.5 rounded-full bg-[var(--sys-surface)]">
-                                                <div
-                                                    className={`h-full rounded-full ${u.creditBalance?.remaining <= 5 ? 'bg-[var(--sys-surface)] shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-primary'}`}
-                                                    style={{ width: `${Math.min(100, ((u.credits?.used || 0) / (u.credits?.total + (u.credits?.bonus || 0))) * 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="w-16">
-                                            <p className="text-base font-bold text-[var(--sys-text)]">{u.creditBalance?.unlimited ? '∞' : `${u.creditBalance?.remaining || 0}`}</p>
-                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-tighter">remaining</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                         <button onClick={() => setCreditModal(u)} title="Add Credits" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">add_circle</span></button>
-                                        <button onClick={() => handleResetCredits(u._id)} title="Reset Credits" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">restart_alt</span></button>
-                                        <button onClick={() => setPlanModal(u)} title="Change Plan" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">upgrade</span></button>
-                                        
-                                        {(!u.approvalStatus || u.approvalStatus === 'pending') ? (
-                                            <div className="flex gap-1 border-x border-[var(--sys-border)] px-1 mx-1">
-                                                <button onClick={() => handleApproveUser(u._id)} title="Approve User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-primary transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">check_circle</span></button>
-                                                <button onClick={() => handleRejectUser(u._id)} title="Reject User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-primary transition-all cursor-pointer shadow-sm"><span className="material-symbols-outlined text-base font-bold">cancel</span></button>
-                                            </div>
-                                        ) : u.approvalStatus === 'approved' ? (
-                                            <div className="px-2 border-x border-[var(--sys-border)] mx-1">
-                                                <span className="text-[9px] font-black text-primary/50 bg-[var(--sys-primary-dim)] px-2 py-1 rounded-md border border-[var(--sys-border)] flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[10px]">verified</span>
-                                                    APPROVED
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="px-2 border-x border-[var(--sys-border)] mx-1">
-                                                <span className="text-[9px] font-black text-primary/50 bg-[var(--sys-primary-dim)] px-2 py-1 rounded-md border border-[var(--sys-border)] flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[10px]">block</span>
-                                                    REJECTED
-                                                </span>
-                                            </div>
-                                        )}
 
-                                        <button onClick={() => handleImpersonate(u._id, u.name)} title="Login as User" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">login</span></button>
-                                        <button onClick={() => openUserStudioModal(u._id)} title="Studio Access" className="p-2 rounded-lg hover:bg-[#FF4D00]/10 text-[var(--sys-text-muted)] hover:text-[#FF4D00] transition-all cursor-pointer"><span className="material-symbols-outlined text-base">shield_person</span></button>
-                                        <button onClick={() => handleDeleteUser(u._id, u.name)} title="Delete" className="p-2 rounded-lg hover:bg-[var(--sys-primary-dim)] text-[var(--sys-text-muted)] hover:text-primary transition-all cursor-pointer"><span className="material-symbols-outlined text-base">delete</span></button>
+                        {/* Drawer */}
+                        {userDrawer && (
+                            <div className="fixed inset-0 z-50 flex justify-end" style={{background:'rgba(0,0,0,0.55)'}} onClick={() => setUserDrawer(null)}>
+                                <div className="w-full max-w-md bg-[#0e1025] border-l border-[var(--sys-border)] h-full overflow-y-auto shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary text-xl font-black">{userDrawer.name?.[0]?.toUpperCase()}</div>
+                                            <div><p className="font-bold text-[var(--sys-text)]">{userDrawer.name}</p><p className="text-xs text-[var(--sys-text-muted)]">{userDrawer.email}</p></div>
+                                        </div>
+                                        <button onClick={() => setUserDrawer(null)} className="p-2 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] cursor-pointer"><span className="material-symbols-outlined">close</span></button>
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap mb-4">
+                                        <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--sys-primary-dim)] text-primary font-bold uppercase">{userDrawer.plan}</span>
+                                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${userDrawer.segment==='power'?'bg-green-500/20 text-green-400':userDrawer.segment==='churned'?'bg-amber-500/20 text-amber-400':userDrawer.segment==='dead'?'bg-red-500/20 text-red-400':'bg-cyan-500/20 text-cyan-400'}`}>{userDrawer.segment==='power'?'⚡ Power':userDrawer.segment==='churned'?'⚠ Churned':userDrawer.segment==='dead'?'☠ Dead':'● Active'}</span>
+                                        <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] font-bold">{userDrawer.approvalStatus?.toUpperCase()}</span>
+                                        <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)]">Joined {new Date(userDrawer.createdAt).toLocaleDateString('en-IN',{month:'short',year:'numeric'})}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                        {[{label:'Credits 30d',val:userDrawer.creditsSpent30d||0,c:'text-primary'},{label:'Gen 30d',val:userDrawer.generationCount30d||0},{label:'Storage',val:`${userDrawer.storageUsedMB||0}MB`},{label:'Time on App',val:`${userDrawer.sessionDurationMins||0}m`},{label:'Downloads',val:userDrawer.totalDownloads||0},{label:'Shares',val:userDrawer.totalShares||0}].map(s=>(
+                                            <div key={s.label} className="bg-[var(--sys-surface)] rounded-xl p-3 text-center">
+                                                <p className={`text-lg font-black ${s.c||'text-[var(--sys-text)]'}`}>{s.val}</p>
+                                                <p className="text-[9px] text-[var(--sys-text-muted)] uppercase font-bold mt-0.5">{s.label}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mb-4">
+                                        <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Studio Breakdown</p>
+                                        {[{label:'Content',val:userDrawer.contentCount||0,color:'#6366f1'},{label:'Creative',val:userDrawer.creativeCount||0,color:'#FF4D00'},{label:'Video',val:userDrawer.videoCount||0,color:'#06b6d4'}].map(s=>{
+                                            const mx=Math.max(userDrawer.contentCount||0,userDrawer.creativeCount||0,userDrawer.videoCount||1,1);
+                                            return(<div key={s.label} className="flex items-center gap-2 mb-1.5"><span className="text-[10px] text-[var(--sys-text-muted)] w-14">{s.label}</span><div className="flex-1 h-1.5 rounded-full bg-[var(--sys-surface)]"><div className="h-full rounded-full" style={{width:`${Math.min(100,(s.val/mx)*100)}%`,backgroundColor:s.color}}/></div><span className="text-[10px] font-bold w-6 text-right text-[var(--sys-text)]">{s.val}</span></div>);
+                                        })}
+                                        {userDrawer.topStudio&&<p className="text-[10px] text-[var(--sys-text-muted)] mt-1">Top: <span className="text-primary font-bold capitalize">{userDrawer.topStudio}</span></p>}
+                                    </div>
+                                    <div className="mb-4 p-3 bg-[var(--sys-surface)] rounded-xl">
+                                        <p className="text-xs font-bold text-[var(--sys-text-muted)] uppercase mb-1">Credits</p>
+                                        <p className="text-xl font-black text-primary">{userDrawer.creditBalance?.unlimited?'∞':userDrawer.creditBalance?.remaining??0} <span className="text-xs font-normal text-[var(--sys-text-muted)]">remaining · {userDrawer.credits?.used||0} used / {(userDrawer.credits?.total||0)+(userDrawer.credits?.bonus||0)} total</span></p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button onClick={()=>{handleImpersonate(userDrawer._id,userDrawer.name);setUserDrawer(null)}} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--sys-primary-dim)] text-primary text-xs font-bold cursor-pointer"><span className="material-symbols-outlined text-sm">login</span>Impersonate</button>
+                                        <button onClick={()=>{setCreditModal(userDrawer);setUserDrawer(null)}} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold cursor-pointer"><span className="material-symbols-outlined text-sm">add_circle</span>Credits</button>
+                                        <button onClick={()=>{setPlanModal(userDrawer);setUserDrawer(null)}} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold cursor-pointer"><span className="material-symbols-outlined text-sm">upgrade</span>Plan</button>
+                                        <button onClick={()=>{openUserStudioModal(userDrawer._id);setUserDrawer(null)}} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-bold cursor-pointer"><span className="material-symbols-outlined text-sm">shield_person</span>Studios</button>
+                                        <button onClick={()=>{handleDeleteUser(userDrawer._id,userDrawer.name);setUserDrawer(null)}} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold cursor-pointer"><span className="material-symbols-outlined text-sm">delete</span></button>
                                     </div>
                                 </div>
                             </div>
-                        ))}</div>
-                        {totalUsers > 20 && <div className="flex justify-center gap-2 mt-6">
-                            <button disabled={userPage <= 1} onClick={() => setUserPage(p => p - 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">← Prev</button>
-                            <span className="px-4 py-2 text-sm text-[var(--sys-text-muted)]">Page {userPage}</span>
-                            <button disabled={users.length < 20} onClick={() => setUserPage(p => p + 1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">Next →</button>
-                        </div>}
+                        )}
+                        {/* Segment Tabs */}
+                        <div className="flex gap-1 p-1 bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)] overflow-x-auto">
+                            {[{id:'all',label:'All',icon:'group'},{id:'active',label:'Active',icon:'radio_button_checked',ac:'text-cyan-400'},{id:'power',label:'Power',icon:'bolt',ac:'text-green-400'},{id:'churned',label:'Churned',icon:'warning',ac:'text-amber-400'},{id:'dead',label:'Dead',icon:'skull',ac:'text-red-400'}].map(seg=>(
+                                <button key={seg.id} onClick={()=>{setUserSegment(seg.id);setUserPage(1)}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${userSegment===seg.id?'bg-[var(--sys-bg)] shadow text-[var(--sys-text)]':'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                    <span className={`material-symbols-outlined text-sm ${userSegment===seg.id&&seg.ac?seg.ac:''}`}>{seg.icon}</span>
+                                    {seg.label}
+                                    {segmentCounts[seg.id]!=null&&<span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-[var(--sys-border)] text-[var(--sys-text-muted)] text-[9px] font-black">{segmentCounts[seg.id]}</span>}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Sort Bar */}
+                        <div className="flex gap-2 flex-wrap items-center">
+                            <select value={userSort} onChange={e=>setUserSort(e.target.value)} className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs outline-none cursor-pointer">
+                                <option value="lastActive">Last Active</option>
+                                <option value="creditsSpent">Credits Spent (30d)</option>
+                                <option value="generations">Generations (30d)</option>
+                                <option value="storageUsed">Storage Used</option>
+                                <option value="sessionDuration">Time on App</option>
+                                <option value="downloads">Downloads</option>
+                                <option value="shares">Shares</option>
+                                <option value="creditsUsed">Credits Used (Total)</option>
+                                <option value="createdAt">Joined Date</option>
+                            </select>
+                            <button onClick={()=>setUserSortOrder(o=>o==='desc'?'asc':'desc')} className="p-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] cursor-pointer" title="Toggle sort">
+                                <span className="material-symbols-outlined text-sm">{userSortOrder==='desc'?'arrow_downward':'arrow_upward'}</span>
+                            </button>
+                            <p className="text-xs text-[var(--sys-text-muted)] ml-auto">{totalUsers} users · click a row to deep-dive</p>
+                        </div>
+                        {/* Table */}
+                        {usersLoading?(
+                            <div className="flex items-center justify-center py-16 text-[var(--sys-text-muted)]"><span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>Loading...</div>
+                        ):(
+                            <div className="overflow-x-auto rounded-2xl border border-[var(--sys-border)]">
+                                <table className="w-full text-sm">
+                                    <thead><tr className="border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                        <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)]">User</th>
+                                        <th className="text-center px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)]">Segment</th>
+                                        <th className="text-right px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] cursor-pointer hover:text-primary" onClick={()=>setUserSort('creditsSpent')}>Credits 30d{userSort==='creditsSpent'?' ▾':''}</th>
+                                        <th className="text-right px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] cursor-pointer hover:text-primary" onClick={()=>setUserSort('generations')}>Gen{userSort==='generations'?' ▾':''}</th>
+                                        <th className="text-right px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] cursor-pointer hover:text-primary" onClick={()=>setUserSort('storageUsed')}>Storage{userSort==='storageUsed'?' ▾':''}</th>
+                                        <th className="text-right px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] cursor-pointer hover:text-primary" onClick={()=>setUserSort('downloads')}>DL{userSort==='downloads'?' ▾':''}</th>
+                                        <th className="text-right px-3 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--sys-text-muted)] cursor-pointer hover:text-primary" onClick={()=>setUserSort('lastActive')}>Last Active{userSort==='lastActive'?' ▾':''}</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        {users.map(u=>{
+                                            const ss={power:'text-green-400 bg-green-500/10',active:'text-cyan-400 bg-cyan-500/10',churned:'text-amber-400 bg-amber-500/10',dead:'text-red-400 bg-red-500/10'};
+                                            const sl={power:'⚡ Power',active:'● Active',churned:'⚠ Churned',dead:'☠ Dead'};
+                                            const seg=u.segment||'active';
+                                            const da=u.lastActive?Math.floor((Date.now()-new Date(u.lastActive))/86400000):null;
+                                            const las=da===null?'Never':da===0?'Today':da===1?'Yesterday':`${da}d ago`;
+                                            return(<tr key={u._id} className="border-b border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer group" onClick={()=>setUserDrawer(u)}>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-black shrink-0">{u.name?.[0]?.toUpperCase()}</div>
+                                                    <div className="min-w-0"><p className="font-bold text-[var(--sys-text)] text-xs truncate max-w-[140px]">{u.name}</p><p className="text-[10px] text-[var(--sys-text-muted)] truncate max-w-[140px]">{u.email}</p></div>
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-[var(--sys-primary-dim)] text-primary uppercase shrink-0">{u.plan}</span>
+                                                </div></td>
+                                                <td className="px-3 py-3 text-center"><span className={`text-[9px] px-2 py-1 rounded-full font-bold ${ss[seg]||ss.active}`}>{sl[seg]||seg}</span></td>
+                                                <td className="px-3 py-3 text-right"><span className="text-xs font-bold text-primary">{u.creditsSpent30d||0}</span></td>
+                                                <td className="px-3 py-3 text-right"><span className="text-xs font-bold text-[var(--sys-text)]">{u.generationCount30d||0}</span></td>
+                                                <td className="px-3 py-3 text-right"><span className="text-xs text-[var(--sys-text-muted)]">{u.storageUsedMB||0} MB</span></td>
+                                                <td className="px-3 py-3 text-right"><span className="text-xs text-[var(--sys-text-muted)]">{u.totalDownloads||0}</span></td>
+                                                <td className="px-3 py-3 text-right"><span className={`text-[10px] font-bold ${seg==='dead'?'text-red-400':seg==='churned'?'text-amber-400':'text-[var(--sys-text-muted)]'}`}>{las}</span></td>
+                                            </tr>);
+                                        })}
+                                        {users.length===0&&<tr><td colSpan="7" className="py-16 text-center text-[var(--sys-text-muted)] text-sm">No users in this segment</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        {/* Pagination */}
+                        {totalUsers>25&&(
+                            <div className="flex justify-center gap-2">
+                                <button disabled={userPage<=1} onClick={()=>setUserPage(p=>p-1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">← Prev</button>
+                                <span className="px-4 py-2 text-sm text-[var(--sys-text-muted)]">Page {userPage} · {totalUsers} users</span>
+                                <button disabled={users.length<25} onClick={()=>setUserPage(p=>p+1)} className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-sm text-[var(--sys-text-muted)] disabled:opacity-30 cursor-pointer">Next →</button>
+                            </div>
+                        )}
                     </div>
                 )}
 
