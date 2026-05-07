@@ -212,7 +212,7 @@ const EXPLORE_CSS = `
 }
 `;
 
-export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, studioFilter = '' }) {
+export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, onSelectTemplate = null, studioFilter = '' }) {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [templates, setTemplates] = useState([]);
@@ -267,59 +267,35 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
         return matchesSearch;
     });
 
-    // ── Template click handler (preserved from original) ──
+    // ── Template click handler ──
     const handleTemplateClick = (template) => {
         if (window.innerWidth < 768 && mobileTappedTemplateId !== template._id) {
             setMobileTappedTemplateId(template._id);
             return;
         }
-        const categoryName = (template.categoryId?.name || '').toLowerCase().trim();
+
+        // ── Overlay mode: delegate to parent — parent opens TemplateGenerationModal ──
+        // This ensures the /api/templates/:id/use route is always called (fixes G3)
+        if (overlayMode && onSelectTemplate) {
+            onSelectTemplate(template);
+            if (onCloseOverlay) onCloseOverlay();
+            return;
+        }
+
+        // ── Standalone mode (e.g. /templates page): open modal inline ──
+        // For video/content origin, navigate to the correct studio
         const origin = (template.studioOrigin || '').toLowerCase().trim();
-        let targetRoute = null, targetMode = null;
-
-        if (categoryName === 'video q-ads' || categoryName === 'video qads' || origin === 'video') {
-            targetRoute = '/video-studio'; targetMode = 'q-ads';
-        } else if (categoryName === 'ai create' || categoryName === 'ai creative') {
-            targetRoute = '/creative-studio'; targetMode = 'create';
-        } else if (categoryName === 'campaign shot' || categoryName === 'campaignshot') {
-            targetRoute = '/creative-studio'; targetMode = 'campaignshot';
-        } else if (categoryName === 'carousel' || categoryName === 'carousels') {
-            targetRoute = '/creative-studio'; targetMode = 'carousel';
-        } else if (categoryName === 'campaigns' || categoryName === 'campaign') {
-            targetRoute = '/creative-studio'; targetMode = 'campaigns';
-        } else if (categoryName === 'logo' || categoryName === 'logo gen' || categoryName === 'campaign logo') {
-            targetRoute = '/creative-studio'; targetMode = 'campaignlogo';
-        } else if (categoryName === 'photoshoot' || categoryName === 'ai photoshoot') {
-            targetRoute = '/creative-studio'; targetMode = 'photoshoot';
-        } else if (categoryName === 'try-on' || categoryName === 'tryon' || categoryName === 'virtual try-on') {
-            targetRoute = '/creative-studio'; targetMode = 'tryon';
-        } else if (categoryName === 'mockups' || categoryName === 'mockup') {
-            targetRoute = '/creative-studio'; targetMode = 'mockups';
-        } else if (template.studioSection) {
-            const section = template.studioSection.toLowerCase().trim();
-            targetRoute = '/creative-studio';
-            if (section === 'carousel') targetMode = 'carousel';
-            else if (section === 'campaign_shot') targetMode = 'campaignshot';
-            else if (section === 'campaign') targetMode = 'campaigns';
-            else if (section === 'ai_create') targetMode = 'create';
-            else if (section === 'avatar') targetMode = 'photoshoot';
-            else targetMode = 'create';
-        } else if (origin === 'creative' || origin === 'image') {
-            targetRoute = '/creative-studio'; targetMode = 'create';
-        } else if (origin === 'content') {
-            targetRoute = '/content-studio';
-        } else {
-            targetRoute = '/creative-studio'; targetMode = 'create';
+        if (origin === 'video') {
+            navigate(`/video-studio?templateId=${template._id}&mode=q-ads`);
+            return;
+        }
+        if (origin === 'content') {
+            navigate(`/content-studio?templateId=${template._id}`);
+            return;
         }
 
-        if (targetRoute) {
-            let url = `${targetRoute}?templateId=${template._id}`;
-            if (targetMode) url += `&mode=${targetMode}`;
-            navigate(url);
-            if (overlayMode && onCloseOverlay) onCloseOverlay();
-        } else {
-            setSelectedTemplate(template);
-        }
+        // All creative/image templates: open modal directly
+        setSelectedTemplate(template);
     };
 
     // ── Render ──
