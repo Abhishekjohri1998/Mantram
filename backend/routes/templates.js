@@ -188,12 +188,13 @@ router.post('/:id/use', protect, async (req, res) => {
             if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
         }
 
-        // 1. Build prompt — pass correct S3 URL param names
+        // 1. Build prompt — pass correct S3 URL param names + brandId for placeholder substitution
         const promptData = await buildTemplatePrompt({
             template,
             userPrompt,
-            productImageUrl,  // S3 URL or null (maps to resolvedProduct in combiner)
-            avatarImageUrl,   // S3 URL or null (maps to resolvedAvatar in combiner)
+            productImageUrl,  // S3 URL or null
+            avatarImageUrl,   // S3 URL or null
+            brandId,          // Stage 3: enables {brand_name} etc. substitution
         });
 
         // 2. Determine cost & deduct credits
