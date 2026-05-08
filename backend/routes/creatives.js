@@ -821,6 +821,20 @@ Generate the adapted creative now.`;
                     }
                 }
 
+                // ── BUG-FIX: Catch-all S3 Upload ──
+                // If we skipped the initial S3 upload (expecting to add a logo), but the logo overlay
+                // didn't happen (e.g. brand has no logo) or failed, finalUrl will STILL be a data URI.
+                // We MUST upload it to S3, otherwise GenerationJob is never updated with a valid URL 
+                // and the frontend polls forever.
+                if (finalUrl && finalUrl.startsWith('data:image/')) {
+                    try {
+                        finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}-final.png`);
+                        console.log(`✅ [BG-S3] Uploaded final image to S3: ${finalUrl}`);
+                    } catch (s3Err) {
+                        console.error('[BG-S3] Final fallback upload failed:', s3Err.message);
+                    }
+                }
+
                 if (finalUrl !== rawImageUrl) {
                     await Creative.updateOne(
                         { _id: creative._id },
