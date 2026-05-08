@@ -1,10 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Play, CheckCircle2 } from 'lucide-react';
 import useReveal from '../../hooks/useReveal';
+import useWaitlist from '../../hooks/useWaitlist';
 import { BRAND } from '../../data/studios';
 
 export default function Hero({ onEarlyAccess, onAgencyDemo }) {
     const revealContent = useReveal();
+    const [heroEmail, setHeroEmail] = useState('');
+    const { submit, submitting, submitted, error } = useWaitlist();
+
+    const handleInlineSubmit = async (e) => {
+        e.preventDefault();
+        if (!heroEmail.trim()) {
+            onEarlyAccess(); // No email entered — just open the full modal
+            return;
+        }
+        await submit({ email: heroEmail, name: '', type: 'individual', source: 'hero_inline' });
+    };
 
     return (
         <section className="relative pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden flex flex-col items-center text-center">
@@ -64,20 +76,33 @@ export default function Hero({ onEarlyAccess, onAgencyDemo }) {
                     </button>
                 </div>
 
-                {/* Waitlist Input */}
-                <div className="flex flex-col sm:flex-row items-center w-full max-w-md mx-auto mt-8 bg-[#121214] border border-white/10 rounded-full p-1 sm:pl-6 focus-within:border-[#FF5A1F]/50 transition-colors">
-                    <input 
-                        type="email" 
-                        placeholder="you@brand.com" 
-                        className="bg-transparent border-none text-white text-sm outline-none w-full flex-1 px-4 sm:px-0 py-3 sm:py-0 placeholder:text-[#a1a1aa]"
-                    />
-                    <button 
-                        onClick={onEarlyAccess}
-                        className="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-sm text-white transition-all hover:scale-105 active:scale-95 bg-[#FF5A1F]"
-                    >
-                        Join waitlist <span aria-hidden="true" className="ml-1">→</span>
-                    </button>
-                </div>
+                {/* Waitlist Inline Input */}
+                {submitted ? (
+                    <div className="flex items-center gap-2 mt-8 px-6 py-3 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        <span className="text-sm font-medium text-emerald-300">You're on the list! We'll be in touch.</span>
+                    </div>
+                ) : (
+                    <form onSubmit={handleInlineSubmit} className="flex flex-col sm:flex-row items-center w-full max-w-md mx-auto mt-8 bg-[#121214] border border-white/10 rounded-full p-1 sm:pl-6 focus-within:border-[#FF5A1F]/50 transition-colors">
+                        <input 
+                            type="email" 
+                            placeholder="you@brand.com"
+                            value={heroEmail}
+                            onChange={(e) => setHeroEmail(e.target.value)}
+                            className="bg-transparent border-none text-white text-sm outline-none w-full flex-1 px-4 sm:px-0 py-3 sm:py-0 placeholder:text-[#a1a1aa]"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={submitting}
+                            className="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-sm text-white transition-all hover:scale-105 active:scale-95 bg-[#FF5A1F] disabled:opacity-60"
+                        >
+                            {submitting ? 'Joining…' : <>Join waitlist <span aria-hidden="true" className="ml-1">→</span></>}
+                        </button>
+                    </form>
+                )}
+                {error && (
+                    <p className="text-xs mt-2 text-red-400">{error}</p>
+                )}
             </div>
         </section>
     );

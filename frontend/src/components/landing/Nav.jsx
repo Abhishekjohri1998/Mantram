@@ -57,12 +57,13 @@ export default function Nav({ onEarlyAccess, onAgencyDemo, isAuthenticated }) {
                         </Link>
                     ) : (
                         <>
-                            <button
+                            <Link
+                                to="/login"
                                 className="hidden sm:inline-flex text-[13px] font-medium transition-colors hover:text-white cursor-pointer"
                                 style={{ color: '#a1a1aa' }}
                             >
                                 Sign in
-                            </button>
+                            </Link>
                             <button
                                 onClick={onEarlyAccess}
                                 className="hidden sm:inline-flex text-[13px] font-medium py-2 px-4 rounded-full transition-all hover:bg-white/5 cursor-pointer"
