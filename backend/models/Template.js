@@ -142,6 +142,24 @@ const templateSchema = new mongoose.Schema({
     savedVideoSettings: {
         type: mongoose.Schema.Types.Mixed,
         default: {}  // { duration, format, model, presetId }
+    },
+    // ── System reference image — used by the pipeline as a style/layout anchor ──
+    // Must be an S3/CDN URL (not base64). Used in templateRefImageUrl inpainting path.
+    systemReferenceImage: {
+        type: String,
+        default: ''
+    },
+    // ── defaultSettings — overrides for the generation pipeline ───────────────
+    // Examples: { format: 'instagram-post', aspectRatio: '1:1', model: 'gemini-flash' }
+    defaultSettings: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+    },
+    // ── enableProductAnalysis — opt-out flag for the two-pass product analyzer ─
+    // Set to false to skip Stage 4 product intelligence (e.g. for non-product templates)
+    enableProductAnalysis: {
+        type: Boolean,
+        default: true
     }
 }, { timestamps: true });
 

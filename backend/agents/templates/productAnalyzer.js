@@ -1,54 +1,82 @@
 /**
  * productAnalyzer.js — Stage 4: Two-pass AI product intelligence pipeline
  *
+ * Uses raw fetch for the Anthropic API (same pattern as AnthropicProvider in ai/providers/anthropic.js).
+ * Does NOT require the @anthropic-ai/sdk package — only the ANTHROPIC_API_KEY env var.
+ *
  * Pass 1: Classification — determines product category + complexity from image
  * Pass 2: Specification Capture — extracts detailed mechanical/visual specs per taxonomy
  *
- * Uses Claude 3.5 Sonnet (claude-3-5-sonnet-20241022) for both passes.
- *
  * Only runs when:
- *  1. A product image is provided
- *  2. The template has complex_product: true (or category matches auto-detect)
+ *  1. A product image URL is provided
+ *  2. ANTHROPIC_API_KEY is set in env
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { PRODUCT_CATEGORIES } from './productTaxonomy.js';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
 const SUPPORTED_CATEGORIES = Object.keys(PRODUCT_CATEGORIES);
 
 /**
- * Pass 1: Classification
- * Takes image URL/base64, returns { category, complexity, confidence }
+ * Low-level Claude call with vision support.
+ * imageData: full S3/CDN URL (preferred) or data: base64 string.
  */
-async function classifyProduct(imageData) {
-    const isBase64 = imageData.startsWith('data:');
-    const isUrl = imageData.startsWith('http');
+async function callClaudeVision(imageData, userText, maxTokens = 512) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
-    const imageSource = isBase64
-        ? {
-            type: 'base64',
-            media_type: imageData.split(';')[0].replace('data:', ''),
-            data: imageData.split(',')[1],
-          }
-        : {
-            type: 'url',
-            url: imageData,
-          };
+    // Build image source block
+    let imageBlock;
+    if (imageData.startsWith('data:')) {
+        const [meta, b64] = imageData.split(',');
+        const mediaType = meta.replace('data:', '').replace(';base64', '');
+        imageBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } };
+    } else {
+        // HTTP/HTTPS URL — Claude vision supports direct URL references
+        imageBlock = { type: 'image', source: { type: 'url', url: imageData } };
+    }
 
-    const categoryList = SUPPORTED_CATEGORIES.join(', ');
-
-    const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 256,
+    const body = {
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens,
         messages: [{
             role: 'user',
-            content: [
-                { type: 'image', source: imageSource },
-                {
-                    type: 'text',
-                    text: `You are a product classification expert. Analyze this product image and classify it.
+            content: [imageBlock, { type: 'text', text: userText }]
+        }]
+    };
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`Claude API Error [${response.status}]: ${errData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.error) throw new Error(`Claude Error: ${data.error.message}`);
+
+    const rawText = (data.content?.[0]?.text || '').trim();
+    // Strip markdown code fences if present
+    return rawText.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+}
+
+/**
+ * Pass 1: Classification
+ * Returns { category, complexity, confidence, productType }
+ */
+async function classifyProduct(imageData) {
+    const categoryList = SUPPORTED_CATEGORIES.join(', ');
+
+    const prompt = `You are a product classification expert. Analyze this product image and classify it.
 
 Available categories: ${categoryList}
 
@@ -65,63 +93,32 @@ Complexity guidance:
 - medium: products with moderate visual complexity (apparel, food packaging, basic accessories)
 - low: simple products with few critical visual features
 
-Respond with valid JSON only.`
-                }
-            ]
-        }]
-    });
-
-    const rawText = response.content[0].text.trim();
-    // Strip any markdown code fences
-    const jsonText = rawText.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+Respond with valid JSON only.`;
 
     try {
-        return JSON.parse(jsonText);
-    } catch {
-        // Safe fallback if Claude returns non-JSON
+        const text = await callClaudeVision(imageData, prompt, 256);
+        return JSON.parse(text);
+    } catch (err) {
+        console.warn('[productAnalyzer] Pass 1 parse/fetch failed:', err.message);
         return { category: 'general', complexity: 'medium', confidence: 0.5, productType: 'product' };
     }
 }
 
 /**
  * Pass 2: Specification Capture
- * Takes image + category, returns detailed spec object + description paragraph
+ * Returns { specs, description }
  */
 async function captureProductSpecs(imageData, category) {
     const taxonomy = PRODUCT_CATEGORIES[category];
-    if (!taxonomy) {
-        return { description: '', specs: {} };
-    }
+    if (!taxonomy) return { specs: {}, description: '' };
 
-    const isBase64 = imageData.startsWith('data:');
-    const imageSource = isBase64
-        ? {
-            type: 'base64',
-            media_type: imageData.split(';')[0].replace('data:', ''),
-            data: imageData.split(',')[1],
-          }
-        : {
-            type: 'url',
-            url: imageData,
-          };
-
-    // Build the spec schema from taxonomy
     const fieldsDescription = taxonomy.fields
         .map(f => `- "${f.name}": ${f.description}`)
         .join('\n');
 
     const criticalFieldsStr = taxonomy.criticalFields.join(', ');
 
-    const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1024,
-        messages: [{
-            role: 'user',
-            content: [
-                { type: 'image', source: imageSource },
-                {
-                    type: 'text',
-                    text: `You are a professional product photographer and technical writer with meticulous attention to detail.
+    const prompt = `You are a professional product photographer and technical writer with meticulous attention to detail.
 
 This product belongs to the category: ${category}
 
@@ -135,49 +132,34 @@ CRITICAL FIELDS (must be present, never omit): ${criticalFieldsStr}
 Respond ONLY with a valid JSON object mapping field names to their observed values.
 If a field is not visible or not applicable, use null.
 All values should be short descriptive strings.
-No markdown, no explanation, pure JSON only.`
-                }
-            ]
-        }]
-    });
-
-    const rawText = response.content[0].text.trim();
-    const jsonText = rawText.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+No markdown, no explanation, pure JSON only.`;
 
     let specs = {};
     try {
-        specs = JSON.parse(jsonText);
-    } catch {
-        // If parsing fails, return empty specs — prompt will use fallback
-        console.warn('[productAnalyzer] Pass 2 JSON parse failed — using empty specs');
+        const text = await callClaudeVision(imageData, prompt, 1024);
+        specs = JSON.parse(text);
+    } catch (err) {
+        console.warn('[productAnalyzer] Pass 2 parse/fetch failed:', err.message);
     }
 
-    // Validate critical fields — warn if any are null/missing
+    // Warn on missing critical fields
     const missingCritical = taxonomy.criticalFields.filter(f => !specs[f]);
     if (missingCritical.length > 0) {
         console.warn(`[productAnalyzer] Missing critical fields for ${category}: ${missingCritical.join(', ')}`);
     }
 
-    // Generate description from taxonomy template
     const description = taxonomy.descriptionTemplate(specs);
-
     return { specs, description };
 }
 
 /**
- * Main export: analyzeProduct
+ * analyzeProduct — Main export
  *
- * Runs both passes and returns a complete productIntelligence object.
- * Call this before buildTemplatePrompt when a product image is present.
+ * Runs Pass 1 (classify) then Pass 2 (spec capture) if category is supported.
+ * Non-fatal: all errors return null, generation continues without intelligence.
  *
- * Returns:
- *  - category         : string — PRODUCT_CATEGORIES key or 'general'
- *  - complexity       : 'low' | 'medium' | 'high'
- *  - confidence       : 0.0-1.0
- *  - productType      : string — short label
- *  - specs            : object — all extracted fields
- *  - description      : string — dense description paragraph for injection
- *  - isComplex        : boolean — shorthand for complexity === 'high'
+ * @param {string} imageData - S3 URL or data: base64 string of the product image
+ * @returns {{ category, complexity, confidence, productType, specs, description, isComplex } | null}
  */
 export async function analyzeProduct(imageData) {
     if (!imageData) return null;
@@ -189,9 +171,10 @@ export async function analyzeProduct(imageData) {
     try {
         // Pass 1: Classify
         const classification = await classifyProduct(imageData);
+        const category = classification.category;
 
-        // Only run Pass 2 for supported categories (skip 'general')
-        if (classification.category === 'general' || !SUPPORTED_CATEGORIES.includes(classification.category)) {
+        // Only run Pass 2 for known taxonomy categories
+        if (category === 'general' || !SUPPORTED_CATEGORIES.includes(category)) {
             return {
                 ...classification,
                 specs: {},
@@ -201,7 +184,7 @@ export async function analyzeProduct(imageData) {
         }
 
         // Pass 2: Spec capture
-        const { specs, description } = await captureProductSpecs(imageData, classification.category);
+        const { specs, description } = await captureProductSpecs(imageData, category);
 
         return {
             ...classification,
@@ -209,10 +192,8 @@ export async function analyzeProduct(imageData) {
             description,
             isComplex: classification.complexity === 'high',
         };
-
     } catch (err) {
-        console.error('[productAnalyzer] Analysis failed:', err.message);
-        // Non-fatal — generation continues without intelligence
-        return null;
+        console.error('[productAnalyzer] Analysis failed (non-fatal):', err.message);
+        return null; // Generation continues without intelligence
     }
 }

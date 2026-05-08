@@ -1067,11 +1067,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             psAbortRef.current?.abort()
             campAbortRef.current?.abort()
             activeBrandIdRef.current = activeBrand?._id
-            if (activeGenerations.length > 0 || enhancing || templateGenerating) {
-                setActiveGenerations([]); setEnhancing(false); setTemplateGenerating(false)
+            if (activeGenerations.length > 0 || enhancing) {
+                setActiveGenerations([]); setEnhancing(false)
             }
         }
-    }, [activeBrand?._id, activeGenerations.length, enhancing, templateGenerating])
+    }, [activeBrand?._id, activeGenerations.length, enhancing])
     useEffect(() => {
         if (autoGenerate && activeBrand && prompt.trim() && activeGenerations.length === 0) {
             setAutoGenerate(false)
@@ -9247,9 +9247,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {selectedApiTemplate && (
                 <TemplateGenerationModal
                     template={selectedApiTemplate}
-                    activeBrand={activeBrand}
                     onClose={() => setSelectedApiTemplate(null)}
-                    onGenerationComplete={() => setSelectedApiTemplate(null)}
                 />
             )}
         </DashboardLayout>

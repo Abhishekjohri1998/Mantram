@@ -212,14 +212,19 @@ router.post('/:id/use', protect, async (req, res) => {
         });
 
         // 2. Determine cost & deduct credits
-        let cost = 0;
-        let deductCategory = 'template';
-        if (template.studioOrigin === 'creative') { cost = 4; deductCategory = 'creative'; }
-        else if (template.studioOrigin === 'video') { cost = 8; deductCategory = 'videoGenerate'; }
-        else if (template.studioOrigin === 'content') { cost = 2; deductCategory = 'content'; }
+        let deductCategory = null;
+        if (template.studioOrigin === 'creative') deductCategory = 'creative';
+        else if (template.studioOrigin === 'video') deductCategory = 'videoGenerate';
+        else if (template.studioOrigin === 'content') deductCategory = 'content';
 
-        if (cost > 0) {
-            await deductCredits(req.user._id, cost, deductCategory);
+        // Resolve actual credit cost for GenerationJob tracking
+        const { getCreditCosts } = await import('../middleware/credits.js');
+        const creditCosts = await getCreditCosts();
+        const cost = deductCategory ? (creditCosts[deductCategory] || 0) : 0;
+
+        if (deductCategory) {
+            // Use action string so deductCredits logs studio + brand correctly
+            await deductCredits(req.user._id, deductCategory, 1, brandId);
         }
 
         // 3. Increment usageCount; increment usedByCount only first time per user
