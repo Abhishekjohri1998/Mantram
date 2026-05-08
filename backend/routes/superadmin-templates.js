@@ -481,7 +481,7 @@ router.put('/:id', protect, superadmin, async (req, res) => {
         // Step 6: allow studioSection, isPublished, promptTemplate, generationModel updates
         const ALLOWED_UPDATES = [
             'name', 'description', 'tags', 'categoryId', 'studioOrigin', 'studioSection',
-            'isActive', 'isPublished', 'isFeatured',
+            'isActive', 'isPublished', 'isFeatured', 'showOnHomeScreen',
             'previewUrl', 'previewImageUrl', 'previewType', 'previewVideoUrl',
             'promptTemplate', 'generationModel', 'generationParams',
             'sortOrder',

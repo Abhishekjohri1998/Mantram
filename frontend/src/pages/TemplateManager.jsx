@@ -484,6 +484,7 @@ const TemplateManager = () => {
                 uploadFd.append('studioOrigin', selectedStudio);
                 uploadFd.append('studioSection', selectedSection);
                 uploadFd.append('isFeatured', fd.get('isFeatured') === 'on');
+                uploadFd.append('showOnHomeScreen', fd.get('showOnHomeScreen') === 'on');
                 uploadFd.append('isActive', fd.get('isActive') === 'on');
                 uploadFd.append('isPublished', fd.get('isPublished') === 'on');
 
@@ -508,6 +509,7 @@ const TemplateManager = () => {
                     description: fd.get('description'),
                     tags: tags,
                     isFeatured: fd.get('isFeatured') === 'on',
+                    showOnHomeScreen: fd.get('showOnHomeScreen') === 'on',
                     isActive: fd.get('isActive') === 'on',
                     isPublished: fd.get('isPublished') === 'on'
                 };
@@ -664,6 +666,7 @@ const TemplateManager = () => {
                                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Name</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Category</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Section</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#10B981' }}>Homescreen</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Active</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'left', color: '#E84118' }}>Published</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usage</th>
@@ -729,6 +732,8 @@ const TemplateManager = () => {
                                         <td style={{ padding: '12px 16px', fontWeight: 600 }}>{t.name}</td>
                                         <td style={{ padding: '12px 16px' }}><span style={{ background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{catName}</span></td>
                                         <td style={{ padding: '12px 16px' }}><code style={{ background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{t.studioSection || 'general'}</code></td>
+                                        {/* Homescreen toggle (green) */}
+                                        <td style={{ padding: '12px 16px' }}><button onClick={() => toggleField(t, 'showOnHomeScreen')} style={toggleBtnStyle(t.showOnHomeScreen, '#10B981')}>{t.showOnHomeScreen ? 'Shown' : 'Hidden'}</button></td>
                                         {/* Active toggle (green) */}
                                         <td style={{ padding: '12px 16px' }}><button onClick={() => toggleField(t, 'isActive')} style={toggleBtnStyle(t.isActive)}>{t.isActive ? 'Active' : 'Inactive'}</button></td>
                                         {/* Publish toggle (orange — FIX 7) */}
@@ -844,6 +849,7 @@ const TemplateManager = () => {
                             </label>
                             <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginTop: 4 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isFeatured" defaultChecked={modal.data?.isFeatured ?? false} /> Featured</label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="showOnHomeScreen" defaultChecked={modal.data?.showOnHomeScreen ?? false} /> Show on Homescreen</label>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isActive" defaultChecked={modal.data?.isActive ?? true} /> Active</label>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}><input type="checkbox" name="isPublished" defaultChecked={modal.data?.isPublished ?? false} /> Published</label>
                             </div>
