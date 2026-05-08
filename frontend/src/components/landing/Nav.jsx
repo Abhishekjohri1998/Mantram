@@ -43,7 +43,7 @@ export default function Nav({ onAgencyDemo, isAuthenticated }) {
                     <button onClick={() => scrollTo('how-it-works')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">How it works</button>
                     <button onClick={() => scrollTo('case-studies')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Case Studies</button>
                     <button onClick={() => scrollTo('pricing')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">Pricing</button>
-                    <button onClick={onAgencyDemo} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">For Agencies</button>
+                    <button onClick={() => scrollTo('agencies')} className="text-[#a1a1aa] hover:text-white transition-colors cursor-pointer">For Agencies</button>
                 </div>
 
                 <div className="flex items-center gap-4">

@@ -56,20 +56,20 @@ export default function Landing() {
                 <main role="main" className="relative z-[2]">
                     <Hero />
                     <FeaturedVideos />
-                    <ActionDemo />
+                    <div id="templates"><ActionDemo /></div>
                     <TrustLogos />
                     <IntelligenceLayer />
                     <Metrics />
                     <Comparison />
-                    <StudiosShowcase />
+                    <div id="studios"><StudiosShowcase /></div>
                     <Integrations />
                     <FeaturedStudios />
-                    <HowItWorks />
-                    <CaseStudies />
+                    <div id="how-it-works"><HowItWorks /></div>
+                    <div id="case-studies"><CaseStudies /></div>
                     <Testimonial />
-                    <Pricing />
+                    <div id="pricing"><Pricing /></div>
                     <FAQ />
-                    <FinalCTA />
+                    <div id="agencies"><FinalCTA /></div>
                 </main>
 
                 <Footer />
