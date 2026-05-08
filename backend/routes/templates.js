@@ -389,4 +389,42 @@ router.post('/:id/use', protect, async (req, res) => {
     }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// GET /api/templates/my-brand — brand-scoped user-created DNA templates
+// Returns templates created by this user for this brand
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/my-brand', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        if (!brandId) return res.status(400).json({ success: false, error: 'brandId is required' });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/templates/analyze-and-create — Gemini DNA extraction pipeline
+// Accepts: referenceImageUrl (S3), brandId, name, aspectRatio
+// Returns: { success, template } with full DNA object
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/analyze-and-create', protect, async (req, res) => {
+    const start = Date.now();
+    try {
+        const {
+            referenceImageUrl,
+            brandId,
+            name,
+            aspectRatio = '1:1',
+        } = req.body;
+
+        if (!referenceImageUrl) return res.status(400).json({ success: false, error: 'referenceImageUrl is required' });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DELETE /api/templates/:id — Soft-delete a user-created template
+// Only the creator can delete their own templates
+// ══════════════════════════════════════════════════════════════════════════════
+router.delete('/:id', protect, async (req, res) => {
+    try {
+        const template = await Template.findOne({
+            _id: req.params.id,
+            userCreated: true,
+            createdBy: req.user._id,
+        });
+
 export default router;
