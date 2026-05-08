@@ -11,6 +11,7 @@ import Metrics from '../components/landing/Metrics'
 import Comparison from '../components/landing/Comparison'
 import StudiosShowcase from '../components/landing/StudiosShowcase'
 import Integrations from '../components/landing/Integrations'
+import FeaturedStudios from '../components/landing/FeaturedStudios'
 import HowItWorks from '../components/landing/HowItWorks'
 import CaseStudies from '../components/landing/CaseStudies'
 import Testimonial from '../components/landing/Testimonial'
@@ -62,6 +63,7 @@ export default function Landing() {
                     <Comparison />
                     <StudiosShowcase />
                     <Integrations />
+                    <FeaturedStudios />
                     <HowItWorks />
                     <CaseStudies />
                     <Testimonial />
