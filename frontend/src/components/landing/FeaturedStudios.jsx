@@ -12,7 +12,8 @@ const SHOWCASES = [
         features: ['Brand book parser', 'Approval workflows', 'Multi-format export', 'Version history'],
         placeholderText: 'CREATIVE STUDIO · BRAND ASSET PREVIEW',
         placeholderColor: '#1e3a8a', // Dark blue
-        reverse: false
+        reverse: false,
+        image: '/screenshots/creative-studio.png'
     },
     {
         id: 'video',
@@ -22,7 +23,8 @@ const SHOWCASES = [
         features: ['16:9, 9:16, 1:1', 'Voice-over library', 'Auto-localization', 'Stock + custom'],
         placeholderText: 'VIDEO STUDIO · 6S SPOT TIMELINE',
         placeholderColor: '#7c2d12', // Dark orange/brown
-        reverse: true
+        reverse: true,
+        image: '/screenshots/video-studio.png'
     },
     {
         id: 'pulse',
@@ -32,7 +34,8 @@ const SHOWCASES = [
         features: ['Live dashboards', 'Creative scoring', 'Anomaly alerts', 'Slack + Teams'],
         placeholderText: 'PULSE STUDIO · LIVE SIGNAL FEED',
         placeholderColor: '#064e3b', // Dark green
-        reverse: false
+        reverse: false,
+        image: '/screenshots/dashboard.png'
     }
 ];
 
@@ -97,26 +100,40 @@ function ShowcaseRow({ showcase, index }) {
 
             {/* Visual Side */}
             <div className="flex-1 w-full">
-                {/* Diagonal stripes background pattern implementation inside the container */}
+                {/* Container */}
                 <div 
                     className="w-full aspect-[4/3] rounded-3xl relative overflow-hidden flex items-center justify-center shadow-2xl transition-transform duration-700 hover:scale-[1.02]"
                     style={{ backgroundColor: showcase.placeholderColor }}
                 >
-                    {/* Diagonal striped overlay for that technical blueprint feel */}
-                    <motion.div 
-                        className="absolute -top-[50%] -bottom-[50%] -left-[50%] -right-[50%] opacity-10 mix-blend-overlay"
-                        style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)',
-                            y: yParallax
-                        }}
-                    />
-                    
-                    {/* Inner glowing element */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
-                    
-                    <span className="relative z-10 text-[10px] font-bold text-white/50 tracking-[0.2em] uppercase">
-                        {showcase.placeholderText}
-                    </span>
+                    {showcase.image ? (
+                        <>
+                            <img 
+                                src={showcase.image} 
+                                alt={showcase.eyebrow} 
+                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-105" 
+                            />
+                            {/* Inner border/shadow to blend the image into the card nicely */}
+                            <div className="absolute inset-0 border border-white/10 rounded-3xl pointer-events-none mix-blend-overlay" />
+                        </>
+                    ) : (
+                        <>
+                            {/* Diagonal striped overlay for that technical blueprint feel */}
+                            <motion.div 
+                                className="absolute -top-[50%] -bottom-[50%] -left-[50%] -right-[50%] opacity-10 mix-blend-overlay"
+                                style={{
+                                    backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)',
+                                    y: yParallax
+                                }}
+                            />
+                            
+                            {/* Inner glowing element */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
+                            
+                            <span className="relative z-10 text-[10px] font-bold text-white/50 tracking-[0.2em] uppercase">
+                                {showcase.placeholderText}
+                            </span>
+                        </>
+                    )}
                 </div>
             </div>
             
