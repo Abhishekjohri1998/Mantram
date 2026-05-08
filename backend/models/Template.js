@@ -10,7 +10,7 @@ const templateSchema = new mongoose.Schema({
     categoryId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'TemplateCategory',
-        required: true
+        default: null,
     },
     studioOrigin: {
         type: String,
@@ -143,6 +143,39 @@ const templateSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.Mixed,
         default: {}  // { duration, format, model, presetId }
     },
+    // ── Brand-scoped user-created templates ────────────────────────────────────
+    brandId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Brand',
+        default: null,
+    },
+    // ── userCreated flag — distinguishes user templates from admin-published ────
+    userCreated: {
+        type: Boolean,
+        default: false,
+    },
+    // ── Design DNA — AI-extracted visual blueprint of the reference image ──────
+    // Written once at template creation time, never changes (like savedPrompt)
+    dna: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
+        // Shape: {
+        //   layout: String,                // e.g. "split-left-right", "centered-hero"
+        //   colorPalette: [String],        // hex codes extracted from image
+        //   contentZones: [{               // each zone the AI detected
+        //     role: String,               // "headline", "product", "offer", "cta", "logo"
+        //     position: String,           // "top-left", "center", "bottom-right"
+        //     style: String,              // "bold 72px white uppercase"
+        //   }],
+        //   mood: String,                  // "festive bold", "minimal luxury"
+        //   typography: {
+        //     headingStyle: String,
+        //     bodyStyle: String,
+        //   },
+        //   promptFormula: String,         // full reusable formula with {{PLACEHOLDERS}}
+        //   fitInstruction: String,        // how to map product onto zones
+        // }
+    },
     // ── System reference image — used by the pipeline as a style/layout anchor ──
     // Must be an S3/CDN URL (not base64). Used in templateRefImageUrl inpainting path.
     systemReferenceImage: {
@@ -191,5 +224,8 @@ templateSchema.index({ usageCount: -1 });
 
 // ── Compound index for section-scoped template queries (Step 9) ───────────────
 templateSchema.index({ studioSection: 1, isPublished: 1, isActive: 1 });
+
+// ── Compound index for brand-scoped user-created template queries ─────────────
+templateSchema.index({ brandId: 1, userCreated: 1, isActive: 1, createdAt: -1 });
 
 export default mongoose.model('Template', templateSchema);

@@ -3,7 +3,10 @@ import SEOHead from '../components/SEOHead'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
-import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, monthlyStrategy as monthlyStrategyAPI, API_BASE } from '../services/api'
+import { creatives as creativesAPI, agents as agentsAPI, products as productsAPI, brands as brandsAPI, media as mediaAPI, trends as trendsAPI, nexus as nexusAPI, videoStudio as videoStudioAPI, canvasAssets, monthlyStrategy as monthlyStrategyAPI, templates as templatesAPI, API_BASE } from '../services/api'
+import TemplateDNACard from '../components/TemplateDNACard'
+import TemplateFitPanel from '../components/TemplateFitPanel'
+import TemplateCreateFlow from '../components/TemplateCreateFlow'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
 import VoiceInput from '../components/VoiceInput'
@@ -1117,6 +1120,12 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [creatingCategory, setCreatingCategory] = useState(false)
     const [newCat, setNewCat] = useState({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
 
+    // ── DNA Template Intelligence state ──
+    const [dnaTemplates, setDnaTemplates] = useState([])          // brand-scoped user-created templates
+    const [dnaTemplatesLoading, setDnaTemplatesLoading] = useState(false)
+    const [fitPanelTemplate, setFitPanelTemplate] = useState(null) // template currently open in FitPanel
+    const [showCreateFlow, setShowCreateFlow] = useState(false)    // TemplateCreateFlow modal open
+
     // ── Other UI/Ref State ──
     const [designBaseImage, setDesignBaseImage] = useState(null)
     const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
@@ -1359,7 +1368,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }, [activeBrand?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
+        if (studioMode === 'templates' && activeBrand?._id) {
+            loadCustomTemplates()
+            loadDnaTemplates()
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [studioMode, activeBrand?._id])
 
@@ -2504,6 +2516,28 @@ Return ONLY the prompt formula text, no explanation. Start directly with "Create
 
 
     // ── Load custom templates for the active brand ──
+    async function loadDnaTemplates() {
+        if (!activeBrand?._id) return
+        setDnaTemplatesLoading(true)
+        try {
+            const data = await templatesAPI.myBrand(activeBrand._id)
+            if (data.success) setDnaTemplates(data.templates || [])
+        } catch (e) {
+            console.warn('[CreativeStudio] DNA templates load failed:', e.message)
+        } finally {
+            setDnaTemplatesLoading(false)
+        }
+    }
+
+    async function handleDeleteDnaTemplate(templateId) {
+        try {
+            await templatesAPI.delete(templateId)
+            setDnaTemplates(prev => prev.filter(t => t._id !== templateId))
+        } catch (e) {
+            console.error('[CreativeStudio] Delete DNA template failed:', e.message)
+        }
+    }
+
     async function loadCustomTemplates() {
 
         if (!activeBrand?._id) return
@@ -7356,7 +7390,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 <span className="material-symbols-outlined text-2xl">dashboard_customize</span>
                                 Brand Templates
                             </h3>
-                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">Pick a template, fill in your details, and generate on-brand designs instantly</p>
+                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">Upload a reference creative — AI writes the design formula and reuses it for future images</p>
                         </div>
                         {activeTemplate && (
                             <button onClick={() => { setActiveTemplate(null); setTemplateFields({}); setTemplateResult(null); setTemplatePromptPreview(''); setTemplateRefImage(null) }}
@@ -7366,6 +7400,151 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                             </button>
                         )}
                     </div>
+
+                    {/* ══════════ DNA TEMPLATE LIBRARY (new) ══════════ */}
+                    {activeBrand && (
+                        <div className="mb-8">
+                            {/* Section header */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ff7a3d' }}>auto_awesome</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>My AI Templates</span>
+                                    {dnaTemplates.length > 0 && (
+                                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, background: 'rgba(255,77,0,0.15)', color: '#ff7a3d', border: '1px solid rgba(255,77,0,0.25)', fontWeight: 700 }}>
+                                            {dnaTemplates.length}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setShowCreateFlow(true)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 6,
+                                        padding: '9px 16px', borderRadius: 100,
+                                        background: 'linear-gradient(135deg, #ff4d00, #ff6a2b)',
+                                        color: '#fff', border: 'none', fontSize: 13, fontWeight: 700,
+                                        cursor: 'pointer', boxShadow: '0 4px 16px rgba(255,77,0,0.35)',
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_photo_alternate</span>
+                                    Upload Template
+                                </button>
+                            </div>
+
+                            {/* Loading */}
+                            {dnaTemplatesLoading && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                                    <span className="material-symbols-outlined" style={{ animation: 'spin 0.8s linear infinite' }}>progress_activity</span>
+                                    Loading your templates...
+                                </div>
+                            )}
+
+                            {/* Empty state */}
+                            {!dnaTemplatesLoading && dnaTemplates.length === 0 && (
+                                <div
+                                    onClick={() => setShowCreateFlow(true)}
+                                    style={{
+                                        border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 18,
+                                        padding: '40px 24px', display: 'flex', flexDirection: 'column',
+                                        alignItems: 'center', gap: 12, cursor: 'pointer',
+                                        background: 'rgba(255,77,0,0.02)',
+                                        transition: 'border-color 0.2s, background 0.2s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,77,0,0.3)'; e.currentTarget.style.background = 'rgba(255,77,0,0.05)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,77,0,0.02)'; }}
+                                >
+                                    <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#ff7a3d' }}>add_photo_alternate</span>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>No templates yet</div>
+                                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', maxWidth: 280, lineHeight: 1.5 }}>
+                                            Upload any marketing image — AI will study it and create a reusable design formula instantly
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 100, background: 'rgba(255,77,0,0.15)', border: '1px solid rgba(255,77,0,0.25)', color: '#ff7a3d', fontSize: 13, fontWeight: 700 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>
+                                        Create Your First Template
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* DNA card grid */}
+                            {!dnaTemplatesLoading && dnaTemplates.length > 0 && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
+                                    {dnaTemplates.map(tmpl => (
+                                        <TemplateDNACard
+                                            key={tmpl._id}
+                                            template={tmpl}
+                                            onUse={t => setFitPanelTemplate(t)}
+                                            onDelete={handleDeleteDnaTemplate}
+                                        />
+                                    ))}
+                                    {/* Add more card */}
+                                    <div
+                                        onClick={() => setShowCreateFlow(true)}
+                                        style={{
+                                            border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 14,
+                                            display: 'flex', flexDirection: 'column',
+                                            alignItems: 'center', justifyContent: 'center',
+                                            gap: 8, minHeight: 180, cursor: 'pointer',
+                                            transition: 'border-color 0.2s, background 0.2s',
+                                        }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,77,0,0.35)'; e.currentTarget.style.background = 'rgba(255,77,0,0.04)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'rgba(255,255,255,0.2)' }}>add</span>
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>New Template</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Divider before legacy section */}
+                            {dnaTemplates.length > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0 20px', opacity: 0.4 }}>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Classic Templates</span>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ═══ FIT PANEL ═══ */}
+                    {fitPanelTemplate && (
+                        <TemplateFitPanel
+                            template={fitPanelTemplate}
+                            brandId={activeBrand?._id}
+                            onClose={() => setFitPanelTemplate(null)}
+                            onSuccess={(url, tmpl) => {
+                                // Push to generation gallery so the image appears immediately
+                                if (url) {
+                                    setGenerationHistory(prev => [{
+                                        imageUrl: url,
+                                        _prompt: `Template: ${tmpl?.name || 'AI Template'}`,
+                                        title: `Template: ${tmpl?.name || 'AI Template'}`,
+                                        _timestamp: Date.now(),
+                                        createdAt: new Date().toISOString(),
+                                    }, ...prev])
+                                }
+                                // Close panel after a short delay so user can see the result in panel first
+                                setTimeout(() => setFitPanelTemplate(null), 2500)
+                            }}
+                        />
+                    )}
+
+                    {/* ═══ CREATE FLOW ═══ */}
+                    {showCreateFlow && (
+                        <TemplateCreateFlow
+                            brandId={activeBrand?._id}
+                            onCreated={(newTemplate) => {
+                                setDnaTemplates(prev => [newTemplate, ...prev])
+                                setShowCreateFlow(false)
+                                // Auto-open FitPanel for the newly created template
+                                if (newTemplate) setFitPanelTemplate(newTemplate)
+                            }}
+                            onClose={() => setShowCreateFlow(false)}
+                        />
+                    )}
 
                     {!activeBrand ? (
                         <div className="studio-card p-12 text-center fade-up-1">
