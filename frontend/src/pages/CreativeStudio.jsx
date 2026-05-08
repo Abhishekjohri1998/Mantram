@@ -1645,13 +1645,71 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                 templates.get(templateId).then(res => {
                     const tpl = res.template;
                     if (tpl) {
-                        const tplPrompt = tpl.promptTemplate || tpl.savedPrompt || '';
+                        const rawPrompt = tpl.promptTemplate || tpl.savedPrompt || '';
                         const assets = tpl.templateAssets || [];
                         const prodImg = assets.find(a => a.role === 'product')?.url || tpl.savedProductImageUrls?.[0] || '';
                         const avatarImg = assets.find(a => a.role === 'avatar')?.url || tpl.savedAvatarUrl || '';
                         const templateImg = assets.find(a => a.role === 'template')?.url || '';
                         const refImg = assets.find(a => a.role === 'reference')?.url || '';
                         const bgImg = assets.find(a => a.role === 'background')?.url || '';
+
+                        // ── FIX 1: Resolve systemReferenceImage → designBaseImage ──
+                        // This is the primary visual anchor that enables template inpainting.
+                        // Without it, the backend has zero design reference and generates generic images.
+                        const sysRefImage = tpl.systemReferenceImage || '';
+                        if (sysRefImage && sysRefImage.startsWith('http')) {
+                            setDesignBaseImage(sysRefImage);
+                        } else if (bgImg) {
+                            // Fallback: background asset from templateAssets
+                            setDesignBaseImage(bgImg);
+                        } else if (!sysRefImage && (tpl.previewUrl || tpl.previewImageUrl) && tpl.previewType === 'image') {
+                            // Last resort: use the preview image as design reference
+                            // so every template can produce style-matched output
+                            const previewFallback = tpl.previewImageUrl || tpl.previewUrl;
+                            if (previewFallback && previewFallback.startsWith('http')) {
+                                setDesignBaseImage(previewFallback);
+                            }
+                        }
+
+                        // ── FIX 2: Apply template's generation model & default settings ──
+                        // Ensures the same model/format/aspect ratio that created the preview
+                        // is used when the user generates from this template.
+                        if (tpl.generationModel) {
+                            setImageModel(tpl.generationModel);
+                        }
+                        if (tpl.defaultSettings) {
+                            if (tpl.defaultSettings.format) {
+                                setSelectedType(tpl.defaultSettings.format);
+                            }
+                            if (tpl.defaultSettings.aspectRatio) {
+                                setAspectRatio(tpl.defaultSettings.aspectRatio);
+                            }
+                        }
+
+                        // ── FIX 3: Resolve promptTemplate placeholders client-side ──
+                        // promptTemplate may contain {brand_name}, {product_description} etc.
+                        // Without resolution, the AI receives literal placeholder text.
+                        let resolvedPrompt = rawPrompt;
+                        if (activeBrand && rawPrompt.includes('{')) {
+                            const subs = {
+                                '{brand_name}': activeBrand.name || '',
+                                '{brand_tagline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                                '{brand_color}': activeBrand.dna?.colors?.[0]?.hex || activeBrand.dna?.colors?.[0]?.name || '',
+                                '{brand_personality}': activeBrand.dna?.personality || '',
+                                '{brand_industry}': activeBrand.dna?.industry || '',
+                                '{product_name}': activeBrand.name || '',
+                                '{tagline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                                '{headline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                                '{user_brief}': '',
+                                '{packaging_description}': '',
+                                '{product_description}': '',
+                            };
+                            for (const [placeholder, value] of Object.entries(subs)) {
+                                resolvedPrompt = resolvedPrompt.replaceAll(placeholder, value);
+                            }
+                            // Clean up any remaining unresolved placeholders to avoid AI confusion
+                            resolvedPrompt = resolvedPrompt.replace(/\{[a-z_]+\}/g, '').replace(/\s{2,}/g, ' ').trim();
+                        }
 
                         // ── Always set shared asset state ──
                         if (prodImg) {
@@ -1672,38 +1730,30 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                         const effectiveMode = mode || 'create';
 
                         if (effectiveMode === 'carousel') {
-                            // Carousel uses carouselPrompt
-                            setCarouselPrompt(tplPrompt);
+                            setCarouselPrompt(resolvedPrompt);
                         } else if (effectiveMode === 'campaigns') {
-                            // Campaigns uses campKeyword + campName
-                            setCampKeyword(tplPrompt);
+                            setCampKeyword(resolvedPrompt);
                             setCampName(tpl.name || '');
                         } else if (effectiveMode === 'campaignshot') {
-                            // Campaign Shot uses csBrief for the scene prompt
-                            setCsBrief(tplPrompt);
+                            setCsBrief(resolvedPrompt);
                             if (csMoodPreset !== 'custom') setCsMoodPreset('custom');
                             if (refImg) setCsRefImage(refImg);
                         } else if (effectiveMode === 'campaignlogo') {
-                            // Campaign Logo uses clgText
-                            setClgText(tplPrompt);
+                            setClgText(resolvedPrompt);
                         } else if (effectiveMode === 'photoshoot') {
-                            // Photoshoot uses photoshootBrief
-                            setPhotoshootBrief(tplPrompt);
+                            setPhotoshootBrief(resolvedPrompt);
                         } else {
-                            // AI Create and all other modes use prompt
-                            setPrompt(tplPrompt);
+                            setPrompt(resolvedPrompt);
                         }
 
                         // Set style/design reference if available
                         if (refImg && effectiveMode !== 'campaignshot') {
                             setCsRefImage(refImg);
                         }
-                        if (bgImg) {
-                            setDesignBaseImage(bgImg);
-                        }
 
                         // Close quick-start panel if open
                         setShowQuickStart(false);
+                        console.log(`[Template Hydration] "${tpl.name}" loaded — model: ${tpl.generationModel || 'default'}, designRef: ${sysRefImage ? 'systemRef' : bgImg ? 'bgAsset' : tpl.previewType === 'image' ? 'previewFallback' : 'none'}, prompt: ${resolvedPrompt.substring(0, 80)}...`);
                     }
                 }).catch(err => console.error("[CreativeStudio] Failed to load template", err));
             }).catch(() => {});
