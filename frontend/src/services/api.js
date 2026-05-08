@@ -225,6 +225,29 @@ export const templates = {
     },
     get: (id) => apiFetch(`/templates/${id}`),
     use: (id, data) => apiFetch(`/templates/${id}/use`, { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    // ── DNA Template Intelligence ──────────────────────────────────────────────
+    // Returns all user-created templates scoped to a brand (for the template grid)
+    myBrand: (brandId) => apiFetch(`/templates/my-brand?brandId=${brandId}`),
+    // Runs Gemini 2-pass vision DNA extraction on a reference image, creates Template doc
+    analyzeAndCreate: (data) => apiFetch('/templates/analyze-and-create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        timeout: 90000,  // DNA extraction can take 30-45s
+    }),
+    // Soft-delete a user-created template (sets isActive=false)
+    delete: (id) => apiFetch(`/templates/${id}`, { method: 'DELETE' }),
+    // Upload a reference image for template creation — returns S3 URL
+    uploadReferenceImage: (file) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'template-references');
+        return fetch(`${API_BASE}/media/upload`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        }).then(r => r.json());
+    },
 };
 
 // ============ Creatives API ============

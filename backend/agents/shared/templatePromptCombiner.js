@@ -8,6 +8,9 @@
  * Stage 4 update: accepts productDescription and productClassification from the
  * two-pass product analyzer, injects them as substitution values and directives.
  *
+ * DNA Fit Engine: when useDnaFormula=true (user-created templates), uses
+ * template.dna.promptFormula as the base and expands {{UPPERCASE}} placeholders.
+ *
  * Returns:
  *  - finalPrompt           : string — merged template + user prompt
  *  - visionInputs          : array  — structured [{ role, format, data }]
@@ -24,6 +27,7 @@ const COMPLEX_CATEGORIES = ['wireless_audio', 'computing', 'wearable_tech', 'mob
 export async function buildTemplatePrompt({
     template,
     userPrompt,
+    brief = '',
     // S3 URL params (preferred)
     productImageUrl,
     avatarImageUrl,
@@ -32,13 +36,15 @@ export async function buildTemplatePrompt({
     // Stage 4: product intelligence from the two-pass analyzer
     productDescription = '',
     productClassification = null,
+    // DNA Fit Engine: use dna.promptFormula as base for user-created templates
+    useDnaFormula = false,
     // Legacy base64 params (kept for backward compat)
     userProductImageBase64,
     userAvatarImageBase64,
 }) {
     if (!template) throw new Error('Template is required to build prompt');
 
-    // ── 1. Load brand data for placeholder substitution ──
+    // ── 1. Load brand data for placeholder substitution ──────────────────────
     let brandData = {};
     if (brandId) {
         try {
@@ -48,6 +54,7 @@ export async function buildTemplatePrompt({
                     brand_name: brand.name || '',
                     brand_tagline: brand.tagline || brand.dna?.tagline || '',
                     brand_color_primary: brand.dna?.colors?.[0]?.hex || brand.dna?.colors?.[0]?.name || '',
+                    brand_colors: brand.dna?.colors?.map(c => c.hex).filter(Boolean).join(', ') || '',
                     brand_personality: brand.dna?.personality || '',
                     brand_industry: brand.dna?.industry || '',
                 };
@@ -57,49 +64,77 @@ export async function buildTemplatePrompt({
         }
     }
 
-    // ── 2. Build base prompt — use promptTemplate (placeholder-enabled) if present ──
-    // promptTemplate contains {brand_name}, {packaging_description} etc.
-    // savedPrompt is the locked immutable fallback.
-    let basePrompt = template.promptTemplate || template.savedPrompt || '';
+    // ── 2. Resolve user intent (brief + userPrompt merged) ───────────────────
+    const userIntent = (brief || userPrompt || '').trim();
 
-    // ── 3. Build substitution map (Stage 3 core fix) ──
+    // ── 3. Choose base prompt ─────────────────────────────────────────────────
+    // For user-created templates with DNA: use dna.promptFormula (canonical)
+    // For admin templates: use promptTemplate → savedPrompt (locked formula)
+    let basePrompt;
+    if (useDnaFormula && template.dna && template.dna.promptFormula) {
+        basePrompt = template.dna.promptFormula;
+    } else {
+        basePrompt = template.promptTemplate || template.savedPrompt || '';
+    }
+
+    // ── 4. Build substitution map — supports both {lowercase} and {{UPPERCASE}} ─
+    // {lowercase} = legacy admin template format
+    // {{UPPERCASE}} = new DNA formula format for user-created templates
+    const brandName = brandData.brand_name || 'the brand';
+    const effectiveProduct = productDescription || userIntent || 'the product';
+
     const substitutions = {
-        // Brand identity tokens
-        '{brand_name}': brandData.brand_name || 'the brand',
+        // ── {{UPPERCASE}} format (DNA formulas from analyze-and-create) ─────
+        '{{BRAND}}': brandName,
+        '{{BRAND_NAME}}': brandName,
+        '{{PRODUCT}}': effectiveProduct,
+        '{{PRODUCT_DESCRIPTION}}': productDescription || userIntent,
+        '{{HEADLINE}}': userIntent || brandData.brand_tagline || brandName,
+        '{{OFFER}}': userIntent || '',
+        '{{CTA}}': 'Shop Now',
+        '{{SUBTEXT}}': userIntent || '',
+        '{{TAGLINE}}': brandData.brand_tagline || userIntent || '',
+        '{{COLOR}}': brandData.brand_colors || brandData.brand_color_primary || '',
+        '{{COLORS}}': brandData.brand_colors || '',
+        // ── {lowercase} format (legacy admin templates) ───────────────────────
+        '{brand_name}': brandName,
         '{brand_tagline}': brandData.brand_tagline || '',
         '{brand_color}': brandData.brand_color_primary || '',
         '{brand_personality}': brandData.brand_personality || '',
         '{brand_industry}': brandData.brand_industry || '',
-        // Product tokens (Stage 4: populated by productAnalyzer)
-        '{product_name}': brandData.brand_name || 'the product',
+        '{product_name}': brandName,
         '{packaging_description}': productDescription || '',
         '{product_description}': productDescription || '',
-        // User brief token
-        '{tagline}': userPrompt || brandData.brand_tagline || '',
-        '{user_brief}': userPrompt || '',
-        // Generic placeholders
-        '{headline}': brandData.brand_tagline || userPrompt || '',
+        '{tagline}': userIntent || brandData.brand_tagline || '',
+        '{user_brief}': userIntent || '',
+        '{headline}': brandData.brand_tagline || userIntent || '',
     };
 
     // Apply all substitutions
     let finalPrompt = basePrompt;
     for (const [placeholder, value] of Object.entries(substitutions)) {
-        // replaceAll is not available in all Node versions — use global regex
-        finalPrompt = finalPrompt.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+        // Escape special regex characters in the placeholder
+        const escaped = placeholder.replace(/[{}[\]()*+?.\\^$|]/g, '\\$&');
+        finalPrompt = finalPrompt.replace(new RegExp(escaped, 'g'), value);
     }
 
-    // ── 4. Append user brief if provided and not already substituted into prompt ──
-    if (userPrompt && userPrompt.trim() && !finalPrompt.includes(userPrompt.trim())) {
+    // ── 5. Append user brief/intent if not already in prompt ─────────────────
+    if (userIntent && !finalPrompt.toLowerCase().includes(userIntent.toLowerCase().substring(0, 30))) {
         finalPrompt = finalPrompt
-            ? `${finalPrompt}\n\nAdditional direction: ${userPrompt.trim()}`
-            : userPrompt.trim();
+            ? `${finalPrompt}\n\nUser brief: ${userIntent}`
+            : userIntent;
     }
 
-    // ── 5. Resolve images ──
+    // ── 6. Inject brand colors if not already mentioned ──────────────────────
+    if (brandData.brand_colors && !finalPrompt.includes(brandData.brand_colors)) {
+        finalPrompt += `\n\nBrand colors: ${brandData.brand_colors}.`;
+    }
+
+    // ── 7. Resolve images ─────────────────────────────────────────────────────
     const resolvedProduct = productImageUrl || userProductImageBase64 || null;
     const resolvedAvatar = avatarImageUrl || userAvatarImageBase64 || null;
 
-    // ── 6. Complex product preservation prefix (Stage 4) ──
+    // ── 8. Complex product preservation prefix (Stage 4) ─────────────────────
     // Prepend a mandatory accuracy directive for products with many physical details
     const isComplex = productClassification && (
         productClassification.complexity === 'high' ||
@@ -107,15 +142,14 @@ export async function buildTemplatePrompt({
     );
 
     if (isComplex && productDescription) {
-        const preservationPrefix = `[CRITICAL — PRESERVE PRODUCT ACCURACY]
-A reference product image is provided. You MUST reproduce the EXACT product visible in the reference image:
-— Exact shape, form factor, and proportions
-— Exact materials, surface finish, and colour
-— Exact placement of branding, logos, and text
-— Exact mechanical and hardware features: ${productDescription}
-Do NOT invent features. Do NOT substitute a generic version. The product in the output must match the reference image identically.
-
-`;
+        const preservationPrefix =
+            `[CRITICAL — PRESERVE PRODUCT ACCURACY]\n` +
+            `A reference product image is provided. You MUST reproduce the EXACT product visible in the reference image:\n` +
+            `— Exact shape, form factor, and proportions\n` +
+            `— Exact materials, surface finish, and colour\n` +
+            `— Exact placement of branding, logos, and text\n` +
+            `— Exact mechanical and hardware features: ${productDescription}\n` +
+            `Do NOT invent features. Do NOT substitute a generic version. The product in the output must match the reference image identically.\n\n`;
         finalPrompt = preservationPrefix + finalPrompt;
     } else {
         // Standard product/avatar reference directives
@@ -139,7 +173,7 @@ Do NOT invent features. Do NOT substitute a generic version. The product in the 
         }
     }
 
-    // ── 7. Assemble vision inputs (structured — for video/content pipelines) ──
+    // ── 9. Assemble vision inputs (structured — for video/content pipelines) ──
     const visionInputs = [];
 
     if (template.systemReferenceImage) {
@@ -166,7 +200,7 @@ Do NOT invent features. Do NOT substitute a generic version. The product in the 
         });
     }
 
-    // ── 8. Flat refImageUrls for internalGenerateCreative ──
+    // ── 10. Flat refImageUrls for internalGenerateCreative ───────────────────
     const refImageUrls = visionInputs
         .map(v => v.data)
         .filter(d => d && (d.startsWith('http://') || d.startsWith('https://')));

@@ -1,0 +1,437 @@
+/* ── TemplateFitPanel ────────────────────────────────────────────────────── */
+
+.tfp-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    animation: tfp-backdrop-in 0.2s ease;
+}
+
+@keyframes tfp-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.tfp-panel {
+    width: min(440px, 100vw);
+    background: #13131f;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: tfp-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes tfp-slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.tfp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0;
+}
+
+.tfp-header__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.tfp-header__thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.tfp-header__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tfp-header__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-top: 3px;
+    flex-wrap: wrap;
+}
+
+.tfp-header__meta .material-symbols-outlined {
+    font-size: 14px;
+    color: #ff7a3d;
+}
+
+.tfp-palette {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.tfp-palette-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.tfp-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.tfp-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+.tfp-close .material-symbols-outlined { font-size: 20px; }
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+.tfp-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.tfp-body::-webkit-scrollbar { width: 4px; }
+.tfp-body::-webkit-scrollbar-track { background: transparent; }
+.tfp-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ── Section label ─────────────────────────────────────────────────────────── */
+.tfp-section-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.tfp-section-label .material-symbols-outlined {
+    font-size: 16px;
+    color: #ff7a3d;
+}
+
+.tfp-optional {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: lowercase;
+    letter-spacing: 0;
+}
+
+/* ── Drop Zone ─────────────────────────────────────────────────────────────── */
+.tfp-drop-zone {
+    border: 2px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.tfp-drop-zone:hover {
+    border-color: rgba(255, 77, 0, 0.4);
+    background: rgba(255, 77, 0, 0.04);
+}
+
+.tfp-drop-zone .material-symbols-outlined {
+    font-size: 36px;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.tfp-drop-zone__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: center;
+}
+
+.tfp-drop-zone__text span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Product Preview ───────────────────────────────────────────────────────── */
+.tfp-product-preview {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 1 / 1;
+    max-height: 200px;
+    background: #0d0d1a;
+}
+
+.tfp-product-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.tfp-product-uploading {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+}
+
+.tfp-product-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.tfp-product-remove:hover { background: rgba(220, 38, 38, 0.8); color: #fff; }
+.tfp-product-remove .material-symbols-outlined { font-size: 16px; }
+
+/* ── Brief ─────────────────────────────────────────────────────────────────── */
+.tfp-brief {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+
+.tfp-brief:focus {
+    border-color: rgba(255, 77, 0, 0.4);
+}
+
+.tfp-brief::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── DNA Strip ─────────────────────────────────────────────────────────────── */
+.tfp-dna-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 12px;
+    margin-top: 16px;
+}
+
+.tfp-dna-strip .material-symbols-outlined {
+    font-size: 18px;
+    color: #a5b4fc;
+    flex-shrink: 0;
+}
+
+.tfp-dna-strip__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tfp-dna-strip__info strong {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a5b4fc;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tfp-dna-strip__info span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: capitalize;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tfp-dna-strip__zones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tfp-zone-pill {
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.15);
+    color: #c7d2fe;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    text-transform: capitalize;
+}
+
+/* ── Error ─────────────────────────────────────────────────────────────────── */
+.tfp-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(220, 38, 38, 0.12);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    border-radius: 10px;
+    font-size: 13px;
+    color: #fca5a5;
+    margin-top: 14px;
+}
+
+.tfp-error .material-symbols-outlined { font-size: 18px; color: #f87171; }
+
+/* ── Generate Button ───────────────────────────────────────────────────────── */
+.tfp-generate-btn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #ff4d00, #ff6a2b);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 20px rgba(255, 77, 0, 0.4);
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.tfp-generate-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(255, 77, 0, 0.55);
+}
+
+.tfp-generate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tfp-generate-btn .material-symbols-outlined { font-size: 20px; }
+
+/* ── Result ────────────────────────────────────────────────────────────────── */
+.tfp-result {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tfp-result img {
+    width: 100%;
+    display: block;
+}
+
+.tfp-result-actions {
+    display: flex;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.tfp-result-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #ff4d00, #ff6a2b);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.15s;
+}
+
+.tfp-result-btn--outline {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.tfp-result-btn--outline:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+.tfp-result-btn .material-symbols-outlined { font-size: 16px; }
+
+/* ── Spin ──────────────────────────────────────────────────────────────────── */
+.spin {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
