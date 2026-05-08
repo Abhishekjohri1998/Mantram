@@ -1,29 +1,38 @@
 import React from 'react';
-import useReveal from '../../hooks/useReveal';
+import { motion } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 export default function Comparison() {
-    const revealRef = useReveal();
-
     return (
-        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5" ref={revealRef}>
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 overflow-hidden">
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 
                 {/* Section Header */}
-                <div className="flex flex-col items-center text-center mb-16">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-100px" }}
+                    className="flex flex-col items-center text-center mb-16"
+                >
                     <span className="text-[11px] font-bold tracking-widest uppercase mb-4" style={{ color: BRAND.primary }}>
                         The Shift
                     </span>
                     <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif">
                         The old way <span className="italic" style={{ color: BRAND.primary }}>vs Mantram.</span>
                     </h2>
-                </div>
+                </motion.div>
 
                 {/* Comparison Grid */}
                 <div className="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto relative">
                     
                     {/* Left Card: The Old Way */}
-                    <div className="bg-[#121214] border border-white/5 rounded-3xl p-8 lg:p-10 flex flex-col justify-between">
+                    <motion.div 
+                        initial={{ opacity: 0, x: -40 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, margin: "-100px" }}
+                        transition={{ type: 'spring', stiffness: 60, delay: 0.1 }}
+                        className="bg-[#121214] border border-white/5 rounded-3xl p-8 lg:p-10 flex flex-col justify-between"
+                    >
                         <div>
                             <div className="flex justify-between items-center mb-10 text-[11px] font-bold text-[#a1a1aa] uppercase tracking-widest">
                                 <span>The Old Way</span>
@@ -72,10 +81,16 @@ export default function Comparison() {
                                 <span className="text-xl md:text-2xl text-white font-serif tracking-tight">1-2</span>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Right Card: The New Way */}
-                    <div className="bg-[#121214] border rounded-3xl p-8 lg:p-10 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,77,0,0.1)]" style={{ borderColor: `${BRAND.primary}40` }}>
+                    <motion.div 
+                        initial={{ opacity: 0, x: 40 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, margin: "-100px" }}
+                        transition={{ type: 'spring', stiffness: 60, delay: 0.2 }}
+                        className="bg-[#121214] border rounded-3xl p-8 lg:p-10 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,77,0,0.1)]" style={{ borderColor: `${BRAND.primary}40` }}
+                    >
                         
                         {/* With Mantram Badge */}
                         <div className="absolute -top-3.5 right-10">
@@ -132,7 +147,7 @@ export default function Comparison() {
                                 <span className="text-xl md:text-2xl font-serif tracking-tight" style={{ color: BRAND.primary }}>22</span>
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                 </div>
             </div>

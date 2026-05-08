@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
-import useReveal from '../../hooks/useReveal';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 const SHOWCASES = [
@@ -49,11 +49,23 @@ export default function FeaturedStudios() {
 }
 
 function ShowcaseRow({ showcase, index }) {
-    const revealRef = useReveal();
+    const containerRef = useRef(null);
+    const { scrollYProgress } = useScroll({
+        target: containerRef,
+        offset: ["start end", "end start"]
+    });
+
     const isReversed = showcase.reverse;
+    
+    const yParallax = useTransform(scrollYProgress, [0, 1], ["-20%", "20%"]);
+    const opacityFade = useTransform(scrollYProgress, [0, 0.4], [0, 1]);
 
     return (
-        <div ref={revealRef} className={`flex flex-col lg:flex-row items-center gap-16 lg:gap-24 ${isReversed ? 'lg:flex-row-reverse' : ''}`}>
+        <motion.div 
+            ref={containerRef} 
+            style={{ opacity: opacityFade }}
+            className={`flex flex-col lg:flex-row items-center gap-16 lg:gap-24 ${isReversed ? 'lg:flex-row-reverse' : ''}`}
+        >
             
             {/* Copy Side */}
             <div className="flex-1 w-full">
@@ -91,10 +103,11 @@ function ShowcaseRow({ showcase, index }) {
                     style={{ backgroundColor: showcase.placeholderColor }}
                 >
                     {/* Diagonal striped overlay for that technical blueprint feel */}
-                    <div 
-                        className="absolute inset-0 opacity-10 mix-blend-overlay"
+                    <motion.div 
+                        className="absolute -top-[50%] -bottom-[50%] -left-[50%] -right-[50%] opacity-10 mix-blend-overlay"
                         style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)'
+                            backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)',
+                            y: yParallax
                         }}
                     />
                     
@@ -107,6 +120,6 @@ function ShowcaseRow({ showcase, index }) {
                 </div>
             </div>
             
-        </div>
+        </motion.div>
     );
 }

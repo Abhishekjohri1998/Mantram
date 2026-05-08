@@ -1,10 +1,24 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import useReveal from '../../hooks/useReveal';
 import { BRAND, STUDIOS, STUDIO_ICONS } from '../../data/studios';
 
 export default function StudiosShowcase() {
     const revealRef = useReveal();
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.05 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, scale: 0.9, y: 20 },
+        visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 80 } }
+    };
 
     return (
         <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5" ref={revealRef}>
@@ -29,10 +43,17 @@ export default function StudiosShowcase() {
                 </div>
 
                 {/* Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
                     {STUDIOS.map((studio, i) => (
-                        <a 
+                        <motion.a 
                             key={studio.slug}
+                            variants={itemVariants}
                             href={`/studio/${studio.slug}`}
                             className={`group bg-[#121214] border rounded-2xl p-6 flex flex-col justify-between hover:bg-white/5 transition-all min-h-[220px] ${
                                 i === 0 
@@ -66,9 +87,9 @@ export default function StudiosShowcase() {
                             <div className="mt-8 flex items-center gap-1 text-[13px] font-medium transition-transform group-hover:translate-x-1" style={{ color: BRAND.primary }}>
                                 Explore <ArrowRight className="w-3.5 h-3.5" />
                             </div>
-                        </a>
+                        </motion.a>
                     ))}
-                </div>
+                </motion.div>
 
             </div>
         </section>

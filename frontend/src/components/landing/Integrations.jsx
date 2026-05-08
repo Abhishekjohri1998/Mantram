@@ -1,5 +1,5 @@
 import React from 'react';
-import useReveal from '../../hooks/useReveal';
+import { motion } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 import { Instagram, Youtube, Twitter, Linkedin, Facebook, ShoppingBag, ShoppingCart, Store, Megaphone, Presentation, HardDrive, Figma, Slack, MessageCircle, BarChart3, Cloud } from 'lucide-react';
 
@@ -94,10 +94,21 @@ function Share2Icon(props) {
 
 
 export default function Integrations() {
-    const revealRef = useReveal();
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.1 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 30 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+    };
 
     return (
-        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5" ref={revealRef}>
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 overflow-hidden">
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 
                 {/* Header Row */}
@@ -117,10 +128,16 @@ export default function Integrations() {
                     </div>
                 </div>
 
-                {/* Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Columns Grid */}
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
                     {INTEGRATION_COLUMNS.map((col, idx) => (
-                        <div key={idx} className="bg-[#121214] border border-white/5 rounded-3xl p-6 flex flex-col">
+                        <motion.div key={idx} variants={itemVariants} className="bg-[#121214] border border-white/5 rounded-3xl p-6 flex flex-col">
                             
                             <div className="mb-6">
                                 <h3 className="text-[11px] font-bold text-[#FF4D00] uppercase tracking-wider mb-1">{col.title}</h3>
@@ -141,9 +158,9 @@ export default function Integrations() {
                                 ))}
                             </div>
                             
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
 
             </div>
         </section>

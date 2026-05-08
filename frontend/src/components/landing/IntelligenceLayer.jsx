@@ -1,5 +1,5 @@
 import React from 'react';
-import useReveal from '../../hooks/useReveal';
+import { motion } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 import { Sparkles, BrainCircuit, Box, Image as ImageIcon, Video, Mic, Music, Waves, CircleDot, Triangle, Diamond, Command, Activity, Cpu } from 'lucide-react';
 
@@ -28,10 +28,21 @@ const MODELS = [
 ];
 
 export default function IntelligenceLayer() {
-    const revealRef = useReveal();
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.05 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, scale: 0.95, y: 10 },
+        visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+    };
 
     return (
-        <section className="py-24 md:py-32 relative border-y border-white/5" ref={revealRef}>
+        <section className="py-24 md:py-32 relative border-y border-white/5 overflow-hidden">
             {/* Background pattern */}
             <div className="absolute inset-0 z-0 opacity-[0.03]" 
                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} 
@@ -51,10 +62,17 @@ export default function IntelligenceLayer() {
                 </div>
 
                 {/* Models Grid */}
-                <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10"
+                >
                     {MODELS.map((model, i) => (
-                        <div 
+                        <motion.div 
                             key={i}
+                            variants={itemVariants}
                             className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default"
                         >
                             <div className="flex justify-between items-start w-full">
@@ -69,9 +87,9 @@ export default function IntelligenceLayer() {
                                 <span className="block text-[15px] font-bold text-white mb-0.5 group-hover:text-[#FF5A1F] transition-colors">{model.name}</span>
                                 <span className="block text-[11px] text-[#a1a1aa]">{model.vendor}</span>
                             </div>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
 
                 {/* Bottom Pill */}
                 <div className="inline-flex items-center gap-3 bg-[#121214] border border-white/10 rounded-full py-3 px-6 shadow-xl relative overflow-hidden group">
