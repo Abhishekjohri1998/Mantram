@@ -285,6 +285,15 @@ router.post('/:id/use', protect, async (req, res) => {
                         // System reference image (template design reference)
                         templateRefImageUrl: template.systemReferenceImage?.startsWith('http') ? template.systemReferenceImage : null,
                         templateInpainting: !!template.systemReferenceImage?.startsWith('http'),
+                        // FIX #3: Skip the agentic pipeline — template prompt is already production-ready
+                        // buildTemplatePrompt() already resolved placeholders, injected brand DNA, and
+                        // added product preservation directives. The Art Director would REWRITE it.
+                        skipPipeline: true,
+                        alreadyEnhanced: true,
+                        // Use the model that originally created this template's preview
+                        imageModel: template.generationModel || settings?.imageModel || 'nanobanana-2',
+                        // Pass aspect ratio from template defaults
+                        aspectRatio: template.defaultSettings?.aspectRatio || settings?.aspectRatio || '1:1',
                     },
                     jobId
                 },

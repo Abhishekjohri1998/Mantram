@@ -144,6 +144,9 @@ const EXPLORE_CSS = `
 .hover-btn-use { background: var(--sys-primary); color: #fff; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .explore-card:hover .hover-btn-use { transform: translateY(0); }
 .hover-btn-use:hover { filter: brightness(1.1); transform: scale(1.05); }
+.hover-btn-generate { background: rgba(255,255,255,0.12); color: #fff; padding: 7px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.03s; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(4px); }
+.explore-card:hover .hover-btn-generate { transform: translateY(0); }
+.hover-btn-generate:hover { background: rgba(255,255,255,0.22); transform: scale(1.05); border-color: rgba(255,255,255,0.4); }
 .hover-btn-preview { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.05s; backdrop-filter: blur(4px); }
 .explore-card:hover .hover-btn-preview { transform: translateY(0); }
 .hover-btn-preview:hover { background: rgba(255,255,255,0.25); transform: scale(1.1); }
@@ -498,6 +501,13 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                                 handleTemplateClick(template);
                                             }}>
                                                 Use this template
+                                            </button>
+                                            <button className="hover-btn-generate" onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedTemplate(template);
+                                            }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
+                                                Generate Now
                                             </button>
                                             <button className="hover-btn-preview" onClick={(e) => {
                                                 e.stopPropagation();

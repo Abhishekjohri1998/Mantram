@@ -1119,6 +1119,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // ── Other UI/Ref State ──
     const [designBaseImage, setDesignBaseImage] = useState(null)
+    const [sourceTemplateId, setSourceTemplateId] = useState(null) // Tracks which template populated designBaseImage
     const [referenceImages, setReferenceImages] = useState({ style: null, character: null, upload: null })
     const [characters, setCharacters] = useState([])
     const [addLogo, setAddLogo] = useState(() => !!activeBrand?.dna?.logo?.url)
@@ -1751,6 +1752,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             setCsRefImage(refImg);
                         }
 
+                        // ── Track template source for pipeline bypass + backend awareness ──
+                        setSourceTemplateId(templateId);
+
                         // Close quick-start panel if open
                         setShowQuickStart(false);
                         console.log(`[Template Hydration] "${tpl.name}" loaded — model: ${tpl.generationModel || 'default'}, designRef: ${sysRefImage ? 'systemRef' : bgImg ? 'bgAsset' : tpl.previewType === 'image' ? 'previewFallback' : 'none'}, prompt: ${resolvedPrompt.substring(0, 80)}...`);
@@ -1961,6 +1965,15 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             if (designBaseImage) {
                 options.templateInpainting = true
                 options.templateRefImageUrl = designBaseImage
+                // ── FIX #1: Skip the full agentic pipeline for template-based generations ──
+                // Template prompts are already production-ready (resolved placeholders, brand DNA).
+                // Running the Art Director rewrites them into generic prompts — defeating the purpose.
+                // skipPipeline sends the prompt directly to image generation, saving 8-20 seconds.
+                if (sourceTemplateId) {
+                    options.skipPipeline = true
+                    options.alreadyEnhanced = true
+                    options.sourceTemplateId = sourceTemplateId
+                }
                 if (!fullPrompt.toLowerCase().includes('edit') && !fullPrompt.toLowerCase().includes('change') && !fullPrompt.toLowerCase().includes('modify')) {
                     fullPrompt = `Edit this image while keeping the same layout, composition, characters, and products. Apply these changes: ${fullPrompt}`
                 }
@@ -2070,7 +2083,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                                 ))
                             }
                         } catch { /* ignore polling errors */ }
-                    }, 5000)
+                    }, attempts < 15 ? 2000 : 5000) // ── FIX #4: Adaptive polling — 2s for first 30s (when most results arrive), then 5s
                 }
                 pollLocalJob()
                 // Don't remove from activeGenerations here — the poll interval will do it
