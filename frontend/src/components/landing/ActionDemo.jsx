@@ -21,36 +21,36 @@ export default function ActionDemo() {
         <section className="py-24 md:py-32 relative" ref={revealRef}>
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 
-                {/* Section Header */}
-                <div className="flex flex-col items-center text-center mb-16">
-                    <span className="text-[11px] font-bold tracking-widest text-[#a1a1aa] uppercase mb-4">
-                        Watch Mantram in action
-                    </span>
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-4xl">
-                        90 seconds. One campaign. <br />
-                        <span className="italic" style={{ color: BRAND.primary }}>From prompt to publish.</span>
-                    </h2>
-                </div>
+                {/* Header & Filters Row */}
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-12">
+                    {/* Section Header */}
+                    <div>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-2xl leading-[1.1]">
+                            90 seconds. <span className="italic" style={{ color: BRAND.primary }}>One campaign.</span> <br />
+                            From prompt to publish.
+                        </h2>
+                    </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap justify-center gap-3 mb-12">
-                    {FILTERS.map(filter => (
-                        <button
-                            key={filter}
-                            onClick={() => setActiveFilter(filter)}
-                            className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                                activeFilter === filter 
-                                    ? 'bg-white text-black' 
-                                    : 'bg-white/5 text-[#a1a1aa] hover:text-white hover:bg-white/10'
-                            }`}
-                        >
-                            {filter}
-                        </button>
-                    ))}
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-3">
+                        {FILTERS.map(filter => (
+                            <button
+                                key={filter}
+                                onClick={() => setActiveFilter(filter)}
+                                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                                    activeFilter === filter 
+                                        ? 'bg-white text-black border-white' 
+                                        : 'bg-transparent text-[#a1a1aa] border-white/10 hover:text-white hover:bg-white/5'
+                                }`}
+                            >
+                                {filter}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Video Player Container */}
-                <div className="relative max-w-5xl mx-auto w-full aspect-video rounded-3xl overflow-hidden group cursor-pointer border border-white/10 bg-[#121214] shadow-2xl">
+                <div className="relative w-full aspect-[21/9] md:aspect-video rounded-3xl overflow-hidden group cursor-pointer border border-white/10 bg-[#121214] shadow-2xl">
                     {/* Ambient Glow */}
                     <div className="absolute inset-0 z-0">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] rounded-full blur-[100px] opacity-20 mix-blend-screen" style={{ background: BRAND.primary }} />
@@ -90,11 +90,11 @@ export default function ActionDemo() {
                 </div>
 
                 {/* Timeline Strip */}
-                <div className="max-w-5xl mx-auto mt-8 grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="w-full mt-6 grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
                     {TIMELINE.map((item, idx) => (
-                        <div key={idx} className="bg-white/5 rounded-xl p-4 border border-white/5 hover:border-white/20 transition-colors">
-                            <div className="text-[11px] font-bold text-[#a1a1aa] mb-1">{item.time}</div>
-                            <div className="text-sm font-medium text-white">{item.label}</div>
+                        <div key={idx} className="bg-[#121214] rounded-2xl p-4 border border-white/5 hover:border-white/20 transition-colors">
+                            <div className="text-[11px] font-bold text-[#a1a1aa] mb-2">{item.time}</div>
+                            <div className="text-sm font-bold text-white">{item.label}</div>
                         </div>
                     ))}
                 </div>

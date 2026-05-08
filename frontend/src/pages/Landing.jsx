@@ -7,7 +7,10 @@ import FeaturedVideos from '../components/landing/FeaturedVideos'
 import ActionDemo from '../components/landing/ActionDemo'
 import TrustLogos from '../components/landing/TrustLogos'
 import IntelligenceLayer from '../components/landing/IntelligenceLayer'
+import Metrics from '../components/landing/Metrics'
+import Comparison from '../components/landing/Comparison'
 import StudiosShowcase from '../components/landing/StudiosShowcase'
+import Integrations from '../components/landing/Integrations'
 import HowItWorks from '../components/landing/HowItWorks'
 import CaseStudies from '../components/landing/CaseStudies'
 import Testimonial from '../components/landing/Testimonial'
@@ -55,7 +58,10 @@ export default function Landing() {
                     <ActionDemo />
                     <TrustLogos />
                     <IntelligenceLayer />
+                    <Metrics />
+                    <Comparison />
                     <StudiosShowcase />
+                    <Integrations />
                     <HowItWorks />
                     <CaseStudies />
                     <Testimonial />
