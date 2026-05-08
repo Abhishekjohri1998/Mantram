@@ -5,6 +5,7 @@ import TemplateCategory from '../models/TemplateCategory.js';
 import TemplateUsageLog from '../models/TemplateUsageLog.js';
 import GenerationJob from '../models/GenerationJob.js';
 import { buildTemplatePrompt } from '../agents/shared/templatePromptCombiner.js';
+import { analyzeProduct } from '../agents/templates/productAnalyzer.js';
 import { deductCredits } from '../middleware/credits.js';
 import { internalGenerateCreative } from './creatives.js';
 import Brand from '../models/Brand.js';
@@ -188,23 +189,42 @@ router.post('/:id/use', protect, async (req, res) => {
             if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
         }
 
-        // 1. Build prompt — pass correct S3 URL param names
+        // 1. Stage 4: Run two-pass product intelligence if product image is present
+        //    This classifies the product and extracts detailed specs for accurate generation
+        let productIntelligence = null;
+        if (productImageUrl && template.enableProductAnalysis !== false) {
+            console.log(`[Template] Starting product analysis for template: ${template.name}`);
+            productIntelligence = await analyzeProduct(productImageUrl);
+            if (productIntelligence) {
+                console.log(`[Template] Product classified: ${productIntelligence.category} (${productIntelligence.complexity} complexity, ${(productIntelligence.confidence * 100).toFixed(0)}% confidence)`);
+            }
+        }
+
+        // 2. Build prompt — pass brandId + product intelligence for full substitution
         const promptData = await buildTemplatePrompt({
             template,
             userPrompt,
-            productImageUrl,  // S3 URL or null (maps to resolvedProduct in combiner)
-            avatarImageUrl,   // S3 URL or null (maps to resolvedAvatar in combiner)
+            productImageUrl,
+            avatarImageUrl,
+            brandId,
+            productDescription: productIntelligence?.description || '',
+            productClassification: productIntelligence || null,
         });
 
         // 2. Determine cost & deduct credits
-        let cost = 0;
-        let deductCategory = 'template';
-        if (template.studioOrigin === 'creative') { cost = 4; deductCategory = 'creative'; }
-        else if (template.studioOrigin === 'video') { cost = 8; deductCategory = 'videoGenerate'; }
-        else if (template.studioOrigin === 'content') { cost = 2; deductCategory = 'content'; }
+        let deductCategory = null;
+        if (template.studioOrigin === 'creative') deductCategory = 'creative';
+        else if (template.studioOrigin === 'video') deductCategory = 'videoGenerate';
+        else if (template.studioOrigin === 'content') deductCategory = 'content';
 
-        if (cost > 0) {
-            await deductCredits(req.user._id, cost, deductCategory);
+        // Resolve actual credit cost for GenerationJob tracking
+        const { getCreditCosts } = await import('../middleware/credits.js');
+        const creditCosts = await getCreditCosts();
+        const cost = deductCategory ? (creditCosts[deductCategory] || 0) : 0;
+
+        if (deductCategory) {
+            // Use action string so deductCredits logs studio + brand correctly
+            await deductCredits(req.user._id, deductCategory, 1, brandId);
         }
 
         // 3. Increment usageCount; increment usedByCount only first time per user

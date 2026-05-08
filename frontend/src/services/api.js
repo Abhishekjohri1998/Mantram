@@ -629,6 +629,12 @@ export const superadmin = {
     resetCredits: (id) => apiFetch(`/superadmin/users/${id}/reset-credits`, { method: 'POST' }),
     approveUser: (id) => apiFetch(`/superadmin/users/${id}/approve`, { method: 'PUT' }),
     rejectUser: (id) => apiFetch(`/superadmin/users/${id}/reject`, { method: 'PUT' }),
+    // User Intelligence Analytics
+    getUserAnalytics: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/superadmin/users/analytics?${query}`);
+    },
+    getUserSegmentCounts: () => apiFetch('/superadmin/users/segment-counts'),
 
     // Waitlist
     approveWaitlist: (id) => apiFetch(`/superadmin/waitlist/${id}/approve`, { method: 'POST' }),

@@ -41,6 +41,11 @@ const creativeSchema = new mongoose.Schema({
     status: { type: String, enum: ['draft', 'approved', 'published', 'archived'], default: 'draft' },
     rating: { type: Number, min: 1, max: 5 },
     tags: [String],
+
+    // Analytics counters — incremented by download/share events
+    downloadCount: { type: Number, default: 0 },
+    shareCount: { type: Number, default: 0 },
+    fileSizeMB: { type: Number, default: 0 }, // estimated: (width*height*3)/1_048_576
 }, { timestamps: true });
 
 creativeSchema.index({ user: 1, brand: 1, type: 1 });

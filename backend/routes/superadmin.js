@@ -32,6 +32,7 @@ import env from '../config/env.js';
 import { getOnPageProviderStatus } from '../utils/onpage-api.js';
 import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
 import { getRedisStatus } from '../utils/cache.js';
+import VideoProject from '../models/VideoProject.js';
 
 // Super Admin V2 Sub-routers
 import templateRoutes from './superadmin-templates.js';
@@ -306,6 +307,220 @@ router.get('/stats', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // 2. USER MANAGEMENT
 // ══════════════════════════════════════════════════════════════
+
+// Helper: compute segment label from lastActive date
+function getUserSegment(lastActive, creditsSpent30d, generationCount30d) {
+    const now = Date.now();
+    const ms = lastActive ? now - new Date(lastActive).getTime() : Infinity;
+    const days = ms / (1000 * 60 * 60 * 24);
+    if (days > 30) return 'dead';
+    if (days > 7) return 'churned';
+    if (creditsSpent30d > 200 || generationCount30d > 50) return 'power';
+    return 'active';
+}
+
+// GET /api/superadmin/users/segment-counts  — fast tab badge counts
+router.get('/users/segment-counts', async (req, res) => {
+    try {
+        const now = new Date();
+        const d7  = new Date(now - 7  * 24 * 60 * 60 * 1000);
+        const d30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+        const [total, active, churned, dead, power] = await Promise.all([
+            User.countDocuments({ role: { $ne: 'superadmin' } }),
+            User.countDocuments({ role: { $ne: 'superadmin' }, lastActive: { $gte: d7 } }),
+            User.countDocuments({ role: { $ne: 'superadmin' }, lastActive: { $gte: d30, $lt: d7 } }),
+            User.countDocuments({ role: { $ne: 'superadmin' }, $or: [{ lastActive: { $lt: d30 } }, { lastActive: { $exists: false } }] }),
+            // Power = active users with high credit usage in last 30 days
+            CreditUsage.aggregate([
+                { $match: { createdAt: { $gte: d30 } } },
+                { $group: { _id: '$user', total: { $sum: '$cost' }, count: { $sum: 1 } } },
+                { $match: { $or: [{ total: { $gt: 200 } }, { count: { $gt: 50 } }] } },
+                { $count: 'n' },
+            ]).then(r => r[0]?.n || 0),
+        ]);
+
+        res.json({ success: true, counts: { all: total, active, churned, dead, power } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// GET /api/superadmin/users/analytics  — full enriched user list with all analytics columns
+router.get('/users/analytics', async (req, res) => {
+    try {
+        const {
+            page = 1, limit = 25, search, plan, segment = 'all',
+            sort = 'lastActive', order = 'desc',
+        } = req.query;
+
+        const now = new Date();
+        const d7  = new Date(now - 7  * 24 * 60 * 60 * 1000);
+        const d30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+        // 1. Build base filter
+        const filter = { role: { $ne: 'superadmin' } };
+        if (search) {
+            const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            filter.$or = [
+                { name: new RegExp(safe, 'i') },
+                { email: new RegExp(safe, 'i') },
+                { company: new RegExp(safe, 'i') },
+            ];
+        }
+        if (plan) filter.plan = plan;
+        if (segment === 'active')  filter.lastActive = { $gte: d7 };
+        if (segment === 'churned') filter.lastActive = { $gte: d30, $lt: d7 };
+        if (segment === 'dead')    filter.$or = [...(filter.$or || []), ...[{ lastActive: { $lt: d30 } }, { lastActive: { $exists: false } }]];
+        // 'power' segment filtered post-aggregation
+
+        // 2. Sort map
+        const SORT_MAP = {
+            lastActive:      { lastActive: order === 'asc' ? 1 : -1 },
+            creditsSpent:    { creditsSpent30d: order === 'asc' ? 1 : -1 },
+            generations:     { generationCount30d: order === 'asc' ? 1 : -1 },
+            storageUsed:     { storageUsedMB: order === 'asc' ? 1 : -1 },
+            sessionDuration: { 'usage.sessionDurationMins': order === 'asc' ? 1 : -1 },
+            downloads:       { totalDownloads: order === 'asc' ? 1 : -1 },
+            shares:          { totalShares: order === 'asc' ? 1 : -1 },
+            createdAt:       { createdAt: order === 'asc' ? 1 : -1 },
+            creditsUsed:     { 'credits.used': order === 'asc' ? 1 : -1 },
+        };
+        const sortStage = SORT_MAP[sort] || SORT_MAP.lastActive;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // 3. Get CreditUsage stats per user for last 30 days
+        const creditStats = await CreditUsage.aggregate([
+            { $match: { createdAt: { $gte: d30 } } },
+            { $group: {
+                _id: '$user',
+                creditsSpent30d: { $sum: '$cost' },
+                generationCount30d: { $sum: 1 },
+                studios: { $push: '$studio' },
+            }},
+        ]);
+        const creditMap = {};
+        for (const c of creditStats) {
+            // compute top studio
+            const freq = {};
+            for (const s of c.studios) freq[s] = (freq[s] || 0) + 1;
+            const topStudio = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+            creditMap[c._id.toString()] = {
+                creditsSpent30d: c.creditsSpent30d,
+                generationCount30d: c.generationCount30d,
+                topStudio,
+            };
+        }
+
+        // 4. Get Creative stats per user
+        const creativeStats = await Creative.aggregate([
+            { $group: {
+                _id: '$user',
+                creativeCount: { $sum: 1 },
+                downloadCount: { $sum: { $ifNull: ['$downloadCount', 0] } },
+                shareCount:    { $sum: { $ifNull: ['$shareCount', 0] } },
+                fileSizeMB:    { $sum: { $ifNull: ['$fileSizeMB', 0] } },
+            }},
+        ]);
+        const creativeMap = {};
+        for (const c of creativeStats) creativeMap[c._id.toString()] = c;
+
+        // 5. Get VideoProject stats per user
+        const videoStats = await VideoProject.aggregate([
+            { $group: {
+                _id: '$user',
+                videoCount:       { $sum: 1 },
+                videosCompleted:  { $sum: { $cond: [{ $in: ['$status', ['done', 'completed']] }, 1, 0] } },
+                videoDownloads:   { $sum: { $ifNull: ['$downloadCount', 0] } },
+                videoSizeMB:      { $sum: { $ifNull: ['$fileSizeMB', 0] } },
+            }},
+        ]);
+        const videoMap = {};
+        for (const v of videoStats) videoMap[v._id.toString()] = v;
+
+        // 6. Get Content count per user
+        const contentStats = await Content.aggregate([
+            { $group: { _id: '$user', contentCount: { $sum: 1 } } },
+        ]);
+        const contentMap = {};
+        for (const c of contentStats) contentMap[c._id.toString()] = c.contentCount;
+
+        // 7. Fetch users
+        let users = await User.find(filter)
+            .select('-password -verificationToken -resetPasswordToken')
+            .populate('activeSubscription', 'status plan')
+            .lean();
+
+        // 8. Enrich each user
+        users = users.map(u => {
+            const uid = u._id.toString();
+            const cr = creditMap[uid] || { creditsSpent30d: 0, generationCount30d: 0, topStudio: '' };
+            const cv = creativeMap[uid] || { creativeCount: 0, downloadCount: 0, shareCount: 0, fileSizeMB: 0 };
+            const vd = videoMap[uid] || { videoCount: 0, videosCompleted: 0, videoDownloads: 0, videoSizeMB: 0 };
+            const contentCount = contentMap[uid] || 0;
+
+            const totalDownloads  = (u.usage?.downloadCount || 0) + cv.downloadCount + vd.videoDownloads;
+            const totalShares     = (u.usage?.shareCount || 0) + cv.shareCount;
+            const storageUsedMB   = parseFloat((cv.fileSizeMB + vd.videoSizeMB).toFixed(2));
+            const creditBalance   = getCreditBalance(u);
+            const seg             = getUserSegment(u.lastActive, cr.creditsSpent30d, cr.generationCount30d);
+
+            return {
+                _id: u._id, name: u.name, email: u.email, role: u.role,
+                plan: u.plan, company: u.company, avatar: u.avatar,
+                lastActive: u.lastActive, createdAt: u.createdAt,
+                credits: u.credits, creditBalance,
+                usage: u.usage,
+                // Analytics columns
+                creditsSpent30d:    cr.creditsSpent30d,
+                generationCount30d: cr.generationCount30d,
+                topStudio:          cr.topStudio,
+                contentCount,
+                creativeCount:      cv.creativeCount,
+                videoCount:         vd.videoCount,
+                videosCompleted:    vd.videosCompleted,
+                totalDownloads,
+                totalShares,
+                storageUsedMB,
+                sessionDurationMins: u.usage?.sessionDurationMins || 0,
+                segment: seg,
+                approvalStatus: u.approvalStatus,
+                activeSubscription: u.activeSubscription,
+                streak: u.streak,
+            };
+        });
+
+        // 9. Filter power segment post-enrichment
+        if (segment === 'power') {
+            users = users.filter(u => u.creditsSpent30d > 200 || u.generationCount30d > 50);
+        }
+
+        // 10. Sort in-memory (already have all aggregated data)
+        const sortKey = Object.keys(sortStage)[0];
+        const sortDir = Object.values(sortStage)[0];
+        users.sort((a, b) => {
+            const aVal = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => o?.[k], a) : a[sortKey];
+            const bVal = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => o?.[k], b) : b[sortKey];
+            if (aVal == null && bVal == null) return 0;
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+            if (aVal instanceof Date || typeof aVal === 'string') {
+                return sortDir === 1
+                    ? new Date(aVal) - new Date(bVal)
+                    : new Date(bVal) - new Date(aVal);
+            }
+            return sortDir === 1 ? aVal - bVal : bVal - aVal;
+        });
+
+        const total = users.length;
+        const paged = users.slice(skip, skip + parseInt(limit));
+
+        res.json({ success: true, users: paged, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    } catch (error) {
+        console.error('[SA /users/analytics]', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 router.get('/users', async (req, res) => {
     try {

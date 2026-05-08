@@ -1663,6 +1663,142 @@
    HERO / TWO-COLUMN LAYOUT REDESIGN
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── View Switcher — prominent Monthly/Brainstorm toggle ── */
+.bs-view-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.75rem 0.75rem 0;
+  flex-shrink: 0;
+}
+
+.bs-view-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.875rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sys-text-muted);
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  position: relative;
+}
+
+.bs-view-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sys-text);
+}
+
+.bs-view-tab.active {
+  background: rgba(255, 77, 0, 0.08);
+  border-color: rgba(255, 77, 0, 0.25);
+  color: var(--sys-primary);
+}
+
+.bs-view-tab .material-symbols-outlined {
+  font-size: 18px !important;
+  flex-shrink: 0;
+}
+
+.bs-view-tab-badge {
+  margin-left: auto;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  color: #fff;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* ── Sidebar separator line ── */
+.bs-sidebar-divider {
+  height: 1px;
+  background: var(--sys-border);
+  margin: 0.5rem 0.75rem;
+}
+
+/* ── Sessions footer in sidebar ── */
+.bs-sidebar-sessions {
+  padding: 0.75rem;
+  margin-top: auto;
+  border-top: 1px solid var(--sys-border);
+}
+
+.bs-sidebar-sessions-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.875rem;
+  background: var(--sys-bg);
+  border: 1px solid var(--sys-border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--sys-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.bs-sidebar-sessions-btn:hover {
+  color: var(--sys-text);
+  border-color: var(--sys-primary);
+}
+
+.bs-sidebar-sessions-count {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--sys-primary);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* ── Slim phase bar — single active pill ── */
+.bs-phase-bar--slim {
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.bs-phase-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  background: color-mix(in srgb, var(--phase-color, var(--sys-primary)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--phase-color, var(--sys-primary)) 30%, transparent);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--phase-color, var(--sys-primary));
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* ── Sticky hero action bar ── */
+.bs-hero-action-bar--sticky {
+  position: relative;
+  flex-shrink: 0;
+}
+
+
 .bs-layout-split {
   display: flex;
   flex: 1;
