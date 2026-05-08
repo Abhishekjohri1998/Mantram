@@ -38,6 +38,7 @@ export async function buildTemplatePrompt({
     productClassification = null,
     // DNA Fit Engine: use dna.promptFormula as base for user-created templates
     useDnaFormula = false,
+    isFullPrompt = false,
     // Legacy base64 params (kept for backward compat)
     userProductImageBase64,
     userAvatarImageBase64,
@@ -71,7 +72,9 @@ export async function buildTemplatePrompt({
     // For user-created templates with DNA: use dna.promptFormula (canonical)
     // For admin templates: use promptTemplate → savedPrompt (locked formula)
     let basePrompt;
-    if (useDnaFormula && template.dna && template.dna.promptFormula) {
+    if (isFullPrompt && userIntent) {
+        basePrompt = userIntent;
+    } else if (useDnaFormula && template.dna && template.dna.promptFormula) {
         basePrompt = template.dna.promptFormula;
     } else {
         basePrompt = template.promptTemplate || template.savedPrompt || '';
@@ -119,7 +122,7 @@ export async function buildTemplatePrompt({
     }
 
     // ── 5. Append user brief/intent if not already in prompt ─────────────────
-    if (userIntent && !finalPrompt.toLowerCase().includes(userIntent.toLowerCase().substring(0, 30))) {
+    if (!isFullPrompt && userIntent && !finalPrompt.toLowerCase().includes(userIntent.toLowerCase().substring(0, 30))) {
         finalPrompt = finalPrompt
             ? `${finalPrompt}\n\nUser brief: ${userIntent}`
             : userIntent;

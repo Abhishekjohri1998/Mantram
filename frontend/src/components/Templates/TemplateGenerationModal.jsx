@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { templates as templatesAPI } from '../../services/api';
 import { useBrand } from '../../context/BrandContext';
@@ -36,6 +36,35 @@ export default function TemplateGenerationModal({ template, onClose }) {
     const navigate = useNavigate();
     const { activeBrand } = useBrand();
     const [userPrompt, setUserPrompt] = useState('');
+    const [hydrated, setHydrated] = useState(false);
+
+    // Pre-fill prompt with hydrated template formula
+    useEffect(() => {
+        if (!template || hydrated) return;
+        const rawPrompt = template.promptTemplate || template.savedPrompt || '';
+        let resolvedPrompt = rawPrompt;
+        if (activeBrand && rawPrompt.includes('{')) {
+            const subs = {
+                '{brand_name}': activeBrand.name || '',
+                '{brand_tagline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                '{brand_color}': activeBrand.dna?.colors?.[0]?.hex || activeBrand.dna?.colors?.[0]?.name || '',
+                '{brand_personality}': activeBrand.dna?.personality || '',
+                '{brand_industry}': activeBrand.dna?.industry || '',
+                '{product_name}': activeBrand.name || '',
+                '{tagline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                '{headline}': activeBrand.tagline || activeBrand.dna?.tagline || '',
+                '{user_brief}': '',
+                '{packaging_description}': '',
+                '{product_description}': '',
+            };
+            for (const [placeholder, value] of Object.entries(subs)) {
+                resolvedPrompt = resolvedPrompt.replaceAll(placeholder, value);
+            }
+            resolvedPrompt = resolvedPrompt.replace(/\{[a-z_]+\}/g, '').replace(/\s{2,}/g, ' ').trim();
+        }
+        setUserPrompt(resolvedPrompt);
+        setHydrated(true);
+    }, [template, activeBrand, hydrated]);
 
     // Product image state — stores { preview: localObjectUrl, s3Url, uploading, error }
     const [productImg, setProductImg] = useState({ preview: null, s3Url: null, uploading: false, error: '' });
@@ -100,6 +129,7 @@ export default function TemplateGenerationModal({ template, onClose }) {
             // BUG-03 FIX: send S3 URLs, never base64
             const userInputs = {
                 userPrompt,
+                isFullPrompt: true, // Tells backend this is the complete base prompt, not just a brief
                 productImageUrl: productImg.s3Url || null,
                 avatarImageUrl: avatarImg.s3Url || null,
                 brandId: activeBrand?._id || null,

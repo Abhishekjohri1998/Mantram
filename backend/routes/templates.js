@@ -179,7 +179,7 @@ router.post('/:id/use', protect, async (req, res) => {
 
         const { userInputs = {} } = req.body;
         // Step 10 + BUG-03 FIX: Accept S3 URL strings — base64 deprecated
-        const { userPrompt, productImageUrl, avatarImageUrl, settings, brandId: inputBrandId } = userInputs;
+        const { userPrompt, isFullPrompt, productImageUrl, avatarImageUrl, settings, brandId: inputBrandId } = userInputs;
 
         // Resolve brandId — use provided, or fall back to user's first brand
         let brandId = inputBrandId || null;
@@ -204,6 +204,7 @@ router.post('/:id/use', protect, async (req, res) => {
         const promptData = await buildTemplatePrompt({
             template,
             userPrompt,
+            isFullPrompt,
             productImageUrl,
             avatarImageUrl,
             brandId,
