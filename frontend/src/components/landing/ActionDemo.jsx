@@ -48,9 +48,11 @@ export default function ActionDemo() {
                         ))}
                     </div>
                 </div>
+            </div>
 
-                {/* Video Player Container */}
-                <div className="relative w-full aspect-[21/9] md:aspect-video rounded-3xl overflow-hidden group cursor-pointer border border-white/10 bg-[#121214] shadow-2xl">
+            {/* Full-width Video Player Section */}
+            <div className="w-full px-4 md:px-8 mb-6">
+                <div className="relative w-full aspect-[21/9] md:aspect-video rounded-[32px] overflow-hidden group cursor-pointer border border-white/10 bg-[#121214] shadow-2xl">
                     {/* Ambient Glow */}
                     <div className="absolute inset-0 z-0">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] rounded-full blur-[100px] opacity-20 mix-blend-screen" style={{ background: BRAND.primary }} />
@@ -88,9 +90,11 @@ export default function ActionDemo() {
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
                 {/* Timeline Strip */}
-                <div className="w-full mt-6 grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+                <div className="w-full grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
                     {TIMELINE.map((item, idx) => (
                         <div key={idx} className="bg-[#121214] rounded-2xl p-4 border border-white/5 hover:border-white/20 transition-colors">
                             <div className="text-[11px] font-bold text-[#a1a1aa] mb-2">{item.time}</div>
