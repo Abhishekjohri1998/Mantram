@@ -39,15 +39,15 @@ export default function Testimonial() {
                     </div>
                 </div>
 
-                {/* Right side: Visual Placeholder */}
+                {/* Right side: Visual Portrait */}
                 <div className="w-full lg:w-[420px] shrink-0">
-                    <div className="w-full aspect-[4/5] rounded-[2rem] bg-gradient-to-br from-[#ea580c] to-[#431407] relative flex items-center justify-center shadow-2xl overflow-hidden">
-                        {/* Diagonal pattern */}
-                        <div className="absolute inset-0 opacity-10 mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)' }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
-                        <span className="relative z-10 text-[10px] font-bold text-white/50 tracking-[0.2em] uppercase">
-                            PORTRAIT · PRIYA MEHTA
-                        </span>
+                    <div className="w-full aspect-[4/5] rounded-[2rem] bg-gradient-to-br from-[#ea580c] to-[#431407] relative flex items-center justify-center shadow-2xl overflow-hidden group">
+                        <img 
+                            src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=800" 
+                            alt="Priya Mehta" 
+                            className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-80 group-hover:scale-105 transition-transform duration-700" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                     </div>
                 </div>
 
