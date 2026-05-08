@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
         worksheet.addRow({
             date: new Date().toLocaleString(),
             type: type || 'individual',
-            name,
+            name: name || '-',
             email,
             company: company || '-',
             role: role || '-',
@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
             subject: 'You are on the list! Welcome to Mantram AI ✨',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-                    <h2 style="color: #6366f1;">Hi ${name.split(' ')[0]},</h2>
+                    <h2 style="color: #6366f1;">Hi ${(name || '').split(' ')[0] || email.split('@')[0]},</h2>
                     <p>Thank you for requesting early access to <strong>Mantram AI</strong>!</p>
                     <p>Your spot on the waitlist has been secured. We are rolling out access in batches to ensure the best possible experience for our users.</p>
                     <p>We're building an entirely new way to handle marketing with AI agents, and we can't wait for you to try it.</p>
@@ -130,13 +130,13 @@ router.post('/', async (req, res) => {
         const teamMailOptions = {
             from: `"Mantram AI Waitlist" <${env.email.user}>`,
             to: env.email.user, // Send to damantram.ai@gmail.com
-            subject: `🎉 New Waitlist Sign-up: ${name} (${type})`,
+            subject: `🎉 New Waitlist Sign-up: ${name || email} (${type})`,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                     <h2>New Waitlist Submission! 🚀</h2>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
                         <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Type:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${type || 'individual'}</td></tr>
-                        <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td></tr>
+                        <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Name:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${name || '(not provided)'}</td></tr>
                         <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Email:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${email}</td></tr>
                         <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Company:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${company || '-'}</td></tr>
                         <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Role:</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${role || '-'}</td></tr>

@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 const waitlistSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: true,
-        trim: true
+        trim: true,
+        default: ''
     },
     email: {
         type: String,

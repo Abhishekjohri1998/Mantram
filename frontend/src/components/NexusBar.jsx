@@ -108,8 +108,11 @@ export default function NexusBar() {
         }])
     }, [activeBrand?._id])
 
-    // ── Load briefing on mount ──
+    // ── Load briefing on mount (only if authenticated) ──
     useEffect(() => {
+        const token = localStorage.getItem('mantram_token')
+        if (!token) return // Skip on public pages (landing, auth)
+
         const alreadyShown = sessionStorage.getItem(BRIEFING_SESSION_KEY)
         if (alreadyShown) return
 
@@ -132,8 +135,10 @@ export default function NexusBar() {
         return () => { cancelled = true; clearTimeout(timer) }
     }, [])
 
-    // ── Load notifications ──
+    // ── Load notifications (only if authenticated) ──
     const loadNotifications = useCallback(async () => {
+        const token = localStorage.getItem('mantram_token')
+        if (!token) return // Skip on public pages
         try {
             const data = await nexusAPI.notifications(brandId)
             if (data.success) setNotifications(data.notifications || [])
