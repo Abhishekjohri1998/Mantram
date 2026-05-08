@@ -188,6 +188,15 @@ async function publishScheduledPost(post) {
                 postId = await publishCarouselToInstagram(account.accountId, account.accessToken, caption, carouselUrls);
             } else if (post.platform === 'linkedin') {
                 postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, caption, carouselUrls);
+            } else if (post.platform === 'twitter') {
+                // Twitter doesn't support carousels — post first image with per-user credentials
+                const twCreds = {
+                    apiKey: config.twitter.apiKey,
+                    apiSecret: config.twitter.apiSecret,
+                    accessToken: account.accessToken,
+                    accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
+                };
+                postId = await publishToTwitter(caption, carouselUrls[0], null, twCreds);
             }
         } else {
             // ── Single image/video/text publish ──
@@ -198,7 +207,14 @@ async function publishScheduledPost(post) {
             } else if (post.platform === 'linkedin') {
                 postId = await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
             } else if (post.platform === 'twitter') {
-                postId = await publishToTwitter(caption, absoluteImageUrl, absoluteVideoUrl);
+                // Use per-user tokens stored in SocialAccount — not global app credentials
+                const twCreds = {
+                    apiKey: config.twitter.apiKey,
+                    apiSecret: config.twitter.apiSecret,
+                    accessToken: account.accessToken,
+                    accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
+                };
+                postId = await publishToTwitter(caption, absoluteImageUrl, absoluteVideoUrl, twCreds);
             } else {
                 post.status = 'failed';
                 post.error = `Unsupported platform: ${post.platform}`;

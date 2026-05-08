@@ -6,7 +6,8 @@ import { requireCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import SocialStrategy from '../models/SocialStrategy.js';
 import SocialAccount from '../models/SocialAccount.js';
-import { fetchRecentPosts } from '../services/socialService.js';
+import SocialPost from '../models/SocialPost.js';
+import { fetchRecentPosts, fetchPostAnalytics } from '../services/socialService.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
 import { buildBrandContext } from '../agents/shared/agentUtils.js';
@@ -131,6 +132,33 @@ async function collectStrategyIntelligence(userId, brand, platforms) {
         const liveResults = await Promise.allSettled(livePostPromises);
         for (const r of liveResults) {
             if (r.status === 'fulfilled') intel.recentPlatformPosts.push(...r.value);
+        }
+
+        // Fetch analytics for the last 5 published posts per platform (non-blocking)
+        // This gives the strategy real performance data to reason from.
+        const recentPublished = publishedPosts.slice(0, 10).filter(p => p.postId);
+        const analyticsPromises = recentPublished.map(async (p) => {
+            const account = accounts.find(a => a.platform === p.platform && a.accountId === p.accountId);
+            if (!account?.accessToken) return null;
+            try {
+                const stats = await fetchPostAnalytics(p.postId, account.accessToken, p.platform);
+                if (stats) {
+                    // Persist analytics back to DB for future strategy use
+                    await SocialPost.findByIdAndUpdate(p._id, {
+                        analytics: { ...stats, fetchedAt: new Date() }
+                    }).catch(() => {});
+                    return { platform: p.platform, caption: (p.caption || '').substring(0, 80), publishedAt: p.publishedAt || p.createdAt, stats };
+                }
+            } catch (e) { /* non-fatal */ }
+            return null;
+        });
+        const analyticsResults = await Promise.allSettled(analyticsPromises);
+        const enrichedAnalytics = analyticsResults
+            .filter(r => r.status === 'fulfilled' && r.value)
+            .map(r => r.value);
+        if (enrichedAnalytics.length) {
+            intel.postAnalytics = enrichedAnalytics;
+            console.log(`[STRATEGY-INTEL] Fetched analytics for ${enrichedAnalytics.length} published posts`);
         }
 
         // Post history summary
@@ -380,6 +408,16 @@ function formatIntelligenceContext(intel, calendar) {
         sections.push(`📚 BRAND KNOWLEDGE BANK:\n${kb}`);
     }
 
+    // 8. Post Analytics (real engagement data)
+    if (intel.postAnalytics?.length) {
+        const analyticsText = intel.postAnalytics.map(a =>
+            `- [${a.platform}] "${a.caption}" → Likes: ${a.stats.likes ?? 'N/A'}, Comments: ${a.stats.comments ?? 'N/A'}, Impressions: ${a.stats.impressions ?? 'N/A'}${a.stats.retweets ? `, Retweets: ${a.stats.retweets}` : ''} (${new Date(a.publishedAt).toLocaleDateString()})`
+        ).join('\n');
+        sections.push(`📊 REAL POST PERFORMANCE (live from platform API):\n${analyticsText}\n⚠️ Use these EXACT numbers in your data insights. Do NOT modify them.`);
+    } else {
+        sections.push('📊 REAL POST PERFORMANCE: Analytics not yet available for recent posts (posts may have no postId, or platform API returned no data).');
+    }
+
     return sections.length > 0 ? sections.join('\n\n') : 'No additional data available — generate strategy based on brand context alone.';
 }
 
@@ -418,6 +456,37 @@ router.post('/generate-strategy', protect, requireStudio('socialMediaStudio'), r
 
 ═══════════════ BRAND CONTEXT ═══════════════
 ${brandCtx}
+
+═══════════════ PLATFORM ALGORITHM INTELLIGENCE — 2026 CURRENT ═══════════════
+These are VERIFIED algorithm signals for 2026. You MUST reference these specifically in your platform strategies and growth tactics.
+
+🔵 LINKEDIN 2026 ALGORITHM SIGNALS:
+1. **Document posts (PDFs/carousels)** = highest organic reach of any format. LinkedIn boosts them 3-4x over regular posts because they drive the highest dwell time.
+2. **Dwell time > likes**: The algorithm measures HOW LONG people stop and read. A 1,200-word text post that people spend 2+ minutes reading outranks a viral 50-word post.
+3. **First-hour engagement velocity** = #1 ranking signal. Posts that get engagement within the first 60 minutes get amplified to second-degree connections. Posting time is CRITICAL.
+4. **Hashtags: 3-5 max**. More than 5 tanks reach. Use 1 branded + 2 niche industry tags + 1 trending.
+5. **Native video > external links**. LinkedIn suppresses posts with external URLs in the body by 40-70%. Put links in first comment always.
+6. **Polls trigger algorithm boost** — they signal engagement intent, driving reach to non-followers.
+7. **LinkedIn Newsletter = algorithm moat** — subscribers get notification for every issue. Building a newsletter compounds reach over time.
+8. **Top Voice badge / Creator Mode**: Activating Creator Mode and building toward Top Voice status gets organic amplification on relevant searches.
+9. **Comment depth > comment count**: 5 replies in a thread = better signal than 5 separate comments.
+10. **Best posting times (IST)**: Tuesday–Thursday 8–9 AM or 12–1 PM. Avoid Friday afternoons and weekends.
+11. **Optimal posting frequency**: 3-5x/week maximum. Over-posting (daily+) suppresses reach per post by 30%.
+12. **Collaborative articles / co-authorship** = new 2026 reach hack for B2B brands.
+
+🐦 TWITTER / X 2026 ALGORITHM SIGNALS:
+1. **Long-form posts (500+ chars with line breaks)** get 3x more impressions than short tweets. The algorithm now favors depth over brevity.
+2. **External links KILL reach by ~70%**. Never put links in the tweet body. Always reply to your own tweet with the link immediately after posting.
+3. **Bookmarks > likes** as a reach signal in 2026. Content that people save gets amplified to their network. Create content worth bookmarking (stats, frameworks, how-tos).
+4. **Reply within first 30 minutes** of posting: Engaging with replies quickly in the first 30 min triggers the algorithm to push the post further.
+5. **Thread format consistently outperforms single tweets** for brand-building content. 5-7 tweet threads work best.
+6. **X Premium (verification)** gives a ~20-30% reach multiplier. Brands with Premium posting get priority in the For You feed.
+7. **Communities posting**: Posting in relevant X Communities reaches highly engaged niche audiences — massively underutilized by brands in 2026.
+8. **Quote tweets > retweets**: Quoting trending posts with your perspective drives more profile visits than a standard RT.
+9. **Spaces appearances**: Joining audio Spaces as a speaker drives follower growth spikes — 2-3x profile visit rate during/after Space.
+10. **Video tweets** (native upload, not YouTube links) get 10x more reach than text-only tweets.
+11. **Best posting times (IST)**: Tuesday 9–11 AM, Wednesday 9 AM–12 PM, Thursday 8–10 AM. Worst: Friday–Sunday mornings.
+12. **Avoid: hashtag spam** (2+ hashtags reduces reach), controversial reply-bait, repeated posting of same content.
 
 ═══════════════ LIVE DATA & ANALYTICS ═══════════════
 ${intelligenceContext}

@@ -19,6 +19,8 @@ import {
     publishToLinkedIn,
     publishCarouselToLinkedIn,
     publishToTwitter,
+    getTwitterOAuthRequestToken,
+    exchangeTwitterVerifier,
     fetchRecentPosts,
     fetchPostAnalytics
 } from '../services/socialService.js';
@@ -81,26 +83,32 @@ router.get('/auth/:platform', protect, async (req, res) => {
 
         const state = signState(`${req.user._id.toString()}:${platform}:${Buffer.from(origin).toString('base64')}`);
 
-        // Twitter/X uses app-level OAuth 1.0a tokens — auto-connect instead of redirect
+        // Twitter/X — proper OAuth 1.0a three-legged flow
+        // Each user connects their OWN X account instead of sharing Mantram AI's handle.
         if (platform === 'twitter') {
-            const { apiKey, accessToken } = config.twitter;
-            if (!apiKey || !accessToken) {
-                return res.status(400).json({ success: false, error: 'Twitter API credentials not configured on server' });
+            const { apiKey } = config.twitter;
+            if (!apiKey) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Twitter API credentials are not configured on this server. Ask your admin to add TWITTER_API_KEY and TWITTER_API_SECRET to the environment.'
+                });
             }
-            // Auto-register the Twitter account for this user
-            await SocialAccount.findOneAndUpdate(
-                { user: req.user._id, platform: 'twitter', accountId: 'mantram_x' },
-                {
-                    user: req.user._id,
-                    platform: 'twitter',
-                    accountId: 'mantram_x',
-                    accountName: 'Mantram AI (X)',
-                    accessToken: accessToken,
-                    isActive: true,
-                },
-                { upsert: true, returnDocument: 'after' }
-            );
-            return res.json({ success: true, autoConnected: true, message: 'Twitter/X account connected!' });
+            try {
+                const callbackUrl = `${config.backendUrl}/api/social/auth/twitter/callback`;
+                const { oauthToken, oauthTokenSecret } = await getTwitterOAuthRequestToken(callbackUrl);
+                // Store secret keyed by oauthToken (Twitter doesn't pass state through callback)
+                pendingTwitterOAuth.set(oauthToken, {
+                    secret: oauthTokenSecret,
+                    userId: req.user._id.toString(),
+                    origin,
+                    expiresAt: Date.now() + 10 * 60 * 1000, // 10 min TTL
+                });
+                const authUrl = `https://api.twitter.com/oauth/authenticate?oauth_token=${oauthToken}`;
+                return res.json({ success: true, authUrl });
+            } catch (twErr) {
+                console.error('[SOCIAL] Twitter request token error:', twErr.response?.data || twErr.message);
+                return res.status(500).json({ success: false, error: twErr.message || 'Failed to initiate Twitter OAuth' });
+            }
         }
 
         const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
@@ -110,6 +118,16 @@ router.get('/auth/:platform', protect, async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to generate auth URL' });
     }
 });
+
+// ── In-memory store for pending Twitter OAuth requests (TTL: 10 minutes) ──
+// Map<oauthToken, { secret, userId, origin, expiresAt }>
+const pendingTwitterOAuth = new Map();
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of pendingTwitterOAuth.entries()) {
+        if (v.expiresAt < now) pendingTwitterOAuth.delete(k);
+    }
+}, 60_000);
 
 /**
  * @route   GET /api/social/auth/facebook/callback
@@ -246,6 +264,69 @@ router.get('/auth/linkedin/callback', async (req, res) => {
     } catch (error) {
         console.error('LinkedIn Callback Error:', error);
         res.redirect(`${targetFrontend}/integrations?social=processing_failed&platform=linkedin`);
+    }
+});
+
+/**
+ * @route   GET /api/social/auth/twitter/callback
+ * @desc    Handle Twitter OAuth 1.0a callback — exchange verifier for user access tokens
+ * @access  Public (redirected by Twitter)
+ */
+router.get('/auth/twitter/callback', async (req, res) => {
+    const { oauth_token, oauth_verifier, denied } = req.query;
+    let targetFrontend = config.frontendUrl[0];
+
+    // Look up the pending request (carries origin + userId)
+    const pending = pendingTwitterOAuth.get(oauth_token);
+    if (pending?.origin) {
+        try { targetFrontend = getSafeRedirectUrl(Buffer.from(pending.origin).toString('base64')); } catch { }
+    }
+
+    if (denied) {
+        pendingTwitterOAuth.delete(oauth_token);
+        return res.redirect(`${targetFrontend}/integrations?social=denied&platform=twitter`);
+    }
+
+    if (!oauth_token || !oauth_verifier || !pending) {
+        return res.redirect(`${targetFrontend}/integrations?social=invalid_request&platform=twitter`);
+    }
+
+    try {
+        pendingTwitterOAuth.delete(oauth_token); // consume it
+
+        // Exchange verifier for permanent access tokens
+        const twitterCreds = await exchangeTwitterVerifier(oauth_token, pending.secret, oauth_verifier);
+
+        const userExists = await mongoose.model('User').findById(pending.userId);
+        if (!userExists) {
+            return res.redirect(`${targetFrontend}/integrations?social=user_not_found&platform=twitter`);
+        }
+
+        // Upsert the SocialAccount with user-specific tokens
+        await SocialAccount.findOneAndUpdate(
+            { user: pending.userId, platform: 'twitter', accountId: twitterCreds.userId },
+            {
+                user: pending.userId,
+                platform: 'twitter',
+                accountId: twitterCreds.userId,
+                accountName: `@${twitterCreds.screenName}`,
+                accessToken: twitterCreds.accessToken,
+                // Store secret in metadata — the SocialAccount schema's accessToken field
+                // only holds one token; we put the secret here so publishToTwitter can use it.
+                metadata: {
+                    accessTokenSecret: twitterCreds.accessTokenSecret,
+                    screenName: twitterCreds.screenName,
+                },
+                isActive: true,
+            },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        console.log(`[SOCIAL] ✅ Twitter @${twitterCreds.screenName} connected for user ${pending.userId}`);
+        res.redirect(`${targetFrontend}/integrations?social=success&platform=twitter`);
+    } catch (error) {
+        console.error('[SOCIAL] Twitter Callback Error:', error.response?.data || error.message);
+        res.redirect(`${targetFrontend}/integrations?social=processing_failed&platform=twitter`);
     }
 });
 
@@ -580,8 +661,14 @@ router.post('/publish', protect, async (req, res) => {
                     } else if (account.platform === 'linkedin') {
                         postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, postText, carouselUrls);
                     } else if (account.platform === 'twitter') {
-                        // Twitter doesn't support carousel — post first image
-                        postId = await publishToTwitter(postText, carouselUrls[0], null);
+                        // Twitter doesn't support carousel — post first image with per-user credentials
+                        const twCreds = {
+                            apiKey: config.twitter.apiKey,
+                            apiSecret: config.twitter.apiSecret,
+                            accessToken: account.accessToken,
+                            accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
+                        };
+                        postId = await publishToTwitter(postText, carouselUrls[0], null, twCreds);
                     }
                 } else {
                     // Single image/video publish
@@ -592,7 +679,13 @@ router.post('/publish', protect, async (req, res) => {
                     } else if (account.platform === 'linkedin') {
                         postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
                     } else if (account.platform === 'twitter') {
-                        postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl);
+                        const twCreds = {
+                            apiKey: config.twitter.apiKey,
+                            apiSecret: config.twitter.apiSecret,
+                            accessToken: account.accessToken,
+                            accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
+                        };
+                        postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl, twCreds);
                     }
                 }
 
