@@ -1,9 +1,10 @@
 import React from 'react';
 import { Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import useReveal from '../../hooks/useReveal';
 import { BRAND } from '../../data/studios';
 
-export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
+export default function Pricing() {
     const revealRef = useReveal();
 
     return (
@@ -39,12 +40,12 @@ export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
                             <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Standard support</span>
                         </div>
                         
-                        <button 
-                            onClick={onEarlyAccess}
-                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8"
+                        <Link 
+                            to="/auth?mode=signup"
+                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8 text-center block"
                         >
                             Start trial
-                        </button>
+                        </Link>
                     </div>
 
                     {/* Enterprise */}
@@ -67,12 +68,12 @@ export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
                             <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Dedicated CSM</span>
                         </div>
                         
-                        <button 
-                            onClick={onAgencyDemo || onEarlyAccess}
-                            className="w-full py-3 rounded-xl bg-[#FF5A1F] text-white font-bold text-sm hover:bg-[#e04a14] transition-colors mt-8"
+                        <Link 
+                            to="/auth?mode=signup"
+                            className="w-full py-3 rounded-xl bg-[#FF5A1F] text-white font-bold text-sm hover:bg-[#e04a14] transition-colors mt-8 text-center block"
                         >
                             Book a demo
-                        </button>
+                        </Link>
                     </div>
 
                     {/* Studio Lite */}
@@ -91,12 +92,12 @@ export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
                             <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Community support</span>
                         </div>
                         
-                        <button 
-                            onClick={onEarlyAccess}
-                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8"
+                        <Link 
+                            to="/auth?mode=signup"
+                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8 text-center block"
                         >
                             Get started
-                        </button>
+                        </Link>
                     </div>
 
                 </div>

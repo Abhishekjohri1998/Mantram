@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import SEOHead from '../components/SEOHead'
 
@@ -16,7 +15,6 @@ import Pricing from '../components/landing/Pricing'
 import FAQ from '../components/landing/FAQ'
 import FinalCTA from '../components/landing/FinalCTA'
 import Footer from '../components/landing/Footer'
-import WaitlistModal from '../components/landing/WaitlistModal'
 import CursorGlow from '../components/landing/CursorGlow'
 
 import { BRAND } from '../data/studios'
@@ -31,12 +29,6 @@ import { BRAND } from '../data/studios'
  */
 export default function Landing() {
     const { isAuthenticated } = useAuth()
-    const [modalOpen, setModalOpen] = useState(false)
-    const [modalType, setModalType] = useState('individual')
-
-    const openEarlyAccess = () => { setModalType('individual'); setModalOpen(true) }
-    const openAgencyDemo  = () => { setModalType('enterprise'); setModalOpen(true) }
-    const closeModal      = () => setModalOpen(false)
 
     return (
         <>
@@ -55,12 +47,10 @@ export default function Landing() {
 
                 <Nav
                     isAuthenticated={isAuthenticated}
-                    onEarlyAccess={openEarlyAccess}
-                    onAgencyDemo={openAgencyDemo}
                 />
 
                 <main role="main" className="relative z-[2]">
-                    <Hero onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <Hero />
                     <FeaturedVideos />
                     <ActionDemo />
                     <TrustLogos />
@@ -69,18 +59,13 @@ export default function Landing() {
                     <HowItWorks />
                     <CaseStudies />
                     <Testimonial />
-                    <Pricing onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <Pricing />
                     <FAQ />
-                    <FinalCTA onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <FinalCTA />
                 </main>
 
                 <Footer />
 
-                <WaitlistModal
-                    open={modalOpen}
-                    initialType={modalType}
-                    onClose={closeModal}
-                />
             </div>
         </>
     )

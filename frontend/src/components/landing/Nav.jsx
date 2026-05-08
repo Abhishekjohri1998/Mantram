@@ -7,7 +7,7 @@ import { BRAND } from '../../data/studios'
  * Two CTAs in the top-right mirror the hero buttons so visitors can convert
  * from any scroll depth.
  */
-export default function Nav({ onEarlyAccess, onAgencyDemo, isAuthenticated }) {
+export default function Nav({ onAgencyDemo, isAuthenticated }) {
     const [scrolled, setScrolled] = useState(false)
 
     useEffect(() => {
@@ -64,20 +64,20 @@ export default function Nav({ onEarlyAccess, onAgencyDemo, isAuthenticated }) {
                             >
                                 Sign in
                             </Link>
-                            <button
-                                onClick={onEarlyAccess}
+                            <Link
+                                to="/auth?mode=signup"
                                 className="hidden sm:inline-flex text-[13px] font-medium py-2 px-4 rounded-full transition-all hover:bg-white/5 cursor-pointer"
                                 style={{ color: 'white', border: `1px solid rgba(255,255,255,0.15)` }}
                             >
-                                Join waitlist
-                            </button>
-                            <button
-                                onClick={onEarlyAccess}
+                                Request Access
+                            </Link>
+                            <Link
+                                to="/auth?mode=signup"
                                 className="text-[13px] font-bold py-2 px-5 rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
                                 style={{ background: BRAND.primary, color: 'white' }}
                             >
                                 Book a Demo <span aria-hidden="true">→</span>
-                            </button>
+                            </Link>
                         </>
                     )}
                 </div>

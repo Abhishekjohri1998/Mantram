@@ -23,6 +23,7 @@ export default function Auth() {
     const [showForgot, setShowForgot] = useState(false)
     const [forgotEmail, setForgotEmail] = useState('')
     const [forgotMessage, setForgotMessage] = useState('')
+    const [successMessage, setSuccessMessage] = useState('')
     const [forgotLoading, setForgotLoading] = useState(false)
     const pollingRef = useRef(null)
 
@@ -96,6 +97,7 @@ export default function Auth() {
         e.preventDefault()
         setLoading(true)
         setError('')
+        setSuccessMessage('')
         try {
             let res;
             if (isLogin) {
@@ -110,10 +112,13 @@ export default function Auth() {
                     } catch (e) {}
                 }
                 res = await register(form.name, form.email, form.password, form.company, initialWebsite)
-            }
-
-
-            // After auth, redirect to intended destination
+                if (!res.token) {
+                    setIsLogin(true);
+                    setForm(prev => ({ ...prev, password: '' }));
+                    setSuccessMessage('Access request received! We will notify you via email once your account is approved.');
+                    return;
+                }
+            }            // After auth, redirect to intended destination
             let dest = redirect;
             
             // Logic for "New user vs Older user" redirection
@@ -193,7 +198,7 @@ export default function Auth() {
                         <h1 className="text-2xl font-extrabold text-[var(--sys-text)] tracking-tight">Mantram AI</h1>
                     </div>
                     <p className="text-[var(--sys-text-muted)] text-sm">
-                        {isLogin ? 'Welcome back. Sign in to continue.' : 'Create your account to get started.'}
+                        {isLogin ? 'Welcome back. Sign in to continue.' : 'Apply for early access to Mantram AI.'}
                     </p>
 
                     {/* Plan context banner */}
@@ -222,10 +227,10 @@ export default function Auth() {
                                 }`}>
                             Sign In
                         </button>
-                        <button onClick={() => { setIsLogin(false); setError('') }}
+                        <button onClick={() => { setIsLogin(false); setError(''); setSuccessMessage(''); }}
                             className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${!isLogin ? 'bg-primary text-white shadow-lg' : 'text-[var(--sys-text-muted)] hover:text-white'
                                 }`}>
-                            Sign Up
+                            Request Access
                         </button>
                     </div>
 
@@ -324,6 +329,12 @@ export default function Auth() {
                                 <span className="material-symbols-outlined text-lg">error</span> {error}
                             </div>
                         )}
+                        {successMessage && (
+                            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm flex items-start gap-2">
+                                <span className="material-symbols-outlined text-lg shrink-0">check_circle</span> 
+                                <span>{successMessage}</span>
+                            </div>
+                        )}
 
                         <button type="submit" disabled={loading}
                             className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold disabled:opacity-50">
@@ -333,7 +344,7 @@ export default function Auth() {
                                     {isLogin ? 'Signing in...' : 'Creating account...'}
                                 </span>
                             ) : (
-                                isLogin ? 'Sign In' : 'Create Account'
+                                isLogin ? 'Sign In' : 'Request Access'
                             )}
                         </button>
                     </form>
