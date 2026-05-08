@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import SEOHead from '../components/SEOHead'
 
@@ -8,7 +7,11 @@ import FeaturedVideos from '../components/landing/FeaturedVideos'
 import ActionDemo from '../components/landing/ActionDemo'
 import TrustLogos from '../components/landing/TrustLogos'
 import IntelligenceLayer from '../components/landing/IntelligenceLayer'
+import Metrics from '../components/landing/Metrics'
+import Comparison from '../components/landing/Comparison'
 import StudiosShowcase from '../components/landing/StudiosShowcase'
+import Integrations from '../components/landing/Integrations'
+import FeaturedStudios from '../components/landing/FeaturedStudios'
 import HowItWorks from '../components/landing/HowItWorks'
 import CaseStudies from '../components/landing/CaseStudies'
 import Testimonial from '../components/landing/Testimonial'
@@ -16,7 +19,6 @@ import Pricing from '../components/landing/Pricing'
 import FAQ from '../components/landing/FAQ'
 import FinalCTA from '../components/landing/FinalCTA'
 import Footer from '../components/landing/Footer'
-import WaitlistModal from '../components/landing/WaitlistModal'
 import CursorGlow from '../components/landing/CursorGlow'
 
 import { BRAND } from '../data/studios'
@@ -31,12 +33,6 @@ import { BRAND } from '../data/studios'
  */
 export default function Landing() {
     const { isAuthenticated } = useAuth()
-    const [modalOpen, setModalOpen] = useState(false)
-    const [modalType, setModalType] = useState('individual')
-
-    const openEarlyAccess = () => { setModalType('individual'); setModalOpen(true) }
-    const openAgencyDemo  = () => { setModalType('enterprise'); setModalOpen(true) }
-    const closeModal      = () => setModalOpen(false)
 
     return (
         <>
@@ -55,32 +51,29 @@ export default function Landing() {
 
                 <Nav
                     isAuthenticated={isAuthenticated}
-                    onEarlyAccess={openEarlyAccess}
-                    onAgencyDemo={openAgencyDemo}
                 />
 
                 <main role="main" className="relative z-[2]">
-                    <Hero onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <Hero />
                     <FeaturedVideos />
-                    <ActionDemo />
+                    <div id="templates"><ActionDemo /></div>
                     <TrustLogos />
                     <IntelligenceLayer />
-                    <StudiosShowcase />
-                    <HowItWorks />
-                    <CaseStudies />
+                    <Metrics />
+                    <Comparison />
+                    <div id="studios"><StudiosShowcase /></div>
+                    <Integrations />
+                    <FeaturedStudios />
+                    <div id="how-it-works"><HowItWorks /></div>
+                    <div id="case-studies"><CaseStudies /></div>
                     <Testimonial />
-                    <Pricing onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <div id="pricing"><Pricing /></div>
                     <FAQ />
-                    <FinalCTA onEarlyAccess={openEarlyAccess} onAgencyDemo={openAgencyDemo} />
+                    <div id="agencies"><FinalCTA /></div>
                 </main>
 
                 <Footer />
 
-                <WaitlistModal
-                    open={modalOpen}
-                    initialType={modalType}
-                    onClose={closeModal}
-                />
             </div>
         </>
     )

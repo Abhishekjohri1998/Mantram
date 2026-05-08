@@ -13,7 +13,8 @@ const CASES = [
             { value: '68', label: 'SPOTS' },
             { value: '₹0.04', label: 'CPV' }
         ],
-        gradient: 'from-[#be123c] to-[#4c0519]' // Pink/Red gradient
+        gradient: 'from-[#be123c] to-[#4c0519]', // Pink/Red gradient
+        image: 'https://images.unsplash.com/photo-1540039155732-d68a9fc897bc?auto=format&fit=crop&q=80&w=800'
     },
     {
         brand: 'Tata 1mg',
@@ -23,7 +24,8 @@ const CASES = [
             { value: '4.1M', label: 'IMPRESSIONS' },
             { value: '38', label: 'ASSETS' }
         ],
-        gradient: 'from-[#0e7490] to-[#164e63]' // Cyan gradient
+        gradient: 'from-[#0e7490] to-[#164e63]', // Cyan gradient
+        image: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=800'
     },
     {
         brand: 'Britannia',
@@ -33,7 +35,8 @@ const CASES = [
             { value: '8.2M', label: 'REACH' },
             { value: '54', label: 'LOCALIZATIONS' }
         ],
-        gradient: 'from-[#b45309] to-[#78350f]' // Gold/Brown gradient
+        gradient: 'from-[#b45309] to-[#78350f]', // Gold/Brown gradient
+        image: 'https://images.unsplash.com/photo-1514222709107-a180c68d72b4?auto=format&fit=crop&q=80&w=800'
     }
 ];
 
@@ -67,9 +70,15 @@ export default function CaseStudies() {
                             className="rounded-[2rem] overflow-hidden flex flex-col bg-[#121214] border border-white/5 group hover:border-white/10 transition-colors h-[500px]"
                         >
                             {/* Top Half - Gradient */}
-                            <div className={`flex-1 bg-gradient-to-br ${item.gradient} p-8 relative flex flex-col items-center justify-center`}>
-                                {/* Diagonal line pattern overlay */}
-                                <div className="absolute inset-0 opacity-10 mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)' }} />
+                            <div className={`flex-1 bg-gradient-to-br ${item.gradient} p-8 relative flex flex-col items-center justify-center overflow-hidden`}>
+                                {item.image ? (
+                                    <>
+                                        <img src={item.image} alt={item.brand} className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay group-hover:scale-105 transition-transform duration-700" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
+                                    </>
+                                ) : (
+                                    <div className="absolute inset-0 opacity-10 mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)' }} />
+                                )}
                                 
                                 <span className="absolute top-8 left-8 text-white font-bold text-xl tracking-tight z-10">
                                     {item.brand}

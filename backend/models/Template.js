@@ -104,6 +104,10 @@ const templateSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    showOnHomeScreen: {
+        type: Boolean,
+        default: false
+    },
     usageCount: {
         type: Number,
         default: 0

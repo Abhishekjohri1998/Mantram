@@ -16,7 +16,6 @@ export default function SuperAdminDashboard() {
     const [stats, setStats] = useState(null)
     const [users, setUsers] = useState([])
     const [pendingUsers, setPendingUsers] = useState([])
-    const [waitlist, setWaitlist] = useState([])
     const [totalUsers, setTotalUsers] = useState(0)
     const [coupons, setCoupons] = useState([])
     const [retentionOffers, setRetentionOffers] = useState([])
@@ -152,7 +151,6 @@ export default function SuperAdminDashboard() {
         ]},
         { label: 'People', icon: 'group', items: [
             { id: 'approvals', label: 'Approvals', icon: 'how_to_reg', badge: pendingUsers?.length },
-            { id: 'waitlist', label: 'Waitlist', icon: 'list_alt', badge: waitlist?.length },
             { id: 'users', label: 'Users', icon: 'person_search' },
             { id: 'ai-credits', label: 'AI Usage', icon: 'token' },
         ]},
@@ -191,7 +189,6 @@ export default function SuperAdminDashboard() {
         if (tab === 'users' || tab === 'ai-credits') { loadUsers(); if (tab === 'users') loadSegmentCounts() }
         if (tab === 'tokenUsage' || tab === 'overview') loadTokenUsage()
         if (tab === 'approvals') loadPendingUsers()
-        if (tab === 'waitlist') loadWaitlist()
         if (tab === 'coupons') loadCoupons()
         if (tab === 'retentionOffers') loadRetentionOffers()
         if (tab === 'storeConfig') { loadSettings(); loadCreditCosts() }
@@ -224,7 +221,6 @@ export default function SuperAdminDashboard() {
     }
     const loadLogs = async () => { setLogsLoading(true); try { const d = await API.getSystemLogs({ page: logsPage, limit: 50 }); setLogs(d.logs || []); setTotalLogs(d.total || 0) } catch (e) { console.error(e) } finally { setLogsLoading(false) } }
     const loadPendingUsers = async () => { try { const d = await API.getUsers({ approvalStatus: 'pending', limit: 50 }); setPendingUsers(d.users || []) } catch (e) { console.error(e) } }
-    const loadWaitlist = async () => { try { const d = await API.getWaitlist(); setWaitlist(d.waitlist || []) } catch (e) { console.error(e) } }
     const loadCoupons = async () => { try { const d = await API.getCoupons(); setCoupons(d.coupons || []) } catch (e) { console.error(e) } }
     const loadRetentionOffers = async () => { try { const d = await API.getRetentionOffers(); setRetentionOffers(d.offers || []) } catch (e) { console.error(e) } }
     const loadBrands = async () => { try { const d = await API.getBrands({ limit: 50 }); setBrands(d.brands || []); setTotalBrands(d.total || 0) } catch (e) { console.error(e) } }
@@ -357,28 +353,6 @@ export default function SuperAdminDashboard() {
         } 
     }
 
-    const handleDeleteWaitlist = async (id) => {
-        if (!confirm('Remove this entry from waitlist?')) return;
-        try {
-            await API.deleteWaitlist(id);
-            showToast('Waitlist entry removed');
-            loadWaitlist();
-            loadStats();
-        } catch (e) {
-            showToast(e.message || 'Failed to remove entry', 'error');
-        }
-    }
-
-    const handleApproveWaitlist = async (id) => {
-        try {
-            await API.approveWaitlist(id);
-            showToast('Invitation email sent!');
-            loadWaitlist();
-        } catch (e) {
-            showToast(e.message || 'Failed to send invite', 'error');
-        }
-    }
-    
     const handleApproveUser = async (id) => { 
         try { 
             await API.approveUser(id); 

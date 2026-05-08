@@ -1,112 +1,97 @@
 import React from 'react';
-import { Check, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import useReveal from '../../hooks/useReveal';
-import { BRAND } from '../../data/studios';
-
-const SHOWCASES = [
-    {
-        id: 'creative',
-        eyebrow: '01 · CREATIVE STUDIO',
-        title: <>From prompt to <span className="italic" style={{ color: BRAND.primary }}>brand-true asset</span> in under 30 seconds.</>,
-        description: 'Lock your brand fonts, palette, logos and tone of voice once. Every output respects them — no re-prompting, no review purgatory.',
-        features: ['Brand book parser', 'Approval workflows', 'Multi-format export', 'Version history'],
-        placeholderText: 'CREATIVE STUDIO · BRAND ASSET PREVIEW',
-        placeholderColor: '#1e3a8a', // Dark blue
-        reverse: false
-    },
-    {
-        id: 'video',
-        eyebrow: '02 · VIDEO STUDIO',
-        title: <>Cinematic <span className="italic" style={{ color: BRAND.primary }}>6-second</span> spots for every channel, at scale.</>,
-        description: 'From concert Q-ads to product reels — direct, edit, and export in one place. Your team stays in the creative seat.',
-        features: ['16:9, 9:16, 1:1', 'Voice-over library', 'Auto-localization', 'Stock + custom'],
-        placeholderText: 'VIDEO STUDIO · 6S SPOT TIMELINE',
-        placeholderColor: '#7c2d12', // Dark orange/brown
-        reverse: true
-    },
-    {
-        id: 'pulse',
-        eyebrow: '03 · PULSE STUDIO',
-        title: <>The <span className="italic" style={{ color: BRAND.primary }}>signal</span>, not the noise.</>,
-        description: 'Real-time performance, audience reactions and creative recommendations — in one feed, refreshed every 15 minutes.',
-        features: ['Live dashboards', 'Creative scoring', 'Anomaly alerts', 'Slack + Teams'],
-        placeholderText: 'PULSE STUDIO · LIVE SIGNAL FEED',
-        placeholderColor: '#064e3b', // Dark green
-        reverse: false
-    }
-];
+import { BRAND, STUDIOS, STUDIO_ICONS } from '../../data/studios';
 
 export default function StudiosShowcase() {
+    const revealRef = useReveal();
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.05 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, scale: 0.9, y: 20 },
+        visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 80 } }
+    };
+
     return (
-        <section className="py-24 md:py-32 relative border-b border-white/5 bg-[#0b0b0c]">
-            <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-32">
-                {SHOWCASES.map((showcase, index) => (
-                    <ShowcaseRow key={showcase.id} showcase={showcase} index={index} />
-                ))}
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5" ref={revealRef}>
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
+                
+                {/* Header Row */}
+                <div className="flex flex-col lg:flex-row justify-between items-start gap-12 mb-16">
+                    <div>
+                        <span className="text-[11px] font-bold tracking-widest uppercase mb-4 block" style={{ color: BRAND.primary }}>
+                            The Studios
+                        </span>
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif leading-[1.1]">
+                            Sixteen specialists.<br />
+                            <span className="italic" style={{ color: BRAND.primary }}>One creative OS.</span>
+                        </h2>
+                    </div>
+                    <div className="lg:w-1/3 lg:pt-8">
+                        <p className="text-[#a1a1aa] leading-relaxed text-sm md:text-base font-medium">
+                            Each Mantram Studio is purpose-built for one part of the creative pipeline — from concept to publish to optimize. Use one. Use all. They share your brand book, assets, and history natively.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Grid */}
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                    {STUDIOS.map((studio, i) => (
+                        <motion.a 
+                            key={studio.slug}
+                            variants={itemVariants}
+                            href={`/studio/${studio.slug}`}
+                            className={`group bg-[#121214] border rounded-2xl p-6 flex flex-col justify-between hover:bg-white/5 transition-all min-h-[220px] ${
+                                i === 0 
+                                    ? 'border-[#FF4D00]' 
+                                    : 'border-white/5 hover:border-white/20'
+                            }`}
+                        >
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="text-[#FF4D00]">
+                                    <span className="material-symbols-outlined text-[28px]">{STUDIO_ICONS[studio.slug]}</span>
+                                </div>
+                                {i < 2 && (
+                                    <span className="text-[10px] font-bold text-white bg-[#FF4D00] px-2.5 py-1 rounded-sm uppercase tracking-wider">
+                                        Most Used
+                                    </span>
+                                )}
+                                {i === STUDIOS.length - 1 && (
+                                    <span className="text-[10px] font-bold text-white bg-[#FF4D00] px-2.5 py-1 rounded-sm uppercase tracking-wider">
+                                        New
+                                    </span>
+                                )}
+                            </div>
+
+                            <div>
+                                <h3 className="text-white font-bold mb-2 text-[15px]">{studio.name}</h3>
+                                <p className="text-[#a1a1aa] text-xs leading-relaxed">
+                                    {studio.tagline}
+                                </p>
+                            </div>
+
+                            <div className="mt-8 flex items-center gap-1 text-[13px] font-medium transition-transform group-hover:translate-x-1" style={{ color: BRAND.primary }}>
+                                Explore <ArrowRight className="w-3.5 h-3.5" />
+                            </div>
+                        </motion.a>
+                    ))}
+                </motion.div>
+
             </div>
         </section>
-    );
-}
-
-function ShowcaseRow({ showcase, index }) {
-    const revealRef = useReveal();
-    const isReversed = showcase.reverse;
-
-    return (
-        <div ref={revealRef} className={`flex flex-col lg:flex-row items-center gap-16 lg:gap-24 ${isReversed ? 'lg:flex-row-reverse' : ''}`}>
-            
-            {/* Copy Side */}
-            <div className="flex-1 w-full">
-                <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-6 block">
-                    {showcase.eyebrow}
-                </span>
-                
-                <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
-                    {showcase.title}
-                </h2>
-                
-                <p className="text-[#a1a1aa] text-lg leading-relaxed mb-8">
-                    {showcase.description}
-                </p>
-
-                <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-10 text-[13px] text-[#a1a1aa] font-medium">
-                    {showcase.features.map((feature, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-green-500 shrink-0" />
-                            {feature}
-                        </div>
-                    ))}
-                </div>
-
-                <button className="flex items-center gap-2 text-sm font-semibold text-white px-5 py-2.5 rounded-full transition-colors hover:bg-white/10 border border-white/10">
-                    Learn more <ArrowRight className="w-4 h-4" />
-                </button>
-            </div>
-
-            {/* Visual Side */}
-            <div className="flex-1 w-full">
-                {/* Diagonal stripes background pattern implementation inside the container */}
-                <div 
-                    className="w-full aspect-[4/3] rounded-3xl relative overflow-hidden flex items-center justify-center shadow-2xl transition-transform duration-700 hover:scale-[1.02]"
-                    style={{ backgroundColor: showcase.placeholderColor }}
-                >
-                    {/* Diagonal striped overlay for that technical blueprint feel */}
-                    <div 
-                        className="absolute inset-0 opacity-10 mix-blend-overlay"
-                        style={{
-                            backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)'
-                        }}
-                    />
-                    
-                    {/* Inner glowing element */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
-                    
-                    <span className="relative z-10 text-[10px] font-bold text-white/50 tracking-[0.2em] uppercase">
-                        {showcase.placeholderText}
-                    </span>
-                </div>
-            </div>
-            
-        </div>
     );
 }

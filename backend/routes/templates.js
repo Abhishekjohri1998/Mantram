@@ -18,7 +18,7 @@ const router = express.Router();
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/public/homepage', async (req, res) => {
     try {
-        const templates = await Template.find({ isActive: true, isPublished: true, studioSection: 'homepage' })
+        const templates = await Template.find({ isActive: true, isPublished: true, showOnHomeScreen: true })
             .select('name previewUrl previewImageUrl previewVideoUrl previewType studioOrigin')
             .populate('categoryId', 'name color iconEmoji')
             .sort({ isFeatured: -1, createdAt: -1 })

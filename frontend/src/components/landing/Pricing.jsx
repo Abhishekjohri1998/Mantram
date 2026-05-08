@@ -1,14 +1,37 @@
-import React from 'react';
-import { Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import useReveal from '../../hooks/useReveal';
 import { BRAND } from '../../data/studios';
+import { apiFetch } from '../../services/api';
 
-export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
+export default function Pricing() {
     const revealRef = useReveal();
+    const [packages, setPackages] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPackages = async () => {
+            try {
+                // Fetch subscription packages from the public endpoint
+                const data = await apiFetch('/payments/packages');
+                if (data.success && data.packages) {
+                    // Filter out inactive plans if needed, though backend should only return active or we just show them
+                    setPackages(data.packages.filter(p => p.isActive));
+                }
+            } catch (error) {
+                console.error('Failed to fetch pricing packages:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPackages();
+    }, []);
 
     return (
         <section className="py-24 md:py-32 bg-[#0b0b0c] relative" ref={revealRef}>
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <div className="max-w-[1400px] mx-auto px-4 md:px-6">
                 
                 {/* Header */}
                 <div className="flex flex-col items-center text-center mb-16">
@@ -16,91 +39,96 @@ export default function Pricing({ onEarlyAccess, onAgencyDemo }) {
                         Pricing
                     </span>
                     <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif max-w-3xl leading-[1.1]">
-                        Pick the pack. <span className="italic" style={{ color: BRAND.primary }}>Scale on your terms.</span>
+                        Pick the plan. <span className="italic" style={{ color: BRAND.primary }}>Scale on your terms.</span>
                     </h2>
                 </div>
 
-                {/* Cards Grid */}
-                <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto items-end">
-                    
-                    {/* Smart Show */}
-                    <div className="bg-[#121214] border border-white/5 rounded-2xl p-8 flex flex-col h-[460px]">
-                        <h3 className="text-white font-bold text-xl mb-1">Smart Show</h3>
-                        <p className="text-[#a1a1aa] text-sm mb-6">For brand teams launching campaigns</p>
-                        
-                        <div className="text-white font-serif text-3xl tracking-tight mb-8">
-                            Starts at $1,200/mo
-                        </div>
-                        
-                        <div className="flex-1 flex flex-col gap-3 text-[13px] text-[#a1a1aa] font-medium">
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> 8 core studios</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> 3 brand seats</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Templates library</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Standard support</span>
-                        </div>
-                        
-                        <button 
-                            onClick={onEarlyAccess}
-                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8"
-                        >
-                            Start trial
-                        </button>
+                {loading ? (
+                    <div className="flex justify-center items-center py-20">
+                        <Loader2 className="w-8 h-8 text-[#FF5A1F] animate-spin" />
                     </div>
-
-                    {/* Enterprise */}
-                    <div className="bg-[#121214] border border-[#FF5A1F] rounded-2xl p-8 flex flex-col h-[480px] relative shadow-[0_0_40px_rgba(255,90,31,0.15)] z-10">
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#FF5A1F] text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
-                            Most popular
-                        </div>
-                        
-                        <h3 className="text-white font-bold text-xl mb-1">Enterprise</h3>
-                        <p className="text-[#a1a1aa] text-sm mb-6">For agencies and brand groups</p>
-                        
-                        <div className="text-white font-serif text-3xl tracking-tight mb-8">
-                            Custom
-                        </div>
-                        
-                        <div className="flex-1 flex flex-col gap-3 text-[13px] text-[#a1a1aa] font-medium">
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> All 16 studios</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Unlimited brands</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Pulse + Performance</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Dedicated CSM</span>
-                        </div>
-                        
-                        <button 
-                            onClick={onAgencyDemo || onEarlyAccess}
-                            className="w-full py-3 rounded-xl bg-[#FF5A1F] text-white font-bold text-sm hover:bg-[#e04a14] transition-colors mt-8"
-                        >
-                            Book a demo
-                        </button>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+                        {packages.map((pack) => {
+                            const isPopular = pack.badge && pack.badge.length > 0;
+                            const cardColor = pack.color || '#6366f1';
+                            
+                            return (
+                                <div 
+                                    key={pack._id} 
+                                    className="bg-[#121214] rounded-2xl p-8 flex flex-col relative transition-transform hover:-translate-y-1"
+                                    style={{
+                                        borderColor: isPopular ? cardColor : 'rgba(255,255,255,0.05)',
+                                        borderWidth: '1px',
+                                        borderStyle: 'solid',
+                                        boxShadow: isPopular ? `0 0 40px ${cardColor}20` : 'none',
+                                        zIndex: isPopular ? 10 : 1
+                                    }}
+                                >
+                                    {isPopular && (
+                                        <div 
+                                            className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full whitespace-nowrap"
+                                            style={{ backgroundColor: cardColor }}
+                                        >
+                                            {pack.badge}
+                                        </div>
+                                    )}
+                                    
+                                    <h3 className="text-white font-serif text-2xl mb-1">{pack.name}</h3>
+                                    <p className="text-[#a1a1aa] text-sm mb-6 h-10 line-clamp-2">{pack.description || pack.tagline}</p>
+                                    
+                                    <div className="text-white font-serif text-4xl tracking-tight mb-8">
+                                        {pack.contactForPricing ? (
+                                            <span className="text-2xl mt-2 block">Custom Pricing</span>
+                                        ) : (
+                                            <>
+                                                {pack.pricing?.currency === 'USD' ? '$' : '₹'}
+                                                {pack.pricing?.monthly}
+                                                <span className="text-sm text-[#a1a1aa] font-sans font-normal">/mo</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="flex-1 flex flex-col gap-4 text-[14px] text-[#a1a1aa] font-medium mb-8">
+                                        {pack.features && pack.features.map((feature, idx) => (
+                                            <span key={idx} className="flex items-start gap-3">
+                                                <Check 
+                                                    className="w-5 h-5 shrink-0 mt-0.5" 
+                                                    style={{ color: cardColor }} 
+                                                /> 
+                                                <span className="leading-snug">{feature.name}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    
+                                    <Link 
+                                        to={pack.contactForPricing ? "mailto:sales@mantram.ai" : "/auth?mode=signup"}
+                                        className="w-full py-3.5 rounded-xl text-white font-bold text-sm transition-colors text-center block mt-auto border"
+                                        style={isPopular ? {
+                                            backgroundColor: cardColor,
+                                            borderColor: cardColor,
+                                        } : {
+                                            backgroundColor: 'transparent',
+                                            borderColor: 'rgba(255,255,255,0.1)',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!isPopular) {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!isPopular) {
+                                                e.currentTarget.style.backgroundColor = 'transparent';
+                                            }
+                                        }}
+                                    >
+                                        {pack.contactForPricing ? "Contact Sales" : "Get Started"}
+                                    </Link>
+                                </div>
+                            );
+                        })}
                     </div>
-
-                    {/* Studio Lite */}
-                    <div className="bg-[#121214] border border-white/5 rounded-2xl p-8 flex flex-col h-[460px]">
-                        <h3 className="text-white font-bold text-xl mb-1">Studio Lite</h3>
-                        <p className="text-[#a1a1aa] text-sm mb-6">For solo marketers and freelancers</p>
-                        
-                        <div className="text-white font-serif text-3xl tracking-tight mb-8">
-                            $99/mo
-                        </div>
-                        
-                        <div className="flex-1 flex flex-col gap-3 text-[13px] text-[#a1a1aa] font-medium">
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> 4 studios</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> 1 brand</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Watermarked exports</span>
-                            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500 shrink-0" /> Community support</span>
-                        </div>
-                        
-                        <button 
-                            onClick={onEarlyAccess}
-                            className="w-full py-3 rounded-xl border border-white/10 text-white font-bold text-sm hover:bg-white/5 transition-colors mt-8"
-                        >
-                            Get started
-                        </button>
-                    </div>
-
-                </div>
-
+                )}
             </div>
         </section>
     );
