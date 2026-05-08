@@ -13,13 +13,12 @@ import MaskingCanvas from '../components/MaskingCanvas'
 import Walkthrough from '../components/Walkthrough'
 import TemplateLibrary from './TemplateLibrary'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
-import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal'
 import './CreativeStudio/CreativeStudio.css'
 
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
-function TemplateSuggestionRow({ brandId, section = 'ai_create', onSelect }) {
+function TemplateSuggestionRow({ brandId, onSelect }) {
     const [templates, setTemplates] = useState([])
     const [loaded, setLoaded] = useState(false)
 
@@ -27,7 +26,7 @@ function TemplateSuggestionRow({ brandId, section = 'ai_create', onSelect }) {
         let cancelled = false
         const token = localStorage.getItem('mantram_token')
         const qs = brandId ? `?brandId=${brandId}` : ''
-        fetch(`${TMPL_ROW_API}/templates/by-section/${section}${qs}`, {
+        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(r => r.ok ? r.json() : null)
@@ -35,7 +34,7 @@ function TemplateSuggestionRow({ brandId, section = 'ai_create', onSelect }) {
         .catch(() => {}) // silent failure — never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
-    }, [brandId, section])
+    }, [brandId])
 
     // Don't render anything until loaded (prevents layout shift)
     if (!loaded || templates.length === 0) return null
@@ -69,6 +68,7 @@ function TemplateSuggestionRow({ brandId, section = 'ai_create', onSelect }) {
                 paddingBottom: 8,
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(255,255,255,0.12) transparent',
+                // Fixed height prevents reflow when images load
                 height: 130,
                 alignItems: 'center',
             }}>
@@ -196,8 +196,243 @@ const quickStartCards = [
     { id: 'story', icon: 'auto_stories', label: 'Brand Story', desc: 'Tell your brand narrative', color: '#ec4899' },
 ]
 
-// ── [Legacy templateCategories removed — all templates now served from MongoDB via /api/templates] ──
-// Replaced by the API-driven TemplateLibrary in Stage 1 of the template system unification.
+// ── Template Categories with Sub-Templates ──
+const templateCategories = [
+    {
+        id: 'sales', icon: 'local_offer', label: 'Sales & Offers', color: '#ef4444',
+        desc: 'Promotional offers, discounts, festive & seasonal sales',
+        subTemplates: [
+            {
+                id: 'general-sale', label: 'General Sale', icon: 'sell',
+                desc: 'All-purpose sale/offer design',
+                fields: [
+                    { key: 'offerText', label: 'Offer Details', type: 'text', placeholder: 'e.g. FLAT 50% OFF' },
+                    { key: 'validTill', label: 'Valid Till', type: 'text', placeholder: 'e.g. This Weekend Only' },
+                    { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Order Now', default: 'Order Now' },
+                    { key: 'mood', label: 'Design Mood', type: 'select', options: ['Urgency/Bold', 'Elegant Luxury', 'Minimalist', 'Playful/Fun'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a promotional sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'SPECIAL OFFER'}\nVALID TILL: ${vals.validTill || 'Limited Time'}\nCTA: "${vals.cta || 'Order Now'}"\nMOOD: ${vals.mood || 'Urgency/Bold'}\nBRAND COLORS: ${colors}\nMake the offer text LARGE and prominent. Eye-catching, bold, impossible to scroll past. Include ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'diwali-sale', label: 'Diwali Sale', icon: 'celebration',
+                desc: 'Festival of lights themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Diwali Mega Sale - Up to 60% OFF' },
+                    { key: 'productName', label: 'Product/Category', type: 'text', placeholder: 'e.g. on all Electronics' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop the Festive Sale', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Diwali sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Diwali Special Offer'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Diwali — diyas, rangoli, lanterns, golden sparkles, warm festive lighting\nBRAND COLORS: ${colors}\nFestive and joyful but still on-brand. Include ${brand.name} logo. Traditional+modern design.`
+                }
+            },
+            {
+                id: 'republic-sale', label: 'Republic Day Sale', icon: 'flag',
+                desc: 'Patriotic themed sale',
+                fields: [
+                    { key: 'offerText', label: 'Offer', type: 'text', placeholder: 'e.g. Republic Day Sale – 26% OFF' },
+                    { key: 'productName', label: 'Product', type: 'text', placeholder: 'e.g. on all categories' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Celebrate & Save', default: 'Shop Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a Republic Day sale creative for ${brand.name}.\nOFFER: ${vals.offerText || 'Republic Day Special'}\nPRODUCT: ${vals.productName || ''}\nCTA: "${vals.cta || 'Shop Now'}"\nTHEME: Republic Day — tricolor (saffron, white, green), patriotic, flag elements, Ashoka Chakra subtle\nBRAND COLORS: ${colors}\nPatriotic + brand identity blend. Include ${brand.name} logo.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'product', icon: 'shopping_bag', label: 'Product Showcase', color: '#f59e0b',
+        desc: 'Feature products with professional brand styling',
+        subTemplates: [
+            {
+                id: 'product-hero', label: 'Hero Shot', icon: 'star',
+                desc: 'Full product hero with brand styling',
+                fields: [
+                    { key: 'productName', label: 'Product Name', type: 'text', placeholder: 'e.g. Premium Leather Bag' },
+                    { key: 'tagline', label: 'Tagline', type: 'text', placeholder: 'e.g. Crafted for Excellence' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now' },
+                    { key: 'layout', label: 'Layout', type: 'select', options: ['Centered', 'Lifestyle', 'Flat Lay', 'Minimal White', 'Dark Luxury'] },
+                    { key: 'image', label: 'Product Image', type: 'image', hint: 'Upload product photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    const font = brand.dna?.fonts?.heading?.family || 'modern sans-serif'
+                    return `Create a premium product showcase for ${brand.name}.\nPRODUCT: ${vals.productName || 'a product'}\nTAGLINE: "${vals.tagline || 'Quality You Deserve'}"\nCTA: "${vals.cta || 'Shop Now'}"\nLAYOUT: ${vals.layout || 'Centered'}\nBRAND COLORS: ${colors}\nFONT: ${font}\nClean background, brand color accents, product as hero element, professional.`
+                }
+            },
+            {
+                id: 'product-comparison', label: 'Product Comparison', icon: 'compare',
+                desc: 'Side-by-side product comparison',
+                fields: [
+                    { key: 'product1', label: 'Product 1', type: 'text', placeholder: 'e.g. Basic Plan' },
+                    { key: 'product2', label: 'Product 2', type: 'text', placeholder: 'e.g. Premium Plan' },
+                    { key: 'highlight', label: 'What to Highlight', type: 'text', placeholder: 'e.g. Premium = Best Value' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product comparison visual for ${brand.name}.\nLEFT: ${vals.product1 || 'Option A'}\nRIGHT: ${vals.product2 || 'Option B'}\nHIGHLIGHT: ${vals.highlight || 'Choose the best'}\nBRAND COLORS: ${colors}\nClean split layout, easy to compare, ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'quotes', icon: 'format_quote', label: 'Quotes & Testimonials', color: '#10b981',
+        desc: 'Customer reviews, brand quotes, motivational content',
+        subTemplates: [
+            {
+                id: 'testimonial', label: 'Customer Testimonial', icon: 'reviews',
+                desc: 'Customer review card',
+                fields: [
+                    { key: 'quote', label: 'Quote Text', type: 'textarea', placeholder: 'Type the quote...' },
+                    { key: 'author', label: 'Author Name', type: 'text', placeholder: 'e.g. Rahul Sharma, CEO' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Solid Brand Color', 'Gradient', 'Texture', 'Photo (Blurred)', 'Dark/Moody'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a testimonial card for ${brand.name}.\nQUOTE: "${vals.quote || 'Great experience!'}"\nAUTHOR: ${vals.author || 'Happy Customer'}\nBG: ${vals.bgStyle || 'Solid Brand Color'}\nBRAND COLORS: ${colors}\nElegant, large quotation marks, ${brand.name} logo subtle in corner.`
+                }
+            },
+            {
+                id: 'motivational', label: 'Motivational Quote', icon: 'lightbulb',
+                desc: 'Inspirational brand quote',
+                fields: [
+                    { key: 'quote', label: 'Quote', type: 'textarea', placeholder: 'e.g. Dream big, start small...' },
+                    { key: 'bgStyle', label: 'Background', type: 'select', options: ['Gradient', 'Nature Photo', 'Abstract', 'Minimal', 'Dark'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a motivational quote post for ${brand.name}.\nQUOTE: "${vals.quote || 'Success starts with a single step'}"\nBG: ${vals.bgStyle || 'Gradient'}\nUSE brand colors: ${colors}\nInspirational, visually stunning, ${brand.name} branding.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'announcement', icon: 'campaign', label: 'Announcements', color: 'var(--sys-text)',
+        desc: 'Launches, updates, news, and alerts',
+        subTemplates: [
+            {
+                id: 'launch', label: 'Product Launch', icon: 'rocket_launch',
+                desc: 'New product/service launch',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Introducing Our Latest Innovation' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'Brief details...' },
+                    { key: 'tone', label: 'Tone', type: 'select', options: ['Exciting', 'Professional', 'Teaser/Mystery', 'Celebratory'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a product launch announcement for ${brand.name}.\nHEADLINE: "${vals.headline || 'Something Big is Coming!'}"\nDETAILS: ${vals.details || ''}\nTONE: ${vals.tone || 'Exciting'}\nBRAND COLORS: ${colors}\nBold, shareable, ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'news-update', label: 'News/Update', icon: 'newspaper',
+                desc: 'Brand news or company update',
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. We just hit 10K customers!' },
+                    { key: 'details', label: 'Details', type: 'textarea', placeholder: 'More info...' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a news update post for ${brand.name}.\nHEADLINE: "${vals.headline || 'Exciting Update'}"\nDETAILS: ${vals.details || ''}\nBRAND COLORS: ${colors}\nProfessional, newsworthy, ${brand.name} identity applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'events', icon: 'event', label: 'Events', color: '#ec4899',
+        desc: 'Event promotions, invitations, and recaps',
+        subTemplates: [
+            {
+                id: 'event-promo', label: 'Event Promotion', icon: 'calendar_month',
+                desc: 'Promote an upcoming event',
+                fields: [
+                    { key: 'eventName', label: 'Event Name', type: 'text', placeholder: 'e.g. Annual Tech Summit 2026' },
+                    { key: 'date', label: 'Date & Time', type: 'text', placeholder: 'e.g. March 15 | 10AM' },
+                    { key: 'venue', label: 'Venue', type: 'text', placeholder: 'e.g. Taj Hotel, Mumbai' },
+                    { key: 'cta', label: 'CTA', type: 'text', placeholder: 'e.g. Register Now', default: 'Register Now' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an event promo for ${brand.name}.\nEVENT: ${vals.eventName || 'Event'}\nDATE: ${vals.date || 'Coming Soon'}\nVENUE: ${vals.venue || 'TBA'}\nCTA: "${vals.cta || 'Register Now'}"\nBRAND COLORS: ${colors}\nClear hierarchy: Name > Date > Venue > CTA. ${brand.name} branding prominent.`
+                }
+            },
+            {
+                id: 'birthday', label: 'Birthday Post', icon: 'cake',
+                desc: 'Birthday greetings for team/clients',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Amit Kumar' },
+                    { key: 'message', label: 'Birthday Message', type: 'textarea', placeholder: 'e.g. Wishing you a wonderful birthday!' },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload their photo (optional)' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a birthday greeting post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMESSAGE: "${vals.message || 'Happy Birthday!'}"\nBRAND COLORS: ${colors}\nFestive, warm, celebration vibes. Cake/balloons/confetti elements. Brand logo included.`
+                }
+            },
+            {
+                id: 'anniversary', label: 'Anniversary', icon: 'favorite',
+                desc: 'Work anniversary or milestone celebration',
+                fields: [
+                    { key: 'personName', label: 'Person\'s Name', type: 'text', placeholder: 'e.g. Priya Patel' },
+                    { key: 'years', label: 'Years / Milestone', type: 'text', placeholder: 'e.g. 5 Years' },
+                    { key: 'message', label: 'Message', type: 'textarea', placeholder: 'e.g. Thank you for your dedication!' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a work anniversary celebration post for ${brand.name}.\nNAME: ${vals.personName || 'Team Member'}\nMILESTONE: ${vals.years || 'Anniversary'}\nMESSAGE: "${vals.message || 'Thank you for your incredible journey with us!'}"\nBRAND COLORS: ${colors}\nCelebratory, professional, warm. ${brand.name} branding applied.`
+                }
+            },
+        ]
+    },
+    {
+        id: 'content', icon: 'analytics', label: 'Content & Info', color: '#0ea5e9',
+        desc: 'Infographics, tips, educational content',
+        subTemplates: [
+            {
+                id: 'infographic', label: 'Infographic', icon: 'bar_chart',
+                desc: 'Data-driven visual content',
+                fields: [
+                    { key: 'topic', label: 'Topic', type: 'text', placeholder: 'e.g. 5 Benefits of Organic Products' },
+                    { key: 'points', label: 'Key Points (one per line)', type: 'textarea', placeholder: 'Point 1\nPoint 2\nPoint 3' },
+                    { key: 'style', label: 'Style', type: 'select', options: ['Numbered List', 'Icon Grid', 'Flowchart', 'Statistics'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create an infographic for ${brand.name}.\nTOPIC: ${vals.topic || 'Key Facts'}\nPOINTS: ${vals.points || '1. Point one\n2. Point two'}\nSTYLE: ${vals.style || 'Numbered List'}\nBRAND COLORS: ${colors}\nIcons for each point, visually digestible, ${brand.name} branding.`
+                }
+            },
+            {
+                id: 'service-post', label: 'Service Highlight', icon: 'design_services',
+                desc: 'Highlight a service offering',
+                fields: [
+                    { key: 'serviceName', label: 'Service Name', type: 'text', placeholder: 'e.g. Interior Design Consultation' },
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'e.g. Expert Design, Made Simple' },
+                    { key: 'style', label: 'Visual Style', type: 'select', options: ['Corporate Clean', 'Modern Gradient', 'Illustrated', 'Geometric'] },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a service highlight post for ${brand.name}.\nSERVICE: ${vals.serviceName || 'our service'}\nHEADLINE: "${vals.headline || 'Expert Service'}"\nSTYLE: ${vals.style || 'Corporate Clean'}\nBRAND COLORS: ${colors}\nInformative, visually appealing, ${brand.name} identity.`
+                }
+            },
+            {
+                id: 'behind-scenes', label: 'Behind the Scenes', icon: 'videocam',
+                desc: 'Show process and culture',
+                fields: [
+                    { key: 'scene', label: 'What\'s Happening?', type: 'text', placeholder: 'e.g. Team brainstorming' },
+                    { key: 'vibe', label: 'Vibe', type: 'select', options: ['Authentic', 'Professional', 'Fun/Playful', 'Creative'] },
+                    { key: 'image', label: 'Photo', type: 'image', hint: 'Upload a BTS photo' },
+                ],
+                buildPrompt: (brand, vals) => {
+                    const colors = brand.dna?.colors?.map(c => c.name || 'brand accent').filter(Boolean).join(', ') || 'brand colors'
+                    return `Create a behind-the-scenes story for ${brand.name}.\nSCENE: ${vals.scene || 'Team at work'}\nVIBE: ${vals.vibe || 'Authentic'}\nBRAND COLORS: ${colors} as accent overlays\nAuthentic, warm, ${brand.name} brand identity maintained.`
+                }
+            },
+        ]
+    },
+]
 
 export default function CreativeStudio() {
 
@@ -857,8 +1092,30 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [bankTab, setBankTab] = useState('generated')
     const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
 
-    // ── Unified API-driven Template State (Stage 1: legacy system removed) ──
-    const [selectedApiTemplate, setSelectedApiTemplate] = useState(null)
+    // ── Template & Category State ──
+    const [activeTemplate, setActiveTemplate] = useState(null)
+    const [templateFields, setTemplateFields] = useState({})
+    const [templatePromptPreview, setTemplatePromptPreview] = useState('')
+    const [templateRefImage, setTemplateRefImage] = useState(null)
+    const [templateGenerating, setTemplateGenerating] = useState(false)
+    const [templateResult, setTemplateResult] = useState(null)
+    const [templateError, setTemplateError] = useState('')
+    const [reversePrompting, setReversePrompting] = useState(false)
+    const [savedTemplates, setSavedTemplates] = useState([])
+    const [showCreateTemplate, setShowCreateTemplate] = useState(false)
+    const [creatingTemplate, setCreatingTemplate] = useState(false)
+    const [analyzeLoading, setAnalyzeLoading] = useState(false)
+    const [newTmpl, setNewTmpl] = useState({
+        label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern',
+        promptFormula: '', referenceImageUrl: '', fields: [], category: ''
+    })
+    const [analyzedMeta, setAnalyzedMeta] = useState({ colorPalette: [], layoutDescription: '' })
+    const [templateFieldsMode, setTemplateFieldsMode] = useState('simple')
+    const [activeCategory, setActiveCategory] = useState(null)
+    const [savedCategories, setSavedCategories] = useState([])
+    const [showCreateCategory, setShowCreateCategory] = useState(false)
+    const [creatingCategory, setCreatingCategory] = useState(false)
+    const [newCat, setNewCat] = useState({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
 
     // ── Other UI/Ref State ──
     const [designBaseImage, setDesignBaseImage] = useState(null)
@@ -1067,11 +1324,11 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             psAbortRef.current?.abort()
             campAbortRef.current?.abort()
             activeBrandIdRef.current = activeBrand?._id
-            if (activeGenerations.length > 0 || enhancing) {
-                setActiveGenerations([]); setEnhancing(false)
+            if (activeGenerations.length > 0 || enhancing || templateGenerating) {
+                setActiveGenerations([]); setEnhancing(false); setTemplateGenerating(false)
             }
         }
-    }, [activeBrand?._id, activeGenerations.length, enhancing])
+    }, [activeBrand?._id, activeGenerations.length, enhancing, templateGenerating])
     useEffect(() => {
         if (autoGenerate && activeBrand && prompt.trim() && activeGenerations.length === 0) {
             setAutoGenerate(false)
@@ -1101,8 +1358,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }
     }, [activeBrand?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) loadCustomTemplates()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
 
-
+    useEffect(() => {
+        if (studioMode === 'templates' && activeBrand?._id) {
+            loadCustomCategories()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [studioMode, activeBrand?._id])
 
     // ── Logo History: Load from Creative Bank when studio opens ──
     // Persists logo history across page refreshes by fetching previously
@@ -2046,13 +2312,399 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
 
     // ── Template Generation Handler ──
-    // ── handleTemplateSelect: unified API-driven template handler (wired in Stage 2) ──
-    const handleTemplateSelect = (template) => {
-        setSelectedApiTemplate(template)
-        // Close any overlay (e.g. TemplateLibrary overlay) — modal handles generation
-        setShowTemplateLibrary(false)
+    async function handleTemplateGenerate(tmpl) {
+
+        if (!activeBrand || templateGenerating) return
+        setTemplateGenerating(true)
+        setTemplateError('')
+        setTemplateResult(null)
+        try {
+            let builtPrompt = tmpl.buildPrompt(activeBrand, templateFields)
+
+            // Append additional user instructions (gender change, outfit, background, etc.)
+            const extraInstructions = templateFields._additionalInstructions?.trim()
+            if (extraInstructions) {
+                builtPrompt += `\n\nADDITIONAL CHANGES (apply these intelligently — adapt the ENTIRE image, not just face swap):\n${extraInstructions}`
+            }
+
+            setTemplatePromptPreview(builtPrompt)
+
+            const options = {
+                style: tmpl.style || 'modern',
+                referenceImages: {},
+                aspectRatio: templateFields._aspectRatio || aspectRatio,
+                imageSize: templateFields._imageSize || '1K',
+                characters: [],
+            }
+
+            // Collect ALL image fields from the template — separate by role
+            const imageFields = (tmpl.fields || []).filter(f => f.type === 'image')
+            const modelFields = imageFields.filter(f => /model|person|human|character|lady|man|woman/i.test(f.label || f.key))
+            const productFields = imageFields.filter(f => /product|item|device|object|photo/i.test(f.label || f.key))
+            const otherImageFields = imageFields.filter(f => !modelFields.includes(f) && !productFields.includes(f))
+
+            // Model/Person images → character references (for face/appearance preservation)
+            for (const mf of modelFields) {
+                const imgSrc = templateFields[mf.key]
+                if (imgSrc) {
+                    options.characters.push({ name: mf.label || 'Model', image: imgSrc })
+                }
+            }
+
+            // Product images → product image (first one wins)
+            const productField = productFields[0]
+            const productImage = productField ? templateFields[productField.key] : null
+
+            // If no specific model/product detected, fall back to first image field like before
+            if (modelFields.length === 0 && productFields.length === 0 && imageFields.length > 0) {
+                const fallbackField = imageFields[0]
+                const fallbackImage = templateFields[fallbackField.key]
+                if (fallbackImage) {
+                    if (/model|person/i.test(fallbackField.label)) {
+                        options.characters.push({ name: fallbackField.label || 'Character', image: fallbackImage })
+                    } else {
+                        // Treat as product
+                        if (fallbackImage.startsWith('data:image/')) {
+                            options.baseImage = fallbackImage
+                        } else {
+                            options.productImageUrl = fallbackImage
+                        }
+                    }
+                }
+            }
+
+            // Template inpainting mode: reference image exists (saved template)
+            const refImage = templateRefImage || tmpl.referenceImageUrl
+            if (refImage) {
+                options.templateInpainting = true
+                options.templateRefImageUrl = refImage
+                if (productImage) {
+                    if (productImage.startsWith('data:image/')) {
+                        options.baseImage = productImage
+                    } else {
+                        options.productImageUrl = productImage
+                    }
+                }
+            } else if (productImage) {
+                if (productImage.startsWith('data:image/')) {
+                    options.baseImage = productImage
+                } else {
+                    options.productImageUrl = productImage
+                }
+            }
+
+            // Additional reference images (non-model, non-product)
+            for (const oif of otherImageFields) {
+                const imgSrc = templateFields[oif.key]
+                if (imgSrc && !options.referenceImages.upload) {
+                    options.referenceImages.upload = imgSrc
+                }
+            }
+
+            setAiWarnings([])
+            const signal = getSignal(aiCreateAbortRef)
+            const data = await creativesAPI.generate({
+                brandId: activeBrand._id,
+                type: tmpl.type,
+                prompt: builtPrompt,
+                options: { ...options, imageModel },
+            }, { signal, timeout: 180000 })
+
+            if (data.success && data.creative) {
+                setTemplateResult(data.creative)
+                if (data.warnings?.length > 0) {
+                    setAiWarnings(data.warnings)
+                }
+            } else {
+                throw new Error(data.error || 'Generation failed')
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            console.error('❌ Template generation error:', err)
+            setTemplateError({
+                message: err.message,
+                isProviderError: err.isProviderError,
+                provider: err.provider
+            })
+        }
+        setTemplateGenerating(false)
     }
 
+
+    // ── Reverse Prompt Handler (analyze uploaded image to extract design formula) ──
+    async function handleReversePrompt(imageSource, tmplId) {
+
+        if (!activeBrand) return
+        setReversePrompting(true)
+        try {
+            // Determine if imageSource is a base64 data URI or a remote URL
+            const isBase64 = imageSource.startsWith('data:')
+            setTemplateRefImage(imageSource)
+
+            const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'brand palette'
+            const brandName = activeBrand.name
+
+            const analysisPrompt = `You are an expert design analyst. Analyze this image and create a REUSABLE PROMPT FORMULA for generating new images in this exact style.
+
+EXTRACT AND DESCRIBE:
+1. BACKGROUND: What's the background? (color, gradient, texture, pattern)
+2. LAYOUT: How are elements arranged? (left-right split, centered, grid, layered)
+3. TYPOGRAPHY: Font style, size hierarchy, weight, colors used for text
+4. COLOR SCHEME: Dominant colors and how they're applied
+5. DESIGN ELEMENTS: Shapes, lines, icons, decorative elements, borders, shadows
+6. PRODUCT/IMAGE PLACEMENT: Where is the main image/product placed?
+7. LOGO PLACEMENT: Where and how is the brand logo placed?
+8. TEXT CONTENT ZONES: Where does headline, subtext, CTA, price appear?
+9. OVERALL MOOD: Professional, playful, luxury, minimal, bold, etc.
+
+NOW CREATE A REUSABLE PROMPT FORMULA using {{PLACEHOLDERS}} for content that changes:
+- {{HEADLINE}} for the main headline text
+- {{SUBTEXT}} for supporting text or description
+- {{CTA}} for call-to-action text
+- {{PRODUCT_NAME}} for product name
+- {{PRICE}} for any price shown
+- {{OFFER}} for any offer/discount text
+- {{PRODUCT_IMAGE}} for where the product image goes
+
+The formula should describe the EXACT visual style, layout, colors, and design elements so that when placeholders are filled, the AI generates an image with identical design language but different content.
+
+Brand: ${brandName}
+Brand Colors: ${brandColors}
+
+Return ONLY the prompt formula text, no explanation. Start directly with "Create a..." or "Design a..."`
+
+            const data = await canvasAssets.aiAnalyze({
+                prompt: analysisPrompt,
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
+            })
+
+            if (data.description) {
+                // Successfully got a prompt formula — set it as the template prompt
+                setTemplatePromptPreview(data.description)
+                // Also auto-fill the prompt field so user can generate immediately
+                setPrompt(data.description
+                    .replace(/\{\{HEADLINE\}\}/g, activeBrand.name)
+                    .replace(/\{\{SUBTEXT\}\}/g, '')
+                    .replace(/\{\{CTA\}\}/g, 'Shop Now')
+                    .replace(/\{\{PRODUCT_NAME\}\}/g, '')
+                    .replace(/\{\{PRICE\}\}/g, '')
+                    .replace(/\{\{OFFER\}\}/g, '')
+                    .replace(/\{\{PRODUCT_IMAGE\}\}/g, '')
+                )
+            } else {
+                setTemplatePromptPreview(`Create a design matching this reference style for ${brandName}. Use brand colors (${brandColors}). Maintain the same layout, typography hierarchy, and visual elements. {{HEADLINE}} as the main text. {{SUBTEXT}} as supporting text. {{CTA}} as call-to-action.`)
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            console.error('Reverse prompt error:', err)
+            setTemplatePromptPreview(`Create a design matching the uploaded reference style for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as the main text. {{SUBTEXT}} as supporting text. {{CTA}} as call-to-action.`)
+        }
+        setReversePrompting(false)
+    }
+
+
+    // ── Load custom templates for the active brand ──
+    async function loadCustomTemplates() {
+
+        if (!activeBrand?._id) return
+        try {
+            const data = await brandsAPI.getTemplates(activeBrand._id)
+            if (data.success) setSavedTemplates(data.templates || [])
+        } catch (err) {
+            if (err.name === 'AbortError') return
+            console.error('Load templates error:', err)
+        }
+    }
+
+
+    // ── Create a new custom template ──
+    async function handleCreateTemplate() {
+
+        if (!activeBrand?._id || !newTmpl.label || !newTmpl.promptFormula) return
+        setCreatingTemplate(true)
+        try {
+            const data = await brandsAPI.saveTemplate(activeBrand._id, {
+                ...newTmpl,
+                templateId: `custom-${Date.now()}`,
+            })
+            if (data.success) {
+                await loadCustomTemplates()
+                setShowCreateTemplate(false)
+                setNewTmpl({ label: '', icon: 'auto_awesome', description: '', type: 'instagram-post', style: 'modern', promptFormula: '', referenceImageUrl: '', fields: [] })
+            }
+        } catch (err) { console.error('Create template error:', err) }
+        setCreatingTemplate(false)
+    }
+
+
+    // ── Analyze image for new template creation — SMART STRUCTURED ANALYSIS ──
+    async function handleAnalyzeForTemplate(imageSource) {
+
+        if (!activeBrand) return
+        setAnalyzeLoading(true)
+        setNewTmpl(prev => ({ ...prev, referenceImageUrl: imageSource }))
+        setAnalyzedMeta({ colorPalette: [], layoutDescription: '' })
+
+        const isBase64 = imageSource.startsWith('data:')
+        const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'not specified'
+
+        try {
+            const data = await canvasAssets.aiAnalyzeTemplate({
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
+                brandName: activeBrand.name,
+                brandColors,
+            })
+
+            if (data.promptFormula) {
+                // Auto-generate fields from detected elements
+                const autoFields = (data.elements || []).map((el, i) => {
+                    const key = el.role?.replace(/[^a-z0-9_]/gi, '_').toLowerCase() || `field_${i}`
+                    const placeholder = el.type === 'image'
+                        ? (el.description || 'Upload an image')
+                        : (el.default || `Enter ${el.label?.toLowerCase() || 'value'}`)
+                    
+                    return {
+                        key,
+                        label: el.label || `Element ${i + 1}`,
+                        type: el.type === 'color' ? 'color'
+                            : el.type === 'select' ? 'select'
+                            : el.type === 'image' ? 'image'
+                            : el.role === 'subtext' || el.role === 'body' || el.role === 'quote' ? 'textarea'
+                            : 'text',
+                        placeholder,
+                        default: el.default || '',
+                        options: el.options || [],
+                        style: el.style || '',
+                        description: el.description || '',
+                        _detected: true, // marker for auto-detected fields
+                    }
+                })
+
+                setNewTmpl(prev => ({
+                    ...prev,
+                    promptFormula: data.promptFormula,
+                    fields: autoFields,
+                }))
+                setAnalyzedMeta({
+                    colorPalette: data.colorPalette || [],
+                    layoutDescription: data.layoutDescription || '',
+                })
+                setTemplateFieldsMode('advanced') // Auto-switch to show detected elements
+            } else {
+                // Fallback if structured analysis failed
+                setNewTmpl(prev => ({
+                    ...prev,
+                    promptFormula: `Create a design matching this reference style for ${activeBrand.name}. Use brand colors (${brandColors}). Maintain the same layout, typography hierarchy, and visual elements. Replace content with: {{HEADLINE}}, {{SUBTEXT}}, {{CTA}}.`,
+                    fields: [
+                        { key: 'headline', label: 'Headline', type: 'text', placeholder: 'Main heading text', default: '', _detected: true },
+                        { key: 'subtext', label: 'Subtext', type: 'textarea', placeholder: 'Supporting text', default: '', _detected: true },
+                        { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now', _detected: true },
+                    ]
+                }))
+            }
+        } catch (err) {
+            console.error('Template analyze error:', err)
+            setNewTmpl(prev => ({
+                ...prev,
+                promptFormula: `Create a design matching the uploaded reference for ${activeBrand.name}. Use brand colors. {{HEADLINE}} as main text. {{SUBTEXT}} as subtext. {{CTA}} as call-to-action.`,
+                fields: [
+                    { key: 'headline', label: 'Headline', type: 'text', placeholder: 'Main heading text', default: '', _detected: true },
+                    { key: 'subtext', label: 'Subtext', type: 'text', placeholder: 'Supporting text', default: '', _detected: true },
+                    { key: 'cta', label: 'Call to Action', type: 'text', placeholder: 'e.g. Shop Now', default: 'Shop Now', _detected: true },
+                ]
+            }))
+        }
+        setAnalyzeLoading(false)
+    }
+
+
+    // ── Load custom categories from DB ──
+    async function loadCustomCategories() {
+
+        if (!activeBrand?._id) return
+        try {
+            const data = await brandsAPI.getCategories(activeBrand._id)
+            if (data.success) setSavedCategories(data.categories || [])
+        } catch (err) { console.error('Load categories error:', err) }
+    }
+
+
+    // ── Create a new custom category ──
+    async function handleCreateCategory() {
+
+        if (!activeBrand?._id || !newCat.label) return
+        setCreatingCategory(true)
+        try {
+            const data = await brandsAPI.saveCategory(activeBrand._id, {
+                label: newCat.label,
+                icon: newCat.icon,
+                color: newCat.color,
+            })
+            if (data.success) {
+                await loadCustomCategories()
+                setShowCreateCategory(false)
+                setNewCat({ label: '', icon: 'auto_awesome', color: '#f59e0b', imageSource: 'upload' })
+            }
+        } catch (err) { console.error('Create category error:', err) }
+        setCreatingCategory(false)
+    }
+
+
+    // ── Analyze image for category creation (reverse prompting) ──
+    async function handleAnalyzeForCategory(imageSource) {
+
+        if (!activeBrand) return
+        setAnalyzeLoading(true)
+        setNewCat(prev => ({ ...prev, referenceImageUrl: imageSource }))
+
+        const isBase64 = imageSource.startsWith('data:')
+        const brandColors = activeBrand.dna?.colors?.map(c => c.hex).join(', ') || 'not specified'
+
+        try {
+            const data = await canvasAssets.aiAnalyze({
+                prompt: `You are an expert design analyst. Analyze this design image and create a REUSABLE BASE PROMPT FORMULA for this template category.
+
+Extract the visual DNA:
+1. Background style (color, gradient, texture, pattern)
+2. Layout structure and composition
+3. Typography style, hierarchy, and colors
+4. Design elements (shapes, borders, shadows, decorative elements)
+5. Logo/branding placement
+6. Color scheme and how colors are applied
+7. Overall mood and visual theme
+
+Create a BASE PROMPT FORMULA using {{KEYWORD}} placeholders for parts that change between sub-templates:
+- {{HEADLINE}} for main text
+- {{SUBTEXT}} for supporting text  
+- {{CTA}} for call-to-action
+- {{PRODUCT_NAME}} for product name
+- {{OFFER}} for offer/discount
+- {{EVENT_NAME}} for event name
+- {{IMAGE}} for product/reference image
+
+Brand: ${activeBrand.name}
+Brand colors: ${brandColors}
+
+Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
+                ...(isBase64 ? { imageBase64: imageSource } : { imageUrl: imageSource }),
+            })
+            if (data.description) {
+                setNewCat(prev => ({ ...prev, basePromptFormula: data.description }))
+            } else {
+                setNewCat(prev => ({
+                    ...prev,
+                    basePromptFormula: `Create a design matching this reference style for ${activeBrand.name}. Brand colors: ${brandColors}. Maintain the same layout, typography, and visual elements. Replace: {{HEADLINE}}, {{SUBTEXT}}, {{CTA}}.`
+                }))
+            }
+        } catch (err) {
+            console.error('Analyze error:', err)
+            setNewCat(prev => ({
+                ...prev,
+                basePromptFormula: `Create a design in the reference style for ${activeBrand.name}. Use brand colors. {{HEADLINE}} main text. {{SUBTEXT}} subtext. {{CTA}} call-to-action.`
+            }))
+        }
+        setAnalyzeLoading(false)
+    }
 
 
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
@@ -6695,15 +7347,1377 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             )}
 
             {/* =================== BRAND TEMPLATES MODE =================== */}
-            {studioMode === "templates" && (
-                <TemplateLibrary
-                    overlayMode={true}
-                    studioFilter="creative"
-                    onCloseOverlay={() => setStudioMode("create")}
-                    onSelectTemplate={handleTemplateSelect}
-                />
-            )}
+            {studioMode === 'templates' && (
+                <div>
 
+                    <div data-wt="templates-header" className="flex items-center justify-between mb-6 fade-up">
+                        <div>
+                            <h3 className="text-xl font-extrabold text-gradient flex items-center gap-2">
+                                <span className="material-symbols-outlined text-2xl">dashboard_customize</span>
+                                Brand Templates
+                            </h3>
+                            <p className="text-sm text-[var(--sys-text-muted)] mt-1">Pick a template, fill in your details, and generate on-brand designs instantly</p>
+                        </div>
+                        {activeTemplate && (
+                            <button onClick={() => { setActiveTemplate(null); setTemplateFields({}); setTemplateResult(null); setTemplatePromptPreview(''); setTemplateRefImage(null) }}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold studio-card text-[var(--sys-text)] hover:text-[var(--sys-text)] cursor-pointer">
+                                <span className="material-symbols-outlined text-sm">arrow_back</span>
+                                All Templates
+                            </button>
+                        )}
+                    </div>
+
+                    {!activeBrand ? (
+                        <div className="studio-card p-12 text-center fade-up-1">
+                            <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-4 block">brand_awareness</span>
+                            <h3 className="text-lg font-bold text-[var(--sys-text-muted)] mb-2">Select a Brand First</h3>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Templates use your brand colors, personality, and style</p>
+                        </div>
+                    ) : !activeTemplate ? (
+                        /* ──────────── Template Library — Categories & Sub-Templates ──────────── */
+                        <>
+                            {!activeCategory ? (
+                                /* ═══ LEVEL 1: Category Grid ═══ */
+                                <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {/* ── Built-in Categories ── */}
+                                        {templateCategories.map((cat, idx) => (
+                                            <button key={cat.id}
+                                                onClick={() => setActiveCategory(cat)}
+                                                className={`studio-card p-4 sm:p-5 text-left cursor-pointer group min-h-[180px] relative overflow-hidden fade-up-${Math.min(idx + 1, 5)}`}>
+                                                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300 shadow bg-[var(--sys-text)]/[0.04] border border-[var(--sys-border)] group-hover:bg-[var(--sys-text)]/[0.08]">
+                                                    <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">{cat.icon}</span>
+                                                </div>
+                                                <h4 className="text-base font-bold text-[var(--sys-text)] mb-1.5 transition-colors">{cat.label}</h4>
+                                                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed mb-3">{cat.desc}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded">
+                                                        {cat.subTemplates.length + (savedTemplates.filter(st => st.category === cat.id).length)} templates
+                                                    </span>
+                                                    <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] mt-0.5 ml-auto group-hover:text-[var(--sys-text)] transition-colors">arrow_forward</span>
+                                                </div>
+                                            </button>
+                                        ))}
+
+                                        {/* ── Saved Custom Categories from DB ── */}
+                                        {savedCategories.map(cc => (
+                                            <button key={cc.categoryId}
+                                                onClick={() => setActiveCategory({
+                                                    id: cc.categoryId, icon: cc.icon, label: cc.label,
+                                                    color: cc.color || '#f59e0b', desc: cc.description,
+                                                    isCustom: true, basePromptFormula: cc.basePromptFormula,
+                                                    referenceImageUrl: cc.referenceImageUrl,
+                                                    subTemplates: [] // custom categories only have custom sub-templates
+                                                })}
+                                                className="studio-card p-4 sm:p-5 text-left border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer group min-h-[170px] relative">
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                    <button onClick={async (e) => {
+                                                        e.stopPropagation()
+                                                        if (confirm(`Delete category "${cc.label}" and all its templates?`)) {
+                                                            try { await brandsAPI.deleteCategory(activeBrand._id, cc.categoryId); loadCustomCategories(); loadCustomTemplates() }
+                                                            catch (err) { console.error(err) }
+                                                        }
+                                                    }} className="p-1 rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                        <span className="material-symbols-outlined text-xs">delete</span>
+                                                    </button>
+                                                </div>
+                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform bg-[var(--sys-text)]/[0.04] border border-[var(--sys-border)] group-hover:bg-[var(--sys-text)]/[0.08]">
+                                                    <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">{cc.icon || 'auto_awesome'}</span>
+                                                </div>
+                                                <h4 className="text-base font-bold text-[var(--sys-text)] mb-1 transition-colors">{cc.label}</h4>
+                                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed mb-3">{cc.description || 'Custom category'}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-primary/70 bg-[var(--sys-surface)]/[0.08] px-2 py-0.5 rounded"><span className="material-symbols-outlined text-[inherit] text-lg align-middle mr-1 -mt-0.5">auto_awesome</span> Custom</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-0.5 rounded">
+                                                        {savedTemplates.filter(st => st.category === cc.categoryId).length} templates
+                                                    </span>
+                                                    <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] ml-auto group-hover:text-primary transition-colors">arrow_forward</span>
+                                                </div>
+                                            </button>
+                                        ))}
+
+                                        {/* ── Create New Category Card ── */}
+                                        <button onClick={() => setShowCreateCategory(true)}
+                                            className="rounded-2xl p-4 sm:p-5 text-left border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-text)]/[0.02] transition-all cursor-pointer group flex flex-col items-center justify-center min-h-[170px]">
+                                            <div className="w-14 h-14 rounded-2xl bg-[var(--sys-bg)] flex items-center justify-center mb-3 group-hover:bg-[var(--sys-text)]/[0.05] group-hover:scale-110 transition-all border border-[var(--sys-border)]">
+                                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">add</span>
+                                            </div>
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] mb-1">New Category</h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)] text-center">e.g. Birthday, Anniversary<br />Learn from a reference design</p>
+                                        </button>
+                                    </div>
+
+                                    {/* Brand identity bar */}
+                                    <div className="mt-6 studio-card p-4 flex items-center gap-4">
+                                        <div className="flex gap-1.5 shrink-0">
+                                            {(activeBrand.dna?.colors || []).slice(0, 5).map((c, i) => (
+                                                <div key={i} className="w-6 h-6 rounded-lg border border-[var(--sys-border)]" style={{ background: c.hex }} />
+                                            ))}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-[var(--sys-text)] truncate">
+                                                {templateCategories.reduce((s, c) => s + c.subTemplates.length, 0) + savedTemplates.length} templates using {activeBrand.name}'s brand identity
+                                            </p>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">Colors, personality ({activeBrand.dna?.voice?.personality || 'professional'}), and style auto-applied</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-primary text-lg shrink-0">verified</span>
+                                    </div>
+                                </>
+                            ) : (
+                                /* ═══ LEVEL 2: Sub-Templates inside a Category ═══ */
+                                <>
+                                    {/* Breadcrumb */}
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <button onClick={() => setActiveCategory(null)}
+                                            className="text-sm text-[var(--sys-text-muted)] hover:text-primary cursor-pointer flex items-center gap-1 transition-colors">
+                                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                                            All Categories
+                                        </button>
+                                        <span className="text-slate-700">/</span>
+                                        <span className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sm" style={{ color: activeCategory.color }}>{activeCategory.icon}</span>
+                                            {activeCategory.label}
+                                        </span>
+                                    </div>
+
+                                    {/* Aspect Ratio for templates */}
+                                    <div className="studio-card p-4 mb-4">
+                                        <h4 className="text-xs font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
+                                            <span className="material-symbols-outlined text-sm">aspect_ratio</span>
+                                            Aspect Ratio
+                                        </h4>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {ASPECT_RATIOS.map(ar => (
+                                                <button key={ar.ratio} onClick={() => setAspectRatio(ar.ratio)}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium cursor-pointer transition-all border ${aspectRatio === ar.ratio
+                                                        ? 'bg-[var(--sys-text)] text-[var(--sys-bg)] border-[var(--sys-text)] shadow-sm' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                    <span className="text-xs">{ar.icon}</span> {ar.ratio}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Sub-template grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                        {/* ── Built-in sub-templates ── */}
+                                        {activeCategory.subTemplates.map(sub => (
+                                            <button key={sub.id}
+                                                onClick={() => {
+                                                    setActiveTemplate({ ...sub, type: activeCategory.id, style: 'modern' })
+                                                    const defaults = {}
+                                                    sub.fields.forEach(f => { if (f.default) defaults[f.key] = f.default })
+                                                    setTemplateFields(defaults)
+                                                    setTemplateResult(null)
+                                                    setTemplatePromptPreview('')
+                                                    setTemplateRefImage(null)
+                                                    setTemplateError('')
+                                                }}
+                                                className="studio-card p-4 text-left cursor-pointer group">
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform bg-[var(--sys-text)]/[0.04] border border-[var(--sys-border)] group-hover:bg-[var(--sys-text)]/[0.08]">
+                                                    <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">{sub.icon}</span>
+                                                </div>
+                                                <h4 className="text-sm font-bold text-[var(--sys-text)] mb-1 transition-colors">{sub.label}</h4>
+                                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{sub.desc}</p>
+                                                <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-2 py-0.5 rounded mt-2 inline-block">{sub.fields.length} fields</span>
+                                            </button>
+                                        ))}
+
+                                        {/* ── Saved custom sub-templates in this category ── */}
+                                        {savedTemplates.filter(st => st.category === activeCategory.id).map(ct => (
+                                            <div key={ct.templateId}
+                                                className="studio-card p-4 text-left border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer group relative"
+                                                onClick={() => {
+                                                    setActiveTemplate({
+                                                        id: ct.templateId, icon: ct.icon, label: ct.label,
+                                                        desc: ct.description, type: ct.type || activeCategory.id, style: ct.style || 'modern',
+                                                        isCustom: true, promptFormula: ct.promptFormula,
+                                                        referenceImageUrl: ct.referenceImageUrl,
+                                                        fields: (ct.fields?.length > 0 ? ct.fields : [
+                                                            { key: 'headline', label: 'Headline / Title', type: 'text', placeholder: 'Main text' },
+                                                            { key: 'details', label: 'Details', type: 'textarea', placeholder: 'Additional details...' },
+                                                            { key: 'product_image', label: 'Add Product / Reference Image', type: 'image', hint: 'Upload or pick from your image bank' },
+                                                        ]).map(f => ({ ...f, type: f.type || 'text' })),
+                                                        buildPrompt: (brand, vals) => {
+                                                            let p = ct.promptFormula || ''
+                                                            Object.entries(vals).forEach(([k, v]) => {
+                                                                p = p.replace(new RegExp(`\\{\\{${k.toUpperCase()}\\}\\}`, 'g'), v || '')
+                                                                p = p.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'gi'), v || '')
+                                                            })
+                                                            const remaining = Object.entries(vals).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join('\n')
+                                                            if (remaining && !p.includes(remaining.split('\n')[0])) p += '\n\nUser inputs:\n' + remaining
+                                                            return p
+                                                        }
+                                                    })
+                                                    setTemplateFields({})
+                                                    setTemplateResult(null)
+                                                    setTemplatePromptPreview('')
+                                                    setTemplateRefImage(ct.referenceImageUrl || null)
+                                                    setTemplateError('')
+                                                }}>
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                    <button onClick={async (e) => {
+                                                        e.stopPropagation()
+                                                        if (confirm(`Delete "${ct.label}"?`)) {
+                                                            try { await brandsAPI.deleteTemplate(activeBrand._id, ct.templateId); loadCustomTemplates() }
+                                                            catch (err) { console.error(err) }
+                                                        }
+                                                    }} className="p-1 rounded-lg bg-[var(--sys-primary-dim)] text-primary hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                        <span className="material-symbols-outlined text-xs">delete</span>
+                                                    </button>
+                                                </div>
+                                                <div className="w-10 h-10 rounded-xl bg-[var(--sys-text)]/[0.04] border border-[var(--sys-border)] flex items-center justify-center mb-2 group-hover:bg-[var(--sys-text)]/[0.08] transition-colors">
+                                                    <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">{ct.icon || 'auto_awesome'}</span>
+                                                </div>
+                                                <h4 className="text-sm font-bold text-[var(--sys-text)] mb-1 transition-colors">{ct.label}</h4>
+                                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed truncate">{ct.description || 'Custom template'}</p>
+                                                <span className="text-xs font-semibold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded mt-2 inline-block"><span className="material-symbols-outlined text-[inherit] text-[14px] align-middle mr-1 -mt-0.5">auto_awesome</span> Custom</span>
+                                            </div>
+                                        ))}
+
+                                        {/* ── Add Sub-Template Card ── */}
+                                        <button onClick={() => {
+                                            setNewTmpl(prev => ({ ...prev, category: activeCategory.id }))
+                                            setShowCreateTemplate(true)
+                                        }}
+                                            className="rounded-2xl p-4 border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-text)]/[0.02] transition-all cursor-pointer group flex flex-col items-center justify-center min-h-[140px]">
+                                            <div className="w-10 h-10 rounded-xl bg-[var(--sys-bg)] flex items-center justify-center mb-2 group-hover:bg-[var(--sys-text)]/[0.05] group-hover:scale-110 transition-all">
+                                                <span className="material-symbols-outlined text-xl text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)]">add</span>
+                                            </div>
+                                            <h4 className="text-[11px] font-bold text-[var(--sys-text)] mb-0.5">Add Sub-Template</h4>
+                                            <p className="text-xs text-[var(--sys-text-muted)] text-center">Learn from image<br />or write prompt formula</p>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ═══ CREATE TEMPLATE MODAL ═══ */}
+                            {showCreateTemplate && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
+                                    onClick={() => setShowCreateTemplate(false)}>
+                                    <div className="w-full max-w-[calc(100%-2rem)] sm:max-w-2xl mx-auto max-h-[85vh] overflow-y-auto glass-panel rounded-3xl p-4 sm:p-6 mx-4 animate-scale-in"
+                                        onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-[var(--sys-text)]">add_circle</span>
+                                                    {activeCategory ? `Add Sub-Template` : 'Create New Template'}
+                                                </h3>
+                                                <p className="text-sm text-[var(--sys-text-muted)] mt-1">
+                                                    {activeCategory
+                                                        ? <>Adding to <span className="font-bold text-[var(--sys-text)]" style={{ color: activeCategory.color }}>{activeCategory.label}</span> — learn from an image or write a prompt formula</>
+                                                        : 'Pick a category, then build a reusable design formula'}
+                                                </p>
+                                            </div>
+                                            <button onClick={() => setShowCreateTemplate(false)}
+                                                className="p-2 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                                                <span className="material-symbols-outlined">close</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Category — only show picker when opened from top-level */}
+                                        {activeCategory ? (
+                                            <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                <span className="material-symbols-outlined text-lg" style={{ color: activeCategory.color }}>{activeCategory.icon}</span>
+                                                <span className="text-sm font-bold text-[var(--sys-text)]">{activeCategory.label}</span>
+                                                <span className="text-sm text-[var(--sys-text-muted)] ml-auto">Category (auto-selected)</span>
+                                            </div>
+                                        ) : (
+                                            <div className="mb-4">
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Select Category *</label>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {templateCategories.map(cat => (
+                                                        <button key={cat.id} onClick={() => setNewTmpl(p => ({ ...p, category: cat.id }))}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium cursor-pointer transition-all ${newTmpl.category === cat.id
+                                                                ? 'text-[var(--sys-text)] shadow-lg' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'}`}
+                                                            style={newTmpl.category === cat.id ? { background: cat.color } : {}}>
+                                                            <span className="material-symbols-outlined text-sm">{cat.icon}</span>
+                                                            {cat.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Template Name & Icon */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-4">
+                                            <div className="col-span-9">
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Template Name *</label>
+                                                <input type="text" value={newTmpl.label}
+                                                    onChange={e => setNewTmpl(p => ({ ...p, label: e.target.value }))}
+                                                    placeholder="e.g. Diwali Sale, Birthday Post, Anniversary Card..."
+                                                    className="input-glass w-full py-2.5 text-sm" />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Icon</label>
+                                                <select value={newTmpl.icon}
+                                                    onChange={e => setNewTmpl(p => ({ ...p, icon: e.target.value }))}
+                                                    className="input-glass w-full py-2.5 text-sm">
+                                                    {['auto_awesome', 'cake', 'favorite', 'celebration', 'star', 'card_giftcard', 'mood', 'eco', 'flag', 'spa', 'local_fire_department', 'brush', 'pets', 'music_note', 'restaurant', 'school'].map(ic => (
+                                                        <option key={ic} value={ic}>{ic.replace(/_/g, ' ')}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        <div className="mb-4">
+                                            <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Description</label>
+                                            <input type="text" value={newTmpl.description}
+                                                onChange={e => setNewTmpl(p => ({ ...p, description: e.target.value }))}
+                                                placeholder="e.g. Festive Diwali-themed sales post with diyas and lanterns"
+                                                className="input-glass w-full py-2.5 text-sm" />
+                                        </div>
+
+                                        {/* ── Learn from Image ── */}
+                                        <div className="mb-4 p-4 rounded-2xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                            <h4 className="text-xs font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
+                                                <span className="material-symbols-outlined text-sm">image_search</span>
+                                                Learn from a Reference Design
+                                                <span className="text-xs font-semibold text-[var(--sys-text-muted)] bg-[var(--sys-surface)] border border-[var(--sys-border)] px-2 py-0.5 rounded ml-auto">Recommended</span>
+                                            </h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)] mb-3">Upload a design — AI extracts style, layout, and creates a reusable formula. Future images keep the same look, only changing your content.</p>
+
+                                            {newTmpl.referenceImageUrl ? (
+                                                <div className="relative rounded-xl overflow-hidden mb-2">
+                                                    <img loading="lazy" decoding="async" src={newTmpl.referenceImageUrl} alt="Reference" className="w-full max-h-44 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                                    <button onClick={() => setNewTmpl(p => ({ ...p, referenceImageUrl: '' }))}
+                                                        className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-text)] hover:text-[var(--sys-bg)] cursor-pointer transition-colors shadow">
+                                                        <span className="material-symbols-outlined text-xs">close</span>
+                                                    </button>
+                                                    {analyzeLoading && (
+                                                        <div className="absolute inset-0 bg-black/60/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl">
+                                                            <span className="material-symbols-outlined text-2xl text-[var(--sys-text)] animate-spin mb-2">progress_activity</span>
+                                                            <p className="text-sm font-bold text-[var(--sys-text)]">Analyzing design style...</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <label className="flex flex-col items-center justify-center py-6 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] cursor-pointer transition-colors bg-[var(--sys-surface)]">
+                                                    <span className="material-symbols-outlined text-2xl text-[var(--sys-text-muted)] mb-2">add_photo_alternate</span>
+                                                    <span className="text-[11px] text-[var(--sys-text)] font-semibold">Upload a reference design</span>
+                                                    <span className="text-xs text-[var(--sys-text-muted)] mt-1">AI extracts style → auto-generates prompt formula</span>
+                                                    <input type="file" className="hidden" accept="image/*" onChange={e => {
+                                                        const file = e.target.files?.[0]
+                                                        if (file) {
+                                                            const reader = new FileReader()
+                                                            reader.onload = async ev => {
+                                                                const s3Url = await uploadToS3(ev.target.result, 'templates')
+                                                                handleAnalyzeForTemplate(s3Url)
+                                                            }
+                                                            reader.readAsDataURL(file)
+                                                        }
+                                                    }} />
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {/* Prompt Formula */}
+                                        <div className="mb-4">
+                                            <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block flex items-center gap-2">
+                                                Prompt Formula *
+                                                <span className="text-[var(--sys-text-muted)] font-normal text-xs">Use {'{{PLACEHOLDER}}'} for changeable parts</span>
+                                            </label>
+                                            <textarea value={newTmpl.promptFormula}
+                                                onChange={e => setNewTmpl(p => ({ ...p, promptFormula: e.target.value }))}
+                                                placeholder={`e.g. Create a ${newTmpl.label || 'festive sale'} post for ${activeBrand?.name || 'brand'}.\nKeep the same layout and design elements as reference.\nOnly change: {{HEADLINE}}, {{DETAILS}}`}
+                                                className="input-glass w-full py-3 text-sm resize-none font-mono" rows={5} />
+                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1 italic flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Use {'{{HEADLINE}}'}, {'{{PRODUCT}}'}, {'{{MESSAGE}}'} as placeholders — only these change, the design stays consistent.</p>
+                                        </div>
+
+                                        {/* ═══ Simple / Advanced Mode Toggle ═══ */}
+                                        <div className="mb-6">
+                                            {/* Mode Toggle */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex bg-[var(--sys-surface)] rounded-xl p-1 border border-[var(--sys-border)]">
+                                                    <button onClick={() => setTemplateFieldsMode('simple')}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${templateFieldsMode === 'simple'
+                                                            ? 'bg-primary text-[var(--sys-text)] shadow-none'
+                                                            : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                        <span className="material-symbols-outlined text-xs mr-1 align-middle">tune</span>
+                                                        Simple
+                                                    </button>
+                                                    <button onClick={() => setTemplateFieldsMode('advanced')}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${templateFieldsMode === 'advanced'
+                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text)] shadow-none'
+                                                            : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                        <span className="material-symbols-outlined text-xs mr-1 align-middle">auto_awesome</span>
+                                                        Advanced
+                                                        {(newTmpl.fields || []).some(f => f._detected) && (
+                                                            <span className="ml-1 text-[8px] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-full">{(newTmpl.fields || []).length}</span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                {templateFieldsMode === 'advanced' && (
+                                                    <button onClick={() => setNewTmpl(p => ({
+                                                        ...p,
+                                                        fields: [...(p.fields || []), { key: `field${(p.fields?.length || 0) + 1}`, label: '', type: 'text', placeholder: '' }]
+                                                    }))}
+                                                        className="text-sm text-primary cursor-pointer flex items-center gap-1 hover:text-primary-light">
+                                                        <span className="material-symbols-outlined text-xs">add</span> Add Field
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* ── SIMPLE MODE ── */}
+                                            {templateFieldsMode === 'simple' && (
+                                                <div className="space-y-4">
+                                                    {/* Layout & Color info (from AI analysis) */}
+                                                    {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
+                                                        <div className="p-3 rounded-xl bg-[var(--sys-text-muted)] border border-[var(--sys-text)] flex items-center gap-3">
+                                                            {analyzedMeta.colorPalette.length > 0 && (
+                                                                <div className="flex gap-1">
+                                                                    {analyzedMeta.colorPalette.map((c, i) => (
+                                                                        <div key={i} className="w-5 h-5 rounded-md border border-[var(--sys-border)]" style={{ background: c }} title={c} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {analyzedMeta.layoutDescription && (
+                                                                <span className="text-[10px] text-[var(--sys-text-muted)] flex-1">{analyzedMeta.layoutDescription}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Title Field */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Title / Headline</label>
+                                                        <input type="text"
+                                                            value={newTmpl._simpleTitle || ''}
+                                                            onChange={e => setNewTmpl(p => ({ ...p, _simpleTitle: e.target.value }))}
+                                                            placeholder="e.g. FLAUNT., Summer Sale, Brand Tagline..."
+                                                            className="input-glass w-full py-2.5 text-sm" />
+                                                    </div>
+
+                                                    {/* Message / Details */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Message / Details</label>
+                                                        <textarea
+                                                            value={newTmpl._simpleMessage || ''}
+                                                            onChange={e => setNewTmpl(p => ({ ...p, _simpleMessage: e.target.value }))}
+                                                            placeholder="Additional text, offers, descriptions..."
+                                                            className="input-glass w-full py-2.5 text-sm resize-none" rows={2} />
+                                                    </div>
+
+                                                    {/* Product / Model Image */}
+                                                    <div>
+                                                        <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Product / Reference Image</label>
+                                                        {newTmpl._simpleImage ? (
+                                                            <div className="relative rounded-xl overflow-hidden bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                                <img loading="lazy" decoding="async" src={newTmpl._simpleImage} alt="Selected" className="w-full max-h-40 object-contain" />
+                                                                <button onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: '' }))}
+                                                                    className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                                    <span className="material-symbols-outlined text-xs">close</span>
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 gap-2">
+                                                                {/* Upload from system */}
+                                                                <label className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] hover:border-primary/30 cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">upload_file</span>
+                                                                    <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">Upload</span>
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                                        const file = e.target.files?.[0]
+                                                                        if (!file) return
+                                                                        const reader = new FileReader()
+                                                                        reader.onload = (ev) => setNewTmpl(p => ({ ...p, _simpleImage: ev.target.result }))
+                                                                        reader.readAsDataURL(file)
+                                                                    }} />
+                                                                </label>
+                                                                {/* From brand assets */}
+                                                                <button onClick={async () => {
+                                                                    try {
+                                                                        const data = await creativesAPI.imageBank({ brandId: activeBrand._id, limit: 20 })
+                                                                        if (data.images?.length > 0) {
+                                                                            setNewTmpl(p => ({ ...p, _showBrandImages: true, _brandImageList: data.images }))
+                                                                        }
+                                                                    } catch (e) { console.error(e) }
+                                                                }}
+                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] hover:border-[var(--sys-text)] cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-[var(--sys-text)]/60">photo_library</span>
+                                                                    <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">Brand Assets</span>
+                                                                </button>
+                                                                {/* From URL */}
+                                                                <button onClick={() => {
+                                                                    const url = prompt('Enter image URL:')
+                                                                    if (url) setNewTmpl(p => ({ ...p, _simpleImage: url }))
+                                                                }}
+                                                                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] hover:border-[var(--sys-text)] cursor-pointer transition-all text-center">
+                                                                    <span className="material-symbols-outlined text-lg text-[var(--sys-text)]/60">link</span>
+                                                                    <span className="text-[10px] text-[var(--sys-text-muted)] font-medium">URL</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Brand Image Picker Grid */}
+                                                        {newTmpl._showBrandImages && (newTmpl._brandImageList || []).length > 0 && (
+                                                            <div className="mt-2 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <span className="text-[10px] font-bold text-[var(--sys-text)]">Select from Brand Assets</span>
+                                                                    <button onClick={() => setNewTmpl(p => ({ ...p, _showBrandImages: false }))}
+                                                                        className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">✕</button>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto">
+                                                                    {newTmpl._brandImageList.map((img, i) => (
+                                                                        <img loading="lazy" decoding="async" key={i} src={img.url} alt=""
+                                                                            className="w-full h-16 object-cover rounded-lg cursor-pointer border border-transparent hover:border-primary transition-all"
+                                                                            onClick={() => setNewTmpl(p => ({ ...p, _simpleImage: img.url, _showBrandImages: false }))} />
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">
+                                                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-xs">lightbulb</span> Simple mode — set the main text and image. Switch to Advanced for full AI-detected element control.</span>
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* ── ADVANCED MODE ── */}
+                                            {templateFieldsMode === 'advanced' && (
+                                                <div>
+                                                    {/* Layout & Color info */}
+                                                    {(analyzedMeta.layoutDescription || analyzedMeta.colorPalette.length > 0) && (
+                                                        <div className="mb-3 p-3 rounded-xl bg-[var(--sys-text-muted)] border border-[var(--sys-text)] flex items-center gap-3">
+                                                            {analyzedMeta.colorPalette.length > 0 && (
+                                                                <div className="flex gap-1">
+                                                                    {analyzedMeta.colorPalette.map((c, i) => (
+                                                                        <div key={i} className="w-5 h-5 rounded-md border border-[var(--sys-border)]" style={{ background: c }} title={c} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {analyzedMeta.layoutDescription && (
+                                                                <span className="text-[10px] text-[var(--sys-text-muted)] flex-1">{analyzedMeta.layoutDescription}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {(newTmpl.fields || []).length === 0 && (
+                                                        <div className="py-6 text-center rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                                            <span className="material-symbols-outlined text-2xl text-slate-700 mb-2 block">upload_file</span>
+                                                            <p className="text-xs text-[var(--sys-text-muted)]">Upload a reference image — AI will auto-detect elements</p>
+                                                            <p className="text-[10px] text-slate-700 mt-1">Or click "Add Field" to create manually</p>
+                                                        </div>
+                                                    )}
+
+                                                    {(newTmpl.fields || []).map((f, i) => {
+                                                        const typeBadge = { text: 'edit_note', textarea: 'edit_note', image: 'image', color: 'palette', select: 'list' }[f.type] || 'edit_note'
+                                                        return (
+                                                            <div key={i} className={`mb-2 p-3 rounded-xl border transition-all ${f._detected ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]' : 'border-[var(--sys-border)] bg-[var(--sys-surface)]'}`}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="material-symbols-outlined text-sm" title={f.type}>{typeBadge}</span>
+                                                                    <input type="text" value={f.label}
+                                                                        onChange={e => {
+                                                                            const updated = [...newTmpl.fields]
+                                                                            updated[i] = { ...f, label: e.target.value, key: e.target.value.toLowerCase().replace(/\s+/g, '_') || f.key }
+                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                        }}
+                                                                        placeholder="Field name"
+                                                                        className="input-glass flex-1 py-1.5 text-xs font-semibold" />
+                                                                    <select value={f.type}
+                                                                        onChange={e => {
+                                                                            const updated = [...newTmpl.fields]
+                                                                            updated[i] = { ...f, type: e.target.value }
+                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                        }}
+                                                                        className="input-glass py-1.5 text-[10px] w-20 rounded-lg">
+                                                                        <option value="text">Text</option>
+                                                                        <option value="textarea">Long Text</option>
+                                                                        <option value="image">Image</option>
+                                                                        <option value="color">Color</option>
+                                                                        <option value="select">Select</option>
+                                                                    </select>
+                                                                    {f._detected && (
+                                                                        <span className="text-[8px] bg-[var(--sys-text)]/[0.08] text-[var(--sys-text)] px-1.5 py-0.5 rounded font-bold">AI</span>
+                                                                    )}
+                                                                    <button onClick={() => setNewTmpl(p => ({ ...p, fields: p.fields.filter((_, fi) => fi !== i) }))}
+                                                                        className="p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-border)] cursor-pointer">
+                                                                        <span className="material-symbols-outlined text-xs">close</span>
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Image upload options for image type fields */}
+                                                                {f.type === 'image' && (
+                                                                    <div className="mt-2 ml-7">
+                                                                        {f._selectedImage ? (
+                                                                            <div className="relative rounded-lg overflow-hidden bg-[var(--sys-surface)] inline-block">
+                                                                                <img loading="lazy" decoding="async" src={f._selectedImage} alt="" className="max-h-24 object-contain rounded-lg" />
+                                                                                <button onClick={() => {
+                                                                                    const updated = [...newTmpl.fields]
+                                                                                    updated[i] = { ...f, _selectedImage: '' }
+                                                                                    setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                }}
+                                                                                    className="absolute top-1 right-1 p-0.5 rounded bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                                                    <span className="material-symbols-outlined text-[10px]">close</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex gap-1.5">
+                                                                                <label className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/30 cursor-pointer transition-all text-[9px] text-[var(--sys-text-muted)]">
+                                                                                    <span className="material-symbols-outlined text-[11px]">upload</span> Upload
+                                                                                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                                                                        const file = e.target.files?.[0]
+                                                                                        if (!file) return
+                                                                                        const reader = new FileReader()
+                                                                                        reader.onload = (ev) => {
+                                                                                            const updated = [...newTmpl.fields]
+                                                                                            updated[i] = { ...f, _selectedImage: ev.target.result }
+                                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                        }
+                                                                                        reader.readAsDataURL(file)
+                                                                                    }} />
+                                                                                </label>
+                                                                                <button onClick={async () => {
+                                                                                    try {
+                                                                                        const data = await creativesAPI.imageBank({ brandId: activeBrand._id, limit: 20 })
+                                                                                        if (data.images?.length > 0) {
+                                                                                            const updated = [...newTmpl.fields]
+                                                                                            updated[i] = { ...f, _showPicker: true, _pickerImages: data.images }
+                                                                                            setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                        }
+                                                                                    } catch (e) { console.error(e) }
+                                                                                }}
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer transition-all text-[9px] text-[var(--sys-text-muted)]">
+                                                                                    <span className="material-symbols-outlined text-[11px]">photo_library</span> Brand
+                                                                                </button>
+                                                                                <button onClick={() => {
+                                                                                    const url = prompt('Enter image URL:')
+                                                                                    if (url) {
+                                                                                        const updated = [...newTmpl.fields]
+                                                                                        updated[i] = { ...f, _selectedImage: url }
+                                                                                        setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                    }
+                                                                                }}
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-text)] cursor-pointer transition-all text-[9px] text-[var(--sys-text-muted)]">
+                                                                                    <span className="material-symbols-outlined text-[11px]">link</span> URL
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Brand image picker */}
+                                                                        {f._showPicker && (f._pickerImages || []).length > 0 && (
+                                                                            <div className="mt-1.5 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1 max-h-24 overflow-y-auto">
+                                                                                    {f._pickerImages.map((img, pi) => (
+                                                                                        <img loading="lazy" decoding="async" key={pi} src={img.url} alt=""
+                                                                                            className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-primary"
+                                                                                            onClick={() => {
+                                                                                                const updated = [...newTmpl.fields]
+                                                                                                updated[i] = { ...f, _selectedImage: img.url, _showPicker: false }
+                                                                                                setNewTmpl(p => ({ ...p, fields: updated }))
+                                                                                            }} />
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {f.description && (
+                                                                            <p className="text-[9px] text-primary/50 mt-1 italic">{f.description}</p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Default value for text fields */}
+                                                                {f.default && f.type !== 'image' && f.type !== 'color' && (
+                                                                    <p className="text-[9px] text-[var(--sys-text-muted)] ml-7 mt-1">Default: "{f.default}"</p>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Save */}
+                                        <button onClick={handleCreateTemplate}
+                                            disabled={!newTmpl.label || !newTmpl.promptFormula || !newTmpl.category || creatingTemplate}
+                                            className="btn-primary w-full py-4 rounded-2xl text-sm font-bold disabled:opacity-30">
+                                            {creatingTemplate ? (
+                                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Saving...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-sm">save</span> Save to {templateCategories.find(c => c.id === newTmpl.category)?.label || 'Library'}</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ═══ CREATE CATEGORY MODAL ═══ */}
+                            {showCreateCategory && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] animate-fade-in"
+                                    onClick={() => setShowCreateCategory(false)}>
+                                    <div className="w-full max-w-[calc(100%-2rem)] sm:max-w-md mx-auto studio-card p-4 sm:p-6 mx-4 animate-scale-in"
+                                        onClick={e => e.stopPropagation()}>
+
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between mb-5">
+                                            <h3 className="text-lg font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary">create_new_folder</span>
+                                                New Category
+                                            </h3>
+                                            <button onClick={() => setShowCreateCategory(false)}
+                                                className="p-2 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Live Preview */}
+                                        <div className="flex items-center gap-3 p-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-5">
+                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all"
+                                                style={{ background: `var(--sys-primary)`, boxShadow: `0 4px 15px ${newCat.color}12` }}>
+                                                <span className="material-symbols-outlined text-2xl" style={{ color: newCat.color }}>{newCat.icon}</span>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-[var(--sys-text)] truncate">{newCat.label || 'Category Name'}</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Preview — this is how it'll look in your grid</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Category Name */}
+                                        <div className="mb-4">
+                                            <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Category Name *</label>
+                                            <input type="text" value={newCat.label}
+                                                onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))}
+                                                placeholder="e.g. Birthday, Anniversary, Diwali..."
+                                                className="input-glass w-full py-3 text-sm"
+                                                autoFocus />
+                                        </div>
+
+                                        {/* Icon & Color — side by side */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                                            <div>
+                                                <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Icon</label>
+                                                <select value={newCat.icon}
+                                                    onChange={e => setNewCat(p => ({ ...p, icon: e.target.value }))}
+                                                    className="input-glass w-full py-3 text-sm">
+                                                    {['auto_awesome', 'cake', 'favorite', 'celebration', 'star', 'card_giftcard', 'mood', 'eco', 'flag', 'spa', 'local_fire_department', 'brush', 'pets', 'music_note', 'restaurant', 'school', 'sports_esports', 'local_offer', 'campaign', 'event'].map(ic => (
+                                                        <option key={ic} value={ic}>{ic.replace(/_/g, ' ')}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-[var(--sys-text-muted)] mb-1.5 block">Color</label>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {['#ef4444', '#f59e0b', '#10b981', 'var(--sys-text)', '#ec4899', '#0ea5e9', '#f97316', '#14b8a6'].map(c => (
+                                                        <button key={c} onClick={() => setNewCat(p => ({ ...p, color: c }))}
+                                                            className={`w-8 h-8 rounded-xl border cursor-pointer transition-all ${newCat.color === c ? 'border-[var(--sys-border)] scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
+                                                            style={{ background: c }} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Create Button */}
+                                        <button onClick={handleCreateCategory}
+                                            disabled={!newCat.label || creatingCategory}
+                                            className="btn-primary w-full py-3.5 rounded-2xl text-sm font-bold disabled:opacity-30">
+                                            {creatingCategory ? (
+                                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Creating...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-sm">add</span> Create "{newCat.label || 'Category'}"</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+
+                    ) : (
+                        /* ──────────── Active Template Detail Panel ──────────── */
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+                            {/* Left — Form Fields */}
+                            <div className="col-span-12 lg:col-span-5 space-y-4">
+                                {/* Template Header */}
+                                <div className="studio-card p-4 sm:p-5">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                            <span className="material-symbols-outlined text-2xl text-primary">{activeTemplate.icon}</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-base font-bold text-[var(--sys-text)]">{activeTemplate.label}</h4>
+                                            <p className="text-sm text-[var(--sys-text-muted)]">{activeTemplate.desc}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* ── Default Brand Prompt (auto-generated from brand DNA) ── */}
+                                    <div className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10 mb-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h5 className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                                                <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                                                Default Brand Prompt
+                                                <span className="text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded ml-1">Auto-generated</span>
+                                            </h5>
+                                            <button onClick={() => {
+                                                const defaultPrompt = activeTemplate.isCustom
+                                                    ? (activeTemplate.promptFormula || '')
+                                                    : activeTemplate.buildPrompt(activeBrand, {})
+                                                navigator.clipboard.writeText(defaultPrompt)
+                                            }}
+                                                className="text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer flex items-center gap-0.5">
+                                                <span className="material-symbols-outlined text-xs">content_copy</span> Copy
+                                            </button>
+                                        </div>
+                                        <div className="bg-[var(--sys-surface)] rounded-lg p-3 text-sm text-[var(--sys-text-muted)] leading-relaxed max-h-28 overflow-y-auto font-mono whitespace-pre-wrap mb-3">
+                                            {activeTemplate.isCustom
+                                                ? (activeTemplate.promptFormula || 'No prompt formula saved.')
+                                                : activeTemplate.buildPrompt(activeBrand, {})}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleTemplateGenerate(activeTemplate)}
+                                                disabled={templateGenerating}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-bold hover:bg-primary/30 cursor-pointer transition-all disabled:opacity-30">
+                                                <span className="material-symbols-outlined text-xs">bolt</span>
+                                                Use Default Prompt
+                                            </button>
+                                            <span className="text-xs text-[var(--sys-text-muted)] italic">or fill fields below to customize</span>
+                                        </div>
+                                        <p className="text-[8px] text-[var(--sys-text-muted)] mt-2 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-sm text-primary">verified</span>
+                                            Built with {activeBrand.name}'s brand colors ({(activeBrand.dna?.colors || []).slice(0, 3).map(c => c.hex).join(', ') || 'default'}), {activeBrand.dna?.voice?.personality || 'professional'} voice
+                                        </p>
+                                    </div>
+
+                                    {/* Form Fields */}
+                                    <div className="space-y-3">
+                                        {activeTemplate.fields.map(field => (
+                                            <div key={field.key}>
+                                                <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block flex items-center gap-1">
+                                                    {field.label}
+                                                    {field.hint && <span className="text-[var(--sys-text-muted)] font-normal">— {field.hint}</span>}
+                                                </label>
+
+                                                {field.type === 'text' && (
+                                                    <input type="text" value={templateFields[field.key] || ''}
+                                                        onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                        placeholder={field.placeholder}
+                                                        className="input-glass w-full py-2.5 text-sm" />
+                                                )}
+
+                                                {field.type === 'textarea' && (
+                                                    <textarea value={templateFields[field.key] || ''}
+                                                        onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                        placeholder={field.placeholder}
+                                                        className="input-glass w-full py-2.5 text-sm resize-none" rows={3} />
+                                                )}
+
+                                                {field.type === 'select' && (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {field.options.map(opt => (
+                                                            <button key={opt} onClick={() => setTemplateFields(prev => ({ ...prev, [field.key]: opt }))}
+                                                                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${templateFields[field.key] === opt
+                                                                    ? 'bg-primary text-[var(--sys-text)] shadow-none'
+                                                                    : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
+                                                                {opt}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {field.type === 'color' && (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative">
+                                                            <input type="color"
+                                                                value={templateFields[field.key] || field.default || '#6366f1'}
+                                                                onChange={e => setTemplateFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                                className="w-10 h-10 rounded-lg border border-[var(--sys-border)] cursor-pointer bg-transparent" />
+                                                        </div>
+                                                        <span className="text-xs text-[var(--sys-text-muted)] font-mono">{templateFields[field.key] || field.default || '#6366f1'}</span>
+                                                        {/* Brand color swatches for quick pick */}
+                                                        {(activeBrand?.dna?.colors || []).length > 0 && (
+                                                            <div className="flex gap-1.5 ml-2">
+                                                                {activeBrand.dna.colors.slice(0, 5).map((c, ci) => (
+                                                                    <button key={ci}
+                                                                        onClick={() => setTemplateFields(prev => ({ ...prev, [field.key]: c.hex }))}
+                                                                        className={`w-7 h-7 rounded-md border cursor-pointer transition-all hover:scale-110 ${templateFields[field.key] === c.hex ? 'border-[var(--sys-border)] shadow-lg' : 'border-[var(--sys-border)]'}`}
+                                                                        style={{ background: c.hex }}
+                                                                        title={c.name || c.hex} />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {field.type === 'image' && (
+                                                    <div>
+                                                        {templateFields[field.key] ? (
+                                                            <div className="relative rounded-xl overflow-hidden">
+                                                                <img loading="lazy" decoding="async" src={templateFields[field.key]} alt="Uploaded" className="w-full max-h-40 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                                                <button onClick={() => setTemplateFields(prev => { const next = { ...prev }; delete next[field.key]; return next })}
+                                                                    className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                                    <span className="material-symbols-outlined text-xs">close</span>
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-3">
+                                                                {/* Source buttons row */}
+                                                                <div className="flex gap-2">
+                                                                    <label className="flex-1 flex flex-col items-center justify-center py-4 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/30 cursor-pointer transition-colors bg-[var(--sys-surface)]">
+                                                                        <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)] mb-1">add_photo_alternate</span>
+                                                                        <span className="text-sm text-[var(--sys-text-muted)]">Upload File</span>
+                                                                        <input type="file" className="hidden" accept="image/*" onChange={e => {
+                                                                            const file = e.target.files?.[0]
+                                                                            if (file) {
+                                                                                const reader = new FileReader()
+                                                                                reader.onload = async ev => {
+                                                                                    const s3Url = await uploadToS3(ev.target.result, 'template-fields')
+                                                                                    setTemplateFields(prev => ({ ...prev, [field.key]: s3Url }))
+                                                                                }
+                                                                                reader.readAsDataURL(file)
+                                                                            }
+                                                                        }} />
+                                                                    </label>
+                                                                    <button onClick={() => {
+                                                                        if (bankImages.length === 0) loadImageBank()
+                                                                        setTemplateFields(prev => ({ ...prev, [`${field.key}_picker`]: prev[`${field.key}_picker`] === 'bank' ? '' : 'bank' }))
+                                                                    }}
+                                                                        className={`flex-1 flex flex-col items-center justify-center py-4 rounded-xl border border-dashed cursor-pointer transition-colors ${templateFields[`${field.key}_picker`] === 'bank' ? 'border-primary/40 bg-primary/5' : 'border-[var(--sys-border)] hover:border-primary/30 bg-[var(--sys-surface)]'}`}>
+                                                                        <span className="material-symbols-outlined text-lg text-primary mb-1">photo_library</span>
+                                                                        <span className="text-sm text-[var(--sys-text-muted)]">Image Bank</span>
+                                                                    </button>
+                                                                    {activeBrand?.dna?.brandImages?.length > 0 && (
+                                                                        <button onClick={() => {
+                                                                            setTemplateFields(prev => ({ ...prev, [`${field.key}_picker`]: prev[`${field.key}_picker`] === 'brand' ? '' : 'brand' }))
+                                                                        }}
+                                                                            className={`flex-1 flex flex-col items-center justify-center py-4 rounded-xl border border-dashed cursor-pointer transition-colors ${templateFields[`${field.key}_picker`] === 'brand' ? 'border-[var(--sys-border)] bg-[var(--sys-primary-dim)]' : 'border-[var(--sys-border)]/[0.15] hover:border-[var(--sys-border)] bg-[var(--sys-surface)]/[0.02]'}`}>
+                                                                            <span className="material-symbols-outlined text-lg text-primary mb-1">branding_watermark</span>
+                                                                            <span className="text-sm text-primary/70">Brand Assets</span>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Image Bank grid picker */}
+                                                                {templateFields[`${field.key}_picker`] === 'bank' && (
+                                                                    <div className="rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] p-3 max-h-[220px] overflow-y-auto custom-scrollbar">
+                                                                        {bankImages.length > 0 ? (
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                                                                {bankImages.slice(0, 24).map(img => (
+                                                                                    <button key={img._id} onClick={() => {
+                                                                                        setTemplateFields(prev => {
+                                                                                            const next = { ...prev, [field.key]: img.imageUrl }
+                                                                                            delete next[`${field.key}_picker`]
+                                                                                            return next
+                                                                                        })
+                                                                                    }}
+                                                                                        className="group relative rounded-lg overflow-hidden aspect-square cursor-pointer  border-[var(--sys-border)] hover:ring-primary/50 transition-all">
+                                                                                        <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || ''} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                                                                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                            <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">check_circle</span>
+                                                                                        </div>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="py-6 text-center">
+                                                                                <span className="material-symbols-outlined animate-spin text-primary text-lg">progress_activity</span>
+                                                                                <p className="text-xs text-[var(--sys-text-muted)] mt-2">Loading images...</p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Brand assets grid picker */}
+                                                                {templateFields[`${field.key}_picker`] === 'brand' && activeBrand?.dna?.brandImages?.length > 0 && (
+                                                                    <div className="rounded-xl border border-[var(--sys-border)] bg-[var(--sys-primary-dim)] p-3 max-h-[220px] overflow-y-auto custom-scrollbar">
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                                                            {activeBrand.dna.brandImages.map((img, i) => (
+                                                                                <button key={i} onClick={() => {
+                                                                                    setTemplateFields(prev => {
+                                                                                        const next = { ...prev, [field.key]: img.url }
+                                                                                        delete next[`${field.key}_picker`]
+                                                                                        return next
+                                                                                    })
+                                                                                }}
+                                                                                    className="group relative rounded-lg overflow-hidden aspect-square cursor-pointer  hover: transition-all">
+                                                                                    <img loading="lazy" decoding="async" src={img.url} alt={img.alt || ''} className="w-full h-full object-cover" />
+                                                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                        <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
+                                                                                    </div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Learn from Image (Reverse Prompting) */}
+                                <div className="studio-card p-4 sm:p-5">
+                                    <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                                        <span className="material-symbols-outlined text-primary text-sm">lightbulb</span>
+                                        Learn from an Image
+                                        <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded ml-auto">Optional</span>
+                                    </h4>
+                                    <p className="text-sm text-[var(--sys-text-muted)] mb-3">Upload a reference design and AI will extract a reusable prompt formula based on its style, colors, and layout.</p>
+
+                                    {templateRefImage ? (
+                                        <div className="relative rounded-xl overflow-hidden mb-3">
+                                            <img loading="lazy" decoding="async" src={templateRefImage} alt="Reference" className="w-full max-h-32 object-contain bg-[var(--sys-surface)] rounded-xl" />
+                                            <button onClick={() => setTemplateRefImage(null)}
+                                                className="absolute top-2 right-2 p-1 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] hover:bg-[var(--sys-primary-dim)] cursor-pointer">
+                                                <span className="material-symbols-outlined text-xs">close</span>
+                                            </button>
+                                            {reversePrompting && (
+                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-xl">
+                                                    <span className="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <label className="flex items-center justify-center py-4 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer transition-colors bg-[var(--sys-surface)]/[0.03]">
+                                                <span className="material-symbols-outlined text-lg text-primary/50 mr-2">image_search</span>
+                                                <span className="text-[11px] text-primary/70">Upload a design to analyze</span>
+                                                <input type="file" className="hidden" accept="image/*" onChange={e => {
+                                                    const file = e.target.files?.[0]
+                                                    if (file) {
+                                                        const reader = new FileReader()
+                                                        reader.onload = async ev => {
+                                                            const s3Url = await uploadToS3(ev.target.result, 'reverse-prompt')
+                                                            handleReversePrompt(s3Url, activeTemplate.id)
+                                                        }
+                                                        reader.readAsDataURL(file)
+                                                    }
+                                                }} />
+                                            </label>
+                                            {/* Brand website images for quick pick */}
+                                            {(activeBrand?.dna?.brandImages?.length > 0 || activeBrand?.dna?.bannerImages?.length > 0) && (
+                                                <div>
+                                                    <p className="text-sm text-[var(--sys-text-muted)] mb-1.5 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-sm text-primary">language</span>
+                                                        Or pick from your brand website:
+                                                    </p>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-1.5 max-h-24 overflow-y-auto">
+                                                        {(activeBrand.dna.brandImages || activeBrand.dna.bannerImages || []).slice(0, 10).map((img, i) => (
+                                                            <button key={i}
+                                                                onClick={() => handleReversePrompt(img.url, activeTemplate.id)}
+                                                                className="rounded-lg overflow-hidden border border-[var(--sys-border)] hover:border-[var(--sys-border)] cursor-pointer transition-all">
+                                                                <img loading="lazy" decoding="async" src={img.url} alt="" className="w-full aspect-square object-cover"
+                                                                    onError={e => e.target.parentElement.style.display = 'none'} />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Size & Resolution Controls */}
+                                <div className="studio-card p-4 sm:p-5">
+                                    <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                                        <span className="material-symbols-outlined text-primary text-sm">aspect_ratio</span>
+                                        Size & Resolution
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {/* Aspect Ratio */}
+                                        <div>
+                                            <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Aspect Ratio</label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    { value: '1:1', label: '1:1', icon: 'crop_square' },
+                                                    { value: '4:5', label: '4:5', icon: 'crop_portrait' },
+                                                    { value: '9:16', label: '9:16', icon: 'smartphone' },
+                                                    { value: '16:9', label: '16:9', icon: 'crop_landscape' },
+                                                    { value: '3:2', label: '3:2', icon: 'crop_landscape' },
+                                                    { value: '4:3', label: '4:3', icon: 'crop_landscape' },
+                                                    { value: '3:4', label: '3:4', icon: 'crop_portrait' },
+                                                    { value: '21:9', label: '21:9', icon: 'panorama_wide_angle' },
+                                                ].map(r => (
+                                                    <button key={r.value} onClick={() => setTemplateFields(prev => ({ ...prev, _aspectRatio: r.value }))}
+                                                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${(templateFields._aspectRatio || aspectRatio) === r.value
+                                                            ? 'bg-[var(--sys-surface)] text-[var(--sys-text)] shadow-none'
+                                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
+                                                        <span className="material-symbols-outlined text-xs">{r.icon}</span>
+                                                        {r.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Resolution */}
+                                        <div>
+                                            <label className="text-[11px] font-bold text-[var(--sys-text-muted)] mb-1.5 block">Resolution</label>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { value: '512px', label: 'Draft', desc: '512px — fast preview' },
+                                                    { value: '1K', label: '1K', desc: 'Standard quality' },
+                                                    { value: '2K', label: '2K', desc: 'High quality' },
+                                                ].map(r => (
+                                                    <button key={r.value} onClick={() => setTemplateFields(prev => ({ ...prev, _imageSize: r.value }))}
+                                                        className={`flex-1 py-2 rounded-lg text-center transition-all cursor-pointer ${(templateFields._imageSize || '1K') === r.value
+                                                            ? 'bg-[var(--sys-primary-dim)] text-[var(--sys-primary)] border border-[var(--sys-border)] shadow-none'
+                                                            : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] border border-[var(--sys-border)]'}`}>
+                                                        <p className="text-xs font-bold">{r.label}</p>
+                                                        <p className="text-[9px] text-[var(--sys-text-muted)] mt-0.5">{r.desc}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Additional Instructions (AI Vision adjustments) */}
+                                <div className="studio-card p-4 sm:p-5">
+                                    <div className="flex items-center justify-between cursor-pointer"
+                                        onClick={() => setTemplateFields(prev => ({ ...prev, _showExtraInstructions: !prev._showExtraInstructions }))}>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[var(--sys-text)] text-sm">magic_exchange</span>
+                                            Additional Changes
+                                            <span className="text-xs text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded">Optional</span>
+                                        </h4>
+                                        <span className={`material-symbols-outlined text-sm text-[var(--sys-text-muted)] transition-transform ${templateFields._showExtraInstructions ? 'rotate-180' : ''}`}>
+                                            expand_more
+                                        </span>
+                                    </div>
+
+                                    {templateFields._showExtraInstructions && (
+                                        <div className="mt-3 space-y-3">
+                                            <p className="text-xs text-[var(--sys-text-muted)]">Tell AI what to change — gender, outfit, pose, background, add/remove elements. Our vision engine will intelligently adapt the entire image.</p>
+
+                                            {/* Smart suggestion chips — toggle with exclusive groups */}
+                                            {(() => {
+                                                const CHIPS = [
+                                                    { label: 'Make model male', value: 'Change the model to a male with similar pose and expression', ms: 'face_6', group: 'gender' },
+                                                    { label: 'Make model female', value: 'Change the model to a female with similar pose and expression', ms: 'face_3', group: 'gender' },
+                                                    { label: 'Formal outfit', value: 'Change outfit to a formal business suit', ms: 'checkroom', group: 'outfit' },
+                                                    { label: 'Casual outfit', value: 'Change outfit to casual streetwear', ms: 'styler', group: 'outfit' },
+                                                    { label: 'Outdoor background', value: 'Change background to an outdoor natural environment', ms: 'park', group: 'bg' },
+                                                    { label: 'Studio background', value: 'Change background to a clean studio environment', ms: 'domain', group: 'bg' },
+                                                    { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme', ms: 'dark_mode', group: 'theme' },
+                                                    { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme', ms: 'light_mode', group: 'theme' },
+                                                    { label: 'Indian model', value: 'Change the model to an Indian person with similar pose', ms: 'person', group: 'ethnicity' },
+                                                    { label: 'Smiling pose', value: 'Change the expression to a warm natural smile', ms: 'sentiment_satisfied', group: 'expression' },
+                                                ];
+                                                const activeChips = templateFields._activeChips || [];
+                                                const toggleChip = (chip) => {
+                                                    setTemplateFields(prev => {
+                                                        const prevActive = prev._activeChips || [];
+                                                        const isActive = prevActive.includes(chip.label);
+                                                        let nextActive;
+                                                        if (isActive) {
+                                                            // Remove this chip
+                                                            nextActive = prevActive.filter(l => l !== chip.label);
+                                                        } else {
+                                                            // Remove any chip from same exclusive group, then add this one
+                                                            const sameGroupLabels = CHIPS.filter(c => c.group === chip.group).map(c => c.label);
+                                                            nextActive = [...prevActive.filter(l => !sameGroupLabels.includes(l)), chip.label];
+                                                        }
+                                                        // Rebuild prompt from active chips + freeform text
+                                                        const chipTexts = nextActive.map(l => CHIPS.find(c => c.label === l)?.value).filter(Boolean);
+                                                        const freeform = (prev._freeformInstructions || '').trim();
+                                                        const combined = [...chipTexts, ...(freeform ? [freeform] : [])].join('. ');
+                                                        return { ...prev, _activeChips: nextActive, _additionalInstructions: combined };
+                                                    });
+                                                };
+                                                return (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {CHIPS.map((chip, i) => {
+                                                            const isActive = activeChips.includes(chip.label);
+                                                            return (
+                                                                <button key={i} onClick={() => toggleChip(chip)}
+                                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-medium cursor-pointer transition-all flex items-center gap-1 ${isActive
+                                                                        ? 'bg-primary text-white border border-primary shadow-sm'
+                                                                        : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-text)] hover:border-[var(--sys-text)] hover:text-[var(--sys-bg)]'}`}>
+                                                                    <span className="material-symbols-outlined text-[10px]">{isActive ? 'check' : chip.ms}</span>{chip.label}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Free-form textarea */}
+                                            <textarea
+                                                value={templateFields._freeformInstructions || ''}
+                                                onChange={e => {
+                                                    const freeform = e.target.value;
+                                                    setTemplateFields(prev => {
+                                                        const CHIPS = [
+                                                            { label: 'Make model male', value: 'Change the model to a male with similar pose and expression' },
+                                                            { label: 'Make model female', value: 'Change the model to a female with similar pose and expression' },
+                                                            { label: 'Formal outfit', value: 'Change outfit to a formal business suit' },
+                                                            { label: 'Casual outfit', value: 'Change outfit to casual streetwear' },
+                                                            { label: 'Outdoor background', value: 'Change background to an outdoor natural environment' },
+                                                            { label: 'Studio background', value: 'Change background to a clean studio environment' },
+                                                            { label: 'Dark theme', value: 'Make the overall design darker with a premium dark theme' },
+                                                            { label: 'Light theme', value: 'Make the overall design lighter with a clean light theme' },
+                                                            { label: 'Indian model', value: 'Change the model to an Indian person with similar pose' },
+                                                            { label: 'Smiling pose', value: 'Change the expression to a warm natural smile' },
+                                                        ];
+                                                        const chipTexts = (prev._activeChips || []).map(l => CHIPS.find(c => c.label === l)?.value).filter(Boolean);
+                                                        const trimmed = freeform.trim();
+                                                        const combined = [...chipTexts, ...(trimmed ? [trimmed] : [])].join('. ');
+                                                        return { ...prev, _freeformInstructions: freeform, _additionalInstructions: combined };
+                                                    });
+                                                }}
+                                                placeholder="e.g., Change the model to a young man in a blue hoodie, make the background a sunset beach scene, add sunglasses..."
+                                                className="input-glass w-full py-3 text-sm resize-none" rows={3} />
+
+                                            {/* Enhance Additional Instructions */}
+                                            {templateFields._additionalInstructions && (
+                                                <div className="flex items-center gap-2">
+                                                    <CreditTooltipWrapper action="promptEnhance">
+                                                        <button onClick={async () => {
+                                                            if (!templateFields._additionalInstructions?.trim() || !activeBrand || enhancing) return
+                                                            setEnhancing(true)
+                                                            try {
+                                                                const data = await creativesAPI.enhancePrompt({
+                                                                    brandId: activeBrand._id,
+                                                                    prompt: `Image modification instructions: ${templateFields._additionalInstructions.trim()}`,
+                                                                    style: 'photorealistic',
+                                                                    format: 'template-edit',
+                                                                    aspectRatio: templateFields._aspectRatio || aspectRatio || '1:1',
+                                                                })
+                                                                if (data.enhancedPrompt) setTemplateFields(prev => ({ ...prev, _additionalInstructions: data.enhancedPrompt }))
+                                                            } catch (err) { console.error('Enhance failed:', err) }
+                                                            finally { setEnhancing(false) }
+                                                        }}
+                                                            disabled={enhancing || !activeBrand}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${enhancing
+                                                                ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]'
+                                                                : 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-primary hover:from-amber-500/25 hover:to-orange-500/20 border border-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
+                                                            <span className={`material-symbols-outlined text-sm ${enhancing ? 'animate-spin' : ''}`}>
+                                                                {enhancing ? 'progress_activity' : 'auto_awesome'}
+                                                            </span>
+                                                            {enhancing ? 'Enhancing...' : 'Enhance'}
+                                                        </button>
+                                                    </CreditTooltipWrapper>
+                                                    <span className="text-xs text-primary flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-xs">visibility</span>
+                                                        AI Vision will apply these changes
+                                                    </span>
+                                                    <button onClick={() => setTemplateFields(prev => ({ ...prev, _additionalInstructions: '', _activeChips: [], _freeformInstructions: '' }))}
+                                                        className="text-xs text-primary hover:text-[var(--sys-primary)] cursor-pointer ml-auto">Clear</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Generate Button */}
+                                <CreditTooltipWrapper action="creative">
+                                    <button onClick={() => handleTemplateGenerate(activeTemplate)}
+                                        disabled={templateGenerating}
+                                        className="btn-primary w-full py-4 rounded-2xl text-sm font-bold disabled:opacity-30">
+                                        {templateGenerating ? (
+                                            <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating Design...</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate {activeTemplate.label} <CreditBadge action="creative" /></>
+                                        )}
+                                    </button>
+                                </CreditTooltipWrapper>
+
+                                {templateError && (
+                                    <div className={`p-3 rounded-xl border flex items-center gap-2 mb-4 ${templateError.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'}`}>
+                                        <span className="material-symbols-outlined text-sm">{templateError.isProviderError ? 'warning' : 'error'}</span>
+                                        <div className="text-xs">
+                                            <span className="font-bold mr-1">{templateError.isProviderError ? `${templateError.provider || 'AI Provider'} Notice:` : 'Error:'}</span>
+                                            {templateError.message}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Right — Preview & Result */}
+                            <div className="col-span-12 lg:col-span-7 space-y-4">
+                                {/* Prompt Preview */}
+                                {(templatePromptPreview || Object.keys(templateFields).length > 0) && (
+                                    <div className="studio-card p-4 sm:p-5">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-primary text-sm">visibility</span>
+                                                Prompt Preview
+                                            </h4>
+                                            <button onClick={() => {
+                                                const built = activeTemplate.buildPrompt(activeBrand, templateFields)
+                                                setTemplatePromptPreview(built)
+                                            }}
+                                                className="text-sm text-primary hover:text-primary-light cursor-pointer flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-xs">refresh</span> Refresh
+                                            </button>
+                                        </div>
+                                        <div className="bg-[var(--sys-surface)] rounded-xl p-3 text-[11px] text-[var(--sys-text-muted)] leading-relaxed max-h-40 overflow-y-auto font-mono whitespace-pre-wrap">
+                                            {templatePromptPreview || activeTemplate.buildPrompt(activeBrand, templateFields)}
+                                        </div>
+                                        <button onClick={() => {
+                                            navigator.clipboard.writeText(templatePromptPreview || activeTemplate.buildPrompt(activeBrand, templateFields))
+                                        }}
+                                            className="mt-2 text-sm text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-xs">content_copy</span> Copy Prompt
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Result Display */}
+                                <GlobalLoader 
+                                    isActive={templateGenerating} 
+                                    title={`Creating Your ${activeTemplate.label}`}
+                                    currentStage={`AI is designing with ${activeBrand.name}'s brand identity...`}
+                                    icon={activeTemplate.icon}
+                                    estimatedDuration={25}
+                                    thinkingContext="creative"
+                                />
+
+                                {!templateGenerating && !templateResult && (
+                                    <div className="studio-card p-12 flex flex-col items-center justify-center min-h-[400px]">
+                                        <span className="material-symbols-outlined text-6xl text-slate-700 mb-4">{activeTemplate.icon}</span>
+                                        <h3 className="text-lg font-bold text-[var(--sys-text-muted)] mb-2">{activeTemplate.label}</h3>
+                                        <p className="text-xs text-[var(--sys-text-muted)] max-w-sm text-center">Fill in the fields on the left and click Generate. Your design will appear here with {activeBrand.name}'s brand styling automatically applied.</p>
+                                    </div>
+                                )}
+
+                                {templateResult && (
+                                    <div className="studio-card p-4 sm:p-5 fade-up">
+                                        <div className="rounded-2xl overflow-hidden mb-4">
+                                            <img src={templateResult.imageUrl} alt={activeTemplate.label} className="w-full rounded-2xl" loading="lazy" decoding="async" />
+                                        </div>
+                                        <div className="flex gap-2 flex-wrap">
+                                            <a href={templateResult.imageUrl} download={`${activeTemplate.id}-${activeBrand.name}.png`}
+                                                className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold">
+                                                <span className="material-symbols-outlined text-sm">download</span>
+                                                Download
+                                            </a>
+                                            <button onClick={() => { setTemplateResult(null); handleTemplateGenerate(activeTemplate) }}
+                                                className="py-2.5 px-5 rounded-xl text-xs font-bold glass-panel text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">refresh</span>
+                                                Regenerate
+                                            </button>
+                                            <button onClick={() => {
+                                                sessionStorage.setItem('canvasEditorImage', templateResult.imageUrl)
+                                                navigate('/ai-canvas')
+                                            }}
+                                                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-[var(--sys-text)] text-[var(--sys-text)] hover:bg-[var(--sys-text)] cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">edit</span>
+                                                Open in Canvas
+                                            </button>
+                                            <button onClick={() => {
+                                                setDesignBaseImage(templateResult.imageUrl)
+                                                setPrompt(templatePromptPreview || activeTemplate.buildPrompt(activeBrand, templateFields))
+                                                setSelectedType(activeTemplate.type)
+                                                setStyle(activeTemplate.style)
+                                                setStudioMode('create')
+                                            }}
+                                                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">palette</span>
+                                                Edit in Design Studio
+                                            </button>
+                                            <button onClick={() => setPublishData({ image: templateResult.imageUrl, text: '' })}
+                                                className="py-2.5 px-5 rounded-xl text-xs font-bold bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 cursor-pointer">
+                                                <span className="material-symbols-outlined text-sm">share</span>
+                                                Publish
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* =================== IMAGE BANK MODE =================== */}
             {studioMode === 'imagebank' && (
@@ -9233,22 +11247,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 </div>
             )}
 
-            {/* ========== TEMPLATE LIBRARY OVERLAY (standalone / header trigger) ========== */}
+            {/* ========== TEMPLATE LIBRARY OVERLAY ========== */}
             {showTemplateLibrary && (
-                <TemplateLibrary
-                    overlayMode={true}
-                    studioFilter="creative"
-                    onCloseOverlay={() => setShowTemplateLibrary(false)}
-                    onSelectTemplate={handleTemplateSelect}
-                />
-            )}
-
-            {/* ========== UNIFIED TEMPLATE GENERATION MODAL ========== */}
-            {selectedApiTemplate && (
-                <TemplateGenerationModal
-                    template={selectedApiTemplate}
-                    onClose={() => setSelectedApiTemplate(null)}
-                />
+                <TemplateLibrary overlayMode={true} studioFilter="creative" onCloseOverlay={() => setShowTemplateLibrary(false)} />
             )}
         </DashboardLayout>
     )
