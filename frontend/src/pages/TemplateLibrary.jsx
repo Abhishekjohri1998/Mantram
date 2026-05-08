@@ -138,6 +138,17 @@ const EXPLORE_CSS = `
 .ex-shimmer { background: linear-gradient(90deg, var(--sys-surface) 25%, var(--sys-bg) 50%, var(--sys-surface) 75%); background-size: 200% 100%; animation: exShimmer 1.5s infinite; }
 @keyframes exShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
+/* Card Hover Overlay */
+.card-hover-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; opacity: 0; transition: opacity 0.3s ease; z-index: 10; pointer-events: none; }
+.explore-card:hover .card-hover-overlay { opacity: 1; pointer-events: auto; }
+.hover-btn-use { background: var(--sys-primary); color: #fff; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.explore-card:hover .hover-btn-use { transform: translateY(0); }
+.hover-btn-use:hover { filter: brightness(1.1); transform: scale(1.05); }
+.hover-btn-preview { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.05s; backdrop-filter: blur(4px); }
+.explore-card:hover .hover-btn-preview { transform: translateY(0); }
+.hover-btn-preview:hover { background: rgba(255,255,255,0.25); transform: scale(1.1); }
+.hover-btn-preview .material-symbols-outlined { font-size: 20px; }
+
 /* Overlay mode header */
 .explore-overlay-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--sys-border); background: var(--sys-surface); }
 
@@ -480,6 +491,26 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                         ) : (
                                             <div className="ex-shimmer" style={{ width: '100%', height: '100%' }} />
                                         )}
+
+                                        <div className="card-hover-overlay">
+                                            <button className="hover-btn-use" onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleTemplateClick(template);
+                                            }}>
+                                                Use this template
+                                            </button>
+                                            <button className="hover-btn-preview" onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPreviewModal({
+                                                    open: true,
+                                                    src: isVideo ? (template.previewVideoUrl || template.previewUrl) : (template.previewUrl || template.previewImageUrl),
+                                                    type: isVideo ? 'video' : 'image',
+                                                    name: template.name
+                                                });
+                                            }}>
+                                                <span className="material-symbols-outlined">zoom_in</span>
+                                            </button>
+                                        </div>
 
                                         {isFeatured && <div className="card-badge-featured">Featured</div>}
                                         {isVideo && <div className="card-badge-duration">{randDuration(idx)}</div>}
