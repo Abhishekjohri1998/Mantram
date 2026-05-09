@@ -761,8 +761,23 @@ function DayCard({ item, onClick }) {
     ? CONTENT_TYPE_ICONS[item.contentType]
     : (PLATFORM_ICONS[item.platform] || CONTENT_TYPE_ICONS[item.contentType] || 'description')
   const displayPlatform = isBlogType
-    ? item.contentType  // show 'blog' / 'newsletter' instead of wrong platform
+    ? item.contentType
     : (item.platform || item.contentType)
+
+  // Asset detection
+  const assetUrl = item.generatedAsset?.url || null
+  const carouselUrls = item.generatedAsset?.imageUrls || []
+  const hasAsset = !!(assetUrl || carouselUrls.length > 0)
+  const isVideo = item.targetStudio === 'video' || item.contentType === 'reel' || item.contentType === 'video'
+
+  // Status badge config
+  const statusBadge = item.status === 'complete'
+    ? { label: '✓ Ready', bg: 'rgba(34,197,94,0.85)' }
+    : item.status === 'in_progress'
+    ? { label: '⚡ Generating', bg: 'rgba(245,158,11,0.85)' }
+    : item.status === 'published'
+    ? { label: '✓ Published', bg: 'rgba(255,77,0,0.85)' }
+    : null
 
   return (
     <div className="ms-day-card" onClick={() => onClick(item)} style={{ borderLeftColor: statusColor, borderLeftWidth: 3 }}>
@@ -770,6 +785,42 @@ function DayCard({ item, onClick }) {
         <span className="ms-day-label">{dateStr}</span>
         <span className="ms-day-type-badge">{item.contentType}</span>
       </div>
+
+      {/* Thumbnail preview — shown when asset is generated */}
+      {hasAsset ? (
+        <div className="ms-card-thumb-wrap">
+          {carouselUrls.length > 1 ? (
+            <div className="ms-card-carousel-strip">
+              {carouselUrls.slice(0, 3).map((url, i) => (
+                <img key={i} src={url} alt="" className="ms-card-carousel-img" loading="lazy"
+                  onError={e => { e.target.style.display = 'none' }} />
+              ))}
+              {carouselUrls.length > 3 && (
+                <div className="ms-card-carousel-more">+{carouselUrls.length - 3}</div>
+              )}
+            </div>
+          ) : (
+            <img src={assetUrl || carouselUrls[0]} alt="" className="ms-card-thumb-img" loading="lazy"
+              onError={e => { e.target.parentElement.style.display = 'none' }} />
+          )}
+          {isVideo && (
+            <div className="ms-card-play-icon">
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#fff' }}>play_circle</span>
+            </div>
+          )}
+          {statusBadge && (
+            <div className="ms-card-asset-badge" style={{ background: statusBadge.bg }}>
+              {statusBadge.label}
+            </div>
+          )}
+        </div>
+      ) : isVideo && item.status === 'pending' ? (
+        <div className="ms-card-thumb-wrap ms-card-video-placeholder">
+          <span className="material-symbols-outlined" style={{ fontSize: 24, opacity: 0.25 }}>videocam</span>
+          <span style={{ fontSize: '0.6rem', opacity: 0.35 }}>Video</span>
+        </div>
+      ) : null}
+
       <div className="ms-day-card-body">
         <div className="ms-day-platform">
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>
@@ -778,7 +829,7 @@ function DayCard({ item, onClick }) {
           {displayPlatform}
         </div>
         <div className="ms-day-angle">{item.brief?.angle || 'Brief pending'}</div>
-        {item.brief?.captionDraft && (
+        {!hasAsset && item.brief?.captionDraft && (
           <div className="ms-day-caption">"{item.brief.captionDraft}"</div>
         )}
       </div>
