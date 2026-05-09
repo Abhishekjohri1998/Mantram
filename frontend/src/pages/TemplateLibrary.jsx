@@ -121,7 +121,7 @@ const EXPLORE_CSS = `
 /* Card */
 .explore-card { display: flex; flex-direction: column; cursor: pointer; border: none; background: none; padding: 0; text-align: left; position: relative; break-inside: avoid; margin-bottom: 14px; }
 .explore-card-thumb { width: 100%; border-radius: 12px; overflow: hidden; position: relative; background: var(--sys-surface); border: 1px solid var(--sys-border); }
-.explore-card-thumb img, .explore-card-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease, filter 0.3s ease; }
+.explore-card-thumb img, .explore-card-thumb video { width: 100%; height: auto; object-fit: cover; display: block; transition: transform 0.4s ease, filter 0.3s ease; }
 .explore-card:hover .explore-card-thumb img, .explore-card:hover .explore-card-thumb video { transform: scale(1.05); filter: brightness(1.1); }
 .card-badge-featured { position: absolute; top: 10px; left: 10px; background: rgba(0,212,170,0.9); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 14px; z-index: 5; display: flex; align-items: center; gap: 4px; }
 .card-badge-featured::before { content: '★'; font-size: 9px; }
@@ -483,20 +483,9 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                             const avatarColor = pickColor(idx);
                             const titleText = (template.name || '').toUpperCase().replace(/\s+/g, ' • ');
 
-                            // Compute aspect ratio from template data
-                            const rawRatio = template.defaultSettings?.aspectRatio
-                                || template.savedVideoSettings?.format
-                                || template.generationParams?.aspectRatio
-                                || template.dna?.aspectRatio
-                                || '';
-                            // Convert "9:16" → "9/16", "1:1" → "1/1", etc.
-                            const thumbAspect = rawRatio.includes(':')
-                                ? rawRatio.replace(':', '/')
-                                : '3/4'; // default fallback
-
                             return (
                                 <button key={template._id} className="explore-card" onClick={() => handleTemplateClick(template)} onMouseLeave={() => setMobileTappedTemplateId(null)}>
-                                    <div className="explore-card-thumb" style={{ aspectRatio: thumbAspect }}>
+                                    <div className="explore-card-thumb">
                                         {isVideo && (template.previewVideoUrl || template.previewUrl) ? (
                                             <video src={template.previewVideoUrl || template.previewUrl} muted autoPlay loop playsInline />
                                         ) : (template.previewUrl || template.previewImageUrl) ? (
