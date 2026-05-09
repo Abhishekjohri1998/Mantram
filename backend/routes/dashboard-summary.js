@@ -756,7 +756,6 @@ router.get('/enhanced', protect, async (req, res) => {
         const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
         const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
         const tomorrowEnd   = new Date(todayEnd);   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
-        const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
         const baseFilter = { user: userId, ...(brandId ? { brand: brandId } : {}) };
 
@@ -780,7 +779,7 @@ router.get('/enhanced', protect, async (req, res) => {
                 .select('platform caption scheduledFor status accountId accountName').lean().catch(() => []),
             brandId
                 ? IntelMission.find({ brand: brandId, user: userId, status: 'active' })
-                    .select('title type target status lastRunAt findings').sort({ updatedAt: -1 }).limit(5).lean().catch(() => [])
+                    .select('title type target status lastCheckedAt findings').sort({ updatedAt: -1 }).limit(5).lean().catch(() => [])
                 : Promise.resolve([]),
             SocialPost.countDocuments({ ...baseFilter, status: 'scheduled', scheduledFor: { $gte: now } }).catch(() => 0),
         ]);
