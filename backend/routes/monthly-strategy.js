@@ -1043,6 +1043,7 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
                       aspectRatio: getAspectRatio(item.contentType, item.platform),
                       imageModel: imageModel,
                       imageSize: '1K',
+                      syncUpload: true, // Prevents 16MB document bloat from base64 strings
                     },
                   },
                   user: req.user,

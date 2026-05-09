@@ -755,10 +755,10 @@ Generate the adapted creative now.`;
             endProgress(progressId);
         }
 
-        // BACKGROUND POST-PROCESSING
-        (async () => {
+        // POST-PROCESSING: Upload to S3, add Logo, and run Critic
+        const runPostProcessing = async () => {
+            let finalUrl = rawImageUrl;
             try {
-                let finalUrl = rawImageUrl;
                 const ts = Date.now();
 
                 // ⚡ PERF: when addLogo=true, skip the first S3 upload entirely.
@@ -822,10 +822,6 @@ Generate the adapted creative now.`;
                 }
 
                 // ── BUG-FIX: Catch-all S3 Upload ──
-                // If we skipped the initial S3 upload (expecting to add a logo), but the logo overlay
-                // didn't happen (e.g. brand has no logo) or failed, finalUrl will STILL be a data URI.
-                // We MUST upload it to S3, otherwise GenerationJob is never updated with a valid URL 
-                // and the frontend polls forever.
                 if (finalUrl && finalUrl.startsWith('data:image/')) {
                     try {
                         finalUrl = await uploadToS3(finalUrl, `creatives/${brandId}/${ts}-final.png`);
@@ -840,7 +836,7 @@ Generate the adapted creative now.`;
                         { _id: creative._id },
                         { $set: { imageUrl: finalUrl, thumbnailUrl: finalUrl, 'aiMeta.processingStatus': 'ready' } }
                     );
-                    // ── Also update the GenerationJob so the polling frontend gets the real URL ──
+                    // Also update the GenerationJob so the polling frontend gets the real URL
                     if (jobId) {
                         await GenerationJob.updateOne(
                             { jobId },
@@ -854,12 +850,9 @@ Generate the adapted creative now.`;
                     );
                 }
 
-                // ── POST-GENERATION CRITIC (MCoT Stage 2) — async background ──
-                // Analyze the final image after S3 upload (so we have a stable HTTP URL)
-                // Saves quality verdict + score to aiMeta without blocking the user response
+                // ── POST-GENERATION CRITIC (MCoT Stage 2) ──
                 if (finalUrl && finalUrl.startsWith('http') && agenticMeta?.finalPrompt) {
                     try {
-                        // ⚡ PERF: Use the already-imported postGenerationCriticNode (line 45) — no dynamic re-import
                         const criticState = {
                             brief: prompt,
                             finalPrompt: agenticMeta.finalPrompt,
@@ -893,7 +886,16 @@ Generate the adapted creative now.`;
             } catch (bgErr) {
                 console.error('[BG] error:', bgErr.message);
             }
-        })();
+            return finalUrl;
+        };
+
+        if (options?.syncUpload) {
+            const finalUrl = await runPostProcessing();
+            creative.imageUrl = finalUrl;
+            creative.thumbnailUrl = finalUrl;
+        } else {
+            runPostProcessing().catch(e => console.error(e));
+        }
 
         return { success: true, creative, warnings: result.warnings || [] };
     } catch (error) {
