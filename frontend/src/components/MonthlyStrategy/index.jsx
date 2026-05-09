@@ -847,6 +847,7 @@ export default function MonthlyStrategy() {
   const [batchGenerating, setBatchGenerating] = useState(false)
   const [batchProgress, setBatchProgress]   = useState({ done: 0, total: 0 })
   const batchPollRef = useRef(null)
+  const batchJobIdRef = useRef(null)
 
   const abortRef    = useRef(null)
   const activeJobId = useRef(null)  // tracks current background job
@@ -1060,6 +1061,7 @@ export default function MonthlyStrategy() {
     try {
       const data = await msAPI.batchGenerate(strategy._id, { imageModel: batchModel })
       if (data?.batchId) {
+        batchJobIdRef.current = data.batchId
         let pollCount = 0
         batchPollRef.current = setInterval(async () => {
           try {
@@ -1089,6 +1091,27 @@ export default function MonthlyStrategy() {
       setBatchGenerating(false)
     }
   }, [strategy?._id, batchGenerating, batchModel, calendarItems])
+
+  // ── Stop/cancel batch generation ──
+  const handleStopBatch = useCallback(async () => {
+    if (batchPollRef.current) {
+      clearInterval(batchPollRef.current)
+      batchPollRef.current = null
+    }
+    if (batchJobIdRef.current) {
+      try { await jobsAPI.cancel(batchJobIdRef.current) } catch {}
+      batchJobIdRef.current = null
+    }
+    setBatchGenerating(false)
+    setBatchProgress({ done: 0, total: 0 })
+    // Reload strategy to get any images generated before stopping
+    if (strategy?._id) {
+      try {
+        const r = await msAPI.get(strategy._id)
+        if (r?.strategy) { setStrategy(r.strategy); setCalendarItems(r.strategy.calendar || []) }
+      } catch {}
+    }
+  }, [strategy?._id])
 
   // Cleanup batch poll on unmount
   useEffect(() => () => { if (batchPollRef.current) clearInterval(batchPollRef.current) }, [])
@@ -1383,6 +1406,22 @@ export default function MonthlyStrategy() {
                 }} />
               </div>
             </div>
+            <button
+              onClick={handleStopBatch}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.45rem 0.85rem', borderRadius: 8,
+                background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                color: '#ef4444', fontSize: '0.75rem', fontWeight: 700,
+                cursor: 'pointer', transition: 'all 0.2s',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)' }}
+              onMouseOut={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>stop_circle</span>
+              Stop
+            </button>
           </div>
         )}
 

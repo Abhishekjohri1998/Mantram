@@ -75,6 +75,7 @@ export default function SmartCalendar() {
     const [batchGenerating, setBatchGenerating] = useState(false)
     const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 })
     const batchPollRef = useRef(null)
+    const batchJobIdRef = useRef(null)
 
     // Active strategy for batch ops
     const [activeStrategy, setActiveStrategy] = useState(null)
@@ -230,6 +231,7 @@ export default function SmartCalendar() {
         try {
             const data = await msAPI.batchGenerate(activeStrategy._id, { imageModel: batchModel })
             if (data.batchId) {
+                batchJobIdRef.current = data.batchId
                 // Poll for completion
                 let pollCount = 0
                 batchPollRef.current = setInterval(async () => {
@@ -252,6 +254,17 @@ export default function SmartCalendar() {
             console.error('Batch generation failed:', err)
             setBatchGenerating(false)
         }
+    }
+
+    const handleStopBatch = async () => {
+        if (batchPollRef.current) { clearInterval(batchPollRef.current); batchPollRef.current = null }
+        if (batchJobIdRef.current) {
+            try { await jobsAPI.cancel(batchJobIdRef.current) } catch {}
+            batchJobIdRef.current = null
+        }
+        setBatchGenerating(false)
+        setBatchProgress({ done: 0, total: 0 })
+        fetchEntries()
     }
 
     useEffect(() => () => { if (batchPollRef.current) clearInterval(batchPollRef.current) }, [])
@@ -355,6 +368,11 @@ export default function SmartCalendar() {
                                 <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${batchProgress.total ? (batchProgress.done / batchProgress.total) * 100 : 0}%` }} />
                             </div>
                         </div>
+                        <button onClick={handleStopBatch}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all cursor-pointer flex-shrink-0">
+                            <span className="material-symbols-outlined text-sm">stop_circle</span>
+                            Stop
+                        </button>
                     </div>
                 )}
 
