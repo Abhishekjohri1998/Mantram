@@ -1409,7 +1409,7 @@ export default function MonthlyStrategy() {
                   }
                   {batchGenerating
                     ? `Generating ${batchProgress.done}/${batchProgress.total}...`
-                    : `Generate All Images (${calendarItems.filter(it => it.status === 'pending' && (!it.targetStudio || it.targetStudio === 'creative')).length})`
+                    : `Generate All Assets (${calendarItems.filter(it => it.status === 'pending' && (!it.targetStudio || ['creative', 'video'].includes(it.targetStudio))).length})`
                   }
                 </button>
               </>

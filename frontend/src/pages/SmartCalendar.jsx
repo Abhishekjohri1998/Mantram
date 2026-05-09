@@ -168,9 +168,13 @@ export default function SmartCalendar() {
         return days
     }, [currentMonth, currentYear, monthEvents, entriesByDay])
 
-    // Pending items count (for batch gen)
+    // Pending items count (for batch gen) — only creative/video, skip text-only 'content' items
     const pendingCount = useMemo(() => {
-        return calendarEntries.filter(e => e.source === 'strategy' && e.status === 'pending').length
+        return calendarEntries.filter(e => 
+            e.source === 'strategy' && 
+            e.status === 'pending' &&
+            (!e.rawItem?.targetStudio || ['creative', 'video'].includes(e.rawItem.targetStudio))
+        ).length
     }, [calendarEntries])
 
     // ── Selected day data ──
@@ -331,7 +335,7 @@ export default function SmartCalendar() {
                                 <button onClick={handleBatchGenerate} disabled={batchGenerating}
                                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20">
                                     <span className="material-symbols-outlined text-sm">{batchGenerating ? 'hourglass_empty' : 'bolt'}</span>
-                                    {batchGenerating ? `Generating ${batchProgress.done}/${batchProgress.total}...` : `Generate All (${pendingCount})`}
+                                    {batchGenerating ? `Generating ${batchProgress.done}/${batchProgress.total}...` : `Generate All Assets (${pendingCount})`}
                                 </button>
                             </div>
                         )}

@@ -189,9 +189,9 @@ function buildSocialMediaInstruction(connectedPlatforms) {
 }
 
 const STUDIO_MAP = {
-  reel: 'video', ugc: 'video', youtube: 'video',
+  reel: 'video', ugc: 'video', youtube: 'video', video: 'video',
   carousel: 'creative', static: 'creative', story: 'creative', ad: 'creative',
-  blog: 'content', newsletter: 'content',
+  blog: 'content', newsletter: 'content', text: 'creative', thread: 'creative',
   email: 'retention', whatsapp: 'retention',
   listing: 'content',
 };
@@ -929,12 +929,12 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
 
     const { imageModel = 'nanobanana-2', itemIds } = req.body;
 
-    // Filter to pending items that target creative studio (image generation)
+    // Filter to pending items that target creative studio (image generation) or video studio (thumbnail generation)
     const pendingItems = (doc.calendar || []).filter(item => {
       if (item.status !== 'pending') return false;
       if (itemIds?.length && !itemIds.includes(item._id.toString())) return false;
       const studio = item.targetStudio || 'creative';
-      return studio === 'creative';
+      return studio === 'creative' || studio === 'video';
     });
 
     if (pendingItems.length === 0) {
@@ -974,11 +974,19 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
 
         for (const item of pendingItems) {
           try {
+            // Check if batch was cancelled before generating
+            const jobCheck = await GenerationJob.findOne({ jobId: batchJobId }).lean();
+            if (jobCheck?.status === 'cancelled') {
+              console.log(`[batch-generate] Job ${batchJobId} cancelled — stopping.`);
+              break;
+            }
+
             // Build prompt from brief fields
             const prompt = [
               item.brief?.visualDirection && `VISUAL: ${item.brief.visualDirection}`,
               item.brief?.angle && `CAMPAIGN: ${item.brief.angle}`,
               item.brief?.toneDirection && `MOOD: ${item.brief.toneDirection}`,
+              item.brief?.captionDraft && `CAPTION CONTEXT: ${item.brief.captionDraft}`,
               `Brand-consistent professional marketing visual for ${item.platform || 'instagram'}.`,
               `FORMAT: ${item.contentType || 'static post'}`,
             ].filter(Boolean).join('\n');
@@ -992,14 +1000,24 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
             // Map platform → valid Creative.type enum value
             const PLATFORM_TO_CREATIVE_TYPE = {
               instagram: 'instagram-post',
-              facebook:  'instagram-post',   // same format — Creative model has no 'facebook-post'
+              facebook:  'instagram-post',
               linkedin:  'linkedin-post',
               twitter:   'twitter-post',
-              tiktok:    'instagram-story',   // 9:16 aspect
+              tiktok:    'instagram-story',
               gbp:       'instagram-post',
               youtube:   'youtube-thumb',
             };
             const creativeType = PLATFORM_TO_CREATIVE_TYPE[item.platform] || 'instagram-post';
+
+            // Determine aspect ratio based on content type + platform
+            const getAspectRatio = (contentType, platform) => {
+              if (['story', 'reel', 'video'].includes(contentType)) return '9:16';
+              if (contentType === 'carousel') return '1:1';
+              if (platform === 'linkedin') return '1.91:1';
+              if (platform === 'twitter') return '16:9';
+              if (platform === 'youtube') return '16:9';
+              return '4:5'; // instagram/facebook default
+            };
 
             const result = await internalGenerateCreative({
               body: {
@@ -1007,13 +1025,13 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
                 brandId: doc.brand?.toString(),
                 type: creativeType,
                 options: {
-                  aspectRatio: item.contentType === 'story' ? '9:16' : item.contentType === 'carousel' ? '1:1' : '4:5',
+                  aspectRatio: getAspectRatio(item.contentType, item.platform),
                   imageModel: imageModel,
-                  imageSize: '1K', // 1K for speed in batch mode
+                  imageSize: '1K',
                 },
               },
               user: req.user,
-              creditsDeducted: 0,  // ← credits charged separately at job level
+              creditsDeducted: 0,
             });
 
             if (result?.success && result?.creative?.imageUrl) {
