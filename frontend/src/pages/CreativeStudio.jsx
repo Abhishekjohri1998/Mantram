@@ -7540,6 +7540,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             template={tmpl}
                                             onUse={t => setFitPanelTemplate(t)}
                                             onDelete={handleDeleteDnaTemplate}
+                                            recentGenerations={generationHistory.filter(h => h.templateId === tmpl._id || h._prompt === `Template: ${tmpl.name}`)}
                                         />
                                     ))}
                                     {/* Add more card */}
@@ -7587,6 +7588,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         title: `Template: ${tmpl?.name || 'AI Template'}`,
                                         _timestamp: Date.now(),
                                         createdAt: new Date().toISOString(),
+                                        templateId: tmpl?._id
                                     }, ...prev])
                                 }
                                 // Close panel after a short delay so user can see the result in panel first

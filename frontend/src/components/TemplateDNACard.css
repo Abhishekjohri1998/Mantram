@@ -215,3 +215,37 @@
     border: 1px solid rgba(255, 255, 255, 0.15);
     flex-shrink: 0;
 }
+
+
+/* Recent Generations */
+.tdna-card__generations {
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.tdna-card__generations-title {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.tdna-card__generations-list {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.tdna-card__generation-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.tdna-card__generation-more {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
