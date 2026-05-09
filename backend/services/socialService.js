@@ -598,6 +598,25 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
                 permalink: media.permalink,
                 platform: 'instagram'
             }));
+        } else if (platform === 'twitter') {
+            // Twitter v2 — recent tweets for a user (bearer token, no user auth needed for public)
+            const bearerToken = config.twitter.bearerToken;
+            if (!bearerToken) return [];
+            const twUrl = `https://api.twitter.com/2/users/${accountId}/tweets?tweet.fields=created_at,text,attachments&max_results=10`;
+            const twResp = await axios.get(twUrl, {
+                headers: { 'Authorization': `Bearer ${bearerToken}` }
+            });
+            return (twResp.data?.data || []).map(tweet => ({
+                id: tweet.id,
+                content: tweet.text || '',
+                createdAt: tweet.created_at,
+                permalink: `https://x.com/i/status/${tweet.id}`,
+                platform: 'twitter',
+            }));
+        } else if (platform === 'linkedin') {
+            // LinkedIn personal post history is not directly available via public API without r_member_social + ugcPosts scope
+            // Return empty array gracefully
+            return [];
         }
         return [];
     } catch (error) {
@@ -608,8 +627,8 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // Updated scopes: r_liteprofile → openid+profile, r_emailaddress → email
-    const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
+    // r_member_social added for reading analytics (likes/comments on personal posts)
+    const scopes = ['openid', 'profile', 'email', 'w_member_social', 'r_member_social'].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
     return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;
@@ -773,9 +792,38 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
                 reach: insights.find(i => i.name === 'reach')?.values[0]?.value || 0
             };
         } else if (platform === 'linkedin') {
-            // LinkedIn analytics usually require a separate call to the organizationalInsights or similar
-            // For now, return a placeholder or implement if needed
-            return { likes: 0, comments: 0, impressions: 0 };
+            // LinkedIn Share Statistics via socialActions endpoint
+            // postId is the share URN like urn:li:share:7338271625718587392
+            const encodedUrn = encodeURIComponent(postId);
+            const liUrl = `https://api.linkedin.com/v2/socialActions/${encodedUrn}`;
+            const liResp = await axios.get(liUrl, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'X-Restli-Protocol-Version': '2.0.0',
+                    'LinkedIn-Version': '202401',
+                }
+            });
+            const d = liResp.data;
+            return {
+                likes: d.reactions?.numReactions ?? d.likesSummary?.totalLikes ?? 0,
+                comments: d.commentsSummary?.totalFirstLevelComments ?? 0,
+                impressions: 0, // LinkedIn doesn't expose personal impressions via socialActions
+            };
+        } else if (platform === 'twitter') {
+            // Twitter v2 public metrics — works with bearer token (no user auth needed)
+            const bearerToken = config.twitter.bearerToken;
+            if (!bearerToken) return null;
+            const twUrl = `https://api.twitter.com/2/tweets/${postId}?tweet.fields=public_metrics`;
+            const twResp = await axios.get(twUrl, {
+                headers: { 'Authorization': `Bearer ${bearerToken}` }
+            });
+            const m = twResp.data?.data?.public_metrics || {};
+            return {
+                likes: m.like_count || 0,
+                comments: m.reply_count || 0,
+                impressions: m.impression_count || 0,
+                retweets: m.retweet_count || 0,
+            };
         }
     } catch (error) {
         console.error(`Failed to fetch analytics for ${platform} post ${postId}:`, error.response?.data || error.message);
@@ -818,8 +866,9 @@ function twitterAuthHeader(method, url, extraParams, consumerKey, consumerSecret
 /**
  * Publish a tweet to Twitter/X with optional image or video
  */
-export const publishToTwitter = async (text, imageUrl, videoUrl) => {
-    const { apiKey, apiSecret, accessToken, accessTokenSecret } = config.twitter;
+export const publishToTwitter = async (text, imageUrl, videoUrl, credentials = null) => {
+    // credentials override allows per-user tokens; falls back to app-level config
+    const { apiKey, apiSecret, accessToken, accessTokenSecret } = credentials || config.twitter;
     if (!apiKey || !accessToken) throw new Error('Twitter API credentials not configured');
 
     try {
@@ -920,4 +969,79 @@ export const publishToTwitter = async (text, imageUrl, videoUrl) => {
         const msg = errData?.detail || errData?.errors?.[0]?.message || errData?.title || error.message;
         throw new Error(msg || 'Failed to publish to Twitter/X');
     }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// TWITTER / X — OAuth 1.0a Three-Legged Flow Helpers
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Step 1 of OAuth 1.0a: Get a temporary request token from Twitter.
+ * Returns { oauthToken, oauthTokenSecret }.
+ * The caller must redirect the user to:
+ *   https://api.twitter.com/oauth/authenticate?oauth_token={oauthToken}
+ */
+export const getTwitterOAuthRequestToken = async (callbackUrl) => {
+    const { apiKey, apiSecret } = config.twitter;
+    if (!apiKey || !apiSecret) throw new Error('Twitter API key/secret not configured');
+
+    const url = 'https://api.twitter.com/oauth/request_token';
+    const oauthParams = {
+        oauth_callback: callbackUrl,
+        oauth_consumer_key: apiKey,
+        oauth_nonce: crypto.randomBytes(16).toString('hex'),
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_version: '1.0',
+    };
+    // Sign the request — token secret is empty string at request_token stage
+    oauthParams.oauth_signature = twitterOAuthSign('POST', url, oauthParams, apiSecret, '');
+    const headerStr = Object.keys(oauthParams).sort()
+        .map(k => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`).join(', ');
+
+    const response = await axios.post(url, null, {
+        headers: { 'Authorization': `OAuth ${headerStr}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    const parsed = new URLSearchParams(response.data);
+    const oauthToken = parsed.get('oauth_token');
+    const oauthTokenSecret = parsed.get('oauth_token_secret');
+    if (!oauthToken) throw new Error('Twitter did not return an oauth_token — verify your app Callback URL in the Twitter Developer Portal');
+    return { oauthToken, oauthTokenSecret };
+};
+
+/**
+ * Step 3 of OAuth 1.0a: Exchange the verifier for permanent user-level access tokens.
+ * Returns { accessToken, accessTokenSecret, userId, screenName }.
+ */
+export const exchangeTwitterVerifier = async (oauthToken, oauthTokenSecret, oauthVerifier) => {
+    const { apiKey, apiSecret } = config.twitter;
+    const url = 'https://api.twitter.com/oauth/access_token';
+
+    const oauthParams = {
+        oauth_consumer_key: apiKey,
+        oauth_nonce: crypto.randomBytes(16).toString('hex'),
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+        oauth_token: oauthToken,
+        oauth_verifier: oauthVerifier,
+        oauth_version: '1.0',
+    };
+    oauthParams.oauth_signature = twitterOAuthSign('POST', url, oauthParams, apiSecret, oauthTokenSecret);
+    const headerStr = Object.keys(oauthParams).sort()
+        .map(k => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`).join(', ');
+
+    const response = await axios.post(
+        url,
+        new URLSearchParams({ oauth_verifier: oauthVerifier }),
+        { headers: { 'Authorization': `OAuth ${headerStr}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const parsed = new URLSearchParams(response.data);
+    return {
+        accessToken: parsed.get('oauth_token'),
+        accessTokenSecret: parsed.get('oauth_token_secret'),
+        userId: parsed.get('user_id'),
+        screenName: parsed.get('screen_name'),
+    };
 };

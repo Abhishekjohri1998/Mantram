@@ -5,7 +5,7 @@ const socialPostSchema = new mongoose.Schema({
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand' },
 
     // Target account
-    platform: { type: String, required: true }, // instagram, facebook, linkedin
+    platform: { type: String, required: true }, // instagram, facebook, linkedin, twitter
     accountId: { type: String, required: true },
     accountName: { type: String, default: '' },
 
@@ -18,6 +18,17 @@ const socialPostSchema = new mongoose.Schema({
     // Platform response
     postId: { type: String, default: '' },
     postUrl: { type: String, default: '' },
+
+    // Analytics — fetched from platform API after publishing (enriches strategy generation)
+    analytics: {
+        likes:       { type: Number, default: 0 },
+        comments:    { type: Number, default: 0 },
+        impressions: { type: Number, default: 0 },
+        reach:       { type: Number, default: 0 },
+        retweets:    { type: Number, default: 0 },  // Twitter/X only
+        engagement:  { type: Number, default: 0 },  // Composite engagement (IG)
+        fetchedAt:   { type: Date, default: null },
+    },
 
     // Status
     status: {

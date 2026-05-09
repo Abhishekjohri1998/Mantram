@@ -237,6 +237,11 @@ export default function Integrations() {
                 loadAllStatuses()
                 syncChannel.postMessage(e.data) // Notify other tabs
             }
+            if (e.data?.type === 'SOCIAL_PLATFORM_DENIED') {
+                // User cancelled Twitter (or other) OAuth — clear loading spinner
+                const p = e.data.platform
+                if (p) setLoading(l => ({ ...l, [p]: false }))
+            }
         }
         window.addEventListener('message', handler)
         return () => {
@@ -248,12 +253,17 @@ export default function Integrations() {
     // Detect if this window is an OAuth popup and should close itself
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
-        if (params.get('social') === 'success' && window.opener) {
-            window.opener.postMessage({
-                type: 'SOCIAL_PLATFORM_CONNECTED',
-                platform: params.get('platform')
-            }, window.location.origin)
-            window.close()
+        const socialStatus = params.get('social')
+        const platform = params.get('platform')
+        if (window.opener) {
+            if (socialStatus === 'success') {
+                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_CONNECTED', platform }, window.location.origin)
+                window.close()
+            } else if (socialStatus === 'denied' || socialStatus === 'processing_failed' || socialStatus === 'invalid_request') {
+                // User cancelled Twitter auth or another error — notify parent to stop spinner
+                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }, window.location.origin)
+                window.close()
+            }
         }
     }, [])
 
