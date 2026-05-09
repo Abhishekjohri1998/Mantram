@@ -26,7 +26,8 @@ const calendarItemSchema = new mongoose.Schema({
     contentType:    {
         type: String,
         enum: ['reel', 'carousel', 'static', 'story', 'blog', 'email',
-               'ad', 'ugc', 'newsletter', 'youtube', 'whatsapp', 'listing'],
+               'ad', 'ugc', 'newsletter', 'youtube', 'whatsapp', 'listing',
+               'video', 'text', 'thread'],
         required: true,
     },
     platform:       { type: String, default: '' },   // instagram | linkedin | email | amazon etc.
