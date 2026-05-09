@@ -170,7 +170,7 @@ const MCP_CALLS = {
 };
 
 const TYPE_INSTRUCTIONS = {
-  'social-media': `Generate a social-media-first strategy. Calendar: 70% Reels/carousels, 20% static/stories, 10% UGC. Focus on Instagram, LinkedIn, YouTube Shorts. Every brief must include a viral hook angle and specific hashtag set.`,
+  'social-media': null, // Dynamic — built at runtime based on connected platforms
   'performance-marketing': `Generate a paid-media strategy. Calendar: 40% ad creatives (Meta/Google), 40% social proof content, 20% landing page copy briefs. Include ROAS targets and audience targeting notes in briefs.`,
   'seo': `Generate an SEO-first strategy. Calendar: 50% blogs/articles, 30% social content promoting blogs, 20% email newsletters. Every blog brief must include a target keyword.`,
   'sales': `Generate a sales acceleration strategy. Calendar: 40% offer/promo content, 30% social proof/reviews, 30% conversion-focused emails and WhatsApp. Include urgency hooks and CTA direction in every brief.`,
@@ -180,6 +180,14 @@ const TYPE_INSTRUCTIONS = {
   'marketplace': `Generate a marketplace growth strategy. Calendar: 40% listing content updates (A+/A++), 30% review response/social proof, 30% social driving traffic to listings. Include SEO keywords for every marketplace brief.`,
 };
 
+// Build dynamic social-media type instruction based on connected platforms
+function buildSocialMediaInstruction(connectedPlatforms) {
+  const platformList = connectedPlatforms.length > 0
+    ? connectedPlatforms.join(', ')
+    : 'Instagram, LinkedIn';
+  return `Generate a social-media-first strategy. Calendar MUST include content for ALL these connected platforms: ${platformList}. Distribute content evenly across all platforms — every platform gets content every day. Mix: 40% Reels/video, 30% carousels/static, 20% stories/UGC, 10% text posts. Every brief must include a viral hook angle and platform-specific hashtag set.`;
+}
+
 const STUDIO_MAP = {
   reel: 'video', ugc: 'video', youtube: 'video',
   carousel: 'creative', static: 'creative', story: 'creative', ad: 'creative',
@@ -188,8 +196,12 @@ const STUDIO_MAP = {
   listing: 'content',
 };
 
-function buildStrategyPrompt({ brandContext, strategyContext, researchContext, strategyType, month, year, userBrief, launchEvents, focusKeywords, toneOverride }) {
+function buildStrategyPrompt({ brandContext, strategyContext, researchContext, strategyType, month, year, userBrief, launchEvents, focusKeywords, toneOverride, connectedPlatforms, startingDate, endDay }) {
   const monthName = new Date(year, month - 1, 1).toLocaleString('en', { month: 'long' });
+  const platformList = connectedPlatforms?.length ? connectedPlatforms.join(', ') : 'instagram, linkedin';
+  const numPlatforms = connectedPlatforms?.length || 2;
+  const daysRemaining = (endDay || 28) - (startingDate || 1) + 1;
+  const totalItems = Math.min(daysRemaining * numPlatforms, 90); // Cap at 90 to avoid token overflow
 
   // Build user directive block if any context was provided
   const hasDirective = userBrief || (launchEvents?.length) || (focusKeywords?.length) || toneOverride;
@@ -204,6 +216,11 @@ REQUIRED KEYWORDS: These MUST appear in captions or angles: ${focusKeywords.join
 ${toneOverride ? `
 TONE OVERRIDE: Override brand default — use ${toneOverride} tone throughout all content.` : ''}
 </user_directive>` : '';
+
+  // Get type instruction — dynamic for social-media
+  const typeInstruction = strategyType === 'social-media'
+    ? buildSocialMediaInstruction(connectedPlatforms || [])
+    : (TYPE_INSTRUCTIONS[strategyType] || '');
 
   return {
     system: `You are a Senior Brand Strategist and CMO. You generate data-driven monthly content strategies grounded in real brand data. Output ONLY valid JSON — no prose, no markdown fences, no explanation. Your JSON must be complete and parseable. Do NOT truncate.`,
@@ -222,18 +239,23 @@ STRATEGY TYPE: ${strategyType}
 TARGET MONTH: ${monthName} ${year}
 
 TYPE-SPECIFIC FOCUS:
-${TYPE_INSTRUCTIONS[strategyType] || ''}
+${typeInstruction}
 
 CALENDAR RULES:
-- Generate exactly 20 calendar items (not 30 — quality over quantity)
-- Spread evenly: dates from ${year}-${String(month).padStart(2,'0')}-01 to ${year}-${String(month).padStart(2,'0')}-28
-- Max 1 item per date
+- The user wants ONE POST PER PLATFORM PER DAY on EVERY connected platform
+- Connected platforms: ${platformList} (${numPlatforms} platforms)
+- Generate content for dates from ${year}-${String(month).padStart(2,'0')}-${String(startingDate || 1).padStart(2,'0')} to ${year}-${String(month).padStart(2,'0')}-${String(endDay || 28).padStart(2,'0')}
+- 🚨 CRITICAL: Do NOT generate any posts for dates BEFORE ${monthName} ${startingDate || 1}, ${year} — those dates are in the past
+- Generate approximately ${totalItems} calendar items total (${daysRemaining} days × ${numPlatforms} platforms)
+- Each day MUST have exactly 1 post for EACH connected platform: ${platformList}
+- Vary content types per platform: Instagram (reels, carousels, stories), LinkedIn (carousels, static, articles), Twitter (static, text), Facebook (static, carousels, video), YouTube (reels/shorts)
 - Keep captionDraft under 100 chars, angle under 80 chars — be concise
+- IMPORTANT: EVERY post caption and angle MUST mention the brand name or specific brand products. Generic content is NOT acceptable.
 ${launchEvents?.length ? `- CRITICAL: The following dates are launch anchors — they MUST appear in the calendar with launch content: ${launchEvents.map(e=>e.date).join(', ')}` : ''}
 
 Return ONLY this JSON (no text before or after):
 {
-  "summary": "2-sentence strategy summary mentioning brand name",
+  "summary": "2-sentence strategy summary — MUST mention the brand name",
   "strategyDocument": {
     "objective": "...",
     "keyThemes": ["..."],
@@ -243,7 +265,7 @@ Return ONLY this JSON (no text before or after):
     {
       "date": "YYYY-MM-DD",
       "contentType": "reel|carousel|static|story|blog|email|ad|ugc|newsletter|youtube|whatsapp|listing",
-      "platform": "instagram|linkedin|twitter|facebook|youtube|email|whatsapp|amazon",
+      "platform": "${connectedPlatforms?.[0] || 'instagram'}|${platformList.replace(/, /g, '|')}",
       "brief": {
         "angle": "...",
         "format": "...",
@@ -278,15 +300,23 @@ function buildResearchContext(mcpResults) {
   return parts.join('\n\n') || 'No live research data — proceeding with brand knowledge.';
 }
 
-function validateCalendar(calendar) {
+function validateCalendar(calendar, startingDate, month, year) {
   const dateCounts = new Map();
+  // Build the cutoff date string for filtering past dates
+  const cutoffDate = startingDate ? `${year}-${String(month).padStart(2,'0')}-${String(startingDate).padStart(2,'0')}` : null;
+
   return (calendar || [])
     .filter(item => item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+    .filter(item => {
+      // Filter out any items before the starting date (past dates)
+      if (cutoffDate && item.date < cutoffDate) return false;
+      return true;
+    })
     .map(item => {
-      // Enforce max 2 items per date (as per the prompt instruction)
+      // Allow up to N items per date (one per platform)
       const count = (dateCounts.get(item.date) || 0) + 1;
       dateCounts.set(item.date, count);
-      if (count > 2) return null;
+      if (count > 8) return null; // Safety cap: max 8 platforms per day
 
       const brief = item.brief || {};
       const incomplete = !brief.angle || !brief.captionDraft || !brief.toneDirection || !brief.callToAction;
@@ -334,6 +364,24 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   const dna = brand.dna || {};
   const products = brandProducts.map(p => p.title).filter(Boolean);
 
+  // Fetch connected social accounts to determine which platforms to generate for
+  const SocialAccount = mongoose.model('SocialAccount');
+  const connectedAccounts = await SocialAccount.find({ user: userId, isActive: true })
+    .select('platform accountName')
+    .lean()
+    .catch(() => []);
+  const connectedPlatforms = [...new Set(connectedAccounts.map(a => a.platform))];
+  if (connectedPlatforms.length === 0) {
+    // Fallback — if no accounts connected, use common defaults
+    connectedPlatforms.push('instagram', 'linkedin');
+  }
+
+  // Calculate starting date — skip past dates for current month
+  const today = new Date();
+  const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
+  const startingDate = isCurrentMonth ? today.getDate() + 1 : 1; // Start from tomorrow if current month
+  const endDay = new Date(year, month, 0).getDate(); // Last day of month
+
   // Strategy context block
   const strategyContext = [
     dna.competitiveIntel?.competitors?.length ? `Competitors: ${dna.competitiveIntel.competitors.map(c=>`${c.name}(${c.weaknesses||''})`).join(', ')}` : '',
@@ -341,6 +389,8 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
     dna.uniqueSellingPoints?.length ? `USPs: ${dna.uniqueSellingPoints.join(', ')}` : '',
     dna.missionStatement ? `Mission: ${dna.missionStatement}` : '',
     `Strategy for: ${new Date(year, month-1,1).toLocaleString('en',{month:'long'})} ${year}`,
+    `Connected social platforms: ${connectedPlatforms.join(', ')} (${connectedAccounts.map(a => `${a.platform}: ${a.accountName}`).join(', ')})`,
+    `Posting cadence: 1 post per platform per day on ALL connected platforms`,
   ].filter(Boolean).join('\n');
 
   emitFn({ type: 'research_done', tool: 'brand_dna', label: 'Brand DNA loaded' });
@@ -360,7 +410,8 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   const researchContext = buildResearchContext(mcpResults);
 
   // 3. Generate strategy via callAgent
-  emitFn({ type: 'generating', message: `Building your 30-day ${strategyType} calendar...` });
+  const daysRemaining = endDay - startingDate + 1;
+  emitFn({ type: 'generating', message: `Building your ${daysRemaining}-day calendar across ${connectedPlatforms.length} platforms (${connectedPlatforms.join(', ')})...` });
   const { system, user } = buildStrategyPrompt({
     brandContext: brandContextStr, strategyContext, researchContext,
     strategyType, month, year,
@@ -368,6 +419,9 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
     launchEvents:   launchEvents || [],
     focusKeywords:  focusKeywords || [],
     toneOverride:   toneOverride || '',
+    connectedPlatforms,
+    startingDate,
+    endDay,
   });
 
   let parsed;
@@ -394,9 +448,9 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
 
   // 4. Validate calendar
   emitFn({ type: 'research_start', tool: 'validation', label: 'Validating calendar' });
-  const calendar = validateCalendar(parsed.calendar);
+  const calendar = validateCalendar(parsed.calendar, startingDate, month, year);
   const brandSpecific = checkBrandSpecificity({ calendar }, brand.name, products);
-  emitFn({ type: 'research_done', tool: 'validation', label: `Validated ${calendar.length} calendar items` });
+  emitFn({ type: 'research_done', tool: 'validation', label: `Validated ${calendar.length} calendar items across ${connectedPlatforms.length} platforms` });
 
   // 5. Version logic
   const existing = await MonthlyStrategy.find({ user: userId, brand: brandId, strategyType, month, year }).sort({ version: -1 }).limit(1);
