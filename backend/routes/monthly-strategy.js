@@ -989,11 +989,23 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
               { $set: { 'calendar.$.status': 'in_progress' } }
             );
 
+            // Map platform → valid Creative.type enum value
+            const PLATFORM_TO_CREATIVE_TYPE = {
+              instagram: 'instagram-post',
+              facebook:  'instagram-post',   // same format — Creative model has no 'facebook-post'
+              linkedin:  'linkedin-post',
+              twitter:   'twitter-post',
+              tiktok:    'instagram-story',   // 9:16 aspect
+              gbp:       'instagram-post',
+              youtube:   'youtube-thumb',
+            };
+            const creativeType = PLATFORM_TO_CREATIVE_TYPE[item.platform] || 'instagram-post';
+
             const result = await internalGenerateCreative({
               body: {
                 prompt,
                 brandId: doc.brand?.toString(),
-                type: `${item.platform || 'instagram'}-post`,
+                type: creativeType,
                 options: {
                   aspectRatio: item.contentType === 'story' ? '9:16' : item.contentType === 'carousel' ? '1:1' : '4:5',
                   imageModel: imageModel,
