@@ -213,9 +213,9 @@ router.post('/analyze-and-create', protect, async (req, res) => {
         if (!imagePart) return res.status(400).json({ success: false, error: 'Could not process the reference image' });
 
         // ── Gemini Vision — Design DNA Extraction ───────────────────────────────
-        const DNA_PROMPT = `You are a world-class brand design analyst. Study this marketing creative image with extreme precision.
+        const DNA_PROMPT = `You are a world-class creative director and prompt engineer. Study this marketing creative image with extreme precision.
 
-Your task: Extract the complete Design DNA so this EXACT visual style can be perfectly replicated for any product or content.
+Your task: Extract the complete Design DNA AND write a hyper-detailed image generation prompt that can perfectly replicate this EXACT visual style for any new product or content.
 
 Brand: ${brandName}
 Brand Colors (for context): ${brandColors}
@@ -224,27 +224,46 @@ Analyze and return ONLY valid JSON (no markdown, no code fences, no comments):
 
 {
   "layout": "one of: centered-hero | split-left-right | split-right-left | top-hero-bottom-text | grid | full-bleed | asymmetric | minimal-white | dark-cinematic",
-  "colorPalette": ["#HEX1", "#HEX2", "#HEX3"],
+  "colorPalette": ["#HEX1", "#HEX2", "#HEX3", "#HEX4"],
   "mood": "2-4 word description, e.g. bold festive luxury",
   "typography": {
-    "headingStyle": "describe the headline font weight, size, case, color, and position",
+    "headingStyle": "describe the headline font weight, size, case, color, effects (glow/shadow/outline), and exact position",
     "bodyStyle": "describe body/subtext style if visible, else write 'not present'"
   },
   "contentZones": [
     {
       "role": "headline | product | offer | cta | logo | subtext | model | background | decorative",
       "position": "top-left | top-center | top-right | center | bottom-left | bottom-center | bottom-right | full-bleed | left-half | right-half",
-      "style": "concise visual description of this zone"
+      "style": "detailed visual description of this zone including size proportion, spacing, effects"
     }
   ],
-  "fitInstruction": "A precise instruction for how a new product image should be placed in this template.",
-  "promptFormula": "A complete, reusable image generation prompt starting with 'Create a' that captures this EXACT visual style. Use {{BRAND}} for brand name, {{PRODUCT_DESCRIPTION}} for the product, {{HEADLINE}} for main text, {{OFFER}} for offer/discount text, {{CTA}} for call-to-action."
+  "fitInstruction": "A precise instruction for how a new product image should be placed in this template — position, size proportion, lighting direction, shadow angle.",
+  "promptFormula": "SEE RULES BELOW — this must be a 15-25 line detailed generation prompt"
 }
 
-RULES:
-- Only describe what is ACTUALLY visible in the image
+CRITICAL RULES FOR promptFormula:
+The promptFormula is the MOST IMPORTANT field. It will be used directly as an image generation prompt to recreate this design with different content. It must be 15-25 lines long and capture EVERY visual detail:
+
+1. Start with: "Create a premium marketing creative image with the following EXACT design specifications:"
+2. BACKGROUND: Describe the exact background — gradients (direction, colors), textures, patterns, lighting direction and intensity, any bokeh/blur/particle effects
+3. LAYOUT: Describe the exact spatial layout — what occupies which portion of the frame (e.g. "product hero occupying 45% of the left half, vertically centered")
+4. PRODUCT ZONE: Write "{{PRODUCT_DESCRIPTION}}" as a placeholder where the product goes, with exact instructions on scale, position, lighting, and shadow
+5. TYPOGRAPHY: Describe every text element — font characteristics (bold/light, sans-serif/serif, condensed/wide), size relative to the frame, color with hex values, effects (drop shadow, glow, outline, gradient fill), exact position, letter-spacing, text-transform (uppercase/lowercase)
+6. HEADLINE: Use {{HEADLINE}} as placeholder text. Describe its exact style and position
+7. OFFER/PRICE: If present, use {{OFFER}} as placeholder. Describe badge/callout style — shape, background color, border, position
+8. CTA: If present, use {{CTA}} as placeholder. Describe button/banner style
+9. BRAND: Use {{BRAND}} where the brand name/logo appears. Describe position and style
+10. DECORATIVE ELEMENTS: Describe ALL decorative elements — borders, dividers, icons, shapes, overlays, glow effects, particle systems, lens flares
+11. COLOR SCHEME: Reference exact hex colors from colorPalette for each element
+12. PHOTOGRAPHY DIRECTION: Describe camera angle, depth of field, lighting setup (rim lighting, dramatic side light, soft diffused, etc.)
+13. MOOD & ATMOSPHERE: Describe the emotional feel — dramatic, energetic, luxurious, playful, etc.
+14. End with: "The overall composition should feel [mood] with magazine-quality production value."
+
+- Do NOT use vague terms like "professional" or "modern" without specifics
+- Every element must have an explicit color, position, and size description
+- The prompt must be self-contained — someone reading it without seeing the image should be able to recreate it
 - colorPalette must be real hex codes extracted from the image
-- promptFormula must be detailed enough to recreate this design without seeing the original`;
+- Only describe what is ACTUALLY visible in the image`;
 
         const ANALYSIS_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-lite'];
         let rawText = '';
@@ -311,6 +330,7 @@ RULES:
             previewImageUrl: referenceImageUrl,
             previewUrl: referenceImageUrl,         // required by schema
             previewType: 'image',                  // required by schema
+            systemReferenceImage: referenceImageUrl, // ← enables inpainting path in /use
             savedPrompt: promptForSave,            // required by schema (non-empty)
             promptTemplate: promptForSave,
             dna,
@@ -486,8 +506,11 @@ router.post('/:id/use', protect, async (req, res) => {
                         productImageUrl: productImageUrl || null,
                         avatarImageUrl: avatarImageUrl || null,
                         // System reference image (template design reference)
-                        templateRefImageUrl: template.systemReferenceImage?.startsWith('http') ? template.systemReferenceImage : null,
-                        templateInpainting: !!template.systemReferenceImage?.startsWith('http'),
+                        // For user-created templates, fall back to previewImageUrl if systemReferenceImage is empty
+                        templateRefImageUrl: (template.systemReferenceImage || template.previewImageUrl || '').startsWith('http')
+                            ? (template.systemReferenceImage || template.previewImageUrl)
+                            : null,
+                        templateInpainting: !!(template.systemReferenceImage || template.previewImageUrl || '').startsWith('http'),
                         // FIX #3: Skip the agentic pipeline — template prompt is already production-ready
                         // buildTemplatePrompt() already resolved placeholders, injected brand DNA, and
                         // added product preservation directives. The Art Director would REWRITE it.
