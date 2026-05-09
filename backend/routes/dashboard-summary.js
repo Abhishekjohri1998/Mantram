@@ -15,6 +15,9 @@ import { protect } from '../middleware/auth.js';
 import Brand from '../models/Brand.js';
 import Content from '../models/Content.js';
 import Creative from '../models/Creative.js';
+import SocialPost from '../models/SocialPost.js';
+import SocialAccount from '../models/SocialAccount.js';
+import IntelMission from '../models/IntelMission.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import {
     getTrendingTopics,
@@ -734,6 +737,91 @@ Content Stats: ${JSON.stringify(contentStats)}`,
     } catch (error) {
         console.error('Strategy generation error:', error);
         res.status(500).json({ error: safeErrorMessage(error) });
+    }
+});
+
+// ── ═══════════════════════════════════════════════════════════════════════════
+// GET /api/dashboard-summary/enhanced — Single-call aggregate for Command Center
+// Returns: scheduled posts, social accounts, intel missions, strategy status,
+//          studio activity counts, health scores, streak — all in one hit.
+// ── ═══════════════════════════════════════════════════════════════════════════
+router.get('/enhanced', protect, async (req, res) => {
+    try {
+        const { brandId } = req.query;
+        const userId = req.user._id;
+        const brand = brandId ? await Brand.findById(brandId).lean() : null;
+
+        const now = new Date();
+        const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+        const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+        const tomorrowEnd   = new Date(todayEnd);   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+        const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+
+        const baseFilter = { user: userId, ...(brandId ? { brand: brandId } : {}) };
+
+        const [
+            activity,
+            streak,
+            socialAccounts,
+            todayPosts,
+            tomorrowPosts,
+            intelMissions,
+            scheduledCount,
+        ] = await Promise.allSettled([
+            getStudioActivity(userId, brandId),
+            computeStreak(userId),
+            SocialAccount.find(baseFilter).select('platform accountId accountName accessToken createdAt').lean().catch(() => []),
+            SocialPost.find({ ...baseFilter, scheduledFor: { $gte: todayStart, $lte: todayEnd } })
+                .sort({ scheduledFor: 1 }).limit(10)
+                .select('platform caption scheduledFor status postId accountId accountName').lean().catch(() => []),
+            SocialPost.find({ ...baseFilter, scheduledFor: { $gte: tomorrowStart, $lte: tomorrowEnd } })
+                .sort({ scheduledFor: 1 }).limit(5)
+                .select('platform caption scheduledFor status accountId accountName').lean().catch(() => []),
+            brandId
+                ? IntelMission.find({ brand: brandId, user: userId, status: 'active' })
+                    .select('title type target status lastRunAt findings').sort({ updatedAt: -1 }).limit(5).lean().catch(() => [])
+                : Promise.resolve([]),
+            SocialPost.countDocuments({ ...baseFilter, status: 'scheduled', scheduledFor: { $gte: now } }).catch(() => 0),
+        ]);
+
+        const activityData = activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } };
+        const healthScores = computeBrandHealth(brand, activityData);
+
+        // Per-platform social summary
+        const accounts = socialAccounts.status === 'fulfilled' ? socialAccounts.value : [];
+        const platformMap = {};
+        for (const acc of accounts) {
+            platformMap[acc.platform] = {
+                connected: true,
+                accountName: acc.accountName,
+                accountId: acc.accountId,
+                connectedAt: acc.createdAt,
+            };
+        }
+
+        res.json({
+            success: true,
+            healthScores,
+            activity: activityData,
+            streak: streak.status === 'fulfilled' ? streak.value : 0,
+            scheduledPosts: {
+                today: todayPosts.status === 'fulfilled' ? todayPosts.value : [],
+                tomorrow: tomorrowPosts.status === 'fulfilled' ? tomorrowPosts.value : [],
+                totalUpcoming: scheduledCount.status === 'fulfilled' ? scheduledCount.value : 0,
+            },
+            socialPlatforms: {
+                instagram: platformMap.instagram || { connected: false },
+                facebook: platformMap.facebook || { connected: false },
+                linkedin: platformMap.linkedin || { connected: false },
+                twitter: platformMap.twitter || { connected: false },
+            },
+            connectedPlatformCount: accounts.length,
+            intelMissions: intelMissions.status === 'fulfilled' ? intelMissions.value : [],
+        });
+    } catch (error) {
+        console.error('[Dashboard Enhanced] Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 

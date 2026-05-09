@@ -1,911 +1,532 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
-import { content as contentAPI, creatives as creativesAPI, trends as trendsAPI, dashboardSummary, shopifyAnalytics, pmStudio, funnelStudio, brandCalendar as brandCalendarAPI } from '../services/api'
+import { dashboardSummary, trends as trendsAPI, brandCalendar as brandCalendarAPI, pmStudio, funnelStudio, shopifyAnalytics } from '../services/api'
 import { getUpcomingEvents, EVENT_COLORS } from '../data/calendarData'
 import SmartCommandBox from '../components/SmartCommandBox'
 import IntelReportViewer from '../components/IntelReportViewer'
-import Walkthrough from '../components/Walkthrough'
 
-// ── Helpers ──
 function getGreeting() {
-    const h = new Date().getHours()
-    if (h < 12) return 'Good Morning'
-    if (h < 17) return 'Good Afternoon'
-    return 'Good Evening'
+  const h = new Date().getHours()
+  return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'
 }
 
-function getDateString() {
-    return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+function useTypewriter(text, speed = 38) {
+  const [displayed, setDisplayed] = useState('')
+  useEffect(() => {
+    setDisplayed('')
+    if (!text) return
+    let i = 0
+    const iv = setInterval(() => { setDisplayed(text.slice(0, ++i)); if (i >= text.length) clearInterval(iv) }, speed)
+    return () => clearInterval(iv)
+  }, [text, speed])
+  return displayed
 }
 
-// ── Typewriter Hook ──
-function useTypewriter(text, speed = 40) {
-    const [displayed, setDisplayed] = useState('')
-    const [done, setDone] = useState(false)
-    useEffect(() => {
-        setDisplayed('')
-        setDone(false)
-        if (!text) return
-        let i = 0
-        const interval = setInterval(() => {
-            setDisplayed(text.slice(0, i + 1))
-            i++
-            if (i >= text.length) { clearInterval(interval); setDone(true) }
-        }, speed)
-        return () => clearInterval(interval)
-    }, [text, speed])
-    return { displayed, done }
+// ── Micro ring SVG ──
+function Ring({ score = 0, color, size = 56, stroke = 6 }) {
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const [v, setV] = useState(0)
+  useEffect(() => { const t = setTimeout(() => setV(score), 400); return () => clearTimeout(t) }, [score])
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={circ - (v/100)*circ}
+        strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`}
+        style={{transition:'stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1)',filter:`drop-shadow(0 0 4px ${color}60)`}}/>
+    </svg>
+  )
 }
 
-// ── Apple-Watch Health Ring ──
-function HealthRing({ score, radius, strokeWidth, color, label, delay = 0, loading = false }) {
-    const circumference = 2 * Math.PI * radius
-    const [animated, setAnimated] = useState(0)
-    useEffect(() => {
-        if (loading) return
-        const t = setTimeout(() => setAnimated(score), 300 + delay)
-        return () => clearTimeout(t)
-    }, [score, delay, loading])
-
-    if (loading) {
-        return (
-            <g className="animate-pulse">
-                <circle cx="90" cy="90" r={radius} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={strokeWidth} />
-            </g>
-        )
-    }
-
-    return (
-        <g>
-            <circle cx="90" cy="90" r={radius} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={strokeWidth} />
-            <circle cx="90" cy="90" r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
-                strokeDasharray={circumference} strokeDashoffset={circumference - (animated / 100) * circumference}
-                strokeLinecap="round" transform="rotate(-90 90 90)"
-                style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 6px ${color}40)` }} />
-        </g>
-    )
+// ── Platform icon + color map ──
+const PL = {
+  instagram: { icon: 'photo_camera', color: '#E1306C', bg: 'rgba(225,48,108,0.12)' },
+  facebook:  { icon: 'thumb_up',     color: '#1877F2', bg: 'rgba(24,119,242,0.12)' },
+  linkedin:  { icon: 'work',         color: '#0A66C2', bg: 'rgba(10,102,194,0.12)' },
+  twitter:   { icon: 'alternate_email', color: '#1DA1F2', bg: 'rgba(29,161,242,0.12)' },
 }
 
-// ── Skeleton UI Helper ──
-function Skeleton({ className, circle = false }) {
-    return (
-        <div className={`relative overflow-hidden bg-[var(--sys-surface)] ${circle ? 'rounded-full' : 'rounded-lg'} ${className}`}>
-            <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] -translate-x-full animate-[shimmer_2s_infinite]" />
-        </div>
-    )
+function PlatformIcon({ platform, size = 18 }) {
+  const p = PL[platform] || { icon: 'share', color: '#888', bg: 'rgba(136,136,136,0.12)' }
+  return (
+    <span className="inline-flex items-center justify-center rounded-lg" style={{ width: size+10, height: size+10, background: p.bg }}>
+      <span className="material-symbols-outlined" style={{ fontSize: size, color: p.color }}>{p.icon}</span>
+    </span>
+  )
 }
 
-function SkeletonHero() {
-    return (
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4">
-            <div className="flex-1 space-y-3">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-64" />
-            </div>
-            <Skeleton className="h-12 w-32 rounded-xl" />
-        </div>
-    )
+// ── Status badge ──
+function StatusBadge({ status }) {
+  const cfg = { published: { color: '#34d399', icon: 'task_alt' }, failed: { color: '#f43f5e', icon: 'error_outline' }, scheduled: { color: '#f59e0b', icon: 'schedule_send' }, processing: { color: '#8b5cf6', icon: 'hourglass_empty' } }
+  const c = cfg[status] || cfg.scheduled
+  return <span className="material-symbols-outlined" style={{ fontSize: 13, color: c.color }}>{c.icon}</span>
 }
 
-function SkeletonStats({ count = 4 }) {
-    return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[...Array(count)].map((_, i) => (
-                <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                    <Skeleton className="h-3 w-16 mb-3" />
-                    <Skeleton className="h-7 w-24" />
-                </div>
-            ))}
-        </div>
-    )
+// ── Skeleton pulse ──
+function Skel({ className }) {
+  return <div className={`rounded-lg bg-white/[0.04] animate-pulse ${className}`}/>
 }
 
-function SkeletonRings() {
-    return (
-        <div className="flex flex-col sm:flex-row items-center gap-8 p-6 glass-panel rounded-2xl border border-[var(--sys-border)]">
-            <Skeleton className="size-32 rounded-full shrink-0" />
-            <div className="grid grid-cols-2 gap-3 flex-1 w-full">
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                        <Skeleton className="size-3 rounded-full" />
-                        <div className="space-y-2 flex-1">
-                            <Skeleton className="h-3 w-16" />
-                            <Skeleton className="h-5 w-10" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+// ── Bento card wrapper ──
+function Card({ children, className = '', onClick, glow }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm relative overflow-hidden transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-[#ff4d00]/25 hover:bg-[rgba(255,77,0,0.02)]' : ''} ${className}`}
+      style={glow ? { boxShadow: '0 0 40px rgba(255,77,0,0.07)' } : {}}
+    >
+      {children}
+    </div>
+  )
 }
 
-function SkeletonHub() {
-    return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="p-4 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] space-y-3">
-                        <div className="flex justify-between items-start">
-                            <Skeleton className="h-5 w-32" />
-                            <Skeleton className="h-4 w-12 rounded-full" />
-                        </div>
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+// ── Section label ──
+function Label({ icon, children, action, onAction }) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2">
+        {icon && <span className="material-symbols-outlined text-[#ff4d00] text-lg">{icon}</span>}
+        <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-white/50">{children}</h3>
+      </div>
+      {action && <button onClick={onAction} className="text-[10px] font-bold text-[#ff4d00] hover:opacity-80 transition-opacity cursor-pointer">{action}</button>}
+    </div>
+  )
 }
 
-function SkeletonPulse() {
-    return (
-        <div className="grid grid-cols-3 gap-3 mb-5">
-            {[1, 2, 3].map(i => (
-                <div key={i} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex flex-col items-center gap-2">
-                    <Skeleton className="size-5 rounded-md" />
-                    <Skeleton className="h-6 w-16" />
-                    <Skeleton className="h-3 w-10" />
-                </div>
-            ))}
-        </div>
-    )
+// ── SVG Sparkline ──
+function Spark({ data = [], color = '#ff4d00', h = 28, w = 64 }) {
+  if (data.length < 2) return null
+  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1
+  const pts = data.map((v, i) => `${(i/(data.length-1))*w},${h - ((v-min)/range)*h}`).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{filter:`drop-shadow(0 0 3px ${color}80)`}}/>
+    </svg>
+  )
 }
 
-function SkeletonBrands() {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map(i => (
-                <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)]">
-                    <Skeleton className="size-12 sm:size-14 rounded-2xl shrink-0" />
-                    <div className="flex-1 space-y-2">
-                        <Skeleton className="h-5 w-32" />
-                        <Skeleton className="h-3 w-24" />
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-}
-
-// ── Ticker Item ──
-function TickerItem({ icon, value, label, color }) {
-    return (
-        <div className="flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-2.5 shrink-0">
-            <span className="material-symbols-outlined text-base sm:text-lg" style={{ color }}>{icon}</span>
-            <span className="text-base sm:text-lg font-extrabold text-[var(--sys-text)]">{value}</span>
-            <span className="text-[10px] sm:text-xs md:text-sm text-[var(--sys-text-muted)] whitespace-nowrap uppercase tracking-tight">{label}</span>
-        </div>
-    )
-}
-
-// ═════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // MAIN DASHBOARD
-// ═════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 export default function UserDashboard() {
-    const navigate = useNavigate()
-    const { user } = useAuth()
-    const { brands, activeBrand, selectBrand, loading: brandsLoading } = useBrand()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { brands, activeBrand, loading: brandsLoading } = useBrand()
 
-    const [summary, setSummary] = useState(null)
-    const [loadingSummary, setLoadingSummary] = useState(true)
-    const [trendingTopics, setTrendingTopics] = useState([])
-    const [trendsLoading, setTrendsLoading] = useState(false)
-    const [recentContent, setRecentContent] = useState([])
-    const [stats, setStats] = useState({ content: 0, creatives: 0 })
-    const [activeTab, setActiveTab] = useState('trends')
-    const [radarHover, setRadarHover] = useState(null)
-    const [d2cSnapshot, setD2cSnapshot] = useState(null)
-    const [error, setError] = useState(null)
+  // ── State ──
+  const [enhanced, setEnhanced] = useState(null)
+  const [intel, setIntel] = useState(null)
+  const [trends, setTrends] = useState([])
+  const [todaySchedule, setTodaySchedule] = useState({ today: [], tomorrow: [] })
+  const [perfData, setPerfData] = useState(null)
+  const [funnelData, setFunnelData] = useState(null)
+  const [blendedRoas, setBlendedRoas] = useState(null)
+  const [anomalies, setAnomalies] = useState([])
+  const [d2c, setD2c] = useState(null)
+  const [loadingEnhanced, setLoadingEnhanced] = useState(true)
+  const [loadingIntel, setLoadingIntel] = useState(true)
+  const [loadingTrends, setLoadingTrends] = useState(true)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+  const [intelReport, setIntelReport] = useState(null)
+  const [activeIntelTab, setActiveIntelTab] = useState('trends')
+  const [error, setError] = useState(null)
 
-    // ── Analytics state (Funnel + Performance + ROAS) ──
-    const [funnelData, setFunnelData] = useState(null)
-    const [perfData, setPerfData] = useState(null)
-    const [anomalies, setAnomalies] = useState([])
-    const [blendedRoas, setBlendedRoas] = useState(null)
-    const [loadingAnalytics, setLoadingAnalytics] = useState(true)
-    const [loadingD2C, setLoadingD2C] = useState(true)
+  const country = activeBrand?.dna?.country || 'India'
+  const upcoming = getUpcomingEvents(country, 14)
+  const greeting = useTypewriter(`${getGreeting()}, ${user?.name?.split(' ')[0] || 'Creator'}`)
 
-    // Intel state
-    const [intelMissions, setIntelMissions] = useState([])
-    const [loadingIntel, setLoadingIntel] = useState(true)
-    const [intelReport, setIntelReport] = useState(null) // { mission, findings }
-    const [showIntelReport, setShowIntelReport] = useState(false)
+  // ── Redirect if no brands ──
+  useEffect(() => {
+    if (!brandsLoading && brands?.length === 0 && user?.role !== 'member') navigate('/onboarding')
+  }, [brands, brandsLoading, navigate, user?.role])
 
-    // Today's Calendar widget state
-    const [todaySchedule, setTodaySchedule] = useState({ today: [], tomorrow: [] })
-    const [loadingToday, setLoadingToday] = useState(false)
+  // ── Load enhanced aggregate ──
+  const loadEnhanced = useCallback(async () => {
+    setLoadingEnhanced(true)
+    try { setEnhanced(await dashboardSummary.getEnhanced(activeBrand?._id)) }
+    catch (e) { console.warn('Enhanced load:', e.message) }
+    finally { setLoadingEnhanced(false) }
+  }, [activeBrand?._id])
 
+  // ── Load intelligence (trends + news + ideas) ──
+  const loadIntel = useCallback(async () => {
+    setLoadingIntel(true)
+    try { setIntel(await dashboardSummary.getIntelligence(activeBrand?._id)) }
+    catch (e) { console.warn('Intel load:', e.message) }
+    finally { setLoadingIntel(false) }
+  }, [activeBrand?._id])
 
-    const country = activeBrand?.dna?.country || activeBrand?.country || 'India'
-    const upcoming = useMemo(() => getUpcomingEvents(country, 14), [country])
-    const greetingText = `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Creator'}`
-    const { displayed: typedGreeting, done: greetingDone } = useTypewriter(greetingText)
+  // ── Load brand-matched trends ──
+  const loadTrends = useCallback(async () => {
+    setLoadingTrends(true)
+    try {
+      const d = activeBrand?._id ? await trendsAPI.brandMatch(activeBrand._id) : await trendsAPI.now()
+      setTrends(d.trends || [])
+    } catch (e) { console.warn('Trends:', e.message) }
+    finally { setLoadingTrends(false) }
+  }, [activeBrand?._id])
 
-    // ── Loaders ──
-    const loadSummary = useCallback(async () => {
-        setLoadingSummary(true)
-        try { setSummary(await dashboardSummary.get(activeBrand?._id)) }
-        catch (err) {
-            console.warn('Dashboard summary error:', err.message)
-            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-        }
-        finally { setLoadingSummary(false) }
-    }, [activeBrand?._id])
+  // ── Load analytics (PM + Funnel + ROAS + D2C) ──
+  const loadAnalytics = useCallback(async () => {
+    if (!activeBrand?._id) return
+    setLoadingAnalytics(true)
+    try {
+      const [perfR, funnelR, roasR, anomR, d2cR] = await Promise.allSettled([
+        pmStudio.dashboard({ brandId: activeBrand._id }),
+        funnelStudio.list({ brandId: activeBrand._id }).then(async d => {
+          const best = (d.funnels||[]).sort((a,b)=>(b.metrics?.totalEntries||0)-(a.metrics?.totalEntries||0))[0]
+          if (!best) return null
+          const ar = await funnelStudio.analytics(best._id)
+          return { funnel: best, analytics: ar.analytics }
+        }),
+        pmStudio.blendedRoas({ brandId: activeBrand._id }),
+        pmStudio.anomalies({ brandId: activeBrand._id }),
+        shopifyAnalytics.snapshot(),
+      ])
+      if (perfR.status === 'fulfilled') setPerfData(perfR.value?.dashboard || null)
+      if (funnelR.status === 'fulfilled') setFunnelData(funnelR.value)
+      if (roasR.status === 'fulfilled') setBlendedRoas(roasR.value)
+      if (anomR.status === 'fulfilled') setAnomalies(anomR.value?.anomalies || [])
+      if (d2cR.status === 'fulfilled') setD2c(d2cR.value)
+    } catch(e) { console.warn('Analytics:', e.message) }
+    finally { setLoadingAnalytics(false) }
+  }, [activeBrand?._id])
 
-    const loadTrends = useCallback(async () => {
-        setTrendsLoading(true)
-        try {
-            const data = activeBrand?._id ? await trendsAPI.brandMatch(activeBrand._id) : await trendsAPI.now()
-            setTrendingTopics(data.trends || [])
-        } catch (err) {
-            console.warn('Trends error:', err.message)
-            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-        }
-        finally { setTrendsLoading(false) }
-    }, [activeBrand?._id])
+  // ── Today's calendar ──
+  useEffect(() => {
+    if (!activeBrand?._id) return
+    brandCalendarAPI.today(activeBrand._id)
+      .then(d => setTodaySchedule({ today: d.today||[], tomorrow: d.tomorrow||[] }))
+      .catch(()=>{})
+  }, [activeBrand?._id])
 
-    // ── Analytics loader (Funnel + Performance + ROAS) ──
-    const loadAnalytics = useCallback(async () => {
-        if (!activeBrand?._id) return
-        setLoadingAnalytics(true)
-        const brandId = activeBrand._id
-        try {
-            const [funnelRes, perfRes, anomalyRes, roasRes] = await Promise.allSettled([
-                funnelStudio.list({ brandId }).then(async (data) => {
-                    const funnels = data.funnels || []
-                    if (funnels.length === 0) return null
-                    // Pick the best funnel (highest entries or first active)
-                    const best = funnels.sort((a, b) => (b.metrics?.totalEntries || 0) - (a.metrics?.totalEntries || 0))[0]
-                    const analyticsRes = await funnelStudio.analytics(best._id)
-                    return { funnel: best, analytics: analyticsRes.analytics }
-                }),
-                pmStudio.dashboard({ brandId }),
-                pmStudio.anomalies({ brandId }),
-                pmStudio.blendedRoas({ brandId }),
-            ])
-            if (funnelRes.status === 'fulfilled' && funnelRes.value) setFunnelData(funnelRes.value)
-            if (perfRes.status === 'fulfilled') setPerfData(perfRes.value?.dashboard || null)
-            if (anomalyRes.status === 'fulfilled') setAnomalies(anomalyRes.value?.anomalies || [])
-            if (roasRes.status === 'fulfilled') setBlendedRoas(roasRes.value || null)
+  // ── Main load effect ──
+  useEffect(() => {
+    setEnhanced(null); setIntel(null); setTrends([])
+    setPerfData(null); setFunnelData(null); setBlendedRoas(null); setD2c(null)
+    loadEnhanced(); loadIntel(); loadTrends(); loadAnalytics()
+    const iv = setInterval(() => { loadEnhanced(); loadTrends() }, 30*60*1000)
+    return () => clearInterval(iv)
+  }, [activeBrand?._id, loadEnhanced, loadIntel, loadTrends, loadAnalytics])
 
-            // Check for rejected promises that might be provider errors
-            const rejected = [funnelRes, perfRes, anomalyRes, roasRes].find(r => r.status === 'rejected')
-            if (rejected && rejected.reason?.isProviderError) {
-                setError({
-                    message: rejected.reason.message,
-                    isProviderError: true,
-                    provider: rejected.reason.provider
-                })
-            }
-        } catch (err) {
-            setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-        }
-        finally { setLoadingAnalytics(false) }
-    }, [activeBrand?._id])
+  // ── Derived data ──
+  const health = enhanced?.healthScores || {}
+  const streak = enhanced?.streak || 0
+  const socialPlatforms = enhanced?.socialPlatforms || {}
+  const intelMissions = enhanced?.intelMissions || []
+  const scheduledPosts = enhanced?.scheduledPosts || { today: [], tomorrow: [], totalUpcoming: 0 }
+  const activity = enhanced?.activity || { content: { thisWeek: 0 }, creatives: { thisWeek: 0 } }
+  const grokTrends = intel?.grokTrends || []
+  const businessNews = intel?.businessNews || []
+  const grokContent = intel?.grokContent || []
+  const grokSeo = intel?.grokSeo || {}
 
-    // Clear stale data and re-fetch when brand changes
-    useEffect(() => {
-        setSummary(null)
-        setTrendingTopics([])
-        setRecentContent([])
-        setStats({ content: 0, creatives: 0 })
-    }, [activeBrand?._id])
+  const studios = [
+    { icon: 'psychology',     label: 'Brainstorm', path: '/brainstorm',           color: '#FF4D00', count: 0 },
+    { icon: 'edit_note',      label: 'Content',    path: '/content-studio',        color: '#34d399', count: activity.content?.thisWeek || 0 },
+    { icon: 'auto_fix_high',  label: 'Creative',   path: '/creative-studio',       color: '#ec4899', count: activity.creatives?.thisWeek || 0 },
+    { icon: 'movie',          label: 'Video',      path: '/video-studio',          color: '#f59e0b', count: 0 },
+    { icon: 'search_insights',label: 'SEO',        path: '/seo-studio',            color: '#06b6d4', count: 0 },
+    { icon: 'campaign',       label: 'Ads',        path: '/performance-marketing', color: '#f43f5e', count: perfData?.stats?.activeCampaigns || 0 },
+    { icon: 'calendar_month', label: 'Calendar',   path: '/smart-calendar',        color: '#a78bfa', count: scheduledPosts.totalUpcoming || 0 },
+    { icon: 'share',          label: 'Social',     path: '/social-media-studio',   color: '#38bdf8', count: enhanced?.connectedPlatformCount || 0 },
+  ]
+  const hotStudioIdx = studios.reduce((best, s, i) => s.count > studios[best].count ? i : best, 0)
 
-    useEffect(() => {
-        async function fetchBasicData() {
-            try {
-                const params = { limit: 5 }
-                if (activeBrand?._id) params.brandId = activeBrand._id
-                const [c, cr] = await Promise.all([
-                    contentAPI.list(params).catch(() => ({ content: [], total: 0 })),
-                    creativesAPI.list(params).catch(() => ({ creatives: [], total: 0 })),
-                ])
-                setRecentContent(c.content || [])
-                setStats({ content: c.total || 0, creatives: cr.total || 0 })
-            } catch (err) {
-                console.warn(err)
-                setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-            }
-        }
-        fetchBasicData()
-    }, [activeBrand?._id])
+  const healthMetrics = [
+    { label: 'Content', key: 'contentVelocity',   color: '#ff4d00', icon: 'speed' },
+    { label: 'Creative', key: 'creativeOutput',   color: '#8ff5ff', icon: 'fingerprint' },
+    { label: 'Brand',   key: 'brandCompleteness', color: '#f3eff6', icon: 'grid_view' },
+    { label: 'Trend',   key: 'trendReadiness',    color: '#ff906d', icon: 'trending_up' },
+  ]
 
-    useEffect(() => {
-        loadSummary(); loadTrends(); loadAnalytics()
-        setLoadingD2C(true)
-        shopifyAnalytics.snapshot()
-            .then(d => setD2cSnapshot(d))
-            .catch(err => {
-                setError({ message: err.message, isProviderError: err.isProviderError, provider: err.provider })
-            })
-            .finally(() => setLoadingD2C(false))
-        const interval = setInterval(() => { loadTrends(); loadSummary(); loadAnalytics() }, 30 * 60 * 1000)
-        return () => clearInterval(interval)
-    }, [loadSummary, loadTrends, loadAnalytics])
+  const openIntelReport = async (mission) => {
+    try {
+      const token = localStorage.getItem('mantram_token')
+      const base = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
+      const r = await fetch(`${base}/intel/missions/${mission._id}/findings`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) { const d = await r.json(); setIntelReport({ mission, findings: d }) }
+    } catch {}
+  }
 
-    // Redirect to onboarding if no brands found (and not loading)
-    // ONLY for non-members who have the permission to create their first brand.
-    useEffect(() => {
-        if (!brandsLoading && brands && brands.length === 0 && user?.role !== 'member') {
-            navigate('/onboarding')
-        }
-    }, [brands, brandsLoading, navigate, user?.role])
-
-    // ── Load intel missions ──
-    useEffect(() => {
-        async function fetchIntelData() {
-            if (!activeBrand?._id) return
-            setLoadingIntel(true)
-            try {
-                const token = localStorage.getItem('mantram_token')
-                const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-                const resp = await fetch(`${API_BASE}/intel/missions?brandId=${activeBrand._id}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
-                if (resp.ok) {
-                    const data = await resp.json()
-                    setIntelMissions(data.missions || [])
-                }
-            } catch { /* silent */ }
-            finally { setLoadingIntel(false) }
-        }
-        fetchIntelData()
-    }, [activeBrand?._id])
-
-    // ── Load today's calendar ──
-    useEffect(() => {
-        if (!activeBrand?._id) return
-        setLoadingToday(true)
-        brandCalendarAPI.today(activeBrand._id)
-            .then(data => setTodaySchedule({ today: data.today || [], tomorrow: data.tomorrow || [] }))
-            .catch(() => {})
-            .finally(() => setLoadingToday(false))
-    }, [activeBrand?._id])
-
-    const openIntelReport = async (mission) => {
-        try {
-            const token = localStorage.getItem('mantram_token')
-            const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
-            const resp = await fetch(`${API_BASE}/intel/missions/${mission._id}/findings`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            if (resp.ok) {
-                const data = await resp.json()
-                setIntelReport({ mission, findings: data })
-                setShowIntelReport(true)
-            }
-        } catch { /* silent */ }
-    }
-
-    const insight = summary?.dailyInsight
-    const health = summary?.healthScores || {}
-    const grokTrends = summary?.grokTrends || []
-    const grokSeo = summary?.grokSeo || {}
-    const grokContent = summary?.grokContent || []
-    const businessNews = summary?.businessNews || []
-    const didYouKnow = summary?.didYouKnow || []
-    const activity = summary?.activity || { content: {}, creatives: {} }
-    const streak = summary?.streak || 0
-    const radar = summary?.strikesRadar || null
-
-    const studios = [
-        { icon: 'psychology', label: 'Brainstorm', path: '/brainstorm', color: '#FF4D00', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
-        { icon: 'edit_note', label: 'Content', path: '/content-studio', color: '#34d399', bg: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
-        { icon: 'auto_fix_high', label: 'Creative', path: '/creative-studio', color: '#ec4899', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
-        { icon: 'movie', label: 'Video', path: '/video-studio', color: '#f59e0b', bg: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
-        { icon: 'search_insights', label: 'SEO', path: '/seo-studio', color: '#06b6d4', bg: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
-        { icon: 'campaign', label: 'Ads', path: '/performance-marketing', color: '#f43f5e', bg: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
-        { icon: 'calendar_month', label: 'Calendar', path: '/smart-calendar', color: '#fb923c', bg: 'bg-[var(--sys-surface)] border border-[var(--sys-border)]' },
-        { icon: 'forum', label: 'Inbox', path: '/conversations', color: '#FF4D00', bg: 'from-[#FF4D00]/15 to-[#FF7A00]/5' },
-    ]
-
-    // ── Intel tabs (Trends / News / Ideas) ──
-    const intelTabs = [
-        { id: 'trends', label: '🔥 Trending' },
-        { id: 'news',   label: '📰 News' },
-        { id: 'ideas',  label: '💡 Ideas' },
-    ]
-
-    return (
-        <DashboardLayout title="Command Center" subtitle="Your AI-driven operational hub">
-            <SEOHead title="Command Center — Mantram AI" noIndex={true} />
-            <Walkthrough studioId="dashboard" />
-
-            {/* ERROR BANNER */}
-            {error && (
-                <div className={`mb-6 p-4 rounded-xl border flex items-center gap-4 ${error.isProviderError ? 'bg-[#ff7a00]/10 border-[#ff7a00]/20 text-[#ff7a00]' : 'bg-[#ff4d00]/10 border-[#ff4d00]/20 text-[#ff4d00]'}`}>
-                    <span className="material-symbols-outlined text-xl">{error.isProviderError ? 'warning' : 'error'}</span>
-                    <p className="flex-1 text-sm font-medium">{error.isProviderError && <span className="font-bold mr-1">[{error.provider}]</span>}{error.message}</p>
-                    <button onClick={() => setError(null)}><span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] opacity-70 hover:text-[var(--sys-text)] transition-colors">close</span></button>
-                </div>
-            )}
-
-            {/* COMMAND BOX / GLOBAL SCAN */}
-            <div className="mb-8 relative">
-                <SmartCommandBox variant="dashboard" className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 text-[var(--sys-text)] placeholder-[#48474c] focus:border-[#ff4d00]/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]" />
+  return (
+    <DashboardLayout title="Command Center" subtitle="Your AI-driven operational hub">
+      <SEOHead title="Command Center — Mantram AI" noIndex={true} />
+      {error && (
+        <div className="mb-5 px-4 py-3 rounded-xl border flex items-center gap-3 bg-[#ff4d00]/10 border-[#ff4d00]/20 text-[#ff4d00] text-sm">
+          <span className="material-symbols-outlined text-lg">warning</span>
+          <span className="flex-1 font-medium">{error.message}</span>
+          <button onClick={()=>setError(null)}><span className="material-symbols-outlined text-sm opacity-60 hover:opacity-100">close</span></button>
+        </div>
+      )}
+      {anomalies.length > 0 && (
+        <div className="mb-5 px-4 py-3 rounded-xl border flex items-center gap-3 bg-amber-500/10 border-amber-500/20 text-amber-400 text-sm">
+          <span className="material-symbols-outlined text-lg animate-pulse">crisis_alert</span>
+          <span className="flex-1 font-medium">Anomaly detected: {anomalies[0]?.metric || 'Data drift'} threshold breached</span>
+          <button onClick={()=>navigate('/performance-marketing')} className="text-xs font-bold underline">View</button>
+        </div>
+      )}
+      <div className="mb-6">
+        <SmartCommandBox variant="dashboard" className="w-full bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 text-white placeholder-white/30 focus:border-[#ff4d00]/40 shadow-inner" />
+      </div>
+            <div className="max-w-7xl mx-auto space-y-5 pb-16">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</p>
+            <h1 className="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">{greeting}<span className="animate-pulse">|</span></h1>
+          </div>
+          {streak > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ff4d00]/10 border border-[#ff4d00]/20">
+              <span className="text-xl">🔥</span>
+              <div><p className="text-lg font-black text-[#ff4d00] leading-none">{streak}</p><p className="text-[9px] text-white/40 uppercase tracking-widest">Day Streak</p></div>
             </div>
-
-            {/* 12-COLUMN GRID CORE */}
-            <div className="max-w-6xl mx-auto grid grid-cols-12 gap-6 pb-12">
-                
-                {/* ════ LEFT COLUMN (8 cols) ════ */}
-                <div className="col-span-12 lg:col-span-8 space-y-6">
-                    
-                    {/* 1. HERO INSIGHT (AI Mission Feed) */}
-                    {loadingSummary ? (
-                        <div className="relative overflow-hidden rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-8 h-[200px] flex items-center justify-center">
-                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] opacity-70 text-3xl animate-spin">progress_activity</span>
-                        </div>
-                    ) : insight ? (
-                        <div className="relative overflow-hidden rounded-3xl border border-[#ff4d00]/20 bg-[var(--sys-bg)] p-8 mt-[2px] shadow-[0_8px_32px_rgba(255,77,0,0.05)] group">
-                            {/* Glass overlay */}
-                            <div className="absolute inset-0 bg-[var(--sys-surface)] border border-[var(--sys-border)] pointer-events-none"></div>
-                            {/* Ambient glow tracking group hover */}
-                            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(255,77,0,0.1)_0%,transparent_70%)] rounded-full -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700 pointer-events-none blur-3xl"></div>
-                            
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <span className="material-symbols-outlined text-[#ff4d00] animate-pulse">crisis_alert</span>
-                                    <span className="text-xs font-bold uppercase tracking-widest text-[#ff4d00]">Active Objective • {insight.category}</span>
-                                </div>
-                                <h2 className="text-3xl lg:text-4xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] leading-tight mb-4 tracking-tighter">
-                                    {insight.title}
-                                </h2>
-                                <p className="text-[var(--sys-text-muted)] text-lg max-w-2xl leading-relaxed mb-8">
-                                    {insight.tip}
-                                </p>
-                                <button 
-                                    onClick={() => navigate(insight.actionPath || '/content-studio')}
-                                    className="bg-white text-black px-6 py-3 rounded-lg font-bold hover:bg-[#acaab0] transition-colors flex items-center gap-2 group/btn cursor-pointer">
-                                    <span>{insight.actionLabel || 'Initiate Scan'}</span>
-                                    <span className="material-symbols-outlined group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
-                                </button>
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {/* 2. TELEMETRY GRID (Brand Health) */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                            { label: 'Content Velocity', score: health?.contentVelocity, color: '#ff4d00', icon: 'speed' },
-                            { label: 'Creative DNA', score: health?.creativeOutput, color: '#8ff5ff', icon: 'fingerprint' },
-                            { label: 'Brand Matrix', score: health?.brandCompleteness, color: '#f3eff6', icon: 'grid_view' },
-                            { label: 'Trend Alignment', score: health?.trendReadiness, color: '#ff906d', icon: 'trending_up' },
-                        ].map((m, i) => (
-                            <div key={i} className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-5 relative overflow-hidden group hover:border-[var(--sys-border)] transition-all">
-                                <span className="material-symbols-outlined absolute top-4 right-4 text-[var(--sys-text-muted)] opacity-70 text-3xl opacity-20 group-hover:text-[var(--sys-text)]/10 group-hover:scale-110 transition-all duration-500">{m.icon}</span>
-                                <p className="text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-widest mb-1">{m.label}</p>
-                                <p className="text-4xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] mb-3">
-                                    {Math.round(m.score || 0)}<span className="text-lg text-[var(--sys-text-muted)] opacity-70 ml-1">/100</span>
-                                </p>
-                                {/* Micro progress bar */}
-                                <div className="h-1 w-full bg-[var(--sys-surface)] rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${m.score || 0}%`, background: m.color, boxShadow: `0 0 10px ${m.color}` }}></div>
-                                </div>
-                            </div>
-                        ))}
+          )}
+        </div>
+        <div className="grid grid-cols-12 gap-5">
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="monitoring">Brand Pulse</Label>
+            {loadingEnhanced ? (
+              <div className="grid grid-cols-2 gap-3">{[0,1,2,3].map(i=><Skel key={i} className="h-20"/>)}</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {healthMetrics.map((m,i)=>(
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                    <Ring score={health[m.key]||0} color={m.color} size={44} stroke={4}/>
+                    <div>
+                      <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">{m.label}</p>
+                      <p className="text-xl font-['Space_Grotesk'] font-bold text-white leading-tight">{Math.round(health[m.key]||0)}<span className="text-xs text-white/30">/100</span></p>
                     </div>
-
-                    {/* 3. PERFORMANCE ARCHITECTURE */}
-                    {(perfData || funnelData || blendedRoas) && (
-                        <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 shadow-2xl overflow-hidden relative">
-                            {/* Glass highlights */}
-                            <div className="absolute top-0 inset-x-0 h-[1px] bg-[var(--sys-surface)] border border-[var(--sys-border)]"></div>
-                            
-                            <div className="flex items-center justify-between mb-8">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-[#8ff5ff]">finance</span>
-                                    <h3 className="text-lg font-bold text-[var(--sys-text)]">Performance Vector</h3>
-                                </div>
-                                <button className="text-xs text-[var(--sys-text-muted)] opacity-70 hover:text-[var(--sys-text)] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 cursor-pointer" onClick={() => navigate('/performance-marketing')}>
-                                    Deep Dive <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
-                                <div>
-                                    <p className="text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-widest mb-1">Total Ad Spend</p>
-                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#ff4d00]">₹{(perfData?.stats?.totalSpend || 0).toLocaleString()}</p>
-                                    <p className="text-[var(--sys-text-muted)] opacity-70 text-[10px] uppercase font-bold mt-1 tracking-wider"><span className="text-green-500">Live</span> Meta + Google</p>
-                                </div>
-                                <div>
-                                    <p className="text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-widest mb-1">Blended ROAS</p>
-                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[#8ff5ff]">{blendedRoas?.mer?.toFixed(1) || perfData?.stats?.avgRoas || '—'}x</p>
-                                    <p className="text-[var(--sys-text-muted)] opacity-70 text-[10px] uppercase font-bold mt-1 tracking-wider">Across Network</p>
-                                </div>
-                                <div>
-                                    <p className="text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-widest mb-1">Funnel CVP</p>
-                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)]">{funnelData?.analytics?.overview?.conversionRate || 0}%</p>
-                                    <p className="text-[var(--sys-text-muted)] opacity-70 text-[10px] uppercase font-bold mt-1 tracking-wider">Macro Conversion</p>
-                                </div>
-                                <div>
-                                    <p className="text-[var(--sys-text-muted)] text-xs font-bold uppercase tracking-widest mb-1">Active Flights</p>
-                                    <p className="text-3xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)]">{perfData?.stats?.activeCampaigns || 0}</p>
-                                    <p className="text-[var(--sys-text-muted)] opacity-70 text-[10px] uppercase font-bold mt-1 tracking-wider">Campaigns Live</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                
-                    {/* ── INTELLIGENCE HUB (Trends / News / Ideas) ── */}
-                    <div className="dash-card overflow-hidden !p-0 anim-up" style={{ animationDelay: '140ms' }}>
-                        {/* Tab bar */}
-                        <div className="flex border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
-                            {intelTabs.map(tab => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`intel-tab flex-1 px-4 py-3 text-xs font-black cursor-pointer border-b-2 transition-all ${activeTab === tab.id ? 'active border-violet-500 text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] border-transparent hover:text-[var(--sys-text)]'}`}>
-                                    {tab.label}
-                                </button>
-                            ))}
-                            <button onClick={() => { loadSummary(); loadTrends() }}
-                                className="px-4 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-colors border-l border-[var(--sys-border)]">
-                                <span className={`material-symbols-outlined text-lg ${loadingSummary ? 'animate-spin' : ''}`}>refresh</span>
-                            </button>
-                        </div>
-
-                        <div className="p-5">
-                            {/* ── TRENDS TAB ── */}
-                            {activeTab === 'trends' && (
-                                <div className="space-y-2.5">
-                                    {(trendsLoading && trendingTopics.length === 0) ? (
-                                        <div className="flex items-center gap-2 py-6 text-[var(--sys-text-muted)] text-sm">
-                                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                                            Scanning trends…
-                                        </div>
-                                    ) : trendingTopics.length > 0 ? trendingTopics.slice(0, 5).map((trend, i) => (
-                                        <div key={i} className="flex items-center gap-3 p-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] hover:border-rose-500/15 transition-all group"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 50}ms both` }}>
-                                            <span className={`material-symbols-outlined text-xl shrink-0 ${trend.source === 'Grok xAI' ? 'text-orange-400' : 'text-rose-400'}`}>
-                                                {trend.source === 'Grok xAI' ? 'smart_toy' : 'trending_up'}
-                                            </span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <p className="text-sm font-bold text-[var(--sys-text)] truncate">{trend.title}</p>
-                                                    {trend.urgency === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold shrink-0">🔥</span>}
-                                                </div>
-                                                {(trend.contentIdea || trend.angle) && (
-                                                    <p className="text-xs text-[var(--sys-text-muted)] truncate">💡 {trend.contentIdea || trend.angle}</p>
-                                                )}
-                                            </div>
-                                            <button onClick={() => navigate(`/content-studio?trend=${encodeURIComponent(trend.title)}&prompt=${encodeURIComponent(trend.contentIdea || `Create content about "${trend.title}"`)}`)}
-                                                className="shrink-0 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer border border-rose-500/15 opacity-60 group-hover:opacity-100 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                                <span className="hidden sm:inline">Create</span>
-                                            </button>
-                                        </div>
-                                    )) : grokTrends.slice(0, 4).map((t, i) => (
-                                        <div key={i} className="p-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-orange-500/20 transition-all"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 50}ms both` }}>
-                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                <p className="text-sm font-bold text-[var(--sys-text)]">{t.topic}</p>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${t.urgency === 'now' ? 'bg-rose-500/15 text-rose-400' : t.urgency === 'today' ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-500/10 text-[var(--sys-text-muted)]'}`}>
-                                                    {t.urgency === 'now' ? '🔴 NOW' : t.urgency === 'today' ? '🟡 Today' : '📅 This week'}
-                                                </span>
-                                            </div>
-                                            {t.marketingAngle && <p className="text-xs text-emerald-400">💡 {t.marketingAngle}</p>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* ── NEWS TAB ── */}
-                            {activeTab === 'news' && (
-                                <div className="space-y-2.5">
-                                    {loadingSummary ? (
-                                        [1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-[var(--sys-surface)] animate-pulse" />)
-                                    ) : businessNews.length > 0 ? businessNews.slice(0, 5).map((n, i) => (
-                                        <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-emerald-500/15 transition-all"
-                                            style={{ animation: `slide-up .35s ease-out ${i * 60}ms both` }}>
-                                            <span className="text-xl shrink-0">{n.emoji || '📰'}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <p className="text-sm font-bold text-[var(--sys-text)] leading-snug">{n.headline}</p>
-                                                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${n.category === 'funding' ? 'bg-green-500/10 text-green-400' : n.category === 'competitor' ? 'bg-rose-500/10 text-rose-400' : 'bg-cyan-500/10 text-cyan-400'}`}>{n.category}</span>
-                                                </div>
-                                                <p className="text-xs text-emerald-400 mt-1">💡 {n.relevance}</p>
-                                            </div>
-                                        </div>
-                                    )) : <p className="text-sm text-[var(--sys-text-muted)] py-6 text-center">No news yet — refresh to fetch latest.</p>}
-                                </div>
-                            )}
-
-                            {/* ── IDEAS TAB ── */}
-                            {activeTab === 'ideas' && (
-                                <div className="space-y-2.5">
-                                    {loadingSummary ? (
-                                        [1,2,3,4].map(i => <div key={i} className="h-20 rounded-xl bg-[var(--sys-surface)] animate-pulse" />)
-                                    ) : grokContent.length > 0 ? grokContent.slice(0, 5).map((s, i) => (
-                                        <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] hover:border-cyan-500/20 transition-all cursor-pointer group"
-                                            onClick={() => navigate(`/content-studio?goal=write&prompt=${encodeURIComponent(s.hook || s.title)}`)}
-                                            style={{ animation: `slide-up .35s ease-out ${i * 60}ms both` }}>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${s.platform === 'instagram' ? 'bg-pink-500/10 text-pink-400' : s.platform === 'twitter' ? 'bg-sky-500/10 text-sky-400' : 'bg-slate-500/10 text-[var(--sys-text-muted)]'}`}>{s.platform}</span>
-                                                    <span className="text-[10px] text-[var(--sys-text-muted)] font-bold">{s.format}</span>
-                                                    {s.viralPotential === 'high' && <span className="text-[10px] text-orange-400 font-bold ml-auto">🔥 Viral</span>}
-                                                </div>
-                                                <p className="text-sm font-bold text-[var(--sys-text)] group-hover:text-cyan-400 transition-colors line-clamp-1">{s.title}</p>
-                                                <p className="text-xs text-[var(--sys-text-muted)] line-clamp-2 mt-0.5">{s.hook}</p>
-                                            </div>
-                                            <span className="material-symbols-outlined text-sm text-[var(--sys-text-muted)] group-hover:text-cyan-400 transition-colors shrink-0 mt-1">arrow_forward</span>
-                                        </div>
-                                    )) : <p className="text-sm text-[var(--sys-text-muted)] py-6 text-center">No content ideas yet — refresh to generate.</p>}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ── UPCOMING OPPORTUNITIES ── */}
-                    {upcoming.length > 0 && (
-                        <div className="dash-card anim-up" style={{ animationDelay: '180ms' }}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-amber-400 text-lg">celebration</span>
-                                    <span className="text-sm font-bold text-[var(--sys-text)]">Upcoming Opportunities</span>
-                                </div>
-                                <button onClick={() => navigate('/smart-calendar')} className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-bold cursor-pointer">View All →</button>
-                            </div>
-                            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-                                {upcoming.slice(0, 7).map((e, i) => {
-                                    const color = EVENT_COLORS[e.type] || EVENT_COLORS.global
-                                    return (
-                                        <button key={i} onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(e.name)}&tone=${e.tone}`)}
-                                            className="shrink-0 w-36 rounded-xl p-3 text-left bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer border flex flex-col gap-2"
-                                            style={{ borderColor: color.border + '25', animation: `slide-up .35s ease-out ${i * 40}ms both` }}>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xl">{e.emoji}</span>
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil <= 3 ? 'bg-rose-500/20 text-rose-400' : e.daysUntil <= 7 ? 'bg-amber-500/20 text-amber-400' : 'bg-violet-500/15 text-violet-400'}`}>
-                                                    {e.daysUntil === 0 ? 'TODAY' : e.daysUntil === 1 ? 'TMR' : `${e.daysUntil}d`}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs font-bold text-[var(--sys-text)] leading-tight line-clamp-2">{e.name}</p>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* ════ RIGHT COLUMN (4 cols) ════ */}
-                <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                    
-                    {/* ACTIVE STUDIOS LIST */}
-                    <div data-wt="dashboard-studios" className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
-                        <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest mb-6">Active Studios</h3>
-                        <div className="space-y-1">
-                            {studios.slice(0, 5).map((s, i) => (
-                                <button key={i} onClick={() => navigate(s.path)}
-                                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-[var(--sys-surface)] transition-colors group cursor-pointer border border-transparent hover:border-[#48474c]/30">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center border border-[var(--sys-border)] group-hover:border-[#ff4d00]/50 transition-colors">
-                                            <span className="material-symbols-outlined text-[16px] text-[var(--sys-text-muted)] group-hover:text-[#ff4d00]" style={s.color === '#FF4D00' ? {color: '#FF4D00'} : {}}>{s.icon}</span>
-                                        </div>
-                                        <span className="text-sm font-medium text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-colors">{s.label}</span>
-                                    </div>
-                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] opacity-70 group-hover:text-[var(--sys-text)] transition-colors">arrow_forward</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* D2C PULSE */}
-                    <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[#8ff5ff] text-xl">storefront</span>
-                                <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest">D2C Pulse</h3>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <div className={`w-2 h-2 rounded-full ${d2cSnapshot?.connected ? 'bg-[#8ff5ff] animate-pulse' : 'bg-[var(--sys-surface)]'}`}></div>
-                                <span className="text-[10px] font-bold text-[var(--sys-text-muted)] opacity-70 uppercase">{d2cSnapshot?.connected ? 'Live Sync' : 'Disconnected'}</span>
-                            </div>
-                        </div>
-
-                        {d2cSnapshot?.connected ? (
-                            <div className="space-y-4">
-                                <div className="border border-[var(--sys-border)] rounded-2xl p-4 bg-[var(--sys-surface)]">
-                                    <p className="text-[var(--sys-text-muted)] text-[10px] font-bold uppercase tracking-widest mb-1">Weekly Volume</p>
-                                    <p className="text-2xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] flex items-baseline gap-1">
-                                        ₹{(d2cSnapshot.weeklyRevenue || 0).toLocaleString()} <span className="text-xs text-[#8ff5ff]">+4.2%</span>
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="border border-[var(--sys-border)] rounded-2xl p-4 bg-[var(--sys-surface)]">
-                                        <p className="text-[var(--sys-text-muted)] text-[10px] font-bold uppercase tracking-widest mb-1">Orders</p>
-                                        <p className="text-xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)]">{d2cSnapshot.weeklyOrders || 0}</p>
-                                    </div>
-                                    <div className="border border-[var(--sys-border)] rounded-2xl p-4 bg-[var(--sys-surface)]">
-                                        <p className="text-[var(--sys-text-muted)] text-[10px] font-bold uppercase tracking-widest mb-1">Velocity</p>
-                                        <p className="text-xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)]">High</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center py-6">
-                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] opacity-70 text-3xl mb-2">sync_disabled</span>
-                                <p className="text-[var(--sys-text-muted)] text-xs mb-4">Shopify API disconnected.</p>
-                                <button className="px-4 py-2 bg-[var(--sys-surface)] border border-[#48474c]/30 rounded-lg text-xs font-bold text-[var(--sys-text)] hover:bg-[#48474c]/20 transition-colors" onClick={() => navigate('/d2c-analytics')}>Configure Source</button>
-                            </div>
-                        )}
-                    </div>
-
-                                        {/* ── TRENDING KEYWORDS ── */}
-                    {grokSeo?.risingKeywords?.length > 0 && (
-                        <div className="dash-card border border-amber-500/10 anim-up" style={{ animationDelay: '160ms' }}>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">search</span>
-                                <span className="text-sm font-bold text-[var(--sys-text)]">Trending Keywords</span>
-                            </div>
-                            <div className="space-y-2">
-                                {grokSeo.risingKeywords.slice(0, 5).map((k, i) => (
-                                    <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] transition-all">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-medium text-[var(--sys-text)] truncate">"{k.keyword}"</p>
-                                            <p className="text-[10px] text-[var(--sys-text-muted)]">{k.intent} intent</p>
-                                        </div>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ml-2 ${k.trend === 'breakout' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>{k.growthRate}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={() => navigate('/seo-studio')} className="w-full mt-3 py-2 rounded-xl bg-amber-500/5 text-amber-400 text-xs font-bold hover:bg-amber-500/10 transition-all cursor-pointer border border-amber-500/10">
-                                Open SEO Studio →
-                            </button>
-                        </div>
-                    )}
-
-                    {/* ── QUICK WIN (next event) ── */}
-                    {upcoming.length > 0 && (
-                        <div className="dash-card bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-500/10 anim-up" style={{ animationDelay: '200ms' }}>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="material-symbols-outlined text-amber-400 text-lg">tips_and_updates</span>
-                                <span className="text-sm font-bold text-[var(--sys-text)]">Quick Win</span>
-                            </div>
-                            <p className="text-sm text-slate-300 mb-3">
-                                <span className="text-base mr-1">{upcoming[0].emoji}</span>
-                                <strong>{upcoming[0].name}</strong> is {upcoming[0].daysUntil === 0 ? 'today' : upcoming[0].daysUntil === 1 ? 'tomorrow' : `in ${upcoming[0].daysUntil} days`}
-                            </p>
-                            <button onClick={() => navigate(`/content-studio?occasion=${encodeURIComponent(upcoming[0].name)}&tone=${upcoming[0].tone}`)}
-                                className="w-full py-2 rounded-xl bg-amber-500/10 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-amber-500/20">
-                                <span className="material-symbols-outlined text-sm">auto_awesome</span>Generate Content
-                            </button>
-                        </div>
-                    )}
-
-                    {/* ── TODAY'S CALENDAR WIDGET ── */}
-                    <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary text-xl">calendar_today</span>
-                                <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest">Today's Posts</h3>
-                            </div>
-                            <button onClick={() => navigate('/brand-calendar')} className="text-[10px] font-bold text-primary hover:opacity-80 transition-opacity cursor-pointer flex items-center gap-1">
-                                View Calendar <span className="material-symbols-outlined text-[11px]">arrow_forward</span>
-                            </button>
-                        </div>
-
-                        {loadingToday ? (
-                            <div className="space-y-2">
-                                {[1,2].map(i => <div key={i} className="h-10 rounded-xl bg-[var(--sys-surface)] animate-pulse" />)}
-                            </div>
-                        ) : (todaySchedule.today.length + todaySchedule.tomorrow.length) === 0 ? (
-                            <div className="text-center py-5">
-                                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] opacity-30 block mb-2">event_busy</span>
-                                <p className="text-xs text-[var(--sys-text-muted)]">Nothing scheduled today</p>
-                                <button onClick={() => navigate('/brand-calendar')} className="mt-3 px-4 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/20 transition-colors border border-primary/20">
-                                    Schedule a Post
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {todaySchedule.today.length > 0 && (
-                                    <div>
-                                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] mb-2">Today</p>
-                                        <div className="space-y-1.5">
-                                            {todaySchedule.today.slice(0,3).map(e => {
-                                                const PL_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work' }
-                                                const PL_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2' }
-                                                const platform = e.platform?.toLowerCase() || ''
-                                                const statusColor = e.status === 'published' ? 'text-emerald-400' : e.status === 'failed' ? 'text-red-400' : 'text-amber-400'
-                                                const statusIcon  = e.status === 'published' ? 'task_alt' : e.status === 'failed' ? 'error_outline' : 'schedule_send'
-                                                return (
-                                                    <div key={e._id} onClick={() => navigate('/brand-calendar')} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20 cursor-pointer transition-all group">
-                                                        <span className="material-symbols-outlined text-[14px] shrink-0" style={{ color: PL_COLOR[platform] || '#888' }}>{PL_ICON[platform] || 'share'}</span>
-                                                        <p className="text-[11px] text-[var(--sys-text-muted)] truncate flex-1 group-hover:text-[var(--sys-text)] transition-colors">{e.caption?.slice(0,30) || e.contentType || 'Post'}</p>
-                                                        <div className="flex items-center gap-1 shrink-0">
-                                                            {e.scheduledAt && <span className="text-[10px] text-[var(--sys-text-muted)]">{new Date(e.scheduledAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</span>}
-                                                            <span className={`material-symbols-outlined text-[11px] ${statusColor}`}>{statusIcon}</span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                                {todaySchedule.tomorrow.length > 0 && (
-                                    <div>
-                                        <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] mb-2">Tomorrow</p>
-                                        <div className="space-y-1.5">
-                                            {todaySchedule.tomorrow.slice(0,2).map(e => {
-                                                const PL_ICON  = { instagram:'photo_camera', facebook:'thumb_up', linkedin:'work' }
-                                                const PL_COLOR = { instagram:'#E1306C', facebook:'#1877F2', linkedin:'#0A66C2' }
-                                                const platform = e.platform?.toLowerCase() || ''
-                                                return (
-                                                    <div key={e._id} onClick={() => navigate('/brand-calendar')} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/20 cursor-pointer transition-all group opacity-70 hover:opacity-100">
-                                                        <span className="material-symbols-outlined text-[14px] shrink-0" style={{ color: PL_COLOR[platform] || '#888' }}>{PL_ICON[platform] || 'share'}</span>
-                                                        <p className="text-[11px] text-[var(--sys-text-muted)] truncate flex-1 group-hover:text-[var(--sys-text)] transition-colors">{e.caption?.slice(0,30) || e.contentType || 'Post'}</p>
-                                                        {e.scheduledAt && <span className="text-[10px] text-[var(--sys-text-muted)] shrink-0">{new Date(e.scheduledAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</span>}
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* SYSTEM STATUS */}
-                    <div className="rounded-3xl border border-[var(--sys-border)] bg-[var(--sys-bg)] p-6 relative overflow-hidden">
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">router</span>
-                            <h3 className="text-sm font-bold text-[var(--sys-text)] uppercase tracking-widest">System Matrix</h3>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Threat / Alerts */}
-                            {anomalies.length > 0 ? (
-                                <div className="flex items-start gap-3 p-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-xl">
-                                    <span className="material-symbols-outlined text-primary text-sm mt-0.5">warning</span>
-                                    <div>
-                                        <p className="text-xs font-bold text-primary">Anomaly Detected</p>
-                                        <p className="text-[10px] text-primary/80">{anomalies[0]?.metric || 'Data drift'} threshold breached</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[var(--sys-text-muted)] text-xs font-bold">Network Anomalies</span>
-                                    <span className="text-[#8ff5ff] text-xs font-bold px-2 py-0.5 bg-[#8ff5ff]/10 rounded border border-[#8ff5ff]/20">0 Threats</span>
-                                </div>
-                            )}
-
-                            <div className="flex items-center justify-between">
-                                <span className="text-[var(--sys-text-muted)] text-xs font-bold">API Router</span>
-                                <span className="text-xs font-bold text-[var(--sys-text)]">Optimal</span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                                <span className="text-[var(--sys-text-muted)] text-xs font-bold text-nowrap">Local Context</span>
-                                <span className="text-[10px] font-mono text-[var(--sys-text-muted)] opacity-70 bg-[var(--sys-surface)] px-2 py-0.5 rounded border border-[var(--sys-border)]">0x{activeBrand?._id?.slice(-6) || 'a82f3'}</span>
-                            </div>
-                            
-                            {/* Visual Divider */}
-                            <div className="h-[1px] w-full bg-[#48474c]/20 my-2"></div>
-                            
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-[var(--sys-text-muted)] opacity-70">System Check</span>
-                                <span className="text-[var(--sys-text-muted)] opacity-70 text-[10px] font-bold tracking-widest uppercase">Pass</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            {/* Intel Report Overlay */}
-            {showIntelReport && intelReport && (
-                <IntelReportViewer
-                    mission={intelReport.mission}
-                    findings={intelReport.findings}
-                    onClose={() => { setShowIntelReport(false); setIntelReport(null) }}
-                />
+                  </div>
+                ))}
+              </div>
             )}
-        </DashboardLayout>
-    )
+            {d2c?.connected ? (
+              <div className="mt-4 pt-4 border-t border-white/[0.05] grid grid-cols-3 gap-2">
+                {[['Revenue','₹'+String((d2c.weeklyRevenue||0).toLocaleString()),'#34d399'],['Orders',String(d2c.weeklyOrders||0),'#8ff5ff'],['Velocity','High','#a78bfa']].map(([l,v,c])=>(
+                  <div key={l} className="text-center"><p className="text-[10px] text-white/30 uppercase tracking-wider">{l}</p><p className="text-sm font-bold" style={{color:c}}>{v}</p></div>
+                ))}
+              </div>
+            ) : (
+              <button onClick={()=>navigate('/d2c-analytics')} className="mt-4 w-full py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/40 hover:text-white/70 transition-colors font-bold cursor-pointer">Connect Shopify →</button>
+            )}
+          </Card>
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="calendar_today" action="View Calendar" onAction={()=>navigate('/brand-calendar')}>Today&apos;s Queue</Label>
+            {(todaySchedule.today.length + todaySchedule.tomorrow.length) === 0 ? (
+              <div className="text-center py-8">
+                <span className="material-symbols-outlined text-4xl text-white/10 block mb-3">event_busy</span>
+                <p className="text-xs text-white/30 mb-4">Nothing scheduled today</p>
+                <button onClick={()=>navigate('/social-media-studio')} className="px-4 py-2 rounded-xl bg-[#ff4d00]/10 border border-[#ff4d00]/20 text-[#ff4d00] text-xs font-bold hover:bg-[#ff4d00]/20 cursor-pointer">+ Schedule a Post</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {todaySchedule.today.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-white/30">Today</p>}
+                {todaySchedule.today.slice(0,4).map(e=>(
+                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-[#ff4d00]/20 cursor-pointer transition-all group">
+                    <PlatformIcon platform={(e.platform||'').toLowerCase()}/>
+                    <p className="text-xs text-white/60 truncate flex-1 group-hover:text-white">{(e.caption||'Post').slice(0,32)}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {e.scheduledFor && <span className="text-[10px] text-white/30">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+                      <StatusBadge status={e.status}/>
+                    </div>
+                  </div>
+                ))}
+                {todaySchedule.tomorrow.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-white/20 mt-2">Tomorrow</p>}
+                {todaySchedule.tomorrow.slice(0,2).map(e=>(
+                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] cursor-pointer opacity-60 hover:opacity-90 transition-all">
+                    <PlatformIcon platform={(e.platform||'').toLowerCase()}/>
+                    <p className="text-xs text-white/50 truncate flex-1">{(e.caption||'Post').slice(0,32)}</p>
+                    {e.scheduledFor && <span className="text-[10px] text-white/25">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="finance" action="Deep Dive" onAction={()=>navigate('/performance-marketing')}>Performance Vector</Label>
+            {loadingAnalytics ? (
+              <div className="space-y-3">{[0,1,2,3].map(i=><Skel key={i} className="h-12"/>)}</div>
+            ) : (perfData||funnelData||blendedRoas) ? (
+              <div className="space-y-2">
+                {[['Total Spend','₹'+String((perfData?.stats?.totalSpend||0).toLocaleString()),'#ff4d00'],['Blended ROAS',String(blendedRoas?.mer||perfData?.stats?.avgRoas||'—')+'x','#8ff5ff'],['Funnel CVR',String(funnelData?.analytics?.overview?.conversionRate||0)+'%','#34d399'],['Live Campaigns',String(perfData?.stats?.activeCampaigns||0),'#a78bfa']].map(([l,v,c])=>(
+                  <div key={l} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider">{l}</p>
+                    <p className="text-lg font-['Space_Grotesk'] font-bold" style={{color:c}}>{v}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <span className="material-symbols-outlined text-4xl text-white/10 block mb-3">campaign</span>
+                <p className="text-xs text-white/30 mb-4">No ad campaigns yet</p>
+                <button onClick={()=>navigate('/performance-marketing')} className="px-4 py-2 rounded-xl bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] text-xs font-bold hover:bg-[#f43f5e]/20 cursor-pointer">Connect Ads →</button>
+              </div>
+            )}
+          </Card>
+        </div>
+        <div className="grid grid-cols-12 gap-5">
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="local_fire_department">🔥 Trending Now</Label>
+            {(loadingTrends && trends.length===0) ? (
+              <div className="space-y-2">{[0,1,2,3,4].map(i=><Skel key={i} className="h-14"/>)}</div>
+            ) : (trends.length>0?trends:grokTrends).slice(0,5).map((t,i)=>(
+              <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-rose-500/15 transition-all group">
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black shrink-0 mt-0.5 ${(t.urgency==='high'||t.urgency==='now')?'bg-rose-500/15 text-rose-400':t.urgency==='today'?'bg-amber-500/15 text-amber-400':'bg-white/5 text-white/30'}`}>
+                  {(t.urgency==='high'||t.urgency==='now')?'NOW':t.urgency==='today'?'TODAY':'WEEK'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white/80 truncate">{t.title||t.topic}</p>
+                  {(t.contentIdea||t.angle||t.marketingAngle) && <p className="text-[10px] text-emerald-400 truncate">💡 {t.contentIdea||t.angle||t.marketingAngle}</p>}
+                </div>
+                <button onClick={()=>navigate('/content-studio?trend='+encodeURIComponent(t.title||t.topic))} className="shrink-0 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold cursor-pointer transition-opacity">Create</button>
+              </div>
+            ))}
+            {(grokSeo?.risingKeywords||[]).length > 0 && (
+              <div className="mt-3 pt-3 border-t border-white/[0.05]">
+                <p className="text-[9px] uppercase tracking-wider text-white/30 mb-2 font-bold">Rising Keywords</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {grokSeo.risingKeywords.slice(0,4).map((k,i)=>(
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/15">{k.keyword}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="newspaper">📰 Business News</Label>
+            {loadingIntel ? (
+              <div className="space-y-2">{[0,1,2,3].map(i=><Skel key={i} className="h-16"/>)}</div>
+            ) : businessNews.length > 0 ? businessNews.slice(0,4).map((n,i)=>(
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-emerald-500/15 transition-all">
+                <span className="text-xl shrink-0">{n.emoji||'📰'}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2 mb-1">
+                    <p className="text-xs font-bold text-white/80 leading-tight flex-1">{n.headline}</p>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${n.category==='funding'?'bg-green-500/10 text-green-400':n.category==='competitor'?'bg-rose-500/10 text-rose-400':'bg-cyan-500/10 text-cyan-400'}`}>{n.category}</span>
+                  </div>
+                  {n.relevance && <p className="text-[10px] text-emerald-400">💡 {n.relevance}</p>}
+                </div>
+              </div>
+            )) : <p className="text-xs text-white/30 py-8 text-center">Refresh to fetch latest news</p>}
+          </Card>
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="tips_and_updates">💡 Opportunities</Label>
+            {loadingIntel ? (
+              <div className="space-y-2">{[0,1,2].map(i=><Skel key={i} className="h-16"/>)}</div>
+            ) : grokContent.slice(0,3).map((s,i)=>(
+              <div key={i} onClick={()=>navigate('/content-studio?prompt='+encodeURIComponent(s.hook||s.title))} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-cyan-500/20 cursor-pointer transition-all group">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${s.platform==='instagram'?'bg-pink-500/10 text-pink-400':s.platform==='twitter'?'bg-sky-500/10 text-sky-400':s.platform==='linkedin'?'bg-blue-500/10 text-blue-400':'bg-white/5 text-white/30'}`}>{s.platform||'Content'}</span>
+                  {s.viralPotential==='high' && <span className="text-[9px] text-orange-400 font-bold ml-auto">🔥 Viral</span>}
+                </div>
+                <p className="text-xs font-bold text-white/70 group-hover:text-cyan-400 transition-colors line-clamp-1">{s.title}</p>
+                <p className="text-[10px] text-white/30 line-clamp-1 mt-0.5">{s.hook}</p>
+              </div>
+            ))}
+            {upcoming.slice(0,3).map((e,i)=>(
+              <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name))} className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-violet-500/20 cursor-pointer mb-2 transition-all group">
+                <span className="text-lg">{e.emoji}</span>
+                <span className="text-xs text-white/60 flex-1 text-left">{e.name}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil<=3?'bg-rose-500/15 text-rose-400':e.daysUntil<=7?'bg-amber-500/15 text-amber-400':'bg-violet-500/10 text-violet-400'}`}>{e.daysUntil===0?'TODAY':e.daysUntil===1?'TMR':String(e.daysUntil)+'d'}</span>
+              </button>
+            ))}
+          </Card>
+        </div>
+        {upcoming.length > 0 && (
+          <Card className="p-5">
+            <Label icon="celebration" action="View All" onAction={()=>navigate('/smart-calendar')}>Upcoming Events</Label>
+            <div className="flex gap-3 overflow-x-auto pb-1" style={{scrollbarWidth:'none'}}>
+              {upcoming.slice(0,12).map((e,i)=>{
+                const c = EVENT_COLORS[e.type]||EVENT_COLORS.global
+                return (
+                  <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name)+'&tone='+(e.tone||''))}
+                    className="shrink-0 w-32 rounded-xl p-3 text-left bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.06] flex flex-col gap-2 transition-all cursor-pointer"
+                    style={{borderColor:c.border+'20'}}>
+                    <div className="flex items-center justify-between"><span className="text-xl">{e.emoji}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil<=3?'bg-rose-500/15 text-rose-400':e.daysUntil<=7?'bg-amber-500/15 text-amber-400':'bg-violet-500/10 text-violet-400'}`}>{e.daysUntil===0?'TODAY':e.daysUntil===1?'TMR':String(e.daysUntil)+'d'}</span></div>
+                    <p className="text-[11px] font-bold text-white/70 leading-tight line-clamp-2">{e.name}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+        )}
+        <div className="grid grid-cols-12 gap-5">
+          <Card className="col-span-12 lg:col-span-5 p-5">
+            <Label icon="hub" action="Manage" onAction={()=>navigate('/integrations')}>Social Pipeline</Label>
+            <div className="space-y-2">
+              {['instagram','facebook','linkedin','twitter'].map(pl=>{
+                const p = socialPlatforms[pl]||{connected:false}
+                const meta = PL[pl]||{icon:'share',color:'#888',bg:'rgba(136,136,136,0.1)'}
+                return (
+                  <div key={pl} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-white/[0.10] transition-all">
+                    <span className="inline-flex items-center justify-center rounded-lg w-9 h-9 shrink-0" style={{background:meta.bg}}>
+                      <span className="material-symbols-outlined text-lg" style={{color:meta.color}}>{meta.icon}</span>
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white/70 capitalize">{pl}</p>
+                      <p className="text-[10px] text-white/30">{p.connected?(p.accountName||'Connected'):'Not connected'}</p>
+                    </div>
+                    {p.connected ? (
+                      <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/><span className="text-[10px] text-emerald-400 font-bold">Live</span></div>
+                    ) : (
+                      <button onClick={()=>navigate('/integrations')} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.08] border border-white/[0.07] cursor-pointer">Connect</button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {scheduledPosts.totalUpcoming > 0 && (
+              <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between">
+                <span className="text-xs text-white/30">Upcoming posts queued</span>
+                <span className="text-sm font-black text-[#ff4d00]">{scheduledPosts.totalUpcoming}</span>
+              </div>
+            )}
+          </Card>
+          <Card className="col-span-12 lg:col-span-4 p-5">
+            <Label icon="apps">Studio Launcher</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {studios.map((s,i)=>(
+                <button key={i} onClick={()=>navigate(s.path)} className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all cursor-pointer ${i===hotStudioIdx?'bg-[#ff4d00]/10 border-[#ff4d00]/25':'bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.10]'}`}>
+                  <span className="material-symbols-outlined text-xl" style={{color:i===hotStudioIdx?'#ff4d00':s.color}}>{s.icon}</span>
+                  <p className="text-[9px] font-bold text-white/50 leading-tight text-center">{s.label}</p>
+                  {s.count > 0 && <span className="text-[8px] font-black px-1 py-0.5 rounded-full bg-white/[0.07] text-white/30">{s.count}</span>}
+                </button>
+              ))}
+            </div>
+          </Card>
+          <Card className="col-span-12 lg:col-span-3 p-5">
+            <Label icon="radar" action="New +" onAction={()=>navigate('/seo-studio?tab=intel')}>Intel Missions</Label>
+            {intelMissions.length === 0 ? (
+              <div className="text-center py-6">
+                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">satellite_alt</span>
+                <p className="text-xs text-white/30 mb-3">No active missions</p>
+                <button onClick={()=>navigate('/seo-studio?tab=intel')} className="px-3 py-1.5 rounded-xl bg-[#06b6d4]/10 border border-[#06b6d4]/20 text-[#06b6d4] text-xs font-bold hover:bg-[#06b6d4]/20 cursor-pointer">Launch Mission</button>
+              </div>
+            ) : intelMissions.map((m,i)=>(
+              <div key={i} onClick={()=>openIntelReport(m)} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-[#06b6d4]/20 cursor-pointer transition-all group">
+                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${m.status==='active'?'bg-emerald-400 animate-pulse':'bg-white/20'}`}/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white/70 group-hover:text-[#06b6d4] transition-colors truncate">{m.title}</p>
+                  <p className="text-[10px] text-white/30">{m.target?.name} · {m.type}</p>
+                </div>
+                <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-[#06b6d4] transition-colors">chevron_right</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+      {intelReport && (
+        <IntelReportViewer
+          mission={intelReport.mission}
+          findings={intelReport.findings}
+          onClose={()=>setIntelReport(null)}
+        />
+      )}
+    </DashboardLayout>
+  )
 }
-

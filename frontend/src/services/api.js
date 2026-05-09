@@ -411,6 +411,7 @@ export const dashboardSummary = {
     getHero: (brandId) => apiFetch(`/dashboard-summary/hero${brandId ? `?brandId=${brandId}` : ''}`),
     getIntelligence: (brandId) => apiFetch(`/dashboard-summary/intelligence${brandId ? `?brandId=${brandId}` : ''}`),
     getRadar: (brandId) => apiFetch(`/dashboard-summary/radar${brandId ? `?brandId=${brandId}` : ''}`),
+    getEnhanced: (brandId) => apiFetch(`/dashboard-summary/enhanced${brandId ? `?brandId=${brandId}` : ''}`),
 };
 
 
