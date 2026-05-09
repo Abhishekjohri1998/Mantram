@@ -277,9 +277,9 @@ The promptFormula is the MOST IMPORTANT field. It will be used directly as an im
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ role: 'user', parts: [imagePart, { text: DNA_PROMPT }] }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+                        generationConfig: { temperature: 0.15, maxOutputTokens: 8192 },
                     }),
-                    signal: AbortSignal.timeout(35_000),
+                    signal: AbortSignal.timeout(60_000),
                 });
                 const data = await resp.json();
                 if (data.error) {
@@ -299,10 +299,35 @@ The promptFormula is the MOST IMPORTANT field. It will be used directly as an im
         // ── Parse DNA JSON ──────────────────────────────────────────────────────
         let dna = null;
         try {
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) dna = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-            console.warn('[TemplateCreate] DNA JSON parse failed, using fallback:', e.message);
+            // Log raw response for debugging (first 500 chars)
+            console.log(`[TemplateCreate] Raw DNA response (${rawText.length} chars):`, rawText.substring(0, 500));
+
+            // Strategy 1: Try to extract JSON between first { and last }
+            const firstBrace = rawText.indexOf('{');
+            const lastBrace = rawText.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                const jsonCandidate = rawText.substring(firstBrace, lastBrace + 1);
+                dna = JSON.parse(jsonCandidate);
+            }
+        } catch (e1) {
+            console.warn('[TemplateCreate] Primary JSON parse failed:', e1.message);
+            // Strategy 2: Try cleaning common issues (trailing commas, control chars)
+            try {
+                const firstBrace = rawText.indexOf('{');
+                const lastBrace = rawText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace > firstBrace) {
+                    let cleaned = rawText.substring(firstBrace, lastBrace + 1);
+                    // Remove trailing commas before closing braces/brackets
+                    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+                    // Remove control characters except newlines and tabs
+                    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+                    dna = JSON.parse(cleaned);
+                    console.log('[TemplateCreate] JSON parsed after cleaning');
+                }
+            } catch (e2) {
+                console.warn('[TemplateCreate] Secondary JSON parse also failed:', e2.message);
+                console.warn('[TemplateCreate] Raw text snippet:', rawText.substring(0, 300));
+            }
         }
 
         // ── Fallback DNA if parsing failed ──────────────────────────────────────
