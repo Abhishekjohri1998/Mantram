@@ -12,7 +12,7 @@
 import React, { useState } from 'react';
 import './TemplateDNACard.css';
 
-export default function TemplateDNACard({ template, onUse, onDelete, recentGenerations = [] }) {
+export default function TemplateDNACard({ template, onUse, onDelete, recentGenerations = [], onPreviewImage }) {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
@@ -113,6 +113,9 @@ export default function TemplateDNACard({ template, onUse, onDelete, recentGener
                                 src={gen.imageUrl || gen.thumbnailUrl} 
                                 alt="Generation" 
                                 className="tdna-card__generation-img"
+                                onClick={(e) => { e.stopPropagation(); onPreviewImage && onPreviewImage(gen.imageUrl || gen.thumbnailUrl); }}
+                                style={{ cursor: 'pointer' }}
+                                title="Click to preview"
                             />
                         ))}
                         {recentGenerations.length > 3 && (

@@ -7541,6 +7541,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                             onUse={t => setFitPanelTemplate(t)}
                                             onDelete={handleDeleteDnaTemplate}
                                             recentGenerations={generationHistory.filter(h => h.templateId === tmpl._id || h._prompt === `Template: ${tmpl.name}`)}
+                                            onPreviewImage={(url) => setZoomImage(url)}
                                         />
                                     ))}
                                     {/* Add more card */}
