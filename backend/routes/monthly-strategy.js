@@ -970,10 +970,18 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
         // Note: ES module caches the import so this is effectively free after first call
         const { internalGenerateCreative } = await import('./creatives.js');
 
+        const delay = ms => new Promise(res => setTimeout(res, ms));
         let completed = 0, failed = 0;
+        let consecutiveFailures = 0; // Circuit breaker
 
         for (const item of pendingItems) {
           try {
+            // Circuit breaker check
+            if (consecutiveFailures >= 5) {
+              console.error(`[batch-generate] Circuit breaker triggered. 5 consecutive failures. Aborting batch ${batchJobId}.`);
+              break;
+            }
+
             // Check if batch was cancelled before generating
             const jobCheck = await GenerationJob.findOne({ jobId: batchJobId }).lean();
             if (jobCheck?.status === 'cancelled') {
@@ -1019,52 +1027,88 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
               return '4:5'; // instagram/facebook default
             };
 
-            const result = await internalGenerateCreative({
-              body: {
-                prompt,
-                brandId: doc.brand?.toString(),
-                type: creativeType,
-                options: {
-                  aspectRatio: getAspectRatio(item.contentType, item.platform),
-                  imageModel: imageModel,
-                  imageSize: '1K',
-                },
-              },
-              user: req.user,
-              creditsDeducted: 0,
-            });
+            let result = null;
+            let attempt = 0;
+            let success = false;
 
-            if (result?.success && result?.creative?.imageUrl) {
-              const assetUrl = result.creative.imageUrl;
-              await MonthlyStrategy.updateOne(
-                { _id: doc._id, 'calendar._id': item._id },
-                {
-                  $set: {
-                    'calendar.$.status': 'complete',
-                    'calendar.$.generatedAsset': {
-                      type: 'image',
-                      url: assetUrl,
-                      title: item.brief?.angle || 'Calendar asset',
+            // ── Retry Loop with Exponential Backoff ──
+            while (attempt < 3 && !success) {
+              try {
+                result = await internalGenerateCreative({
+                  body: {
+                    prompt,
+                    brandId: doc.brand?.toString(),
+                    type: creativeType,
+                    options: {
+                      aspectRatio: getAspectRatio(item.contentType, item.platform),
+                      imageModel: imageModel,
+                      imageSize: '1K',
                     },
                   },
+                  user: req.user,
+                  creditsDeducted: 0,
+                });
+
+                if (result?.success && result?.creative?.imageUrl) {
+                  success = true;
+                } else {
+                  throw new Error(result?.error || 'Generation returned no image');
                 }
-              );
-              completed++;
-            } else {
-              await MonthlyStrategy.updateOne(
-                { _id: doc._id, 'calendar._id': item._id },
-                { $set: { 'calendar.$.status': 'pending' } }
-              );
-              failed++;
+              } catch (err) {
+                const msg = err.message.toLowerCase();
+                // Identify transient/rate-limit errors
+                const isTransient = msg.includes('overload') || msg.includes('503') || 
+                                    msg.includes('500') || msg.includes('timeout') || 
+                                    msg.includes('busy') || msg.includes('rate limit') || 
+                                    msg.includes('429');
+
+                if (isTransient && attempt < 2) {
+                  attempt++;
+                  const backoff = 10000 * Math.pow(2, attempt - 1); // 10s, 20s
+                  console.warn(`[batch-generate] Transient error for item ${item._id}: ${err.message}. Retrying in ${backoff/1000}s (Attempt ${attempt}/2)...`);
+                  await delay(backoff);
+                } else {
+                  // Definitive failure or out of retries
+                  throw err;
+                }
+              }
             }
+
+            // Success handling
+            const assetUrl = result.creative.imageUrl;
+            await MonthlyStrategy.updateOne(
+              { _id: doc._id, 'calendar._id': item._id },
+              {
+                $set: {
+                  'calendar.$.status': 'complete',
+                  'calendar.$.generatedAsset': {
+                    type: 'image',
+                    url: assetUrl,
+                    title: item.brief?.angle || 'Calendar asset',
+                  },
+                },
+              }
+            );
+            
+            completed++;
+            consecutiveFailures = 0; // Reset circuit breaker
+
+            // Pacing delay: Wait 3 seconds between successful generations to avoid hammering the API
+            await delay(3000);
+
           } catch (itemErr) {
             console.error(`[batch-generate] Item ${item._id} failed:`, itemErr.message);
             failed++;
+            consecutiveFailures++;
+            
             // Reset this item to pending so user can retry
             await MonthlyStrategy.updateOne(
               { _id: doc._id, 'calendar._id': item._id },
               { $set: { 'calendar.$.status': 'pending' } }
             ).catch(() => {});
+
+            // Small delay after a failure before attempting the next item
+            await delay(5000);
           }
 
           // Update batch job progress after each item
