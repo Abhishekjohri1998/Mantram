@@ -70,6 +70,13 @@ const CONTENT_TYPE_ICONS = {
   story:      'amp_stories',
   static:     'image',
   ad:         'ads_click',
+  text:       'notes',
+  thread:     'forum',
+  ugc:        'person_play',
+  youtube:    'smart_display',
+  email:      'mail',
+  whatsapp:   'chat',
+  listing:    'storefront',
 }
 
 const STUDIO_PATHS = {
