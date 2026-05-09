@@ -408,7 +408,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 
                 // Call the Logo Art Director (Claude for precision reasoning)
                 const adResult = await aiRouter.generateText({
-                    model: 'claude-3-5-sonnet-20241022',
+                    model: 'claude-3-5-sonnet-20240620',
                     max_tokens: 800,
                     messages: [{ role: 'user', content: logoADPrompt }]
                 });
