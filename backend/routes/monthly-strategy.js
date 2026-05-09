@@ -1015,15 +1015,17 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
               gbp:       'instagram-post',
               youtube:   'youtube-thumb',
             };
-            const creativeType = PLATFORM_TO_CREATIVE_TYPE[item.platform] || 'instagram-post';
+            const normalizedPlatform = (item.platform || 'instagram').toLowerCase();
+            const creativeType = PLATFORM_TO_CREATIVE_TYPE[normalizedPlatform] || 'instagram-post';
 
             // Determine aspect ratio based on content type + platform
-            const getAspectRatio = (contentType, platform) => {
+            const getAspectRatio = (contentType, platformStr) => {
+              const p = platformStr.toLowerCase();
               if (['story', 'reel', 'video'].includes(contentType)) return '9:16';
               if (contentType === 'carousel') return '1:1';
-              if (platform === 'linkedin') return '1.91:1';
-              if (platform === 'twitter') return '16:9';
-              if (platform === 'youtube') return '16:9';
+              if (p === 'linkedin') return '1.91:1';
+              if (p === 'twitter' || p === 'x') return '16:9';
+              if (p === 'youtube') return '16:9';
               return '4:5'; // instagram/facebook default
             };
 

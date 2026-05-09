@@ -764,9 +764,10 @@ function DayCard({ item, onClick }) {
 
   // Use content-type icon for text-based types (blog, newsletter) — they don't belong to instagram etc.
   const isBlogType = BLOG_TYPES.has(item.contentType)
+  const normalizedPlatform = (item.platform || '').toLowerCase()
   const displayIcon = isBlogType
     ? CONTENT_TYPE_ICONS[item.contentType]
-    : (PLATFORM_ICONS[item.platform] || CONTENT_TYPE_ICONS[item.contentType] || 'description')
+    : (PLATFORM_ICONS[normalizedPlatform] || CONTENT_TYPE_ICONS[item.contentType] || 'description')
   const displayPlatform = isBlogType
     ? item.contentType
     : (item.platform || item.contentType)
@@ -1114,7 +1115,7 @@ export default function MonthlyStrategy() {
   const handleBatchGenerate = useCallback(async () => {
     if (!strategy?._id || batchGenerating) return
     setBatchGenerating(true)
-    const pending = calendarItems.filter(it => it.status === 'pending' && (it.targetStudio === 'creative' || !it.targetStudio))
+    const pending = calendarItems.filter(it => it.status === 'pending' && (!it.targetStudio || ['creative', 'video'].includes(it.targetStudio)))
     setBatchProgress({ done: 0, total: pending.length })
     try {
       const data = await msAPI.batchGenerate(strategy._id, { imageModel: batchModel })
