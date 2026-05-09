@@ -32,7 +32,35 @@ import config from '../config/env.js';
 const POLL_INTERVAL_MS = 60 * 1000; // 60 seconds — fast enough to catch posts on time
 const STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes — if still 'processing' after this, mark failed
 const MAX_BATCH_SIZE = 20; // Max posts to process per tick
+const MAX_RETRIES = 3; // Max retry attempts before permanent failure
+const BACKOFF_BASE_MS = 2 * 60 * 1000; // 2 minutes — base for exponential backoff
 let isRunning = false;
+
+// ── Exponential backoff delay: 2min, 8min, 32min ──────────────────────────────
+function getBackoffDelay(retryCount) {
+    return BACKOFF_BASE_MS * Math.pow(4, retryCount); // 2m → 8m → 32m
+}
+
+// ── Determine if an error is retryable (transient) vs permanent ───────────────
+function isRetryableError(errorMessage) {
+    if (!errorMessage) return false;
+    const msg = errorMessage.toLowerCase();
+    // Permanent errors — do NOT retry
+    const permanentPatterns = [
+        'no active',         // No account connected
+        'token expired',     // Need to reconnect
+        'missing access',    // Missing credentials
+        'unsupported platform', // Platform not implemented
+        'require at least',  // Missing required media
+        'reconnect',         // Account needs reconnection
+        'permission',        // Insufficient permissions
+        'invalid_token',     // Token is invalid
+        'oauth',             // OAuth flow needed
+    ];
+    if (permanentPatterns.some(p => msg.includes(p))) return false;
+    // Everything else (rate limit, timeout, network, 500, etc.) is retryable
+    return true;
+}
 
 // ── Helper: format a datetime nicely ──────────────────────────────────────────
 function fmtDate(d) {
@@ -229,14 +257,41 @@ async function publishScheduledPost(post) {
         post.error = '';
         await post.save();
 
-        console.log(`[SCHEDULER] ✅ Published post ${post._id} to ${post.platform} — postId: ${postId}`);
+        console.log(`[SCHEDULER] ✅ Published post ${post._id} to ${post.platform} (${post.accountName || 'N/A'}) — postId: ${postId}`);
 
     } catch (err) {
-        console.error(`[SCHEDULER] ❌ Failed to publish post ${post._id}:`, err.message);
+        const errorMsg = err.message || 'Unknown publishing error';
+        console.error(`[SCHEDULER] ❌ Attempt ${(post.retryCount || 0) + 1} failed for post ${post._id} (${post.platform}):`, errorMsg);
         if (err.stack) console.error(err.stack);
-        post.status = 'failed';
-        post.error = err.message || 'Unknown publishing error';
-        await post.save();
+
+        const currentRetry = post.retryCount || 0;
+
+        // Check if the error is retryable and we haven't exceeded max retries
+        if (isRetryableError(errorMsg) && currentRetry < (post.maxRetries || MAX_RETRIES)) {
+            // Schedule retry with exponential backoff
+            const backoffMs = getBackoffDelay(currentRetry);
+            const nextRetryAt = new Date(Date.now() + backoffMs);
+
+            post.status = 'scheduled';  // Put back in the scheduled queue
+            post.retryCount = currentRetry + 1;
+            post.lastRetryAt = new Date();
+            post.scheduledFor = nextRetryAt;  // Reschedule with backoff delay
+            post.error = `Retry ${currentRetry + 1}/${post.maxRetries || MAX_RETRIES}: ${errorMsg} — next attempt at ${fmtDate(nextRetryAt)}`;
+            await post.save();
+
+            console.log(`[SCHEDULER] 🔄 Post ${post._id} scheduled for retry ${post.retryCount}/${post.maxRetries || MAX_RETRIES} at ${nextRetryAt.toISOString()} (backoff: ${Math.round(backoffMs / 60000)}min)`);
+        } else {
+            // Permanent failure — max retries exhausted or non-retryable error
+            post.status = 'failed';
+            post.error = currentRetry > 0
+                ? `Failed after ${currentRetry + 1} attempts: ${errorMsg}`
+                : errorMsg;
+            await post.save();
+
+            if (currentRetry > 0) {
+                console.warn(`[SCHEDULER] 💀 Post ${post._id} permanently failed after ${currentRetry + 1} attempts`);
+            }
+        }
     }
 }
 

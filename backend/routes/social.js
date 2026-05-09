@@ -962,19 +962,23 @@ router.put('/posts/:id/cancel', protect, async (req, res) => {
 router.get('/scheduled/diagnostic', protect, async (req, res) => {
     try {
         const userId = req.user._id;
-        const [counts, recentFailed, recentScheduled, accounts] = await Promise.all([
+        const [counts, recentFailed, recentScheduled, accounts, postsInRetry] = await Promise.all([
             SocialPost.aggregate([
                 { $match: { user: new mongoose.Types.ObjectId(userId) } },
                 { $group: { _id: '$status', count: { $sum: 1 } } },
             ]),
             SocialPost.find({ user: userId, status: 'failed' })
                 .sort({ updatedAt: -1 }).limit(10)
-                .select('platform accountName scheduledFor error caption updatedAt'),
+                .select('platform accountName scheduledFor error caption retryCount lastRetryAt updatedAt'),
             SocialPost.find({ user: userId, status: 'scheduled' })
                 .sort({ scheduledFor: 1 }).limit(10)
-                .select('platform accountName scheduledFor caption'),
+                .select('platform accountName scheduledFor caption retryCount'),
             SocialAccount.find({ user: userId })
                 .select('platform accountName accountId isActive tokenExpiresAt'),
+            // Posts currently in retry backoff (retryCount > 0 and still scheduled)
+            SocialPost.countDocuments({
+                user: userId, status: 'scheduled', retryCount: { $gt: 0 },
+            }),
         ]);
 
         const now = new Date();
@@ -983,11 +987,31 @@ router.get('/scheduled/diagnostic', protect, async (req, res) => {
             user: userId, status: 'scheduled', scheduledFor: { $lte: now },
         });
 
+        // Next scheduled post
+        const nextPost = recentScheduled[0] || null;
+        const nextPostIn = nextPost ? Math.round((new Date(nextPost.scheduledFor).getTime() - now.getTime()) / 60000) : null;
+
+        // Health status indicator
+        const expiredTokens = accounts.filter(a => a.tokenExpiresAt && a.tokenExpiresAt <= now);
+        let healthStatus = 'healthy';
+        if (expiredTokens.length > 0) healthStatus = 'warning';
+        if (overdue > 5) healthStatus = 'critical';
+        if (accounts.filter(a => a.isActive).length === 0) healthStatus = 'no_accounts';
+
         res.json({
             success: true,
             now: now.toISOString(),
+            healthStatus,
             statusCounts,
             overdueScheduled: overdue, // > 0 means scheduler isn't running, or is stuck
+            postsInRetry, // Posts waiting for retry backoff
+            nextScheduledPost: nextPost ? {
+                platform: nextPost.platform,
+                accountName: nextPost.accountName,
+                scheduledFor: nextPost.scheduledFor,
+                minutesUntil: nextPostIn,
+                isRetry: (nextPost.retryCount || 0) > 0,
+            } : null,
             accounts: accounts.map(a => ({
                 platform: a.platform,
                 accountName: a.accountName,
@@ -996,6 +1020,7 @@ router.get('/scheduled/diagnostic', protect, async (req, res) => {
                 tokenExpiresAt: a.tokenExpiresAt,
                 tokenExpired: !!(a.tokenExpiresAt && a.tokenExpiresAt <= now),
             })),
+            expiredTokenCount: expiredTokens.length,
             recentFailed,
             upcoming: recentScheduled,
         });

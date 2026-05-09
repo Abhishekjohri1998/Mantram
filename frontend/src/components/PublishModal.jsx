@@ -129,6 +129,11 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
         )
     }
 
+    const selectAllAccounts = () => {
+        const allIds = accounts.map(a => a._id)
+        setSelectedAccounts(prev => prev.length === allIds.length ? [] : allIds)
+    }
+
     const getSelectedPlatforms = () => {
         const selected = accounts.filter(a => selectedAccounts.includes(a._id))
         return [...new Set(selected.map(a => a.platform))]
@@ -271,10 +276,22 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
     const selectedPlatforms = getSelectedPlatforms()
     const isCarouselMode = Array.isArray(imageUrls) && imageUrls.length > 1
 
+    // Format a Date object as local datetime-local value (YYYY-MM-DDTHH:MM)
+    // This avoids the timezone bug where toISOString().slice(0,16) produces UTC times
+    // but datetime-local interprets them as local time.
+    const toLocalDatetimeValue = (d) => {
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        const hours = String(d.getHours()).padStart(2, '0')
+        const minutes = String(d.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+
     const getMinDateTime = () => {
         const now = new Date()
         now.setMinutes(now.getMinutes() + 5)
-        return now.toISOString().slice(0, 16)
+        return toLocalDatetimeValue(now)
     }
 
     return (
@@ -519,10 +536,23 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
 
                             {/* ── Account Selection ── */}
                             <div>
-                                <h4 className="text-xs font-bold text-[var(--sys-text-muted)] mb-3 uppercase tracking-widest flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-primary">group</span>
-                                    Select Accounts
-                                </h4>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-primary">group</span>
+                                        Select Accounts
+                                    </h4>
+                                    {accounts.length > 0 && (
+                                        <button
+                                            onClick={selectAllAccounts}
+                                            className="text-[11px] font-bold text-primary hover:text-primary/80 cursor-pointer transition-colors flex items-center gap-1"
+                                        >
+                                            <span className="material-symbols-outlined text-xs">
+                                                {selectedAccounts.length === accounts.length ? 'deselect' : 'select_all'}
+                                            </span>
+                                            {selectedAccounts.length === accounts.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
                                 {loading ? (
                                     <div className="py-8 text-center"><span className="material-symbols-outlined animate-spin text-primary">progress_activity</span></div>
                                 ) : accounts.length === 0 ? (
@@ -753,7 +783,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                         return d
                                                     }
                                                     const optDate = getDate()
-                                                    const optVal = optDate.toISOString().slice(0, 16)
+                                                    const optVal = toLocalDatetimeValue(optDate)
                                                     const isActive = scheduledFor === optVal
                                                     return (
                                                         <button key={opt.label} onClick={() => setScheduledFor(optVal)}

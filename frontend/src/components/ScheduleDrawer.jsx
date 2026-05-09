@@ -18,6 +18,9 @@ const PLATFORM_META = {
     instagram: { label: 'Instagram', icon: 'photo_camera',  color: '#E1306C' },
     facebook:  { label: 'Facebook',  icon: 'thumb_up',      color: '#1877F2' },
     linkedin:  { label: 'LinkedIn',  icon: 'work',          color: '#0A66C2' },
+    twitter:   { label: 'Twitter / X', icon: 'alternate_email', color: '#1DA1F2' },
+    tiktok:    { label: 'TikTok',    icon: 'music_note',    color: '#010101' },
+    gbp:       { label: 'Google Business', icon: 'location_on', color: '#4285F4' },
 }
 
 function pad2(n) { return String(n).padStart(2, '0') }
@@ -72,6 +75,21 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
     const toggleAcct = (id) => setSelAccts(prev =>
         prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
+
+    const selectAllAccounts = () => {
+        const allIds = accounts.map(a => a._id)
+        setSelAccts(prev => prev.length === allIds.length ? [] : allIds)
+    }
+
+    const selectAllForPlatform = (platform) => {
+        const platformIds = accounts.filter(a => a.platform === platform).map(a => a._id)
+        const allSelected = platformIds.every(id => selAccts.includes(id))
+        if (allSelected) {
+            setSelAccts(prev => prev.filter(id => !platformIds.includes(id)))
+        } else {
+            setSelAccts(prev => [...new Set([...prev, ...platformIds])])
+        }
+    }
 
     const handleSchedule = async () => {
         if (!selAccts.length) { setError('Select at least one account'); return }
@@ -155,9 +173,22 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
 
                     {/* Accounts */}
                     <div>
-                        <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">
-                            Publish To
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider">
+                                Publish To
+                            </label>
+                            {accounts.length > 0 && (
+                                <button
+                                    onClick={selectAllAccounts}
+                                    className="text-[11px] font-bold text-primary hover:text-primary/80 cursor-pointer transition-colors flex items-center gap-1"
+                                >
+                                    <span className="material-symbols-outlined text-xs">
+                                        {selAccts.length === accounts.length ? 'deselect' : 'select_all'}
+                                    </span>
+                                    {selAccts.length === accounts.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                            )}
+                        </div>
                         {accounts.length === 0 ? (
                             <div className="rounded-xl border border-[var(--sys-border)] bg-[var(--sys-surface)] p-4 text-xs text-[var(--sys-text-muted)] text-center">
                                 <span className="material-symbols-outlined block text-2xl mb-1 text-[var(--sys-text-muted)]">link_off</span>
@@ -165,32 +196,53 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
                                 <a href="/integrations" className="text-primary underline mt-1 inline-block">Connect accounts →</a>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {Object.entries(grouped).map(([platform, accts]) => {
                                     const meta = PLATFORM_META[platform] || { label: platform, icon: 'share', color: '#888' }
-                                    return accts.map(acct => {
-                                        const isSelected = selAccts.includes(acct._id)
-                                        return (
+                                    const platformAllSelected = accts.every(a => selAccts.includes(a._id))
+                                    return (
+                                        <div key={platform}>
+                                            {/* Platform group header */}
                                             <button
-                                                key={acct._id}
-                                                onClick={() => toggleAcct(acct._id)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer text-left ${
-                                                    isSelected
-                                                        ? 'border-primary/40 bg-primary/5 text-[var(--sys-text)]'
-                                                        : 'border-[var(--sys-border)] hover:border-primary/20 text-[var(--sys-text-muted)]'
-                                                }`}
+                                                onClick={() => selectAllForPlatform(platform)}
+                                                className="w-full flex items-center gap-2 mb-1.5 px-1 text-left cursor-pointer group"
                                             >
-                                                <span className="material-symbols-outlined text-lg" style={{ color: isSelected ? meta.color : '' }}>{meta.icon}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-semibold">{meta.label}</p>
-                                                    <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{acct.accountName}</p>
-                                                </div>
-                                                <span className={`material-symbols-outlined text-sm ${isSelected ? 'text-primary' : 'text-[var(--sys-border)]'}`}>
-                                                    {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                                                <span className="material-symbols-outlined text-sm" style={{ color: meta.color }}>{meta.icon}</span>
+                                                <span className="text-[11px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider flex-1">{meta.label}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                                                    platformAllSelected ? 'bg-primary/15 text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] group-hover:text-primary'
+                                                }`}>
+                                                    {platformAllSelected ? '✓ All' : `Select ${accts.length > 1 ? 'all' : ''}`}
                                                 </span>
                                             </button>
-                                        )
-                                    })
+                                            {/* Accounts for this platform */}
+                                            <div className="space-y-1.5">
+                                                {accts.map(acct => {
+                                                    const isSelected = selAccts.includes(acct._id)
+                                                    return (
+                                                        <button
+                                                            key={acct._id}
+                                                            onClick={() => toggleAcct(acct._id)}
+                                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer text-left ${
+                                                                isSelected
+                                                                    ? 'border-primary/40 bg-primary/5 text-[var(--sys-text)]'
+                                                                    : 'border-[var(--sys-border)] hover:border-primary/20 text-[var(--sys-text-muted)]'
+                                                            }`}
+                                                        >
+                                                            <span className="material-symbols-outlined text-lg" style={{ color: isSelected ? meta.color : '' }}>{meta.icon}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-xs font-semibold">{meta.label}</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)] truncate">{acct.accountName}</p>
+                                                            </div>
+                                                            <span className={`material-symbols-outlined text-sm ${isSelected ? 'text-primary' : 'text-[var(--sys-border)]'}`}>
+                                                                {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                                                            </span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )
                                 })}
                             </div>
                         )}

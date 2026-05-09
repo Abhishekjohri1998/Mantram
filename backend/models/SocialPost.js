@@ -52,6 +52,11 @@ const socialPostSchema = new mongoose.Schema({
     calendarItemId:   { type: String, default: null },       // Strategy calendarItem._id (string)
     strategyId:       { type: mongoose.Schema.Types.ObjectId, ref: 'MonthlyStrategy', default: null },
 
+    // Retry tracking — used by scheduledPostPublisher for exponential backoff
+    retryCount:  { type: Number, default: 0 },   // Number of publish attempts so far
+    lastRetryAt: { type: Date, default: null },   // When the last retry was attempted
+    maxRetries:  { type: Number, default: 3 },    // Max retries before permanent failure
+
     // Reminder tracking — used by scheduledPostPublisher to send 1-hr email
     reminderSentAt: { type: Date, default: null },
 
