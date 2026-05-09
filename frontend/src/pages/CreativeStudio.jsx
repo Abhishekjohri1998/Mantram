@@ -7590,7 +7590,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     }, ...prev])
                                 }
                                 // Close panel after a short delay so user can see the result in panel first
-                                setTimeout(() => setFitPanelTemplate(null), 2500)
+                                // setTimeout(() => setFitPanelTemplate(null), 2500) // BUG-FIX: Disabled auto-close so user can download/view result
                             }}
                         />
                     )}
