@@ -82,26 +82,7 @@ export default function ActionDemo() {
                         className="absolute inset-0 w-full h-full object-cover z-10"
                     />
 
-                    {/* Top Left Badge */}
-                    <div className="absolute top-6 left-6 z-20">
-                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-xs font-bold tracking-wider text-white">LIVE PREVIEW</span>
-                        </div>
-                    </div>
 
-                    {/* Bottom Metadata */}
-                    <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-black/80 to-transparent">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h3 className="text-white text-xl font-bold mb-1">End-to-end Campaign Generation</h3>
-                                <p className="text-[#a1a1aa] text-sm">Featuring: Creative Studio, Video Studio, Pulse</p>
-                            </div>
-                            <span className="text-white font-medium bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
-                                01:30
-                            </span>
-                        </div>
-                    </div>
                 </motion.div>
             </div>
 
