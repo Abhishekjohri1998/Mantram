@@ -3451,89 +3451,65 @@ router.post('/campaign-shot', protect, requireStudio('creativeStudio'), requireC
             }
         }
 
-        // ── Step 2: AI Art Director — Build the campaign shot prompt ──
-        // This is the "Creative Director" brain that uses the formula
-        const MOOD_PRESETS = {
-            'dark-botanical': {
-                env: 'dark botanical setting, deep green leaves fading into shadow, subtle mist, rich foliage',
-                lighting: 'low-key cinematic, soft top light with green rim highlights, deep shadows',
-                surface: 'dark wet stone with subtle reflections',
-                palette: 'deep green, black, emerald',
-            },
-            'aqua-mist': {
-                env: 'dark aqua atmosphere, floating water droplets, light mist, deep underwater mood',
-                lighting: 'cold cinematic, blue rim highlights, deep contrast, iceberg tones',
-                surface: 'reflective wet base, glossy dark blue',
-                palette: 'deep blue, cyan, black, aqua',
-            },
-            'charcoal-industrial': {
-                env: 'deep black charcoal setting, minimal industrial haze, raw texture background',
-                lighting: 'sharp directional light, strong highlights on product edges, deep dramatic shadows',
-                surface: 'matte black with subtle brushed metal reflection',
-                palette: 'black, dark grey, deep charcoal blue',
-            },
-            'warm-glow': {
-                env: 'dark backdrop with soft warm amber/orange glow diffusion, bokeh light orbs',
-                lighting: 'soft warm cinematic highlights, candle-warm tones, gentle rim light',
-                surface: 'glossy dark base with warm golden reflection',
-                palette: 'black, warm orange, gold, cream white',
-            },
-            'luxury-noir': {
-                env: 'deep noir atmosphere, soft studio smoke, ultra-dark background with controlled light spill',
-                lighting: 'high-fashion editorial: single hard key light + soft fill, strong shadows with detail',
-                surface: 'black marble or lacquered obsidian surface, mirror reflection',
-                palette: 'black, silver, deep navy, platinum',
-            },
-            'custom': {
-                env: brief || 'premium product setting, cinematic atmosphere',
-                lighting: 'cinematic, professional studio',
-                surface: 'premium dark surface',
-                palette: brandColors.map(c => c.name || c.hex || 'brand color').join(', ') || 'brand palette',
-            },
-        };
+        // ── Step 2: AI Art Director — Generates UNIQUE creative direction each time ──
+        // No hardcoded mood presets. The AI generates a fresh, contextual mood for every
+        // generation based on brand DNA, product type, user brief, and variation profile.
+        // This ensures genuinely diverse creative output — no two shots look the same.
 
-        const mood = MOOD_PRESETS[moodPreset] || MOOD_PRESETS['dark-botanical'];
-
-        // Auto-detect color palette from brand if not custom
-        const paletteStr = moodPreset !== 'custom' && brandColors.length > 0
-            ? `${mood.palette}, accented by ${brandColors.slice(0, 2).map(c => c.name || c.hex).join(', ')}`
-            : mood.palette;
-
-        // ── AI Agent: Extract product identity + generate taglines ──
+        // ── AI Agent: Extract product identity + generate taglines + generate mood ──
         let detectedProductName = productName || '';
         let tagline1 = primaryTagline || '';
         let tagline2 = secondaryTagline || '';
         let detectedCategory = brandCategory;
+        // AI-generated mood (unique every time)
+        let aiMood = {
+            env: 'premium cinematic product setting, atmospheric depth, volumetric light',
+            lighting: 'cinematic studio lighting with dramatic contrast and rim highlights',
+            surface: 'premium reflective surface with subtle material texture',
+            palette: brandColors.length > 0
+                ? brandColors.slice(0, 3).map(c => c.name || c.hex).join(', ')
+                : 'premium dark tones with selective highlights',
+        };
 
         try {
             const aiRouter = getRouter();
-            const agentPrompt = `You are a world-class Creative Director and Copywriter for premium brand advertising.
+            const agentPrompt = `You are a world-class Creative Director, Cinematographer, and Copywriter for premium brand advertising.
 
 Brand: ${brandName}
 Industry/Category: ${brandCategory}
 Brand Description: ${brandDescription}
 Brand Tagline: ${brandTagline}
+Brand Colors: ${brandColors.length > 0 ? brandColors.map(c => c.name || c.hex).join(', ') : 'not specified'}
 Product Name (if known): ${detectedProductName || 'detect from context'}
 User Brief: ${brief || 'cinematic product poster, brand campaign'}
 
 Your task: Generate the PERFECT art direction elements for a cinematic product advertisement poster.
+Be ORIGINAL and UNIQUE — do NOT default to generic dark botanical/noir/moody looks every time.
+Draw inspiration from the brand's actual industry, the product's personality, and the user's brief.
+Think like a Cannes Lions art director — surprise, delight, innovate.
 
 Return ONLY valid JSON:
 {
-  "productName": "detected or refined product name (e.g. 'Neem Face Wash')",
-  "category": "product category in CAPS (e.g. 'FMCG', 'SKINCARE', 'BEVERAGE', 'ELECTRONICS')",
-  "tagline1": "primary brand tagline (4-6 words max, powerful, e.g. 'PURE HERBAL CARE')",
-  "tagline2": "secondary descriptive line (3-5 words, e.g. 'Neem Powered Clean')",
-  "perspectiveTypo": "single brand word for large perspective typography (usually brand name in CAPS)",
-  "productDescription": "one sentence description of the product for prompt context (for the AI image model)",
-  "arrangementNote": "how to arrange the products: upright + open/angled for maximum visual impact"
+  "productName": "detected or refined product name",
+  "category": "product category in CAPS (e.g. 'SKINCARE', 'BEVERAGE', 'ELECTRONICS')",
+  "tagline1": "primary brand tagline (4-6 words max, powerful)",
+  "tagline2": "secondary descriptive line (3-5 words)",
+  "perspectiveTypo": "single brand word for large perspective typography",
+  "productDescription": "one sentence description of the product for prompt context",
+  "arrangementNote": "how to arrange the products for maximum visual impact",
+  "mood": {
+    "env": "a SPECIFIC, VIVID, UNIQUE environment/scene description (15-30 words). Be creative — don't always default to 'dark moody'. Consider: sunlit terrazzo, golden hour desert, rain-soaked neon streets, frosted glass atelier, volcanic obsidian cave, tropical sunrise, etc.",
+    "lighting": "specific lighting setup description (10-20 words). Vary between: butterfly lighting, Rembrandt, split light, golden hour backlight, neon cross-light, overhead softbox, natural window light, etc.",
+    "surface": "the surface/base the product sits on (8-15 words). Be inventive — wet marble, cracked earth, silk drape, terrazzo, raw concrete, frosted glass, etc.",
+    "palette": "3-5 specific color names that suit THIS brand and THIS mood (not always dark). Use the brand's actual colors when relevant."
+  }
 }`;
 
             const aiResult = await aiRouter.generateText({
-                systemPrompt: 'You are a creative director. Output valid JSON only. No markdown, no explanation.',
+                systemPrompt: 'You are a creative director. Output valid JSON only. No markdown, no explanation. Be CREATIVE and VARIED — never repeat the same mood twice.',
                 userPrompt: agentPrompt,
-                temperature: 0.5,
-                maxTokens: 512,
+                temperature: 0.85,
+                maxTokens: 700,
             });
 
             const aiText = (aiResult.text || '').replace(/```json|```/gi, '').trim();
@@ -3544,13 +3520,28 @@ Return ONLY valid JSON:
                 tagline1 = primaryTagline || parsed.tagline1 || brandTagline || 'PREMIUM QUALITY';
                 tagline2 = secondaryTagline || parsed.tagline2 || '';
                 detectedCategory = parsed.category || brandCategory;
+                // Extract AI-generated mood
+                if (parsed.mood) {
+                    aiMood = {
+                        env: parsed.mood.env || aiMood.env,
+                        lighting: parsed.mood.lighting || aiMood.lighting,
+                        surface: parsed.mood.surface || aiMood.surface,
+                        palette: parsed.mood.palette || aiMood.palette,
+                    };
+                }
                 console.log(`   🎯 AI Art Director: ${detectedProductName} | ${tagline1} | ${tagline2}`);
+                console.log(`   🎨 AI Mood: env="${aiMood.env.substring(0, 60)}..." | palette="${aiMood.palette}"`);
             }
         } catch (agentErr) {
             console.warn('⚠️ Campaign Shot AI agent failed, using fallbacks:', agentErr.message);
             detectedProductName = productName || brandName;
             tagline1 = primaryTagline || brandTagline || 'PREMIUM QUALITY';
             tagline2 = secondaryTagline || 'Crafted for Excellence';
+        }
+
+        // If user provided a custom brief, weave it into the AI mood
+        if (brief && brief.trim()) {
+            aiMood.env = `${brief.trim()} — ${aiMood.env}`;
         }
 
         // ── Variation Profiles: each index produces a distinct creative direction ──
@@ -3628,7 +3619,7 @@ The STYLE from the style reference image must define the entire visual world aro
 Do NOT default to a generic cinematic look — commit fully to the style of the reference image.
 ═════════════════════════════════════════════════════════════` : '';
 
-        const masterPrompt = `Cinematic moody ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+        const masterPrompt = `Cinematic ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
 ${imageRefBlock}
 ${styleRefBlock}
@@ -3638,9 +3629,9 @@ ${variation.compositionNote}
 
 BRANDING (top center): ${brandName} logo area, product name "${detectedProductName}" in clean brand typography${brandFont !== 'modern sans-serif' ? `, using ${brandFont} font family` : ''}
 
-ENVIRONMENT: ${hasRef ? 'Derive from style reference image' : mood.env}
+ENVIRONMENT: ${hasRef ? 'Derive from style reference image' : aiMood.env}
 
-LIGHTING: ${hasRef ? 'Derive from style reference image' : mood.lighting}
+LIGHTING: ${hasRef ? 'Derive from style reference image' : aiMood.lighting}
 
 PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth
 
@@ -3648,7 +3639,7 @@ SECONDARY TYPOGRAPHY (clean brand font):
 "${tagline1}"
 "${tagline2}"
 
-SURFACE: ${hasRef ? 'Derive from style reference image' : mood.surface}
+SURFACE: ${hasRef ? 'Derive from style reference image' : aiMood.surface}
 
 COLOR PALETTE: ${hasRef ? 'Derive from style reference image — do not override with preset colors' : paletteStr}
 
@@ -3873,7 +3864,7 @@ ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`;
 Brand: ${brandName}
 Product: ${detectedProductName}
 Variation Style: ${variation.label} — ${variation.copyVoice}
-Mood: ${moodPreset || 'dark-botanical'} — ${mood.env}
+Mood: ${aiMood.env}
 Primary Tagline: ${tagline1}
 Secondary Tagline: ${tagline2}
 Brief: ${brief || 'premium brand campaign'}

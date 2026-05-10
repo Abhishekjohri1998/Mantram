@@ -11309,26 +11309,19 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* ── 3. Mood Preset — dropdown ── */}
+                            {/* ── 3. Creative Direction — AI Art Director brief ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Cinematic Mood</p>
-                                <div className="relative">
-                                    <select value={csMoodPreset} onChange={e => setCsMoodPreset(e.target.value)}
-                                        className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="dark-botanical">Dark Botanical — Deep greens, moody forest</option>
-                                        <option value="aqua-mist">Aqua Mist — Dark aqua, water droplets</option>
-                                        <option value="charcoal-industrial">Charcoal Industrial — Raw black, sharp edges</option>
-                                        <option value="warm-glow">Warm Glow — Amber, bokeh, candlelight</option>
-                                        <option value="luxury-noir">Luxury Noir — Black marble, editorial</option>
-                                        <option value="custom">Custom — Write your own brief</option>
-                                    </select>
-                                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
-                                </div>
-                                {csMoodPreset === 'custom' && (
-                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
-                                        placeholder="Describe your scene, mood, colors... e.g. 'Monsoon rain, deep blue tones, bokeh'"
-                                        className="mt-2 w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />
-                                )}
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">palette</span> Creative Direction
+                                    <span className="text-[9px] opacity-50 ml-1">AI auto-directs if left blank</span>
+                                </p>
+                                <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
+                                    placeholder="Describe your vision... e.g. 'Monsoon rain, deep blue tones' or 'Sunlit terrazzo, golden hour warmth' or 'Diwali festive theme with diyas'"
+                                    className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />
+                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1.5 opacity-60">
+                                    <span className="material-symbols-outlined text-[10px] align-middle mr-0.5">auto_awesome</span>
+                                    AI Art Director creates a unique mood, lighting & palette for every shot
+                                </p>
                             </div>
 
                             {/* ── 4. Canvas Size — dropdown ── */}
@@ -11363,17 +11356,6 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
 
-                            {/* ── 5. Optional Brief (non-custom moods) ── */}
-                            {csMoodPreset !== 'custom' && (
-                                <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[13px]">edit_note</span> Additional Brief <span className="text-[9px] opacity-50 ml-1">optional</span>
-                                    </p>
-                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
-                                        placeholder="e.g. 'Feature the product with morning dew drops' or 'Add Diwali festive feel'"
-                                        className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[60px] focus:border-primary/40 transition-all" />
-                                </div>
-                            )}
 
                             {/* ── 6. Taglines — optional override ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
