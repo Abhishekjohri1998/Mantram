@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { useUI } from '../context/UIContext';
 import TagInput from '../components/shared/TagInput';
+import { useModelStatus } from '../hooks/useModelStatus';
 
 // --- Prompt Display Block ---
 function PromptBlock({ text }) {
@@ -95,6 +96,7 @@ const SECTIONS_BY_STUDIO = {
 
 const TemplateManager = () => {
     const { addToast } = useUI();
+    const modelStatuses = useModelStatus();
 
     // Top-level tab
     const [activeTab, setActiveTab] = useState('templates'); // 'templates' | 'categories'
@@ -1083,12 +1085,24 @@ const TemplateManager = () => {
                                                 <>
                                                     {(!isImgCat) && (
                                                         <optgroup label="Video Models">
-                                                            {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                            {VIDEO_MODELS.map(m => {
+                                                                const s = modelStatuses[m.value];
+                                                                const label = s && s.status !== 'healthy'
+                                                                    ? `${m.label} (${s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'})`
+                                                                    : m.label;
+                                                                return <option key={m.value} value={m.value}>{label}</option>
+                                                            })}
                                                         </optgroup>
                                                     )}
                                                     {(!isVidCat) && (
                                                         <optgroup label="Image Models">
-                                                            {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                            {IMAGE_MODELS.map(m => {
+                                                                const s = modelStatuses[m.value];
+                                                                const label = s && s.status !== 'healthy'
+                                                                    ? `${m.label} (${s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'})`
+                                                                    : m.label;
+                                                                return <option key={m.value} value={m.value}>{label}</option>
+                                                            })}
                                                         </optgroup>
                                                     )}
                                                 </>

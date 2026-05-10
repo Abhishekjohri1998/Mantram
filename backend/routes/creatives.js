@@ -4704,4 +4704,79 @@ router.get('/carousel/:carouselId', protect, async (req, res) => {
 });
 
 
+router.get('/model-status', protect, async (req, res) => {
+    try {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        
+        // Find jobs in the last hour (both images and videos)
+        const jobs = await GenerationJob.aggregate([
+            { $match: { type: { $in: ['ai-create', 'video', 'video-generate'] }, createdAt: { $gte: oneHourAgo } } },
+            { 
+                $group: { 
+                    _id: { $ifNull: ["$options.imageModel", { $ifNull: ["$options.model", "$options.videoModel"] }] },
+                    total: { $sum: 1 },
+                    failed: { $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] } },
+                    completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+                    totalTimeMs: { 
+                        $sum: { 
+                            $cond: [
+                                { $and: [{ $eq: ["$status", "completed"] }, { $ne: [{ $type: "$completedAt" }, "missing"] }, { $ne: [{ $type: "$startedAt" }, "missing"] }] },
+                                { $subtract: ["$completedAt", "$startedAt"] },
+                                0
+                            ] 
+                        } 
+                    }
+                }
+            }
+        ]);
+
+        const statuses = {};
+        
+        jobs.forEach(job => {
+            const modelId = job._id || 'nanobanana-2'; // default fallback if null
+            const completed = job.completed;
+            const failed = job.failed;
+            const total = job.total;
+            const avgTimeMs = completed > 0 ? job.totalTimeMs / completed : 0;
+            const avgTimeSec = Math.round(avgTimeMs / 1000);
+            const failRate = total > 0 ? failed / total : 0;
+            
+            let status = 'healthy';
+            let message = '';
+            
+            // Define thresholds
+            if (avgTimeSec > 120 || failRate > 0.5) {
+                status = 'overloaded';
+                message = `Experiencing heavy load (~${Math.max(avgTimeSec, 120)}s)`;
+            } else if (avgTimeSec > 45 || failRate > 0.2) {
+                status = 'busy';
+                message = `High traffic (~${Math.max(avgTimeSec, 45)}s)`;
+            }
+
+            statuses[modelId] = {
+                status,
+                avgTimeSeconds: avgTimeSec,
+                failureRate: failRate,
+                message
+            };
+        });
+
+        // Add defaults for models without recent data
+        const defaultModels = [
+            'nanobanana-2', 'nanobanana-pro', 'flux-pro-v1.1', 'flux-2-pro', 'gpt-image-2', 'grok-imagen', 'seedream-5', 'ideogram', 'gpt-image-1', 'recraft-v4',
+            'seedance-2.0', 'kling-v2-master', 'wan-2.1', 'luma-ray-2', 'happyhorse-1.0', 'gemini-image', 'kling-3.0', 'veo-3.1'
+        ];
+        defaultModels.forEach(m => {
+            if (!statuses[m]) {
+                statuses[m] = { status: 'healthy', avgTimeSeconds: 15, failureRate: 0, message: '' };
+            }
+        });
+
+        res.json({ success: true, statuses });
+    } catch (error) {
+        console.error('❌ Error fetching model status:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 export default router;

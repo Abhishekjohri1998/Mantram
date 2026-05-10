@@ -9,6 +9,7 @@ import TemplateFitPanel from '../components/TemplateFitPanel'
 import TemplateCreateFlow from '../components/TemplateCreateFlow'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
+import { useModelStatus } from '../hooks/useModelStatus'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
@@ -442,6 +443,7 @@ export default function CreativeStudio() {
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
     const { user } = useAuth()
+    const modelStatuses = useModelStatus()
     const [searchParams, setSearchParams] = useSearchParams()
 
     // ── Global State ──
@@ -3103,11 +3105,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="relative">
                                                         <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
                                                             className="input-glass w-full py-3 px-4 pl-11 text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] focus:border-[#FF4D00] transition-colors rounded-xl outline-none appearance-none shadow-sm cursor-pointer hover:bg-[var(--sys-surface-hover)]">
-                                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => {
+                                                                const s = modelStatuses[id];
+                                                                const hasWarning = s && s.status !== 'healthy';
+                                                                const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                                return (
                                                                 <option key={id} value={id}>
-                                                                    {m.name} — {m.desc}
+                                                                    {m.name} {hasWarning ? `[${warningLabel}]` : `— ${m.desc}`}
                                                                 </option>
-                                                            ))}
+                                                                )
+                                                            })}
                                                         </select>
                                                         <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">{ANIMATE_MODELS[animateModel]?.icon || 'memory'}</span>
                                                         <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none">expand_more</span>
@@ -4291,20 +4298,26 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {showModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-surface)] rounded-xl shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[220px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-primary)]/10 text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]')}>
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '14px' }}>auto_awesome</span>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-semibold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--sys-primary)', color: 'white' }}>NEW</span>}
                                                             </div>
                                                             <span className="text-[9px] opacity-50 truncate block">{m.provider}</span>
                                                         </div>
                                                         {imageModel === m.id && <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: '14px' }}>check</span>}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -4654,7 +4667,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {showModelMenu && (
                                             <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-50 border border-[var(--sys-border)] overflow-hidden">
                                                 <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                                    {IMAGE_MODELS.map(m => (
+                                                    {IMAGE_MODELS.map(m => {
+                                                        const s = modelStatuses[m.id];
+                                                        const hasWarning = s && s.status !== 'healthy';
+                                                        const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                        return (
                                                         <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                             className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                             <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -4663,13 +4680,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                    {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                     {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
                                                                 </div>
                                                                 <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
                                                             </div>
                                                             {imageModel === m.id && <span className="material-symbols-outlined text-[secondary] text-[11px]">check</span>}
                                                         </button>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
@@ -5819,9 +5838,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <label className="text-[10px] font-semibold text-[var(--sys-text-muted)] mb-1 block">Model</label>
                                         <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
                                             className="w-full px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:outline-none cursor-pointer">
-                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
-                                                <option key={id} value={id}>{m.name}</option>
-                                            ))}
+                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => {
+                                                const s = modelStatuses[id];
+                                                const hasWarning = s && s.status !== 'healthy';
+                                                const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                return (
+                                                <option key={id} value={id}>{m.name} {hasWarning ? `[${warningLabel}]` : ''}</option>
+                                                )
+                                            })}
                                         </select>
                                     </div>
                                     <div>
@@ -6051,7 +6075,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="ml-auto text-[10px] text-[var(--sys-text-muted)] font-normal">Affects style &amp; quality</span>
                                 </h3>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {LOGO_IMAGE_MODELS.map(m => (
+                                    {LOGO_IMAGE_MODELS.map(m => {
+                                        const s = modelStatuses[m.id];
+                                        const hasWarning = s && s.status !== 'healthy';
+                                        const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                        return (
                                         <button
                                             key={m.id}
                                             onClick={() => setLogoImageModel(m.id)}
@@ -6067,11 +6095,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <span className="flex items-center gap-1.5">
                                                 <span className="material-symbols-outlined !text-sm" style={{ color: m.color }}>{m.icon}</span>
                                                 <span className="text-[11px] font-bold leading-none">{m.name}</span>
+                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                 {m.isNew && <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1 rounded font-bold">NEW</span>}
                                             </span>
                                             <span className="text-[9px] text-[var(--sys-text-muted)] leading-tight pl-5">{m.desc}</span>
                                         </button>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
 
@@ -6502,7 +6532,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {showModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                         <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -6511,6 +6545,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
                                                             </div>
                                                             <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
@@ -6521,7 +6556,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         )}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -11215,7 +11251,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {showCsModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[260px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setCsModel(m.id); setShowCsModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (csModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                         <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -11224,13 +11264,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f' }}>NEW</span>}
                                                             </div>
                                                             <div className="text-[9px] opacity-50 truncate">{m.provider} · {m.desc}</div>
                                                         </div>
                                                         {csModel === m.id && <span className="material-symbols-outlined text-[14px]" style={{ color: m.color }}>check</span>}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
