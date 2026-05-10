@@ -32,20 +32,29 @@ const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
 
 // BUG-3 FIX: Sign OAuth state with HMAC to prevent tampering
+// Uses '|' as delimiter — safe because base64 and hex never contain pipes.
 function signState(payload) {
     const secret = config.jwtSecret || 'dev-secret';
     const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex').substring(0, 16);
-    return `${payload}:${hmac}`;
+    return `${payload}|${hmac}`;
 }
 function verifyState(signedState) {
-    const parts = signedState.split(':');
-    if (parts.length < 4) return null; // userId:platform:origin:hmac
-    const hmac = parts.pop();
-    const payload = parts.join(':');
+    if (!signedState) return null;
+    const lastPipe = signedState.lastIndexOf('|');
+    if (lastPipe === -1) return null;
+    const hmac = signedState.substring(lastPipe + 1);
+    const payload = signedState.substring(0, lastPipe);
     const secret = config.jwtSecret || 'dev-secret';
     const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex').substring(0, 16);
     if (hmac !== expected) return null;
-    return parts; // [userId, platform, originBase64]
+    // payload = userId:platform:base64Origin — split on first two colons only
+    const firstColon = payload.indexOf(':');
+    const secondColon = payload.indexOf(':', firstColon + 1);
+    if (firstColon === -1 || secondColon === -1) return null;
+    const userId = payload.substring(0, firstColon);
+    const platform = payload.substring(firstColon + 1, secondColon);
+    const originBase64 = payload.substring(secondColon + 1);
+    return [userId, platform, originBase64];
 }
 // BUG-10 FIX: Validate redirect URL against whitelist
 function getSafeRedirectUrl(base64Origin) {
