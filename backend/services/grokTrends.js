@@ -356,7 +356,38 @@ Return 6-10 content suggestions. Make them SPECIFIC and ACTIONABLE.`,
         setCache(cacheKey, result);
         console.log(`📝 Grok: Generated ${result.suggestions.length} content suggestions for ${brandName}`);
     }
-    return result || { suggestions: [], weeklyTheme: '', avoidTopics: [] };
+
+    // Fallback suggestions when Grok API fails — contextual to the brand
+    return result || {
+        suggestions: [
+            {
+                title: `Behind the Scenes at ${brandName}`,
+                platform: 'instagram',
+                format: 'reel',
+                hook: `Ever wondered what goes on behind the scenes? Here's a peek 👀`,
+                viralPotential: 'medium',
+                trendConnection: 'Authenticity trend',
+            },
+            {
+                title: `Why ${industry} is Changing in 2026`,
+                platform: 'linkedin',
+                format: 'post',
+                hook: `The ${industry} landscape is shifting fast. Here's what you need to know`,
+                viralPotential: 'medium',
+                trendConnection: 'Industry thought leadership',
+            },
+            {
+                title: `3 Tips Your Customers Wish You Knew`,
+                platform: 'instagram',
+                format: 'carousel',
+                hook: `Your customers are thinking this — but not saying it`,
+                viralPotential: 'high',
+                trendConnection: 'Value-driven content',
+            },
+        ],
+        weeklyTheme: 'Build trust through authentic storytelling',
+        avoidTopics: [],
+    };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
