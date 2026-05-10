@@ -758,6 +758,8 @@ router.get('/enhanced', protect, async (req, res) => {
         const tomorrowEnd   = new Date(todayEnd);   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
 
         const baseFilter = { user: userId, ...(brandId ? { brand: brandId } : {}) };
+        // SocialAccount is user-scoped (no brand field in schema), so query with user only
+        const socialFilter = { user: userId };
 
         const [
             activity,
@@ -770,7 +772,7 @@ router.get('/enhanced', protect, async (req, res) => {
         ] = await Promise.allSettled([
             getStudioActivity(userId, brandId),
             computeStreak(userId),
-            SocialAccount.find(baseFilter).select('platform accountId accountName accessToken createdAt').lean().catch(() => []),
+            SocialAccount.find(socialFilter).select('platform accountId accountName accessToken createdAt').lean().catch(() => []),
             SocialPost.find({ ...baseFilter, scheduledFor: { $gte: todayStart, $lte: todayEnd } })
                 .sort({ scheduledFor: 1 }).limit(10)
                 .select('platform caption scheduledFor status postId accountId accountName').lean().catch(() => []),
