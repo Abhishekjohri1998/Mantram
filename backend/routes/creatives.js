@@ -3597,41 +3597,85 @@ Return ONLY valid JSON:
         }
 
         if (hasRef) {
-            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (STYLE REFERENCE): Match the mood, color palette, composition style, lighting approach, and cinematic feel of this reference image. Use it as the visual direction guide while keeping the product as the hero element.\n`;
+            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (TEMPLATE — LAYOUT BLUEPRINT): This is the DESIGN TEMPLATE to replicate. You must match its EXACT layout structure: where text is positioned, how large the typography is, where the photo/model is placed, how elements overlap, the background color blocking, and the overall visual composition. This is NOT just a mood reference — it is the LAYOUT you must follow. Replace the template's placeholder content with ${brandName}'s brand content while keeping the same design structure.\n`;
             imgIdx++;
         }
 
         // ── Style transfer block — injected only when a style ref is provided ──
-        // Strong visual style lock: instructs the model to use the ref as a creative bible,
-        // not just as a loose mood suggestion.
+        // When a template/reference image is given, it must be treated as the LAYOUT BIBLE.
+        // The AI must replicate the exact composition, typography placement, color blocking,
+        // and visual structure — not just the mood/color grading.
         const styleRefBlock = hasRef ? `
-═══ STYLE TRANSFER DIRECTIVE (CRITICAL — HIGHEST PRIORITY) ═══
-A STYLE REFERENCE image has been provided (see REFERENCE IMAGE ${hasCharacter ? 3 : 2} above).
-You MUST extract and replicate the following attributes FROM THAT REFERENCE IMAGE:
-  • COLOR GRADING — replicate the exact tonal range, saturation, hue shifts, and colour temperature
-  • LIGHTING STYLE — replicate the lighting setup (hard/soft, direction, shadows, highlights, rim lights)
-  • ATMOSPHERIC MOOD — replicate the environmental feel (misty, smoky, clean studio, natural, moody etc.)
-  • COMPOSITIONAL STYLE — replicate the framing approach, negative space usage, and depth layers
-  • TEXTURE & FINISH — replicate the surface texture quality (matte, glossy, film grain, smooth render)
-  • CINEMATIC GRADE — replicate the overall "feel" and aesthetic language of the reference
-The PRODUCT from REFERENCE IMAGE 1 must remain the hero subject.
-The STYLE from the style reference image must define the entire visual world around it.
-Do NOT default to a generic cinematic look — commit fully to the style of the reference image.
+═══ TEMPLATE REPLICATION DIRECTIVE (ABSOLUTE HIGHEST PRIORITY) ═══
+A TEMPLATE/STYLE REFERENCE image has been provided (see REFERENCE IMAGE ${hasCharacter ? 3 : 2} above).
+You MUST treat this reference as a LAYOUT BLUEPRINT — replicate its EXACT visual structure:
+
+  LAYOUT STRUCTURE (CRITICAL):
+  • Replicate the EXACT position and size of text elements — if the reference has giant text in the center, YOUR output must have giant text in the center
+  • Replicate the EXACT position of the photo/model — if cropped to one side, do the same; if full-bleed behind text, do the same
+  • Replicate the EXACT placement of brand name, date, location elements — if in corners, put them in corners
+  • Replicate the EXACT text-to-image relationship — if text overlaps the photo, overlap it; if text is beside the photo, keep it beside
+
+  TYPOGRAPHY STYLE (CRITICAL):
+  • Match the EXACT typography weight, size ratio, and casing from the reference
+  • If the reference has BOLD CONDENSED UPPERCASE filling most of the card, do the same
+  • If text is opaque and dominant, make it opaque and dominant — do NOT make it semi-transparent unless the reference does
+  • Match letter spacing, line height, and text color from the reference
+
+  VISUAL DESIGN:
+  • COLOR BLOCKING — replicate the exact background color treatment (solid color fill, gradient, photo-only, etc.)
+  • COLOR GRADING — replicate the exact tonal range, saturation, and colour temperature
+  • PHOTO TREATMENT — replicate how the photo blends with the background (blend modes, overlay, hard crop, etc.)
+  • COMPOSITION RATIOS — replicate the proportional space allocated to text vs. image vs. background
+
+  WHAT TO CHANGE (replace with brand content):
+  • Replace placeholder text (e.g. "X BRAND", "STEP IN") with ${brandName} and the taglines provided below
+  • Replace placeholder imagery with the PRODUCT from REFERENCE IMAGE 1
+  • Apply ${brandName}'s brand colors where the reference uses its brand colors
+
+  WHAT NOT TO CHANGE:
+  • Do NOT rearrange the layout — keep the same visual hierarchy and element positions
+  • Do NOT change the typography style — if the reference uses bold condensed caps, use bold condensed caps
+  • Do NOT add elements that aren't in the reference (no extra perspective text, no extra floating elements)
+  • Do NOT default to a generic "cinematic product shot" — commit fully to the reference's design language
+
+THE OUTPUT MUST LOOK LIKE A DIRECT ADAPTATION OF THE REFERENCE IMAGE — same layout, same style, different brand content.
 ═════════════════════════════════════════════════════════════` : '';
 
-        const masterPrompt = `Cinematic ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+        const masterPrompt = hasRef
+            // ── TEMPLATE MODE: Reference image drives the entire layout ──
+            ? `${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
 ${imageRefBlock}
 ${styleRefBlock}
+
+BRAND CONTENT TO INSERT (replace template placeholders):
+  • Brand name: ${brandName}
+  • Product name: ${detectedProductName}
+  • Primary headline: "${tagline1}"
+  • Secondary line: "${tagline2}"
+  • Font family: ${brandFont}
+
+${hasCharacter ? `CHARACTER/MODEL: Use the provided character reference image. The person MUST match the reference — same face, same features. Position them in the same way the template positions its model/person.` : `PRODUCT: Place the product from REFERENCE IMAGE 1 where the template positions its hero element. Match the product's scale and placement to the template's composition.`}
+
+TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp detail, ${canvasSize}
+OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no frames
+
+${brief ? `CREATIVE BRIEF: ${brief}` : ''}`
+
+            // ── ORIGINAL MODE: AI Art Director drives the creative ──
+            : `Cinematic ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+
+${imageRefBlock}
 PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside the provided character/model (see CHARACTER reference image above). The person MUST match the reference — same face, same features. Position them elegantly with the product.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
 
 ${variation.compositionNote}
 
 BRANDING (top center): ${brandName} logo area, product name "${detectedProductName}" in clean brand typography${brandFont !== 'modern sans-serif' ? `, using ${brandFont} font family` : ''}
 
-ENVIRONMENT: ${hasRef ? 'Derive from style reference image' : aiMood.env}
+ENVIRONMENT: ${aiMood.env}
 
-LIGHTING: ${hasRef ? 'Derive from style reference image' : aiMood.lighting}
+LIGHTING: ${aiMood.lighting}
 
 PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth
 
@@ -3639,9 +3683,9 @@ SECONDARY TYPOGRAPHY (clean brand font):
 "${tagline1}"
 "${tagline2}"
 
-SURFACE: ${hasRef ? 'Derive from style reference image' : aiMood.surface}
+SURFACE: ${aiMood.surface}
 
-COLOR PALETTE: ${hasRef ? 'Derive from style reference image — do not override with preset colors' : aiMood.palette}
+COLOR PALETTE: ${aiMood.palette}
 
 TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp product detail, ${canvasSize}
 STYLE: magazine-grade product photography, Cannes Lions advertising quality, cinematic color grade
