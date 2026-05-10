@@ -13,7 +13,7 @@ const SHOWCASES = [
         placeholderText: 'CREATIVE STUDIO · BRAND ASSET PREVIEW',
         placeholderColor: '#1e3a8a', // Dark blue
         reverse: false,
-        image: '/screenshots/creative-studio.png'
+        image: 'https://mantram-assets.s3.ap-south-1.amazonaws.com/uploads/Explore+Tab+screenshot.png'
     },
     {
         id: 'video',
@@ -24,7 +24,7 @@ const SHOWCASES = [
         placeholderText: 'VIDEO STUDIO · 6S SPOT TIMELINE',
         placeholderColor: '#7c2d12', // Dark orange/brown
         reverse: true,
-        image: '/screenshots/video-studio.png'
+        image: 'https://mantram-assets.s3.ap-south-1.amazonaws.com/uploads/Video+studio+screenshot.png'
     },
     {
         id: 'pulse',
@@ -35,7 +35,7 @@ const SHOWCASES = [
         placeholderText: 'PULSE STUDIO · LIVE SIGNAL FEED',
         placeholderColor: '#064e3b', // Dark green
         reverse: false,
-        image: '/screenshots/dashboard.png'
+        image: 'https://mantram-assets.s3.ap-south-1.amazonaws.com/uploads/analytics+screenshot.png'
     }
 ];
 
