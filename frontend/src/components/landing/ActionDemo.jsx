@@ -4,19 +4,8 @@ import useReveal from '../../hooks/useReveal';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
-const FILTERS = ['Full demo', 'Creative Studio', 'Video Studio', 'Pulse'];
-
-const TIMELINE = [
-    { time: '00:00', label: 'The brief' },
-    { time: '00:18', label: 'Brand parse' },
-    { time: '00:32', label: 'Asset generation' },
-    { time: '00:54', label: 'Review & edit' },
-    { time: '01:15', label: 'Export & publish' }
-];
-
 export default function ActionDemo() {
     const revealRef = useReveal();
-    const [activeFilter, setActiveFilter] = useState('Full demo');
     const containerRef = useRef(null);
     
     const { scrollYProgress } = useScroll({
@@ -30,36 +19,7 @@ export default function ActionDemo() {
 
     return (
         <section className="py-24 md:py-32 relative" ref={containerRef}>
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
-                
-                {/* Header & Filters Row */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-12">
-                    {/* Section Header */}
-                    <div>
-                        <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-2xl leading-[1.1]">
-                            90 seconds. <span className="italic" style={{ color: BRAND.primary }}>One campaign.</span> <br />
-                            From prompt to publish.
-                        </h2>
-                    </div>
 
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-3">
-                        {FILTERS.map(filter => (
-                            <button
-                                key={filter}
-                                onClick={() => setActiveFilter(filter)}
-                                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                                    activeFilter === filter 
-                                        ? 'bg-white text-black border-white' 
-                                        : 'bg-transparent text-[#a1a1aa] border-white/10 hover:text-white hover:bg-white/5'
-                                }`}
-                            >
-                                {filter}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
 
             {/* Full-width Video Player Section */}
             <div className="w-full px-4 md:px-8 mb-6">
@@ -86,18 +46,7 @@ export default function ActionDemo() {
                 </motion.div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
-                {/* Timeline Strip */}
-                <div className="w-full grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-                    {TIMELINE.map((item, idx) => (
-                        <div key={idx} className="bg-[#121214] rounded-2xl p-4 border border-white/5 hover:border-white/20 transition-colors">
-                            <div className="text-[11px] font-bold text-[#a1a1aa] mb-2">{item.time}</div>
-                            <div className="text-sm font-bold text-white">{item.label}</div>
-                        </div>
-                    ))}
-                </div>
 
-            </div>
         </section>
     );
 }
