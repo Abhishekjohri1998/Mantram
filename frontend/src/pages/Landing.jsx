@@ -63,7 +63,6 @@ export default function Landing() {
                     <div id="studios"><StudiosShowcase /></div>
                     <FeaturedStudios />
                     <div id="how-it-works"><HowItWorks /></div>
-                    <div id="case-studies"><CaseStudies /></div>
                     <Testimonial />
                     <div id="pricing"><Pricing /></div>
                     <FAQ />

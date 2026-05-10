@@ -19,10 +19,9 @@ export default function ActionDemo() {
 
     return (
         <section className="py-24 md:py-32 relative" ref={containerRef}>
-            <div className="max-w-7xl mx-auto px-4 md:px-6 mb-12 text-center">
-                <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-3xl mx-auto leading-[1.1]">
-                    90 seconds. <span className="italic" style={{ color: BRAND.primary }}>One campaign.</span> <br />
-                    From prompt to publish.
+            <div className="max-w-4xl mx-auto px-4 md:px-6 mb-12 text-center">
+                <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif mx-auto leading-[1.1]">
+                    Your ultimate AI marketing <span className="italic" style={{ color: BRAND.primary }}>Command Center.</span>
                 </h2>
             </div>
 

@@ -71,7 +71,7 @@ export default function FeaturedVideos() {
 
     if (isLoading) {
         return (
-            <section className="relative w-full overflow-hidden pb-20 pt-4 -mt-10 z-10" ref={revealRef}>
+            <section className="relative w-full overflow-hidden pb-20 pt-4 z-10" ref={revealRef}>
                 <div className="flex gap-4 md:gap-6 px-8 md:px-24 py-4">
                     {[1,2,3].map(i => (
                         <div key={i} className="shrink-0 w-[280px] md:w-[340px] aspect-[4/5] rounded-[24px] bg-white/5 animate-pulse" />
@@ -82,7 +82,7 @@ export default function FeaturedVideos() {
     }
 
     return (
-        <section className="relative w-full overflow-hidden pb-20 pt-4 -mt-10 z-10" ref={revealRef}>
+        <section className="relative w-full overflow-hidden pb-20 pt-4 z-10" ref={revealRef}>
             {/* Gradient mask for smooth edge fading */}
             <div className="absolute inset-y-0 left-0 w-8 md:w-24 bg-gradient-to-r from-[#0b0b0c] to-transparent z-10 pointer-events-none" />
             <div className="absolute inset-y-0 right-0 w-8 md:w-24 bg-gradient-to-l from-[#0b0b0c] to-transparent z-10 pointer-events-none" />
@@ -90,7 +90,7 @@ export default function FeaturedVideos() {
             {/* Scroll container */}
             <div 
                 ref={scrollRef}
-                className="flex gap-4 md:gap-6 px-8 md:px-24 overflow-x-auto snap-x snap-mandatory scrollbar-hide py-4"
+                className="flex gap-4 md:gap-6 px-8 md:px-24 overflow-x-auto snap-x snap-mandatory scrollbar-hide py-4 scroll-smooth"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 {featuredItems.map((item) => (

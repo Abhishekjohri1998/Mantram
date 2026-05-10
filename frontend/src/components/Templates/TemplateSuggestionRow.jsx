@@ -132,7 +132,7 @@ export default function TemplateSuggestionRow({ brandId, onSelect, section = 'ai
                     /* Shimmer state */
                     [1, 2, 3, 4, 5].map(i => (
                         <div key={`shimmer-${i}`} style={{
-                            flex: '0 0 120px',
+                            flex: '0 0 auto',
                             width: 120,
                             borderRadius: 12,
                             border: '1.5px solid var(--color-border-tertiary)',
@@ -149,14 +149,15 @@ export default function TemplateSuggestionRow({ brandId, onSelect, section = 'ai
                     <>
                         {templates.map(t => {
                             const isNew = t.isNew || (new Date() - new Date(t.createdAt)) < 7 * 24 * 60 * 60 * 1000;
+                            const rawRatio = t.generationParams?.aspectRatio || t.savedVideoSettings?.format || t.defaultSettings?.aspectRatio || '4:5';
+                            const parsedRatio = rawRatio.replace(':', '/');
                             return (
                             <button
                                 key={t._id}
                                 title={t.name}
                                 onClick={() => onSelect(t)}
                                 style={{
-                                    flex: '0 0 120px',
-                                    width: 120,
+                                    flex: '0 0 auto',
                                     borderRadius: 12,
                                     border: '1.5px solid var(--color-border-tertiary)',
                                     background: 'var(--color-background-primary)',
@@ -183,8 +184,8 @@ export default function TemplateSuggestionRow({ brandId, onSelect, section = 'ai
                                 className="group"
                             >
                                 <div style={{ 
-                                    width: '100%', 
-                                    aspectRatio: '4/5', 
+                                    height: 135,
+                                    aspectRatio: parsedRatio,
                                     borderRadius: 8, 
                                     overflow: 'hidden', 
                                     position: 'relative',
