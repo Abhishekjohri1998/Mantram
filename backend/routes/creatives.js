@@ -3641,7 +3641,7 @@ SECONDARY TYPOGRAPHY (clean brand font):
 
 SURFACE: ${hasRef ? 'Derive from style reference image' : aiMood.surface}
 
-COLOR PALETTE: ${hasRef ? 'Derive from style reference image — do not override with preset colors' : paletteStr}
+COLOR PALETTE: ${hasRef ? 'Derive from style reference image — do not override with preset colors' : (aiMood?.palette || 'premium cinematic color grade')}
 
 TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp product detail, ${canvasSize}
 STYLE: magazine-grade product photography, Cannes Lions advertising quality, cinematic color grade
