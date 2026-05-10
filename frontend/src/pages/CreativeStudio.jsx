@@ -21,7 +21,7 @@ import './CreativeStudio/CreativeStudio.css'
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
-function TemplateSuggestionRow({ brandId, onSelect }) {
+function TemplateSuggestionRow({ brandId, onSelect, section = 'ai_create', label }) {
     const [templates, setTemplates] = useState([])
     const [loaded, setLoaded] = useState(false)
 
@@ -29,7 +29,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         let cancelled = false
         const token = localStorage.getItem('mantram_token')
         const qs = brandId ? `?brandId=${brandId}` : ''
-        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
+        fetch(`${TMPL_ROW_API}/templates/by-section/${section}${qs}`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(r => r.ok ? r.json() : null)
@@ -37,7 +37,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         .catch(() => {}) // silent failure — never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
-    }, [brandId])
+    }, [brandId, section])
 
     // Don't render anything until loaded (prevents layout shift)
     if (!loaded || templates.length === 0) return null
@@ -57,7 +57,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
             }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.5 }}>dashboard_customize</span>
                 <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.45 }}>
-                    Templates · {templates.length} ready
+                    {label || 'Templates'} · {templates.length} ready
                 </span>
             </div>
             {/* Fixed-height scroll container — no layout shift */}
@@ -3018,6 +3018,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
                     <div className="creative-gallery relative" data-wt="creative-gallery">
 
+                        {/* ── Template Suggestions for AI Create ── */}
+                        <TemplateSuggestionRow
+                            section="ai_create"
+                            label="AI Create Templates"
+                            brandId={activeBrand?._id}
+                            onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'create' })}
+                        />
 
 
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
@@ -6330,7 +6337,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             {/* ── Empty State ── */}
                             {!carouselResult && !carouselGenerating && (
-                                <div className="text-center">
+                                <div className="text-center w-full">
                                     <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4 mx-auto">
                                         <span className="material-symbols-outlined text-[var(--sys-primary)] text-4xl">view_carousel</span>
                                     </div>
@@ -6338,6 +6345,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <p className="text-xs text-[var(--sys-text-muted)] max-w-sm mx-auto mb-4">
                                         Describe a scene and we'll generate a seamless panoramic background, auto-split it into carousel panels, and composite your products on top.
                                     </p>
+                                    {/* ── Template Suggestions for Carousel ── */}
+                                    <div className="w-full mt-4 text-left">
+                                        <TemplateSuggestionRow
+                                            section="carousel"
+                                            label="Carousel Templates"
+                                            brandId={activeBrand?._id}
+                                            onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'carousel' })}
+                                        />
+                                    </div>
                                     <div className="flex flex-wrap gap-2 justify-center">
                                         {['Luxury marble kitchen', 'Tropical beach sunset', 'Modern tech workspace', 'Botanical garden'].map(ex => (
                                             <button key={ex} onClick={() => setCarouselPrompt(ex)}
@@ -6686,6 +6702,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <p className="text-sm text-[var(--sys-text-muted)]">Build coordinated campaign batches — trend-powered, AI-driven</p>
                         </div>
                     </div>
+
+                    {/* ── Template Suggestions for Campaigns ── */}
+                    <TemplateSuggestionRow
+                        section="campaign"
+                        label="Campaign Templates"
+                        brandId={activeBrand?._id}
+                        onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'campaigns' })}
+                    />
 
                     {/* Step Indicator — 3-step flow */}
                     <div data-wt="camp-steps" className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
@@ -11416,7 +11440,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     <div className="creative-canvas-panel flex flex-col items-center justify-center p-6 sm:p-10">
                         {/* Empty state */}
                         {!csGenerating && csSlots.every(s => !s) && (
-                            <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
+                            <div className="flex flex-col items-center justify-center gap-4 text-center max-w-md mx-auto w-full">
                                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                     <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">movie_filter</span>
                                 </div>
@@ -11428,6 +11452,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {['Hero Shot', 'Lifestyle', 'Detail Close-up'].map(m => (
                                         <span key={m} className="text-[10px] px-2.5 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-bold">{m}</span>
                                     ))}
+                                </div>
+                                {/* ── Template Suggestions for Campaign Shot ── */}
+                                <div className="w-full mt-4">
+                                    <TemplateSuggestionRow
+                                        section="campaign_shot"
+                                        label="Campaign Shot Templates"
+                                        brandId={activeBrand?._id}
+                                        onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'campaignshot' })}
+                                    />
                                 </div>
                             </div>
                         )}
