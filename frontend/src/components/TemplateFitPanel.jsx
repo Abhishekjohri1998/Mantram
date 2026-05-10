@@ -193,10 +193,41 @@ export default function TemplateFitPanel({ template, brandId, onClose, onSuccess
                 </div>
 
                 <div className="tfp-body">
-                    {/* Result */}
+                    {/* Result — Side-by-side comparison */}
                     {result && (
                         <div className="tfp-result">
-                            <img src={result} alt="Generated" />
+                            <div className="tfp-comparison">
+                                {/* Template Reference */}
+                                {template.previewImageUrl && (
+                                    <div className="tfp-comparison__col">
+                                        <div className="tfp-comparison__label">
+                                            <span className="material-symbols-outlined">dashboard_customize</span>
+                                            Template
+                                        </div>
+                                        <img
+                                            src={template.previewImageUrl}
+                                            alt="Template reference"
+                                            className="tfp-comparison__img"
+                                            onClick={() => window.open(template.previewImageUrl, '_blank')}
+                                            title="Click to view full size"
+                                        />
+                                    </div>
+                                )}
+                                {/* Generated Result */}
+                                <div className="tfp-comparison__col">
+                                    <div className="tfp-comparison__label tfp-comparison__label--result">
+                                        <span className="material-symbols-outlined">auto_awesome</span>
+                                        Generated
+                                    </div>
+                                    <img
+                                        src={result}
+                                        alt="Generated"
+                                        className="tfp-comparison__img"
+                                        onClick={() => window.open(result, '_blank')}
+                                        title="Click to view full size"
+                                    />
+                                </div>
+                            </div>
                             <div className="tfp-result-actions">
                                 <a href={result} download="generated.jpg" className="tfp-result-btn">
                                     <span className="material-symbols-outlined">download</span>

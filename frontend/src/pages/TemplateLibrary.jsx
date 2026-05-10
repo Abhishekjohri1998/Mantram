@@ -111,17 +111,17 @@ const EXPLORE_CSS = `
 .sub-tab.active { color: var(--sys-text); background: var(--sys-surface); }
 .sub-tab:hover { color: var(--sys-text); }
 
-/* Grid */
-.explore-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
-@media (max-width: 1400px) { .explore-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 1024px) { .explore-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 768px) { .explore-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .explore-grid { grid-template-columns: 1fr; } }
+/* Grid — Masonry layout via CSS columns for mixed aspect ratios */
+.explore-grid { columns: 5; column-gap: 14px; }
+@media (max-width: 1400px) { .explore-grid { columns: 4; } }
+@media (max-width: 1024px) { .explore-grid { columns: 3; } }
+@media (max-width: 768px) { .explore-grid { columns: 2; } }
+@media (max-width: 480px) { .explore-grid { columns: 1; } }
 
 /* Card */
-.explore-card { display: flex; flex-direction: column; cursor: pointer; border: none; background: none; padding: 0; text-align: left; position: relative; }
-.explore-card-thumb { width: 100%; aspect-ratio: 3/4; border-radius: 12px; overflow: hidden; position: relative; background: var(--sys-surface); border: 1px solid var(--sys-border); }
-.explore-card-thumb img, .explore-card-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease, filter 0.3s ease; }
+.explore-card { display: flex; flex-direction: column; cursor: pointer; border: none; background: none; padding: 0; text-align: left; position: relative; break-inside: avoid; margin-bottom: 14px; }
+.explore-card-thumb { width: 100%; border-radius: 12px; overflow: hidden; position: relative; background: var(--sys-surface); border: 1px solid var(--sys-border); }
+.explore-card-thumb img, .explore-card-thumb video { width: 100%; height: auto; object-fit: cover; display: block; transition: transform 0.4s ease, filter 0.3s ease; }
 .explore-card:hover .explore-card-thumb img, .explore-card:hover .explore-card-thumb video { transform: scale(1.05); filter: brightness(1.1); }
 .card-badge-featured { position: absolute; top: 10px; left: 10px; background: rgba(0,212,170,0.9); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 14px; z-index: 5; display: flex; align-items: center; gap: 4px; }
 .card-badge-featured::before { content: '★'; font-size: 9px; }
@@ -191,7 +191,7 @@ const EXPLORE_CSS = `
   .publish-btn { padding: 7px 14px; font-size: 12px; }
   .sub-tabs { margin-bottom: 14px; }
   .sub-tab { padding: 5px 12px; font-size: 11px; }
-  .explore-grid { gap: 10px; }
+  .explore-grid { column-gap: 10px; }
   .card-title-text { font-size: 10px; }
   .card-footer { padding: 6px 2px 2px; gap: 6px; }
   .card-avatar { width: 18px; height: 18px; }

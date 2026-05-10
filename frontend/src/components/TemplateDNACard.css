@@ -224,11 +224,50 @@
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 .tdna-card__generations-title {
-    font-size: 11px;
+    font-size: 10px;
     color: rgba(255, 255, 255, 0.4);
     margin-bottom: 8px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.tdna-card__generations-title .material-symbols-outlined {
+    color: #ff7a3d;
+}
+/* Latest generation — shown prominently */
+.tdna-card__latest-gen {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    margin-bottom: 6px;
+    border: 1px solid rgba(255, 77, 0, 0.2);
+    transition: border-color 0.2s;
+}
+.tdna-card__latest-gen:hover {
+    border-color: rgba(255, 77, 0, 0.5);
+}
+.tdna-card__latest-gen img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    max-height: 140px;
+}
+.tdna-card__latest-gen-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(255, 77, 0, 0.85);
+    color: #fff;
+    backdrop-filter: blur(4px);
 }
 .tdna-card__generations-list {
     display: flex;
@@ -241,6 +280,11 @@
     border-radius: 4px;
     object-fit: cover;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.tdna-card__generation-img:hover {
+    border-color: rgba(255, 77, 0, 0.4);
 }
 .tdna-card__generation-more {
     font-size: 10px;

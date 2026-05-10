@@ -102,26 +102,48 @@ export default function TemplateDNACard({ template, onUse, onDelete, recentGener
                     </div>
                 )}
             </div>
-            {/* Recent Generations */}
+            {/* Recent Generations — always visible when any exist */}
             {recentGenerations.length > 0 && (
                 <div className="tdna-card__generations">
-                    <div className="tdna-card__generations-title">Recent</div>
-                    <div className="tdna-card__generations-list">
-                        {recentGenerations.slice(0, 3).map((gen, idx) => (
-                            <img 
-                                key={gen._id || idx} 
-                                src={gen.imageUrl || gen.thumbnailUrl} 
-                                alt="Generation" 
-                                className="tdna-card__generation-img"
-                                onClick={(e) => { e.stopPropagation(); onPreviewImage && onPreviewImage(gen.imageUrl || gen.thumbnailUrl); }}
-                                style={{ cursor: 'pointer' }}
-                                title="Click to preview"
-                            />
-                        ))}
-                        {recentGenerations.length > 3 && (
-                            <div className="tdna-card__generation-more">+{recentGenerations.length - 3}</div>
-                        )}
+                    <div className="tdna-card__generations-title">
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>auto_awesome</span>
+                        Generated ({recentGenerations.length})
                     </div>
+                    {/* Latest generation shown prominently */}
+                    <div
+                        className="tdna-card__latest-gen"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const latestUrl = recentGenerations[0].imageUrl || recentGenerations[0].thumbnailUrl;
+                            onPreviewImage && onPreviewImage(latestUrl);
+                        }}
+                        title="Click to preview"
+                    >
+                        <img
+                            src={recentGenerations[0].imageUrl || recentGenerations[0].thumbnailUrl}
+                            alt="Latest generation"
+                        />
+                        <div className="tdna-card__latest-gen-badge">Latest</div>
+                    </div>
+                    {/* Older generations as thumbnails */}
+                    {recentGenerations.length > 1 && (
+                        <div className="tdna-card__generations-list">
+                            {recentGenerations.slice(1, 4).map((gen, idx) => (
+                                <img 
+                                    key={gen._id || idx} 
+                                    src={gen.imageUrl || gen.thumbnailUrl} 
+                                    alt="Generation" 
+                                    className="tdna-card__generation-img"
+                                    onClick={(e) => { e.stopPropagation(); onPreviewImage && onPreviewImage(gen.imageUrl || gen.thumbnailUrl); }}
+                                    style={{ cursor: 'pointer' }}
+                                    title="Click to preview"
+                                />
+                            ))}
+                            {recentGenerations.length > 4 && (
+                                <div className="tdna-card__generation-more">+{recentGenerations.length - 4}</div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -72,16 +72,15 @@ export default function ActionDemo() {
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] rounded-full blur-[100px] opacity-20 mix-blend-screen" style={{ background: BRAND.primary }} />
                     </div>
 
-                    {/* Placeholder Video Content */}
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition-colors duration-500">
-                        {/* Play Button */}
-                        <div className="relative">
-                            <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: BRAND.primary }} />
-                            <div className="w-20 h-20 rounded-full backdrop-blur-md bg-white/10 border border-white/20 flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
-                                <Play className="w-8 h-8 text-white ml-1" fill="currentColor" />
-                            </div>
-                        </div>
-                    </div>
+                    {/* Autoplaying Video */}
+                    <video 
+                        src="https://mantram-assets.s3.ap-south-1.amazonaws.com/videos/Homescreen+Video.mp4"
+                        autoPlay 
+                        loop 
+                        muted 
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-cover z-10"
+                    />
 
                     {/* Top Left Badge */}
                     <div className="absolute top-6 left-6 z-20">
