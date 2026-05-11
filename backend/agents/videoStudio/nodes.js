@@ -1154,10 +1154,12 @@ export async function ugcPromptBuilderNode(state) {
         product.suggestedHooks ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
     ].filter(Boolean).join('\n');
 
+    const hookShot = !!(settings.hookShot);
+
     const result = await agentUtils.callAgent(
-        UGC_PROMPT_BUILDER_PROMPT(brandContext),
+        UGC_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
         userPrompt,
-        0.4, 1024,
+        0.4, 2048,
     );
 
     // callAgent may return parsed JSON or raw string
@@ -1166,23 +1168,32 @@ export async function ugcPromptBuilderNode(state) {
     // POST-PROCESSING: Guarantee @image1 (avatar) is referenced
     if (imageCount >= 1 && !prompt.includes('@image1')) {
         console.log('[UGC Node] Injecting missing @image1 tag into prompt');
-        prompt = `The person @image1 faces the camera in a natural UGC setting. ` + prompt;
+        prompt = `STYLE: High-end stylized 3D animated character, cinematic lighting.\n\nSHOT 1: MS, 50mm / Static / @image1 faces the camera in a natural setting. ` + prompt;
     }
 
     // Guarantee @image2 (product) is referenced if available
     if (imageCount >= 2 && !prompt.includes('@image2')) {
         console.log('[UGC Node] Injecting missing @image2 tag into prompt');
         prompt = prompt.replace(
-            /\[(\d+)s-(\d+)s\]/,
-            (match) => `${match} The person @image1 holds up the product @image2.`
+            /SHOT (\d+):/,
+            (match) => `${match} @image1 holds up the product @image2.`
         );
     }
 
-    // Ensure constraint block references @image1
+    // Ensure trailing constraint line
+    const CONSTRAINT = 'Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.';
     if (!prompt.includes('Maintain face')) {
-        prompt += '\nMaintain face and clothing consistency of @image1 throughout, no distortion, natural smooth movements. Generate video without subtitles.';
+        prompt += '\n' + CONSTRAINT;
     } else if (!prompt.includes('of @image1')) {
         prompt = prompt.replace('Maintain face and clothing consistency', 'Maintain face and clothing consistency of @image1');
+    }
+
+    // HARD LIMIT: 2200 characters — truncate at last complete sentence before limit
+    if (prompt.length > 2200) {
+        const truncated = prompt.substring(0, 2200);
+        const lastPeriod = truncated.lastIndexOf('.');
+        prompt = (lastPeriod > 1800 ? truncated.substring(0, lastPeriod + 1) : truncated) + '\n' + CONSTRAINT;
+        console.log(`[UGC Node] Prompt truncated to ${prompt.length} chars`);
     }
 
     console.log(`[UGC Node] Prompt built (${prompt.split(/\s+/).length} words, @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')})`);

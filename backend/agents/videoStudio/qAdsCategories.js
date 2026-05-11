@@ -363,7 +363,7 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
 
     // Refine with LLM to inject brand voice and ensure production quality
     const REFINE_SYSTEM = `You are a Seedance 2.0 expert video prompt engineer.
-Refine the given video ad prompt to be production-ready.
+Refine the given video ad prompt into the EXACT cinematic structure below.
 
 BRAND CONTEXT:
 ${brandContext}
@@ -372,26 +372,40 @@ PRODUCT: ${product.productName}
 USP: ${product.mainUSP}
 TARGET AUDIENCE: ${product.targetAudience}
 
-Rules you MUST follow:
-1. Keep ALL timecodes in [00s-XXs] format — do not remove them
-2. Keep ALL @image1 and @image2+ references exactly as-is
-3. Keep the constraint block at the end word-for-word
-4. One motion verb per shot — split if needed
-5. Camera movement must be on its own sentence, separate from subject movement
-6. Keep lighting description — it is mandatory
-7. Total word count must be between 30 and 200 words
-8. Do NOT add negative prompts — Seedance does not support them
-9. Inject brand voice/tone into dialogue naturally
-10. Return ONLY the refined prompt — no explanation, no markdown`;
+OUTPUT STRUCTURE (follow exactly — no deviations):
+STYLE: [one sentence — rendering style, animation quality, visual feel]
+WARDROBE: [@image1 clothing description per shot range]
+ENVIRONMENT: [all scene locations in one sentence]
+MOOD: [emotional arc, one sentence]
+SHOT 1: [Size, focal length] / [Camera move] / [@image1 action. @image2 if shown. ONE motion verb.]
+SHOT 2: [same format]
+[Continue for the video duration — 8–15 shots]
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.
+
+RULES:
+1. Keep ALL @image1 and @image2+ references exactly as-is — never remove them
+2. ONE motion verb per shot line
+3. Camera move on its own clause after the second slash
+4. HARD LIMIT: 2200 characters total — count carefully
+5. No negative prompts. No text overlays.
+6. Inject brand voice into wardrobe, mood and environment choices
+7. Return ONLY the refined prompt — no explanation, no markdown`;
 
     try {
         const refined = await agentUtils.callAgentText(
             REFINE_SYSTEM,
             `PROMPT TO REFINE:\n${basePrompt}`,
             0.3,
-            600
+            900
         );
-        return (refined && typeof refined === 'string' && refined.length > 30) ? refined : basePrompt;
+        // Enforce 2200-char limit
+        let out = (refined && typeof refined === 'string' && refined.length > 30) ? refined : basePrompt;
+        if (out.length > 2200) {
+            const t = out.substring(0, 2200);
+            const lp = t.lastIndexOf('.');
+            out = (lp > 1800 ? t.substring(0, lp + 1) : t) + '\nMaintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.';
+        }
+        return out;
     } catch (err) {
         console.warn(`[Q-Ads] LLM refinement failed, using base template: ${err.message}`);
         return basePrompt;
