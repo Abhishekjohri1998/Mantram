@@ -507,7 +507,7 @@ export const publishCarouselToFacebook = async (pageId, accessToken, text, image
  */
 export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, imageUrls) => {
     try {
-        const LI_VERSION = '202401';
+        const LI_VERSION = '202601';
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
@@ -681,7 +681,7 @@ export const fetchLinkedInProfile = async (accessToken) => {
 
 export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, videoUrl) => {
     try {
-        const LI_VERSION = '202401';
+        const LI_VERSION = '202601';
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
@@ -810,7 +810,7 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'X-Restli-Protocol-Version': '2.0.0',
-                    'LinkedIn-Version': '202401',
+                    'LinkedIn-Version': '202601',
                 },
                 httpsAgent: ipv4Agent
             });
