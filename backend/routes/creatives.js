@@ -293,6 +293,9 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         if (options?.alreadyEnhanced || options?.skipPipeline) {
             console.log('⚡ Pipeline skipped — prompt already enhanced by user');
             agenticMeta = { pipelineRan: false, pipelineSkipped: 'already-enhanced' };
+        } else if (options?.templateInpainting) {
+            console.log('⚡ Pipeline skipped — template inpainting mode (prompt is pre-built)');
+            agenticMeta = { pipelineRan: false, pipelineSkipped: 'template-inpainting' };
 
         // ══════════════════════════════════════════════════════════════════════
         // ── LOGO FAST PATH: Campaign Logo uses specialist 2026 Art Director ──
@@ -2114,7 +2117,8 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         // ⚡ SPEED/QUALITY: Truncate overly long prompts — prompts >2000 chars drastically increase Gemini latency
         // BUT if we have reference images, we MUST preserve the Visual Grounding, otherwise the model hallucinates the product.
         let optimizedPrompt = promptText;
-        if (optimizedPrompt.length > 2000) {
+        const isTemplatePrompt = promptText.includes('TEMPLATE INPAINTING');
+        if (optimizedPrompt.length > 2000 && !isTemplatePrompt) {
             const origLen = optimizedPrompt.length;
             const hasRefs = finalImageParts && finalImageParts.length > 0;
             
@@ -2162,7 +2166,8 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
         // instead of mandatory visual references to faithfully reproduce.
         const refCount = finalImageParts.length;
         let finalPromptForModel = optimizedPrompt;
-        if (refCount > 0) {
+        const isTemplateInpainting = optimizedPrompt.includes('TEMPLATE INPAINTING');
+        if (refCount > 0 && !isTemplateInpainting) {
             const imageRolePreamble = [
                 `\nREFERENCE IMAGES PROVIDED (${refCount} image${refCount > 1 ? 's' : ''}):`,
             ];
