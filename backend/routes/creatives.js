@@ -550,28 +550,39 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
                 : '';
 
             const originalPrompt = fullPrompt;
-            fullPrompt = `TEMPLATE INPAINTING — STRICT DESIGN REPLICATION:
+            fullPrompt = `TEMPLATE INPAINTING — PIXEL-PERFECT DESIGN REPLICATION:
 
-IMAGE 1 (the template): This is the reference design template. You MUST preserve:
-- The EXACT background, colors, gradients, and textures
-- The EXACT layout, composition, and element positions 
-- The EXACT typography style, font weight, and text placement
-- All decorative elements, borders, shadows, and visual effects
-- The same overall aesthetic and mood
+You are a professional graphic designer tasked with adapting an existing design template for a new product/brand. Your job is to REPLICATE the template design exactly, swapping ONLY the product and its associated text.
 
-${contentImageCount > 0 ? `IMAGE 2+: These are the new content images to INSERT into the template design.
-- Replace the product/subject slot in the template with the provided new content image(s)
-- Keep every other part of the design IDENTICAL to Image 1
-- The new content should blend naturally into the existing template design
+IMAGE 1 is the DESIGN TEMPLATE. You MUST preserve EVERYTHING about it:
+- The EXACT same background scene, colors, gradients, textures, and lighting
+- The EXACT same layout grid, composition, and spatial arrangement of ALL elements
+- The EXACT same decorative elements: badges, banners, ribbons, icons, borders, frames, swooshes, splashes
+- The EXACT same typography hierarchy: heading size/weight/position, subheading, body text, CTA button style and position
+- The EXACT same visual effects: shadows, glows, reflections, depth-of-field, bokeh
+- The EXACT same footer/header bar structure and social media icon placement
+
+${contentImageCount > 0 ? `IMAGE 2+: These are the NEW PRODUCT image(s) to INSERT into the template.
+- Place the new product in the EXACT same position, angle, and scale as the original product in Image 1
+- The new product must blend seamlessly with the template's lighting, shadows, and color grading
+- Preserve the product's original branding, labels, and packaging design faithfully
 ` : ''}
-CONTENT TO GENERATE (fill into the template):
+USER'S CONTENT INSTRUCTIONS:
 ${originalPrompt}
 
+CRITICAL ANTI-WATERMARK RULES:
+- Do NOT render any brand name, company name, or text as a large translucent/faded watermark in the background
+- Do NOT repeat any text as a decorative background pattern (e.g. "STARBUCKS STARBUCKS" fading behind the product)
+- Background text watermarks are STRICTLY FORBIDDEN — the background must be clean scene elements only
+- If the original template has decorative background text, replace it with abstract design elements (gradients, bokeh, light streaks) instead
+
 ABSOLUTE RULES:
-1. The output MUST look like Image 1 (the template) — same layout, same colors, same structure
-2. Only the content (product/person/text) changes — NOT the design shell
-3. Do NOT reimagine or reinterpret the design — replicate it precisely
-4. ${contentImageCount > 0 ? 'The new content image(s) should appear in the same position as the original product/subject' : 'Generate fresh content in the same design shell'}
+1. The output MUST be a near-identical twin of Image 1 — same layout, same colors, same structure, same mood
+2. ONLY the product/subject and its directly associated text labels change — the entire design shell stays identical
+3. Do NOT reimagine, reinterpret, or "improve" the template design — REPLICATE it with surgical precision
+4. ${contentImageCount > 0 ? 'The new product image must appear in the EXACT same position, size, and angle as the original product in the template' : 'Generate fresh content fitting naturally into the exact same design shell'}
+5. Match the template's exact aspect ratio and framing — do not crop differently
+6. All text in the output must be sharp, readable, and properly spelled — never blurry or garbled
 
 Generate the adapted creative now.`;
 

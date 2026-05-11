@@ -37,7 +37,7 @@ const avatarSchema = new mongoose.Schema({
     // How the avatar was created
     generationMode: {
         type: String,
-        enum: ['structured', 'advanced', 'reference'],
+        enum: ['structured', 'advanced', 'reference', 'directPrompt'],
         default: 'structured'
     },
     // S3 URL of reference image (only when generationMode = 'reference')
