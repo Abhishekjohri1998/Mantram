@@ -1,5 +1,10 @@
 import axios from 'axios';
+import https from 'https';
 import config from '../config/env.js';
+
+// LinkedIn API sometimes drops IPv6 traffic from AWS EC2, causing ETIMEDOUT.
+// We force IPv4 resolution for LinkedIn requests to prevent this.
+const ipv4Agent = new https.Agent({ family: 4 });
 
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
 
@@ -509,7 +514,7 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             'LinkedIn-Version': LI_VERSION,
             'X-Restli-Protocol-Version': '2.0.0',
         };
-        const authorUrn = `urn:li:person:${personUrn}`;
+        const authorUrn = personUrn.startsWith('urn:li:') ? personUrn : `urn:li:person:${personUrn}`;
 
         // Upload each image and collect URNs
         const imageUrns = [];
@@ -517,13 +522,14 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             try {
                 const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
                     initializeUploadRequest: { owner: authorUrn }
-                }, { headers });
+                }, { headers, httpsAgent: ipv4Agent });
                 const { uploadUrl, image: imageUrn } = initResp.data.value;
 
-                const imgResp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+                const imgResp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, httpsAgent: ipv4Agent });
                 await axios.put(uploadUrl, imgResp.data, {
                     headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
                     maxContentLength: 50 * 1024 * 1024,
+                    httpsAgent: ipv4Agent
                 });
                 imageUrns.push(imageUrn);
                 console.log(`[SOCIAL] LinkedIn carousel image uploaded: ${imageUrn}`);
@@ -548,7 +554,7 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             },
         };
 
-        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers, httpsAgent: ipv4Agent });
         const postId = response.headers['x-restli-id'] || response.data?.id || '';
         console.log(`[SOCIAL] ✅ LinkedIn multi-image post published! ID: ${postId}`);
         return postId;
@@ -627,8 +633,15 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // r_member_social requires special enterprise approval and causes OAuth to crash if requested without it
-    const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
+    // Requesting personal AND organization scopes so users can publish to both.
+    const scopes = [
+        'openid', 
+        'profile', 
+        'email', 
+        'w_member_social', 
+        'w_organization_social', 
+        'rw_organization_admin'
+    ].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
     return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;
@@ -647,7 +660,8 @@ export const exchangeLinkedInCodeForToken = async (code) => {
     };
 
     const response = await axios.post(url, new URLSearchParams(params), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        httpsAgent: ipv4Agent
     });
 
     return response.data;
@@ -659,7 +673,8 @@ export const fetchLinkedInProfile = async (accessToken) => {
     const response = await axios.get(url, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
-        }
+        },
+        httpsAgent: ipv4Agent
     });
     // Map OpenID fields to match the shape our callback expects
     const data = response.data;
@@ -671,6 +686,71 @@ export const fetchLinkedInProfile = async (accessToken) => {
     };
 };
 
+/**
+ * Fetch LinkedIn Company Pages the user is an admin of.
+ * Uses the organizationAcls endpoint and then resolves the organization details.
+ */
+export const fetchLinkedInOrganizations = async (accessToken) => {
+    try {
+        // Step 1: Get all organizations where the user has an ADMIN role
+        const aclsUrl = 'https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED';
+        const aclsResponse = await axios.get(aclsUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'LinkedIn-Version': '202401',
+                'X-Restli-Protocol-Version': '2.0.0'
+            },
+            httpsAgent: ipv4Agent
+        });
+
+        const elements = aclsResponse.data.elements || [];
+        if (elements.length === 0) return [];
+
+        // Extract organization URNs (e.g., "urn:li:organization:123456")
+        const orgUrns = elements.map(el => el.organization);
+
+        // Step 2: Fetch details for these organizations
+        const ids = orgUrns.map(urn => urn.split(':').pop()).join(',');
+        const orgsUrl = `https://api.linkedin.com/v2/organizations?ids=List(${ids})`;
+        const orgsResponse = await axios.get(orgsUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'LinkedIn-Version': '202401',
+                'X-Restli-Protocol-Version': '2.0.0'
+            },
+            httpsAgent: ipv4Agent
+        });
+
+        const results = orgsResponse.data.results || {};
+        
+        const organizations = [];
+        for (const urn of orgUrns) {
+            const orgData = results[urn];
+            if (orgData) {
+                // Determine localized name
+                const locale = Object.keys(orgData.localizedName || {})[0];
+                const name = locale ? orgData.localizedName[locale] : 'LinkedIn Page';
+                
+                organizations.push({
+                    urn,           // e.g., 'urn:li:organization:123456'
+                    id: orgData.id, // e.g., 123456
+                    name: name,
+                    profilePicture: '' // Logos require additional projection, safe to leave blank for now
+                });
+            }
+        }
+
+        return organizations;
+    } catch (error) {
+        if (error.response?.status === 403) {
+            console.log('[SOCIAL] Note: LinkedIn Company Page access skipped (missing developer permissions).');
+        } else {
+            console.error('[SOCIAL] Failed to fetch LinkedIn Organizations:', error.response?.data || error.message);
+        }
+        return [];
+    }
+};
+
 export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, videoUrl) => {
     try {
         const LI_VERSION = '202401';
@@ -680,21 +760,22 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             'LinkedIn-Version': LI_VERSION,
             'X-Restli-Protocol-Version': '2.0.0',
         };
-        const authorUrn = `urn:li:person:${personUrn}`;
+        const authorUrn = personUrn.startsWith('urn:li:') ? personUrn : `urn:li:person:${personUrn}`;
 
         // ── Helper: Upload image to LinkedIn and get asset URN ──
         async function uploadImageToLinkedIn(imgUrl) {
             // Step 1: Initialize upload
             const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
                 initializeUploadRequest: { owner: authorUrn }
-            }, { headers });
+            }, { headers, httpsAgent: ipv4Agent });
             const { uploadUrl, image: imageUrn } = initResp.data.value;
 
             // Step 2: Download image and upload binary to LinkedIn
-            const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000 });
+            const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000, httpsAgent: ipv4Agent });
             await axios.put(uploadUrl, imgResp.data, {
                 headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
                 maxContentLength: 50 * 1024 * 1024,
+                httpsAgent: ipv4Agent
             });
             console.log(`[SOCIAL] ✅ LinkedIn image uploaded: ${imageUrn}`);
             return imageUrn;
@@ -705,14 +786,15 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             // Step 1: Initialize upload
             const initResp = await axios.post('https://api.linkedin.com/rest/videos?action=initializeUpload', {
                 initializeUploadRequest: { owner: authorUrn, fileSizeBytes: 0, uploadCaptions: false, uploadThumbnail: false }
-            }, { headers });
+            }, { headers, httpsAgent: ipv4Agent });
             const { uploadUrl: vidUploadUrl, video: videoUrn } = (initResp.data.value || initResp.data);
 
             // Step 2: Download video and upload binary
-            const vidResp = await axios.get(vidUrl, { responseType: 'arraybuffer', timeout: 120000 });
+            const vidResp = await axios.get(vidUrl, { responseType: 'arraybuffer', timeout: 120000, httpsAgent: ipv4Agent });
             await axios.put(vidUploadUrl, vidResp.data, {
                 headers: { 'Content-Type': 'video/mp4' },
                 maxContentLength: 200 * 1024 * 1024,
+                httpsAgent: ipv4Agent
             });
             console.log(`[SOCIAL] ✅ LinkedIn video uploaded: ${videoUrn}`);
             return videoUrn;
@@ -742,7 +824,7 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             postBody.content = { media: { title: 'Image', id: imageUrn } };
         }
 
-        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers, httpsAgent: ipv4Agent });
 
         // Posts API returns 201 with the post URN in the x-restli-id header
         const postId = response.headers['x-restli-id'] || response.data?.id || '';
@@ -800,8 +882,9 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'X-Restli-Protocol-Version': '2.0.0',
-                    'LinkedIn-Version': '202401',
-                }
+                    'LinkedIn-Version': '202601',
+                },
+                httpsAgent: ipv4Agent
             });
             const d = liResp.data;
             return {
