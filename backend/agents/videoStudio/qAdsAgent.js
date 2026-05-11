@@ -198,10 +198,10 @@ WARDROBE: [avatar clothing per shot range — match environment and brand.]
 ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
 MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
 
-${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}SHOT 1: [Shot size + focal length] / [Camera move] / [Avatar action. Product reference if shown. ONE motion verb only.]
-SHOT 2: [Shot size + focal length] / [Camera move] / [Action]
-SHOT 3: [Shot size + focal length] / [Camera move] / [Action]
-[Continue — 8 to 15 shots based on duration (approx 1.8s per shot)]
+${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}SHOT 1 [00:00 - 00:02]: [Shot size + focal length] / [Camera move] / [Avatar action. Product reference if shown. ONE motion verb only.]
+SHOT 2 [00:02 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
+SHOT 3 [00:04 - 00:06]: [Shot size + focal length] / [Camera move] / [Action]
+[Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
 
 VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees. The prompt MUST NOT exceed 2200 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
 }
