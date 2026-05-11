@@ -505,6 +505,10 @@ export default function CreativeStudio() {
     const [busyModelInfo, setBusyModelInfo] = useState(null)
     const [selectedShot, setSelectedShot] = useState(null)      // Camera shot preset for AI Create
     const [psSelectedShot, setPsSelectedShot] = useState(null)  // Camera shot preset for Photo Studio
+    
+    // Dynamic Template Analysis State
+    const [analyzingComposition, setAnalyzingComposition] = useState(false)
+    const [recommendedPrompt, setRecommendedPrompt] = useState('')
 
     // ── Camera Shot Presets ── (professional directive injected into prompt)
     const CAMERA_SHOT_PRESETS = [
@@ -1309,6 +1313,48 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             campAbortRef.current?.abort()
         }
     }, [])
+
+    // ── Dynamic Template & Reference Analysis ──
+    const analyzeCompositionTimerRef = useRef(null)
+    
+    useEffect(() => {
+        if (!designBaseImage) {
+            setRecommendedPrompt('')
+            return
+        }
+        
+        // Debounce the analysis by 1.5 seconds to avoid spamming the API
+        if (analyzeCompositionTimerRef.current) clearTimeout(analyzeCompositionTimerRef.current)
+        
+        analyzeCompositionTimerRef.current = setTimeout(async () => {
+            setAnalyzingComposition(true)
+            try {
+                const token = localStorage.getItem('mantram_token')
+                const res = await fetch(`${API_BASE}/canvas-assets/analyze-composition`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                        templateUrl: designBaseImage,
+                        productUrl: selectedProduct?.images?.[0]?.url || null,
+                        characterUrl: referenceImages?.character || characters?.[0]?.imageUrl || null,
+                        styleUrl: referenceImages?.style || null,
+                        brandName: activeBrand?.name
+                    }),
+                })
+                const data = await res.json()
+                if (data.success && data.prompt) {
+                    setRecommendedPrompt(data.prompt)
+                }
+            } catch (err) {
+                console.warn('Composition analysis failed:', err.message)
+            } finally {
+                setAnalyzingComposition(false)
+            }
+        }, 1500)
+        
+        return () => clearTimeout(analyzeCompositionTimerRef.current)
+    }, [designBaseImage, selectedProduct, referenceImages, characters, activeBrand?.name])
+
 
 
     useEffect(() => {
@@ -4376,7 +4422,29 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             {/* ── Section: Prompt ── */}
                             <div className="px-4 pt-3 pb-3 flex flex-col flex-grow">
-                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Prompt</p>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest">Prompt</p>
+                                    {analyzingComposition && (
+                                        <span className="flex items-center gap-1.5 text-[9px] font-medium text-[var(--sys-primary)] animate-pulse">
+                                            <span className="material-symbols-outlined text-[10px]">visibility</span>
+                                            Analyzing references...
+                                        </span>
+                                    )}
+                                </div>
+                                {recommendedPrompt && !analyzingComposition && (
+                                    <button 
+                                        onClick={() => { setPrompt(recommendedPrompt); setRecommendedPrompt('') }}
+                                        className="mb-3 w-full flex flex-col items-start gap-1 p-2.5 rounded-lg border border-[var(--sys-primary)]/40 bg-[var(--sys-primary)]/10 text-left hover:bg-[var(--sys-primary)]/20 transition-all cursor-pointer group animate-fade-in">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--sys-primary)] w-full">
+                                            <span className="material-symbols-outlined text-[12px]">auto_fix_high</span>
+                                            ✨ Smart Prompt
+                                            <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--sys-primary)] text-white px-2 py-0.5 rounded-full text-[9px]">Apply</span>
+                                        </div>
+                                        <div className="text-[10px] text-[var(--sys-text)] line-clamp-2 leading-relaxed opacity-80">
+                                            {recommendedPrompt}
+                                        </div>
+                                    </button>
+                                )}
                                 <div className="flex flex-col relative bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl overflow-hidden focus-within:border-[var(--sys-primary)]/50 transition-all flex-grow">
                                     <textarea
                                         value={prompt}

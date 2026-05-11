@@ -1558,4 +1558,81 @@ Return ONLY valid JSON, no explanation text outside the JSON.`
     }
 })
 
+// POST /api/canvas-assets/analyze-composition — Analyzes template + references to build a master generation prompt
+router.post('/analyze-composition', protect, async (req, res) => {
+    try {
+        const { templateUrl, productUrl, characterUrl, styleUrl, brandName } = req.body;
+        
+        if (!templateUrl) {
+            return res.status(400).json({ success: false, error: 'Template URL is required' });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return res.status(400).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        const parts = [];
+        const labels = [];
+        
+        // Helper
+        async function loadPart(url, label) {
+            if (!url) return;
+            const part = await fetchImageAsInlineData(url);
+            if (part) {
+                parts.push(part);
+                labels.push(label);
+            }
+        }
+
+        await loadPart(templateUrl, 'IMAGE 1: The Design Template (LAYOUT BLUEPRINT)');
+        if (productUrl) await loadPart(productUrl, `IMAGE ${parts.length + 1}: The Hero Product to insert`);
+        if (characterUrl) await loadPart(characterUrl, `IMAGE ${parts.length + 1}: The Character/Model to feature`);
+        if (styleUrl) await loadPart(styleUrl, `IMAGE ${parts.length + 1}: The Style/Mood Reference`);
+
+        let promptText = `Act as an expert AI Art Director. I am providing you with a base Design Template (Image 1) and optional reference images.
+Your task is to write a highly detailed, single-paragraph generation prompt that merges these elements.
+
+CRITICAL RULES:
+1. The Template (Image 1) is the absolute layout blueprint. The output prompt MUST explicitly instruct the image model to replicate the template's composition, typography placement, and layout structure exactly.
+2. If a Product image is provided, describe how to insert it seamlessly into the template's hero position.
+3. If a Character image is provided, describe how to position them alongside the product, respecting the template's layout.
+4. If a Style Reference is provided, adapt the template's mood and color palette to match it.
+5. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the description.
+6. Keep the final prompt under 1500 characters.
+7. Mention the brand name: ${brandName || 'The Brand'}.
+
+Write the generation prompt now:`;
+
+        parts.push({ text: labels.join('\n\n') + '\n\n' + promptText });
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const modelId = 'gemini-2.5-flash';
+        const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`;
+
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+            }),
+            signal: AbortSignal.timeout(30_000),
+        });
+
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error.message);
+
+        let detailedPrompt = '';
+        const allParts = data.candidates?.[0]?.content?.parts || [];
+        for (const p of allParts) {
+            if (p.text && !p.thought) detailedPrompt += p.text;
+        }
+
+        res.json({ success: true, prompt: detailedPrompt.trim() });
+
+    } catch (error) {
+        console.error('❌ Error analyzing composition:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 export default router
