@@ -633,12 +633,14 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // Requesting personal scopes only. Organization scopes require approved developer products.
+    // Requesting personal AND organization scopes so users can publish to both.
     const scopes = [
         'openid', 
         'profile', 
         'email', 
-        'w_member_social'
+        'w_member_social', 
+        'w_organization_social', 
+        'rw_organization_admin'
     ].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
