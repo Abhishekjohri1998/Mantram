@@ -386,8 +386,19 @@ export async function submitAtlasCloudVideoGeneration({
             // Product reference: describe image as hero product, not a real person
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the hero product — maintain its exact shape, color, surface texture, and visual identity in every frame.`;
         } else if (imageRole === 'character') {
-            // Character reference: extremely neutral phrasing to avoid NLP safety classifier false-positives
-            faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'represent' : 'represents'} the animated subject — maintain exact visual consistency in every frame.`;
+            // Character reference with mixed avatar+product:
+            // The first ref is typically the avatar, remaining are product images.
+            // Generate separate lock instructions for each.
+            const avatarRefCount = referenceImages.filter(u => u === imageUrl).length > 0 ? 0 : 1;
+            if (faceAssetUris.length > 1 && avatarRefCount > 0) {
+                // Mixed: first ref is avatar, rest are product
+                const avatarTag = '@image1';
+                const productTags = faceAssetUris.slice(1).map((_, i) => `@image${i + 2}`).join(' and ');
+                faceLock = `${avatarTag} is the person/character — maintain their exact facial features, skin tone, hair, build, and clothing style in every frame. ${productTags} ${faceAssetUris.length > 2 ? 'are' : 'is'} the hero product — maintain its exact shape, color, texture, logo, packaging, and visual identity throughout.`;
+            } else {
+                // Single character ref or no products
+                faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'represent' : 'represents'} the animated subject — maintain exact visual consistency in every frame.`;
+            }
         } else {
             // Face reference: preserve human likeness
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;

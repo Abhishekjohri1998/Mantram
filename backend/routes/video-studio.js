@@ -4064,7 +4064,18 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         const aspectRatio = parsedSettings.format || preset?.recommendedFormat || '9:16';
         const resolution = parsedSettings.resolution || '720p';
 
-        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
+        // Build reference images: avatar (face) + ALL product images (visual anchors)
+        // Previously, only imageUrls.slice(1) was included — the FIRST product image was only
+        // a "first frame" hint that the model drifted from. Now ALL product images are references
+        // so the model locks onto the product's exact appearance throughout the video.
+        const allReferenceImages = [...avatarFaceRefs, ...imageUrls];
+
+        // Determine imageRole for Atlas Cloud processing:
+        // - 'character' when avatar is present (face asset registration, no product face check)
+        // - 'product' when only product images (skip face registration entirely)
+        const imageRole = avatarFaceRefs.length > 0 ? 'character' : 'product';
+
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs, total refs=${allReferenceImages.length}`);
 
         const genResult = await submitVideoGeneration({
             prompt: finalPrompt,
@@ -4075,9 +4086,8 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             qualityMode: 'high',
             generateAudio: true,
             imageUrl: imageUrls[0] || null,
-            s3ImageUrls: imageUrls,
-            referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
-            imageRole: avatarFaceRefs.length > 0 ? 'character' : 'product',
+            referenceImages: allReferenceImages,
+            imageRole,
         });
 
         // Persist as VideoProject for polling
