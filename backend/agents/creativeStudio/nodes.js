@@ -419,10 +419,10 @@ const FORMAT_INTELLIGENCE = {
     },
     'banner': {
         label: 'Website Banner / Hero',
-        spec: '1920×600 wide banner (16:9)',
+        spec: '1920×600 wide banner (3.2:1)',
         rules: [
             'Ultra-wide composition: spread content horizontally, avoid centering everything',
-            'Leave text-safe zones on left and/or right for overlay text by the website',
+            'Leave text-safe zones on left and/or right, but keep text away from extreme edges',
             'Background should be visually rich but not compete with foreground text',
             'Consider a gradient or vignette to ensure text readability on all areas',
             'High-res, editorial-quality photography aesthetic',
@@ -1164,6 +1164,14 @@ export async function runCreativePipeline(params) {
             console.log(`⚠️ User provided reference images. Overriding catalog match ("${state.matchedProduct.title}") to rely purely on Visual Grounding.`);
             state.matchedProduct = null;
         }
+        if (state.brandIntel && state.brandIntel.productCandidates) {
+            // Also clear catalog candidates so the AI doesn't randomly pick a catalog item when given user images!
+            state.brandIntel.productCandidates = [];
+            // Force brandType to brand so it doesn't try to force a product insertion from catalog
+            if (state.brandIntel.brandType === 'product') {
+                state.brandIntel.brandType = 'brand';
+            }
+        }
     }
 
     const productName = state.matchedProduct?.title || '';
@@ -1428,6 +1436,8 @@ function buildCopyInjection(copy, aspectRatio = '1:1') {
     } else {
         parts.push(`SAFE ZONE WARNING: Do not place text at the extreme edges. Keep text inside the central safe zone.`);
     }
+
+    parts.push(`HORIZONTAL PADDING WARNING: Do NOT place text hugging the absolute left or right edge of the frame. Leave at least 15% empty padding on the left and right sides to prevent the first and last letters from being physically cut off by the canvas boundary!`);
 
     return `
 ═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══
