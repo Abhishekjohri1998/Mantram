@@ -193,7 +193,7 @@ OUTPUT IS:
 3. "Variant A" label
 4. The prompt structured EXACTLY like this:
 
-STYLE: [Rendering style — e.g. "High-end stylized 3D animated, cinematic lighting, expressive face, polished materials, comedic visual storytelling."]
+STYLE: [Determine style dynamically based on brief and preset. MUST be "Photorealistic cinematic live-action" or "High-end UGC mobile phone footage" unless the user explicitly requests animation. NEVER hardcode 3D animation unless asked.]
 WARDROBE: [avatar clothing per shot range — match environment and brand.]
 ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
 MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
