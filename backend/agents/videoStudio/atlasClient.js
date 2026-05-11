@@ -61,15 +61,12 @@ function resolveModelName(qualityMode, imageCount) {
 
 function resolveHappyHorseModelName(imageCount) {
     // HappyHorse 1.0 model slugs on Atlas Cloud workflows
-    if (imageCount > 1) {
-        console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
-        return 'atlascloud/workflow/happyhorse-1.0/reference-to-video';
+    // HappyHorse might not have a custom reference-to-video workflow, so we fall back to image-to-video
+    if (imageCount >= 1) {
+        console.log(`📌 HappyHorse: ${imageCount} image(s) → image-to-video`);
+        return 'alibaba/happyhorse/image-to-video';
     }
-    if (imageCount === 1) {
-        console.log(`📌 HappyHorse: 1 image → image-to-video`);
-        return 'atlascloud/workflow/happyhorse-1.0/image-to-video';
-    }
-    return 'alibaba/happyhorse-1.0/text-to-video';
+    return 'alibaba/happyhorse/text-to-video';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -536,7 +533,7 @@ export async function submitHappyHorseVideoGeneration({
     }
 
     // R2V: pass all reference images to submitAtlasCloudPayload for upload
-    if (s3RefImages.length > 0 && modelName.includes('reference-to-video')) {
+    if (s3RefImages.length > 0) {
         taskInput.reference_images = s3RefImages.slice(0, 9);
     }
 
