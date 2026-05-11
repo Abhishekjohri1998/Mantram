@@ -10,6 +10,7 @@ import { CreditBadge, CreditTooltipWrapper } from '../components/CreditBadge'
 import PublishModal from '../components/PublishModal'
 import Walkthrough from '../components/Walkthrough'
 import TemplateLibrary from './TemplateLibrary'
+import ViralityMiniPanel from '../components/ViralityMiniPanel'
 import './ContentStudio.css'
 // ============================================================================
 // DATA: Goals, sub-types, channels, tones
@@ -4054,7 +4055,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 // ============================================================================
 
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, brandId }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -4223,6 +4224,18 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         <p className="text-[11px] text-[var(--sys-text-muted)]">Post directly to your social media accounts</p>
                     </button>
                 </div>
+
+                {/* ── Virality Check ── */}
+                <div className="mt-2 mb-4">
+                    <ViralityMiniPanel
+                        contentType="image"
+                        mediaUrl={inlineVisualUrl || undefined}
+                        contentText={result?.content}
+                        brandId={brandId}
+                        platform={result?.platform || 'instagram'}
+                    />
+                </div>
+
                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
                     <p className="text-sm text-primary font-bold flex items-center gap-1"><span className="material-symbols-outlined text-sm">psychology</span> AI is learning from your acceptance</p>
                     <p className="text-sm text-[var(--sys-text-muted)]">Future content will align closer to this style and tone</p>
@@ -5830,6 +5843,7 @@ SPOKESPERSON QUOTES:`
                         inlineVisualUrl={inlineVisualUrl}
                         inlineVisualActive={inlineVisualActive}
                         inlineVisualProgress={inlineVisualProgress}
+                        brandId={activeBrand?._id}
                     />
                     {error && (
                         <div className={`max-w-2xl mx-auto mt-4 p-4 rounded-xl border ${error.isProviderError ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary'} text-sm text-center`}>

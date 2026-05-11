@@ -484,6 +484,16 @@ export const intel = {
     alerts: (brandId) => apiFetch(`/intel/missions/alerts?brandId=${brandId}`),
 };
 
+// ============ Virality Predictor API ============
+export const viralityPredictor = {
+    predict: (data) => apiFetch('/virality/predict', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        timeout: 120000, // 2 min — 3 model calls in sequence
+    }),
+    health: () => apiFetch('/virality/health'),
+};
+
 // ============ Nexus — Unified Agentic Interface ============
 export const nexus = {
     chat: (message, brandId, options = {}) => apiFetch('/nexus/chat', {
