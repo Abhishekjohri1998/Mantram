@@ -150,102 +150,7 @@ const PACKAGES = [
     },
 
     // ─────────────────────────────────────────────────────
-    // TIER 3: Business — ₹7,999/mo
-    // 2,000 credits/mo | Target: established brands, agencies
-    // Magnific equivalent: Business ($299)
-    // ─────────────────────────────────────────────────────
-    {
-        name: 'Business',
-        slug: 'business',
-        tagline: 'For established brands & agencies',
-        description: 'High-volume AI marketing with 2,000 monthly credits, 10 brands, 10 team seats, D2C Analytics, Avatar Studio, and priority support.',
-        tier: 3,
-        studios: {
-            contentStudio: true,
-            creativeStudio: true,
-            seoStudio: true,
-            brainstormStudio: true,
-            videoStudio: true,
-            socialMediaStudio: true,
-            conversationStudio: true,
-            adStudio: true,
-            funnelStudio: true,
-            d2cAnalytics: true,
-            skillsHub: true,
-        },
-        credits: { monthly: 2000, rollover: true, bonusOnSignup: 250 },
-        // Annual: ₹79,990 = ₹6,666/mo (16% off)
-        // Quarterly: ₹21,999 = ₹7,333/mo (8% off)
-        pricing: { monthly: 7999, quarterly: 21999, yearly: 79990, currency: 'INR' },
-        limits: { maxBrands: 10, maxTeamMembers: 10, maxProducts: 1000, maxScheduledPosts: 200, socialIntegrations: 10 },
-        badge: 'BEST VALUE',
-        color: '#f59e0b',
-        icon: 'business_center',
-        isDefault: false,
-        watermarkEnabled: false,
-        displayOrder: 3,
-        contactForPricing: false,
-        features: [
-            { name: '2,000 Credits / month + 2-month rollover', included: true },
-            { name: '+250 Bonus Credits on signup', included: true },
-            { name: '10 Brand Profiles', included: true },
-            { name: 'All AI Studios + D2C Analytics', included: true },
-            { name: '10 Team Seats', included: true },
-            { name: 'Avatar Studio Access', included: true },
-            { name: 'Skills Hub Access', included: true },
-            { name: 'Priority WhatsApp Support', included: true },
-        ]
-    },
-
-    // ─────────────────────────────────────────────────────
-    // TIER 4: Agency — Contact for Pricing
-    // Custom credits | Target: performance marketing agencies
-    // ─────────────────────────────────────────────────────
-    {
-        name: 'Agency',
-        slug: 'agency',
-        tagline: 'For performance marketing agencies',
-        description: 'Custom credit pools, unlimited brands, up to 50 team seats, white-label reports, API access, and a dedicated account manager. Built for agencies at scale.',
-        tier: 4,
-        studios: {
-            contentStudio: true,
-            creativeStudio: true,
-            seoStudio: true,
-            brainstormStudio: true,
-            videoStudio: true,
-            socialMediaStudio: true,
-            conversationStudio: true,
-            adStudio: true,
-            funnelStudio: true,
-            d2cAnalytics: true,
-            skillsHub: true,
-        },
-        credits: { monthly: 10000, rollover: true, bonusOnSignup: 1000 },
-        // contactForPricing: true — UI will show "Contact Sales" instead of price + payment
-        pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' },
-        limits: { maxBrands: 999, maxTeamMembers: 50, maxProducts: 9999, maxScheduledPosts: 9999, socialIntegrations: 50 },
-        badge: 'FOR AGENCIES',
-        color: '#ec4899',
-        icon: 'groups',
-        isDefault: false,
-        watermarkEnabled: false,
-        displayOrder: 4,
-        contactForPricing: true,
-        contactEmail: 'sales@mantram.ai',
-        features: [
-            { name: 'Custom Credit Pool (from 10,000/mo)', included: true },
-            { name: 'Unlimited Brand Profiles', included: true },
-            { name: 'All AI Studios + API Access', included: true },
-            { name: 'Up to 50 Team Seats', included: true },
-            { name: 'White-Label Reports', included: true },
-            { name: 'Dedicated Account Manager', included: true },
-            { name: 'Priority Generation Queue', included: true },
-            { name: 'Custom SLA & Uptime Guarantee', included: true },
-        ]
-    },
-
-    // ─────────────────────────────────────────────────────
-    // TIER 5: Enterprise — Contact for Pricing
+    // TIER 3: Enterprise — Contact for Pricing
     // Unlimited | Target: large enterprise, multi-national brands
     // ─────────────────────────────────────────────────────
     {
@@ -253,7 +158,7 @@ const PACKAGES = [
         slug: 'enterprise',
         tagline: 'Unlimited AI power for enterprises',
         description: 'Unlimited credits, custom integrations, white-labeling, dedicated infrastructure, and a full-service onboarding team. For organizations that demand scale.',
-        tier: 5,
+        tier: 3,
         studios: {
             contentStudio: true,
             creativeStudio: true,
@@ -276,7 +181,7 @@ const PACKAGES = [
         icon: 'diamond',
         isDefault: false,
         watermarkEnabled: false,
-        displayOrder: 5,
+        displayOrder: 3,
         contactForPricing: true,
         contactEmail: 'enterprise@mantram.ai',
         features: [
@@ -311,8 +216,6 @@ async function seed() {
         console.log('   Free:         ₹0/mo   | 100 credits');
         console.log('   Creator:      ₹1,499/mo | 200 credits');
         console.log('   Professional: ₹3,499/mo | 600 credits  [POPULAR]');
-        console.log('   Business:     ₹7,999/mo | 2,000 credits [BEST VALUE]');
-        console.log('   Agency:       Contact   | Custom credits [FOR AGENCIES]');
         console.log('   Enterprise:   Contact   | Unlimited credits');
         await mongoose.disconnect();
         process.exit(0);
