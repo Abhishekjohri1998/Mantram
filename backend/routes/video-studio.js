@@ -17,7 +17,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import { s3Client, getSignedUrlForPath, ensureS3Url } from '../utils/s3.js';
+import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
 import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
 import Avatar from '../models/Avatar.js';
