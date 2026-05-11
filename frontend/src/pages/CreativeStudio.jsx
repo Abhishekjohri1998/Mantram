@@ -1318,7 +1318,12 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const analyzeCompositionTimerRef = useRef(null)
     
     useEffect(() => {
-        if (!designBaseImage) {
+        const isCampaignShot = studioMode === 'campaignshot'
+        const prod = isCampaignShot ? csProductImage : (selectedProduct?.images?.[0]?.url || null)
+        const char = isCampaignShot ? csCharacterImage : (referenceImages?.character || characters?.[0]?.imageUrl || null)
+        const styleRef = isCampaignShot ? csRefImage : (referenceImages?.style || null)
+        
+        if (!designBaseImage && !prod && !char && !styleRef) {
             setRecommendedPrompt('')
             return
         }
@@ -1334,10 +1339,10 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                     body: JSON.stringify({
-                        templateUrl: designBaseImage,
-                        productUrl: selectedProduct?.images?.[0]?.url || null,
-                        characterUrl: referenceImages?.character || characters?.[0]?.imageUrl || null,
-                        styleUrl: referenceImages?.style || null,
+                        templateUrl: designBaseImage || null,
+                        productUrl: prod,
+                        characterUrl: char,
+                        styleUrl: styleRef,
                         brandName: activeBrand?.name
                     }),
                 })
@@ -1353,7 +1358,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         }, 1500)
         
         return () => clearTimeout(analyzeCompositionTimerRef.current)
-    }, [designBaseImage, selectedProduct, referenceImages, characters, activeBrand?.name])
+    }, [designBaseImage, selectedProduct, referenceImages, characters, activeBrand?.name, studioMode, csProductImage, csCharacterImage, csRefImage])
 
 
 
@@ -11379,10 +11384,32 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
                             {/* ── 3. Creative Direction — AI Art Director brief ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[13px]">palette</span> Creative Direction
-                                    <span className="text-[9px] opacity-50 ml-1">AI auto-directs if left blank</span>
-                                </p>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[13px]">palette</span> Creative Direction
+                                        <span className="text-[9px] opacity-50 ml-1">AI auto-directs if left blank</span>
+                                    </p>
+                                    {analyzingComposition && (
+                                        <span className="flex items-center gap-1.5 text-[9px] font-medium text-[var(--sys-primary)] animate-pulse">
+                                            <span className="material-symbols-outlined text-[10px]">visibility</span>
+                                            Analyzing...
+                                        </span>
+                                    )}
+                                </div>
+                                {recommendedPrompt && !analyzingComposition && (
+                                    <button 
+                                        onClick={() => { setCsBrief(recommendedPrompt); setRecommendedPrompt('') }}
+                                        className="mb-3 w-full flex flex-col items-start gap-1 p-2.5 rounded-lg border border-[var(--sys-primary)]/40 bg-[var(--sys-primary)]/10 text-left hover:bg-[var(--sys-primary)]/20 transition-all cursor-pointer group animate-fade-in">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--sys-primary)] w-full">
+                                            <span className="material-symbols-outlined text-[12px]">auto_fix_high</span>
+                                            ✨ Smart Direction
+                                            <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--sys-primary)] text-white px-2 py-0.5 rounded-full text-[9px]">Apply</span>
+                                        </div>
+                                        <div className="text-[10px] text-[var(--sys-text)] line-clamp-2 leading-relaxed opacity-80">
+                                            {recommendedPrompt}
+                                        </div>
+                                    </button>
+                                )}
                                 <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
                                     placeholder="Describe your vision... e.g. 'Monsoon rain, deep blue tones' or 'Sunlit terrazzo, golden hour warmth' or 'Diwali festive theme with diyas'"
                                     className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />

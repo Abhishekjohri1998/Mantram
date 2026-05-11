@@ -1563,8 +1563,8 @@ router.post('/analyze-composition', protect, async (req, res) => {
     try {
         const { templateUrl, productUrl, characterUrl, styleUrl, brandName } = req.body;
         
-        if (!templateUrl) {
-            return res.status(400).json({ success: false, error: 'Template URL is required' });
+        if (!templateUrl && !productUrl && !characterUrl && !styleUrl) {
+            return res.status(400).json({ success: false, error: 'At least one reference image is required' });
         }
 
         const apiKey = process.env.GEMINI_API_KEY;
@@ -1583,19 +1583,19 @@ router.post('/analyze-composition', protect, async (req, res) => {
             }
         }
 
-        await loadPart(templateUrl, 'IMAGE 1: The Design Template (LAYOUT BLUEPRINT)');
+        if (templateUrl) await loadPart(templateUrl, 'IMAGE 1: The Design Template (LAYOUT BLUEPRINT)');
         if (productUrl) await loadPart(productUrl, `IMAGE ${parts.length + 1}: The Hero Product to insert`);
         if (characterUrl) await loadPart(characterUrl, `IMAGE ${parts.length + 1}: The Character/Model to feature`);
         if (styleUrl) await loadPart(styleUrl, `IMAGE ${parts.length + 1}: The Style/Mood Reference`);
 
-        let promptText = `Act as an expert AI Art Director. I am providing you with a base Design Template (Image 1) and optional reference images.
+        let promptText = `Act as an expert AI Art Director. I am providing you with reference images.
 Your task is to write a highly detailed, single-paragraph generation prompt that merges these elements.
 
 CRITICAL RULES:
-1. The Template (Image 1) is the absolute layout blueprint. The output prompt MUST explicitly instruct the image model to replicate the template's composition, typography placement, and layout structure exactly.
-2. If a Product image is provided, describe how to insert it seamlessly into the template's hero position.
-3. If a Character image is provided, describe how to position them alongside the product, respecting the template's layout.
-4. If a Style Reference is provided, adapt the template's mood and color palette to match it.
+${templateUrl ? "1. The Template (Image 1) is the absolute layout blueprint. The output prompt MUST explicitly instruct the image model to replicate the template's composition, typography placement, and layout structure exactly." : "1. Create a stunning, high-end Campaign Shot poster composition."}
+2. If a Product image is provided, describe how to feature it prominently.
+3. If a Character image is provided, describe how to position them alongside the product.
+4. If a Style Reference is provided, adapt the mood and color palette to match it.
 5. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the description.
 6. Keep the final prompt under 1500 characters.
 7. Mention the brand name: ${brandName || 'The Brand'}.
