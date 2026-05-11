@@ -417,6 +417,13 @@
 
   <!-- Microsoft Clarity -->
   <script type="text/javascript">
+    // Suppress known internal Microsoft Clarity bug: Cannot read properties of null (reading 'sequence')
+    window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message && event.reason.message.includes("reading 'sequence'")) {
+            event.preventDefault(); // Stop it from throwing Uncaught in promise
+        }
+    });
+
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
         t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
