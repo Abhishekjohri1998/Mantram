@@ -319,7 +319,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
         try {
             await api('/avatar-studio/save', {
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({ name:avatarName.trim(), selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured' })
+                body:JSON.stringify({ name:avatarName.trim(), selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured', options: createMode==='generate' ? genOptions : {} })
             })
             await loadAvatars(); resetCreate()
         } catch(err) { console.error('[AvatarPicker] Save failed:', err.message) }
