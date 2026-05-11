@@ -3652,16 +3652,16 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
 
         // Persist as VideoProject
         const project = await VideoProject.create({
-            user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
+            user: req.user._id, brand: brandId, studioMode: 'q-ads', mode: 'image-to-video', status: 'generating',
             title: `Q-Ad: ${parsedProduct.productName || categoryId}`,
-            script: prompt, backendPrompt: prompt,
+            backendPrompt: prompt,
             input: {
                 brief: `Q-Ads [${categoryId}]: ${parsedProduct.productName || 'product'}`,
                 images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: i === 0 ? 'avatar' : `product-${i}` })),
-                productData: parsedProduct, categoryId
             },
             generation: {
                 provider: 'atlascloud', model: 'seedance-2.0',
+                falRequestId: genResult.taskId,
                 taskId: genResult.taskId, requestId: genResult.taskId,
                 duration, aspectRatio, progress: 0, status: 'GENERATING',
             },
@@ -3801,10 +3801,10 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             updatePayload.finalVideoUrl = result.videoUrl;
         }
 
-        // V2 projects store taskId in generation.taskId and generation.requestId
-        // Use $or to match both fields since older projects may have different field names
+        // V2 projects store taskId in generation.taskId, generation.requestId, and generation.falRequestId
+        // Use $or to match all possible fields
         await VideoProject.findOneAndUpdate(
-            { $or: [{ 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
+            { $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
             { $set: updatePayload }
         ).catch(e => console.warn('[Q-Ads V2 Status] DB update failed:', e.message));
 
@@ -4110,20 +4110,18 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 user: req.user._id,
                 brand: brandId,
                 studioMode: 'q-ads-v2',
+                mode: 'image-to-video',
                 status: 'generating',
                 title: `Q-Ad [${preset?.name || presetId}] Variant ${variantId}`,
-                script: finalPrompt,
                 backendPrompt: finalPrompt,
                 input: {
-                    brief: userBrief || '',
+                    brief: userBrief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
                     images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
-                    presetId,
-                    variantId,
-                    legend: legend || '',
                 },
                 generation: {
                     provider: genResult.provider || 'atlascloud',
                     model: selectedModel,
+                    falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     duration,
@@ -4131,8 +4129,6 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     progress: 0,
                     status: 'GENERATING',
                 },
-                settings: parsedSettings,
-                categoryId: presetId,
             }).catch(e => { console.warn('[Q-Ads V2 Gen] VideoProject create failed:', e.message); return null; });
             projectId = project?._id;
         }

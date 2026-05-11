@@ -1074,13 +1074,20 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
             {/* History Videos */}
             <div className="qv2-bg">
-                {[
-                    ...projects.filter(p => p.studioMode === 'q-ads-v2' && p.generation?.videoUrl),
-                    ...Object.entries(videoJobs)
-                        .filter(([, j]) => j.status === 'done' && j.videoUrl && !projects.some(p => p.generation?.videoUrl === j.videoUrl))
-                        .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }))
-                ].map(p => (
-                    <GridVideo key={p._id} project={p} onReuse={handleReuse} onPublish={setPublishUrl} />
+                {(() => {
+                    // Source 1: DB projects tagged as q-ads-v2 (or matching by title pattern as fallback)
+                    const dbVideos = projects.filter(p =>
+                        (p.studioMode === 'q-ads-v2' || p.title?.startsWith('Q-Ad')) &&
+                        (p.generation?.videoUrl || p.finalVideoUrl)
+                    );
+                    // Source 2: Session videos not already in source 1 (dedup only against source 1)
+                    const sessionVideos = Object.entries(videoJobs)
+                        .filter(([, j]) => j.status === 'done' && j.videoUrl &&
+                            !dbVideos.some(p => (p.generation?.videoUrl || '').includes(j.videoUrl?.split('?')[0]?.slice(-30) || '___')))
+                        .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }));
+                    return [...sessionVideos, ...dbVideos];
+                })().map(p => (
+                    <GridVideo key={p._id} project={{ ...p, generation: { ...p.generation, videoUrl: p.generation?.videoUrl || p.finalVideoUrl } }} onReuse={handleReuse} />
                 ))}
             </div>
 

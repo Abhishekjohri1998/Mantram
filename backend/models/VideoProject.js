@@ -123,6 +123,10 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Step 6: Generated Video ──
     generation: {
         falRequestId: { type: String, default: '' },
+        requestId: { type: String, default: '' },     // Atlas Cloud / generic provider request ID
+        taskId: { type: String, default: '' },         // Atlas Cloud task ID alias
+        status: { type: String, default: '' },         // GENERATING | COMPLETED | FAILED
+        model: { type: String, default: '' },          // Model used for generation
         falEndpoint: { type: String, default: '' },
         falStatusUrl: { type: String, default: '' },
         falResultUrl: { type: String, default: '' },
@@ -133,6 +137,8 @@ const videoProjectSchema = new mongoose.Schema({
         s3ArchivedAt: { type: Date },                    // When the video was permanently archived to S3
         thumbnailUrl: { type: String, default: '' },
         audioUrl: { type: String, default: '' },
+        duration: { type: Number },                      // Duration in seconds
+        aspectRatio: { type: String, default: '' },      // 9:16, 16:9, 1:1
         progress: { type: Number, default: 0 },  // 0-100
         isWatermarkRemoved: { type: Boolean, default: false }, // For two-step providers like PiAPI
         startedAt: { type: Date },
