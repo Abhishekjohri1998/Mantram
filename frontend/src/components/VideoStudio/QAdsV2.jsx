@@ -723,7 +723,9 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 body: JSON.stringify({
                     productImageUrls: productImgs,
                     avatarUrl: avatarUrl,
-                    brandName: activeBrand?.name
+                    brandName: activeBrand?.name,
+                    userBrief: userBrief || '',
+                    productData: productData || null,
                 })
             });
             if (res.prompt) {
@@ -734,7 +736,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         } finally {
             setIsAnalyzingAssets(false);
         }
-    }, [productImgs, avatarUrl, activeBrand]);
+    }, [productImgs, avatarUrl, activeBrand, userBrief, productData]);
 
 
     // Step 1 — Generate 3 prompt variants (single Claude call)

@@ -3840,9 +3840,10 @@ async function fetchImageAsInlineData(imageUrl) {
 
 // ── POST /api/video-studio/ugc-pro/qads/v2/analyze-assets ──
 // Deep visual analysis of uploaded product and avatar images to generate a rich video brief
+// Accepts optional userBrief and productData to ground the analysis in user intent
 router.post('/ugc-pro/qads/v2/analyze-assets', protect, async (req, res) => {
     try {
-        const { productImageUrls, avatarUrl, brandName } = req.body;
+        const { productImageUrls, avatarUrl, brandName, userBrief, productData } = req.body;
         
         if ((!productImageUrls || productImageUrls.length === 0) && !avatarUrl) {
             return res.status(400).json({ success: false, error: 'At least one reference image is required' });
@@ -3864,26 +3865,66 @@ router.post('/ugc-pro/qads/v2/analyze-assets', protect, async (req, res) => {
         }
 
         if (productImageUrls && productImageUrls.length > 0) {
-            await loadPart(productImageUrls[0], 'IMAGE 1: The Product');
+            for (let i = 0; i < Math.min(productImageUrls.length, 3); i++) {
+                await loadPart(productImageUrls[i], `IMAGE ${parts.length + 1}: Product Reference ${i + 1}`);
+            }
         }
         if (avatarUrl) {
             await loadPart(avatarUrl, `IMAGE ${parts.length + 1}: The Avatar/Character`);
         }
 
-        let promptText = `Act as an expert AI Video Director. I am providing you with reference images.
-Your task is to write a highly detailed, descriptive generation prompt that merges these elements into a stunning video scene.
+        // Parse product data if provided
+        const parsedProduct = typeof productData === 'string' ? (() => { try { return JSON.parse(productData); } catch { return null; } })() : (productData || null);
 
-CRITICAL RULES:
-1. If a Product image is provided, explicitly describe its physical appearance, packaging, color, and distinguishing visual features. Do NOT invent features that are not visible.
-2. If an Avatar/Character image is provided, explicitly describe their exact pose, body language, facial features, and clothing style so a video model can replicate them perfectly without seeing the image. Do NOT invent features that are not visible. Do NOT use age descriptors.
-3. Write a highly detailed, cinematic generation prompt that describes exactly how these elements interact. 
-4. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the visual description.
-5. Provide a complete description without any length constraints. Do not abruptly cut off.
-${brandName ? `6. Mention the brand name: ${brandName}.` : ''}
+        // Build context sections
+        const contextSections = [];
+        
+        if (userBrief && userBrief.trim()) {
+            contextSections.push(`USER'S CREATIVE DIRECTION:\n"${userBrief.trim()}"\nThis is the user's vision — honor their intent, tone, and any specific instructions they provided.`);
+        }
+        
+        if (parsedProduct && (parsedProduct.productName || parsedProduct.description)) {
+            let productCtx = 'PRODUCT DETAILS (from URL analysis):';
+            if (parsedProduct.productName) productCtx += `\n- Name: ${parsedProduct.productName}`;
+            if (parsedProduct.brand) productCtx += `\n- Brand: ${parsedProduct.brand}`;
+            if (parsedProduct.description) productCtx += `\n- Description: ${parsedProduct.description}`;
+            if (parsedProduct.price) productCtx += `\n- Price: ${parsedProduct.price}`;
+            if (parsedProduct.features && parsedProduct.features.length) productCtx += `\n- Key Features: ${parsedProduct.features.slice(0, 5).join(', ')}`;
+            contextSections.push(productCtx);
+        }
+        
+        if (brandName) {
+            contextSections.push(`BRAND: ${brandName}`);
+        }
+
+        const contextBlock = contextSections.length > 0
+            ? `\n\n═══ CONTEXT PROVIDED ═══\n${contextSections.join('\n\n')}\n═══ END CONTEXT ═══\n\n`
+            : '\n\n';
+
+        let promptText = `You are an expert AI Video Director specializing in cinematic ad generation.
+
+I am providing you with reference images${contextSections.length > 0 ? ' and contextual information' : ''}.
+Your task is to synthesize ALL provided inputs into a single, richly detailed video generation prompt.
+${contextBlock}IMAGES PROVIDED:
+${labels.join('\n')}
+
+YOUR TASK — Write a comprehensive, cinematic video generation prompt following these rules:
+
+1. HONOR THE USER'S BRIEF: If a creative direction was provided above, it is your PRIMARY guide. Build upon it — expand, enrich, and detail it, but do NOT contradict or ignore it.
+
+2. PRODUCT ACCURACY: If product images or product data are provided, explicitly describe the product's exact physical appearance — shape, color, texture, packaging, logo placement, material. Use the product data (name, description, features) to accurately name and describe it. Do NOT invent features that are not visible or described.
+
+3. AVATAR/CHARACTER FIDELITY: If an avatar/character image is provided, describe their exact appearance in exhaustive detail — face shape, skin tone, hair style and color, facial hair, expression, body build, posture, clothing (every garment piece, color, fit, pattern). Describe them so precisely that a video model can replicate them perfectly without seeing the image. Do NOT use age descriptors. Do NOT invent features.
+
+4. SCENE COMPOSITION: Describe how the person and product interact — staging, hand placement, camera angle, background environment, lighting setup (direction, color temperature, shadows), depth of field, and mood.
+
+5. MOTION & CINEMATOGRAPHY: Describe camera movement (dolly, pan, tracking), subject motion (gestures, expressions changing), product handling, and temporal flow of the scene from start to finish.
+
+6. OUTPUT FORMAT: Write ONLY the video prompt — no pleasantries, no markdown headers, no quotes, no explanations. Start directly with the scene description. Be exhaustively detailed with no arbitrary length limits.
 
 Write the detailed video prompt now:`;
 
-        parts.push({ text: labels.join('\n\n') + '\n\n' + promptText });
+        parts.push({ text: promptText });
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
         const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-pro-exp-02-05', 'gemini-1.5-pro'];
@@ -3899,9 +3940,9 @@ Write the detailed video prompt now:`;
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ role: 'user', parts }],
-                        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+                        generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
                     }),
-                    signal: AbortSignal.timeout(30_000),
+                    signal: AbortSignal.timeout(45_000),
                 });
 
                 data = await resp.json();
@@ -4061,8 +4102,8 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 generation: {
                     provider: genResult.provider || 'atlascloud',
                     model: selectedModel,
-                    taskId: genResult.taskId || genResult.requestId || genResult.falRequestId,
-                    requestId: genResult.taskId || genResult.requestId || genResult.falRequestId,
+                    taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
+                    requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     duration,
                     aspectRatio,
                     progress: 0,
@@ -4077,9 +4118,9 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         res.json({
             success: true,
             projectId,
-            requestId: genResult.taskId,
-            jobId: genResult.taskId,
-            falRequestId: genResult.taskId,
+            requestId: genResult.requestId || genResult.taskId,
+            jobId: genResult.requestId || genResult.taskId,
+            falRequestId: genResult.requestId || genResult.taskId,
             provider: 'atlascloud',
             variantId,
             presetId,
