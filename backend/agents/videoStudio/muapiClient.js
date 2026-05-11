@@ -169,7 +169,7 @@ export async function submitMuApiVideoGeneration({
         
         // SECURE: Strip any @imageX tags that exceed the number of images we actually have
         // Example: If prompt has @image7 but we only uploaded 3, remove @image7 to prevent 500 errors
-        finalPrompt = finalPrompt.replace(/@image(\d+)/g, (match, p1) => {
+        finalPrompt = finalPrompt.replace(/@image(\d+)/gi, (match, p1) => {
             const index = parseInt(p1, 10);
             if (index > imagesList.length) {
                 console.warn(`🛑 Removing invalid tag ${match} from prompt (only ${imagesList.length} images provided)`);
@@ -182,7 +182,7 @@ export async function submitMuApiVideoGeneration({
     } else {
         // TEXT-TO-VIDEO ONLY: Strictly remove any @image tags that might have leaked from prompt enhancement
         // This prevents "Prompt references @image1 but only 0 image(s) provided" MuAPI error.
-        let cleanPrompt = prompt.trim().replace(/@image\d+/g, '').replace(/\(\s*Visual reference:\s*\)/g, '').trim();
+        let cleanPrompt = prompt.trim().replace(/@image\d+/gi, '').replace(/\(\s*Visual reference:\s*\)/g, '').trim();
         payload.prompt = cleanPrompt;
         console.log(`📝 [MuAPI] T2V Clean Prompt: ${cleanPrompt}`);
     }
