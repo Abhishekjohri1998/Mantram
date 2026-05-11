@@ -1605,21 +1605,61 @@ Write the generation prompt now:`;
         parts.push({ text: labels.join('\n\n') + '\n\n' + promptText });
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        const modelId = 'gemini-2.5-flash';
-        const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`;
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-pro-exp-02-05', 'gemini-1.5-pro'];
+        
+        let data = null;
+        let lastError = null;
 
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-            }),
-            signal: AbortSignal.timeout(30_000),
-        });
+        for (const modelId of modelsToTry) {
+            try {
+                const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`;
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                    }),
+                    signal: AbortSignal.timeout(30_000),
+                });
 
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error.message);
+                data = await resp.json();
+                
+                if (data.error) {
+                    const errMsg = data.error.message?.toLowerCase() || '';
+                    const isRetryable = resp.status === 503 
+                        || resp.status === 429 
+                        || errMsg.includes('overloaded') 
+                        || errMsg.includes('high demand')
+                        || errMsg.includes('temporarily down')
+                        || errMsg.includes('no longer available')
+                        || errMsg.includes('deprecated')
+                        || errMsg.includes('not found')
+                        || resp.status === 404
+                        || (resp.status === 400 && errMsg.includes('model'));
+                        
+                    if (isRetryable) {
+                        console.warn(`   [AnalyzeComp] ${modelId} unavailable (${resp.status}): ${data.error.message?.substring(0, 80)}. Trying next...`);
+                        lastError = new Error(data.error.message);
+                        data = null;
+                        continue;
+                    }
+                    throw new Error(data.error.message);
+                }
+                console.log(`   [AnalyzeComp] ✅ Using ${modelId} successfully`);
+                break; // Success
+            } catch (fetchErr) {
+                if (fetchErr.name === 'AbortError') {
+                    console.warn(`   [AnalyzeComp] ${modelId} timed out after 30s, trying next...`);
+                    lastError = fetchErr;
+                    data = null;
+                    continue;
+                }
+                throw fetchErr;
+            }
+        }
+
+        if (!data) throw lastError || new Error('All Gemini models unavailable for composition analysis — please try again shortly');
 
         let detailedPrompt = '';
         const allParts = data.candidates?.[0]?.content?.parts || [];
