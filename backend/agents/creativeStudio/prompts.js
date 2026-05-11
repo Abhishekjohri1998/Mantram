@@ -55,11 +55,12 @@ ${FORMAT_COMPOSITION_BRIEF(aspectRatio)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NON-NEGOTIABLES (in priority order):
-1. BRAND FIDELITY — Brand DNA above is your anchor. Every choice serves the brand's voice, palette, attitude.
-2. FORMAT FIDELITY — Compose for the canvas above. Vertical 9:16 ≠ square 1:1 ≠ horizontal 16:9. Each is a different image.
-3. MARKETING JOB — Every image has work to do. Stop scroll → hold attention → make the viewer want the thing → make them act.
-4. ANTI-AI-SLOP — In 2026 generic AI imagery is recognised and skipped by viewers AND penalised by Google's Helpful Content guidance. Specificity, point of view, and brand opinion are the antidote.
-5. STYLE RESTRAINT — A 2026 trend is only useful if it serves the brand. Never let a trend override the brand's core identity.
+1. BRIEF IS KING — The user's CREATIVE BRIEF defines the SUBJECT and THEME. The Brand DNA defines the AESTHETIC (lighting, colors, style). NEVER ignore the brief. If the brief asks for "Mother's Day", the image MUST be about Mother's Day, styled in the brand's aesthetic.
+2. BRAND FIDELITY — Brand DNA above is your anchor. Every choice serves the brand's voice, palette, attitude.
+3. FORMAT FIDELITY — Compose for the canvas above. Vertical 9:16 ≠ square 1:1 ≠ horizontal 16:9. Each is a different image.
+4. MARKETING JOB — Every image has work to do. Stop scroll → hold attention → make the viewer want the thing → make them act.
+5. ANTI-AI-SLOP — In 2026 generic AI imagery is recognised and skipped by viewers. Specificity, point of view, and brand opinion are the antidote.
+6. STYLE RESTRAINT — A 2026 trend is only useful if it serves the brand. Never let a trend override the brand's core identity.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -187,10 +188,11 @@ ${FORMAT_COMPOSITION_BRIEF(aspectRatio)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 NON-NEGOTIABLES:
-1. BRAND FIDELITY — Brand DNA is the foundation. 2026 trends serve the brand, never override it.
-2. FORMAT FIDELITY — Compose for the canvas above. Square ≠ vertical ≠ horizontal.
-3. MARKETING JOB — Every image must stop scroll, hold attention, build want, drive action.
-4. ANTI-AI-SLOP — Specificity, opinion, point of view. Generic AI output is penalised by Google's Helpful Content guidance and skipped by viewers in 2026.
+1. BRIEF IS KING — The user's CREATIVE BRIEF defines the SUBJECT and THEME. The Brand DNA defines the AESTHETIC (lighting, colors, style). NEVER ignore the brief. If the brief asks for "Mother's Day", the image MUST be about Mother's Day, styled in the brand's aesthetic.
+2. BRAND FIDELITY — Brand DNA is the foundation of the visual style. 2026 trends serve the brand, never override it.
+3. FORMAT FIDELITY — Compose for the canvas above. Square ≠ vertical ≠ horizontal.
+4. MARKETING JOB — Every image must stop scroll, hold attention, build want, drive action.
+5. ANTI-AI-SLOP — Specificity, opinion, point of view. Generic AI output is penalised by Google's Helpful Content guidance and skipped by viewers in 2026.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2026 DESIGN AESTHETIC LIBRARY
@@ -243,7 +245,7 @@ When typography appears in the image:
 → serif-elegant brand → refined letterforms, fine weight, classical proportion
 → geometric-tech brand → clean sans-serif, precision spacing, clinical precision
 → handwritten-casual → organic, warm, intentionally imperfect energy
-→ NEVER render the actual brand name itself — use a thematic placeholder word or leave a clean space for the post-process overlay
+→ NEVER render the actual brand name itself, or meta-words like "DNA", "Brand", or "Product". Use a thematic placeholder word relevant to the campaign (e.g. "LOVE", "SALE", "NOW"), or leave a clean space for the post-process overlay
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VISUAL DNA GROUND TRUTH — YOUR ART DIRECTION ANCHOR
