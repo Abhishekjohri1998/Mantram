@@ -17,7 +17,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import { s3Client } from '../utils/s3.js';
+import { s3Client, getSignedUrlForPath, ensureS3Url } from '../utils/s3.js';
 import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
 import Avatar from '../models/Avatar.js';
@@ -3808,6 +3808,141 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Q-Ads V2 Image Analysis (Visual Grounding)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchImageAsInlineData(imageUrl) {
+    if (!imageUrl || typeof imageUrl !== 'string') return null
+    try {
+        let fetchUrl = imageUrl
+        const isOurS3 = imageUrl.includes('amazonaws.com') && (
+            imageUrl.includes('mantram-assets') ||
+            imageUrl.includes('mantram-media')
+        )
+        if (isOurS3) {
+            fetchUrl = await getSignedUrlForPath(imageUrl, 300)
+        }
+        const resp = await fetch(fetchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(20_000),
+        })
+        if (!resp.ok) return null
+        const buffer = await resp.arrayBuffer()
+        const contentType = resp.headers.get('content-type') || 'image/jpeg'
+        return { inlineData: { mimeType: contentType, data: Buffer.from(buffer).toString('base64') } }
+    } catch (err) {
+        console.error(`❌ fetchImageAsInlineData failed: ${err.message}`)
+        return null
+    }
+}
+
+// ── POST /api/video-studio/ugc-pro/qads/v2/analyze-assets ──
+// Deep visual analysis of uploaded product and avatar images to generate a rich video brief
+router.post('/ugc-pro/qads/v2/analyze-assets', protect, async (req, res) => {
+    try {
+        const { productImageUrls, avatarUrl, brandName } = req.body;
+        
+        if ((!productImageUrls || productImageUrls.length === 0) && !avatarUrl) {
+            return res.status(400).json({ success: false, error: 'At least one reference image is required' });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return res.status(400).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        const parts = [];
+        const labels = [];
+        
+        async function loadPart(url, label) {
+            if (!url) return;
+            const part = await fetchImageAsInlineData(url);
+            if (part) {
+                parts.push(part);
+                labels.push(label);
+            }
+        }
+
+        if (productImageUrls && productImageUrls.length > 0) {
+            await loadPart(productImageUrls[0], 'IMAGE 1: The Product');
+        }
+        if (avatarUrl) {
+            await loadPart(avatarUrl, `IMAGE ${parts.length + 1}: The Avatar/Character`);
+        }
+
+        let promptText = `Act as an expert AI Video Director. I am providing you with reference images.
+Your task is to write a highly detailed, descriptive generation prompt that merges these elements into a stunning video scene.
+
+CRITICAL RULES:
+1. If a Product image is provided, explicitly describe its physical appearance, packaging, color, and distinguishing visual features. Do NOT invent features that are not visible.
+2. If an Avatar/Character image is provided, explicitly describe their exact pose, body language, facial features, and clothing style so a video model can replicate them perfectly without seeing the image. Do NOT invent features that are not visible. Do NOT use age descriptors.
+3. Write a highly detailed, cinematic generation prompt that describes exactly how these elements interact. 
+4. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the visual description.
+5. Provide a complete description without any length constraints. Do not abruptly cut off.
+${brandName ? `6. Mention the brand name: ${brandName}.` : ''}
+
+Write the detailed video prompt now:`;
+
+        parts.push({ text: labels.join('\n\n') + '\n\n' + promptText });
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-pro-exp-02-05', 'gemini-1.5-pro'];
+        
+        let data = null;
+        let lastError = null;
+
+        for (const modelId of modelsToTry) {
+            try {
+                const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`;
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+                    }),
+                    signal: AbortSignal.timeout(30_000),
+                });
+
+                data = await resp.json();
+                
+                if (data.error) {
+                    const errMsg = data.error.message?.toLowerCase() || '';
+                    const isRetryable = resp.status === 503 || resp.status === 429 || errMsg.includes('overloaded');
+                    if (isRetryable) {
+                        lastError = new Error(data.error.message);
+                        data = null;
+                        continue;
+                    }
+                    throw new Error(data.error.message);
+                }
+                break;
+            } catch (fetchErr) {
+                if (fetchErr.name === 'AbortError') {
+                    lastError = fetchErr;
+                    data = null;
+                    continue;
+                }
+                throw fetchErr;
+            }
+        }
+
+        if (!data) throw lastError || new Error('All Gemini models unavailable for asset analysis');
+
+        let detailedPrompt = '';
+        const allParts = data.candidates?.[0]?.content?.parts || [];
+        for (const p of allParts) {
+            if (p.text && !p.thought) detailedPrompt += p.text;
+        }
+
+        res.json({ success: true, prompt: detailedPrompt.trim() });
+
+    } catch (error) {
+        console.error('❌ Error analyzing video assets:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // ── GET /api/video-studio/ugc-pro/qads/v2/presets ──
 // Returns all 13 presets for frontend grid

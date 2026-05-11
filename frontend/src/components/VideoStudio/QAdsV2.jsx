@@ -549,6 +549,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
     const fileRef = useRef(null)
     const prodImgRef = useRef(null)  // product image file upload
     const [isAnalyzing, setIsAnalyzing] = useState(false)
+    const [isAnalyzingAssets, setIsAnalyzingAssets] = useState(false)
     const [publishUrl, setPublishUrl] = useState('')
 
     // Prompt generation state (3 variants)
@@ -707,6 +708,33 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         } catch (e) { setError(e.message) }
         setIsAnalyzing(false)
     }, [productUrl, activeBrand])
+
+    // Deep Visual Analysis of Assets (Prompt Enhancement)
+    const analyzeAssets = useCallback(async () => {
+        if (!productImgs.length && !avatarUrl) {
+            setError('Please upload a product or avatar image first to generate a smart direction.');
+            return;
+        }
+        setIsAnalyzingAssets(true);
+        setError(null);
+        try {
+            const res = await api('/video-studio/ugc-pro/qads/v2/analyze-assets', {
+                method: 'POST',
+                body: JSON.stringify({
+                    productImageUrls: productImgs,
+                    avatarUrl: avatarUrl,
+                    brandName: activeBrand?.name
+                })
+            });
+            if (res.prompt) {
+                setUserBrief(res.prompt);
+            }
+        } catch (e) {
+            setError('Failed to analyze assets: ' + e.message);
+        } finally {
+            setIsAnalyzingAssets(false);
+        }
+    }, [productImgs, avatarUrl, activeBrand]);
 
 
     // Step 1 — Generate 3 prompt variants (single Claude call)
@@ -911,6 +939,33 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                         onChange={e => setUserBrief(e.target.value)}
                         disabled={isGeneratingPrompts}
                     />
+                    {(productImgs.length > 0 || avatarUrl) && (
+                        <button
+                            onClick={analyzeAssets}
+                            disabled={isAnalyzingAssets}
+                            style={{
+                                background: 'rgba(16,185,129,0.1)',
+                                color: '#10b981',
+                                border: '1px solid rgba(16,185,129,0.3)',
+                                borderRadius: 10,
+                                padding: '8px 12px',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                whiteSpace: 'nowrap',
+                                marginLeft: 8
+                            }}
+                        >
+                            {isAnalyzingAssets ? (
+                                <><span className="material-symbols-outlined spin" style={{ fontSize: 14 }}>autorenew</span> Analyzing...</>
+                            ) : (
+                                <>✨ Smart Direction</>
+                            )}
+                        </button>
+                    )}
                 </div>
 
                 {/* Row 2: Config + blocks + generate */}
