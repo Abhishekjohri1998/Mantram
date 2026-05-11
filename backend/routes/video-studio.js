@@ -3878,28 +3878,24 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             console.log(`[Q-Ads V2] Avatar → face reference (Atlas Asset Library): ${avatarUrl.substring(0, 60)}...`);
         }
 
-        // Strip legend from prompt and remap <<<image_n>>> tags
+        // Strip legend from prompt
         let finalPrompt = prompt
-            .replace(/<<<image_\d+>>>\s*=.*\n?/g, '')  // remove legend lines if duplicated
+            .replace(/@image\d+\s*=.*\n?/g, '')  // remove legend lines if duplicated
             .trim();
-
-        // Keep @Image tags as-is — Atlas injects face-lock prefix automatically.
-        // Just clean the <<<image_n>>> template syntax. Use lowercase @image so sanitizers can strip phantom tags.
-        finalPrompt = finalPrompt.replace(/<<<image_1>>>/g, '@image1');
-        finalPrompt = finalPrompt.replace(/<<<image_2>>>/g, '@image2');
-        finalPrompt = finalPrompt.replace(/<<<image_\d+>>>/g, '@image1');
 
         const selectedModel = parsedSettings.model || 'seedance-2.0';
         const duration = Math.min(parseInt(parsedSettings.duration || preset?.recommendedDuration || 8), 15);
         const aspectRatio = parsedSettings.format || preset?.recommendedFormat || '9:16';
+        const resolution = parsedSettings.resolution || '720p';
 
-        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
 
         const genResult = await submitVideoGeneration({
             prompt: finalPrompt,
             model: selectedModel,
             duration,
             aspectRatio,
+            resolution,
             qualityMode: 'high',
             generateAudio: true,
             imageUrl: imageUrls[0] || null,
