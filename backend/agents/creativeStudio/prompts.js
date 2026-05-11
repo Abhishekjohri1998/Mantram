@@ -138,6 +138,8 @@ COMPOSITION FRAMEWORKS — CHOOSE ONE:
 • SPLIT COMPOSITION: Visual split or duality — two worlds, two moods, creative tension.
 
 RULES:
+- TEXT LENGTH LIMIT: If the aesthetic demands text, NEVER generate more than 1 to 3 short words. Long sentences WILL be cropped off the edges. Keep it punchy.
+- SAFE ZONES: Ensure extreme padding around the text. Never push text to the extreme edges of the canvas, especially in wide or odd aspect ratios, or it will be clipped.
 1. Analyse brief → identify MARKETING JOB, then THEME/OCCASION/MOOD, then choose DESIGN AESTHETIC
 2. Decide PRODUCT INTEGRATION level from brief intent (hero / supporting / ambient / none)
 3. Choose a COMPOSITION FRAMEWORK that creates tension AND fits the canvas above
@@ -235,9 +237,12 @@ TYPOGRAPHY RULE — READ CAREFULLY (this is a precision rule, not a blanket ban)
    Brand logo | Brand name as readable text | Website URL | Social handles | Hex colour codes
 
 ✅ ACTIVELY USE when the brief or chosen aesthetic demands it:
-   Atmospheric or thematic typography as a design element (editorial brutalism requires this)
-   A bold headline word or short phrase that serves as visual composition (not brand identity)
-   Typographic layouts where the type IS part of the creative concept
+   Atmospheric or thematic typography as a design element (editorial brutalism requires this).
+   A bold headline word or short phrase that serves as visual composition.
+   
+⚠️ STRICT TYPOGRAPHY CONSTRAINTS:
+1. TEXT LENGTH LIMIT: NEVER generate more than 1 to 3 short words. Long sentences WILL be cropped off the edges. Keep it punchy (e.g., "INNOVATION", "MASTERPIECE").
+2. SAFE ZONES: Ensure extreme padding around the text. Never push text to the extreme edges of the canvas, especially in wide or odd aspect ratios, or it will be clipped.
 
 When typography appears in the image:
 → Style it based on the brand's Typography Personality (from Brand DNA)

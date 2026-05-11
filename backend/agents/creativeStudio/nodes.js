@@ -489,6 +489,20 @@ export async function artDirectorNode(state) {
         }
     }
 
+    // ── Visual Grounding intelligence (from MCoT product image analysis) ──
+    const vgSection = state.visualGrounding ? [
+        `\n━━━ PRODUCT VISUAL INTELLIGENCE (from MCoT image analysis) ━━━`,
+        state.visualGrounding.productAnalysis ? `Visual Description: ${state.visualGrounding.productAnalysis}` : '',
+        state.visualGrounding.keyVisualFeatures?.length ? `Key Features: ${state.visualGrounding.keyVisualFeatures.join(' | ')}` : '',
+        state.visualGrounding.materialFinish ? `Materials & Finish: ${state.visualGrounding.materialFinish}` : '',
+        state.visualGrounding.generationGuidance ? `Generation Rules: ${state.visualGrounding.generationGuidance}` : '',
+        state.visualGrounding.brandVisualWorld ? `Product Visual World: ${state.visualGrounding.brandVisualWorld}` : '',
+        state.visualGrounding.lightingSuggestion ? `Optimal Lighting: ${state.visualGrounding.lightingSuggestion}` : '',
+        state.visualGrounding.environmentalAffinities?.length ? `Strong Environments for this product: ${state.visualGrounding.environmentalAffinities.join(' | ')}` : '',
+        state.visualGrounding.humanContextClue ? `Human Presence Signal: ${state.visualGrounding.humanContextClue}` : '',
+        `\n⚠️ CRITICAL: The user has provided an image of a specific product. You MUST base your creative direction on the visual description above, even if it doesn't match a specific product name in the catalog.`
+    ].filter(Boolean).join('\n') : '';
+
     const userPrompt = [
         `CREATIVE BRIEF: ${state.brief}`,
         occasionHint,
@@ -506,6 +520,7 @@ export async function artDirectorNode(state) {
         intel.visualDNA?.designAvoid?.length > 0 ? `AVOID: ${intel.visualDNA.designAvoid.slice(0, 3).join('; ')}` : '',
         state.references ? `REFERENCE NOTES: ${state.references}` : '',
         state.productName ? `PRODUCT: ${state.productName}` : '',
+        vgSection,
         productContext,
         // When no product is matched, give the agent the full catalog + decision authority
         intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION REQUIRED — NO PRODUCT WAS AUTO-MATCHED:\nThe user's brief didn't clearly reference any specific product. As the Art Director, YOU must decide:\n1. ANALYZE the brief — does it have ANY thematic connection to a product category? (e.g. "summer vibes" → portable speakers/earbuds)\n2. If YES → pick the most relevant product from the catalog below and integrate it naturally at a SUPPORTING level (30-40% of the image)\n3. If the brief is an OCCASION/GREETING → create a brand-atmosphere scene using the brand's visual identity, colors, and personality. Products appear as ambient props if at all (10-20%), NOT as the hero.\n4. If the brief is PURELY about brand identity → showcase the brand's world without forcing any product.\n\nDO NOT randomly pick a product just to fill space. Make a creative decision.` : '',
@@ -590,10 +605,15 @@ export async function fastCreativeDirectorNode(state) {
     // ── Visual Grounding intelligence (from MCoT product image analysis) ──
     const vgSection = state.visualGrounding ? [
         `\n━━━ PRODUCT VISUAL INTELLIGENCE (from MCoT image analysis) ━━━`,
+        state.visualGrounding.productAnalysis ? `Visual Description: ${state.visualGrounding.productAnalysis}` : '',
+        state.visualGrounding.keyVisualFeatures?.length ? `Key Features: ${state.visualGrounding.keyVisualFeatures.join(' | ')}` : '',
+        state.visualGrounding.materialFinish ? `Materials & Finish: ${state.visualGrounding.materialFinish}` : '',
+        state.visualGrounding.generationGuidance ? `Generation Rules: ${state.visualGrounding.generationGuidance}` : '',
         state.visualGrounding.brandVisualWorld ? `Product Visual World: ${state.visualGrounding.brandVisualWorld}` : '',
         state.visualGrounding.lightingSuggestion ? `Optimal Lighting: ${state.visualGrounding.lightingSuggestion}` : '',
         state.visualGrounding.environmentalAffinities?.length ? `Strong Environments for this product: ${state.visualGrounding.environmentalAffinities.join(' | ')}` : '',
         state.visualGrounding.humanContextClue ? `Human Presence Signal: ${state.visualGrounding.humanContextClue}` : '',
+        `\n⚠️ CRITICAL: The user has provided an image of a specific product. You MUST base your prompt on the visual description above, even if it doesn't match a specific product name in the catalog.`
     ].filter(Boolean).join('\n') : '';
 
     const userPrompt = [
@@ -666,6 +686,15 @@ export async function promptEngineerNode(state) {
         `RULE: Describe the product appearance ONLY based on the data above. Never invent product details, shapes, or features.`,
     ].filter(Boolean).join('\n') : '';
 
+    const vgSection = state.visualGrounding ? [
+        `\n━━━ PRODUCT VISUAL INTELLIGENCE (from MCoT image analysis) ━━━`,
+        state.visualGrounding.productAnalysis ? `Visual Description: ${state.visualGrounding.productAnalysis}` : '',
+        state.visualGrounding.keyVisualFeatures?.length ? `Key Features: ${state.visualGrounding.keyVisualFeatures.join(' | ')}` : '',
+        state.visualGrounding.materialFinish ? `Materials & Finish: ${state.visualGrounding.materialFinish}` : '',
+        state.visualGrounding.generationGuidance ? `Generation Rules: ${state.visualGrounding.generationGuidance}` : '',
+        `\n⚠️ CRITICAL: Ensure the final prompt strictly features the product described in this visual intelligence section.`
+    ].filter(Boolean).join('\n') : '';
+
     // Get format-specific intelligence for prompt engineer too
     const formatKey2 = state.format || 'instagram-post';
     const formatIntel2 = FORMAT_INTELLIGENCE[formatKey2];
@@ -695,6 +724,7 @@ export async function promptEngineerNode(state) {
         formatIntel2 ? `\n🎯 PLATFORM-SPECIFIC REQUIREMENTS (your prompt MUST address these):\n${formatIntel2.rules}` : '',
         `Image Model: ${state.imageModel || 'gemini'} — optimize prompt for this model`,
         `Original Brief: ${state.brief}`,
+        vgSection,
         productGrounding,
     ].filter(Boolean).join('\n');
 
@@ -1126,6 +1156,16 @@ export async function runCreativePipeline(params) {
 
     // Node 0: Brand Intelligence (DB-only, ~50ms — now ~0ms on cache hit)
     state = await brandIntelligenceNode(state);
+    
+    // 💡 OVERRIDE: If the user provided custom reference images, DO NOT force a catalog product match!
+    // This prevents the AI from hallucinating a Smartwatch when the user uploaded a Trimmer.
+    if (state.refImageUrls && state.refImageUrls.length > 0) {
+        if (state.matchedProduct) {
+            console.log(`⚠️ User provided reference images. Overriding catalog match ("${state.matchedProduct.title}") to rely purely on Visual Grounding.`);
+            state.matchedProduct = null;
+        }
+    }
+
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 

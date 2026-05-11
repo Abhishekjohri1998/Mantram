@@ -511,11 +511,16 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         // hint matching the chosen format. This was the root cause users reported:
         // "I select 4:5 / 9:16 but output looks square."
         const orientationHint =
+            ratioNum > 2.5  ? `ULTRA-WIDE HORIZONTAL BANNER ${aspectRatio}` :
             ratioNum > 1.3  ? `WIDESCREEN HORIZONTAL ${aspectRatio}` :
+            ratioNum < 0.4  ? `ULTRA-TALL VERTICAL STRIP ${aspectRatio}` :
             ratioNum < 0.85 ? `VERTICAL PORTRAIT ${aspectRatio}` :
                               `SQUARE ${aspectRatio}`;
+                              
         const composeFor =
+            ratioNum > 2.5  ? 'ultra-wide panoramic banner — the camera MUST be pulled back (zoomed out) to leave generous headroom above the subject. Subjects must be fully visible and NOT cropped by the top or bottom edges. Use strong negative space.' :
             ratioNum > 1.3  ? 'horizontal cinematic frame — subject occupies the left or right two-thirds, with environmental depth extending across the wide canvas. Use rule-of-thirds horizontal balance.' :
+            ratioNum < 0.4  ? 'ultra-tall vertical banner — the camera MUST be pulled back (zoomed out) to leave generous breathing room on the left and right sides. Subjects must not be cropped by the side edges.' :
             ratioNum < 0.85 ? 'vertical reel/story frame — subject is composed top-to-bottom, eyeline upper third, breathing room above the head, brand atmosphere fills the lower third. NEVER center on a square crop.' :
                               'centered square composition with strong middle-frame focal point and balanced negative space.';
         fullPrompt += `\n\nCANVAS FORMAT: ${orientationHint}. Compose for a ${composeFor}\nThe final image MUST be rendered in ${aspectRatio} aspect ratio — do NOT default to 1:1 if the requested ratio differs.`;
@@ -634,6 +639,8 @@ Generate the adapted creative now.`;
                             .toBuffer();
 
                         // Step 2: Resize with cover fit (crop to fill)
+                        // 'cover' is required to prevent severe stretching (e.g. 21:9 native stretched to 3.125).
+                        // Since we removed the CRITICAL CROP CONSTRAINT, text will be safely centered anyway.
                         let resizedBuffer;
                         try {
                             resizedBuffer = await sharp(normalizedBuffer, { limitInputPixels: false })
@@ -641,29 +648,10 @@ Generate the adapted creative now.`;
                                 .png()
                                 .toBuffer();
                         } catch (coverErr) {
-                            // Fallback: if cover fit fails (buffer offset), use fill + flatten
-                            console.warn(`⚠️ Cover resize failed (${coverErr.message}), falling back to fill+extract`);
-                            const meta = await sharp(normalizedBuffer).metadata();
-                            const scaled = await sharp(normalizedBuffer, { limitInputPixels: false })
-                                .resize({
-                                    width: Math.max(targetW, targetH),
-                                    height: Math.max(targetW, targetH),
-                                    fit: 'inside',
-                                    withoutEnlargement: false,
-                                })
-                                .png()
-                                .toBuffer();
-                            const scaledMeta = await sharp(scaled).metadata();
-                            const extractLeft = Math.max(0, Math.floor(((scaledMeta.width || targetW) - targetW) / 2));
-                            const extractTop = Math.max(0, Math.floor(((scaledMeta.height || targetH) - targetH) / 2));
-                            resizedBuffer = await sharp(scaled, { limitInputPixels: false })
-                                .extract({
-                                    left: extractLeft,
-                                    top: extractTop,
-                                    width: Math.min(targetW, scaledMeta.width || targetW),
-                                    height: Math.min(targetH, scaledMeta.height || targetH),
-                                })
-                                .resize({ width: targetW, height: targetH, fit: 'fill' })
+                            // Fallback: if fill fails, just try one more direct fill using the original libvips method
+                            console.warn(`⚠️ Primary resize failed (${coverErr.message}), falling back to direct fill`);
+                            resizedBuffer = await sharp(normalizedBuffer, { limitInputPixels: false })
+                                .resize({ width: targetW, height: targetH, fit: 'fill', fastShrinkOnLoad: false })
                                 .png()
                                 .toBuffer();
                         }
@@ -1394,7 +1382,7 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 // Routes through LaoZhang proxy for gpt-image-2 (direct OpenAI requires org verification).
 // When reference images are provided, uses /images/edits (multipart/form-data).
 // Otherwise uses /images/generations (JSON body).
-export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = []) {
+export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = [], customSize = null) {
     // ── Choose API endpoint ──
     // Auto-prefer LaoZhang for gpt-image-1/2 when key is available.
     // Direct OpenAI remaps these to dall-e-3 which drops ref images and is slower.
@@ -1411,21 +1399,21 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
     // ── Map aspect ratio → nearest supported OpenAI image size ──
-    // GPT Image 2 only supports: 1024x1024, 1024x1536, 1536x1024
-    // We pick the closest by actual ratio, then Sharp crops to exact size downstream.
+    // DALL-E 3 natively supports: 1024x1024, 1024x1792 (9:16), 1792x1024 (16:9)
+    // We map portrait and landscape ratios to their native equivalents to prevent text cropping downstream.
     const sizeMap = {
         '1:1':  '1024x1024',
         '4:5':  '1024x1024',   // 0.8 — closest to square
-        '5:4':  '1536x1024',   // 1.25 — landscape
-        '2:3':  '1024x1536',   // 0.67 — portrait
-        '9:16': '1024x1536',   // 0.56 — portrait
-        '3:4':  '1024x1536',   // 0.75 — portrait
-        '3:2':  '1536x1024',   // 1.5 — landscape
-        '16:9': '1536x1024',   // 1.78 — landscape
-        '4:3':  '1536x1024',   // 1.33 — landscape
-        '21:9': '1536x1024',   // 2.33 — ultra-wide → use landscape, crop downstream
-        '2:1':  '1536x1024',   // 2.0 — wide
-        '1:2':  '1024x1536',   // 0.5 — tall
+        '5:4':  '1792x1024',   // 1.25 — landscape
+        '2:3':  '1024x1792',   // 0.67 — portrait
+        '9:16': '1024x1792',   // native DALL-E 3 portrait
+        '3:4':  '1024x1792',   // 0.75 — portrait
+        '3:2':  '1792x1024',   // native DALL-E 3 landscape
+        '16:9': '1792x1024',   // native DALL-E 3 landscape
+        '4:3':  '1792x1024',   // 1.33 — landscape
+        '21:9': '1792x1024',   // ultra-wide → use landscape
+        '2:1':  '1792x1024',   // wide
+        '1:2':  '1024x1792',   // tall
     };
     // For any unlisted ratio, pick nearest valid size by actual ratio value
     function nearestOpenAISize(ratio) {
@@ -1433,8 +1421,8 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         const w = parseFloat(wStr), h = parseFloat(hStr);
         if (!w || !h) return '1024x1024';
         const r = w / h;
-        if (r > 1.2) return '1536x1024'; // landscape
-        if (r < 0.8) return '1024x1536'; // portrait
+        if (r > 1.2) return '1792x1024'; // landscape
+        if (r < 0.8) return '1024x1792'; // portrait
         return '1024x1024'; // square-ish
     }
     const imageSize = sizeMap[aspectRatio] || nearestOpenAISize(aspectRatio);
@@ -1503,6 +1491,8 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     }
 
     let finalImageSize = imageSize;
+    let customDimensions = null;
+
     if (!useLaoZhang) {
         if (mappedModelId === 'dall-e-3') {
             if (finalImageSize !== '1024x1024' && finalImageSize !== '1024x1792' && finalImageSize !== '1792x1024') {
@@ -1514,6 +1504,34 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             }
         } else if (mappedModelId === 'dall-e-2') {
             finalImageSize = '1024x1024';
+        }
+    } else {
+        // ── GPT Image 2 (via LaoZhang) is fully flexible ──
+        // Rules: max 3:1 ratio, multiples of 16, pixels between 655k and 8.29M
+        if (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1') {
+            let ratio = 1;
+            if (customSize && customSize.width && customSize.height) {
+                ratio = parseFloat(customSize.width) / parseFloat(customSize.height);
+            } else {
+                const [wStr, hStr] = (aspectRatio || '1:1').split(':');
+                let wRatio = parseFloat(wStr) || 1;
+                let hRatio = parseFloat(hStr) || 1;
+                ratio = wRatio / hRatio;
+            }
+            const targetPixels = 1500000; // ~1.5 Megapixels
+            
+            let h = Math.sqrt(targetPixels / ratio);
+            let w = h * ratio;
+            
+            // Snap to multiples of 16
+            w = Math.round(w / 16) * 16;
+            h = Math.round(h / 16) * 16;
+            
+            // Enforce max edge 3840
+            if (w > 3840) { w = 3840; h = Math.round((w / ratio) / 16) * 16; }
+            if (h > 3840) { h = 3840; w = Math.round((h * ratio) / 16) * 16; }
+            
+            customDimensions = { width: w, height: h };
         }
     }
 
@@ -1546,10 +1564,18 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             .trim();
         // If still too long, hard truncate
         if (finalPrompt.length > 3500) {
-            finalPrompt = finalPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
+            const typoMatch = finalPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+            const typoBlock = typoMatch ? typoMatch[0] : '';
+            if (typoBlock) {
+                 finalPrompt = finalPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;
+            } else {
+                 finalPrompt = finalPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
+            }
         }
         console.log(`📏 Prompt condensed for OpenAI API: ${promptText.length} → ${finalPrompt.length} chars`);
     }
+
+
 
     if (useEditsEndpoint) {
         // ── MULTIPART/FORM-DATA path: /images/edits ──
@@ -1569,7 +1595,11 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         formData.append('model', mappedModelId);
         formData.append('prompt', finalPrompt);
         formData.append('n', '1');
-        formData.append('size', finalImageSize);
+        if (customDimensions) {
+            formData.append('size', `${customDimensions.width}x${customDimensions.height}`);
+        } else {
+            formData.append('size', finalImageSize);
+        }
         if (finalQuality && finalQuality !== 'standard') {
             formData.append('quality', finalQuality);
         }
@@ -1593,8 +1623,13 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             model: mappedModelId,
             prompt: finalPrompt,
             n: 1,
-            size: finalImageSize,
         };
+        
+        if (customDimensions) {
+            body.size = `${customDimensions.width}x${customDimensions.height}`;
+        } else {
+            body.size = finalImageSize;
+        }
 
         if (useLaoZhang) {
             body.output_format = finalFormat;
@@ -1712,12 +1747,14 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     for (const ip of imageParts) {
         if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
     }
-    const finalPrompt = aspectRatio && aspectRatio !== '1:1' ? `${promptText}\n\n[ASPECT RATIO: ${aspectRatio}]` : promptText;
+    
+    let finalPrompt = aspectRatio && aspectRatio !== '1:1' ? `${promptText}\n\n[ASPECT RATIO: ${aspectRatio}]` : promptText;
+
     parts.push({ text: finalPrompt });
 
     let imageUrl = null;
     let textResponse = '';
-    let usedModel = '';
+    let usedModel = selectedModelId;
 
     const imageCount = parts.filter(p => p.inlineData).length;
     console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (${selectedModelId}) ══════`);
@@ -1750,9 +1787,6 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
             }),
         };
 
-        // Apply Keep-Alive dispatcher if using native Node 18+ undici fetch
-        // Logic removed: keepAliveAgent was not defined in this scope.
-
         const resp = await fetch(url, fetchOptions);
 
         const data = await resp.json();
@@ -1777,7 +1811,6 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         }
 
         if (imageUrl) {
-            usedModel = selectedModelId;
             console.log(`✅ Image generated successfully with ${selectedModelId}`);
         } else {
             console.warn(`⚠️ ${selectedModelId}: no image in response`);
@@ -1790,8 +1823,13 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         throw e;
     }
 
+    // ── Upload directly to S3 from buffer instead of passing huge base64 around ──
+    const { uploadToS3 } = await import('../utils/s3.js');
+    const s3Url = await uploadToS3(imageUrl, `creatives/gemini/${Date.now()}-${Math.random().toString(36).substring(7)}.png`);
+    console.log(`✅ [${usedModel}] Image generated: ${s3Url.substring(0, 80)}...`);
+
     console.log(`══════ END IMAGE GENERATION ══════\n`);
-    return { imageUrl, model: usedModel, textResponse, warnings };
+    return { imageUrl: s3Url, model: usedModel, textResponse, warnings };
 }
 
 // ── Unified Image Generate — routes by selectedModel, NO auto-fallbacks ──
@@ -1915,7 +1953,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     setTimeout(() => reject(new Error(`TIMEOUT`)), TIMEOUT_MS)
                 );
                 const result = await Promise.race([
-                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque', refImageUrls),
+                    openaiImageGenerate(promptText, aspectRatio, quality, modelKey, 'png', 'opaque', refImageUrls, customSize),
                     timeoutPromise,
                 ]);
                 return { ...result, model: selectedModel };
@@ -1959,13 +1997,25 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 { str: "16:9", val: 16 / 9 }, { str: "21:9", val: 21 / 9 }
             ];
             let closestRatio = nativeRatios[0];
-            let minDiff = Math.abs(ratio - closestRatio.val);
+            // Height Crop Penalty: If a native ratio is numerically smaller than the requested ratio,
+            // fitting it into the target box via 'cover' will force a vertical crop (slicing off heads).
+            // We apply a 2.5x penalty to these ratios to strongly bias the system toward picking
+            // a wider native ratio, which results in horizontal side-cropping (much safer for subjects).
+            const getDiff = (nativeVal, targetRatio) => {
+                const rawDiff = Math.abs(targetRatio - nativeVal);
+                return nativeVal < targetRatio ? rawDiff * 2.5 : rawDiff;
+            };
+            
+            let minDiff = getDiff(closestRatio.val, ratio);
             for (let i = 1; i < nativeRatios.length; i++) {
-                const diff = Math.abs(ratio - nativeRatios[i].val);
-                if (diff < minDiff) { minDiff = diff; closestRatio = nativeRatios[i]; }
+                const diff = getDiff(nativeRatios[i].val, ratio);
+                if (diff < minDiff) { 
+                    minDiff = diff; 
+                    closestRatio = nativeRatios[i]; 
+                }
             }
             nativeAspectRatio = closestRatio.str;
-            console.log(`📐 Custom ${w}x${h} → Gemini native ratio '${nativeAspectRatio}'`);
+            console.log(`📐 Custom ${w}x${h} (ratio ${ratio.toFixed(2)}) → Gemini native ratio '${nativeAspectRatio}' (Height crop penalty applied)`);
         }
 
         // ── Download reference images as inline buffers for Gemini SDK ──
@@ -2065,7 +2115,13 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     .trim();
                 // If STILL over 3500, then we do a harder cap but keep the start and end
                 if (optimizedPrompt.length > 3500) {
-                    optimizedPrompt = optimizedPrompt.substring(0, 3450) + '\n\n[...condensed]';
+                    const typoMatch = optimizedPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+                    const typoBlock = typoMatch ? typoMatch[0] : '';
+                    if (typoBlock) {
+                         optimizedPrompt = optimizedPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;
+                    } else {
+                         optimizedPrompt = optimizedPrompt.substring(0, 3450) + '\n\n[...condensed]';
+                    }
                 }
             } else {
                 // Strip verbose sections that add latency without quality improvement when no refs are used
@@ -2075,10 +2131,16 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     .replace(/REFERENCE IMAGE \d+ \([^)]*\):[^\n]*(?:\n(?!\n|[A-Z]{2,}).*?)*/g, '')
                     .replace(/\n{3,}/g, '\n\n')
                     .trim();
-                // ⚡ PERF: 1500-char cap (was 2000) when no refs — Gemini Flash 3.1 Image
-                // latency scales noticeably above ~1500 chars. Saves ~1–2s per gen.
-                if (optimizedPrompt.length > 1500) {
-                    optimizedPrompt = optimizedPrompt.substring(0, 1450) + '\n\n[...condensed for speed]';
+                // ⚡ PERF: Increased from 1500 -> 3500 because the copywriter text is appended at the very end.
+                // Truncating at 1500 causes the image model to silently lose all text typography instructions.
+                if (optimizedPrompt.length > 3500) {
+                    const typoMatch = optimizedPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+                    const typoBlock = typoMatch ? typoMatch[0] : '';
+                    if (typoBlock) {
+                         optimizedPrompt = optimizedPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;
+                    } else {
+                         optimizedPrompt = optimizedPrompt.substring(0, 3450) + '\n\n[...condensed for speed]';
+                    }
                 }
             }
             console.log(`⚡ Prompt optimized: ${origLen} → ${optimizedPrompt.length} chars (refs: ${hasRefs})`);
