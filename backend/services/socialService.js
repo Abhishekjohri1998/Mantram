@@ -507,7 +507,7 @@ export const publishCarouselToFacebook = async (pageId, accessToken, text, image
  */
 export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, imageUrls) => {
     try {
-        const LI_VERSION = '202601';
+        const LI_VERSION = '202401';
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
@@ -633,14 +633,12 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // Requesting personal AND organization scopes so users can publish to both.
+    // Requesting personal scopes only. Organization scopes require approved developer products.
     const scopes = [
         'openid', 
         'profile', 
         'email', 
-        'w_member_social', 
-        'w_organization_social', 
-        'rw_organization_admin'
+        'w_member_social'
     ].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
@@ -697,7 +695,7 @@ export const fetchLinkedInOrganizations = async (accessToken) => {
         const aclsResponse = await axios.get(aclsUrl, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
-                'LinkedIn-Version': '202601',
+                'LinkedIn-Version': '202401',
                 'X-Restli-Protocol-Version': '2.0.0'
             },
             httpsAgent: ipv4Agent
@@ -715,7 +713,7 @@ export const fetchLinkedInOrganizations = async (accessToken) => {
         const orgsResponse = await axios.get(orgsUrl, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
-                'LinkedIn-Version': '202601',
+                'LinkedIn-Version': '202401',
                 'X-Restli-Protocol-Version': '2.0.0'
             },
             httpsAgent: ipv4Agent
@@ -749,7 +747,7 @@ export const fetchLinkedInOrganizations = async (accessToken) => {
 
 export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, videoUrl) => {
     try {
-        const LI_VERSION = '202601';
+        const LI_VERSION = '202401';
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
