@@ -56,6 +56,7 @@ import { startProgress, addStep, getProgress, endProgress } from '../utils/progr
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
 import { getActiveProvider } from '../ai/providerRouting.js';
 import { createNotification } from '../utils/createNotification.js';
+import { recordGeneration, extractFingerprintFromPipelineResult } from '../agents/creativeStudio/generationFingerprint.js';
 
 
 const router = Router();
@@ -873,6 +874,8 @@ Generate the adapted creative now.`;
                                         'aiMeta.qualityVerdict': q.verdict || null,
                                         'aiMeta.qualityIssues': q.issues || [],
                                         'aiMeta.qualitySummary': q.critiqueNotes || null,
+                                        'aiMeta.mcotScore': q.overallScore || null,
+                                        'aiMeta.mcotCritique': q || null,
                                         'aiMeta.processingStatus': 'ready',
                                     }
                                 }
@@ -882,6 +885,12 @@ Generate the adapted creative now.`;
                     } catch (criticErr) {
                         console.warn(`🔎 [PostGenCritic] Non-blocking error: ${criticErr.message}`);
                     }
+                }
+
+                // ── GENERATION FINGERPRINT RECORDING (Phase 4A) ──
+                if (brandId && agenticMeta) {
+                    const fp = extractFingerprintFromPipelineResult(agenticMeta);
+                    recordGeneration(brandId, fp); // Background fire-and-forget
                 }
             } catch (bgErr) {
                 console.error('[BG] error:', bgErr.message);

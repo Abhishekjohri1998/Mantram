@@ -19,6 +19,7 @@ import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal'
 import TemplateLibrary from './TemplateLibrary'
 import Walkthrough from '../components/Walkthrough'
+import ViralityMiniPanel from '../components/ViralityMiniPanel'
 import './VideoStudio.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -173,6 +174,7 @@ export default function VideoStudio() {
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [playingVideo, setPlayingVideo] = useState(null)
+    const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
     const [advancedRefillData, setAdvancedRefillData] = useState(null)
     const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
     const [historyTab, setHistoryTab] = useState('all') // 'all' | 'completed' | 'progress' | 'drafts'
@@ -1049,7 +1051,32 @@ export default function VideoStudio() {
                                                         {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
                                                     </span>
                                                 </button>
+                                                {/* Virality fire button — only for completed videos */}
+                                                {isDone && videoUrl && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setViralityOpenId(viralityOpenId === p._id ? null : p._id) }}
+                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                                            viralityOpenId === p._id
+                                                                ? 'text-[#ff4d00] bg-[rgba(255,77,0,0.12)] border border-[rgba(255,77,0,0.3)]'
+                                                                : 'text-[var(--sys-text-muted)] hover:text-[#ff4d00] hover:bg-[rgba(255,77,0,0.08)]'
+                                                        }`}
+                                                        title="Check Virality (3 credits)"
+                                                    >
+                                                        <span className="material-symbols-outlined text-base">local_fire_department</span>
+                                                    </button>
+                                                )}
                                             </div>
+                                            {/* Virality Panel — expands below the row when open */}
+                                            {isDone && videoUrl && viralityOpenId === p._id && (
+                                                <div className="px-3 pb-3 pt-0">
+                                                    <ViralityMiniPanel
+                                                        contentType="video"
+                                                        mediaUrl={videoUrl}
+                                                        brandId={activeBrand?._id}
+                                                        platform="instagram"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     )
                                 })}
@@ -1091,7 +1118,7 @@ export default function VideoStudio() {
                                                 )}
                                                 {videoUrl && (
                                                     <div className="absolute inset-0 bg-[var(--sys-surface)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-[var(--sys-text)] text-3xl drop-shadow-lg">play_circle</span>
+                                                        <span className="material-symbols-outlined text-3xl drop-shadow-lg">play_circle</span>
                                                     </div>
                                                 )}
                                                 {/* Status badge */}
@@ -1133,14 +1160,39 @@ export default function VideoStudio() {
                                                         className="p-1 rounded text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Refill">
                                                         <span className="material-symbols-outlined text-sm">replay</span>
                                                     </button>
-                                                    <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
+                                                     <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
                                                         className={`p-1 rounded transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
                                                         title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open'}>
                                                         <span className="material-symbols-outlined text-sm">
                                                             {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
                                                         </span>
                                                     </button>
+                                                    {/* Virality fire button — grid view, only for completed videos */}
+                                                    {isDone && videoUrl && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setViralityOpenId(viralityOpenId === p._id ? null : p._id) }}
+                                                            className={`p-1 rounded transition-all cursor-pointer ml-auto ${
+                                                                viralityOpenId === p._id
+                                                                    ? 'text-[#ff4d00] bg-[rgba(255,77,0,0.12)]'
+                                                                    : 'text-[var(--sys-text-muted)] hover:text-[#ff4d00] hover:bg-[rgba(255,77,0,0.08)]'
+                                                            }`}
+                                                            title="Check Virality (3 credits)"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">local_fire_department</span>
+                                                        </button>
+                                                    )}
                                                 </div>
+                                                {/* Virality Panel — grid card */}
+                                                {isDone && videoUrl && viralityOpenId === p._id && (
+                                                    <div className="mt-2">
+                                                        <ViralityMiniPanel
+                                                            contentType="video"
+                                                            mediaUrl={videoUrl}
+                                                            brandId={activeBrand?._id}
+                                                            platform="instagram"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )

@@ -519,7 +519,106 @@ export default function UserDashboard() {
             ))}
           </Card>
         </div>
+
+        {/* ── Check Virality Bento Card ── */}
+        <Card className="p-0 overflow-hidden" glow onClick={()=>navigate('/virality-predictor')}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255,77,0,0.12) 0%, rgba(245,158,11,0.08) 50%, rgba(99,102,241,0.06) 100%)',
+            borderRadius: '16px',
+            padding: '28px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Background glow blob */}
+            <div style={{
+              position: 'absolute', top: '-30%', left: '-5%',
+              width: '250px', height: '250px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,77,0,0.18) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }}/>
+            <div style={{
+              position: 'absolute', bottom: '-20%', right: '5%',
+              width: '180px', height: '180px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }}/>
+            <div className="flex items-start justify-between gap-6 relative">
+              {/* Left */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: 'rgba(255,77,0,0.15)',
+                    border: '1px solid rgba(255,77,0,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 20px rgba(255,77,0,0.2)',
+                  }}>
+                    <span className="material-symbols-outlined" style={{fontSize: 24, color: '#ff4d00'}}>local_fire_department</span>
+                  </div>
+                  <div>
+                    <h3 style={{margin: 0, fontSize: 16, fontWeight: 800, color: '#fff', fontFamily: 'Inter, sans-serif'}}>Check Virality</h3>
+                    <p style={{margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: 'Inter, sans-serif'}}>AI-powered content analysis</p>
+                  </div>
+                </div>
+                <p style={{margin: '0 0 16px', fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, fontFamily: 'Inter, sans-serif', maxWidth: 480}}>
+                  Upload any image or video — our 3-model AI pipeline predicts virality with a 6-dimension score map, real-time trend research, and brand-specific tips.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { icon: 'auto_awesome', label: 'Gemini Vision', color: '#4285f4' },
+                    { icon: 'travel_explore', label: 'Grok Trends', color: '#ff4d00' },
+                    { icon: 'psychology', label: 'Claude AI', color: '#d97706' },
+                  ].map(m => (
+                    <div key={m.label} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 10px', borderRadius: 8,
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <span className="material-symbols-outlined" style={{fontSize: 14, color: m.color}}>{m.icon}</span>
+                      <span style={{fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)', fontFamily: 'Inter, sans-serif'}}>{m.label}</span>
+                    </div>
+                  ))}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '5px 10px', borderRadius: 8,
+                    background: 'rgba(255,77,0,0.08)',
+                    border: '1px solid rgba(255,77,0,0.2)',
+                  }}>
+                    <span className="material-symbols-outlined" style={{fontSize: 14, color: '#ff4d00'}}>toll</span>
+                    <span style={{fontSize: 11, fontWeight: 700, color: '#ff4d00', fontFamily: 'Inter, sans-serif'}}>3 credits</span>
+                  </div>
+                </div>
+              </div>
+              {/* Right — CTA */}
+              <div className="flex flex-col items-center gap-3 shrink-0">
+                <div style={{
+                  width: 80, height: 80, borderRadius: 16,
+                  background: 'rgba(255,77,0,0.1)',
+                  border: '1px solid rgba(255,77,0,0.2)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                }}>
+                  <span style={{fontSize: 28, fontWeight: 900, color: '#ff4d00', fontFamily: 'Space Grotesk, sans-serif', lineHeight: 1}}>?</span>
+                  <span style={{fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'Inter, sans-serif'}}>Score</span>
+                </div>
+                <div style={{
+                  padding: '10px 18px', borderRadius: 10,
+                  background: 'linear-gradient(135deg, #ff4d00, #ff7733)',
+                  color: '#fff', fontSize: 13, fontWeight: 700,
+                  fontFamily: 'Inter, sans-serif',
+                  boxShadow: '0 4px 20px rgba(255,77,0,0.35)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  whiteSpace: 'nowrap',
+                }}>
+                  <span className="material-symbols-outlined" style={{fontSize: 16}}>local_fire_department</span>
+                  Predict Virality
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
+
       {intelReport && (
         <IntelReportViewer
           mission={intelReport.mission}

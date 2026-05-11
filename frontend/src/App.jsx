@@ -61,6 +61,7 @@ const RetentionStudio = lazy(() => import('./pages/RetentionStudio'))
 const UserSettings = lazy(() => import('./pages/UserSettings'))
 const BrandCalendar = lazy(() => import('./pages/BrandCalendar'))
 const AvatarGenerator = lazy(() => import('./pages/AvatarGenerator'))
+const ViralityPredictor = lazy(() => import('./pages/ViralityPredictor'))
 
 // ── Pulse Studio (brief-to-published) ──
 const PulseStudio = lazy(() => import('./pages/PulseStudio/index'))
@@ -185,6 +186,7 @@ function App() {
                     <Route path="/creative-studio/pulse-studio/*" element={<Navigate to="/pulse-studio" replace />} />
 
                          <Route path="/avatar-generator" element={<ProtectedRoute><AvatarGenerator /></ProtectedRoute>} />
+                     <Route path="/virality-predictor" element={<ProtectedRoute><ViralityPredictor /></ProtectedRoute>} />
 
                 {/* Catch-all: redirect unknown routes to Explore (prevents blank screens from stale links) */}
                     <Route path="*" element={<Navigate to="/templates" replace />} />

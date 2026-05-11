@@ -310,12 +310,52 @@ export function buildBrandContext(brand, products = []) {
     if (dna.voice?.sampleQuote) parts.push(`Sample Quote: "${dna.voice.sampleQuote}"`);
     if (dna.voice?.keywords?.length) parts.push(`Key Phrases: ${dna.voice.keywords.join(', ')}`);
 
-    // ── Visual Identity ──
+    // ── Visual Identity (full — no fields dropped) ──
     if (dna.colors?.length) {
         const colorStr = dna.colors.map(c => `${c.name || c.usage}: ${c.hex}`).join(', ');
         parts.push(`Brand Colors: ${colorStr}`);
     }
     if (dna.fonts?.heading?.family) parts.push(`Heading Font: ${dna.fonts.heading.family}`);
+    if (dna.fonts?.body?.family) parts.push(`Body Font: ${dna.fonts.body.family}`);
+    if (dna.fonts?.accent?.family) parts.push(`Accent Font: ${dna.fonts.accent.family}`);
+
+    // ── Brand Story & Positioning ──
+    if (dna.tagline) parts.push(`Brand Tagline: ${dna.tagline}`);
+    if (dna.missionStatement) parts.push(`Brand Mission: ${dna.missionStatement}`);
+    if (dna.uniqueSellingPoints?.length) {
+        parts.push(`Brand USPs (differentiate from competitors): ${dna.uniqueSellingPoints.join(' | ')}`);
+    }
+
+    // ── Visual DNA — Art Direction Ground Truth ──
+    // These fields ARE in the DB but were previously never passed to agents. Now fully surfaced.
+    if (dna.photographyStyle) parts.push(`Photography Style Preference: ${dna.photographyStyle}`);
+    if (dna.visualDNA?.designStyle) parts.push(`Visual Design Style: ${dna.visualDNA.designStyle}`);
+    if (dna.visualDNA?.imageMood) parts.push(`Image Mood: ${dna.visualDNA.imageMood}`);
+    if (dna.visualDNA?.typographyStyle) parts.push(`Typography Personality: ${dna.visualDNA.typographyStyle}`);
+    if (dna.visualDNA?.layoutPreference) parts.push(`Layout Preference: ${dna.visualDNA.layoutPreference}`);
+    if (dna.visualDNA?.textureStyle) parts.push(`Texture / Surface Style: ${dna.visualDNA.textureStyle}`);
+    if (dna.visualDNA?.decorativeElements) parts.push(`Decorative Elements: ${dna.visualDNA.decorativeElements}`);
+    if (dna.visualDNA?.designRules?.length) {
+        parts.push(`Design Rules (ALWAYS apply): ${dna.visualDNA.designRules.join(' | ')}`);
+    }
+    if (dna.visualDNA?.designAvoid?.length) {
+        parts.push(`Design Avoid (NEVER do this): ${dna.visualDNA.designAvoid.join(' | ')}`);
+    }
+    if (dna.visualDNA?.imageAnalysis) {
+        // AI-generated visual analysis of the brand's own images — ground truth for visual style
+        parts.push(`AI Visual Analysis of brand imagery: ${String(dna.visualDNA.imageAnalysis).substring(0, 400)}`);
+    }
+
+    // ── Competitive Intelligence ──
+    if (dna.competitiveIntel?.marketPosition) {
+        parts.push(`Market Position: ${dna.competitiveIntel.marketPosition}`);
+    }
+    if (dna.competitiveIntel?.differentiators?.length) {
+        parts.push(`Key Differentiators vs competitors: ${dna.competitiveIntel.differentiators.join(' | ')}`);
+    }
+    if (dna.competitiveIntel?.industryTrends?.length) {
+        parts.push(`Industry Trends (stay current): ${dna.competitiveIntel.industryTrends.join(' | ')}`);
+    }
 
     // ── Content Style ──
     if (dna.contentStyle?.dos?.length) parts.push(`Content Dos: ${dna.contentStyle.dos.join('; ')}`);

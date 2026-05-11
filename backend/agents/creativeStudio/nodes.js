@@ -24,6 +24,7 @@ import {
     VISUAL_GROUNDING_PROMPT,
     POST_GENERATION_CRITIC_PROMPT,
 } from './prompts.js';
+import { getEnvironmentDiversityDirective } from './generationFingerprint.js';
 
 
 // ── MCP MARKET INTEL NODE — Runs BEFORE Art Director ──
@@ -513,6 +514,7 @@ export async function artDirectorNode(state) {
         state.marketIntel?.trendingTopics ? `\n📡 LIVE TRENDING TOPICS RIGHT NOW (from MCP):\n${state.marketIntel.trendingTopics}\nUse these as creative context if relevant to the brief.` : '',
         state.marketIntel?.viralFormats ? `VIRAL AD FORMATS THIS WEEK: ${state.marketIntel.viralFormats}` : '',
         state.marketIntel?.calendarHooks ? `UPCOMING CALENDAR HOOKS: ${state.marketIntel.calendarHooks}` : '',
+        state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
@@ -575,6 +577,25 @@ export async function fastCreativeDirectorNode(state) {
         }
     }
 
+    // ── Live market intelligence (now guaranteed to be present — MCP co-schedules with VG) ──
+    const marketIntelSection = state.marketIntel ? [
+        `\n━━━ LIVE MARKET INTELLIGENCE (real-time MCP data) ━━━`,
+        state.marketIntel.trendingTopics ? `Trending in ${intel.industry || 'this category'} right now:\n${state.marketIntel.trendingTopics}` : '',
+        state.marketIntel.viralFormats ? `Viral creative formats this week: ${state.marketIntel.viralFormats}` : '',
+        state.marketIntel.calendarHooks ? `Timely calendar hooks: ${state.marketIntel.calendarHooks}` : '',
+        state.marketIntel.webIntel ? `Industry context: ${state.marketIntel.webIntel.substring(0, 350)}` : '',
+        `INSTRUCTION: Use this live intelligence to make the output feel CURRENT and RELEVANT. If a trending format matches the brand DNA, apply it. Do not force trends that contradict the brand's visual identity.`,
+    ].filter(Boolean).join('\n') : '';
+
+    // ── Visual Grounding intelligence (from MCoT product image analysis) ──
+    const vgSection = state.visualGrounding ? [
+        `\n━━━ PRODUCT VISUAL INTELLIGENCE (from MCoT image analysis) ━━━`,
+        state.visualGrounding.brandVisualWorld ? `Product Visual World: ${state.visualGrounding.brandVisualWorld}` : '',
+        state.visualGrounding.lightingSuggestion ? `Optimal Lighting: ${state.visualGrounding.lightingSuggestion}` : '',
+        state.visualGrounding.environmentalAffinities?.length ? `Strong Environments for this product: ${state.visualGrounding.environmentalAffinities.join(' | ')}` : '',
+        state.visualGrounding.humanContextClue ? `Human Presence Signal: ${state.visualGrounding.humanContextClue}` : '',
+    ].filter(Boolean).join('\n') : '';
+
     const userPrompt = [
         `CREATIVE BRIEF: ${state.brief}`,
         occasionHint,
@@ -582,13 +603,21 @@ export async function fastCreativeDirectorNode(state) {
         `ASPECT RATIO: ${state.aspectRatio || '1:1'}`,
         formatIntel ? `\nPLATFORM RULES for ${formatIntel.label.toUpperCase()}:\n${formatIntel.rules}` : '',
         state.style ? `STYLE: ${state.style}` : '',
-        intel.visualDNA?.designStyle ? `BRAND STYLE: ${intel.visualDNA.designStyle}` : '',
-        intel.primaryColors?.length > 0 ? `BRAND PRIMARY COLORS: ${intel.primaryColors.join(', ')}` : '',
+        intel.visualDNA?.designStyle ? `BRAND VISUAL STYLE: ${intel.visualDNA.designStyle}` : '',
+        intel.visualDNA?.imageMood ? `BRAND IMAGE MOOD: ${intel.visualDNA.imageMood}` : '',
+        intel.visualDNA?.typographyStyle ? `BRAND TYPOGRAPHY PERSONALITY: ${intel.visualDNA.typographyStyle}` : '',
+        intel.visualDNA?.photographyStyle ? `PHOTOGRAPHY DIRECTION: ${intel.visualDNA.photographyStyle}` : '',
+        intel.visualDNA?.designRules?.length > 0 ? `DESIGN RULES (must follow): ${intel.visualDNA.designRules.slice(0, 4).join('; ')}` : '',
+        intel.visualDNA?.designAvoid?.length > 0 ? `DESIGN AVOID: ${intel.visualDNA.designAvoid.slice(0, 4).join('; ')}` : '',
+        intel.primaryColors?.length > 0 ? `BRAND PRIMARY COLORS: ${intel.primaryColors.join(', ')} — dominant in atmosphere and lighting` : '',
         `IMAGE MODEL: ${state.imageModel || 'gemini'} — optimize prompt accordingly`,
+        marketIntelSection,
+        vgSection,
         productContext,
         // When no product is matched, give the agent catalog + decision authority
         intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION: No product was auto-matched to this brief. You must decide:\n- If the brief relates to a product category → pick the best fit from the catalog and integrate at SUPPORTING level\n- If it's an occasion/greeting → create a brand-atmosphere visual without forcing a product\n- If it's about brand identity → pure brand visual, no product insertion` : '',
         !mp && intel.productCandidates?.length > 0 ? `\nCATALOG (pick ONLY if relevant):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
+        state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
     // ⚡ preferFast — Fast mode already implies speed priority: Gemini 2.5 Flash is ideal
@@ -1100,43 +1129,64 @@ export async function runCreativePipeline(params) {
     const productName = state.matchedProduct?.title || '';
     emit('brand-intel', productName ? `Matched product: ${productName}` : 'Brand context loaded', 'done', productName ? `Using "${productName}" as hero product` : '');
 
-    // ── STEP 1: Parallel Node Execution (Visual Grounding + Art Director + Copywriter) ──
-    // ALL agents that don't depend on each other run in parallel to minimize wall-clock latency.
-    const nodePromises = [];
+    // ── STEP 1: Fire intelligence tasks at t=0 simultaneously ──
+    // Strategy: VG and MCP both start immediately. Creative Director awaits BOTH.
+    // VG already gates the pipeline at 3-8s. MCP (max 6s) resolves within that window.
+    // Net latency cost to critical path: 0ms.
 
-    // ⚡ PERF: MCP Market Intelligence — fire-and-forget (non-blocking)
-    // Previously this was inside Promise.all, meaning a slow 6s MCP timeout would delay
-    // the ENTIRE parallel block. Now it runs independently — if data arrives in time,
-    // the art director benefits; if not, no delay.
-    mcpMarketIntelNode(state).then(updatedState => {
-        state.marketIntel = updatedState.marketIntel;
-        if (state.marketIntel) {
-            emit('brand-intel', '📡 Live trend data injected', 'done', state.marketIntel.viralFormats?.substring(0, 60) || '');
-        }
-    }).catch(() => { /* non-critical — pipeline continues without live trends */ });
-
-    // Promise 1: Visual Grounding (Multimodal MCoT)
-    const visualGroundingTask = (async () => {
+    // Intelligence Task A: Visual Grounding (MCoT)
+    const visualGroundingPromise = (async () => {
         emit('visual-grounding', 'Analyzing product visuals (MCoT)...', 'working');
         const updatedState = await visualGroundingNode(state);
         state.visualGrounding = updatedState.visualGrounding;
         if (state.visualGrounding) {
-            emit('visual-grounding', `Visual analysis: ${state.visualGrounding.confidence || 'done'}`, 'done', state.visualGrounding.productAnalysis?.substring(0, 60) || '');
+            emit('visual-grounding', `Visual analysis: ${state.visualGrounding.confidence || 'done'}`, 'done',
+                state.visualGrounding.productAnalysis?.substring(0, 60) || '');
         } else {
             emit('visual-grounding', 'No product images — skipped', 'done');
         }
     })();
-    nodePromises.push(visualGroundingTask);
 
-    // Promise 2: Creative Vision (Fast vs Quality)
+    // Intelligence Task B: MCP Market Intel — now properly awaited within the VG window
+    // Previously this was fire-and-forget and always missed by the Creative Director.
+    // Now: both tasks start at t=0, Creative Director reads both after they settle.
+    const mcpPromise = mcpMarketIntelNode(state)
+        .then(updatedState => {
+            state.marketIntel = updatedState.marketIntel;
+            if (state.marketIntel) {
+                emit('market-intel', `📡 Live trends loaded`, 'done',
+                    state.marketIntel.viralFormats?.substring(0, 50) || '');
+            }
+        })
+        .catch(() => {
+            state.marketIntel = null; // non-critical — pipeline continues without live trends
+        });
+
+    // Wait for BOTH intelligence tasks AND fingerprint directive before Creative Director starts
+    // VG is typically the slower one (3-8s), so MCP and Fingerprint finish inside the VG window at zero cost.
+    const [_, __, diversityDirective] = await Promise.all([
+        visualGroundingPromise,
+        mcpPromise,
+        getEnvironmentDiversityDirective(brandId)
+    ]);
+
+    if (diversityDirective) {
+        state.diversityDirective = diversityDirective;
+        console.log(`[Nodes] Injected Fingerprint Directive into state`);
+    }
+
+    // Intelligence Task C: Creative Director — now has VG + MCP data fully available in state
+    const nodePromises = [];
     let creativeVisionTask;
+
     if (mode === 'fast') {
         creativeVisionTask = (async () => {
             emit('art-director', 'Creative Director crafting vision & prompt...', 'working');
             const updatedState = await fastCreativeDirectorNode(state);
             state.artDirection = updatedState.artDirection;
             state.engineeredPrompt = updatedState.engineeredPrompt;
-            emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done', state.artDirection?.visualStyle || '');
+            emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done',
+                state.artDirection?.designTrend || state.artDirection?.visualStyle || '');
         })();
     } else {
         creativeVisionTask = (async () => {
