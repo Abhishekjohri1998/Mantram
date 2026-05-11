@@ -536,6 +536,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
     const [format, setFormat] = useState('9:16')
     const [selectedModel, setSelectedModel] = useState('seedance-2.0')
     const [userBrief, setUserBrief] = useState('')
+    const [hookShot, setHookShot] = useState(false)
 
     // Modals
     const [showAvatar, setShowAvatar] = useState(false)
@@ -638,6 +639,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             if (template.savedVideoSettings.format) setFormat(template.savedVideoSettings.format)
             if (template.savedVideoSettings.model) setSelectedModel(template.savedVideoSettings.model)
             if (template.savedVideoSettings.presetId) setSelP(template.savedVideoSettings.presetId)
+            if (template.savedVideoSettings.hookShot !== undefined) setHookShot(template.savedVideoSettings.hookShot)
         }
     }, [])
 
@@ -732,7 +734,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     presetId: selP,
                     userBrief,
                     productData: pData,
-                    settings: { duration, format, model: selectedModel },
+                    settings: { duration, format, model: selectedModel, hookShot },
                     avatarUrl: avatarUrl || null,
                     productImageUrls: pImgs
                 })
@@ -746,7 +748,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             setIsGeneratingPrompts(false)
             setPromptStage('')
         }
-    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, avatarUrl, activeBrand])
+    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, selectedModel, hookShot, avatarUrl, activeBrand])
 
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
@@ -766,7 +768,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     legend: variant.legend || '',
                     productImageUrls: productImgs,
                     avatarUrl: avatarUrl || null,
-                    settings: { duration, format, model: selectedModel }
+                    settings: { duration, format, model: selectedModel, hookShot }
                 })
             })
 
@@ -802,7 +804,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         } catch (e) {
             setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: e.message } }))
         }
-    }, [selP, productImgs, avatarUrl, duration, format, selectedModel, activeBrand])
+    }, [selP, productImgs, avatarUrl, duration, format, selectedModel, hookShot, activeBrand])
 
     useEffect(() => {
         return () => Object.values(pollRefs.current).forEach(clearInterval)
@@ -811,6 +813,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
     const handleReuse = useCallback((project) => {
         if (project.settings?.duration) setDuration(project.settings.duration)
         if (project.settings?.format) setFormat(project.settings.format)
+        if (project.settings?.hookShot !== undefined) setHookShot(project.settings.hookShot)
         if (project.categoryId) setSelP(project.categoryId)
         setUserBrief(project.title || '')
     }, [])
@@ -854,7 +857,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                 </div>
 
                                 {/* Prompt preview (scrollable) */}
-                                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, maxHeight: 140, overflowY: 'auto', padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, maxHeight: 140, overflowY: 'auto', padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'pre-wrap' }}>
                                     {v.prompt}
                                 </div>
 
@@ -923,6 +926,12 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={selectedModel} onChange={setSelectedModel} options={VIDEO_MODELS} icon="smart_toy" />
+
+                    <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
+                    <button className="scott-btn-cfg" onClick={() => setHookShot(!hookShot)} style={{ background: hookShot ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', whiteSpace: 'nowrap', flex: '0 0 auto', border: hookShot ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent', color: hookShot ? '#10b981' : '#fff' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
+                        <span>Hook</span>
+                    </button>
 
                     <div style={{ flex: 1 }} />
 
