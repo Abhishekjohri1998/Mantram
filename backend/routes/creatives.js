@@ -3555,6 +3555,9 @@ router.post('/campaign-shot', protect, requireStudio('creativeStudio'), requireC
         // This ensures genuinely diverse creative output — no two shots look the same.
 
         // ── AI Agent: Extract product identity + generate taglines + generate mood ──
+        // Detect whether the brief is a detailed composition analysis from the Smart Direction feature
+        const briefIsComposition = brief && (brief.length > 100 || /layout|typolog|composition|typography|positioned|placed/i.test(brief));
+        
         let detectedProductName = productName || '';
         let tagline1 = primaryTagline || '';
         let tagline2 = secondaryTagline || '';
@@ -3580,9 +3583,11 @@ Brand Tagline: ${brandTagline}
 Brand Colors: ${brandColors.length > 0 ? brandColors.map(c => c.name || c.hex).join(', ') : 'not specified'}
 Product Name (if known): ${detectedProductName || 'detect from context'}
 User Brief: ${brief || 'cinematic product poster, brand campaign'}
-
+${briefIsComposition ? `
+IMPORTANT: The user brief above is a DETAILED COMPOSITION ANALYSIS from a reference template. Your mood, lighting, environment, and surface MUST align with and SUPPORT the described composition. Extract the visual tone from the brief — do NOT invent a contradictory mood. If the brief describes "bold typography over a model", your env should support that (e.g. clean studio backdrop). If it describes "minimalist layout with white space", do NOT generate a dark moody environment.
+` : ''}
 Your task: Generate the PERFECT art direction elements for a cinematic product advertisement poster.
-Be ORIGINAL and UNIQUE — do NOT default to generic dark botanical/noir/moody looks every time.
+${briefIsComposition ? 'Your mood MUST complement and reinforce the composition described in the brief above.' : 'Be ORIGINAL and UNIQUE — do NOT default to generic dark botanical/noir/moody looks every time.'}
 Draw inspiration from the brand's actual industry, the product's personality, and the user's brief.
 Think like a Cannes Lions art director — surprise, delight, innovate.
 
@@ -3596,17 +3601,20 @@ Return ONLY valid JSON:
   "productDescription": "one sentence description of the product for prompt context",
   "arrangementNote": "how to arrange the products for maximum visual impact",
   "mood": {
-    "env": "a SPECIFIC, VIVID, UNIQUE environment/scene description (15-30 words). Be creative — don't always default to 'dark moody'. Consider: sunlit terrazzo, golden hour desert, rain-soaked neon streets, frosted glass atelier, volcanic obsidian cave, tropical sunrise, etc.",
-    "lighting": "specific lighting setup description (10-20 words). Vary between: butterfly lighting, Rembrandt, split light, golden hour backlight, neon cross-light, overhead softbox, natural window light, etc.",
+    "env": "a SPECIFIC, VIVID, UNIQUE environment/scene description (15-30 words). ${briefIsComposition ? 'MUST align with the composition analysis provided in the brief.' : 'Be creative — don\'t always default to \'dark moody\'. Consider: sunlit terrazzo, golden hour desert, rain-soaked neon streets, frosted glass atelier, volcanic obsidian cave, tropical sunrise, etc.'}",
+    "lighting": "specific lighting setup description (10-20 words). ${briefIsComposition ? 'Match the lighting described or implied by the composition analysis.' : 'Vary between: butterfly lighting, Rembrandt, split light, golden hour backlight, neon cross-light, overhead softbox, natural window light, etc.'}",
     "surface": "the surface/base the product sits on (8-15 words). Be inventive — wet marble, cracked earth, silk drape, terrazzo, raw concrete, frosted glass, etc.",
     "palette": "3-5 specific color names that suit THIS brand and THIS mood (not always dark). Use the brand's actual colors when relevant."
   }
 }`;
 
             const aiResult = await aiRouter.generateText({
-                systemPrompt: 'You are a creative director. Output valid JSON only. No markdown, no explanation. Be CREATIVE and VARIED — never repeat the same mood twice.',
+                systemPrompt: 'You are a creative director. Output valid JSON only. No markdown, no explanation. ' + 
+                    (briefIsComposition 
+                        ? 'The user has provided a detailed composition brief. Your mood, lighting, and environment MUST align with and support this brief. Do NOT contradict the composition structure described.'
+                        : 'Be CREATIVE and VARIED — never repeat the same mood twice.'),
                 userPrompt: agentPrompt,
-                temperature: 0.85,
+                temperature: briefIsComposition ? 0.4 : 0.85,
                 maxTokens: 700,
             });
 
@@ -3690,7 +3698,7 @@ Return ONLY valid JSON:
         imgIdx++;
 
         if (hasCharacter) {
-            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (CHARACTER/MODEL — CRITICAL): This is the person/model to feature in the advertisement. You MUST replicate this person's EXACT face, skin tone, hair color, hair style, facial features, and overall appearance. Do NOT generate a different person. The model in the output must be clearly recognisable as the same individual from this reference photo. Pose them naturally alongside the product in a premium, aspirational way.\n`;
+            imageRefBlock += `\nREFERENCE IMAGE ${imgIdx} (CHARACTER/MODEL — CRITICAL): This is the person/model to feature in the advertisement. You MUST replicate this person's EXACT face, skin tone, hair color, hair style, facial features, body type, clothing style, and overall appearance. Preserve their POSE, STYLING, and BODY LANGUAGE from this reference — if they are sitting, show them sitting; if they are leaning, show them leaning; if they wear a specific outfit, replicate that outfit style. Do NOT generate a different person or change their posture. The model in the output must be clearly recognisable as the same individual in the same style and pose.\n`;
             imgIdx++;
         }
 
@@ -3762,10 +3770,40 @@ OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no fram
 ${brief ? `CREATIVE BRIEF: ${brief}` : ''}`
 
             // ── ORIGINAL MODE: AI Art Director drives the creative ──
-            : `Cinematic ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+            // When brief contains a detailed composition analysis (from Smart Direction),
+            // elevate it as the PRIMARY prompt directive instead of generic variation profiles.
+            : briefIsComposition
+                ? `${detectedCategory} advertisement — ${brandName} ${detectedProductName}
 
 ${imageRefBlock}
-PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside the provided character/model (see CHARACTER reference image above). The person MUST match the reference — same face, same features. Position them elegantly with the product.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
+
+═══ COMPOSITION DIRECTIVE (PRIMARY — from AI visual analysis) ═══
+${brief}
+═════════════════════════════════════════════════════════════
+
+You MUST follow the composition structure described above. This is the AUTHORITATIVE layout specification.
+
+BRAND CONTENT:
+  • Brand name: ${brandName}
+  • Product name: ${detectedProductName}
+  • Primary headline: "${tagline1}"
+  • Secondary line: "${tagline2}"
+  • Font family: ${brandFont}
+
+${hasCharacter ? `CHARACTER/MODEL: Use the provided character reference image. The person MUST match the reference — same face, same features, same pose, same styling, same clothing. Preserve their body language exactly as shown.` : `PRODUCT: Place the product from REFERENCE IMAGE 1 as the hero element. Match scale and placement to the described composition.`}
+
+ENVIRONMENT: ${aiMood.env}
+LIGHTING: ${aiMood.lighting}
+COLOR PALETTE: ${aiMood.palette}
+
+TECHNICAL: ultra-realistic, premium commercial advertising finish, razor-sharp detail, ${canvasSize}
+STYLE: magazine-grade product photography, Cannes Lions advertising quality
+OUTPUT: full bleed, edge-to-edge composition, no borders, no watermarks, no frames`
+
+                : `Cinematic ${detectedCategory} advertisement — ${brandName} ${detectedProductName}
+
+${imageRefBlock}
+PRODUCT ARRANGEMENT: ${hasCharacter ? `Premium product displayed alongside the provided character/model (see CHARACTER reference image above). The person MUST match the reference — same face, same features, same pose, same styling. Position them elegantly with the product.` : variation.arrangementOverride} Show all products clearly with their labels and branding fully visible.
 
 ${variation.compositionNote}
 

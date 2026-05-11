@@ -1316,6 +1316,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
 
     // ── Dynamic Template & Reference Analysis ──
     const analyzeCompositionTimerRef = useRef(null)
+    const lastTemplatePromptRef = useRef(null)
     
     useEffect(() => {
         const isCampaignShot = studioMode === 'campaignshot'
@@ -1360,6 +1361,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
         return () => clearTimeout(analyzeCompositionTimerRef.current)
     }, [designBaseImage, selectedProduct, referenceImages, characters, activeBrand?.name, studioMode, csProductImage, csCharacterImage, csRefImage])
 
+
+    // Auto-apply smart direction for Campaign Shot when coming from template
+    useEffect(() => {
+        if (studioMode !== 'campaignshot' || !recommendedPrompt || analyzingComposition) return;
+        // Only auto-apply if the user hasn't manually edited the brief
+        // (i.e., brief is still the original template prompt or empty)
+        if (!csBrief || csBrief === lastTemplatePromptRef.current) {
+            setCsBrief(recommendedPrompt);
+            setRecommendedPrompt('');
+        }
+    }, [recommendedPrompt, studioMode, analyzingComposition, csBrief]);
 
 
     useEffect(() => {
@@ -1802,6 +1814,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             setCampName(tpl.name || '');
                         } else if (effectiveMode === 'campaignshot') {
                             setCsBrief(resolvedPrompt);
+                            lastTemplatePromptRef.current = resolvedPrompt;
                             if (csMoodPreset !== 'custom') setCsMoodPreset('custom');
                             if (refImg) setCsRefImage(refImg);
                         } else if (effectiveMode === 'campaignlogo') {
