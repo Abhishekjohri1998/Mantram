@@ -331,8 +331,11 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
     };
 
     const product = productData || {};
+    const durationSecs = parseInt(settings?.duration || category.recommendedDuration);
+    // Approximate shot count: ~1.5-2s per shot for fast-paced, ~2-3s for emotional
+    const approxShots = Math.max(4, Math.min(15, Math.round(durationSecs / 1.8)));
 
-    // Assemble template data
+    // Assemble template data — all values from live product/settings, no hardcoding
     const templateData = {
         productName: product.productName || 'the product',
         mainUSP: product.mainUSP || '',
@@ -340,10 +343,14 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
         targetAudience: product.targetAudience || '',
         problemSolved: product.problemSolved || '',
         suggestedDialogue: product.suggestedDialogue || '',
+        productCategory: product.productCategory || 'other',
+        productHandling: product.productHandling || 'held in hands',
+        idealEnvironment: product.idealEnvironment || 'home',
         customDialogue: settings?.customDialogue || null,
         cta: settings?.cta || 'Shop now',
-        duration: parseInt(settings?.duration || category.recommendedDuration),
+        duration: durationSecs,
         format: settings?.format || category.recommendedFormat,
+        environment: settings?.environment || product.idealEnvironment || 'home',
         brandLighting: brandVisual.lighting,
         brandCamera: brandVisual.camera,
         brandGrade: brandVisual.grade,
@@ -353,34 +360,39 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
     const basePrompt = category.promptTemplate(templateData);
 
     // Refine with LLM to inject brand voice and ensure production quality
-    const REFINE_SYSTEM = `You are a Seedance 2.0 expert video prompt engineer.
+    const REFINE_SYSTEM = `You are a Seedance 2.0 expert ad film director and prompt engineer.
 Refine the given video ad prompt into the EXACT cinematic structure below.
+Video duration: ${durationSecs}s — generate approximately ${approxShots} shots.
 
 BRAND CONTEXT:
 ${brandContext}
 
-PRODUCT: ${product.productName}
-USP: ${product.mainUSP}
-TARGET AUDIENCE: ${product.targetAudience}
+PRODUCT: ${product.productName || 'Product'}
+USP: ${product.mainUSP || ''}
+TARGET AUDIENCE: ${product.targetAudience || ''}
+KEY FEATURES: ${(product.keyFeatures || []).join(', ')}
+PRODUCT CATEGORY: ${product.productCategory || 'other'}
+BRAND VISUAL STYLE: ${brandVisual.lighting} / ${brandVisual.grade}
 
 OUTPUT STRUCTURE (follow exactly — no deviations):
-STYLE: [one sentence — rendering style, animation quality, visual feel]
-WARDROBE: [@image1 clothing description per shot range]
-ENVIRONMENT: [all scene locations in one sentence]
-MOOD: [emotional arc, one sentence]
-SHOT 1: [Size, focal length] / [Camera move] / [@image1 action. @image2 if shown. ONE motion verb.]
+STYLE: [one sentence — rendering style, lighting character, visual feel. Reflect brand personality.]
+WARDROBE: [@image1 clothing description per shot range — match environment and brand.]
+ENVIRONMENT: [all scene locations in one sentence — must match product context.]
+MOOD: [emotional arc, one sentence — maps to category: ${category.name}]
+SHOT 1: [Size, focal length] / [Camera move] / [@image1 action. @image2 if product shown. ONE motion verb.]
 SHOT 2: [same format]
-[Continue for the video duration — 8–15 shots]
+[Continue for ~${approxShots} shots based on ${durationSecs}s duration]
 Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.
 
 RULES:
-1. Keep ALL @image1 and @image2+ references exactly as-is — never remove them
-2. ONE motion verb per shot line
-3. Camera move on its own clause after the second slash
-4. HARD LIMIT: 2200 characters total — count carefully
-5. No negative prompts. No text overlays.
-6. Inject brand voice into wardrobe, mood and environment choices
-7. Return ONLY the refined prompt — no explanation, no markdown`;
+1. ALL product-specific info (name, USP, features) must come ONLY from the PRODUCT data above — never hallucinate product details
+2. Keep ALL @image1 and @image2+ references exactly as-is — never remove them
+3. ONE motion verb per shot line
+4. Camera move on its own clause after the second slash
+5. HARD LIMIT: 2200 characters total — count carefully
+6. No negative prompts. No text overlays.
+7. Inject brand voice, lighting style and visual grade into STYLE, WARDROBE, ENVIRONMENT
+8. Return ONLY the refined prompt — no explanation, no markdown, no JSON`;
 
     try {
         const refined = await agentUtils.callAgentText(
