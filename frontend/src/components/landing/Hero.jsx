@@ -11,8 +11,8 @@ export default function Hero({ onAgencyDemo }) {
         offset: ["start start", "end start"]
     });
 
-    const yText = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
-    const opacityText = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+    const yText = useTransform(scrollYProgress, [0, 1], ["0%", "10%"]);
+    const opacityText = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
 
     // Initial stagger animation
     const containerVariants = {

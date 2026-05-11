@@ -3,6 +3,7 @@ import PromptArea from './PromptArea'
 import { IMAGE_MODELS, CAMERA_SHOT_PRESETS, creativeTypes, styles, ASPECT_RATIOS, templateCategories } from '../constants'
 import VoiceInput from '../../../components/VoiceInput'
 import { CreditBadge, CreditTooltipWrapper } from '../../../components/CreditBadge'
+import { useModelStatus } from '../../../hooks/useModelStatus'
 
 const CreateToolsPanel = memo(({ 
     activeBrand, fromContent, setFromContent, designBaseImage, setDesignBaseImage,
@@ -20,6 +21,8 @@ const CreateToolsPanel = memo(({
 }) => {
     
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
+    const modelStatuses = useModelStatus()
+    const activeStatus = modelStatuses[imageModel] || { status: 'healthy', message: '' }
 
     return (
         <div className="creative-tools-panel">
@@ -407,6 +410,12 @@ const CreateToolsPanel = memo(({
                         <span>{IMAGE_MODELS.find(m => m.id === imageModel)?.name || 'NanoBanana 2'}</span>
                         <span className="material-symbols-outlined text-[10px] ml-auto">{showModelMenu ? 'expand_less' : 'expand_more'}</span>
                     </button>
+                    {activeStatus.status !== 'healthy' && (
+                        <div className={`mt-1.5 px-2.5 py-1.5 rounded-lg flex items-start gap-1.5 text-[10px] leading-tight ${activeStatus.status === 'overloaded' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                            <span className="material-symbols-outlined text-[12px]">{activeStatus.status === 'overloaded' ? 'error' : 'warning'}</span>
+                            <span>{activeStatus.message || 'Experiencing high demand, generations may be delayed.'}</span>
+                        </div>
+                    )}
                     {showModelMenu && (
                         <div className="absolute left-0 right-0 bottom-full mb-1 bg-[var(--sys-bg)]/95 backdrop-blur-xl border border-[var(--sys-border)] rounded-xl shadow-2xl z-50 p-1.5 space-y-0.5">
                             {IMAGE_MODELS.map(m => (
@@ -415,7 +424,15 @@ const CreateToolsPanel = memo(({
                                     <span className="material-symbols-outlined text-sm" style={{ color: m.color }}>{m.icon}</span>
                                     <div className="flex-1 min-w-0">
                                         <span className="text-[11px] font-bold truncate block">{m.name}</span>
-                                        <span className="text-[9px] text-[var(--sys-text-muted)] truncate block">{m.desc}</span>
+                                        <span className="text-[9px] text-[var(--sys-text-muted)] truncate block">
+                                            {modelStatuses[m.id]?.status !== 'healthy' ? (
+                                                <span className={modelStatuses[m.id]?.status === 'overloaded' ? 'text-rose-400 font-bold' : 'text-amber-400 font-bold'}>
+                                                    {modelStatuses[m.id]?.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'}
+                                                </span>
+                                            ) : (
+                                                m.desc
+                                            )}
+                                        </span>
                                     </div>
                                 </button>
                             ))}

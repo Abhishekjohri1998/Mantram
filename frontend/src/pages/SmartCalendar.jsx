@@ -5,6 +5,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
 import { social, brandCalendar, monthlyStrategy as msAPI, creatives, jobs as jobsAPI } from '../services/api'
 import { getEventsForMonth, getUpcomingEvents, EVENT_COLORS, COUNTRIES } from '../data/calendarData'
+import { useModelStatus } from '../hooks/useModelStatus'
 
 // ═══════════════════════════════════════════════════════════════
 // SMART CALENDAR — Social Marketing Command Center
@@ -51,6 +52,7 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 export default function SmartCalendar() {
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
+    const modelStatuses = useModelStatus()
     const brandCountry = activeBrand?.dna?.country || 'India'
     const [overrideCountry, setOverrideCountry] = useState(null)
     const country = overrideCountry || brandCountry
@@ -318,17 +320,24 @@ export default function SmartCalendar() {
                                     </button>
                                     {showModelMenu && (
                                         <div className="absolute top-full right-0 mt-1 w-64 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-50 py-2 max-h-80 overflow-y-auto">
-                                            {IMAGE_MODELS.map(m => (
+                                            {IMAGE_MODELS.map(m => {
+                                                const s = modelStatuses[m.id];
+                                                const hasWarning = s && s.status !== 'healthy';
+                                                const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                return (
                                                 <button key={m.id} onClick={() => { setBatchModel(m.id); setShowModelMenu(false) }}
                                                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all cursor-pointer hover:bg-[color-mix(in_srgb,var(--sys-text)_5%,var(--sys-surface))] ${batchModel === m.id ? 'bg-[color-mix(in_srgb,var(--sys-text)_8%,var(--sys-surface))]' : ''}`}>
                                                     <span className="material-symbols-outlined text-base" style={{ color: m.color }}>{m.icon}</span>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-bold text-[var(--sys-text)]">{m.name}</p>
+                                                        <p className="text-xs font-bold text-[var(--sys-text)]">
+                                                            {m.name} {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4 }}>{warningLabel}</span>}
+                                                        </p>
                                                         <p className="text-[10px] text-[var(--sys-text-muted)]">{m.desc}</p>
                                                     </div>
                                                     {batchModel === m.id && <span className="material-symbols-outlined text-primary text-sm">check</span>}
                                                 </button>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>

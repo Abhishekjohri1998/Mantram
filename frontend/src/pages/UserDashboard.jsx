@@ -210,7 +210,7 @@ export default function UserDashboard() {
     setEnhanced(null); setIntel(null); setTrends([])
     setPerfData(null); setFunnelData(null); setBlendedRoas(null); setD2c(null)
     loadEnhanced(); loadIntel(); loadTrends(); loadAnalytics()
-    const iv = setInterval(() => { loadEnhanced(); loadTrends() }, 30*60*1000)
+    const iv = setInterval(() => { loadEnhanced(); loadTrends(); loadIntel() }, 30*60*1000)
     return () => clearInterval(iv)
   }, [activeBrand?._id, loadEnhanced, loadIntel, loadTrends, loadAnalytics])
 
@@ -227,11 +227,11 @@ export default function UserDashboard() {
   const grokSeo = intel?.grokSeo || {}
 
   const studios = [
-    { icon: 'psychology',     label: 'Brainstorm', path: '/brainstorm',           color: '#FF4D00', count: 0 },
+    { icon: 'psychology',     label: 'Brainstorm', path: '/brainstorm',           color: '#FF4D00', count: activity.brainstorms?.thisWeek || 0 },
     { icon: 'edit_note',      label: 'Content',    path: '/content-studio',        color: '#34d399', count: activity.content?.thisWeek || 0 },
     { icon: 'auto_fix_high',  label: 'Creative',   path: '/creative-studio',       color: '#ec4899', count: activity.creatives?.thisWeek || 0 },
-    { icon: 'movie',          label: 'Video',      path: '/video-studio',          color: '#f59e0b', count: 0 },
-    { icon: 'search_insights',label: 'SEO',        path: '/seo-studio',            color: '#06b6d4', count: 0 },
+    { icon: 'movie',          label: 'Video',      path: '/video-studio',          color: '#f59e0b', count: activity.videos?.thisWeek || 0 },
+    { icon: 'search_insights',label: 'SEO',        path: '/seo-studio',            color: '#06b6d4', count: activity.seoAudits?.thisWeek || 0 },
     { icon: 'campaign',       label: 'Ads',        path: '/performance-marketing', color: '#f43f5e', count: perfData?.stats?.activeCampaigns || 0 },
     { icon: 'calendar_month', label: 'Calendar',   path: '/smart-calendar',        color: '#a78bfa', count: scheduledPosts.totalUpcoming || 0 },
     { icon: 'share',          label: 'Social',     path: '/social-media-studio',   color: '#38bdf8', count: enhanced?.connectedPlatformCount || 0 },
@@ -412,7 +412,13 @@ export default function UserDashboard() {
                   {n.relevance && <p className="text-[10px] text-emerald-400">💡 {n.relevance}</p>}
                 </div>
               </div>
-            )) : <p className="text-xs text-white/30 py-8 text-center">Refresh to fetch latest news</p>}
+            )) : (
+              <div className="text-center py-6">
+                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">newspaper</span>
+                <p className="text-xs text-white/30 mb-3">No news loaded</p>
+                <button onClick={()=>loadIntel()} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-colors">Fetch Latest News</button>
+              </div>
+            )}
           </Card>
           <Card className="col-span-12 lg:col-span-4 p-5">
             <Label icon="tips_and_updates">💡 Opportunities</Label>
@@ -428,6 +434,13 @@ export default function UserDashboard() {
                 <p className="text-[10px] text-white/30 line-clamp-1 mt-0.5">{s.hook}</p>
               </div>
             ))}
+            {grokContent.length === 0 && upcoming.length === 0 && !loadingIntel && (
+              <div className="text-center py-6">
+                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">lightbulb</span>
+                <p className="text-xs text-white/30 mb-3">No opportunities detected yet</p>
+                <button onClick={()=>loadIntel()} className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 cursor-pointer transition-colors">Scan for Opportunities</button>
+              </div>
+            )}
             {upcoming.slice(0,3).map((e,i)=>(
               <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name))} className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-violet-500/20 cursor-pointer mb-2 transition-all group">
                 <span className="text-lg">{e.emoji}</span>

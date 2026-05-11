@@ -9,6 +9,7 @@ import TemplateFitPanel from '../components/TemplateFitPanel'
 import TemplateCreateFlow from '../components/TemplateCreateFlow'
 import { useBrand } from '../context/BrandContext'
 import { useAuth } from '../context/AuthContext'
+import { useModelStatus } from '../hooks/useModelStatus'
 import VoiceInput from '../components/VoiceInput'
 import PublishModal from '../components/PublishModal'
 import GlobalLoader from '../components/GlobalLoader'
@@ -21,7 +22,7 @@ import './CreativeStudio/CreativeStudio.css'
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
 
-function TemplateSuggestionRow({ brandId, onSelect }) {
+function TemplateSuggestionRow({ brandId, onSelect, section = 'ai_create', label }) {
     const [templates, setTemplates] = useState([])
     const [loaded, setLoaded] = useState(false)
 
@@ -29,7 +30,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         let cancelled = false
         const token = localStorage.getItem('mantram_token')
         const qs = brandId ? `?brandId=${brandId}` : ''
-        fetch(`${TMPL_ROW_API}/templates/by-section/ai_create${qs}`, {
+        fetch(`${TMPL_ROW_API}/templates/by-section/${section}${qs}`, {
             headers: { Authorization: `Bearer ${token}` }
         })
         .then(r => r.ok ? r.json() : null)
@@ -37,7 +38,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
         .catch(() => {}) // silent failure — never crash the page
         .finally(() => { if (!cancelled) setLoaded(true) })
         return () => { cancelled = true }
-    }, [brandId])
+    }, [brandId, section])
 
     // Don't render anything until loaded (prevents layout shift)
     if (!loaded || templates.length === 0) return null
@@ -57,7 +58,7 @@ function TemplateSuggestionRow({ brandId, onSelect }) {
             }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14, opacity: 0.5 }}>dashboard_customize</span>
                 <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.45 }}>
-                    Templates · {templates.length} ready
+                    {label || 'Templates'} · {templates.length} ready
                 </span>
             </div>
             {/* Fixed-height scroll container — no layout shift */}
@@ -442,6 +443,7 @@ export default function CreativeStudio() {
     const navigate = useNavigate()
     const { activeBrand } = useBrand()
     const { user } = useAuth()
+    const modelStatuses = useModelStatus()
     const [searchParams, setSearchParams] = useSearchParams()
 
     // ── Global State ──
@@ -3018,6 +3020,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                     {/* ═══════════ GALLERY (full-width — settings moved to floating bar) ═══════════ */}
                     <div className="creative-gallery relative" data-wt="creative-gallery">
 
+                        {/* ── Template Suggestions for AI Create ── */}
+                        <TemplateSuggestionRow
+                            section="ai_create"
+                            label="AI Create Templates"
+                            brandId={activeBrand?._id}
+                            onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'create' })}
+                        />
 
 
                         {/* ═══ NATIVE ANIMATE WORKSPACE (MAIN UI) ═══ */}
@@ -3096,11 +3105,16 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <div className="relative">
                                                         <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
                                                             className="input-glass w-full py-3 px-4 pl-11 text-sm font-bold text-[var(--sys-text)] bg-[var(--sys-surface)] border border-[var(--sys-border)] focus:border-[#FF4D00] transition-colors rounded-xl outline-none appearance-none shadow-sm cursor-pointer hover:bg-[var(--sys-surface-hover)]">
-                                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
+                                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => {
+                                                                const s = modelStatuses[id];
+                                                                const hasWarning = s && s.status !== 'healthy';
+                                                                const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                                return (
                                                                 <option key={id} value={id}>
-                                                                    {m.name} — {m.desc}
+                                                                    {m.name} {hasWarning ? `[${warningLabel}]` : `— ${m.desc}`}
                                                                 </option>
-                                                            ))}
+                                                                )
+                                                            })}
                                                         </select>
                                                         <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">{ANIMATE_MODELS[animateModel]?.icon || 'memory'}</span>
                                                         <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none">expand_more</span>
@@ -4284,20 +4298,26 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {showModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-surface)] rounded-xl shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[220px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-primary)]/10 text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-bg)] hover:text-[var(--sys-text)]')}>
                                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)]" style={{ fontSize: '14px' }}>auto_awesome</span>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-semibold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--sys-primary)', color: 'white' }}>NEW</span>}
                                                             </div>
                                                             <span className="text-[9px] opacity-50 truncate block">{m.provider}</span>
                                                         </div>
                                                         {imageModel === m.id && <span className="material-symbols-outlined text-[var(--sys-primary)]" style={{ fontSize: '14px' }}>check</span>}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -4647,7 +4667,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         {showModelMenu && (
                                             <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-50 border border-[var(--sys-border)] overflow-hidden">
                                                 <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                                    {IMAGE_MODELS.map(m => (
+                                                    {IMAGE_MODELS.map(m => {
+                                                        const s = modelStatuses[m.id];
+                                                        const hasWarning = s && s.status !== 'healthy';
+                                                        const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                        return (
                                                         <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                             className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                             <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -4656,13 +4680,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                    {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                     {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
                                                                 </div>
                                                                 <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
                                                             </div>
                                                             {imageModel === m.id && <span className="material-symbols-outlined text-[secondary] text-[11px]">check</span>}
                                                         </button>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
@@ -5812,9 +5838,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         <label className="text-[10px] font-semibold text-[var(--sys-text-muted)] mb-1 block">Model</label>
                                         <select value={animateModel} onChange={e => setAnimateModel(e.target.value)}
                                             className="w-full px-2 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-[11px] focus:outline-none cursor-pointer">
-                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => (
-                                                <option key={id} value={id}>{m.name}</option>
-                                            ))}
+                                            {Object.entries(ANIMATE_MODELS).map(([id, m]) => {
+                                                const s = modelStatuses[id];
+                                                const hasWarning = s && s.status !== 'healthy';
+                                                const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                return (
+                                                <option key={id} value={id}>{m.name} {hasWarning ? `[${warningLabel}]` : ''}</option>
+                                                )
+                                            })}
                                         </select>
                                     </div>
                                     <div>
@@ -6044,7 +6075,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <span className="ml-auto text-[10px] text-[var(--sys-text-muted)] font-normal">Affects style &amp; quality</span>
                                 </h3>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {LOGO_IMAGE_MODELS.map(m => (
+                                    {LOGO_IMAGE_MODELS.map(m => {
+                                        const s = modelStatuses[m.id];
+                                        const hasWarning = s && s.status !== 'healthy';
+                                        const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                        return (
                                         <button
                                             key={m.id}
                                             onClick={() => setLogoImageModel(m.id)}
@@ -6060,11 +6095,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <span className="flex items-center gap-1.5">
                                                 <span className="material-symbols-outlined !text-sm" style={{ color: m.color }}>{m.icon}</span>
                                                 <span className="text-[11px] font-bold leading-none">{m.name}</span>
+                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                 {m.isNew && <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1 rounded font-bold">NEW</span>}
                                             </span>
                                             <span className="text-[9px] text-[var(--sys-text-muted)] leading-tight pl-5">{m.desc}</span>
                                         </button>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
 
@@ -6330,7 +6367,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             {/* ── Empty State ── */}
                             {!carouselResult && !carouselGenerating && (
-                                <div className="text-center">
+                                <div className="text-center w-full">
                                     <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mb-4 mx-auto">
                                         <span className="material-symbols-outlined text-[var(--sys-primary)] text-4xl">view_carousel</span>
                                     </div>
@@ -6338,6 +6375,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     <p className="text-xs text-[var(--sys-text-muted)] max-w-sm mx-auto mb-4">
                                         Describe a scene and we'll generate a seamless panoramic background, auto-split it into carousel panels, and composite your products on top.
                                     </p>
+                                    {/* ── Template Suggestions for Carousel ── */}
+                                    <div className="w-full mt-4 text-left">
+                                        <TemplateSuggestionRow
+                                            section="carousel"
+                                            label="Carousel Templates"
+                                            brandId={activeBrand?._id}
+                                            onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'carousel' })}
+                                        />
+                                    </div>
                                     <div className="flex flex-wrap gap-2 justify-center">
                                         {['Luxury marble kitchen', 'Tropical beach sunset', 'Modern tech workspace', 'Botanical garden'].map(ex => (
                                             <button key={ex} onClick={() => setCarouselPrompt(ex)}
@@ -6486,7 +6532,11 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     {showModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[240px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setImageModel(m.id); setShowModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer group " + (imageModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                         <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -6495,6 +6545,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f', letterSpacing: '0.05em' }}>NEW</span>}
                                                             </div>
                                                             <div className="text-[9px] opacity-50 truncate">{m.provider}</div>
@@ -6505,7 +6556,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             </div>
                                                         )}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -6686,6 +6738,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                             <p className="text-sm text-[var(--sys-text-muted)]">Build coordinated campaign batches — trend-powered, AI-driven</p>
                         </div>
                     </div>
+
+                    {/* ── Template Suggestions for Campaigns ── */}
+                    <TemplateSuggestionRow
+                        section="campaign"
+                        label="Campaign Templates"
+                        brandId={activeBrand?._id}
+                        onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'campaigns' })}
+                    />
 
                     {/* Step Indicator — 3-step flow */}
                     <div data-wt="camp-steps" className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide pb-2">
@@ -11191,7 +11251,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {showCsModelMenu && (
                                         <div className="absolute left-0 right-0 top-full mt-1.5 bg-[var(--sys-bg)] rounded-[14px] shadow-xl z-[60] border border-[var(--sys-border)] overflow-hidden">
                                             <div className="p-1.5 space-y-0.5 max-h-[260px] overflow-y-auto">
-                                                {IMAGE_MODELS.map(m => (
+                                                {IMAGE_MODELS.map(m => {
+                                                    const s = modelStatuses[m.id];
+                                                    const hasWarning = s && s.status !== 'healthy';
+                                                    const warningLabel = hasWarning ? (s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                                                    return (
                                                     <button key={m.id} onClick={() => { setCsModel(m.id); setShowCsModelMenu(false) }}
                                                         className={"w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer " + (csModel === m.id ? 'bg-[var(--sys-surface)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)]')}>
                                                         <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.color + '18' }}>
@@ -11200,13 +11264,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-[11px] font-bold truncate">{m.name}</span>
+                                                                {hasWarning && <span style={{ color: s.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4, fontSize: '10px', fontWeight: 'bold' }}>{warningLabel}</span>}
                                                                 {m.isNew && <span style={{ fontSize: '8px', fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#10a37f22', color: '#10a37f' }}>NEW</span>}
                                                             </div>
                                                             <div className="text-[9px] opacity-50 truncate">{m.provider} · {m.desc}</div>
                                                         </div>
                                                         {csModel === m.id && <span className="material-symbols-outlined text-[14px]" style={{ color: m.color }}>check</span>}
                                                     </button>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -11243,26 +11309,19 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 )}
                             </div>
 
-                            {/* ── 3. Mood Preset — dropdown ── */}
+                            {/* ── 3. Creative Direction — AI Art Director brief ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Cinematic Mood</p>
-                                <div className="relative">
-                                    <select value={csMoodPreset} onChange={e => setCsMoodPreset(e.target.value)}
-                                        className="w-full appearance-none bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-[14px] px-4 py-3 text-[13px] font-bold text-[var(--sys-text)] outline-none cursor-pointer hover:border-primary/30 transition-all pr-10">
-                                        <option value="dark-botanical">Dark Botanical — Deep greens, moody forest</option>
-                                        <option value="aqua-mist">Aqua Mist — Dark aqua, water droplets</option>
-                                        <option value="charcoal-industrial">Charcoal Industrial — Raw black, sharp edges</option>
-                                        <option value="warm-glow">Warm Glow — Amber, bokeh, candlelight</option>
-                                        <option value="luxury-noir">Luxury Noir — Black marble, editorial</option>
-                                        <option value="custom">Custom — Write your own brief</option>
-                                    </select>
-                                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none text-[18px]">expand_more</span>
-                                </div>
-                                {csMoodPreset === 'custom' && (
-                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
-                                        placeholder="Describe your scene, mood, colors... e.g. 'Monsoon rain, deep blue tones, bokeh'"
-                                        className="mt-2 w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />
-                                )}
+                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[13px]">palette</span> Creative Direction
+                                    <span className="text-[9px] opacity-50 ml-1">AI auto-directs if left blank</span>
+                                </p>
+                                <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
+                                    placeholder="Describe your vision... e.g. 'Monsoon rain, deep blue tones' or 'Sunlit terrazzo, golden hour warmth' or 'Diwali festive theme with diyas'"
+                                    className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[70px] focus:border-primary/40 transition-all" />
+                                <p className="text-[9px] text-[var(--sys-text-muted)] mt-1.5 opacity-60">
+                                    <span className="material-symbols-outlined text-[10px] align-middle mr-0.5">auto_awesome</span>
+                                    AI Art Director creates a unique mood, lighting & palette for every shot
+                                </p>
                             </div>
 
                             {/* ── 4. Canvas Size — dropdown ── */}
@@ -11297,17 +11356,6 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
 
-                            {/* ── 5. Optional Brief (non-custom moods) ── */}
-                            {csMoodPreset !== 'custom' && (
-                                <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
-                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[13px]">edit_note</span> Additional Brief <span className="text-[9px] opacity-50 ml-1">optional</span>
-                                    </p>
-                                    <textarea value={csBrief} onChange={e => setCsBrief(e.target.value)}
-                                        placeholder="e.g. 'Feature the product with morning dew drops' or 'Add Diwali festive feel'"
-                                        className="w-full bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-xl p-3 text-[12px] text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] outline-none resize-none min-h-[60px] focus:border-primary/40 transition-all" />
-                                </div>
-                            )}
 
                             {/* ── 6. Taglines — optional override ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
@@ -11416,7 +11464,7 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                     <div className="creative-canvas-panel flex flex-col items-center justify-center p-6 sm:p-10">
                         {/* Empty state */}
                         {!csGenerating && csSlots.every(s => !s) && (
-                            <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm mx-auto">
+                            <div className="flex flex-col items-center justify-center gap-4 text-center max-w-md mx-auto w-full">
                                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                                     <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)]">movie_filter</span>
                                 </div>
@@ -11428,6 +11476,15 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                     {['Hero Shot', 'Lifestyle', 'Detail Close-up'].map(m => (
                                         <span key={m} className="text-[10px] px-2.5 py-1 rounded-full border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-bold">{m}</span>
                                     ))}
+                                </div>
+                                {/* ── Template Suggestions for Campaign Shot ── */}
+                                <div className="w-full mt-4">
+                                    <TemplateSuggestionRow
+                                        section="campaign_shot"
+                                        label="Campaign Shot Templates"
+                                        brandId={activeBrand?._id}
+                                        onSelect={(t) => setSearchParams({ templateId: t._id, mode: 'campaignshot' })}
+                                    />
                                 </div>
                             </div>
                         )}

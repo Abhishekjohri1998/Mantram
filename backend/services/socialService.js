@@ -627,8 +627,8 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // r_member_social added for reading analytics (likes/comments on personal posts)
-    const scopes = ['openid', 'profile', 'email', 'w_member_social', 'r_member_social'].join(' ');
+    // r_member_social requires special enterprise approval and causes OAuth to crash if requested without it
+    const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
     return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;

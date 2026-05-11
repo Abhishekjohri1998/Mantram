@@ -5369,15 +5369,29 @@ router.get('/', protect, async (req, res) => {
         if (mode) filter.mode = mode;
 
         const skip = (Number(page) - 1) * Number(limit);
+        const selectFields = 'title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
+
+        // Build the query — use hint to force the compound index so MongoDB avoids an in-memory sort.
+        // Also set allowDiskUse via setOptions (the chained .allowDiskUse() is unreliable on some driver versions).
+        const query = VideoProject.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit))
+            .select(selectFields)
+            .populate('brand', 'name dna.logo.url')
+            .setOptions({ allowDiskUse: true })
+            .lean();
+
+        // Hint the correct compound index based on the filter shape
+        if (filter.user && filter.brand) {
+            query.hint({ user: 1, brand: 1, createdAt: -1 });
+        } else if (filter.user) {
+            query.hint({ user: 1, createdAt: -1 });
+        }
+        // superadmin without user filter: no hint (let MongoDB pick, but allowDiskUse will save it)
+
         const [projects, total] = await Promise.all([
-            VideoProject.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(Number(limit))
-                .allowDiskUse(true)
-                .select('title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt')
-                .populate('brand', 'name dna.logo.url')
-                .lean(),
+            query.exec(),
             VideoProject.countDocuments(filter),
         ]);
 

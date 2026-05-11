@@ -10,7 +10,6 @@ import IntelligenceLayer from '../components/landing/IntelligenceLayer'
 import Metrics from '../components/landing/Metrics'
 import Comparison from '../components/landing/Comparison'
 import StudiosShowcase from '../components/landing/StudiosShowcase'
-import Integrations from '../components/landing/Integrations'
 import FeaturedStudios from '../components/landing/FeaturedStudios'
 import HowItWorks from '../components/landing/HowItWorks'
 import CaseStudies from '../components/landing/CaseStudies'
@@ -62,10 +61,8 @@ export default function Landing() {
                     <Metrics />
                     <Comparison />
                     <div id="studios"><StudiosShowcase /></div>
-                    <Integrations />
                     <FeaturedStudios />
                     <div id="how-it-works"><HowItWorks /></div>
-                    <div id="case-studies"><CaseStudies /></div>
                     <Testimonial />
                     <div id="pricing"><Pricing /></div>
                     <FAQ />

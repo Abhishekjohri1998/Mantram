@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { useUI } from '../context/UIContext';
 import TagInput from '../components/shared/TagInput';
+import { useModelStatus } from '../hooks/useModelStatus';
 
 // --- Prompt Display Block ---
 function PromptBlock({ text }) {
@@ -95,6 +96,7 @@ const SECTIONS_BY_STUDIO = {
 
 const TemplateManager = () => {
     const { addToast } = useUI();
+    const modelStatuses = useModelStatus();
 
     // Top-level tab
     const [activeTab, setActiveTab] = useState('templates'); // 'templates' | 'categories'
@@ -124,6 +126,11 @@ const TemplateManager = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSection, setSelectedSection] = useState('general');
     const [formErrors, setFormErrors] = useState({});
+
+    // AI auto-analyze state (for Upload New Template modal)
+    const [analyzingPrompt, setAnalyzingPrompt] = useState(false);
+    const [analyzedDna, setAnalyzedDna] = useState(null);
+    const [autoPrompt, setAutoPrompt] = useState('');
 
     // Derived: sections filtered by selected studio
     const filteredSections = selectedStudio
@@ -488,6 +495,11 @@ const TemplateManager = () => {
                 uploadFd.append('isActive', fd.get('isActive') === 'on');
                 uploadFd.append('isPublished', fd.get('isPublished') === 'on');
 
+                // Include AI-analyzed DNA if available
+                if (analyzedDna) {
+                    uploadFd.append('dna', JSON.stringify(analyzedDna));
+                }
+
                 const res = await api('/superadmin/templates/upload', {
                     method: 'POST',
                     body: uploadFd,
@@ -567,7 +579,7 @@ const TemplateManager = () => {
                         ? <button onClick={() => setCatModal({ open: true, data: null })} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ New Category</button>
                         : <>
                             <button onClick={() => { setGenForm({ name: '', categoryId: '', description: '', prompt: '', model: 'seedance-2.0', studioOrigin: 'video', studioSection: 'video_qads', productImageUrls: [], avatarUrl: '', duration: 8, format: '9:16', quality: 'high' }); setGenStatus('idle'); setGenError(''); setGenResult(null); setGenModal(true); }} style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span>Generate Template</button>
-                            <button onClick={() => { setTags([]); setSelectedStudio(''); setSelectedCategory(''); setSelectedSection('general'); setFormErrors({}); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
+                            <button onClick={() => { setTags([]); setSelectedStudio(''); setSelectedCategory(''); setSelectedSection('general'); setFormErrors({}); setAutoPrompt(''); setAnalyzedDna(null); setAnalyzingPrompt(false); setModal({ open: true, data: {}, isNew: true }); }} style={{ background: '#f97316', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>+ Upload Template</button>
                         </>
                     }
                 </div>
@@ -783,7 +795,50 @@ const TemplateManager = () => {
                             {modal.isNew && (
                                 <div style={{ display: 'flex', gap: 14 }}>
                                     <label style={{ ...labelStyle, flex: 2 }}>Preview Media
-                                        <input type="file" name="file" accept="image/*,video/*" style={{ ...inputStyle, padding: '7px 10px', marginTop: 6, borderColor: formErrors.file ? 'rgba(239,68,68,0.5)' : undefined }} />
+                                        <input type="file" name="file" accept="image/*,video/*" style={{ ...inputStyle, padding: '7px 10px', marginTop: 6, borderColor: formErrors.file ? 'rgba(239,68,68,0.5)' : undefined }}
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file || !file.type.startsWith('image/')) return;
+
+                                                // Reset any previous analysis
+                                                setAnalyzingPrompt(true);
+                                                setAnalyzedDna(null);
+                                                setAutoPrompt('');
+
+                                                // Upload to S3 first via a temporary upload
+                                                try {
+                                                    const uploadFd = new FormData();
+                                                    uploadFd.append('file', file);
+                                                    uploadFd.append('folder', 'template-references');
+                                                    const uploadRes = await api('/media/image-reference', {
+                                                        method: 'POST',
+                                                        body: uploadFd,
+                                                        headers: {},
+                                                    });
+                                                    const s3Url = uploadRes?.url || uploadRes?.s3Url || uploadRes?.imageUrl;
+                                                    if (!s3Url) throw new Error('No URL returned');
+
+                                                    // Now trigger AI analysis
+                                                    addToast('✨ Analyzing template design...', 'info');
+                                                    const analysisRes = await api('/superadmin/templates/analyze-image', {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({ imageUrl: s3Url }),
+                                                    });
+                                                    if (analysisRes?.success && analysisRes.promptFormula) {
+                                                        setAutoPrompt(analysisRes.promptFormula);
+                                                        setAnalyzedDna(analysisRes.dna || null);
+                                                        addToast('✨ AI prompt generated successfully!', 'success');
+                                                    } else {
+                                                        addToast('Analysis completed but no prompt generated. Please write manually.', 'warning');
+                                                    }
+                                                } catch (err) {
+                                                    console.error('Auto-analyze failed:', err);
+                                                    addToast('AI analysis failed — you can write the prompt manually.', 'warning');
+                                                } finally {
+                                                    setAnalyzingPrompt(false);
+                                                }
+                                            }}
+                                        />
                                     </label>
                                     <label style={{ ...labelStyle, flex: 1 }}>Studio Origin *
                                         <select
@@ -856,8 +911,40 @@ const TemplateManager = () => {
                             <div style={{ margin: '6px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
                             <div>
                                 {modal.isNew ? (
-                                    <label style={labelStyle}>Prompt Formula *
-                                        <textarea name="savedPrompt" rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6, borderColor: formErrors.savedPrompt ? 'rgba(239,68,68,0.5)' : undefined }} placeholder="Enter the exact prompt to use when generating from this template..." />
+                                    <label style={labelStyle}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            Prompt Formula *
+                                            {analyzingPrompt && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#f97316', fontWeight: 600 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                                    AI is analyzing the design...
+                                                </span>
+                                            )}
+                                            {!analyzingPrompt && autoPrompt && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#10b981', fontWeight: 600 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                                                    AI-generated
+                                                </span>
+                                            )}
+                                        </div>
+                                        <textarea
+                                            name="savedPrompt"
+                                            rows={6}
+                                            value={autoPrompt}
+                                            onChange={e => setAutoPrompt(e.target.value)}
+                                            disabled={analyzingPrompt}
+                                            style={{
+                                                ...inputStyle,
+                                                resize: 'vertical',
+                                                fontFamily: 'monospace',
+                                                fontSize: 12,
+                                                lineHeight: 1.5,
+                                                marginTop: 6,
+                                                borderColor: formErrors.savedPrompt ? 'rgba(239,68,68,0.5)' : analyzingPrompt ? 'rgba(249,115,22,0.4)' : autoPrompt ? 'rgba(16,185,129,0.4)' : undefined,
+                                                opacity: analyzingPrompt ? 0.6 : 1,
+                                            }}
+                                            placeholder={analyzingPrompt ? '✨ Analyzing template design — writing prompt formula...' : 'Enter the exact prompt to use when generating from this template...'}
+                                        />
                                     </label>
                                 ) : (
                                     <>
@@ -998,12 +1085,24 @@ const TemplateManager = () => {
                                                 <>
                                                     {(!isImgCat) && (
                                                         <optgroup label="Video Models">
-                                                            {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                            {VIDEO_MODELS.map(m => {
+                                                                const s = modelStatuses[m.value];
+                                                                const label = s && s.status !== 'healthy'
+                                                                    ? `${m.label} (${s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'})`
+                                                                    : m.label;
+                                                                return <option key={m.value} value={m.value}>{label}</option>
+                                                            })}
                                                         </optgroup>
                                                     )}
                                                     {(!isVidCat) && (
                                                         <optgroup label="Image Models">
-                                                            {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                            {IMAGE_MODELS.map(m => {
+                                                                const s = modelStatuses[m.value];
+                                                                const label = s && s.status !== 'healthy'
+                                                                    ? `${m.label} (${s.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'})`
+                                                                    : m.label;
+                                                                return <option key={m.value} value={m.value}>{label}</option>
+                                                            })}
                                                         </optgroup>
                                                     )}
                                                 </>

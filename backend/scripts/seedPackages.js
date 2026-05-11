@@ -289,33 +289,6 @@ const PACKAGES = [
             { name: 'Custom AI Model Fine-Tuning', included: true },
             { name: '24/7 Dedicated Support + SLA', included: true },
         ]
-    },
-
-    // ─────────────────────────────────────────────────────
-    // TIER -1: Test Plan (Dev/QA only, hidden from users)
-    // ─────────────────────────────────────────────────────
-    {
-        name: 'Test Plan',
-        slug: 'test-plan',
-        tagline: 'For live payment testing',
-        description: 'A minimal price plan to verify full Razorpay integration safely.',
-        tier: 0,
-        studios: {
-            contentStudio: true,
-            brainstormStudio: true,
-        },
-        credits: { monthly: 10, rollover: false, bonusOnSignup: 0 },
-        pricing: { monthly: 1, quarterly: 1, yearly: 1, currency: 'INR' },
-        limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 5, maxScheduledPosts: 1, socialIntegrations: 1 },
-        badge: 'TESTING',
-        color: '#10b981',
-        icon: 'bug_report',
-        displayOrder: -1,
-        contactForPricing: false,
-        features: [
-            { name: 'Live Integration Test', included: true },
-            { name: '1 Rupee Only', included: true },
-        ]
     }
 ];
 

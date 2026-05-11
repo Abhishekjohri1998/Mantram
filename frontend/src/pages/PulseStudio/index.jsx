@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import DashboardLayout from '../../components/DashboardLayout'
 import { useBrand } from '../../context/BrandContext'
 import { apiFetch } from '../../services/api'
+import { useModelStatus } from '../../hooks/useModelStatus'
 
 // ── Image download helper (bypasses CORS on external CDN images) ──────────────
 async function downloadImageFile(imageUrl, filename) {
@@ -104,28 +105,37 @@ const IMAGE_MODELS = [
 ]
 
 function ImageModelSelector({ imageModel, setImageModel, buttonColor = '#7c3aed' }) {
+    const modelStatuses = useModelStatus()
+
     return (
         <div style={{ marginTop: 16, marginBottom: 20, padding: 14, background: 'color-mix(in srgb, var(--sys-text) 3%, var(--sys-surface))', borderRadius: 10, border: '1px solid var(--sys-border)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Image Model</div>
             <div style={{ display: 'flex', gap: 8 }}>
-                {IMAGE_MODELS.map(m => (
-                    <button
-                        key={m.id}
-                        onClick={() => setImageModel(m.id)}
-                        style={{
-                            flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                            background: imageModel === m.id ? `${buttonColor}15` : 'var(--sys-surface)',
-                            border: `1.5px solid ${imageModel === m.id ? buttonColor : 'var(--sys-border)'}`,
-                            transition: 'all 0.2s', textAlign: 'left',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 14, color: imageModel === m.id ? buttonColor : 'var(--sys-text-muted)' }}>{m.icon}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: imageModel === m.id ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>{m.label}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 3 }}>{m.desc}</div>
-                    </button>
-                ))}
+                {IMAGE_MODELS.map(m => {
+                    const statusObj = modelStatuses[m.id];
+                    const hasWarning = statusObj && statusObj.status !== 'healthy';
+                    const warningLabel = hasWarning ? (statusObj.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy') : '';
+                    return (
+                        <button
+                            key={m.id}
+                            onClick={() => setImageModel(m.id)}
+                            style={{
+                                flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                                background: imageModel === m.id ? `${buttonColor}15` : 'var(--sys-surface)',
+                                border: `1.5px solid ${imageModel === m.id ? buttonColor : 'var(--sys-border)'}`,
+                                transition: 'all 0.2s', textAlign: 'left',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 14, color: imageModel === m.id ? buttonColor : 'var(--sys-text-muted)' }}>{m.icon}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: imageModel === m.id ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>
+                                    {m.label} {hasWarning && <span style={{ color: statusObj.status === 'overloaded' ? '#fb7185' : '#fbbf24', marginLeft: 4 }}>{warningLabel}</span>}
+                                </span>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 3 }}>{m.desc}</div>
+                        </button>
+                    )
+                })}
             </div>
         </div>
     )

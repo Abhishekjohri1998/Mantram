@@ -125,13 +125,180 @@ router.post('/', protect, superadmin, async (req, res) => {
     }
 });
 
+// ==========================================
+// ANALYZE IMAGE — AI Design DNA extraction (no template creation)
+// ==========================================
+router.post('/analyze-image', protect, superadmin, async (req, res) => {
+    const start = Date.now();
+    try {
+        const { imageUrl } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl is required' });
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        // Fetch image as base64 for Gemini Vision
+        console.log(`[SuperAdmin AnalyzeImage] Fetching image for DNA analysis...`);
+        let imagePart = null;
+        try {
+            const imageRes = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
+            if (imageRes.ok) {
+                const arrayBuffer = await imageRes.arrayBuffer();
+                const base64 = Buffer.from(arrayBuffer).toString('base64');
+                const mimeType = imageRes.headers.get('content-type') || 'image/jpeg';
+                imagePart = { inlineData: { mimeType: mimeType.split(';')[0], data: base64 } };
+            }
+        } catch (fetchErr) {
+            console.warn('[SuperAdmin AnalyzeImage] Failed to fetch image:', fetchErr.message);
+        }
+        if (!imagePart) return res.status(400).json({ success: false, error: 'Could not process the image' });
+
+        // Gemini Vision — Design DNA Extraction
+        const DNA_PROMPT = `You are a world-class creative director and prompt engineer. Study this marketing creative image with extreme precision.
+
+Your task: Extract the complete Design DNA AND write a hyper-detailed image generation prompt that can perfectly replicate this EXACT visual style for any new product or content.
+
+Analyze and return ONLY valid JSON (no markdown, no code fences, no comments):
+
+{
+  "layout": "one of: centered-hero | split-left-right | split-right-left | top-hero-bottom-text | grid | full-bleed | asymmetric | minimal-white | dark-cinematic",
+  "colorPalette": ["#HEX1", "#HEX2", "#HEX3", "#HEX4"],
+  "mood": "2-4 word description, e.g. bold festive luxury",
+  "typography": {
+    "headingStyle": "describe the headline font weight, size, case, color, effects (glow/shadow/outline), and exact position",
+    "bodyStyle": "describe body/subtext style if visible, else write 'not present'"
+  },
+  "contentZones": [
+    {
+      "role": "headline | product | offer | cta | logo | subtext | model | background | decorative",
+      "position": "top-left | top-center | top-right | center | bottom-left | bottom-center | bottom-right | full-bleed | left-half | right-half",
+      "style": "detailed visual description of this zone including size proportion, spacing, effects"
+    }
+  ],
+  "fitInstruction": "A precise instruction for how a new product image should be placed in this template — position, size proportion, lighting direction, shadow angle.",
+  "promptFormula": "SEE RULES BELOW — this must be a 15-25 line detailed generation prompt"
+}
+
+CRITICAL RULES FOR promptFormula:
+The promptFormula is the MOST IMPORTANT field. It will be used directly as an image generation prompt to recreate this design with different content. It must be 15-25 lines long and capture EVERY visual detail:
+
+1. Start with: "Create a premium marketing creative image with the following EXACT design specifications:"
+2. BACKGROUND: Describe the exact background — gradients (direction, colors), textures, patterns, lighting direction and intensity, any bokeh/blur/particle effects
+3. LAYOUT: Describe the exact spatial layout — what occupies which portion of the frame (e.g. "product hero occupying 45% of the left half, vertically centered")
+4. PRODUCT ZONE: Write "{{PRODUCT_DESCRIPTION}}" as a placeholder where the product goes, with exact instructions on scale, position, lighting, and shadow
+5. TYPOGRAPHY: Describe every text element — font characteristics, size relative to frame, color with hex values, effects, exact position
+6. HEADLINE: Use {{HEADLINE}} as placeholder text. Describe its exact style and position
+7. OFFER/PRICE: If present, use {{OFFER}} as placeholder. Describe badge/callout style
+8. CTA: If present, use {{CTA}} as placeholder. Describe button/banner style
+9. BRAND: Use {{BRAND}} where the brand name/logo appears. Describe position and style
+10. DECORATIVE ELEMENTS: Describe ALL decorative elements — borders, dividers, icons, shapes, overlays, glow effects
+11. COLOR SCHEME: Reference exact hex colors from colorPalette for each element
+12. PHOTOGRAPHY DIRECTION: Describe camera angle, depth of field, lighting setup
+13. MOOD & ATMOSPHERE: Describe the emotional feel
+14. End with: "The overall composition should feel [mood] with magazine-quality production value."
+
+- Do NOT use vague terms like "professional" or "modern" without specifics
+- Every element must have an explicit color, position, and size description
+- The prompt must be self-contained
+- colorPalette must be real hex codes extracted from the image
+- Only describe what is ACTUALLY visible in the image`;
+
+        const ANALYSIS_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-lite'];
+        let rawText = '';
+
+        for (const modelId of ANALYSIS_MODELS) {
+            try {
+                console.log(`[SuperAdmin AnalyzeImage] DNA extraction via ${modelId}...`);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [imagePart, { text: DNA_PROMPT }] }],
+                        generationConfig: { temperature: 0.15, maxOutputTokens: 8192 },
+                    }),
+                    signal: AbortSignal.timeout(60_000),
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    const msg = data.error.message || '';
+                    const overloaded = msg.toLowerCase().includes('high demand') || msg.toLowerCase().includes('overload') || resp.status === 503;
+                    if (overloaded) { console.warn(`[SuperAdmin AnalyzeImage] ${modelId} overloaded, trying next`); continue; }
+                    throw new Error(msg);
+                }
+                const parts = data.candidates?.[0]?.content?.parts || [];
+                for (const p of parts) { if (p.text && !p.thought) rawText += p.text; }
+                if (rawText) { console.log(`[SuperAdmin AnalyzeImage] DNA extracted via ${modelId} (${rawText.length} chars)`); break; }
+            } catch (e) {
+                if (e.name !== 'TimeoutError') console.warn(`[SuperAdmin AnalyzeImage] ${modelId} failed: ${e.message?.substring(0, 80)}`);
+            }
+        }
+
+        // Parse DNA JSON
+        let dna = null;
+        try {
+            const firstBrace = rawText.indexOf('{');
+            const lastBrace = rawText.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                const jsonCandidate = rawText.substring(firstBrace, lastBrace + 1);
+                dna = JSON.parse(jsonCandidate);
+            }
+        } catch (e1) {
+            console.warn('[SuperAdmin AnalyzeImage] Primary JSON parse failed:', e1.message);
+            try {
+                const firstBrace = rawText.indexOf('{');
+                const lastBrace = rawText.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace > firstBrace) {
+                    let cleaned = rawText.substring(firstBrace, lastBrace + 1);
+                    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+                    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+                    dna = JSON.parse(cleaned);
+                    console.log('[SuperAdmin AnalyzeImage] JSON parsed after cleaning');
+                }
+            } catch (e2) {
+                console.warn('[SuperAdmin AnalyzeImage] Secondary JSON parse also failed:', e2.message);
+            }
+        }
+
+        // Fallback DNA
+        if (!dna) {
+            dna = {
+                layout: 'centered-hero',
+                colorPalette: [],
+                mood: 'modern professional',
+                typography: { headingStyle: 'bold uppercase headline', bodyStyle: 'not present' },
+                contentZones: [
+                    { role: 'product', position: 'center', style: 'hero product placement' },
+                    { role: 'headline', position: 'top-center', style: 'bold headline' },
+                ],
+                fitInstruction: 'Place the product prominently in the center of the frame with professional studio lighting.',
+                promptFormula: `Create a professional marketing image featuring {{PRODUCT_DESCRIPTION}}. Include: {{HEADLINE}} as main text. Clean, modern composition.`,
+            };
+        }
+
+        const promptFormula = dna.promptFormula || `Create a professional marketing image featuring {{PRODUCT_DESCRIPTION}}. Include: {{HEADLINE}} as main text.`;
+
+        console.log(`[SuperAdmin AnalyzeImage] Analysis complete in ${Date.now() - start}ms`);
+
+        res.json({
+            success: true,
+            dna,
+            promptFormula,
+        });
+    } catch (error) {
+        console.error('[SuperAdmin AnalyzeImage] Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 router.post('/upload', protect, superadmin, upload.single('file'), async (req, res) => {
     try {
         const {
             name, categoryId, description, tags, savedPrompt, studioOrigin,
-            isFeatured, isActive, isPublished,
+            isFeatured, isActive, isPublished, showOnHomeScreen,
             studioSection, promptTemplate, generationModel,
             savedProductUrl, savedProductImageUrls, savedAvatarUrl, savedVideoSettings,
+            dna: rawDna,
         } = req.body;
 
         if (!req.file) {
@@ -172,6 +339,13 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             templateAssets.push({ role: 'product', label: 'Product Image', url: pUrl, swappable: true });
         }
 
+        // Parse DNA from AI analysis (if present)
+        let parsedDna = null;
+        if (rawDna) {
+            try { parsedDna = typeof rawDna === 'string' ? JSON.parse(rawDna) : rawDna; }
+            catch { parsedDna = null; }
+        }
+
         const template = await Template.create({
             name,
             categoryId,
@@ -180,13 +354,14 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             savedPrompt,
             studioOrigin,
             studioSection: studioSection || 'general',
-            promptTemplate: promptTemplate || '',
+            promptTemplate: promptTemplate || savedPrompt || '',
             generationModel: generationModel || 'gpt-image-2',
             previewUrl,
             previewImageUrl: previewUrl,
             previewType,
             previewVideoUrl: previewType === 'video' ? previewUrl : '',
             isFeatured: isFeatured === 'true' || isFeatured === true,
+            showOnHomeScreen: showOnHomeScreen === 'true' || showOnHomeScreen === true,
             isActive: isActive === 'true' || isActive === true,
             isPublished: isPublished === 'true' || isPublished === true,
             savedProductUrl: savedProductUrl || '',
@@ -194,7 +369,8 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             savedAvatarUrl: savedAvatarUrl || '',
             savedVideoSettings: parsedVideoSettings,
             templateAssets,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            ...(parsedDna ? { dna: parsedDna, systemReferenceImage: previewUrl } : {}),
         });
 
         res.status(201).json({ success: true, template });

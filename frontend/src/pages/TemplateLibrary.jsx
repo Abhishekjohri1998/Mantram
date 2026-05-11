@@ -502,13 +502,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                             }}>
                                                 Use this template
                                             </button>
-                                            <button className="hover-btn-generate" onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedTemplate(template);
-                                            }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
-                                                Generate Now
-                                            </button>
+
                                             <button className="hover-btn-preview" onClick={(e) => {
                                                 e.stopPropagation();
                                                 setPreviewModal({
