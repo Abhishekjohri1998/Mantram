@@ -18,8 +18,10 @@ async function api(path, opts = {}) {
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
+const RES = [{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
 const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
+    {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
     {value:'happyhorse-1.0',label:'HappyHorse 1.0',msIcon:'pets'},
     {value:'grok-imagine',label:'Grok Imagine',msIcon:'smart_toy'},
     {value:'kling-3.0',label:'Kling 3.0',msIcon:'videocam'},
@@ -534,7 +536,8 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
     const [avatarBusy, setAvatarBusy] = useState(false)
     const [duration, setDuration] = useState(8)
     const [format, setFormat] = useState('9:16')
-    const [selectedModel, setSelectedModel] = useState('seedance-2.0')
+    const [resolution, setResolution] = useState('720p')
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
     const [userBrief, setUserBrief] = useState('')
     const [hookShot, setHookShot] = useState(false)
 
@@ -734,7 +737,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     presetId: selP,
                     userBrief,
                     productData: pData,
-                    settings: { duration, format, model: selectedModel, hookShot },
+                    settings: { duration, format, resolution, model: selectedModel, hookShot },
                     avatarUrl: avatarUrl || null,
                     productImageUrls: pImgs
                 })
@@ -748,7 +751,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             setIsGeneratingPrompts(false)
             setPromptStage('')
         }
-    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, selectedModel, hookShot, avatarUrl, activeBrand])
+    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, avatarUrl, activeBrand])
 
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
@@ -768,7 +771,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     legend: variant.legend || '',
                     productImageUrls: productImgs,
                     avatarUrl: avatarUrl || null,
-                    settings: { duration, format, model: selectedModel, hookShot }
+                    settings: { duration, format, resolution, model: selectedModel, hookShot }
                 })
             })
 
@@ -804,7 +807,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         } catch (e) {
             setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: e.message } }))
         }
-    }, [selP, productImgs, avatarUrl, duration, format, selectedModel, hookShot, activeBrand])
+    }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand])
 
     useEffect(() => {
         return () => Object.values(pollRefs.current).forEach(clearInterval)
@@ -922,6 +925,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={format} onChange={setFormat} options={FMTS} icon="crop" />
+                    <CfgMenu value={resolution} onChange={setResolution} options={RES} icon="hd" />
                     <CfgMenu value={duration} onChange={setDuration} options={DURS} icon="timer" />
 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />

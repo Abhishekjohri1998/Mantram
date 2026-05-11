@@ -60,14 +60,14 @@ function resolveModelName(qualityMode, imageCount) {
 }
 
 function resolveHappyHorseModelName(imageCount) {
-    // HappyHorse 1.0 model slugs on Atlas Cloud
+    // HappyHorse 1.0 model slugs on Atlas Cloud workflows
     if (imageCount > 1) {
         console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
-        return 'alibaba/happyhorse-1.0/reference-to-video';
+        return 'atlascloud/workflow/happyhorse-1.0/reference-to-video';
     }
     if (imageCount === 1) {
         console.log(`📌 HappyHorse: 1 image → image-to-video`);
-        return 'alibaba/happyhorse-1.0/image-to-video';
+        return 'atlascloud/workflow/happyhorse-1.0/image-to-video';
     }
     return 'alibaba/happyhorse-1.0/text-to-video';
 }

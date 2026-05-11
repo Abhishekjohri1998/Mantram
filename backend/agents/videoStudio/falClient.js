@@ -27,7 +27,7 @@ const MODEL_ENDPOINTS = {
 
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
-    'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
+    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
 };
 
@@ -44,6 +44,7 @@ export const COST_PER_SECOND = {
     // Seedance 2.0 — Atlas Cloud actual billing: ~$2.10/15s = $0.14/sec at 720p.
     // Base rate $0.20 × 0.7 (720p mult) = $0.14/sec effective. Previous $0.05 was undercharging.
     'seedance-2.0': { fast: 0.20, quality: 0.30 },
+    'seedance-2.0-fast': { fast: 0.10, quality: 0.10 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
@@ -57,6 +58,7 @@ const DURATION_LIMITS = {
     'veo-3.1-fast': { min: 5, max: 8 },
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
+    'seedance-2.0-fast': { min: 5, max: 15 },
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
@@ -102,6 +104,16 @@ export const MODEL_CAPABILITIES = {
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0'], recommended: false,
         maxPromptLength: 200000, // HARD LIMIT from MuAPI/Seedance
+    },
+    'seedance-2.0-fast': {
+        id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', icon: '⚡', provider: 'dynamic',
+        description: 'Faster Seedance 2.0 generation',
+        bestFor: 'Prototyping, quick iterations',
+        duration: { min: 4, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
+        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0-fast'], recommended: false,
+        maxPromptLength: 200000,
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
@@ -375,7 +387,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
-    if (model === 'seedance-2.0') {
+    if (model === 'seedance-2.0' || model === 'seedance-2.0-fast') {
+        const seedanceMode = model === 'seedance-2.0-fast' ? 'fast' : (mode || 'quality');
         const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
         
         // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
@@ -386,7 +399,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 const result = await submitAtlasCloudVideoGeneration({
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
-                    referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
+                    referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: seedanceMode,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
@@ -407,7 +420,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
-                    aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
+                    aspectRatio: aspectRatio || '16:9', qualityMode: seedanceMode,
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
@@ -420,7 +433,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 const result = await submitAtlasCloudVideoGeneration({
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
-                    referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
+                    referenceImages: s3ReferenceImages, qualityMode: seedanceMode,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
@@ -448,7 +461,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             console.error(`🛑 Primary provider (${provider}) failed:`, err.message);
             const cascade = await trySeedanceCascade({
                 prompt: safePrompt, imageUrl: s3ImageUrl, duration,
-                aspectRatio: aspectRatio || '16:9', generateAudio, mode,
+                aspectRatio: aspectRatio || '16:9', generateAudio, mode: seedanceMode,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
             });
