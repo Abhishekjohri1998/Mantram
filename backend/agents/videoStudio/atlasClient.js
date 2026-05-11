@@ -213,9 +213,14 @@ async function submitAtlasCloudPayload(payload) {
     const isI2V = atlasModel.includes('image-to-video');
     const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
 
+    // Sanitize prompt for explicit words before sending
+    let sanitizedPrompt = payload.input?.prompt || '';
+    const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
+    sanitizedPrompt = sanitizedPrompt.replace(BANNED_PATTERNS, 'move');
+
     const atlasPayload = {
         model:           atlasModel,
-        prompt:          payload.input?.prompt || '',
+        prompt:          sanitizedPrompt,
         duration:        payload.input?.duration || 5,
         resolution:      '720p',
         ratio:           rawRatio,

@@ -121,6 +121,10 @@ RULE 12 — EXPLICIT PRODUCT PLACEMENT: State exactly where the product is in ev
 
 RULE 13 — IN MEDIAS RES DEFAULT: The ad is already in progress when it begins. Do not write "the ad opens with someone picking up the product." Write as if the camera arrived mid-action. The only exception is when the brief explicitly says "starts with."
 
+RULE 14 — NO BRAND NAMES OR TRADEMARKS: Never include the brand's name, product names, or any trademarked terms in the prompt. Refer to the product generically as "the product", "the bottle", "the device", etc. AI video models will block generations that contain brand names due to safety and copyright filters.
+
+RULE 15 — NO EXPLICIT/SENSITIVE WORDS: Never use words related to violence, weapons, nudity, or explicit content, even in a metaphorical sense (e.g., "shoots", "kills", "bomb", "naked", "blood"). Use safe, descriptive action verbs.
+
 ═══════════════════════════════════════════════════════
 SECTION 6 — CAMERA VOCABULARY
 Use only this vocabulary. Never use vague terms like "nice angle" or "good shot."
