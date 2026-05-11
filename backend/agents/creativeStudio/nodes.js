@@ -1365,7 +1365,7 @@ export async function runCreativePipeline(params) {
 
     // Inject Copy Rendering instructions
     if (copyResult) {
-        const copyInjection = buildCopyInjection(copyResult);
+        const copyInjection = buildCopyInjection(copyResult, state.aspectRatio);
         if (copyInjection) {
             state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
         }
@@ -1394,7 +1394,7 @@ export async function runCreativePipeline(params) {
  * Build copy injection text for the image prompt.
  * Instructs the AI model to render the headline and CTA as bold, readable text on the image.
  */
-function buildCopyInjection(copy) {
+function buildCopyInjection(copy, aspectRatio = '1:1') {
     if (!copy?.headline) return '';
 
     const parts = [];
@@ -1415,6 +1415,18 @@ function buildCopyInjection(copy) {
     // Typography style instruction
     if (copy.textStyle) {
         parts.push(`TYPOGRAPHY STYLE: ${copy.textStyle}`);
+    }
+
+    // Add safe zone warning for wide aspect ratios (like 16:9) where image generators natively generate 2:1 and sharp crops vertically
+    const isWide = aspectRatio && (aspectRatio.includes('16:9') || aspectRatio.includes('21:9') || aspectRatio.includes('4:1') || aspectRatio.includes('8:1') || aspectRatio.includes('1920x'));
+    const isTall = aspectRatio && (aspectRatio.includes('9:16') || aspectRatio.includes('1:4') || aspectRatio.includes('1:8') || aspectRatio.includes('x1920'));
+    
+    if (isWide) {
+        parts.push(`SAFE ZONE WARNING: Keep ALL text perfectly vertically centered. The top 25% and bottom 25% of the image will be severely cropped out. Do NOT place text near the top or bottom edges!`);
+    } else if (isTall) {
+        parts.push(`SAFE ZONE WARNING: Keep ALL text perfectly horizontally centered. The left 25% and right 25% of the image will be severely cropped out. Do NOT place text near the side edges!`);
+    } else {
+        parts.push(`SAFE ZONE WARNING: Do not place text at the extreme edges. Keep text inside the central safe zone.`);
     }
 
     return `
