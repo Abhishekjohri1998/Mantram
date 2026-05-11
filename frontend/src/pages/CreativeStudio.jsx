@@ -1362,16 +1362,23 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     }, [designBaseImage, selectedProduct, referenceImages, characters, activeBrand?.name, studioMode, csProductImage, csCharacterImage, csRefImage])
 
 
-    // Auto-apply smart direction for Campaign Shot when coming from template
+    // Auto-apply smart direction for Campaign Shot and AI Create when coming from template
     useEffect(() => {
-        if (studioMode !== 'campaignshot' || !recommendedPrompt || analyzingComposition) return;
-        // Only auto-apply if the user hasn't manually edited the brief
-        // (i.e., brief is still the original template prompt or empty)
-        if (!csBrief || csBrief === lastTemplatePromptRef.current) {
-            setCsBrief(recommendedPrompt);
-            setRecommendedPrompt('');
+        if (!['campaignshot', 'create'].includes(studioMode) || !recommendedPrompt || analyzingComposition) return;
+        
+        if (studioMode === 'campaignshot') {
+            // Only auto-apply if the user hasn't manually edited the brief
+            if (!csBrief || csBrief === lastTemplatePromptRef.current) {
+                setCsBrief(recommendedPrompt);
+                setRecommendedPrompt('');
+            }
+        } else if (studioMode === 'create') {
+            if (!prompt || prompt === lastTemplatePromptRef.current) {
+                setPrompt(recommendedPrompt);
+                setRecommendedPrompt('');
+            }
         }
-    }, [recommendedPrompt, studioMode, analyzingComposition, csBrief]);
+    }, [recommendedPrompt, studioMode, analyzingComposition, csBrief, prompt]);
 
 
     useEffect(() => {
@@ -1823,6 +1830,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
                             setPhotoshootBrief(resolvedPrompt);
                         } else {
                             setPrompt(resolvedPrompt);
+                            lastTemplatePromptRef.current = resolvedPrompt;
                         }
 
                         // Set style/design reference if available
