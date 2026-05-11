@@ -3905,7 +3905,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             imageUrl: imageUrls[0] || null,
             s3ImageUrls: imageUrls,
             referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
-            imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
+            imageRole: avatarFaceRefs.length > 0 ? 'character' : 'product',
         });
 
         // Persist as VideoProject for polling

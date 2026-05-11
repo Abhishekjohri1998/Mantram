@@ -374,6 +374,9 @@ export async function submitAtlasCloudVideoGeneration({
         if (imageRole === 'product') {
             // Product reference: describe image as hero product, not a real person
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the hero product — maintain its exact shape, color, surface texture, and visual identity in every frame.`;
+        } else if (imageRole === 'character') {
+            // Character reference: safer phrasing for animated/3D avatars to prevent safety filter blocks on slapstick comedy
+            faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the main character — maintain exact visual consistency of their clothing, body shape, and facial features.`;
         } else {
             // Face reference: preserve human likeness
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;
