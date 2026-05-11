@@ -1580,7 +1580,18 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         if (finalPrompt.length > 3500) {
             const typoMatch = finalPrompt.match(/═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══[\s\S]*$/);
             const typoBlock = typoMatch ? typoMatch[0] : '';
-            if (typoBlock) {
+            
+            // ── Preserve Creative Brief ──
+            const briefMatch = finalPrompt.match(/CREATIVE BRIEF[\s\S]*$/i);
+            const briefBlock = briefMatch ? briefMatch[0] : '';
+            
+            let preserveBlock = '';
+            if (briefBlock) preserveBlock += '\n\n' + briefBlock.trim();
+            if (typoBlock && !preserveBlock.includes(typoBlock)) preserveBlock += '\n\n' + typoBlock.trim();
+            
+            if (preserveBlock && preserveBlock.length < 2500) {
+                 finalPrompt = finalPrompt.substring(0, 3450 - preserveBlock.length) + '\n\n[...condensed]\n' + preserveBlock;
+            } else if (typoBlock && typoBlock.length < 1500) {
                  finalPrompt = finalPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;
             } else {
                  finalPrompt = finalPrompt.substring(0, 3450) + '\n\n[...condensed for model compatibility]';
@@ -3764,8 +3775,7 @@ ENVIRONMENT: ${aiMood.env}
 
 LIGHTING: ${aiMood.lighting}
 
-PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth
-
+${(brief && (brief.length > 50 || brief.toLowerCase().includes('watermark'))) ? '' : `PERSPECTIVE TYPOGRAPHY (PRIMARY): large semi-transparent "${brandName.toUpperCase()}" text extending deep into the background, softly diffused and interacting with the environment, creating dimensional depth\n`}
 SECONDARY TYPOGRAPHY (clean brand font):
 "${tagline1}"
 "${tagline2}"
