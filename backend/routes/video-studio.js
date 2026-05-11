@@ -3884,10 +3884,10 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             .trim();
 
         // Keep @Image tags as-is — Atlas injects face-lock prefix automatically.
-        // Just clean the <<<image_n>>> template syntax.
-        finalPrompt = finalPrompt.replace(/<<<image_1>>>/g, '@Image1');
-        finalPrompt = finalPrompt.replace(/<<<image_2>>>/g, '@Image2');
-        finalPrompt = finalPrompt.replace(/<<<image_\d+>>>/g, '@Image1');
+        // Just clean the <<<image_n>>> template syntax. Use lowercase @image so sanitizers can strip phantom tags.
+        finalPrompt = finalPrompt.replace(/<<<image_1>>>/g, '@image1');
+        finalPrompt = finalPrompt.replace(/<<<image_2>>>/g, '@image2');
+        finalPrompt = finalPrompt.replace(/<<<image_\d+>>>/g, '@image1');
 
         const selectedModel = parsedSettings.model || 'seedance-2.0';
         const duration = Math.min(parseInt(parsedSettings.duration || preset?.recommendedDuration || 8), 15);

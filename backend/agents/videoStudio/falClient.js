@@ -354,7 +354,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // Count total images that will actually be sent (firstFrame + refs)
     const totalImageCount = (s3ImageUrl ? 1 : 0) + s3ReferenceImages.filter(Boolean).length;
     if (totalImageCount > 0) {
-        safePrompt = safePrompt.replace(/@image(\d+)/g, (match, p1) => {
+        safePrompt = safePrompt.replace(/@image(\d+)/gi, (match, p1) => {
             const idx = parseInt(p1, 10);
             if (idx > totalImageCount) {
                 console.warn(`🛡️ [Universal] Stripping phantom ${match} from prompt (only ${totalImageCount} images available)`);
@@ -364,8 +364,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }).replace(/\s{2,}/g, ' ').trim();
     } else {
         // No images at all — strip ALL @image tags
-        const hadTags = /@image\d+/.test(safePrompt);
-        safePrompt = safePrompt.replace(/@image\d+/g, '').replace(/\(\s*Visual reference:\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+        const hadTags = /@image\d+/i.test(safePrompt);
+        safePrompt = safePrompt.replace(/@image\d+/gi, '').replace(/\(\s*Visual reference:\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
         if (hadTags) console.warn(`🛡️ [Universal] Stripped all @image tags from T2V prompt (0 images provided)`);
     }
 
