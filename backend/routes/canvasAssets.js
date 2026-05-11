@@ -1589,18 +1589,19 @@ router.post('/analyze-composition', protect, async (req, res) => {
         if (styleUrl) await loadPart(styleUrl, `IMAGE ${parts.length + 1}: The Style/Mood Reference`);
 
         let promptText = `Act as an expert AI Art Director. I am providing you with reference images.
-Your task is to write a highly detailed, single-paragraph generation prompt that merges these elements.
+Your task is to write a highly detailed, descriptive generation prompt that merges these elements into a stunning Campaign Shot.
 
 CRITICAL RULES:
-${templateUrl ? "1. The Template (Image 1) is the absolute layout blueprint. The output prompt MUST explicitly instruct the image model to replicate the template's composition, typography placement, and layout structure exactly." : "1. Create a stunning, high-end Campaign Shot poster composition."}
-2. If a Product image is provided, describe how to feature it prominently.
-3. If a Character image is provided, describe how to position them alongside the product.
-4. If a Style Reference is provided, adapt the mood and color palette to match it.
-5. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the description.
-6. Keep the final prompt under 1500 characters.
-7. Mention the brand name: ${brandName || 'The Brand'}.
+${templateUrl ? "1. The Template (Image 1) is the ABSOLUTE LAYOUT BLUEPRINT. You MUST deeply analyze and explicitly describe its contents: How is the person posing? Are they sitting, standing, leaning? What are they wearing? What is the background, environment, and lighting? Describe the exact composition and typography placement." : "1. Create a stunning, high-end Campaign Shot poster composition."}
+2. If a Product image is provided, explicitly describe how to integrate it naturally into the scene described in Rule 1.
+3. If a Character image is provided, explicitly instruct that the person in the final image must be THIS exact character, but they MUST adopt the exact pose, body language, and clothing style seen in the Template (Image 1).
+4. If a Style Reference is provided, adapt the mood, lighting, and color palette to match it.
+5. Do NOT just say "exactly replicating the composition." You must physically DESCRIBE the composition in deep detail so an image model can recreate it without seeing the template.
+6. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the visual description.
+7. Keep the final prompt under 1500 characters.
+8. Mention the brand name: ${brandName || 'The Brand'}.
 
-Write the generation prompt now:`;
+Write the detailed generation prompt now:`;
 
         parts.push({ text: labels.join('\n\n') + '\n\n' + promptText });
 
