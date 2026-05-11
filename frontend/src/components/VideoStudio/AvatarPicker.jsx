@@ -222,7 +222,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
     const [genBusy, setGenBusy] = useState(false)
     // variants: [{slot,url,failed}] or [null,null,null] (skeleton)
     const [genVariants, setGenVariants] = useState([])
-    const [genSelectedSlot, setGenSelectedSlot] = useState(null)
+    const [genSelectedSlots, setGenSelectedSlots] = useState([])
     const [saveBusy, setSaveBusy] = useState(false)
 
     const fileRef = useRef(null)
@@ -256,7 +256,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
     useEffect(() => { if (isOpen) loadAvatars() }, [isOpen, loadAvatars])
 
     // ── Reset create state on close ─────────────────────────────────────────────
-    const resetCreate = () => { setShowCreate(false); setCreateMode(null); setAvatarName(''); setDirectPrompt(''); setGenVariants([]); setGenSelectedSlot(null); setGenErrors({}) }
+    const resetCreate = () => { setShowCreate(false); setCreateMode(null); setAvatarName(''); setDirectPrompt(''); setGenVariants([]); setGenSelectedSlots([]); setGenErrors({}) }
     const handleClose = () => { resetCreate(); onClose() }
 
     // ── Upload ──────────────────────────────────────────────────────────────────
@@ -291,8 +291,8 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
         setGenErrors({})
         setGenBusy(true)
         // Show skeleton immediately
-        setGenVariants([null, null, null])
-        setGenSelectedSlot(null)
+        setGenVariants([null, null])
+        setGenSelectedSlots([])
 
         try {
             const body = mode === 'prompt'
@@ -302,29 +302,36 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
             const d = await api('/avatar-studio/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
             const variants = d.variants || []
             setGenVariants(variants)
+            // Auto-select the first successful variant
             const firstOk = variants.find(v => !v.failed && v.url)
-            if (firstOk) setGenSelectedSlot(firstOk.slot)
+            if (firstOk) setGenSelectedSlots([firstOk.slot])
         } catch(err) {
             console.error('[AvatarPicker] Generate failed:', err.message)
-            setGenVariants([{slot:0,failed:true},{slot:1,failed:true},{slot:2,failed:true}])
+            setGenVariants([{slot:0,failed:true},{slot:1,failed:true}])
         }
         setGenBusy(false)
     }, [createMode, genOptions, directPrompt, activeBrand])
 
-    // ── Save selected variant ───────────────────────────────────────────────────
+    // ── Save selected variants ──────────────────────────────────────────────────
     const handleSave = useCallback(async () => {
-        const v = genVariants[genSelectedSlot]
-        if (!v?.url || !avatarName.trim()) return
+        if (genSelectedSlots.length === 0 || !avatarName.trim()) return
         setSaveBusy(true)
         try {
-            await api('/avatar-studio/save', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({ name:avatarName.trim(), selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured', options: createMode==='generate' ? genOptions : {} })
+            // Save each selected variant. If multiple, append #1, #2 to name
+            const promises = genSelectedSlots.map((slot, index) => {
+                const v = genVariants[slot]
+                if (!v?.url) return null
+                const saveName = genSelectedSlots.length > 1 ? `${avatarName.trim()} #${index + 1}` : avatarName.trim()
+                return api('/avatar-studio/save', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ name:saveName, selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured', options: createMode==='generate' ? genOptions : {} })
+                })
             })
+            await Promise.all(promises.filter(Boolean))
             await loadAvatars(); resetCreate()
         } catch(err) { console.error('[AvatarPicker] Save failed:', err.message) }
         setSaveBusy(false)
-    }, [genVariants, genSelectedSlot, avatarName, createMode, loadAvatars])
+    }, [genVariants, genSelectedSlots, avatarName, createMode, loadAvatars])
 
     // ── Select existing avatar ──────────────────────────────────────────────────
     const handleSelect = useCallback((avatar) => {
@@ -334,11 +341,13 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
     // ── Use generated variant directly (bypass save) ────────────────────────────
     const handleUseNow = useCallback(() => {
-        const v = genVariants[genSelectedSlot]
+        if (genSelectedSlots.length === 0) return
+        // Use the first selected variant
+        const v = genVariants[genSelectedSlots[0]]
         if (!v?.url) return
         onSelect({ _id:null, name:avatarName.trim() || 'AI Avatar', imageUrl:v.url })
         handleClose()
-    }, [genVariants, genSelectedSlot, avatarName, onSelect])
+    }, [genVariants, genSelectedSlots, avatarName, onSelect])
 
     // ── Delete ──────────────────────────────────────────────────────────────────
     const handleDelete = useCallback(async (id, e) => {
@@ -351,8 +360,8 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
     const allAvatars = [...publicAvatars, ...myAvatars]
-    const selectedVariantUrl = genSelectedSlot !== null ? genVariants[genSelectedSlot]?.url : null
-    const canSave = selectedVariantUrl && avatarName.trim().length > 0 && !saveBusy
+    const hasSelections = genSelectedSlots.length > 0
+    const canSave = hasSelections && avatarName.trim().length > 0 && !saveBusy
     const canGenerate = !genBusy && (createMode === 'prompt' ? directPrompt.trim().length >= 10 : !!genOptions.genderExpression)
 
     return (
@@ -450,22 +459,26 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
                                     <button className="avpk-btn primary" onClick={handleGenerate} disabled={!canGenerate}>
                                         <span className="material-symbols-outlined" style={{ fontSize:16, animation:genBusy?'avpk-spin 1s linear infinite':'none' }}>{genBusy?'progress_activity':'auto_awesome'}</span>
-                                        {genBusy ? 'Generating 3 variants…' : 'Generate 3 Variants'}
+                                        {genBusy ? 'Generating 2 variants…' : 'Generate 2 Variants'}
                                     </button>
 
                                     {/* Variant grid — appears immediately as skeletons */}
                                     {(genBusy || genVariants.length > 0) && (
-                                        <div className="avpk-var-grid">
-                                            {[0,1,2].map(slot => {
+                                        <div className="avpk-var-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                                            {[0,1].map(slot => {
                                                 const v = genVariants[slot]
                                                 const isSkel   = genBusy || v === null
                                                 const isOk     = !isSkel && v && !v.failed && v.url
                                                 const isFailed = !isSkel && v && v.failed
-                                                const isSel    = genSelectedSlot === slot
+                                                const isSel    = genSelectedSlots.includes(slot)
                                                 return (
                                                     <div key={slot}
                                                         className={`avpk-var-slot ${isOk?'ready':''} ${isSel?'selected':''}`}
-                                                        onClick={() => isOk && setGenSelectedSlot(slot)}>
+                                                        onClick={() => {
+                                                            if (!isOk) return;
+                                                            if (isSel) setGenSelectedSlots(prev => prev.filter(s => s !== slot));
+                                                            else setGenSelectedSlots(prev => [...prev, slot]);
+                                                        }}>
                                                         {isSkel && (
                                                             <div className="avpk-var-spinner">
                                                                 <span className="material-symbols-outlined">progress_activity</span>
@@ -486,18 +499,18 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                                     )}
 
                                     {/* Save / Use buttons */}
-                                    {selectedVariantUrl && (
+                                    {hasSelections && (
                                         <div style={{ display:'flex', gap:8 }}>
                                             <button className="avpk-btn secondary" style={{ flex:1 }} onClick={handleUseNow}>
                                                 <span className="material-symbols-outlined" style={{ fontSize:15 }}>check</span> Use Now
                                             </button>
                                             <button className="avpk-btn primary" style={{ flex:1 }} onClick={handleSave} disabled={!canSave}>
                                                 <span className="material-symbols-outlined" style={{ fontSize:15 }}>{saveBusy?'progress_activity':'bookmark_add'}</span>
-                                                {saveBusy ? 'Saving…' : 'Save to Library'}
+                                                {saveBusy ? 'Saving…' : `Save ${genSelectedSlots.length} to Library`}
                                             </button>
                                         </div>
                                     )}
-                                    <div className="avpk-hint">3 variants · 9:16 portrait · 4 credits</div>
+                                    <div className="avpk-hint">2 variants · 9:16 portrait · 4 credits</div>
                                 </div>
                             )}
 
@@ -517,21 +530,25 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
                                     <button className="avpk-btn primary" onClick={handleGenerate} disabled={!canGenerate}>
                                         <span className="material-symbols-outlined" style={{ fontSize:16, animation:genBusy?'avpk-spin 1s linear infinite':'none' }}>{genBusy?'progress_activity':'auto_awesome'}</span>
-                                        {genBusy ? 'Generating 3 variants…' : 'Generate 3 Variants'}
+                                        {genBusy ? 'Generating 2 variants…' : 'Generate 2 Variants'}
                                     </button>
 
                                     {(genBusy || genVariants.length > 0) && (
-                                        <div className="avpk-var-grid">
-                                            {[0,1,2].map(slot => {
+                                        <div className="avpk-var-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                                            {[0,1].map(slot => {
                                                 const v = genVariants[slot]
                                                 const isSkel   = genBusy || v === null
                                                 const isOk     = !isSkel && v && !v.failed && v.url
                                                 const isFailed = !isSkel && v && v.failed
-                                                const isSel    = genSelectedSlot === slot
+                                                const isSel    = genSelectedSlots.includes(slot)
                                                 return (
                                                     <div key={slot}
                                                         className={`avpk-var-slot ${isOk?'ready':''} ${isSel?'selected':''}`}
-                                                        onClick={() => isOk && setGenSelectedSlot(slot)}>
+                                                        onClick={() => {
+                                                            if (!isOk) return;
+                                                            if (isSel) setGenSelectedSlots(prev => prev.filter(s => s !== slot));
+                                                            else setGenSelectedSlots(prev => [...prev, slot]);
+                                                        }}>
                                                         {isSkel && <div className="avpk-var-spinner"><span className="material-symbols-outlined">progress_activity</span></div>}
                                                         {isOk && <img src={v.url} alt={`Variant ${slot+1}`} />}
                                                         {isFailed && (
@@ -547,18 +564,18 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                                         </div>
                                     )}
 
-                                    {selectedVariantUrl && (
+                                    {hasSelections && (
                                         <div style={{ display:'flex', gap:8 }}>
                                             <button className="avpk-btn secondary" style={{ flex:1 }} onClick={handleUseNow}>
                                                 <span className="material-symbols-outlined" style={{ fontSize:15 }}>check</span> Use Now
                                             </button>
                                             <button className="avpk-btn primary" style={{ flex:1 }} onClick={handleSave} disabled={!canSave}>
                                                 <span className="material-symbols-outlined" style={{ fontSize:15 }}>{saveBusy?'progress_activity':'bookmark_add'}</span>
-                                                {saveBusy ? 'Saving…' : 'Save to Library'}
+                                                {saveBusy ? 'Saving…' : `Save ${genSelectedSlots.length} to Library`}
                                             </button>
                                         </div>
                                     )}
-                                    <div className="avpk-hint">3 variants · 9:16 portrait · 4 credits · directPrompt mode</div>
+                                    <div className="avpk-hint">2 variants · 9:16 portrait · 4 credits · directPrompt mode</div>
                                 </div>
                             )}
                         </div>
