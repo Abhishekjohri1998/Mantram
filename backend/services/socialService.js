@@ -1,5 +1,10 @@
 import axios from 'axios';
+import https from 'https';
 import config from '../config/env.js';
+
+// LinkedIn API sometimes drops IPv6 traffic from AWS EC2, causing ETIMEDOUT.
+// We force IPv4 resolution for LinkedIn requests to prevent this.
+const ipv4Agent = new https.Agent({ family: 4 });
 
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
 
@@ -517,13 +522,14 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             try {
                 const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
                     initializeUploadRequest: { owner: authorUrn }
-                }, { headers });
+                }, { headers, httpsAgent: ipv4Agent });
                 const { uploadUrl, image: imageUrn } = initResp.data.value;
 
-                const imgResp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+                const imgResp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, httpsAgent: ipv4Agent });
                 await axios.put(uploadUrl, imgResp.data, {
                     headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
                     maxContentLength: 50 * 1024 * 1024,
+                    httpsAgent: ipv4Agent
                 });
                 imageUrns.push(imageUrn);
                 console.log(`[SOCIAL] LinkedIn carousel image uploaded: ${imageUrn}`);
@@ -548,7 +554,7 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             },
         };
 
-        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers, httpsAgent: ipv4Agent });
         const postId = response.headers['x-restli-id'] || response.data?.id || '';
         console.log(`[SOCIAL] ✅ LinkedIn multi-image post published! ID: ${postId}`);
         return postId;
@@ -647,7 +653,8 @@ export const exchangeLinkedInCodeForToken = async (code) => {
     };
 
     const response = await axios.post(url, new URLSearchParams(params), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        httpsAgent: ipv4Agent
     });
 
     return response.data;
@@ -659,7 +666,8 @@ export const fetchLinkedInProfile = async (accessToken) => {
     const response = await axios.get(url, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
-        }
+        },
+        httpsAgent: ipv4Agent
     });
     // Map OpenID fields to match the shape our callback expects
     const data = response.data;
@@ -687,14 +695,15 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             // Step 1: Initialize upload
             const initResp = await axios.post('https://api.linkedin.com/rest/images?action=initializeUpload', {
                 initializeUploadRequest: { owner: authorUrn }
-            }, { headers });
+            }, { headers, httpsAgent: ipv4Agent });
             const { uploadUrl, image: imageUrn } = initResp.data.value;
 
             // Step 2: Download image and upload binary to LinkedIn
-            const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000 });
+            const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000, httpsAgent: ipv4Agent });
             await axios.put(uploadUrl, imgResp.data, {
                 headers: { 'Content-Type': imgResp.headers['content-type'] || 'image/png' },
                 maxContentLength: 50 * 1024 * 1024,
+                httpsAgent: ipv4Agent
             });
             console.log(`[SOCIAL] ✅ LinkedIn image uploaded: ${imageUrn}`);
             return imageUrn;
@@ -705,14 +714,15 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             // Step 1: Initialize upload
             const initResp = await axios.post('https://api.linkedin.com/rest/videos?action=initializeUpload', {
                 initializeUploadRequest: { owner: authorUrn, fileSizeBytes: 0, uploadCaptions: false, uploadThumbnail: false }
-            }, { headers });
+            }, { headers, httpsAgent: ipv4Agent });
             const { uploadUrl: vidUploadUrl, video: videoUrn } = (initResp.data.value || initResp.data);
 
             // Step 2: Download video and upload binary
-            const vidResp = await axios.get(vidUrl, { responseType: 'arraybuffer', timeout: 120000 });
+            const vidResp = await axios.get(vidUrl, { responseType: 'arraybuffer', timeout: 120000, httpsAgent: ipv4Agent });
             await axios.put(vidUploadUrl, vidResp.data, {
                 headers: { 'Content-Type': 'video/mp4' },
                 maxContentLength: 200 * 1024 * 1024,
+                httpsAgent: ipv4Agent
             });
             console.log(`[SOCIAL] ✅ LinkedIn video uploaded: ${videoUrn}`);
             return videoUrn;
@@ -742,7 +752,7 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             postBody.content = { media: { title: 'Image', id: imageUrn } };
         }
 
-        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers });
+        const response = await axios.post('https://api.linkedin.com/rest/posts', postBody, { headers, httpsAgent: ipv4Agent });
 
         // Posts API returns 201 with the post URN in the x-restli-id header
         const postId = response.headers['x-restli-id'] || response.data?.id || '';
@@ -801,7 +811,8 @@ export const fetchPostAnalytics = async (postId, accessToken, platform) => {
                     'Authorization': `Bearer ${accessToken}`,
                     'X-Restli-Protocol-Version': '2.0.0',
                     'LinkedIn-Version': '202401',
-                }
+                },
+                httpsAgent: ipv4Agent
             });
             const d = liResp.data;
             return {
