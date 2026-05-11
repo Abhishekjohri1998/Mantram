@@ -60,14 +60,14 @@ function resolveModelName(qualityMode, imageCount) {
 }
 
 function resolveHappyHorseModelName(imageCount) {
-    // HappyHorse 1.0 model slugs on Atlas Cloud workflows
+    // HappyHorse 1.0 model slugs
     if (imageCount > 1) {
         console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
-        return 'atlascloud/workflow/happyhorse-1.0/reference-to-video';
+        return 'alibaba/happyhorse-1.0/reference-to-video';
     }
     if (imageCount === 1) {
         console.log(`📌 HappyHorse: 1 image → image-to-video`);
-        return 'atlascloud/workflow/happyhorse-1.0/image-to-video';
+        return 'alibaba/happyhorse-1.0/image-to-video';
     }
     return 'alibaba/happyhorse-1.0/text-to-video';
 }
@@ -243,15 +243,26 @@ async function submitAtlasCloudPayload(payload) {
                 return await uploadMediaToAtlasCDN(url);
             }));
             const validRefs = processedRefs.filter(Boolean).slice(0, 9);
-            atlasPayload.reference_images = validRefs;
-            console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
+            if (atlasModel.includes('happyhorse')) {
+                atlasPayload.images = validRefs;
+                console.log(`✅ [Atlas R2V] images (HappyHorse): ${validRefs.length} — ${validRefs.join(', ')}`);
+            } else {
+                atlasPayload.reference_images = validRefs;
+                console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
+            }
         }
     } else if (isI2V) {
         const allImages = [...rawImageUrls, ...rawRefImages];
         if (allImages.length > 0) {
             console.log(`📸 [Atlas I2V] Uploading first frame to Atlas CDN...`);
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
-            if (uploaded) atlasPayload.image = uploaded;
+            if (uploaded) {
+                if (atlasModel.includes('happyhorse')) {
+                    atlasPayload.images = [uploaded];
+                } else {
+                    atlasPayload.image = uploaded;
+                }
+            }
         }
     }
 
