@@ -16,6 +16,7 @@ import {
     getLinkedInAuthUrl,
     exchangeLinkedInCodeForToken,
     fetchLinkedInProfile,
+    fetchLinkedInOrganizations,
     publishToLinkedIn,
     publishCarouselToLinkedIn,
     publishToTwitter,
@@ -256,18 +257,36 @@ router.get('/auth/linkedin/callback', async (req, res) => {
         const tokenData = await exchangeLinkedInCodeForToken(code);
         const profile = await fetchLinkedInProfile(tokenData.access_token);
 
+        // Save personal profile
         await SocialAccount.findOneAndUpdate(
             { user: userId, platform: 'linkedin', accountId: profile.id },
             {
                 user: userId,
                 platform: 'linkedin',
                 accountId: profile.id,
-                accountName: `${profile.localizedFirstName} ${profile.localizedLastName}`,
+                accountName: `${profile.localizedFirstName} ${profile.localizedLastName} (Personal)`,
                 accessToken: tokenData.access_token,
                 isActive: true
             },
             { upsert: true, returnDocument: 'after' }
         );
+
+        // Fetch and save managed organizations (Company Pages)
+        const organizations = await fetchLinkedInOrganizations(tokenData.access_token);
+        for (const org of organizations) {
+            await SocialAccount.findOneAndUpdate(
+                { user: userId, platform: 'linkedin', accountId: org.urn },
+                {
+                    user: userId,
+                    platform: 'linkedin',
+                    accountId: org.urn,
+                    accountName: `${org.name} (Page)`,
+                    accessToken: tokenData.access_token,
+                    isActive: true
+                },
+                { upsert: true, returnDocument: 'after' }
+            );
+        }
 
         res.redirect(`${targetFrontend}/integrations?social=success&platform=linkedin`);
     } catch (error) {

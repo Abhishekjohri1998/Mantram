@@ -514,7 +514,7 @@ export const publishCarouselToLinkedIn = async (personUrn, accessToken, text, im
             'LinkedIn-Version': LI_VERSION,
             'X-Restli-Protocol-Version': '2.0.0',
         };
-        const authorUrn = `urn:li:person:${personUrn}`;
+        const authorUrn = personUrn.startsWith('urn:li:') ? personUrn : `urn:li:person:${personUrn}`;
 
         // Upload each image and collect URNs
         const imageUrns = [];
@@ -633,8 +633,15 @@ export const fetchRecentPosts = async (accountId, accessToken, platform) => {
 
 export const getLinkedInAuthUrl = (stateId) => {
     const { clientId, callbackUrl } = config.linkedin;
-    // r_member_social requires special enterprise approval and causes OAuth to crash if requested without it
-    const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
+    // Requesting personal AND organization scopes so users can publish to both.
+    const scopes = [
+        'openid', 
+        'profile', 
+        'email', 
+        'w_member_social', 
+        'w_organization_social', 
+        'rw_organization_admin'
+    ].join(' ');
     const baseUrl = 'https://www.linkedin.com/oauth/v2/authorization';
 
     return `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${stateId}&scope=${encodeURIComponent(scopes)}`;
@@ -679,6 +686,67 @@ export const fetchLinkedInProfile = async (accessToken) => {
     };
 };
 
+/**
+ * Fetch LinkedIn Company Pages the user is an admin of.
+ * Uses the organizationAcls endpoint and then resolves the organization details.
+ */
+export const fetchLinkedInOrganizations = async (accessToken) => {
+    try {
+        // Step 1: Get all organizations where the user has an ADMIN role
+        const aclsUrl = 'https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED';
+        const aclsResponse = await axios.get(aclsUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'LinkedIn-Version': '202601',
+                'X-Restli-Protocol-Version': '2.0.0'
+            },
+            httpsAgent: ipv4Agent
+        });
+
+        const elements = aclsResponse.data.elements || [];
+        if (elements.length === 0) return [];
+
+        // Extract organization URNs (e.g., "urn:li:organization:123456")
+        const orgUrns = elements.map(el => el.organization);
+
+        // Step 2: Fetch details for these organizations
+        const ids = orgUrns.map(urn => urn.split(':').pop()).join(',');
+        const orgsUrl = `https://api.linkedin.com/v2/organizations?ids=List(${ids})`;
+        const orgsResponse = await axios.get(orgsUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'LinkedIn-Version': '202601',
+                'X-Restli-Protocol-Version': '2.0.0'
+            },
+            httpsAgent: ipv4Agent
+        });
+
+        const results = orgsResponse.data.results || {};
+        
+        const organizations = [];
+        for (const urn of orgUrns) {
+            const orgData = results[urn];
+            if (orgData) {
+                // Determine localized name
+                const locale = Object.keys(orgData.localizedName || {})[0];
+                const name = locale ? orgData.localizedName[locale] : 'LinkedIn Page';
+                
+                organizations.push({
+                    urn,           // e.g., 'urn:li:organization:123456'
+                    id: orgData.id, // e.g., 123456
+                    name: name,
+                    profilePicture: '' // Logos require additional projection, safe to leave blank for now
+                });
+            }
+        }
+
+        return organizations;
+    } catch (error) {
+        console.error('[SOCIAL] Failed to fetch LinkedIn Organizations:', error.response?.data || error.message);
+        return [];
+    }
+};
+
 export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, videoUrl) => {
     try {
         const LI_VERSION = '202601';
@@ -688,7 +756,7 @@ export const publishToLinkedIn = async (personUrn, accessToken, text, imageUrl, 
             'LinkedIn-Version': LI_VERSION,
             'X-Restli-Protocol-Version': '2.0.0',
         };
-        const authorUrn = `urn:li:person:${personUrn}`;
+        const authorUrn = personUrn.startsWith('urn:li:') ? personUrn : `urn:li:person:${personUrn}`;
 
         // ── Helper: Upload image to LinkedIn and get asset URN ──
         async function uploadImageToLinkedIn(imgUrl) {
