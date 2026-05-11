@@ -60,13 +60,19 @@ function resolveModelName(qualityMode, imageCount) {
 }
 
 function resolveHappyHorseModelName(imageCount) {
-    // HappyHorse 1.0 model slugs on Atlas Cloud workflows
-    // HappyHorse might not have a custom reference-to-video workflow, so we fall back to image-to-video
-    if (imageCount >= 1) {
-        console.log(`📌 HappyHorse: ${imageCount} image(s) → image-to-video`);
-        return 'alibaba/happyhorse/image-to-video';
+    // HappyHorse 1.0 model slugs on Atlas Cloud — per docs:
+    //   alibaba/happyhorse-1.0/text-to-video
+    //   alibaba/happyhorse-1.0/image-to-video
+    //   alibaba/happyhorse-1.0/reference-to-video
+    if (imageCount > 1) {
+        console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
+        return 'alibaba/happyhorse-1.0/reference-to-video';
     }
-    return 'alibaba/happyhorse/text-to-video';
+    if (imageCount === 1) {
+        console.log(`📌 HappyHorse: 1 image → image-to-video`);
+        return 'alibaba/happyhorse-1.0/image-to-video';
+    }
+    return 'alibaba/happyhorse-1.0/text-to-video';
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -210,11 +216,16 @@ async function submitAtlasCloudPayload(payload) {
     const isI2V = atlasModel.includes('image-to-video');
     const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
 
+    // HappyHorse uses uppercase resolution ('720P', '1080P') per Atlas Cloud docs
+    const isHappyHorse = atlasModel.includes('happyhorse');
+    const rawRes = payload.input?.resolution || '720p';
+    const normalizedRes = isHappyHorse ? rawRes.toUpperCase() : rawRes.toLowerCase();
+
     const atlasPayload = {
         model:           atlasModel,
         prompt:          payload.input?.prompt || '',
         duration:        payload.input?.duration || 5,
-        resolution:      '720p',
+        resolution:      normalizedRes,
         ratio:           rawRatio,
         generate_audio:  payload.input?.generate_audio !== false,
         watermark:       false,
@@ -524,22 +535,22 @@ export async function submitHappyHorseVideoGeneration({
         prompt:         finalPrompt,
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
+        resolution:     res,
         generate_audio: generateAudio !== false,
     };
 
-    // I2V: pass image to submitAtlasCloudPayload for upload
-    if (s3ImageUrls.length > 0 && modelName.includes('image-to-video')) {
+    // I2V: pass first-frame image
+    if (s3ImageUrls.length > 0) {
         taskInput.image_urls = s3ImageUrls;
     }
 
-    // R2V: pass all reference images to submitAtlasCloudPayload for upload
-    if (s3RefImages.length > 0) {
+    // R2V: pass reference images (only for reference-to-video mode)
+    if (s3RefImages.length > 0 && modelName.includes('reference-to-video')) {
         taskInput.reference_images = s3RefImages.slice(0, 9);
     }
-
-    // T2V with first-frame anchor
-    if (s3ImageUrls.length > 0 && modelName.includes('text-to-video')) {
-        taskInput.image_urls = s3ImageUrls;
+    // For I2V with refs, merge into image_urls
+    if (s3RefImages.length > 0 && modelName.includes('image-to-video')) {
+        taskInput.image_urls = [...(taskInput.image_urls || []), ...s3RefImages];
     }
 
     const payload = { model: 'happyhorse', task_type: modelName, input: taskInput };
