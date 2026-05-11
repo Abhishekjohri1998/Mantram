@@ -1598,7 +1598,7 @@ ${templateUrl ? "1. The Template (Image 1) is the ABSOLUTE LAYOUT BLUEPRINT. You
 4. If a Style Reference is provided, adapt the mood, lighting, and color palette to match it.
 5. Do NOT just say "exactly replicating the composition." You must physically DESCRIBE the composition in deep detail so an image model can recreate it without seeing the template.
 6. The output MUST be just the prompt itself—no pleasantries, no quotes. Start directly with the visual description.
-7. Keep the final prompt under 1500 characters.
+7. Provide a complete, highly-detailed description without any length constraints. Do not abruptly cut off.
 8. Mention the brand name: ${brandName || 'The Brand'}.
 
 Write the detailed generation prompt now:`;
@@ -1619,7 +1619,7 @@ Write the detailed generation prompt now:`;
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ role: 'user', parts }],
-                        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+                        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
                     }),
                     signal: AbortSignal.timeout(30_000),
                 });
