@@ -740,7 +740,11 @@ export const fetchLinkedInOrganizations = async (accessToken) => {
 
         return organizations;
     } catch (error) {
-        console.error('[SOCIAL] Failed to fetch LinkedIn Organizations:', error.response?.data || error.message);
+        if (error.response?.status === 403) {
+            console.log('[SOCIAL] Note: LinkedIn Company Page access skipped (missing developer permissions).');
+        } else {
+            console.error('[SOCIAL] Failed to fetch LinkedIn Organizations:', error.response?.data || error.message);
+        }
         return [];
     }
 };
