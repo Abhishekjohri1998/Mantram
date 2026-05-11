@@ -315,14 +315,14 @@ router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, 
             ? (slot) => generateOneVariant(slot, finalPrompt, size, DEFAULT_MODEL, refUrls)
             : (slot) => generateOneVariant(slot, finalPrompt, size, DEFAULT_MODEL);
 
-        const [v0, v1, v2] = await Promise.all([generateFn(0), generateFn(1), generateFn(2)]);
+        const [v0, v1] = await Promise.all([generateFn(0), generateFn(1)]);
 
-        const variants = [v0, v1, v2];
+        const variants = [v0, v1];
         const successCount = variants.filter(v => !v.failed).length;
-        console.log(`✅ [AvatarStudio] ${successCount}/3 variants succeeded | mode=${mode}`);
+        console.log(`✅ [AvatarStudio] ${successCount}/2 variants succeeded | mode=${mode}`);
 
         if (successCount === 0) {
-            return res.status(502).json({ success: false, error: 'All 3 variants failed. Check LaoZhang API key and quota.', variants });
+            return res.status(502).json({ success: false, error: 'Both variants failed. Check LaoZhang API key and quota.', variants });
         }
 
         res.json({
@@ -384,20 +384,19 @@ router.post('/admin/generate', protect, superadmin, async (req, res) => {
         console.log(`🎭 [AvatarStudio/Admin] model=${modelKey} | ratio=${aspectRatio} | size=${size} | direct=${!!directPrompt}`);
         console.log(`   📝 Prompt: ${finalPrompt.substring(0, 100)}...`);
 
-        const [v0, v1, v2] = await Promise.all([
+        const [v0, v1] = await Promise.all([
             generateOneVariant(0, finalPrompt, size, modelKey),
             generateOneVariant(1, finalPrompt, size, modelKey),
-            generateOneVariant(2, finalPrompt, size, modelKey),
         ]);
 
-        const variants = [v0, v1, v2];
+        const variants = [v0, v1];
         const successCount = variants.filter(v => !v.failed).length;
-        console.log(`✅ [AvatarStudio/Admin] ${successCount}/3 variants succeeded`);
+        console.log(`✅ [AvatarStudio/Admin] ${successCount}/2 variants succeeded`);
 
         if (successCount === 0) {
             return res.status(502).json({
                 success: false,
-                error: 'All 3 variants failed. Check LAOZHANG_API_KEY and quota.',
+                error: 'Both variants failed. Check LAOZHANG_API_KEY and quota.',
                 variants,
             });
         }

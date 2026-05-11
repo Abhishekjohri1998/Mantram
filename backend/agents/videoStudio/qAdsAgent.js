@@ -24,18 +24,19 @@ const MCP_TIMEOUT_MS = 5000;
 // SYSTEM PROMPT BUILDER
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format }) {
+function buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format, settings }) {
     const antislop = ANTISLOP_BANNED_WORDS.join(', ');
     const ageblind = AGEBLIND_BANNED_WORDS.join(', ');
     const hasTrending = !!trendingContext;
     const hasCompetitor = !!competitorContext;
 
-    return `You are a professional ad director and Seedance 2.0 prompt engineer. Your job is to take a product brief and brand context and write ONE production-ready cinematic paragraph that functions as directing instructions for an AI video model.
+    return `You are a professional ad director and Seedance 2.0 prompt engineer. Your job is to take a product brief and brand context and write ONE cinematic prompt that functions as directing instructions for an AI video model.
 
-You write exactly like a cinematographer writing a shot note — specific, physical, present tense, no interpretation, no abstraction, no emotion words. You describe only what the camera sees and the microphone hears.
+You write exactly like a cinematographer writing a shot note — specific, physical, present tense, no interpretation, no emotion words. You describe only what the camera sees and the microphone hears.
 
 TARGET MODEL: Seedance 2.0
 DURATION: ${duration}s | FORMAT: ${format}
+HOOK SHOT: ${settings?.hookShot ? 'YES — first 2 shots must be a FUNNY QUIRKY opening that grabs attention' : 'NO'}
 
 ═══════════════════════════════════════════════════════
 SECTION 1 — BRAND DNA
@@ -172,7 +173,7 @@ Never alter the product's appearance from an uploaded image. Never alter avatar 
 ═══════════════════════════════════════════════════════
 SECTION 11 — VARIANT PRODUCTION
 ═══════════════════════════════════════════════════════
-Produce ONE paragraph variant. It uses the preset, the brand DNA, and the brief to construct a cinematic approach within the rules of the preset.
+Produce ONE prompt variant. It uses the preset, the brand DNA, and the brief to construct a cinematic approach within the rules of the preset.
 
 The variant is labeled exactly:
 Variant A
@@ -180,15 +181,25 @@ Variant A
 This label is for the UI only and is stripped before sending to Seedance.
 
 ═══════════════════════════════════════════════════════
-SECTION 12 — OUTPUT FORMAT
+SECTION 12 — OUTPUT FORMAT (STRICT)
 ═══════════════════════════════════════════════════════
 OUTPUT IS:
 1. (If images provided) The legend line(s) using <<<image_n>>> format
 2. A blank line
 3. "Variant A" label
-4. The first paragraph — one continuous flowing prose paragraph. Present tense. Active voice. Concrete physical description. 150–220 words. NO section labels, NO headers, NO bullet points, NO timecodes, NO numbered shots, NO JSON, NO markdown inside the paragraph.
+4. The prompt structured EXACTLY like this:
 
-VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The paragraph reads like a note from the director to the camera operator — specific, physical, actionable.`;
+STYLE: [Rendering style — e.g. "High-end stylized 3D animated, cinematic lighting, expressive face, polished materials, comedic visual storytelling."]
+WARDROBE: [avatar clothing per shot range — match environment and brand.]
+ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
+MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
+
+${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (<<<image_1>>> if provided) MUST be the source of comedy — e.g. the product box falls on the avatar's face, a cat knocks the product onto their head. Make it absurd but brand-safe. Use the same shot notation below.\n\n` : ''}SHOT 1: [Shot size + focal length] / [Camera move] / [Avatar action. Product reference if shown. ONE motion verb only.]
+SHOT 2: [Shot size + focal length] / [Camera move] / [Action]
+SHOT 3: [Shot size + focal length] / [Camera move] / [Action]
+[Continue — 8 to 15 shots based on duration (approx 1.8s per shot)]
+
+VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees. The prompt MUST NOT exceed 2200 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain face and clothing consistency throughout. No distortion. Natural smooth movements. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -266,10 +277,7 @@ function validateVariants(variants) {
     for (const v of variants) {
         const text = v.prompt.toLowerCase();
 
-        // Check for section labels / bullets
-        if (/^(shot \d|beat \d|\d+\.|•|-\s)/m.test(v.prompt)) {
-            issues.push(`Variant ${v.variantId}: contains section labels or bullet points`);
-        }
+        // Allowed to have SHOT/STYLE section labels now. Removed the bullet point check.
 
         // Check for antislop
         for (const word of ANTISLOP_BANNED_WORDS) {
@@ -367,7 +375,7 @@ export async function runQAdsAgent({
     // ── 5. Build system prompt ────────────────────────────────────────────────
     const duration = Math.min(parseInt(settings?.duration || preset.recommendedDuration || 8), 15);
     const format = settings?.format || preset.recommendedFormat || '9:16';
-    const systemPrompt = buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format });
+    const systemPrompt = buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format, settings });
     const userPrompt = buildUserPrompt({ userBrief, productData, hasAvatar, settings });
 
     console.log(`[Q-Ads Agent] Calling Claude — ${imageUrls.length} images, ${duration}s, ${format}`);

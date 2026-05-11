@@ -172,6 +172,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [mood, setMood] = useState('authentic')
     const [environment, setEnvironment] = useState('home')
     const [hookStyle, setHookStyle] = useState('bold_claim')
+    const [hookShot, setHookShot] = useState(false)
     const [duration, setDuration] = useState(5)
     const [aspectRatio, setAspectRatio] = useState('9:16')
     const [language, setLanguage] = useState('english')
@@ -251,7 +252,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
         try {
             const data = await apiJson('/video-studio/ugc-pro/build-prompt', {
                 brandId: activeBrand?._id, productData, avatarUrl, productImageUrls,
-                settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta },
+                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta },
             })
             setPromptText(data.prompt)
             setPromptReady(true)
@@ -272,7 +273,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
         try {
             const data = await apiJson('/video-studio/ugc-pro/generate', {
                 brandId: activeBrand?._id, productData, avatarUrl, productImageUrls, prebuiltPrompt: promptText,
-                settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta },
+                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta },
             })
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
 
@@ -482,6 +483,36 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                                     {HOOKS.map(h => (
                                         <button key={h.id} className={`ugc-pill ${hookStyle === h.id ? 'active' : ''}`} onClick={() => setHookStyle(h.id)}>{h.label}</button>
                                     ))}
+                                </div>
+                            </div>
+                            {/* Hook Shot Toggle */}
+                            <div className="ugc-settings-group" style={{ width: '100%' }}>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '10px 14px',
+                                    borderRadius: 10,
+                                    background: hookShot ? 'rgba(249,115,22,0.1)' : 'rgba(255,255,255,0.04)',
+                                    border: `1px solid ${hookShot ? 'rgba(249,115,22,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                }} onClick={() => setHookShot(v => !v)}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: hookShot ? '#f97316' : 'rgba(255,255,255,0.35)' }}>bolt</span>
+                                        <div>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: hookShot ? '#f97316' : 'rgba(255,255,255,0.7)' }}>Hook Shot</div>
+                                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Funny &amp; quirky opening with your product (box falls on face, cat chaos, etc.)</div>
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        width: 36, height: 20, borderRadius: 10,
+                                        background: hookShot ? '#f97316' : 'rgba(255,255,255,0.12)',
+                                        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                                    }}>
+                                        <div style={{
+                                            position: 'absolute', top: 3, left: hookShot ? 18 : 3,
+                                            width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                                            transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                        }} />
+                                    </div>
                                 </div>
                             </div>
                         </div>

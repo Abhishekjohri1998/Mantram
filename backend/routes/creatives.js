@@ -1578,7 +1578,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
             .trim();
         // If still too long, hard truncate
         if (finalPrompt.length > 3500) {
-            const typoMatch = finalPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+            const typoMatch = finalPrompt.match(/═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══[\s\S]*$/);
             const typoBlock = typoMatch ? typoMatch[0] : '';
             
             // ── Preserve Creative Brief ──
@@ -2141,7 +2141,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                     .trim();
                 // If STILL over 3500, then we do a harder cap but keep the start and end
                 if (optimizedPrompt.length > 3500) {
-                    const typoMatch = optimizedPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+                    const typoMatch = optimizedPrompt.match(/═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══[\s\S]*$/);
                     const typoBlock = typoMatch ? typoMatch[0] : '';
                     if (typoBlock) {
                          optimizedPrompt = optimizedPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;
@@ -2160,7 +2160,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 // ⚡ PERF: Increased from 1500 -> 3500 because the copywriter text is appended at the very end.
                 // Truncating at 1500 causes the image model to silently lose all text typography instructions.
                 if (optimizedPrompt.length > 3500) {
-                    const typoMatch = optimizedPrompt.match(/=== ON-IMAGE TYPOGRAPHY INSTRUCTIONS ===[\s\S]*$/);
+                    const typoMatch = optimizedPrompt.match(/═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══[\s\S]*$/);
                     const typoBlock = typoMatch ? typoMatch[0] : '';
                     if (typoBlock) {
                          optimizedPrompt = optimizedPrompt.substring(0, 3450 - typoBlock.length) + '\n\n[...condensed]\n\n' + typoBlock;

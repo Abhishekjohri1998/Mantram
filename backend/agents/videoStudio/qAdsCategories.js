@@ -35,19 +35,19 @@ export const Q_ADS_CATEGORIES = [
         recommendedDuration: 8,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'handheld natural movement'}, ${d.brandLighting || 'natural window light, warm tones'}.
+`STYLE: Photorealistic lifestyle UGC, natural window light, shallow depth of field, warm-toned grade.
+WARDROBE: @image1 in casual home clothes throughout.
+ENVIRONMENT: Bright living room, near a window.
+MOOD: Genuine curiosity → surprise → delight and excitement.
 
-[00s-02s] @image1 notices @image2 for the first time. Eyes widen with genuine curiosity. Camera holds static medium close-up, slight zoom-in on face.
+SHOT 1: MS, 35mm / Handheld slight sway / @image1 sits at home, notices @image2 on the table for the first time. Eyes widen.
+SHOT 2: MCU, 50mm / Static / @image1 leans forward and reaches toward @image2, expression shifting to genuine curiosity.
+SHOT 3: CU, 85mm / Rack focus product→face / @image1 picks up @image2, turns it over, examines closely.
+SHOT 4: ECU, 85mm push-in / Static macro / @image2 detail — key feature or label fills frame.
+SHOT 5: MCU, 50mm / Slow push-in / @image1 looks directly into camera, surprised smile, holds @image2 up. Dialogue: ${d.customDialogue || d.suggestedDialogue || `"Wait — this actually ${d.mainUSP}?"`}.
+SHOT 6: MS, 35mm / Static / @image1 shows @image2 to camera with enthusiasm. CTA: "${d.cta}".
 
-[02s-05s] @image1 picks up @image2 carefully and examines it closely. Slow rack focus from face to product in hands.
-
-[05s-${d.duration}s] @image1 looks directly into camera with an authentic smile, holds @image2 up. Static medium shot, catch-light visible in eyes.
-
-Dialogue: ${d.customDialogue || d.suggestedDialogue || `"Wait — this is actually ${d.mainUSP}?"`}. CTA: @image1 says "${d.cta}" with genuine enthusiasm.
-
-Lighting: ${d.brandLighting || 'soft natural window light, warm golden tone'}. Colour: ${d.brandGrade || 'natural realistic grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -60,19 +60,18 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 10,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'static locked-off medium close-up'}, ${d.brandLighting || 'soft natural light, warm tones'}.
+`STYLE: Candid UGC talking-head, natural warm light, locked-off intimate feel.
+WARDROBE: @image1 in relaxed everyday clothing throughout.
+ENVIRONMENT: Cozy home — sofa, kitchen counter, or desk.
+MOOD: Honest → confessional → conviction and warmth.
 
-[00s-03s] @image1 leans slightly toward camera, direct eye contact, relaxed and confident posture. Camera completely static, intimate framing.
+SHOT 1: MCU, 50mm / Static locked-off / @image1 faces camera directly, relaxed posture, eye contact. Natural soft window light.
+SHOT 2: MCU, 50mm / Imperceptible push-in / @image1 speaks naturally, gestures with hands, @image2 loosely visible in frame.
+SHOT 3: CU, 85mm / Static / @image1 leans slightly toward lens, lowers voice slightly — conspiratorial warmth. Dialogue: ${d.customDialogue || d.suggestedDialogue || `"Honestly, ${d.mainUSP} — I wish I'd found this sooner."`}.
+SHOT 4: MCU, 50mm / Rack focus face→product / @image1 holds @image2 up to camera clearly. Key feature visible.
+SHOT 5: MCU, 50mm / Slow static / @image1 looks into camera with conviction. CTA: "${d.cta}".
 
-[03s-07s] @image1 gestures naturally while speaking, @image2 visible in frame or held loosely. Camera holds without movement, letting performance breathe.
-
-[07s-${d.duration}s] @image1 holds @image2 up clearly to lens, speaks closing line with conviction. Extremely slow almost imperceptible push-in.
-
-Dialogue: ${d.customDialogue || d.suggestedDialogue || `"Honestly, ${d.mainUSP} — and I wish I'd found this sooner."`}. CTA: "${d.cta}".
-
-Lighting: ${d.brandLighting || 'natural soft window light, slightly warm, realistic shadows'}. Colour: ${d.brandGrade || 'clean natural grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -85,21 +84,19 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 10,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandLighting || 'dramatic soft box light, clean neutral background'}.
+`STYLE: Premium lifestyle unboxing, soft-box directional light, clean neutral background, shallow DoF.
+WARDROBE: @image1 in clean minimal outfit — solid colour, no logos.
+ENVIRONMENT: Clean flat surface — marble, wood, or white table. Minimal props.
+MOOD: Anticipation → reveal → premium satisfaction.
 
-[00s-03s] Close-up overhead shot of @image2 packaging on a clean surface. Hands of @image1 enter frame and slowly begin to open. Camera holds static overhead.
+SHOT 1: Top-down, 35mm / Static overhead / @image2 packaging sits on clean surface. @image1 hands enter frame from above.
+SHOT 2: CU, 85mm / Slow dolly-in / Hands of @image1 carefully open @image2 packaging. Rim light catches edges.
+SHOT 3: MS, 50mm / Slow dolly-in / @image1 lifts @image2 from packaging with both hands. Product rises into frame.
+SHOT 4: ECU, 85mm orbit / Camera arcs 45° around @image2 / Product surface detail — texture, finish, label fills frame.
+SHOT 5: MCU, 50mm / Static / @image1 holds @image2 at eye level, turns it slowly. Dialogue: ${d.customDialogue || `"${d.productName} — ${d.mainUSP}."`}.
+SHOT 6: MS, 35mm / Slow pull-back / @image1 faces camera proudly holding @image2. CTA: "${d.cta}".
 
-[03s-06s] @image1 lifts @image2 from packaging with both hands, revealing the product. Slow dolly-in toward product as it rises into frame.
-
-[06s-09s] @image1 holds @image2 at eye level, turns it slowly to show detail. Camera arcs smoothly around product at 45 degrees.
-
-[09s-${d.duration}s] @image1 faces camera holding @image2 proudly. Static medium shot, product clearly visible.
-
-Dialogue: ${d.customDialogue || `"${d.productName} — ${d.mainUSP}."`}. CTA: "${d.cta}".
-
-Lighting: ${d.brandLighting || 'soft rim light, clean neutral background, premium product photography feel'}. Colour: ${d.brandGrade || 'clean desaturated premium grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -112,19 +109,19 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 10,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'handheld follow shot, organic natural movement'}, ${d.brandLighting || 'natural ambient light, environmental feel'}.
+`STYLE: Fly-on-the-wall lifestyle documentary, natural ambient light, handheld organic movement.
+WARDROBE: @image1 in authentic everyday outfit matching the environment.
+ENVIRONMENT: ${d.environment || 'Home'} — real lived-in setting, natural lighting, environmental props.
+MOOD: Natural → organic product discovery → satisfied ease.
 
-[00s-04s] @image1 goes about a natural activity in a real environment, @image2 present in scene organically. Handheld camera follows naturally with slight sway.
+SHOT 1: WS, 24mm / Handheld follow / @image1 goes about natural activity in real environment. @image2 present in scene organically.
+SHOT 2: MS, 35mm / Handheld slight sway / @image1 reaches for @image2 naturally — seamless, unposed.
+SHOT 3: CU, 85mm / Rack focus env→product / @image1 uses @image2 within the scene. One smooth natural motion.
+SHOT 4: MCU, 50mm / Camera settles static / @image1 pauses, looks at result, quiet satisfaction.
+SHOT 5: MCU, 50mm / Imperceptible push-in / @image1 glances at camera with natural smile. @image2 visible in hand. Dialogue: "${d.mainUSP} — fits right into my day."
+SHOT 6: MS, 35mm / Static / @image1 holds @image2, relaxed and at ease. CTA: "${d.cta}" spoken naturally.
 
-[04s-08s] @image1 reaches for @image2 and uses it naturally within the scene. Camera settles as focus narrows on the interaction between person and product.
-
-[08s-${d.duration}s] @image1 glances up at camera with a natural, unposed smile. @image2 visible in hand or nearby. Camera holds static, intimate and real.
-
-Dialogue: ${d.customDialogue || `"${d.mainUSP} — fits right into my day."`}. CTA: "${d.cta}" spoken naturally.
-
-Lighting: ${d.brandLighting || 'natural ambient light, real environment feel, no studio look'}. Colour: ${d.brandGrade || 'warm natural film grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -137,21 +134,19 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 12,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandLighting || 'bright even light, product details clearly visible'}.
+`STYLE: Clear instructional UGC, bright even light, product details fully legible, warm grade.
+WARDROBE: @image1 in clean casual outfit — hands clearly visible throughout.
+ENVIRONMENT: Kitchen counter, desk, or bathroom — contextually appropriate for ${d.productCategory || 'product'}.
+MOOD: Confident demonstration → clear results → satisfied conclusion.
 
-[00s-03s] Close-up of @image1 hands preparing to use @image2. Static overhead or 45-degree shot, product label and key features visible.
+SHOT 1: Top-down, 35mm / Static overhead / @image1 hands prepare @image2 on surface. Product label and features visible.
+SHOT 2: MCU, 50mm / Tracking follows action / @image1 demonstrates key function of @image2 with clear deliberate motion.
+SHOT 3: CU, 85mm / Slow push-in / Close-up of the result or output of using @image2 — outcome made visually clear.
+SHOT 4: MCU, 50mm / Static / @image1 reacts to result — impressed or satisfied expression. Natural.
+SHOT 5: MS, 50mm / Static / @image1 faces camera, @image2 visible. Dialogue: ${d.customDialogue || `"It literally does ${d.keyFeatures?.[0] || d.mainUSP} — watch."`}.
+SHOT 6: MCU, 50mm / Slow push-in / @image1 holds @image2 up to lens. CTA: "${d.cta}".
 
-[03s-07s] @image1 uses @image2 with clear deliberate motion showing key function. Tracking shot follows the action closely. One smooth continuous motion.
-
-[07s-10s] Close-up of the result or output of using @image2 — the outcome made visually clear. Camera pushes slowly into the result.
-
-[10s-${d.duration}s] @image1 faces camera holding @image2, satisfied expression. Medium close-up, static shot.
-
-Dialogue: ${d.customDialogue || `"It literally does ${d.keyFeatures?.[0] || d.mainUSP} — watch."`}. CTA: "${d.cta}".
-
-Lighting: ${d.brandLighting || 'bright clean even light, all product details readable, no harsh shadows'}. Colour: ${d.brandGrade || 'clean accurate grade, true-to-life colours'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -164,19 +159,20 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 12,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'static medium shot transitioning to warm lifestyle feel'}.
+`STYLE: Emotional lifestyle narrative, lighting shifts from cool→warm to mirror the story arc.
+WARDROBE: @image1 same outfit throughout — the transformation is emotional, not physical.
+ENVIRONMENT: Same home location across both acts — consistency amplifies the contrast.
+MOOD: Tired/frustrated (act 1) → curious discovery (midpoint) → radiant confidence (act 2).
 
-[00s-04s] @image1 shows a moment of the problem or gap — tired, frustrated, or missing something. @image2 not yet visible. Camera holds static, slightly cooler light tone.
+SHOT 1: MCU, 50mm / Static / @image1 shows the problem — tired, frustrated, or struggling. Cool neutral light. No @image2 yet.
+SHOT 2: CU, 85mm / Slow push-in / @image1 expression — genuine fatigue or frustration close up.
+SHOT 3: MCU, 50mm / Slow dolly-in / @image1 discovers @image2. Lighting begins to shift warmer.
+SHOT 4: CU, 85mm / Rack focus / @image1 uses @image2 — hands and product in focus. Warm golden light fills frame.
+SHOT 5: MCU, 50mm / Static warm light / @image1 after — visibly different energy, positive, confident. @image2 held naturally.
+SHOT 6: MS, 35mm / Slow push-in / @image1 faces camera, warm glow. Dialogue: ${d.customDialogue || `"Since I found ${d.productName} — ${d.mainUSP}. Genuinely."`}.
+SHOT 7: MCU, 50mm / Static / @image1 holds @image2, direct eye contact. CTA: "${d.cta}".
 
-[04s-07s] @image1 discovers or starts using @image2. Lighting shifts warmer. Slow dolly-in toward product interaction moment.
-
-[07s-${d.duration}s] @image1 after using @image2 — visibly different, positive, confident. @image2 held naturally. Warm light, static close-up shot, direct eye contact with camera.
-
-Dialogue: ${d.customDialogue || `"Since I found ${d.productName} — ${d.mainUSP}. Genuinely."`}. CTA: "${d.cta}".
-
-Lighting: [00s-04s] slightly cooler natural light. [04s-end] ${d.brandLighting || 'warm golden natural light, positive lift in tone'}. Colour: ${d.brandGrade || 'warm desaturated film grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -189,21 +185,18 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 8,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 high energy, dynamic presence. ${d.brandLighting || 'bold dramatic side light, strong contrast'}.
+`STYLE: High-energy kinetic UGC, bold dramatic side light, high contrast, punchy saturated grade.
+WARDROBE: @image1 in bold confident outfit — solid colour, strong presence.
+ENVIRONMENT: Minimal — @image1 pops against simple background. Energy over environment.
+MOOD: Instant explosive energy → product confidence → direct CTA urgency.
 
-[00s-02s] @image1 holds @image2 directly at camera lens, bold open expression. Camera static extreme close-up, high contrast light.
+SHOT 1: ECU, 85mm snap push / @image1 holds @image2 directly at camera lens. Bold open expression, high contrast light.
+SHOT 2: CU, 50mm / Fast tracking side-on / @image1 uses @image2 with decisive full-energy motion.
+SHOT 3: ECU, 85mm / Static macro / @image2 product detail — label or key feature fills frame. Multiple fast angles implied.
+SHOT 4: MCU, 50mm / Snap push / @image1 faces camera, confident stance, @image2 visible. Dialogue: ${d.customDialogue || `"${d.mainUSP}. Period."`}.
+SHOT 5: CU, 85mm / Static / @image1 direct eye contact, product raised. CTA: "${d.cta}" — fast and direct.
 
-[02s-04s] @image1 uses @image2 with decisive motion, full energy. Quick tracking shot follows movement side-on.
-
-[04s-06s] @image2 product shown in close-up detail from multiple fast angles. Camera cuts between overhead, side, and front. Rapid but stable shots.
-
-[06s-${d.duration}s] @image1 faces camera, holds @image2 up with confident expression. Static medium shot, strong eye contact.
-
-Dialogue: ${d.customDialogue || `"${d.mainUSP}. Period."`}. CTA: "${d.cta}" delivered fast and direct.
-
-Lighting: ${d.brandLighting || 'bold dramatic lighting, high contrast, punchy feel'}. Colour: ${d.brandGrade || 'high contrast vivid grade, saturated'}. Native audio, fast energy background sound, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -217,19 +210,18 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedFormat: '16:9',
         noAvatar: true,
         promptTemplate: (d) =>
-`Product-only cinematic commercial. No character. ${d.brandLighting || 'dramatic rim light, dark moody background'}.
+`STYLE: High-end luxury product commercial, dramatic rim lighting, dark studio, cinematic grade.
+WARDROBE: No character. Product only.
+ENVIRONMENT: Premium studio — dark moody background, clean surface (marble or black acrylic).
+MOOD: Mysterious reveal → textural beauty → hero moment finale.
 
-[00s-04s] @image2 sits on a premium surface. Camera begins a slow 360-degree orbit around the product. Rim lighting catches every edge and texture detail.
+SHOT 1: MS, 50mm / Static / @image2 sits on premium surface. Rim lighting catches every edge and texture.
+SHOT 2: ECU, 85mm orbit / Camera begins slow 360° arc around @image2 / Product edges glow against dark background.
+SHOT 3: ECU, 85mm slow push-in / Camera pushes to extreme close-up of most visually striking feature of @image2.
+SHOT 4: CU, 50mm / Low-angle static / @image2 from below — product towers, dramatically lit.
+SHOT 5: MS, 35mm / Slow pull-back / Camera pulls back to reveal full @image2 in final hero shot. Maximum lighting drama.
 
-[04s-07s] Camera performs a slow dolly-in toward @image2 stopping at extreme close-up of the most visually striking detail. Product label or key feature fills frame.
-
-[07s-${d.duration}s] Camera pulls back slowly to reveal full product in final hero shot. Lighting at maximum drama. Product perfectly centred.
-
-No dialogue. Natural ambient product sounds. CTA text moment implied through final frame.
-
-Lighting: ${d.brandLighting || 'dramatic cinematic rim light, dark studio, product edges glowing, premium material feel'}. Colour: ${d.brandGrade || 'dark moody cinematic grade, deep shadows, crisp highlights'}. Native audio, ${d.format || '16:9'}, 720p.
-
-Product packaging and details stay sharp and consistent throughout. No motion blur on product. Smooth controlled camera movement only. Generate video without subtitles.`,
+No dialogue. Ambient product sounds. Generate video without subtitles.`,
     },
 
     {
@@ -242,21 +234,20 @@ Product packaging and details stay sharp and consistent throughout. No motion bl
         recommendedDuration: 12,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'static medium close-up'}, ${d.brandLighting || 'natural window light'}.
+`STYLE: Emotional problem-solution narrative, lighting arc from desaturated cool → warm golden.
+WARDROBE: @image1 in casual relatable outfit. Same clothes throughout.
+ENVIRONMENT: Everyday location appropriate to the problem — home, office, or kitchen.
+MOOD: Frustrated struggle (act 1) → hope and curiosity (midpoint) → relief and genuine joy (act 2).
 
-[00s-03s] @image1 shows the problem moment — frustrated expression, struggling with a task related to ${d.problemSolved || 'the problem this product solves'}. Camera static, slightly desaturated light.
+SHOT 1: MCU, 50mm / Static cool light / @image1 shows the problem moment — frustrated expression, struggling with issue related to ${d.problemSolved || 'the problem this product solves'}.
+SHOT 2: CU, 85mm / Slow push-in / @image1 expression — genuine frustration or fatigue in close-up.
+SHOT 3: MCU, 50mm / Slow dolly-in / @image1 notices @image2. Expression shifts — curious. Light begins to warm.
+SHOT 4: CU, 85mm / Rack focus face→product / @image1 uses @image2. Problem visibly resolved. Warm light fills scene.
+SHOT 5: MCU, 50mm / Static warm / @image1 relief — expression relaxes into genuine satisfaction. @image2 in hand.
+SHOT 6: MS, 35mm / Slow push-in / @image1 faces camera. Dialogue: ${d.customDialogue || `"I kept dealing with ${d.problemSolved || 'that problem'} until I found ${d.productName}. ${d.mainUSP}."`}.
+SHOT 7: MCU, 50mm / Static / @image1 holds @image2 to camera. CTA: "${d.cta}".
 
-[03s-06s] @image1 notices @image2 for the first time. Expression shifts from frustrated to curious. Slow push-in as @image1 reaches for product.
-
-[06s-10s] @image1 uses @image2, problem visibly resolved. Expression relaxes into relief then genuine satisfaction. Camera settles on warm static close-up.
-
-[10s-${d.duration}s] @image1 faces camera, @image2 visible, speaks directly. Static medium shot, warm light, direct eye contact.
-
-Dialogue: ${d.customDialogue || `"I kept dealing with ${d.problemSolved || 'that problem'} until I found ${d.productName}. ${d.mainUSP}."`}. CTA: "${d.cta}".
-
-Lighting: [00s-06s] slightly cooler neutral light. [06s-end] ${d.brandLighting || 'warm soft natural light, relief and positivity in tone'}. Colour: ${d.brandGrade || 'natural warm grade'}. Native audio, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 
     {
@@ -269,19 +260,19 @@ Maintain face and clothing consistency of @image1 throughout, no distortion, hig
         recommendedDuration: 8,
         recommendedFormat: '9:16',
         promptTemplate: (d) =>
-`@image1 ${d.brandCamera || 'handheld intimate close-up, feels personal and immediate'}, ${d.brandLighting || 'natural light, feels candid not produced'}.
+`STYLE: Candid conspiratorial UGC, natural handheld intimacy, warm real-person feel, candid-not-produced lighting.
+WARDROBE: @image1 in everyday casual clothes — must feel like a real person, not a presenter.
+ENVIRONMENT: Casual real setting — sofa, bedroom, or cafe. Feels unplanned.
+MOOD: Conspiratorial secret → excited revelation → urgent recommendation.
 
-[00s-02s] @image1 leans into camera conspiratorially, slightly lowered voice energy, finger pointing toward lens or product. Camera handheld, slight natural movement.
+SHOT 1: MCU, 50mm / Handheld natural / @image1 leans into camera — lowered voice energy, slightly conspiratorial. Finger points toward lens.
+SHOT 2: CU, 85mm / Handheld slight wobble / @image1 eyes widen, cannot-contain-it excitement. @image2 comes into frame.
+SHOT 3: MCU, 50mm / Static / @image1 holds @image2 up close to camera, taps or points at specific feature. Excited energy.
+SHOT 4: CU, 85mm / Slow push-in / @image2 detail — feature that makes it special. @image1 finger traces it.
+SHOT 5: MCU, 50mm / Handheld settles / @image1 pulls back slightly, @image2 still visible. Genuine urgency. Dialogue: ${d.customDialogue || `"Okay I have to tell you about ${d.productName} — ${d.mainUSP} and nobody talks about it."`}.
+SHOT 6: MS, 35mm / Static / @image1 looks into camera. CTA: "${d.cta} right now."
 
-[02s-05s] @image1 holds @image2 up close to camera, taps or points at specific feature. Excited, cannot-contain-it energy. Camera static, product clearly in frame.
-
-[05s-${d.duration}s] @image1 pulls back slightly, @image2 still visible, delivers CTA with genuine urgency. Handheld camera settles into soft static close-up.
-
-Dialogue: ${d.customDialogue || `"Okay I have to tell you about ${d.productName} — ${d.mainUSP} and nobody talks about it."`}. CTA: "${d.cta} right now."
-
-Lighting: ${d.brandLighting || 'natural candid light, feels real not staged, warm and intimate'}. Colour: ${d.brandGrade || 'natural slightly warm grade, social-native feel'}. Native audio, word-of-mouth energy, 9:16, 720p.
-
-Maintain face and clothing consistency of @image1 throughout, no distortion, high detail. Character face stable without deformation, natural smooth movements. Generate video without subtitles.`,
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.`,
     },
 ];
 
@@ -340,8 +331,11 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
     };
 
     const product = productData || {};
+    const durationSecs = parseInt(settings?.duration || category.recommendedDuration);
+    // Approximate shot count: ~1.5-2s per shot for fast-paced, ~2-3s for emotional
+    const approxShots = Math.max(4, Math.min(15, Math.round(durationSecs / 1.8)));
 
-    // Assemble template data
+    // Assemble template data — all values from live product/settings, no hardcoding
     const templateData = {
         productName: product.productName || 'the product',
         mainUSP: product.mainUSP || '',
@@ -349,10 +343,14 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
         targetAudience: product.targetAudience || '',
         problemSolved: product.problemSolved || '',
         suggestedDialogue: product.suggestedDialogue || '',
+        productCategory: product.productCategory || 'other',
+        productHandling: product.productHandling || 'held in hands',
+        idealEnvironment: product.idealEnvironment || 'home',
         customDialogue: settings?.customDialogue || null,
         cta: settings?.cta || 'Shop now',
-        duration: parseInt(settings?.duration || category.recommendedDuration),
+        duration: durationSecs,
         format: settings?.format || category.recommendedFormat,
+        environment: settings?.environment || product.idealEnvironment || 'home',
         brandLighting: brandVisual.lighting,
         brandCamera: brandVisual.camera,
         brandGrade: brandVisual.grade,
@@ -362,36 +360,55 @@ export async function buildQAdPrompt({ categoryId, productData, settings, brandI
     const basePrompt = category.promptTemplate(templateData);
 
     // Refine with LLM to inject brand voice and ensure production quality
-    const REFINE_SYSTEM = `You are a Seedance 2.0 expert video prompt engineer.
-Refine the given video ad prompt to be production-ready.
+    const REFINE_SYSTEM = `You are a Seedance 2.0 expert ad film director and prompt engineer.
+Refine the given video ad prompt into the EXACT cinematic structure below.
+Video duration: ${durationSecs}s — generate approximately ${approxShots} shots.
 
 BRAND CONTEXT:
 ${brandContext}
 
-PRODUCT: ${product.productName}
-USP: ${product.mainUSP}
-TARGET AUDIENCE: ${product.targetAudience}
+PRODUCT: ${product.productName || 'Product'}
+USP: ${product.mainUSP || ''}
+TARGET AUDIENCE: ${product.targetAudience || ''}
+KEY FEATURES: ${(product.keyFeatures || []).join(', ')}
+PRODUCT CATEGORY: ${product.productCategory || 'other'}
+BRAND VISUAL STYLE: ${brandVisual.lighting} / ${brandVisual.grade}
 
-Rules you MUST follow:
-1. Keep ALL timecodes in [00s-XXs] format — do not remove them
-2. Keep ALL @image1 and @image2+ references exactly as-is
-3. Keep the constraint block at the end word-for-word
-4. One motion verb per shot — split if needed
-5. Camera movement must be on its own sentence, separate from subject movement
-6. Keep lighting description — it is mandatory
-7. Total word count must be between 30 and 200 words
-8. Do NOT add negative prompts — Seedance does not support them
-9. Inject brand voice/tone into dialogue naturally
-10. Return ONLY the refined prompt — no explanation, no markdown`;
+OUTPUT STRUCTURE (follow exactly — no deviations):
+STYLE: [one sentence — rendering style, lighting character, visual feel. Reflect brand personality.]
+WARDROBE: [@image1 clothing description per shot range — match environment and brand.]
+ENVIRONMENT: [all scene locations in one sentence — must match product context.]
+MOOD: [emotional arc, one sentence — maps to category: ${category.name}]
+SHOT 1: [Size, focal length] / [Camera move] / [@image1 action. @image2 if product shown. ONE motion verb.]
+SHOT 2: [same format]
+[Continue for ~${approxShots} shots based on ${durationSecs}s duration]
+Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.
+
+RULES:
+1. ALL product-specific info (name, USP, features) must come ONLY from the PRODUCT data above — never hallucinate product details
+2. Keep ALL @image1 and @image2+ references exactly as-is — never remove them
+3. ONE motion verb per shot line
+4. Camera move on its own clause after the second slash
+5. HARD LIMIT: 2200 characters total — count carefully
+6. No negative prompts. No text overlays.
+7. Inject brand voice, lighting style and visual grade into STYLE, WARDROBE, ENVIRONMENT
+8. Return ONLY the refined prompt — no explanation, no markdown, no JSON`;
 
     try {
         const refined = await agentUtils.callAgentText(
             REFINE_SYSTEM,
             `PROMPT TO REFINE:\n${basePrompt}`,
             0.3,
-            600
+            900
         );
-        return (refined && typeof refined === 'string' && refined.length > 30) ? refined : basePrompt;
+        // Enforce 2200-char limit
+        let out = (refined && typeof refined === 'string' && refined.length > 30) ? refined : basePrompt;
+        if (out.length > 2200) {
+            const t = out.substring(0, 2200);
+            const lp = t.lastIndexOf('.');
+            out = (lp > 1800 ? t.substring(0, lp + 1) : t) + '\nMaintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.';
+        }
+        return out;
     } catch (err) {
         console.warn(`[Q-Ads] LLM refinement failed, using base template: ${err.message}`);
         return basePrompt;

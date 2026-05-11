@@ -117,18 +117,26 @@ export const SCRIPT_DIRECTOR_PROMPT = (brandContext, styleMemory, model = 'seeda
   // Model-specific backend prompt instructions
   const MODEL_PROMPT_GUIDE = {
     'seedance-2.0': `
-BACKEND PROMPT FORMAT FOR SEEDANCE 2.0 (research-backed best practice):
-Use this exact structure for the backendPrompt field:
-[Subject/Character doing Action] in [Specific Environment], [Visual Style], [Camera Movement], [Lighting & Mood]
+BACKEND PROMPT FORMAT FOR SEEDANCE 2.0 — use this EXACT cinematic shot structure:
 
-SEEDANCE 2.0 RULES:
-- Always be explicit about camera movement — never leave it undefined (model will guess badly)
-- One clear movement per shot, no contradictions (e.g., don't mix "fast-paced" + "slow motion")
-- For multi-beat videos, use timeline structure: "[0s–3s]: ... [3s–7s]: ... [7s–15s]: ..."
-- End every backendPrompt with: "4K, ultra HD, rich cinematic detail, stable picture"
-- Camera terms that work well: slow push-in, pull-back reveal, tracking shot, slow orbit around subject, pan left/right, upward tilt reveal, handheld, crane shot rising
-- Specify duration for camera moves: "slow pan right for 3 seconds", "push-in over 5 seconds"
-- Include subject material/texture (silk, metallic, glass) — Seedance excels at material rendering`,
+STYLE: [Visual/rendering style — lighting character, animation feel, material quality]
+WARDROBE: [Character clothing described per shot range — e.g. "Casual hoodie shots 1–4, suit shots 5–8"]
+ENVIRONMENT: [All scene locations in one sentence]
+MOOD: [Emotional arc — opening tone → mid-point shift → closing feeling]
+SHOT 1: [Shot size, focal length] / [Camera move] / [Subject action. Product ref if shown. ONE motion verb.]
+SHOT 2: [same format]
+[Continue for full duration — typically 8–15 shots]
+Maintain face and clothing consistency throughout. No distortion. Natural smooth movements. Generate video without subtitles.
+
+SHOT SIZES: ECU | CU | MCU | MS | MWS | WS | OTS | POV
+FOCAL LENGTHS: 24mm=wide/establishing | 35mm=natural context | 50mm=human natural | 85mm=portrait/detail | 135mm=telephoto
+MOVES: push-in | pull-back | handheld | tracking | static | slide | snap-push | top-down | orbit | crane | rack-focus
+
+AD DIRECTOR RULES:
+- One motion verb per shot. Camera move on its own clause after the second slash.
+- Lighting is the biggest quality lever — always specify: key light source, colour temp, shadow quality
+- Describe material/texture (silk, glass, metallic) — Seedance excels at material rendering
+- HARD LIMIT: backendPrompt must not exceed 2200 characters`,
 
     'kling-3.0': `
 BACKEND PROMPT FORMAT FOR KLING 3.0:
@@ -305,92 +313,59 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
 
 
 // ──────────────────────────────────────────────────────────────────────────────
-// ADVANCED MODE: PROMPT ENHANCER — model-aware, brand-grounded
+// ADVANCED MODE: PROMPT ENHANCER — Director-level, brand-grounded
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '', model = 'seedance-2.0') => {
+  const SEEDANCE_GUIDE = 'Use cinematic shot structure: STYLE / WARDROBE / ENVIRONMENT / MOOD / SHOT 1: [Size,lens] / [Move] / [Action] ... End with quality suffix "4K, ultra HD, cinematic textures, stable picture". One motion verb per shot.';
+  const KLING_GUIDE = 'Multi-shot format "SHOT 1: [...] | SHOT 2: [...]". Include exact body movement, physics, character-environment interaction.';
+  const VEO_GUIDE = 'Director\'s-note narrative style. Include ambient audio cues alongside visual description. Reference commercial styles ("Apple product launch feel").';
+  const GENERIC_GUIDE = '[Subject+Action] + [Setting] + [Visual Style] + [Camera Move] + [Light & Mood]. Add "cinematic, 4K quality" suffix.';
+  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE };
+  const guide = MODEL_GUIDES[model] || SEEDANCE_GUIDE;
 
-  const SEEDANCE_GUIDE = `
-SEEDANCE 2.0 PROMPT STRUCTURE (research-backed — follow this exactly):
-1. Single Shot Video: [Subject/Character doing Action] in [Specific Environment], [Visual Style], [Camera Movement], [Lighting & Mood]
-2. Multi-Shot/Cut Video: If the user describes multiple actions or requests specific cuts (e.g., "cut every 1.5s"), you MUST use timeline prompting.
-   Format: 
-   [0s–1.5s]: Shot 1 description with camera action
-   [1.5s–3s]: Shot 2 description with camera action
-   [3s–4.5s]: Shot 3 description...
-CRITICAL: Mathematically calculate the timestamps based on the user's requested cut frequency.
-
-CAMERA LANGUAGE (use these exact terms):
-- slow push-in (over Xs) → emotional emphasis, product reveal
-- pull-back reveal → unveil context, dramatic opening
-- tracking shot following [subject] → dynamic subject in motion
-- slow orbit around [subject] → 3D reveal, character/product showcase
-- pan left/right for Xs → environmental reveal, following action
-- upward tilt to reveal [subject/sky] → inspirational, majestic
-- handheld → documentary realism, urgency
-- crane rising → establishing scene, epic scale
-- static macro close-up → product texture, detail, premium quality
-
-QUALITY SUFFIX (always include at the end): "4K, ultra HD, cinematic textures, rich detail, stable picture"`;
-
-  const KLING_GUIDE = `
-KLING 3.0 PROMPT STRUCTURE:
-- Multi-shot format: Shot 1: [description] | Shot 2: [description]
-- Include exact body movement and physics
-- Be specific about character interaction with environment`;
-
-  const VEO_GUIDE = `
-VEO 3.1 PROMPT STRUCTURE:
-- Narrative/cinematic style — describe like a director's shot note
-- Include ambient audio cues alongside visual description
-- Reference film/commercial visual references ("like an Apple product launch video")`;
-
-  const GENERIC_GUIDE = `
-CINEMATIC PROMPT STRUCTURE:
-[Subject + Action] + [Setting] + [Visual Style] + [Camera Movement] + [Light & Mood]
-Add: "cinematic, 4K quality" suffix`;
-
-  const MODEL_GUIDES = {
-    'seedance-2.0': SEEDANCE_GUIDE,
-    'seedance-1.0': SEEDANCE_GUIDE,
-    'kling-3.0': KLING_GUIDE,
-    'veo-3.1': VEO_GUIDE,
-    'veo-3.1-fast': VEO_GUIDE,
-    'grok-imagine': GENERIC_GUIDE,
-  };
-
-  const guide = MODEL_GUIDES[model] || MODEL_GUIDES['seedance-2.0'];
-
-  return `You are an AI Video Prompt Enhancer. You take a user's raw prompt and rewrite it into a production-grade prompt optimised for the specific AI video model being used.
+  return `You are an elite Ad Film Director and AI video prompt engineer. Rewrite the raw brief into a production-grade cinematic prompt for ${model}.
 
 ${brandContext}${styleMemory}
 
-TARGET MODEL: ${model}
-${guide}
+MODEL RULES: ${guide}
 
-BRAND DNA → PROMPT INTEGRATION (CRITICAL):
-If brand data is provided above, you MUST embed the brand's identity into the enhanced prompt:
-- Use the brand's colour palette to guide lighting choices (e.g., brand has deep navy → use "cool blue ambient light, navy-toned shadows")
-- Match the brand's mood/personality in the scene's energy (luxury brand → slow, elegant moves; youth brand → fast, energetic)
-- Set the scene in a lifestyle context matching the brand's target audience
-- Incorporate brand content "dos" as visual cues and avoid the "don'ts"
+CINEMATIC SHOT STRUCTURE (Seedance & all multi-shot models):
+STYLE: [Visual/rendering style — lighting character, animation feel]
+WARDROBE: [Character clothing per shot range]
+ENVIRONMENT: [All locations in one sentence]
+MOOD: [Emotional arc — opening → climax → resolution]
+SHOT 1: [Size, focal length] / [Camera move] / [Subject action. ONE motion verb.]
+SHOT 2: [same format] ... [continue for full video duration]
+Maintain face and clothing consistency throughout. No distortion. Natural smooth movements. Generate video without subtitles.
 
-RULES:
-1. ADD vivid visual specifics: lighting setup, camera movement (with speed), composition, colour palette.
-2. ADD cinematic language specific to the target model (see guide above).
-3. ADD motion cues: describe what moves, how fast, in what direction.
-4. STRICT PRESERVATION: CRITICAL: Never drop actions, specific times, or cut instructions provided by the user. If they request a cut every X seconds, you MUST calculate the timeline and include every beat they mentioned.
-5. KEEP the original intent — enhance, don't replace what the user wants.
-6. REMOVE text overlay requests — AI models can't render text well.
-7. Write in present tense, as if describing what plays on screen right now.
-8. For single-shot Seedance: follow the [Subject+Action]+[Environment]+[Style] exactly. For multi-shot Seedance: STRICTLY use the [Xs-Ys] timeline syntax.
+SHOT SIZES: ECU | CU | MCU | MS | MWS | WS | OTS | POV
+LENSES: 24mm=wide | 35mm=natural | 50mm=human | 85mm=portrait | 135mm=telephoto
+MOVES: push-in | pull-back | handheld | tracking | static | slide | snap-push | top-down | orbit | crane | rack-focus
 
-RESPONSE FORMAT — respond with ONLY valid JSON:
+AD DIRECTOR PLAYBOOK:
+• Emotional/Testimonial → slow push-in, warm MCU, long takes (5-8s)
+• Product Reveal → overhead → dolly-in → 360° orbit → hero MS, rim light
+• Comedy/Hook → fast cuts (1-2s), wide lens, high-key bright, slapstick physics
+• Problem→Solution → desaturated CU → warm light opens → satisfied MS
+• Lifestyle → handheld follow, ambient natural light, rack focus env→product
+• Speed/Energy → 0.5-1s cuts, tracking side-on, high contrast, kinetic blur
+• Luxury/Premium → slow macro CUs (4-6s), rim light, shallow DoF, muted grade
+• Social Proof → conspiratorial lean-in, handheld intimate CU, finger-point to lens
+
+BRAND DNA: Map brand HEX → lighting. Personality → shot energy. Scene lifestyle = target audience.
+
+RULES: 2200 char max. No negative prompts. No text overlays. Present tense. Preserve all user-specified cuts/timing.
+
+RESPONSE FORMAT — ONLY valid JSON:
 {
-  "enhancedPrompt": "The production-ready, model-optimised prompt with brand DNA embedded",
-  "changes": ["List of specific enhancements made — e.g., 'Added slow push-in camera move', 'Applied brand navy colour to lighting'"]
+  "enhancedPrompt": "production-ready prompt with brand DNA embedded",
+  "changes": ["list of specific enhancements made"]
 }`;
 };
+
+
+
 
 
 export const DURATION_PLANNER_PROMPT = `You are a Duration Planner for an AI Video Studio. You calculate how to generate a video longer than a model's native duration limit using segment chaining.
@@ -529,36 +504,57 @@ export const UGC_AVATAR_PROMPT = (brandContext, userDescription, environment = '
 
 
 // ──────────────────────────────────────────────────────────────────────────────
-// UGC PRO: SEEDANCE PROMPT BUILDER (callAgent — constructs the generation prompt)
+// UGC PRO: SEEDANCE PROMPT BUILDER — Cinematic Shot Structure
+// STYLE / WARDROBE / ENVIRONMENT / MOOD / SHOTs, 2200-char limit
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const UGC_PROMPT_BUILDER_PROMPT = (brandContext) => `You are a Seedance 2.0 UGC video prompt builder. You construct prompts optimised for MuAPI Seedance I2V generation.
+export const UGC_PROMPT_BUILDER_PROMPT = (brandContext, { hookShot = false } = {}) => `You are a Seedance 2.0 cinematic UGC video prompt engineer.
 
 ${brandContext}
 
-SEEDANCE 2.0 UGC PROMPT RULES:
-1. MANDATORY IMAGE REFERENCES:
-   - @image1 = the avatar/model person. You MUST reference @image1 as the person in EVERY shot.
-   - @image2 = product image (if available). You MUST reference @image2 as the product in relevant shots.
-   - Write: "The person @image1 holds the product @image2 up to camera..."
-   - NEVER omit @image1 — it is the actual human face/body that Seedance will use.
-2. Maximum 200 words. One motion verb per shot. Camera movement on separate sentence from subject.
-3. Always include lighting description — biggest quality lever in Seedance 2.0.
-4. Timecoded shots: [00s-03s], [03s-06s], etc. — with camera and subject action.
-5. End with: "Maintain face and clothing consistency of @image1, no distortion, natural movements."
-6. No negative prompts (Seedance doesn't support them).
-7. Native audio, 720p minimum.
-8. UGC feel — slightly handheld, natural, smartphone-quality. Like a real person filming.
+══════════════════════════════════
+OUTPUT FORMAT — follow EXACTLY:
+══════════════════════════════════
 
-BRAND INTEGRATION:
-- Embed the brand personality in the avatar's energy, setting, and visual style.
-- Reference brand colours in environment/props/lighting.
-- Match the UGC setting to the brand's target audience.
-- The avatar should feel like a real customer/fan of this brand.
+STYLE: [Rendering style — e.g. "High-end stylized 3D animated, cinematic lighting, expressive face, polished materials, comedic visual storytelling."]
 
-CRITICAL: Your output prompt MUST contain @image1 at least 2 times. If @image2 is available, reference it at least once.
+WARDROBE: [@image1 clothing per shot range — e.g. "Casual hoodie in shots 1–4. Smart casual in shots 5–8."]
 
-You will receive: product data, style preferences, and number of available images.
+ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
 
-Return ONLY the Seedance 2.0 prompt text — no JSON, no explanation. Just the prompt string.`;
+MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
+
+${hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product @image2 MUST be the source of comedy — e.g. the product box falls on @image1's face, @image1 is startled by a flying package, a cat knocks @image2 off a shelf onto @image1's head. Make it absurd but brand-safe. Use the same shot notation as below.
+
+` : ''}SHOT 1: [Shot size + focal length] / [Camera move] / [@image1 action. @image2 reference if product shown. ONE motion verb only.]
+SHOT 2: [Shot size + focal length] / [Camera move] / [Action]
+SHOT 3: [Shot size + focal length] / [Camera move] / [Action]
+[Continue — 8 to 15 shots based on duration]
+
+══════════════════════════════════
+IMAGE TAGGING — MANDATORY:
+══════════════════════════════════
+- @image1 = human avatar — reference in EVERY shot showing a person.
+- @image2 = product — reference whenever product is shown or held.
+- Tags appear INLINE in the shot line. Example:
+  "SHOT 4: MCU, 50mm / Handheld / @image1 holds @image2 up, turns it to show the back."
+
+══════════════════════════════════
+SHOT NOTATION:
+══════════════════════════════════
+Sizes: ECU, CU, MCU, MS, MWS, WS
+Lenses: 24mm (wide/env), 35mm (natural), 50mm (human), 85mm (portrait/detail)
+Moves: push-in, pull-back, handheld, tracking, static, slide, snap push, top-down, OTS, low-angle
+
+══════════════════════════════════
+RULES:
+══════════════════════════════════
+1. HARD LIMIT: Prompt MUST NOT exceed 2200 characters total. Count before returning.
+2. No negative prompts. No text overlays in shots.
+3. Last line MUST be exactly: "Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles."
+4. Match brand voice, environment and audience from context above.
+5. Native audio. One motion verb per shot line.
+
+Return ONLY the final prompt string — no JSON, no markdown, no explanation.`;
+
 

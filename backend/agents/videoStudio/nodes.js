@@ -1117,47 +1117,55 @@ export async function ugcPromptBuilderNode(state) {
     const brandName = brand?.name || '';
     const brandDNA = brand?.dna || {};
 
+    const durationSecs = parseInt(settings.duration || 8);
+    // Approximate shot count for the duration (pacing: ~1.8s per shot)
+    const approxShots = Math.max(4, Math.min(15, Math.round(durationSecs / 1.8)));
+    const hookShot = !!(settings.hookShot);
+
     const userPrompt = [
         `Build a Seedance 2.0 UGC video prompt for ${brandName || 'this brand'}.`,
+        `Video duration: ${durationSecs} seconds — generate approximately ${approxShots} shots.`,
         '',
         `BRAND: ${brandName}`,
         brandDNA.tagline ? `BRAND TAGLINE: ${brandDNA.tagline}` : '',
         brandDNA.personality ? `BRAND VOICE: ${brandDNA.personality}` : '',
         brandDNA.targetAudience ? `TARGET AUDIENCE: ${brandDNA.targetAudience}` : '',
         '',
-        `PRODUCT: ${product.productName || 'Product'}`,
-        `USP: ${product.mainUSP || 'Quality product'}`,
-        `KEY FEATURES: ${(product.keyFeatures || []).join(', ')}`,
-        `CATEGORY: ${product.productCategory || 'other'}`,
-        `HANDLING: ${product.productHandling || 'held in hands'}`,
-        product.tagline ? `PRODUCT TAGLINE: ${product.tagline}` : '',
-        product.problemSolved ? `SOLVES: ${product.problemSolved}` : '',
+        `PRODUCT (use ONLY these details — do NOT invent product facts):`,
+        `- Name: ${product.productName || 'Product'}`,
+        `- USP: ${product.mainUSP || 'Quality product'}`,
+        `- Key Features: ${(product.keyFeatures || []).join(', ')}`,
+        `- Category: ${product.productCategory || 'other'}`,
+        `- How It Is Held/Used: ${product.productHandling || 'held in hands'}`,
+        `- Problem It Solves: ${product.problemSolved || ''}`,
+        product.tagline ? `- Product Tagline: ${product.tagline}` : '',
         '',
         `GENERATION SETTINGS:`,
         `- UGC Style: ${settings.style || 'review'}`,
         `- Mood: ${settings.mood || 'authentic'}`,
         `- Environment: ${settings.environment || product.idealEnvironment || 'home'}`,
-        `- Opening Hook: ${settings.hookStyle || 'bold_claim'}`,
-        `- Duration: ${settings.duration || 8} seconds`,
+        `- Hook Shot: ${hookShot ? 'YES — first 2 shots must be funny/quirky with @image2 causing the comedy' : 'NO'}`,
+        `- Opening Hook Style: ${settings.hookStyle || 'bold_claim'}`,
         `- Aspect Ratio: ${settings.aspectRatio || '9:16'}`,
         `- CTA: ${settings.cta || 'Shop now'}`,
         `- Spoken Language: ${settings.language || 'English'}`,
         '',
-        `CRITICAL LANGUAGE RULE: All spoken dialogue and text hooks in your output prompt MUST be written in ${settings.language || 'English'}. Seedance 2.0 uses this to generate the native audio.`,
+        `CRITICAL LANGUAGE RULE: All spoken dialogue must be in ${settings.language || 'English'}.`,
+        `ANTI-HALLUCINATION: You MUST use the exact product name, USP and features listed above. Do NOT invent specifications, prices, or brand claims not provided.`,
         '',
         `IMAGES AVAILABLE: ${imageCount}`,
-        imageCount >= 1 ? '- @image1 = avatar/model person (MUST be referenced as the human in every shot)' : '',
-        imageCount >= 2 ? '- @image2 = product (MUST be referenced as the physical product being shown)' : '',
-        imageCount > 2 ? `- @image3 to @image${imageCount} = additional product angles` : '',
+        imageCount >= 1 ? '- @image1 = avatar/model person (MUST be referenced in every shot showing a person)' : '',
+        imageCount >= 2 ? '- @image2 = product (MUST be referenced whenever the product appears)' : '',
+        imageCount > 2 ? `- @image3 to @image${imageCount} = additional product angles (reference in close-up or detail shots)` : '',
         '',
-        product.suggestedDialogue ? `SUGGESTED DIALOGUE: "${product.suggestedDialogue}"` : '',
-        product.suggestedHooks ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
+        product.suggestedDialogue ? `SUGGESTED DIALOGUE (use as inspiration, adapt naturally): "${product.suggestedDialogue}"` : '',
+        product.suggestedHooks?.length ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await agentUtils.callAgent(
-        UGC_PROMPT_BUILDER_PROMPT(brandContext),
+        UGC_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
         userPrompt,
-        0.4, 1024,
+        0.4, 2048,
     );
 
     // callAgent may return parsed JSON or raw string
@@ -1166,23 +1174,33 @@ export async function ugcPromptBuilderNode(state) {
     // POST-PROCESSING: Guarantee @image1 (avatar) is referenced
     if (imageCount >= 1 && !prompt.includes('@image1')) {
         console.log('[UGC Node] Injecting missing @image1 tag into prompt');
-        prompt = `The person @image1 faces the camera in a natural UGC setting. ` + prompt;
+        // Prepend minimal STYLE header + first shot with @image1
+        prompt = `STYLE: Cinematic lifestyle UGC, natural lighting.\nENVIRONMENT: ${settings.environment || 'home'}.\nMOOD: Authentic and engaging.\n\nSHOT 1: MS, 50mm / Static / @image1 faces camera in a natural setting. ` + prompt;
     }
 
     // Guarantee @image2 (product) is referenced if available
     if (imageCount >= 2 && !prompt.includes('@image2')) {
         console.log('[UGC Node] Injecting missing @image2 tag into prompt');
         prompt = prompt.replace(
-            /\[(\d+)s-(\d+)s\]/,
-            (match) => `${match} The person @image1 holds up the product @image2.`
+            /SHOT (\d+):/,
+            (match) => `${match} @image1 holds up the product @image2.`
         );
     }
 
-    // Ensure constraint block references @image1
+    // Ensure trailing constraint line
+    const CONSTRAINT = 'Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles.';
     if (!prompt.includes('Maintain face')) {
-        prompt += '\nMaintain face and clothing consistency of @image1 throughout, no distortion, natural smooth movements. Generate video without subtitles.';
+        prompt += '\n' + CONSTRAINT;
     } else if (!prompt.includes('of @image1')) {
         prompt = prompt.replace('Maintain face and clothing consistency', 'Maintain face and clothing consistency of @image1');
+    }
+
+    // HARD LIMIT: 2200 characters — truncate at last complete sentence before limit
+    if (prompt.length > 2200) {
+        const truncated = prompt.substring(0, 2200);
+        const lastPeriod = truncated.lastIndexOf('.');
+        prompt = (lastPeriod > 1800 ? truncated.substring(0, lastPeriod + 1) : truncated) + '\n' + CONSTRAINT;
+        console.log(`[UGC Node] Prompt truncated to ${prompt.length} chars`);
     }
 
     console.log(`[UGC Node] Prompt built (${prompt.split(/\s+/).length} words, @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')})`);
