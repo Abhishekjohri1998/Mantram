@@ -82,26 +82,26 @@ const SunoIcon = (props) => (
 
 const MODELS = [
     // Row 1
-    { name: 'GPT-5', vendor: 'OpenAI', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
-    { name: 'Claude 4.5', vendor: 'Anthropic', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
-    { name: 'Gemini 2.5', vendor: 'Google', tag: 'MULTIMODAL', icon: GeminiIcon, color: '#6366f1' },
-    { name: 'Grok 4', vendor: 'xAI', tag: 'REASONING', icon: GrokIcon, color: '#a1a1aa' },
-    { name: 'Llama 4', vendor: 'Meta', tag: 'OPEN', icon: Infinity, color: '#f59e0b' },
-    { name: 'Mistral L', vendor: 'Mistral', tag: 'OPEN', icon: MistralIcon, color: '#f59e0b' },
+    { name: 'GPT-5', vendor: 'OpenAI', domain: 'openai.com', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
+    { name: 'Claude 4.5', vendor: 'Anthropic', domain: 'anthropic.com', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
+    { name: 'Gemini 2.5', vendor: 'Google', domain: 'google.com', tag: 'MULTIMODAL', icon: GeminiIcon, color: '#6366f1' },
+    { name: 'Grok 4', vendor: 'xAI', domain: 'x.ai', tag: 'REASONING', icon: GrokIcon, color: '#a1a1aa' },
+    { name: 'Llama 4', vendor: 'Meta', domain: 'meta.com', tag: 'OPEN', icon: Infinity, color: '#f59e0b' },
+    { name: 'Mistral L', vendor: 'Mistral', domain: 'mistral.ai', tag: 'OPEN', icon: MistralIcon, color: '#f59e0b' },
     // Row 2
-    { name: 'Sora 2', vendor: 'OpenAI', tag: 'VIDEO', icon: OpenAIIcon, color: '#a1a1aa' },
-    { name: 'Veo 3', vendor: 'Google', tag: 'VIDEO', icon: GoogleIcon, color: '#a1a1aa' },
-    { name: 'Kling 2.0', vendor: 'Kuaishou', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
-    { name: 'Seedance', vendor: 'ByteDance', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
-    { name: 'Runway G4', vendor: 'Runway', tag: 'VIDEO', icon: RunwayIcon, color: '#a1a1aa' },
-    { name: 'Hailuo 02', vendor: 'MiniMax', tag: 'VIDEO', icon: HailuoIcon, color: '#a1a1aa' },
+    { name: 'Sora 2', vendor: 'OpenAI', domain: 'openai.com', tag: 'VIDEO', icon: OpenAIIcon, color: '#a1a1aa' },
+    { name: 'Veo 3', vendor: 'Google', domain: 'google.com', tag: 'VIDEO', icon: GoogleIcon, color: '#a1a1aa' },
+    { name: 'Kling 2.0', vendor: 'Kuaishou', domain: 'klingai.com', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
+    { name: 'Seedance', vendor: 'ByteDance', domain: 'bytedance.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
+    { name: 'Runway G4', vendor: 'Runway', domain: 'runwayml.com', tag: 'VIDEO', icon: RunwayIcon, color: '#a1a1aa' },
+    { name: 'Hailuo 02', vendor: 'MiniMax', domain: 'hailuo.ai', tag: 'VIDEO', icon: HailuoIcon, color: '#a1a1aa' },
     // Row 3
-    { name: 'Flux 1.1', vendor: 'BFL', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
-    { name: 'Imagen 4', vendor: 'Google', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
-    { name: 'Ideogram', vendor: 'Ideogram', tag: 'IMAGE', icon: IdeogramIcon, color: '#a1a1aa' },
-    { name: 'Recraft V3', vendor: 'Recraft', tag: 'IMAGE', icon: RecraftIcon, color: '#a1a1aa' },
-    { name: 'ElevenLabs', vendor: 'ElevenLabs', tag: 'VOICE', icon: ElevenLabsIcon, color: '#a1a1aa' },
-    { name: 'Suno V4', vendor: 'Suno', tag: 'MUSIC', icon: SunoIcon, color: '#a1a1aa' },
+    { name: 'Flux 1.1', vendor: 'BFL', domain: 'blackforestlabs.ai', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
+    { name: 'Imagen 4', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
+    { name: 'Ideogram', vendor: 'Ideogram', domain: 'ideogram.ai', tag: 'IMAGE', icon: IdeogramIcon, color: '#a1a1aa' },
+    { name: 'Recraft V3', vendor: 'Recraft', domain: 'recraft.ai', tag: 'IMAGE', icon: RecraftIcon, color: '#a1a1aa' },
+    { name: 'ElevenLabs', vendor: 'ElevenLabs', domain: 'elevenlabs.io', tag: 'VOICE', icon: ElevenLabsIcon, color: '#a1a1aa' },
+    { name: 'Suno V4', vendor: 'Suno', domain: 'suno.com', tag: 'MUSIC', icon: SunoIcon, color: '#a1a1aa' },
 ];
 
 export default function IntelligenceLayer() {
@@ -153,8 +153,14 @@ export default function IntelligenceLayer() {
                             className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default"
                         >
                             <div className="flex justify-between items-start w-full">
-                                <div className="text-white/60 group-hover:text-white transition-colors">
-                                    <model.icon className="w-5 h-5" strokeWidth={1.5} />
+                                <div className="w-7 h-7 bg-white/90 rounded-md flex items-center justify-center shadow-sm border border-white/20 group-hover:bg-white transition-colors overflow-hidden p-1">
+                                    <img 
+                                        src={`https://www.google.com/s2/favicons?domain=${model.domain}&sz=128`} 
+                                        alt={model.vendor} 
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                                    />
+                                    <model.icon className="w-5 h-5 text-black hidden" strokeWidth={1.5} />
                                 </div>
                                 <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: model.color }}>
                                     {model.tag}
