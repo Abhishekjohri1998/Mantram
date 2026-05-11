@@ -3768,6 +3768,12 @@ router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
 router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
     try {
         const { requestId } = req.params;
+        
+        // Guard against undefined/empty requestId (stale frontend state)
+        if (!requestId || requestId === 'undefined' || requestId === 'null') {
+            return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
+        }
+        
         const result = await pollAtlasCloudStatus(requestId);
 
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
@@ -3790,9 +3796,15 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             updatePayload['generation.status'] = result.status;
         }
 
+        // Also set finalVideoUrl when completed for history listing
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            updatePayload.finalVideoUrl = result.videoUrl;
+        }
+
         // V2 projects store taskId in generation.taskId and generation.requestId
+        // Use $or to match both fields since older projects may have different field names
         await VideoProject.findOneAndUpdate(
-            { 'generation.requestId': requestId, user: req.user._id, studioMode: 'q-ads-v2' },
+            { $or: [{ 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
             { $set: updatePayload }
         ).catch(e => console.warn('[Q-Ads V2 Status] DB update failed:', e.message));
 
@@ -5551,7 +5563,7 @@ router.get('/', protect, async (req, res) => {
         if (mode) filter.mode = mode;
 
         const skip = (Number(page) - 1) * Number(limit);
-        const selectFields = 'title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
+        const selectFields = 'title status mode studioMode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
 
         // Build the query — use hint to force the compound index so MongoDB avoids an in-memory sort.
         // Also set allowDiskUse via setOptions (the chained .allowDiskUse() is unreliable on some driver versions).
