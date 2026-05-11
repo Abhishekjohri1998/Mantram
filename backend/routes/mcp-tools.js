@@ -256,6 +256,7 @@ const TOOLS = {
                 model, prompt, duration, aspectRatio, qualityMode,
                 brandId: ctx.brand?._id,
                 source: 'skill_execution',
+                allowDiskUse: true,
             }),
             signal: AbortSignal.timeout(30000), // just queuing, not waiting for result
         });
