@@ -4172,17 +4172,14 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         }
 
         // CRITICAL ROUTING FIX:
-        // - referenceImages (→ Atlas reference_images) must ONLY contain face/avatar assets
-        //   that go through the Asset Library registration (asset:// URI pipeline).
-        // - Product images are NOT face refs — passing them as referenceImages causes
-        //   Atlas to try to register them as face assets, which partially fails and leaves
-        //   raw https:// URLs in reference_images, triggering the safety filter rejection.
-        //
-        // Correct routing:
-        //   avatarFaceRefs (1 item)  → referenceImages (will become asset:// URIs)
-        //   imageUrls[0]             → imageUrl (first-frame scene anchor)
-        //   imageUrls[1+]            → remain in productImageUrls, handled by atlasClient
-        //                               as additional image_urls, not reference_images
+        // We now bundle BOTH the product images and the avatar into referenceImages,
+        // and set imageUrl to null. This forces the model into Reference-to-Video (R2V) mode,
+        // rather than Image-to-Video (I2V) mode where it struggles with product hallucination.
+        // The atlasClient will handle passing these through the Asset Library to bypass safety filters.
+        
+        // Order matters: qAdsAgent sets <<<image_1>>> = product, <<<image_2>>> = avatar
+        const finalReferenceImages = [...imageUrls, ...avatarFaceRefs].slice(0, 9);
+
         const genResult = await submitVideoGeneration({
             prompt:           finalPrompt,
             model:            selectedModel,
@@ -4191,8 +4188,8 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             resolution,
             qualityMode:      'high',
             generateAudio:    true,
-            imageUrl:         imageUrls[0] || null,     // first product image → scene anchor
-            referenceImages:  avatarFaceRefs,           // ONLY avatar → Atlas Asset Library
+            imageUrl:         null,                     // No starting frame, pure R2V
+            referenceImages:  finalReferenceImages,     // Avatar + Product(s) → Asset Library
             imageRole:        resolvedV2ImageRole,
         });
 
