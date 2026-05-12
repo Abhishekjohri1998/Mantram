@@ -275,11 +275,7 @@ async function submitAtlasCloudPayload(payload) {
             console.log(`📸 [Atlas I2V] Uploading first frame to Atlas CDN...`);
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
             if (uploaded) {
-                if (atlasModel.includes('happyhorse')) {
-                    atlasPayload.image_url = uploaded;
-                } else {
-                    atlasPayload.image = uploaded;
-                }
+                atlasPayload.image = uploaded;
             }
         }
     }
