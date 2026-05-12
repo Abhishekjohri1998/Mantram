@@ -104,7 +104,7 @@ export function sanitizePromptForProvider(prompt, provider = 'default', imageCou
     if (imageCount === 0) {
         const hadTags = /@image\d+/i.test(p);
         if (hadTags) {
-            p = p.replace(/@image\d+/gi, '').replace(/\(Visual reference:\)/g, '').replace(/\s{2,}/g, ' ').trim();
+            p = p.replace(/@image\d+/gi, '').replace(/\(Visual reference:\)/g, '').replace(/[ \t]{2,}/g, ' ').trim();
             warnings.push('Stripped all @image tags from prompt — no images were provided in the payload');
         }
     } else {
@@ -143,7 +143,7 @@ export function sanitizePromptForProvider(prompt, provider = 'default', imageCou
     }
 
     // ── Step 6: Final cleanup ─────────────────────────────────────────────────
-    p = p.replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    p = p.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 
     if (warnings.length > 0) {
         console.warn(`⚠️ [PromptSanitizer] ${warnings.length} issue(s) found and fixed:\n  ${warnings.join('\n  ')}`);

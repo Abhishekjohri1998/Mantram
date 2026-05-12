@@ -410,8 +410,8 @@ export async function submitAtlasCloudVideoGeneration({
         .replace(/@image\d+/gi, '')                             // strip old @image refs — will be re-added below
         .replace(/\{[^}]{0,300}\}/g, '')                        // RC#4: strip {curly brace blocks}
         .replace(/\bWARDROBE\s*:\s*([A-Z][A-Z0-9 ]{3,}\b)+/g,  // RC#2: strip BRAND NAME prefix from WARDROBE lines
-            (m) => m.replace(/\b[A-Z]{3,}(?:\s+[A-Z]{3,})*\b/, '').replace(/\s{2,}/g, ' '))
-        .replace(/\s{2,}/g, ' ')
+            (m) => m.replace(/\b[A-Z]{3,}(?:\s+[A-Z]{3,})*\b/, '').replace(/[ \t]{2,}/g, ' '))
+        .replace(/[ \t]{2,}/g, ' ')
         .trim();
 
     // RC#1 FIX — Only inject "real person" face-lock text when imageRole is explicitly 'face'.

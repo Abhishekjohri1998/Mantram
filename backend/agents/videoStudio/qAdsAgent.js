@@ -237,7 +237,7 @@ SHOT 2 [00:02 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
 SHOT 3 [00:04 - 00:06]: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
 
-VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The prompt MUST NOT exceed 2200 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
+VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The prompt MUST NOT exceed 1800 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ function parseVariants(rawText) {
                 .replace(/<<<image_(\d+)>>>/g, (m, n) => parseInt(n) === 1 ? 'the model' : 'the product')
                 // Step 2: Strip legend header lines (<<<image_N>>> = ... lines)
                 .replace(/<<<image_\d+>>>\s*=.*\n?/g, '')
-                .replace(/\s{2,}/g, ' ')
+                .replace(/[ \t]{2,}/g, ' ')
                 .trim();
             variants.push({ variantId: label, prompt: cleanBody, legend });
         }
@@ -514,7 +514,7 @@ export async function runQAdsAgent({
             .replace(/\bof\s+'s\b/g, "of the model's")
             .replace(/\b(?:the\s+)?'s\s+/g, "the model's ")
 
-            .replace(/\s{2,}/g, ' ')
+            .replace(/[ \t]{2,}/g, ' ')
             .trim();
     }
 
