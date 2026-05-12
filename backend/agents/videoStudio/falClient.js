@@ -54,6 +54,7 @@ export const COST_PER_SECOND = {
 
 const DURATION_LIMITS = {
     'kling-3.0': { min: 3, max: 15 },
+    'kling-3.0-o': { min: 5, max: 15 },
     'veo-3.1': { min: 5, max: 8 },
     'veo-3.1-fast': { min: 5, max: 8 },
     'seedance-1.0': { min: 5, max: 10 },
@@ -74,7 +75,17 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: true, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: true,
-        maxPromptLength: 200000, // Kling 3.0 supports approx 2k-3k chars
+        maxPromptLength: 200000,
+    },
+    'kling-3.0-o': {
+        id: 'kling-3.0-o', name: 'Kling 3.0 Omni', icon: '✨', provider: 'fal',
+        description: 'Kling Omni — enhanced detail, multi-reference, premium quality',
+        bestFor: 'Fashion, luxury products, high-fidelity garment & character videos',
+        duration: { min: 5, max: 15, native: 10, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: false,
+        maxPromptLength: 200000,
     },
     'veo-3.1': {
         id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', provider: 'fal',
@@ -347,13 +358,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     // Enforce provider-specific prompt length limits
     let safePrompt = truncatePrompt(prompt, model);
 
-    // 🧹 WATERMARK AVOIDANCE: For Seedance models, append negative-like instructions to the prompt
-    if (model.includes('seedance')) {
-        const watermarkRef = ' (no watermark, clean background, high quality, 4k)';
-        if (!safePrompt.includes('no watermark')) {
-            safePrompt += watermarkRef;
-        }
-    }
+    // NOTE: Watermark avoidance for Atlas Cloud is handled via the payload `watermark: false` field.
+    // Appending "(no watermark, clean background, high quality, 4k)" to the prompt is NOT needed
+    // for Atlas and causes Atlas NLP to parse it as template syntax, contributing to rejections.
 
     const [s3ImageUrl, s3RefAudio, s3RefVideo, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),

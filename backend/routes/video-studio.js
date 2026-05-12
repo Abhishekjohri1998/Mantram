@@ -59,6 +59,7 @@ import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
 import { getPresets } from '../utils/qAdsCache.js';
 import { runQAdsAgent } from '../agents/videoStudio/qAdsAgent.js';
+import { isFashionCategory, resolveImageRole } from '../agents/videoStudio/promptSanitizer.js';
 import { buildVideoHash } from '../utils/videoHash.js';
 import { checkPromptSafety } from '../utils/promptSafety.js';
 import redis from '../utils/redisClient.js';
@@ -3190,18 +3191,43 @@ router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages'
                     if (url?.startsWith('http')) candidateUrls.push(url);
                 }
 
-                // 3. Shopify CDN direct
+                // Helper: reject URLs that are clearly UI assets, not product images
+                const isUiAsset = (u) => {
+                    const lower = u.toLowerCase();
+                    return (
+                        // Social media icons
+                        lower.includes('whatsapp') || lower.includes('facebook') || lower.includes('instagram') ||
+                        lower.includes('twitter') || lower.includes('youtube') || lower.includes('pinterest') ||
+                        lower.includes('tiktok') || lower.includes('snapchat') || lower.includes('telegram') ||
+                        // Payment / trust badges
+                        lower.includes('payment') || lower.includes('visa') || lower.includes('mastercard') ||
+                        lower.includes('paypal') || lower.includes('upi') || lower.includes('razorpay') ||
+                        lower.includes('secure') || lower.includes('badge') || lower.includes('trust') ||
+                        lower.includes('guarantee') || lower.includes('certified') ||
+                        // Shipping / returns
+                        lower.includes('shipping') || lower.includes('delivery') || lower.includes('returns') ||
+                        lower.includes('free-ship') || lower.includes('fast-ship') ||
+                        // UI navigation
+                        lower.includes('header') || lower.includes('footer') || lower.includes('/nav/') ||
+                        lower.includes('breadcrumb') || lower.includes('banner') ||
+                        // Known asset types
+                        lower.includes('icon') || lower.includes('logo') || lower.includes('favicon') ||
+                        lower.includes('sprite') || lower.includes('placeholder') || lower.includes('blank') ||
+                        lower.includes('_small') || lower.includes('_thumb') || lower.includes('_compact') ||
+                        lower.includes('_mini') || lower.includes('_tiny') || lower.includes('_xs') ||
+                        lower.includes('background') || lower.includes('bg-') || lower.includes('/bg/')
+                    );
+                };
+
+                // 3. Shopify CDN direct — with comprehensive UI asset filtering
                 for (const [, url] of pageHtml.matchAll(/["'](https?:\/\/cdn\.shopify\.com\/s\/files\/[^"'?]+\.(?:jpg|jpeg|png|webp))(?:\?[^"']*)?["']/gi)) {
-                    if (!url.includes('icon') && !url.includes('logo') && !url.includes('_small') && !url.includes('_thumb') && !url.includes('_compact')) {
-                        candidateUrls.push(url);
-                    }
+                    if (!isUiAsset(url)) candidateUrls.push(url);
                 }
 
-                // 4. Generic product/gallery images
-                for (const [, url] of pageHtml.matchAll(/["'](https?:\/\/[^"']*(?:product|item|goods|media|gallery|zoom|large)[^"']*\.(?:jpg|jpeg|png|webp))(?:\?[^"']*)?["']/gi)) {
-                    if (!url.includes('icon') && !url.includes('logo') && !url.includes('favicon') && !url.includes('sprite')) {
-                        candidateUrls.push(url);
-                    }
+                // 4. Generic product/gallery images — tightened pattern to avoid nav/social assets
+                // Only match URLs that explicitly have product/collection/variant in path segments
+                for (const [, url] of pageHtml.matchAll(/["'](https?:\/\/[^"']*\/(?:products?|collections?|items?|goods|variants?)\/[^"']*\.(?:jpg|jpeg|png|webp))(?:\?[^"']*)?["']/gi)) {
+                    if (!isUiAsset(url)) candidateUrls.push(url);
                 }
 
                 // Deduplicate by normalised base URL (strip query, size suffixes, and normalize http→https)
@@ -3228,7 +3254,12 @@ router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages'
                         
                         const arrayBuffer = await imgResp.arrayBuffer();
                         const buffer = Buffer.from(arrayBuffer);
-                        if (buffer.length < 8000 || buffer.length > 10_000_000) throw new Error('Invalid size');
+                        // Reject files under 20KB — icons, badges, and sprites are almost always < 20KB
+                        // Max 10MB to avoid giant uncompressed images
+                        if (buffer.length < 20_000 || buffer.length > 10_000_000) {
+                            console.log(`[UGC Analyze] ⏭ Skipping ${imgUrl.substring(0, 60)} — size ${Math.round(buffer.length/1024)}KB (likely icon or invalid)`);
+                            throw new Error('Invalid size');
+                        }
                         
                         const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
                         const s3Key = `ugc-pro/products/${req.user._id}/${Date.now()}-${i}.${ext}`;
@@ -3460,20 +3491,42 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
         const duration = parseInt(parsedSettings.duration || 8);
         const aspectRatio = parsedSettings.aspectRatio || '9:16';
         const quality = parsedSettings.quality || 'high';
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
+        const resolution = parsedSettings.resolution || '720p';
 
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
-        console.log(`[UGC Generate] Submitting — ${duration}s, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
+        console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
-        // Submit to PiAPI via atlasClient
-        const genResult = await submitAtlasCloudVideoGeneration({
-            prompt,
-            imageUrl: imageUrls[0] || null,
-            duration,
-            aspectRatio,
-            qualityMode: quality,
-            generateAudio: true,
-            referenceImages: imageUrls.slice(1),
-        });
+        let genResult;
+        let usedProvider;
+
+        if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') {
+            // Atlas Cloud path (reference-to-video with avatar face locking)
+            genResult = await submitAtlasCloudVideoGeneration({
+                prompt,
+                imageUrl: imageUrls[0] || null,
+                duration,
+                aspectRatio,
+                qualityMode: quality,
+                generateAudio: true,
+                referenceImages: imageUrls.slice(1),
+            });
+            usedProvider = 'atlascloud';
+        } else {
+            // Kling / Veo / other models via falClient submitVideoGeneration
+            const result = await submitVideoGeneration({
+                model: selectedModel,
+                prompt,
+                imageUrl: imageUrls[0] || null,
+                duration,
+                resolution,
+                aspectRatio,
+                generateAudio: true,
+                referenceImages: imageUrls.slice(1),
+            });
+            genResult = { taskId: result.requestId, _payload: result._atlasCloudPayload };
+            usedProvider = result.provider || selectedModel;
+        }
 
         // Persist history as a VideoProject
         const project = await VideoProject.create({
@@ -3485,8 +3538,8 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             backendPrompt: prompt,
             input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
             generation: {
-                provider: 'atlascloud',
-                model: 'seedance-2.0',
+                provider: usedProvider,
+                model: selectedModel,
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
                 duration,
@@ -3500,7 +3553,8 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             success: true,
             projectId: project._id,
             requestId: genResult.taskId,
-            provider: 'atlascloud',
+            provider: usedProvider,
+            model: selectedModel,
             prompt,
             imageCount: imageUrls.length,
             duration,
@@ -3642,12 +3696,25 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
 
         console.log(`[Q-Ads Generate] Submitting — ${categoryId}, ${duration}s, ${imageUrls.length} images`);
 
+        // Determine correct imageRole for Atlas:
+        //   'face'          — user provided an avatar (face-registered, UGC-style)
+        //   'fashion-model' — garment/apparel brand, product image likely contains a human model
+        //   'product'       — standalone product, no human
+        const isFashion = isFashionCategory({ productData: parsedProduct, userBrief: prebuiltPrompt });
+        const resolvedImageRole = resolveImageRole({
+            hasAvatar: avatarFaceRefs.length > 0,
+            isFashion,
+        });
+        if (isFashion && resolvedImageRole === 'fashion-model') {
+            console.log(`👗 [Q-Ads Generate] Fashion/apparel brand detected — imageRole=fashion-model (garment-safe Asset registration)`);
+        }
+
         const genResult = await submitAtlasCloudVideoGeneration({
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
             referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
-            imageRole: avatarFaceRefs.length > 0 ? 'face' : 'product',
+            imageRole: resolvedImageRole,
         });
 
         // Persist as VideoProject
@@ -4089,18 +4156,46 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
 
         console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs, total refs=${allReferenceImages.length}`);
 
+        // Determine correct imageRole for Atlas:
+        //   'face'          — user provided avatar (UGC Pro style)
+        //   'fashion-model' — garment/apparel brand; product image likely contains a human model
+        //   'product'       — standalone product
+        const brandContext = await loadBrandContext(brandId).catch(() => null);
+        const parsedProduct = null; // product data not passed to generate-video endpoint
+        const isFashionBrand = isFashionCategory({ productData: parsedProduct || {}, userBrief: '' });
+        const resolvedV2ImageRole = resolveImageRole({
+            hasAvatar: avatarFaceRefs.length > 0,
+            isFashion: isFashionBrand,
+        });
+        if (isFashionBrand && resolvedV2ImageRole === 'fashion-model') {
+            console.log(`👗 [Q-Ads V2] Fashion/apparel brand detected — imageRole=fashion-model`);
+        }
+
+        // CRITICAL ROUTING FIX:
+        // - referenceImages (→ Atlas reference_images) must ONLY contain face/avatar assets
+        //   that go through the Asset Library registration (asset:// URI pipeline).
+        // - Product images are NOT face refs — passing them as referenceImages causes
+        //   Atlas to try to register them as face assets, which partially fails and leaves
+        //   raw https:// URLs in reference_images, triggering the safety filter rejection.
+        //
+        // Correct routing:
+        //   avatarFaceRefs (1 item)  → referenceImages (will become asset:// URIs)
+        //   imageUrls[0]             → imageUrl (first-frame scene anchor)
+        //   imageUrls[1+]            → remain in productImageUrls, handled by atlasClient
+        //                               as additional image_urls, not reference_images
         const genResult = await submitVideoGeneration({
-            prompt: finalPrompt,
-            model: selectedModel,
+            prompt:           finalPrompt,
+            model:            selectedModel,
             duration,
             aspectRatio,
             resolution,
-            qualityMode: 'high',
-            generateAudio: true,
-            imageUrl: imageUrls[0] || null,
-            referenceImages: allReferenceImages,
-            imageRole,
+            qualityMode:      'high',
+            generateAudio:    true,
+            imageUrl:         imageUrls[0] || null,     // first product image → scene anchor
+            referenceImages:  avatarFaceRefs,           // ONLY avatar → Atlas Asset Library
+            imageRole:        resolvedV2ImageRole,
         });
+
 
         // Persist as VideoProject for polling
         const { VideoProject } = await import('../models/VideoProject.js').catch(() => ({ VideoProject: null }));

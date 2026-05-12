@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
 import AvatarPicker from './AvatarPicker'
+import ViralityMiniPanel from '../ViralityMiniPanel'
+
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -46,6 +48,13 @@ const ENVIRONMENTS = [
 const HOOKS = [
     { id: 'bold_claim', label: 'Bold Claim' }, { id: 'question', label: 'Question' },
     { id: 'story', label: 'Story' }, { id: 'shock', label: 'Shock' },
+]
+const VIDEO_MODELS_UGC = [
+    { value: 'seedance-2.0',     label: 'Seedance 2.0',  icon: 'local_movies' },
+    { value: 'seedance-2.0-fast',label: 'Seedance Fast', icon: 'bolt' },
+    { value: 'kling-3.0',        label: 'Kling 3.0',     icon: 'videocam' },
+    { value: 'kling-3.0-o',      label: 'Kling Omni ✨',  icon: 'auto_awesome' },
+    { value: 'veo-3.1-fast',     label: 'Veo 3.1 Fast',  icon: 'movie' },
 ]
 const LANGUAGES = [
     { id: 'english', label: 'English' }, { id: 'spanish', label: 'Spanish' },
@@ -135,6 +144,39 @@ function Dropdown({ value, onChange, options, label }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
+/* ── UGCVideoCard ── grid card for completed UGC history videos */
+function UGCVideoCard({ v, videoUrl, activeBrand, downloadVideo }) {
+    const [viralityOpen, setViralityOpen] = useState(false)
+    return (
+        <div className="ugc-video-card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+                <video src={videoUrl} muted loop playsInline
+                    onMouseEnter={e => e.target.play()}
+                    onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <div className="ugc-video-overlay">
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button onClick={() => downloadVideo(videoUrl)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>download</span> Download
+                        </button>
+                        <button onClick={() => setViralityOpen(x => !x)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: viralityOpen ? '#ff4d00' : '#fff', background: viralityOpen ? 'rgba(255,77,0,0.2)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>local_fire_department</span> Virality
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {viralityOpen && videoUrl && (
+                <div style={{ padding: '6px 8px 8px', background: 'rgba(10,10,20,0.95)', borderTop: '1px solid rgba(255,77,0,0.15)' }}>
+                    <ViralityMiniPanel contentType="video" mediaUrl={videoUrl} brandId={activeBrand?._id} platform="instagram" />
+                </div>
+            )}
+        </div>
+    )
+}
+
 export default function UGCPro({ activeBrand, projects = [], canCreateVideo = true, onUpgradeRequired }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -177,6 +219,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [aspectRatio, setAspectRatio] = useState('9:16')
     const [language, setLanguage] = useState('english')
     const [cta, setCta] = useState('Shop now')
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0')
     const [showSettings, setShowSettings] = useState(false)
     const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
@@ -252,7 +295,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
         try {
             const data = await apiJson('/video-studio/ugc-pro/build-prompt', {
                 brandId: activeBrand?._id, productData, avatarUrl, productImageUrls,
-                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta },
+                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, model: selectedModel },
             })
             setPromptText(data.prompt)
             setPromptReady(true)
@@ -273,7 +316,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
         try {
             const data = await apiJson('/video-studio/ugc-pro/generate', {
                 brandId: activeBrand?._id, productData, avatarUrl, productImageUrls, prebuiltPrompt: promptText,
-                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta },
+                settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, model: selectedModel },
             })
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
 
@@ -347,20 +390,12 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                 ))}
 
                 {/* Completed videos from History */}
-                {gridVideos.map(v => (
-                    <div key={v._id} className="ugc-video-card">
-                        <video src={v.generation?.videoUrl} muted loop playsInline onMouseEnter={e => e.target.play()} onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }} />
-                        <div className="ugc-video-overlay">
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                <button onClick={() => downloadVideo(v.generation?.videoUrl)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>download</span> Download
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                {gridVideos.map(v => {
+                    const videoUrl = v.generation?.videoUrl
+                    return (
+                        <UGCVideoCard key={v._id} v={v} videoUrl={videoUrl} activeBrand={activeBrand} downloadVideo={downloadVideo} />
+                    )
+                })}
 
                 {/* Empty state */}
                 {jobs.length === 0 && gridVideos.length === 0 && (
@@ -379,7 +414,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                     <div className="ugc-header">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#a855f7' }}>person_play</span>
-                            UGC Pro · Seedance 2.0
+                            UGC Pro · {VIDEO_MODELS_UGC.find(m => m.value === selectedModel)?.label || 'AI'}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {productData && (
@@ -572,6 +607,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                                 { value: '1:1', label: '1:1', icon: 'crop_square' },
                             ]} />
                             <Dropdown value={language} onChange={v => setLanguage(v)} options={LANGUAGES.map(l => ({ value: l.id, label: l.label, icon: 'language' }))} />
+                            <Dropdown value={selectedModel} onChange={v => setSelectedModel(v)} options={VIDEO_MODELS_UGC.map(m => ({ value: m.value, label: m.label, icon: m.icon }))} />
                             <button className="ugc-cfg-btn" onClick={() => setShowSettings(!showSettings)}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>tune</span>
                                 {showSettings ? 'Less' : 'More Settings'}
@@ -595,7 +631,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                                     try {
                                         const data = await apiJson('/video-studio/ugc-pro/build-prompt', {
                                             brandId: activeBrand?._id, productData, avatarUrl, productImageUrls,
-                                            settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta },
+                                            settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta, model: selectedModel },
                                         })
                                         setPromptText(data.prompt)
                                         setPromptReady(true)

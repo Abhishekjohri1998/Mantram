@@ -17,7 +17,9 @@ import MaskingCanvas from '../components/MaskingCanvas'
 import Walkthrough from '../components/Walkthrough'
 import TemplateLibrary from './TemplateLibrary'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
+import ViralityMiniPanel from '../components/ViralityMiniPanel'
 import './CreativeStudio/CreativeStudio.css'
+
 
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
 const TMPL_ROW_API = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '')
@@ -664,6 +666,9 @@ export default function CreativeStudio() {
     const editImageRef = useRef(null) // Avoids stale closure — stores current source URL
     const [isMaskingMode, setIsMaskingMode] = useState(false)
     const maskingCanvasRef = useRef(null)
+
+    // ── Virality Check State ──
+    const [viralityPanelData, setViralityPanelData] = useState(null) // { mediaUrl, contentText }
 
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
@@ -3629,8 +3634,22 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* ── Virality Check ── */}
+                                {result?.imageUrl && (
+                                    <div className="mt-3 pt-3 border-t border-[var(--sys-border)]">
+                                        <ViralityMiniPanel
+                                            contentType="image"
+                                            mediaUrl={result.imageUrl}
+                                            brandId={activeBrand?._id}
+                                            platform="instagram"
+                                            contentText={prompt || result.title}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
+
 
                         {/* ── Text on Image Card ── */}
                         {result?.copy?.headline && (
@@ -3783,6 +3802,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             className="studio-btn-pill !text-[9px] !px-2 !py-1 active border-none" title="Animate">
                                                             <span className="material-symbols-outlined !text-[12px]">animation</span> Animate
                                                         </button>
+                                                        {item.imageUrl && (
+                                                            <button onClick={(e) => { e.stopPropagation(); setViralityPanelData({ mediaUrl: item.imageUrl, contentText: item._prompt || '' }); }}
+                                                                className="studio-btn-pill !text-[9px] !px-2 !py-1 border border-[#FF4D00]/20 bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 hover:border-[#FF4D00]/40" title="Check Virality">
+                                                                <span className="material-symbols-outlined !text-[12px]">local_fire_department</span> Virality
+                                                            </button>
+                                                        )}
+
                                                     </div>
                                                 </div>
                                             </div>
@@ -3870,9 +3896,15 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditPanel(item.imageUrl, 'Creative'); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 Edit
                                                                             </button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] transition-colors whitespace-nowrap">
+                                                                            <button onClick={(e) => { e.stopPropagation(); handleAnimateClick(item); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[var(--sys-text)] hover:text-primary font-semibold text-[10px] border-r border-[var(--sys-border)] transition-colors whitespace-nowrap">
                                                                                 Animate
                                                                             </button>
+                                                                            {item.imageUrl && (
+                                                                                <button onClick={(e) => { e.stopPropagation(); setViralityPanelData({ mediaUrl: item.imageUrl, contentText: item._prompt || '' }); }} className="px-2.5 py-1.5 hover:bg-[#FF4D00]/10 text-[#FF4D00] hover:text-[#FF6A00] font-bold text-[10px] transition-colors whitespace-nowrap flex items-center gap-1">
+                                                                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>local_fire_department</span> Virality
+                                                                                </button>
+                                                                            )}
+
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -11661,6 +11693,36 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ========== VIRALITY OVERLAY MODAL ========== */}
+            {viralityPanelData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+                    onClick={(e) => { if(e.target === e.currentTarget) setViralityPanelData(null) }}>
+                    <div className="bg-[#0A0A14] rounded-2xl border border-[var(--sys-border)] shadow-2xl max-w-lg w-full overflow-hidden relative">
+                        <div className="p-3 border-b border-[var(--sys-border)] flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[#FF4D00]">local_fire_department</span>
+                                Virality Intelligence
+                            </h3>
+                            <button onClick={() => setViralityPanelData(null)} className="text-[var(--sys-text-muted)] hover:text-white transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+                        <div className="p-4 bg-[var(--sys-bg)] max-h-[80vh] overflow-y-auto">
+                            <div className="mb-4 rounded-xl overflow-hidden border border-[var(--sys-border)] bg-black flex justify-center">
+                                <img src={viralityPanelData.mediaUrl} alt="Analyzed Media" className="max-h-[300px] w-auto object-contain" />
+                            </div>
+                            <ViralityMiniPanel
+                                contentType="image"
+                                mediaUrl={viralityPanelData.mediaUrl}
+                                brandId={activeBrand?._id}
+                                platform="instagram"
+                                contentText={viralityPanelData.contentText}
+                            />
+                        </div>
                     </div>
                 </div>
             )}

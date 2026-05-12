@@ -15,6 +15,7 @@ async function api(path, opts = {}) {
     if (!data.success) throw new Error(data.error || 'Request failed')
     return data
 }
+import ViralityMiniPanel from '../ViralityMiniPanel'
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
@@ -25,6 +26,7 @@ const VIDEO_MODELS = [
     {value:'happyhorse-1.0',label:'HappyHorse 1.0',msIcon:'pets'},
     {value:'grok-imagine',label:'Grok Imagine',msIcon:'smart_toy'},
     {value:'kling-3.0',label:'Kling 3.0',msIcon:'videocam'},
+    {value:'kling-3.0-o',label:'Kling Omni',msIcon:'auto_awesome'},
     {value:'veo-3.1',label:'Veo 3.1',msIcon:'movie'},
     {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
     {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
@@ -499,24 +501,34 @@ function CfgMenu({ value, onChange, options, icon }) {
     </div>
 }
 
-function GridVideo({ project, onReuse }) {
+function GridVideo({ project, onReuse, activeBrand }) {
     const vRef = useRef(null)
     const [liked, setLiked] = useState(false)
+    const [viralityOpen, setViralityOpen] = useState(false)
+    const videoUrl = project.generation?.videoUrl
     return <div className="qv2-bi">
-        <video ref={vRef} src={project.generation.videoUrl} muted autoPlay loop playsInline />
+        <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
         <div className="qv2-bi-ov">
             <button className="qv2-bi-btn reuse" onClick={() => onReuse(project)}>
                 <span className="material-symbols-outlined" style={{fontSize: 14}}>replay</span>
                 Reuse
             </button>
-            <button className="qv2-bi-btn" onClick={() => onPublish(project.generation.videoUrl)}>
+            <button className="qv2-bi-btn" onClick={() => onPublish(videoUrl)}>
                 <span className="material-symbols-outlined" style={{fontSize: 14}}>share</span>
                 Publish
+            </button>
+            <button className="qv2-bi-btn" onClick={() => setViralityOpen(x => !x)} style={{ color: viralityOpen ? '#ff4d00' : undefined }}>
+                <span className="material-symbols-outlined" style={{fontSize: 16}}>local_fire_department</span>
             </button>
             <button className="qv2-bi-btn" onClick={() => setLiked(!liked)} style={{ color: liked ? '#ff4d85' : '#fff' }}>
                 <span className="material-symbols-outlined" style={{fontSize: 18, fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0"}}>{liked ? 'favorite' : 'favorite_border'}</span>
             </button>
         </div>
+        {viralityOpen && videoUrl && (
+            <div style={{ padding: '4px 8px 8px', background: 'rgba(0,0,0,0.7)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <ViralityMiniPanel contentType="video" mediaUrl={videoUrl} brandId={activeBrand?._id} platform="instagram" />
+            </div>
+        )}
     </div>
 }
 
@@ -901,6 +913,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                         <a href={job.videoUrl} download target="_blank" rel="noreferrer" style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '6px 12px', borderRadius: 8, textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>Download
                                         </a>
+                                        <ViralityMiniPanel contentType="video" mediaUrl={job.videoUrl} brandId={activeBrand?._id} platform="instagram" />
                                     </div>
                                 ) : job.status === 'generating' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0' }}>
@@ -996,11 +1009,16 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
                     <div style={{ flex: 1 }} />
 
-                    {/* Product block */}
-                    <button className={`scott-block-btn ${productUrl || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56 }}>
+                    {/* Product block — shows first image + count badge if multiple */}
+                    <button className={`scott-block-btn ${productUrl || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative' }}>
                         {productImgs?.[0] && <img src={productImgs[0]} className="scott-block-img" alt="" />}
                         <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
-                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>{productData ? 'READY' : 'PRODUCT'}</span>
+                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>{productData ? 'READY' : productImgs.length > 0 ? `${productImgs.length} IMG` : 'PRODUCT'}</span>
+                        {productImgs.length > 1 && (
+                            <span style={{ position: 'absolute', top: 3, right: 3, background: '#10b981', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
+                                {productImgs.length}
+                            </span>
+                        )}
                     </button>
 
                     {/* Avatar block */}
@@ -1019,7 +1037,31 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 </div>
             </div>
 
-            {/* Templates Row with Category Pills */}
+            {/* Product image strip — visible below the panel when multiple images are loaded */}
+            {productImgs.length > 1 && (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '6px 0 2px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: 1, textTransform: 'uppercase', flexShrink: 0 }}>
+                        {productImgs.length} reference images
+                    </span>
+                    {productImgs.map((u, i) => (
+                        <div key={i} style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+                            <img
+                                src={u}
+                                alt={`ref ${i + 1}`}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: i === 0 ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}
+                                onClick={() => setShowProduct(true)}
+                                title={`Image ${i + 1} — click to manage`}
+                            />
+                            <span style={{ position: 'absolute', bottom: 1, right: 1, background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: 7, fontWeight: 800, borderRadius: 3, padding: '1px 3px', lineHeight: 1.2 }}>
+                                @{i + 1}
+                            </span>
+                        </div>
+                    ))}
+                    <button onClick={() => setShowProduct(true)} style={{ background: 'transparent', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 6, width: 40, height: 40, color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                    </button>
+                </div>
+            )}
             {templates.length > 0 && !isGeneratingPrompts && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
@@ -1087,7 +1129,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                         .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }));
                     return [...sessionVideos, ...dbVideos];
                 })().map(p => (
-                    <GridVideo key={p._id} project={{ ...p, generation: { ...p.generation, videoUrl: p.generation?.videoUrl || p.finalVideoUrl } }} onReuse={handleReuse} />
+                    <GridVideo key={p._id} project={{ ...p, generation: { ...p.generation, videoUrl: p.generation?.videoUrl || p.finalVideoUrl } }} onReuse={handleReuse} activeBrand={activeBrand} />
                 ))}
             </div>
 

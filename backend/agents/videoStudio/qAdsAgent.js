@@ -17,6 +17,7 @@ import { loadBrandContext, callMultimodalAgent } from '../shared/agentUtils.js';
 import { callMcpToolsParallel } from '../../mcp/registry.js';
 import { getPresets } from '../../utils/qAdsCache.js';
 import { ANTISLOP_BANNED_WORDS, AGEBLIND_BANNED_WORDS } from './qAdsPresets.js';
+import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const MCP_TIMEOUT_MS = 5000;
 
@@ -121,9 +122,42 @@ RULE 12 — EXPLICIT PRODUCT PLACEMENT: State exactly where the product is in ev
 
 RULE 13 — IN MEDIAS RES DEFAULT: The ad is already in progress when it begins. Do not write "the ad opens with someone picking up the product." Write as if the camera arrived mid-action. The only exception is when the brief explicitly says "starts with."
 
-RULE 14 — NO BRAND NAMES OR TRADEMARKS: Never include the brand's name, product names, or any trademarked terms in the prompt. Refer to the product generically as "the product", "the bottle", "the device", etc. AI video models will block generations that contain brand names due to safety and copyright filters.
+RULE 14 — NO BRAND NAMES OR TRADEMARKS (CRITICAL — CAUSES IMMEDIATE REJECTION):
+Never include the brand's name, product names, OR product model/style names ANYWHERE in the prompt,
+including in WARDROBE and STYLE sections.
+AI video APIs block generations that contain brand names or product title strings due to copyright filters.
 
-RULE 15 — NO EXPLICIT/SENSITIVE WORDS: Never use words related to violence, weapons, nudity, or explicit content, even in a metaphorical sense (e.g., "shoots", "kills", "bomb", "naked", "blood"). Use safe, descriptive action verbs.
+  ❌ WRONG: "WARDROBE: wearing the ARABEYA BEIGE PANTSUIT"
+  ✅ CORRECT: "WARDROBE: wearing a tailored beige pantsuit with a cinched waist and wide-leg silhouette"
+
+  ❌ WRONG: "WARDROBE: dressed in the Elegant White Ruched Halter Cutout Midi Dress"
+  ✅ CORRECT: "WARDROBE: dressed in a white ruched halter midi dress with a front cutout detail"
+
+  ❌ WRONG: "WARDROBE: wearing the Charlotte Dress"
+  ✅ CORRECT: "WARDROBE: wearing a floral wrap dress with flutter sleeves and a midi hemline"
+
+  ❌ WRONG: "dressed in the Dolce & Gabbana Tailored Cream Blazer"
+  ✅ CORRECT: "dressed in a cream-colored tailored blazer with structured shoulders and a single-button front"
+
+Refer to ALL clothing by their generic descriptors ONLY: color + fabric + silhouette + construction details.
+NEVER use ALL-CAPS style tokens, Title Case product model names, or brand names.
+If the brand name or product model name appears in the user brief, ALWAYS replace it with a visual descriptor.
+
+RULE 15 — SAFE VOCABULARY (CRITICAL FOR ALL CATEGORIES):
+Never use words related to violence, weapons, nudity, or explicit content.
+Banned: "kills", "bomb", "gun", "blood", "naked", "nude", "sex".
+
+For FASHION, APPAREL, GARMENT and TEXTILE brands specifically:
+The word "shoot" and its variants are BANNED even in photography/production contexts — they trigger safety filters.
+Use these EXACT replacements instead:
+  ❌ NEVER say: "fashion shoot" → ✅ SAY: "fashion session"
+  ❌ NEVER say: "photo shoot"   → ✅ SAY: "photography session"
+  ❌ NEVER say: "video shoot"   → ✅ SAY: "video session"
+  ❌ NEVER say: "campaign shoot"→ ✅ SAY: "campaign session"
+  ❌ NEVER say: "the camera shoots" → ✅ SAY: "the camera captures" or "the lens frames"
+  ❌ NEVER say: "shooting footage" → ✅ SAY: "capturing footage"
+  ❌ NEVER say: "shooting the product" → ✅ SAY: "capturing the product"
+For clothing/garment description, safe verbs are: "drapes", "flows", "falls", "wraps", "hugs", "reveals", "emerges".
 
 ═══════════════════════════════════════════════════════
 SECTION 6 — CAMERA VOCABULARY
@@ -142,12 +176,11 @@ SECTION 7 — IMAGE REFERENCE SYSTEM
 ═══════════════════════════════════════════════════════
 If product or avatar images are provided, prepend a legend before the paragraph block using EXACTLY this format:
 
-<<<image_1>>> = product (extract from image: material, shape, label color, logo, distinguishing visual features)
-<<<image_2>>> = avatar (extract from image: wardrobe, build, delivery energy — NO age descriptors)
+${preset.isFashion || (brandContext || '').toLowerCase().includes('apparel') || (brandContext || '').toLowerCase().includes('garment') || (brandContext || '').toLowerCase().includes('fashion') || (brandContext || '').toLowerCase().includes('cloth') || (brandContext || '').toLowerCase().includes('dress') || (brandContext || '').toLowerCase().includes('wear') ? `<<<image_1>>> = garment (extract from image: fabric texture, primary color and any secondary colors, silhouette/cut, neckline style, sleeve style, hemline length, construction details e.g. ruching/pleating/seaming, embellishments, pattern, how it drapes on the body)\n<<<image_2>>> = avatar (extract from image: build, delivery energy, hair — NO age descriptors)` : `<<<image_1>>> = product (extract from image: material, shape, label color, logo placement, distinguishing visual features)\n<<<image_2>>> = avatar (extract from image: wardrobe, build, delivery energy — NO age descriptors)`}
 
 Then begin the paragraph on the next line.
 
-On FIRST MENTION of the product in the paragraph, write its label with the image tag in parentheses. Example: "the bottle (<<<image_1>>>)". After first mention, use the label only.
+On FIRST MENTION of the product/garment in the paragraph, write its label with the image tag in parentheses. Example: "the dress (<<<image_1>>>)". After first mention, use the label only.
 
 On FIRST MENTION of the avatar, same rule. Example: "the creator (<<<image_2>>>)". After first mention, use the label only.
 
@@ -194,16 +227,17 @@ OUTPUT IS:
 4. The prompt structured EXACTLY like this:
 
 STYLE: [Determine style dynamically based on brief and preset. MUST be "Photorealistic cinematic live-action" or "High-end UGC mobile phone footage" unless the user explicitly requests animation. NEVER hardcode 3D animation unless asked.]
-WARDROBE: [avatar clothing per shot range — match environment and brand.]
+WARDROBE: [Describe avatar clothing in GENERIC terms only — color + material + silhouette. NEVER use brand or product names. Write: "a white ruched halter midi dress" NOT "Elegant White Ruched Halter Cutout Midi Dress" — the latter is a product name.]
 ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
 MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
 
+${preset.register && (preset.register.toLowerCase().includes('dialogue') || preset.register.toLowerCase().includes('conversational') || preset.register.toLowerCase().includes('talks to') || preset.register.toLowerCase().includes('peer-to-peer') || preset.register.toLowerCase().includes('instructional') || (preset.group === 'creator' && !preset.register.toLowerCase().includes('no dialogue'))) ? 'DIALOGUE REQUIREMENT — this preset demands spoken words on camera:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nFormat: DIALOGUE: "[exact words the presenter says]"\nMake it natural, conversational, specific to this product. Not generic ad-speak.\nExample: DIALOGUE: "I literally wear this every event — the ruching hides everything."\n' : 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n'}
 ${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}SHOT 1 [00:00 - 00:02]: [Shot size + focal length] / [Camera move] / [Avatar action. Product reference if shown. ONE motion verb only.]
 SHOT 2 [00:02 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
 SHOT 3 [00:04 - 00:06]: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
 
-VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees. The prompt MUST NOT exceed 2200 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
+VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The prompt MUST NOT exceed 2200 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,8 +292,18 @@ function parseVariants(rawText) {
         const label = parts[j].toUpperCase();
         const body = (parts[j + 1] || '').trim();
         if (body.length > 30) {
-            // Strip legend lines from variant body if duplicated
-            const cleanBody = body.replace(/<<<image_\d+>>>\s*=.*\n?/g, '').trim();
+            // Step 1: Strip (<<<image_N>>>) PARENTHETICALS first
+            // The LLM often writes "the creator (<<<image_1>>>)" as a visual reference tag.
+            // After stripping the tag, we'd get "the creator (the model)" which is redundant/odd.
+            // Instead, remove the whole parenthetical — "the creator" is already the right noun.
+            let cleanBody = body
+                .replace(/\s*\(<<<image_\d+>>>\)/g, '')          // strip (<<<image_N>>>) parentheticals
+                .replace(/<<<image_(\d+)>>>'?s?\b/g, (m, n) => parseInt(n) === 1 ? 'the model' : 'the product')
+                .replace(/<<<image_(\d+)>>>/g, (m, n) => parseInt(n) === 1 ? 'the model' : 'the product')
+                // Step 2: Strip legend header lines (<<<image_N>>> = ... lines)
+                .replace(/<<<image_\d+>>>\s*=.*\n?/g, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
             variants.push({ variantId: label, prompt: cleanBody, legend });
         }
     }
@@ -430,6 +474,60 @@ export async function runQAdsAgent({
 
     console.log(`[Q-Ads Agent] Complete — ${variants.length} variants generated`);
     variants.forEach(v => console.log(`[Q-Ads Agent] Variant ${v.variantId}: ${v.prompt.split(/\s+/).length} words`));
+
+    // 🧹 Post-generation cleanup — two-pass fix for real submission failures:
+    //
+    // Pass 1: Brand-name stripping (RC#2)
+    //   Even with RULE 14, LLMs bleed brand names into WARDROBE / STYLE sections.
+    //   Pattern: a WARDROBE/WEARING line that starts with an ALL-CAPS brand token
+    //   e.g. "wearing the ARABEYA BEIGE PANTSUIT" → "wearing the beige pantsuit"
+    //   Strategy: remove the leading ALL_CAPS sequences from WARDROBE descriptions
+    //   and lowercase the remainder so the product reads as generic.
+    //
+    // Pass 2: Curly-brace stripping (RC#4)
+    //   "{no watermark, clean background}" is parsed as template syntax by Atlas NLP.
+    //
+    // Pass 3: promptSanitizer (RC#1 vocab, RC#4 char limit, RC#5 phantom tags)
+
+    function stripBrandNamesFromPrompt(text) {
+        return text
+            // Pass A: Strip { } template blocks
+            .replace(/\{[^}]{0,300}\}/g, '')
+
+            // Pass B: ALL-CAPS brand tokens in WARDROBE / wearing contexts
+            // e.g. "WARDROBE: wearing the ARABEYA BEIGE PANTSUIT" → "WARDROBE: wearing the beige pantsuit"
+            .replace(/(WARDROBE\s*:\s*|\bwearing\s+(?:the\s+)?|\bworn\s+(?:in\s+)?)([A-Z]{2,}(?:\s+[A-Z]{2,})+)/g,
+                (_, prefix, brandToken) => `${prefix}${brandToken.toLowerCase()}`)
+            .replace(/\b(?:wearing|dressed in|in the|the)\s+([A-Z]{3,}(?:\s+[A-Z]{3,})+)\b/g,
+                (_, brand) => `the ${brand.toLowerCase()}`)
+
+            // Pass C: Title Case brand tokens in WARDROBE lines
+            // Catches "WARDROBE: Elegant White Ruched Halter Cutout Midi Dress throughout"
+            // Pattern: WARDROBE: followed by 3+ consecutive Title-Case words (likely a product/garment name)
+            // Replace with "a [lowercased descriptors]" to keep the style description but remove the proper noun feel
+            .replace(/\bWARDROBE\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,})/g,
+                (_, garmentName) => `WARDROBE: a ${garmentName.toLowerCase()}`)
+
+            // Pass D: Fix broken possessives left when <<<image_N>>> was stripped inline
+            // e.g. "runs hands over 's ruched fabric" → "runs hands over the model's ruched fabric"
+            .replace(/\bower\s+'s\b/g, "over the model's")
+            .replace(/\bof\s+'s\b/g, "of the model's")
+            .replace(/\b(?:the\s+)?'s\s+/g, "the model's ")
+
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
+    variants = variants.map(v => {
+        // Pass 1 & 2: brand names + curly braces
+        let p = stripBrandNamesFromPrompt(v.prompt);
+        // Pass 3: vocab sanitizer (shoot→capture, char limit, phantom @image tags)
+        const { prompt: cleanPrompt, warnings } = sanitizePromptForProvider(p, 'atlascloud', 0);
+        if (warnings.length > 0) {
+            console.warn(`[Q-Ads Agent] Post-gen sanitizer fixed Variant ${v.variantId}: ${warnings.join('; ')}`);
+        }
+        return { ...v, prompt: cleanPrompt };
+    });
 
     return {
         variants,

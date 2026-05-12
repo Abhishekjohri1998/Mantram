@@ -1013,21 +1013,34 @@ export async function ugcProductGroundingNode(state) {
     const userPrompt = [
         `Analyse this product for UGC video creation.`,
         textContext ? `\nPRODUCT INFO:\n${textContext}` : '',
-        productImages.length > 0 ? `\n${productImages.length} product images available (URLs provided for reference, not for visual analysis).` : '',
+        productImages.length > 0 ? `\n${productImages.length} product image(s) are available for visual analysis.` : '',
     ].filter(Boolean).join('');
 
+    // Fashion/apparel detection: always use multimodal for garments even when text exists.
+    // Text descriptions on e-commerce sites are generic ("Elegant midi dress").
+    // Only images reveal the fabric texture, ruching details, neckline geometry, drape — all of which
+    // Seedance needs to faithfully recreate the garment across frames.
+    const fashionKeywords = ['apparel', 'garment', 'fashion', 'cloth', 'dress', 'wear', 'outfit', 'blouse', 'skirt', 'top', 'trouser', 'jeans', 'kurta', 'saree', 'lehenga', 'jacket', 'coat', 'suit'];
+    const isFashionProduct = fashionKeywords.some(kw =>
+        textContext.toLowerCase().includes(kw) ||
+        (state.productData?.category || '').toLowerCase().includes(kw)
+    );
+
     let result;
-    // FAST PATH: Always use text-only agent when we have rich text context (JSON-LD, OG tags).
-    // Multimodal Gemini Vision with 3+ images takes 15-30s vs 2-3s for text-only.
-    // Only use multimodal as absolute last resort (no text at all, only images).
+    // FAST PATH: text-only for non-fashion products with rich text.
+    // VISION PATH: always for fashion (garment details require visual analysis), or when text is minimal.
     const hasRichText = textContext.length > 100;
-    if (!hasRichText && productImages.length > 0) {
-        // Minimal text — need vision to understand the product (use max 1 image for speed)
-        console.log(`[UGC Node] Using multimodal (minimal text: ${textContext.length} chars, ${productImages.length} imgs)`);
+    const needsVision = isFashionProduct || !hasRichText;
+    if (needsVision && productImages.length > 0) {
+        const reasonLabel = isFashionProduct ? 'fashion product — garment visual DNA requires vision' : 'minimal text';
+        console.log(`[UGC Node] Using multimodal vision (${reasonLabel}: ${textContext.length} chars, ${productImages.length} imgs)`);
+        const garmentSystemPrompt = isFashionProduct
+            ? UGC_PRODUCT_GROUNDING_PROMPT + '\n\nIMPORTANT: This is a GARMENT/APPAREL product. When analysing the image, extract:\n- Exact fabric type and texture (silk, cotton, crepe, chiffon, etc.)\n- Primary color(s) and any pattern (solid, floral, printed, striped, etc.)\n- Silhouette and cut (fitted, A-line, bodycon, flowy, oversized, etc.)\n- Neckline (halter, V-neck, crew, sweetheart, off-shoulder, etc.)\n- Sleeve type (sleeveless, short, long, flutter, puff, etc.)\n- Hemline (mini, midi, maxi, asymmetric, etc.)\n- Construction details visible in image (ruching, pleating, cutouts, ruffles, smocking, embroidery, buttons, zipper, tie, belt, etc.)\n- How the fabric drapes and moves\nDo NOT use generic terms like "elegant dress". Extract the specific observable visual details.'
+            : UGC_PRODUCT_GROUNDING_PROMPT;
         result = await agentUtils.callMultimodalAgent(
-            UGC_PRODUCT_GROUNDING_PROMPT,
+            garmentSystemPrompt,
             userPrompt,
-            productImages.slice(0, 1),
+            productImages.slice(0, 2), // Use up to 2 product images for garments
             { temperature: 0.2, maxTokens: 2048 }
         );
     } else {

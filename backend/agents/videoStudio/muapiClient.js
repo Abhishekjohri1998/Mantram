@@ -6,6 +6,8 @@
  * Pattern: POST submit → GET poll (async)
  */
 
+import { sanitizePromptForProvider } from './promptSanitizer.js';
+
 const MUAPI_BASE_URL = 'https://api.muapi.ai/api/v1';
 
 function getMuApiKey() {
@@ -149,42 +151,38 @@ export async function submitMuApiVideoGeneration({
         payload.images_list = imagesList;
         console.log(`📸 [MuAPI] Final images_list (${imagesList.length} total):`, imagesList.map(u => u.substring(0, 60)));
 
-        // Prompt Auto-Tagging & Hard Length Guard (4,000 chars)
-        let finalPrompt = finalPromptText;
-        if (finalPrompt.length > 4000) {
-            console.warn(`🛑 MuAPI prompt exceeds 4,000 chars (${finalPrompt.length}). Truncating for technical compatibility.`);
-            finalPrompt = finalPrompt.substring(0, 4000);
-            const lastPeriod = finalPrompt.lastIndexOf('.');
-            if (lastPeriod > 3500) finalPrompt = finalPrompt.substring(0, lastPeriod + 1);
+        // 🧹 Context-aware sanitization (RC#1, RC#4, RC#5):
+        //  - Replaces fashion-unsafe words (e.g. "shoot" → "capture") without breaking meaning
+        //  - Strips @imageN tags where N > actual image count (prevents 400 errors)
+        //  - Hard-enforces 3,800-char limit (MuAPI hard limit is 4,000; using 3,800 for safety)
+        const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
+            finalPromptText, 'muapi', imagesList.length
+        );
+        if (sanitizerWarnings.length > 0) {
+            console.warn(`⚠️ [MuAPI Sanitizer] ${sanitizerWarnings.join(' | ')}`);
         }
-        
+        let finalPrompt = sanitizedPrompt;
+
+        // Auto-tag any images not already referenced in the prompt
         const untaggedIndices = [];
         for (let i = 1; i <= imagesList.length; i++) {
             if (!finalPrompt.includes(`@image${i}`)) untaggedIndices.push(`@image${i}`);
         }
         if (untaggedIndices.length > 0) {
-            finalPrompt += ` (Visual reference: ${untaggedIndices.join(', ')})`;
-            console.log(`📝 [MuAPI] Auto-tagged prompt: ${finalPrompt}`);
-        }
-        
-        // SECURE: Strip any @imageX tags that exceed the number of images we actually have
-        // Example: If prompt has @image7 but we only uploaded 3, remove @image7 to prevent 500 errors
-        finalPrompt = finalPrompt.replace(/@image(\d+)/gi, (match, p1) => {
-            const index = parseInt(p1, 10);
-            if (index > imagesList.length) {
-                console.warn(`🛑 Removing invalid tag ${match} from prompt (only ${imagesList.length} images provided)`);
-                return ''; // remove the tag
+            // Only add tags if we have room within the limit
+            const tagLine = ` (Visual reference: ${untaggedIndices.join(', ')})`;
+            if (finalPrompt.length + tagLine.length <= 3800) {
+                finalPrompt += tagLine;
+                console.log(`📝 [MuAPI] Auto-tagged missing image refs: ${untaggedIndices.join(', ')}`);
             }
-            return match; // keep the tag
-        }).replace(/\s{2,}/g, ' ').trim(); // clean double spaces
+        }
 
         payload.prompt = finalPrompt;
     } else {
-        // TEXT-TO-VIDEO ONLY: Strictly remove any @image tags that might have leaked from prompt enhancement
-        // This prevents "Prompt references @image1 but only 0 image(s) provided" MuAPI error.
-        let cleanPrompt = prompt.trim().replace(/@image\d+/gi, '').replace(/\(\s*Visual reference:\s*\)/g, '').trim();
-        payload.prompt = cleanPrompt;
-        console.log(`📝 [MuAPI] T2V Clean Prompt: ${cleanPrompt}`);
+        // TEXT-TO-VIDEO: strip all @image tags and sanitize fashion vocabulary
+        const { prompt: cleanT2V } = sanitizePromptForProvider(prompt.trim(), 'muapi', 0);
+        payload.prompt = cleanT2V;
+        console.log(`📝 [MuAPI] T2V Clean Prompt (${cleanT2V.length} chars): ${cleanT2V.substring(0, 120)}...`);
     }
 
     console.log(`🎬 [MuAPI] Submitting to ${endpoint} | Payload keys: ${Object.keys(payload).join(', ')}`);
