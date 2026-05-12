@@ -4006,7 +4006,7 @@ Write the detailed video prompt now:`;
         parts.push({ text: promptText });
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-pro-exp-02-05', 'gemini-1.5-pro'];
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'];
         
         let data = null;
         let lastError = null;
