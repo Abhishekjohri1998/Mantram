@@ -1240,7 +1240,7 @@ export default function VideoStudio() {
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {studioMode === 'q-ads' && (
-                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}

@@ -106,24 +106,32 @@ const css = `
     background: rgba(255,255,255,0.15);
     backdrop-filter: blur(4px);
     border: none;
-    border-radius: 50%;
-    width: 32px; height: 32px;
+    border-radius: 16px;
+    height: 28px;
     display: flex; align-items: center; justify-content: center;
     color: #fff;
     cursor: pointer;
     transition: all 0.2s;
-}
-.qv2-bi-btn:hover {
-    background: rgba(255,255,255,0.3);
-    transform: scale(1.1);
-}
-.qv2-bi-btn.reuse {
-    border-radius: 16px;
-    width: auto;
-    padding: 0 12px;
+    padding: 0 10px;
     font-size: 11px;
     font-weight: 700;
     gap: 4px;
+}
+.qv2-bi-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.05);
+}
+.qv2-bi-btn.preview-btn {
+    background: rgba(255, 77, 0, 0.6);
+}
+.qv2-bi-btn.preview-btn:hover {
+    background: rgba(255, 77, 0, 0.85);
+}
+.qv2-bi-btn.template-btn {
+    background: rgba(99, 102, 241, 0.5);
+}
+.qv2-bi-btn.template-btn:hover {
+    background: rgba(99, 102, 241, 0.8);
 }
 .qv2-lay {
     width: 100%;
@@ -515,38 +523,115 @@ function CfgMenu({ value, onChange, options, icon }) {
     </div>
 }
 
-function GridVideo({ project, onReuse, activeBrand }) {
+// ── Save as Template Form (used in admin modal) ─────────────────────────────
+function SaveTemplateForm({ project, onClose, api: apiFn }) {
+    const [name, setName] = useState(project.title || 'Q-Ads Video Template')
+    const [categories, setCategories] = useState([])
+    const [categoryId, setCategoryId] = useState('')
+    const [description, setDescription] = useState('')
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState('')
+    const [success, setSuccess] = useState(false)
+
+    useEffect(() => {
+        apiFn('/superadmin/templates/categories').then(d => {
+            if (d.categories) setCategories(d.categories)
+        }).catch(() => {})
+    }, [apiFn])
+
+    const handleSave = async (e) => {
+        e.preventDefault()
+        if (!name.trim() || !categoryId) return setError('Name and category are required')
+        setSaving(true)
+        setError('')
+        try {
+            await apiFn('/superadmin/templates/promote-from-job', {
+                method: 'POST',
+                body: JSON.stringify({
+                    sourceJobId: project._id,
+                    sourceType: 'VideoProject',
+                    name: name.trim(),
+                    categoryId,
+                    description,
+                    studioOrigin: 'video',
+                    tags: ['q-ads', 'video'],
+                })
+            })
+            setSuccess(true)
+            setTimeout(() => onClose(), 1500)
+        } catch (err) {
+            setError(err.message || 'Failed to save template')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    if (success) {
+        return (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 48, color: '#22c55e', marginBottom: 8 }}>check_circle</span>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Saved as template draft!</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Activate it in Super Admin › Template Manager</p>
+            </div>
+        )
+    }
+
+    return (
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Video preview thumbnail */}
+            {project.generation?.videoUrl && (
+                <div style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '16/9', maxHeight: 160, background: '#000' }}>
+                    <video src={project.generation.videoUrl} muted autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+            )}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Template Name
+                <input value={name} onChange={e => setName(e.target.value)} required style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Category
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }}>
+                    <option value="">Select Category</option>
+                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Description (optional)
+                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Short description..." style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }} />
+            </label>
+            {error && <p style={{ color: '#ef4444', fontSize: 12, margin: 0 }}>{error}</p>}
+            <button type="submit" disabled={saving} style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.7 : 1, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{saving ? 'progress_activity' : 'bookmark_add'}</span>
+                {saving ? 'Saving...' : 'Save as Template'}
+            </button>
+        </form>
+    )
+}
+
+function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     const vRef = useRef(null)
-    const [liked, setLiked] = useState(false)
-    const [viralityOpen, setViralityOpen] = useState(false)
     const videoUrl = project.generation?.videoUrl
     return <div className="qv2-bi">
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
         <div className="qv2-bi-ov">
-            <button className="qv2-bi-btn reuse" onClick={() => onReuse(project)}>
-                <span className="material-symbols-outlined" style={{fontSize: 14}}>replay</span>
-                Reuse
+            <button className="qv2-bi-btn preview-btn" onClick={() => onPreview(videoUrl)}>
+                <span className="material-symbols-outlined" style={{fontSize: 14}}>play_circle</span>
+                Preview
             </button>
-            <button className="qv2-bi-btn" onClick={() => onPublish(videoUrl)}>
-                <span className="material-symbols-outlined" style={{fontSize: 14}}>share</span>
-                Publish
-            </button>
-            <button className="qv2-bi-btn" onClick={() => setViralityOpen(x => !x)} style={{ color: viralityOpen ? '#ff4d00' : undefined }}>
-                <span className="material-symbols-outlined" style={{fontSize: 16}}>local_fire_department</span>
-            </button>
-            <button className="qv2-bi-btn" onClick={() => setLiked(!liked)} style={{ color: liked ? '#ff4d85' : '#fff' }}>
-                <span className="material-symbols-outlined" style={{fontSize: 18, fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0"}}>{liked ? 'favorite' : 'favorite_border'}</span>
-            </button>
+            {isAdmin && (
+                <button className="qv2-bi-btn template-btn" onClick={() => onSaveTemplate(project)}>
+                    <span className="material-symbols-outlined" style={{fontSize: 14}}>bookmark_add</span>
+                    Template
+                </button>
+            )}
         </div>
-        {viralityOpen && videoUrl && (
-            <div style={{ padding: '4px 8px 8px', background: 'rgba(0,0,0,0.7)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <ViralityMiniPanel contentType="video" mediaUrl={videoUrl} brandId={activeBrand?._id} platform="instagram" />
-            </div>
-        )}
     </div>
 }
 
-export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId, canCreateVideo = true, onUpgradeRequired }) {
+export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId, canCreateVideo = true, onUpgradeRequired, user }) {
+    const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
+    const [previewVideo, setPreviewVideo] = useState(null)
+    const [savingTemplate, setSavingTemplate] = useState(null)
     const [categories, setCategories] = useState([])
     const [presets, setPresets] = useState([])
     const [templates, setTemplates] = useState([])
@@ -1263,11 +1348,50 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                         .map(([variantId, j]) => ({ _id: variantId, title: `Variant ${variantId}`, generation: { videoUrl: j.videoUrl }, studioMode: 'q-ads-v2' }));
                     return [...sessionVideos, ...dbVideos];
                 })().map(p => (
-                    <GridVideo key={p._id} project={{ ...p, generation: { ...p.generation, videoUrl: p.generation?.videoUrl || p.finalVideoUrl } }} onReuse={handleReuse} activeBrand={activeBrand} />
+                    <GridVideo key={p._id} project={{ ...p, generation: { ...p.generation, videoUrl: p.generation?.videoUrl || p.finalVideoUrl } }} onPreview={setPreviewVideo} onSaveTemplate={setSavingTemplate} isAdmin={isAdmin} />
                 ))}
             </div>
 
         </div>
+
+        {/* ── Video Preview Modal ── */}
+        {previewVideo && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
+                <div style={{ position: 'relative', maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
+                    <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                    <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
+                        <a href={previewVideo} download="q-ads-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
+                        </a>
+                        <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ── Save as Template Modal (Admin Only) ── */}
+        {savingTemplate && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSavingTemplate(null)}>
+                <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24 }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#6366f1' }}>bookmark_add</span>
+                            Save as Q-Ads Template
+                        </h2>
+                        <button onClick={() => setSavingTemplate(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <SaveTemplateForm
+                        project={savingTemplate}
+                        onClose={() => setSavingTemplate(null)}
+                        api={api}
+                    />
+                </div>
+            </div>
+        )}
 
         {/* Product Modal */}
         {showProduct && (
