@@ -102,12 +102,56 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
     }
 }
 
+// ── Image Pre-Processing (format + resolution) ──────────────────────────────
+// Atlas Cloud requires ALL images to be:
+//   - Format: jpeg, jpg, png, bmp, webp (NOT avif, tiff, svg, heic)
+//   - Resolution: at least 300x300 pixels
+// This helper fetches, converts, and re-uploads to S3 if needed.
+
+async function ensureAssetCompatible(imageUrl) {
+    if (!imageUrl || !imageUrl.startsWith('http')) return imageUrl;
+    try {
+        const res = await fetch(imageUrl);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const contentType = res.headers.get('content-type') || '';
+        const meta = await sharp(buffer).metadata();
+
+        const UNSUPPORTED_FORMATS = ['avif', 'tiff', 'svg', 'heic', 'heif'];
+        const needsConvert = UNSUPPORTED_FORMATS.some(f => contentType.includes(f));
+        const needsResize = (meta.width || 0) < 300 || (meta.height || 0) < 300;
+
+        if (!needsConvert && !needsResize) return imageUrl; // already compatible
+
+        let pipeline = sharp(buffer);
+        if (needsResize) {
+            const scale = Math.max(300 / (meta.width || 300), 300 / (meta.height || 300));
+            const newW = Math.max(300, Math.ceil((meta.width || 300) * scale));
+            const newH = Math.max(300, Math.ceil((meta.height || 300) * scale));
+            pipeline = pipeline.resize(newW, newH, { fit: 'fill' });
+            console.log(`📐 [Atlas Prep] Upscaling ${meta.width}x${meta.height} → ${newW}x${newH}`);
+        }
+        if (needsConvert) {
+            console.log(`🔄 [Atlas Prep] Converting ${contentType} → JPEG`);
+        }
+        const processed = await pipeline.jpeg({ quality: 92 }).toBuffer();
+        const s3Key = `video-studio/asset-prep/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const s3Url = await uploadToS3(processed, s3Key, 'image/jpeg');
+        console.log(`✅ [Atlas Prep] Ready: ${s3Url.substring(0, 70)}`);
+        return s3Url;
+    } catch (e) {
+        console.warn(`⚠️ [Atlas Prep] Pre-processing failed: ${e.message} — using original`);
+        return imageUrl;
+    }
+}
+
 // ── Media Upload (to Atlas native CDN — used for I2V first-frame) ─────────────
 
 async function uploadMediaToAtlasCDN(imageUrl) {
     try {
         console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${imageUrl.substring(0, 60)}...`);
-        const imageRes = await fetch(imageUrl);
+        // Pre-process: ensure format + resolution are compatible before CDN upload
+        const compatibleUrl = await ensureAssetCompatible(imageUrl);
+        const imageRes = await fetch(compatibleUrl);
         const arrayBuffer = await imageRes.arrayBuffer();
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         
@@ -157,11 +201,13 @@ async function uploadMediaToAtlasCDN(imageUrl) {
 
 async function uploadFaceAsset(imageUrl, name = 'face_ref') {
     try {
-        console.log(`👤 [Atlas Asset] Registering face asset: ${imageUrl.substring(0, 80)}...`);
+        // Pre-process: convert unsupported formats + ensure min 300x300 resolution
+        const compatibleUrl = await ensureAssetCompatible(imageUrl);
+        console.log(`👤 [Atlas Asset] Registering face asset: ${compatibleUrl.substring(0, 80)}...`);
         const res = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets`, {
             method: 'POST',
             headers: authHeaders(),
-            body: JSON.stringify({ url: imageUrl, name }),
+            body: JSON.stringify({ url: compatibleUrl, name }),
         });
         const json = await res.json();
         const assetId       = json?.data?.id || json?.id;
@@ -364,16 +410,20 @@ export async function submitAtlasCloudVideoGeneration({
     const faceS3Urls   = []; // face reference images (will be converted to asset:// URIs)
     const firstFrameUrls = []; // scene first-frame anchor
 
-    // Step 1 — ensure first-frame anchor is on S3
+    // Step 1 — ensure first-frame anchor is on S3 + compatible
     if (imageUrl) {
-        const url = await ensureS3Url(imageUrl, 'video-studio/atlascloud');
+        const s3Url = await ensureS3Url(imageUrl, 'video-studio/atlascloud');
+        const url = s3Url ? await ensureAssetCompatible(s3Url) : null;
         if (url) { firstFrameUrls.push(url); console.log(`📸 First frame anchor ready: ${url.substring(0, 60)}`); }
     }
 
-    // Step 2 — ensure all face refs are on S3 first
+    // Step 2 — ensure all face refs are on S3 AND compatible (format + 300x300 min)
     if (referenceImages && referenceImages.length > 0) {
-        console.log(`📸 Ensuring ${referenceImages.length} face ref(s) on S3...`);
-        const uploaded = await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud')));
+        console.log(`📸 Ensuring ${referenceImages.length} face ref(s) on S3 + compatible...`);
+        const uploaded = await Promise.all(referenceImages.map(async img => {
+            const s3Url = await ensureS3Url(img, 'video-studio/atlascloud');
+            return s3Url ? await ensureAssetCompatible(s3Url) : null;
+        }));
         uploaded.forEach(url => { if (url) faceS3Urls.push(url); });
     }
 
@@ -613,12 +663,16 @@ export async function submitHappyHorseVideoGeneration({
     const s3RefImages = [];
 
     if (imageUrl) {
-        const url = await ensureS3Url(imageUrl, 'video-studio/happyhorse');
+        const s3Url = await ensureS3Url(imageUrl, 'video-studio/happyhorse');
+        const url = s3Url ? await ensureAssetCompatible(s3Url) : null;
         if (url) s3ImageUrls.push(url);
     }
 
     if (referenceImages && referenceImages.length > 0) {
-        const uploaded = await Promise.all(referenceImages.map(img => ensureS3Url(img, 'video-studio/happyhorse')));
+        const uploaded = await Promise.all(referenceImages.map(async img => {
+            const s3Url = await ensureS3Url(img, 'video-studio/happyhorse');
+            return s3Url ? await ensureAssetCompatible(s3Url) : null;
+        }));
         uploaded.forEach(url => { if (url) s3RefImages.push(url); });
     }
 
