@@ -717,6 +717,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             const d = await api('/video-studio/ugc-pro/analyze-product', { method: 'POST', body: form, headers: {} })
             setProductData(d.productData)
             setProductImgs(d.productImageUrls || [])
+            setShowProduct(false) // Auto-close modal after successful analysis
         } catch (e) { setError(e.message) }
         setIsAnalyzing(false)
     }, [productUrl, activeBrand])
@@ -1010,7 +1011,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     <div style={{ flex: 1 }} />
 
                     {/* Product block — shows first image + count badge if multiple */}
-                    <button className={`scott-block-btn ${productUrl || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative' }}>
+                    <button className={`scott-block-btn ${productData || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative' }}>
                         {productImgs?.[0] ? (
                             <>
                                 <img src={productImgs[0]} className="scott-block-img" alt="" style={{ opacity: 1 }} />
@@ -1020,10 +1021,15 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                     </span>
                                 )}
                             </>
+                        ) : productData ? (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))', borderRadius: 8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#10b981', zIndex: 2 }}>check_circle</span>
+                                <span style={{ zIndex: 2, fontSize: 8, letterSpacing: 0.5, color: '#10b981', fontWeight: 700, marginTop: 2, maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{(productData.productName || 'READY').substring(0, 8)}</span>
+                            </div>
                         ) : (
                             <>
                                 <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
-                                <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>{productData ? 'READY' : 'PRODUCT'}</span>
+                                <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>PRODUCT</span>
                             </>
                         )}
                     </button>
