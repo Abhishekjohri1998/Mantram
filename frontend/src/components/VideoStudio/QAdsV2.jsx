@@ -594,8 +594,13 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
     // Per-variant video generation state
     // { A: { status, progress, videoUrl, jobId, error }, B: {...}, C: {...} }
-    const [videoJobs, setVideoJobs] = useState({})
+    const [videoJobs, setVideoJobs] = useState({}) // { [variantId]: { status, progress, videoUrl, jobId } }
     const pollRefs = useRef({})
+
+    // Fetch history on mount to ensure latest projects are visible (especially if user switched tabs and returned)
+    useEffect(() => {
+        if (onVideoComplete) onVideoComplete();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [error, setError] = useState(null)
 
@@ -738,7 +743,12 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             if (activeBrand?._id) form.append('brandId', activeBrand._id)
             const d = await api('/video-studio/ugc-pro/analyze-product', { method: 'POST', body: form, headers: {} })
             setProductData(d.productData)
-            setProductImgs(d.productImageUrls || [])
+            setProductImgs(prev => {
+                const newImgs = d.productImageUrls || [];
+                const merged = [...prev];
+                newImgs.forEach(img => { if (!merged.includes(img)) merged.push(img) });
+                return merged;
+            });
             setShowProduct(false) // Auto-close modal after successful analysis
         } catch (e) { setError(e.message) }
         setIsAnalyzing(false)
@@ -790,7 +800,10 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 form.append('productUrl', productUrl)
                 if (activeBrand?._id) form.append('brandId', activeBrand._id)
                 const d = await api('/video-studio/ugc-pro/analyze-product', { method: 'POST', body: form, headers: {} })
-                pData = d.productData; pImgs = d.productImageUrls || []
+                pData = d.productData;
+                const newImgs = d.productImageUrls || [];
+                pImgs = [...pImgs];
+                newImgs.forEach(img => { if (!pImgs.includes(img)) pImgs.push(img) });
                 setProductData(pData); setProductImgs(pImgs)
             }
 
@@ -964,7 +977,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             )}
 
             {/* Scott Panel — two row layout */}
-            <div className="scott-panel" style={{ flexDirection: 'column', gap: 8, padding: '12px 16px' }}>
+            <div className="scott-panel" style={{ flexDirection: 'column', gap: 8, padding: '12px 16px', maxWidth: '1050px' }}>
 
                 {/* Row 1: Brief input */}
                 <div className="scott-input-wrapper" style={{ width: '100%' }}>

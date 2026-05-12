@@ -850,6 +850,8 @@ export default function VideoStudio() {
 
     // Filter projects based on active tab
     const filteredProjects = projects.filter(p => {
+        if (p.studioMode === 'q-ads-v2') return false; // Hide Q-Ads videos from main history
+        
         const hasVideo = !!p.generation?.videoUrl;
         const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
         const isCompleted = p.status === 'done' || p.status === 'critique' || p.status === 'completed' || hasVideo;
