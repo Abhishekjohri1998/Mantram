@@ -504,6 +504,39 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         // If provider !== 'grok', it will fall through to fal.ai routing below.
     }
 
+    // Kling models — route directly to LaoZhang
+    if (model === 'kling-3.0' || model === 'kling-3.0-o') {
+        console.log(`🎬 [Kling] Routing to LaoZhang instead of fal.ai...`);
+        if (!isLaozhangAvailable()) {
+            throw new Error(`Kling generation requires LaoZhang API key, but it is not configured.`);
+        }
+        try {
+            const lzResult = await submitLaozhangVideoGeneration({
+                model, 
+                prompt: safePrompt, 
+                imageUrl: s3ImageUrl,
+                duration, 
+                aspectRatio: aspectRatio || '16:9',
+                generateAudio: generateAudio !== false,
+                referenceImages: s3ReferenceImages.filter(Boolean)
+            });
+            if (lzResult?.videoUrl) {
+                return {
+                    requestId: `lz-${Date.now()}`, 
+                    endpoint: `laozhang-${model}`,
+                    statusUrl: null, 
+                    resultUrl: null, 
+                    provider: 'laozhang',
+                    _laozhangVideoUrl: lzResult.videoUrl,
+                };
+            }
+            throw new Error(`LaoZhang returned an empty video URL`);
+        } catch (err) {
+            console.error(`❌ [Kling] LaoZhang submission failed: ${err.message}`);
+            throw new Error(`Kling generation via LaoZhang failed: ${err.message}`);
+        }
+    }
+
     // HappyHorse 1.0 — routes directly to Atlas Cloud
     if (model === 'happyhorse-1.0') {
         console.log(`🐴 [HappyHorse 1.0] Routing to Atlas Cloud...`);

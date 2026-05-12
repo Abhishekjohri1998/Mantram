@@ -5334,24 +5334,41 @@ router.get('/:id/status', protect, async (req, res) => {
                             console.log(`✅ Safe Mode: Kling 3.0 task submitted: ${klingResult.requestId}`);
                             
                             // Update project with Kling generation details and switch status back to generating
-                            updated.status = project.mode === 'advanced' ? 'advanced-generating' : 'generating';
+                            // Update project with Kling generation details
+                            const isLaozhangSync = !!klingResult._laozhangVideoUrl;
+                            updated.status = isLaozhangSync ? 'completed' : (project.mode === 'advanced' ? 'advanced-generating' : 'generating');
+                            
                             updated.generation = {
                                 falRequestId: klingResult.requestId,
                                 falEndpoint: klingResult.endpoint,
                                 falStatusUrl: klingResult.statusUrl,
                                 falResultUrl: klingResult.resultUrl,
                                 provider: klingResult.provider || 'fal',
-                                progress: 5,
+                                _laozhangVideoUrl: klingResult._laozhangVideoUrl || null,
+                                videoUrl: klingResult._laozhangVideoUrl || '',
+                                progress: isLaozhangSync ? 100 : 5,
                                 startedAt: new Date(),
+                                ...(isLaozhangSync ? { completedAt: new Date() } : {}),
                                 error: '',
                             };
+                            
+                            if (isLaozhangSync) {
+                                updated.finalVideoUrl = klingResult._laozhangVideoUrl;
+                            }
                             
                             // Save the pivot back to the DB immediately
                             await VideoProject.findByIdAndUpdate(project._id, {
                                 status: updated.status,
                                 generation: updated.generation,
+                                ...(isLaozhangSync ? { finalVideoUrl: updated.finalVideoUrl } : {}),
                                 'routing.selectedModel': 'kling-3.0'
                             });
+                            
+                            if (isLaozhangSync) {
+                                // Fire and forget async download to S3
+                                downloadAndUploadVideoToS3(project._id.toString(), klingResult._laozhangVideoUrl)
+                                    .catch(err => console.error(`[SafeMode] LaoZhang async S3 upload failed for ${project._id}:`, err.message));
+                            }
                             
                         } catch (fallbackErr) {
                             console.error(`❌ Safe Mode Kling fallback failed: ${fallbackErr.message}`);
