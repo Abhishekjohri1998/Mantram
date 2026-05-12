@@ -60,7 +60,10 @@ function resolveModelName(qualityMode, imageCount) {
 }
 
 function resolveHappyHorseModelName(imageCount) {
-    // HappyHorse 1.0 model slugs
+    // HappyHorse 1.0 model slugs on Atlas Cloud — per docs:
+    //   alibaba/happyhorse-1.0/text-to-video
+    //   alibaba/happyhorse-1.0/image-to-video
+    //   alibaba/happyhorse-1.0/reference-to-video
     if (imageCount > 1) {
         console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
         return 'alibaba/happyhorse-1.0/reference-to-video';
@@ -213,6 +216,11 @@ async function submitAtlasCloudPayload(payload) {
     const isI2V = atlasModel.includes('image-to-video');
     const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
 
+    // HappyHorse uses uppercase resolution ('720P', '1080P') per Atlas Cloud docs
+    const isHappyHorse = atlasModel.includes('happyhorse');
+    const rawRes = payload.input?.resolution || '720p';
+    const normalizedRes = isHappyHorse ? rawRes.toUpperCase() : rawRes.toLowerCase();
+
     // Sanitize prompt for explicit words before sending
     let sanitizedPrompt = payload.input?.prompt || '';
     const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
@@ -222,7 +230,7 @@ async function submitAtlasCloudPayload(payload) {
         model:           atlasModel,
         prompt:          sanitizedPrompt,
         duration:        payload.input?.duration || 5,
-        resolution:      '720p',
+        resolution:      normalizedRes,
         ratio:           rawRatio,
         generate_audio:  payload.input?.generate_audio !== false,
         watermark:       false,
@@ -394,8 +402,19 @@ export async function submitAtlasCloudVideoGeneration({
             // Product reference: describe image as hero product, not a real person
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the hero product — maintain its exact shape, color, surface texture, and visual identity in every frame.`;
         } else if (imageRole === 'character') {
-            // Character reference: extremely neutral phrasing to avoid NLP safety classifier false-positives
-            faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'represent' : 'represents'} the animated subject — maintain exact visual consistency in every frame.`;
+            // Character reference with mixed avatar+product:
+            // The first ref is typically the avatar, remaining are product images.
+            // Generate separate lock instructions for each.
+            const avatarRefCount = referenceImages.filter(u => u === imageUrl).length > 0 ? 0 : 1;
+            if (faceAssetUris.length > 1 && avatarRefCount > 0) {
+                // Mixed: first ref is avatar, rest are product
+                const avatarTag = '@image1';
+                const productTags = faceAssetUris.slice(1).map((_, i) => `@image${i + 2}`).join(' and ');
+                faceLock = `${avatarTag} is the person/character — maintain their exact facial features, skin tone, hair, build, and clothing style in every frame. ${productTags} ${faceAssetUris.length > 2 ? 'are' : 'is'} the hero product — maintain its exact shape, color, texture, logo, packaging, and visual identity throughout.`;
+            } else {
+                // Single character ref or no products
+                faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'represent' : 'represents'} the animated subject — maintain exact visual consistency in every frame.`;
+            }
         } else {
             // Face reference: preserve human likeness
             faceLock = `${faceTags} ${faceAssetUris.length > 1 ? 'are' : 'is'} the real person who must appear in this video. Preserve their exact facial geometry, skin tone, eye shape, hair, and expression throughout every frame.`;
@@ -543,22 +562,22 @@ export async function submitHappyHorseVideoGeneration({
         prompt:         finalPrompt,
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
+        resolution:     res,
         generate_audio: generateAudio !== false,
     };
 
-    // I2V: pass image to submitAtlasCloudPayload for upload
-    if (s3ImageUrls.length > 0 && modelName.includes('image-to-video')) {
+    // I2V: pass first-frame image
+    if (s3ImageUrls.length > 0) {
         taskInput.image_urls = s3ImageUrls;
     }
 
-    // R2V: pass all reference images to submitAtlasCloudPayload for upload
+    // R2V: pass reference images (only for reference-to-video mode)
     if (s3RefImages.length > 0 && modelName.includes('reference-to-video')) {
         taskInput.reference_images = s3RefImages.slice(0, 9);
     }
-
-    // T2V with first-frame anchor
-    if (s3ImageUrls.length > 0 && modelName.includes('text-to-video')) {
-        taskInput.image_urls = s3ImageUrls;
+    // For I2V with refs, merge into image_urls
+    if (s3RefImages.length > 0 && modelName.includes('image-to-video')) {
+        taskInput.image_urls = [...(taskInput.image_urls || []), ...s3RefImages];
     }
 
     const payload = { model: 'happyhorse', task_type: modelName, input: taskInput };

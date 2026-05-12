@@ -17,7 +17,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import { s3Client } from '../utils/s3.js';
+import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
 import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
 import Avatar from '../models/Avatar.js';
@@ -3652,16 +3652,16 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
 
         // Persist as VideoProject
         const project = await VideoProject.create({
-            user: req.user._id, brand: brandId, studioMode: 'q-ads', status: 'generating',
+            user: req.user._id, brand: brandId, studioMode: 'q-ads', mode: 'image-to-video', status: 'generating',
             title: `Q-Ad: ${parsedProduct.productName || categoryId}`,
-            script: prompt, backendPrompt: prompt,
+            backendPrompt: prompt,
             input: {
                 brief: `Q-Ads [${categoryId}]: ${parsedProduct.productName || 'product'}`,
                 images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: i === 0 ? 'avatar' : `product-${i}` })),
-                productData: parsedProduct, categoryId
             },
             generation: {
                 provider: 'atlascloud', model: 'seedance-2.0',
+                falRequestId: genResult.taskId,
                 taskId: genResult.taskId, requestId: genResult.taskId,
                 duration, aspectRatio, progress: 0, status: 'GENERATING',
             },
@@ -3768,6 +3768,12 @@ router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
 router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
     try {
         const { requestId } = req.params;
+        
+        // Guard against undefined/empty requestId (stale frontend state)
+        if (!requestId || requestId === 'undefined' || requestId === 'null') {
+            return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
+        }
+        
         const result = await pollAtlasCloudStatus(requestId);
 
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
@@ -3790,9 +3796,15 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             updatePayload['generation.status'] = result.status;
         }
 
-        // V2 projects store taskId in generation.taskId and generation.requestId
+        // Also set finalVideoUrl when completed for history listing
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            updatePayload.finalVideoUrl = result.videoUrl;
+        }
+
+        // V2 projects store taskId in generation.taskId, generation.requestId, and generation.falRequestId
+        // Use $or to match all possible fields
         await VideoProject.findOneAndUpdate(
-            { 'generation.requestId': requestId, user: req.user._id, studioMode: 'q-ads-v2' },
+            { $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
             { $set: updatePayload }
         ).catch(e => console.warn('[Q-Ads V2 Status] DB update failed:', e.message));
 
@@ -3808,6 +3820,182 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Q-Ads V2 Image Analysis (Visual Grounding)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchImageAsInlineData(imageUrl) {
+    if (!imageUrl || typeof imageUrl !== 'string') return null
+    try {
+        let fetchUrl = imageUrl
+        const isOurS3 = imageUrl.includes('amazonaws.com') && (
+            imageUrl.includes('mantram-assets') ||
+            imageUrl.includes('mantram-media')
+        )
+        if (isOurS3) {
+            fetchUrl = await getSignedUrlForPath(imageUrl, 300)
+        }
+        const resp = await fetch(fetchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(20_000),
+        })
+        if (!resp.ok) return null
+        const buffer = await resp.arrayBuffer()
+        const contentType = resp.headers.get('content-type') || 'image/jpeg'
+        return { inlineData: { mimeType: contentType, data: Buffer.from(buffer).toString('base64') } }
+    } catch (err) {
+        console.error(`❌ fetchImageAsInlineData failed: ${err.message}`)
+        return null
+    }
+}
+
+// ── POST /api/video-studio/ugc-pro/qads/v2/analyze-assets ──
+// Deep visual analysis of uploaded product and avatar images to generate a rich video brief
+// Accepts optional userBrief and productData to ground the analysis in user intent
+router.post('/ugc-pro/qads/v2/analyze-assets', protect, async (req, res) => {
+    try {
+        const { productImageUrls, avatarUrl, brandName, userBrief, productData } = req.body;
+        
+        if ((!productImageUrls || productImageUrls.length === 0) && !avatarUrl) {
+            return res.status(400).json({ success: false, error: 'At least one reference image is required' });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return res.status(400).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        const parts = [];
+        const labels = [];
+        
+        async function loadPart(url, label) {
+            if (!url) return;
+            const part = await fetchImageAsInlineData(url);
+            if (part) {
+                parts.push(part);
+                labels.push(label);
+            }
+        }
+
+        if (productImageUrls && productImageUrls.length > 0) {
+            for (let i = 0; i < Math.min(productImageUrls.length, 3); i++) {
+                await loadPart(productImageUrls[i], `IMAGE ${parts.length + 1}: Product Reference ${i + 1}`);
+            }
+        }
+        if (avatarUrl) {
+            await loadPart(avatarUrl, `IMAGE ${parts.length + 1}: The Avatar/Character`);
+        }
+
+        // Parse product data if provided
+        const parsedProduct = typeof productData === 'string' ? (() => { try { return JSON.parse(productData); } catch { return null; } })() : (productData || null);
+
+        // Build context sections
+        const contextSections = [];
+        
+        if (userBrief && userBrief.trim()) {
+            contextSections.push(`USER'S CREATIVE DIRECTION:\n"${userBrief.trim()}"\nThis is the user's vision — honor their intent, tone, and any specific instructions they provided.`);
+        }
+        
+        if (parsedProduct && (parsedProduct.productName || parsedProduct.description)) {
+            let productCtx = 'PRODUCT DETAILS (from URL analysis):';
+            if (parsedProduct.productName) productCtx += `\n- Name: ${parsedProduct.productName}`;
+            if (parsedProduct.brand) productCtx += `\n- Brand: ${parsedProduct.brand}`;
+            if (parsedProduct.description) productCtx += `\n- Description: ${parsedProduct.description}`;
+            if (parsedProduct.price) productCtx += `\n- Price: ${parsedProduct.price}`;
+            if (parsedProduct.features && parsedProduct.features.length) productCtx += `\n- Key Features: ${parsedProduct.features.slice(0, 5).join(', ')}`;
+            contextSections.push(productCtx);
+        }
+        
+        if (brandName) {
+            contextSections.push(`BRAND: ${brandName}`);
+        }
+
+        const contextBlock = contextSections.length > 0
+            ? `\n\n═══ CONTEXT PROVIDED ═══\n${contextSections.join('\n\n')}\n═══ END CONTEXT ═══\n\n`
+            : '\n\n';
+
+        let promptText = `You are an expert AI Video Director specializing in cinematic ad generation.
+
+I am providing you with reference images${contextSections.length > 0 ? ' and contextual information' : ''}.
+Your task is to synthesize ALL provided inputs into a single, richly detailed video generation prompt.
+${contextBlock}IMAGES PROVIDED:
+${labels.join('\n')}
+
+YOUR TASK — Write a comprehensive, cinematic video generation prompt following these rules:
+
+1. HONOR THE USER'S BRIEF: If a creative direction was provided above, it is your PRIMARY guide. Build upon it — expand, enrich, and detail it, but do NOT contradict or ignore it.
+
+2. PRODUCT ACCURACY: If product images or product data are provided, explicitly describe the product's exact physical appearance — shape, color, texture, packaging, logo placement, material. Use the product data (name, description, features) to accurately name and describe it. Do NOT invent features that are not visible or described.
+
+3. AVATAR/CHARACTER FIDELITY: If an avatar/character image is provided, describe their exact appearance in exhaustive detail — face shape, skin tone, hair style and color, facial hair, expression, body build, posture, clothing (every garment piece, color, fit, pattern). Describe them so precisely that a video model can replicate them perfectly without seeing the image. Do NOT use age descriptors. Do NOT invent features.
+
+4. SCENE COMPOSITION: Describe how the person and product interact — staging, hand placement, camera angle, background environment, lighting setup (direction, color temperature, shadows), depth of field, and mood.
+
+5. MOTION & CINEMATOGRAPHY: Describe camera movement (dolly, pan, tracking), subject motion (gestures, expressions changing), product handling, and temporal flow of the scene from start to finish.
+
+6. OUTPUT FORMAT: Write ONLY the video prompt — no pleasantries, no markdown headers, no quotes, no explanations. Start directly with the scene description. Be exhaustively detailed with no arbitrary length limits.
+
+Write the detailed video prompt now:`;
+
+        parts.push({ text: promptText });
+
+        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-pro-exp-02-05', 'gemini-1.5-pro'];
+        
+        let data = null;
+        let lastError = null;
+
+        for (const modelId of modelsToTry) {
+            try {
+                const url = `${baseUrl}/models/${modelId}:generateContent?key=${apiKey}`;
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
+                    }),
+                    signal: AbortSignal.timeout(45_000),
+                });
+
+                data = await resp.json();
+                
+                if (data.error) {
+                    const errMsg = data.error.message?.toLowerCase() || '';
+                    const isRetryable = resp.status === 503 || resp.status === 429 || errMsg.includes('overloaded');
+                    if (isRetryable) {
+                        lastError = new Error(data.error.message);
+                        data = null;
+                        continue;
+                    }
+                    throw new Error(data.error.message);
+                }
+                break;
+            } catch (fetchErr) {
+                if (fetchErr.name === 'AbortError') {
+                    lastError = fetchErr;
+                    data = null;
+                    continue;
+                }
+                throw fetchErr;
+            }
+        }
+
+        if (!data) throw lastError || new Error('All Gemini models unavailable for asset analysis');
+
+        let detailedPrompt = '';
+        const allParts = data.candidates?.[0]?.content?.parts || [];
+        for (const p of allParts) {
+            if (p.text && !p.thought) detailedPrompt += p.text;
+        }
+
+        res.json({ success: true, prompt: detailedPrompt.trim() });
+
+    } catch (error) {
+        console.error('❌ Error analyzing video assets:', error.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // ── GET /api/video-studio/ugc-pro/qads/v2/presets ──
 // Returns all 13 presets for frontend grid
@@ -3888,7 +4076,18 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         const aspectRatio = parsedSettings.format || preset?.recommendedFormat || '9:16';
         const resolution = parsedSettings.resolution || '720p';
 
-        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs`);
+        // Build reference images: avatar (face) + ALL product images (visual anchors)
+        // Previously, only imageUrls.slice(1) was included — the FIRST product image was only
+        // a "first frame" hint that the model drifted from. Now ALL product images are references
+        // so the model locks onto the product's exact appearance throughout the video.
+        const allReferenceImages = [...avatarFaceRefs, ...imageUrls];
+
+        // Determine imageRole for Atlas Cloud processing:
+        // - 'character' when avatar is present (face asset registration, no product face check)
+        // - 'product' when only product images (skip face registration entirely)
+        const imageRole = avatarFaceRefs.length > 0 ? 'character' : 'product';
+
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs, total refs=${allReferenceImages.length}`);
 
         const genResult = await submitVideoGeneration({
             prompt: finalPrompt,
@@ -3899,9 +4098,8 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             qualityMode: 'high',
             generateAudio: true,
             imageUrl: imageUrls[0] || null,
-            s3ImageUrls: imageUrls,
-            referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
-            imageRole: avatarFaceRefs.length > 0 ? 'character' : 'product',
+            referenceImages: allReferenceImages,
+            imageRole,
         });
 
         // Persist as VideoProject for polling
@@ -3912,29 +4110,25 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 user: req.user._id,
                 brand: brandId,
                 studioMode: 'q-ads-v2',
+                mode: 'image-to-video',
                 status: 'generating',
                 title: `Q-Ad [${preset?.name || presetId}] Variant ${variantId}`,
-                script: finalPrompt,
                 backendPrompt: finalPrompt,
                 input: {
-                    brief: userBrief || '',
+                    brief: userBrief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
                     images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
-                    presetId,
-                    variantId,
-                    legend: legend || '',
                 },
                 generation: {
                     provider: genResult.provider || 'atlascloud',
                     model: selectedModel,
-                    taskId: genResult.taskId || genResult.requestId || genResult.falRequestId,
-                    requestId: genResult.taskId || genResult.requestId || genResult.falRequestId,
+                    falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
+                    taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
+                    requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     duration,
                     aspectRatio,
                     progress: 0,
                     status: 'GENERATING',
                 },
-                settings: parsedSettings,
-                categoryId: presetId,
             }).catch(e => { console.warn('[Q-Ads V2 Gen] VideoProject create failed:', e.message); return null; });
             projectId = project?._id;
         }
@@ -3942,9 +4136,9 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         res.json({
             success: true,
             projectId,
-            requestId: genResult.taskId,
-            jobId: genResult.taskId,
-            falRequestId: genResult.taskId,
+            requestId: genResult.requestId || genResult.taskId,
+            jobId: genResult.requestId || genResult.taskId,
+            falRequestId: genResult.requestId || genResult.taskId,
             provider: 'atlascloud',
             variantId,
             presetId,
@@ -5365,7 +5559,7 @@ router.get('/', protect, async (req, res) => {
         if (mode) filter.mode = mode;
 
         const skip = (Number(page) - 1) * Number(limit);
-        const selectFields = 'title status mode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
+        const selectFields = 'title status mode studioMode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
 
         // Build the query — use hint to force the compound index so MongoDB avoids an in-memory sort.
         // Also set allowDiskUse via setOptions (the chained .allowDiskUse() is unreliable on some driver versions).
