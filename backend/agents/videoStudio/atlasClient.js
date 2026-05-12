@@ -276,7 +276,7 @@ async function submitAtlasCloudPayload(payload) {
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
             if (uploaded) {
                 if (atlasModel.includes('happyhorse')) {
-                    atlasPayload.images = [uploaded];
+                    atlasPayload.image_url = uploaded;
                 } else {
                     atlasPayload.image = uploaded;
                 }
