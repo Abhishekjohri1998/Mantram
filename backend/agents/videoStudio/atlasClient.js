@@ -110,12 +110,25 @@ async function uploadMediaToAtlasCDN(imageUrl) {
         const imageRes = await fetch(imageUrl);
         const arrayBuffer = await imageRes.arrayBuffer();
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
-        let extension = 'jpg';
-        if (contentType.includes('png')) extension = 'png';
-        else if (contentType.includes('webp')) extension = 'webp';
+        
+        // Convert unsupported formats (avif, tiff, heic, svg) to JPEG using sharp
+        const UNSUPPORTED = ['avif', 'tiff', 'heic', 'heif', 'svg'];
+        const isUnsupported = UNSUPPORTED.some(f => contentType.includes(f));
+        let finalBuffer, finalType, extension;
+        
+        if (isUnsupported) {
+            console.log(`🔄 [Atlas CDN] Converting ${contentType} → JPEG (unsupported by Atlas)`);
+            finalBuffer = await sharp(Buffer.from(arrayBuffer)).jpeg({ quality: 90 }).toBuffer();
+            finalType = 'image/jpeg';
+            extension = 'jpg';
+        } else {
+            finalBuffer = Buffer.from(arrayBuffer);
+            finalType = contentType;
+            extension = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+        }
 
         const formData = new FormData();
-        formData.append('file', new Blob([arrayBuffer], { type: contentType }), `media.${extension}`);
+        formData.append('file', new Blob([finalBuffer], { type: finalType }), `media.${extension}`);
 
         const res = await fetch(`${ATLAS_INFERENCE_BASE}/model/uploadMedia`, {
             method: 'POST',
