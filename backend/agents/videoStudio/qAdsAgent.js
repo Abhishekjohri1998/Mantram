@@ -237,7 +237,7 @@ SHOT 2 [00:02 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
 SHOT 3 [00:04 - 00:06]: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
 
-VIVID BUT ECONOMICAL. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. The prompt MUST NOT exceed 1800 characters total. Count before returning. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
+VIVID AND HIGHLY DETAILED. Describe the scene frame by frame with rich, explicit visual details. Do not write a short summary—flesh out every action and camera movement to create a comprehensive cinematic prompt. The total length MUST be between 1000 and 1800 characters to ensure enough detail without exceeding API limits. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
