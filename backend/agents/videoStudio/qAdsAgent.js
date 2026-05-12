@@ -459,7 +459,7 @@ export async function runQAdsAgent({
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.75, maxTokens: 3000, returnRaw: true }
+            { temperature: 0.75, maxTokens: 5000, returnRaw: true }
         );
     } catch (llmErr) {
         console.error(`[Q-Ads Agent] Claude call failed: ${llmErr.message}`);
@@ -485,7 +485,7 @@ export async function runQAdsAgent({
                 retrySystem,
                 userPrompt,
                 imageUrls,
-                { temperature: 0.65, maxTokens: 3000, returnRaw: true }
+                { temperature: 0.65, maxTokens: 5000, returnRaw: true }
             );
             variants = parseVariants(rawOutput);
             const retryIssues = validateVariants(variants);

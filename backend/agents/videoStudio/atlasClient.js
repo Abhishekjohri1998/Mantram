@@ -22,7 +22,7 @@ import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const ATLAS_INFERENCE_BASE  = 'https://api.atlascloud.ai/api/v1';
 const ATLAS_CONSOLE_BASE    = 'https://console.atlascloud.ai/api/v1';
-const ATLASCLOUD_MAX_PROMPT_LENGTH = 1950;
+const ATLASCLOUD_MAX_PROMPT_LENGTH = 4000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
