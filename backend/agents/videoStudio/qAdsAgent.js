@@ -227,17 +227,31 @@ OUTPUT IS:
 4. The prompt structured EXACTLY like this:
 
 STYLE: [Determine style dynamically based on brief and preset. MUST be "Photorealistic cinematic live-action" or "High-end UGC mobile phone footage" unless the user explicitly requests animation. NEVER hardcode 3D animation unless asked.]
-WARDROBE: [Describe avatar clothing in GENERIC terms only — color + material + silhouette. NEVER use brand or product names. Write: "a white ruched halter midi dress" NOT "Elegant White Ruched Halter Cutout Midi Dress" — the latter is a product name.]
-ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
+WARDROBE: [Write 2-3 sentences describing the avatar's clothing in GENERIC terms only — color, material, silhouette, texture, pattern, fit, accessories. Describe how the garment drapes, its neckline, sleeve type, hemline, and any visible details like buttons, zippers, or embellishments. NEVER use brand or product names. Write: "a fitted ribbed chocolate brown tank top with thin spaghetti straps and a scooped neckline, paired with a delicate gold chain necklace resting on the collarbones" NOT "Elegant Chocolate Tank Top."]
+ENVIRONMENT: [2-3 sentences describing the full environment — surfaces, textures, props visible, color palette of the space, time of day.]
 MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
 
-${preset.register && (preset.register.toLowerCase().includes('dialogue') || preset.register.toLowerCase().includes('conversational') || preset.register.toLowerCase().includes('talks to') || preset.register.toLowerCase().includes('peer-to-peer') || preset.register.toLowerCase().includes('instructional') || (preset.group === 'creator' && !preset.register.toLowerCase().includes('no dialogue'))) ? 'DIALOGUE REQUIREMENT — this preset demands spoken words on camera:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nFormat: DIALOGUE: "[exact words the presenter says]"\nMake it natural, conversational, specific to this product. Not generic ad-speak.\nExample: DIALOGUE: "I literally wear this every event — the ruching hides everything."\n' : 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n'}
-${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}SHOT 1 [00:00 - 00:02]: [Shot size + focal length] / [Camera move] / [Avatar action. Product reference if shown. ONE motion verb only.]
-SHOT 2 [00:02 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
-SHOT 3 [00:04 - 00:06]: [Shot size + focal length] / [Camera move] / [Action]
+${(() => {
+    const needsDialogue = preset.register && (preset.register.toLowerCase().includes('dialogue') || preset.register.toLowerCase().includes('conversational') || preset.register.toLowerCase().includes('talks to') || preset.register.toLowerCase().includes('peer-to-peer') || preset.register.toLowerCase().includes('instructional') || (preset.group === 'creator' && !preset.register.toLowerCase().includes('no dialogue')));
+    const lang = settings?.language || 'English';
+    if (needsDialogue) {
+        return `DIALOGUE REQUIREMENT — this preset demands spoken words on camera:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nDIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written in ${lang}. The dialogue must sound natural and conversational in ${lang}, not translated.\nFormat: DIALOGUE: "[exact words the presenter says in ${lang}]"\nMake it natural, conversational, specific to this product. Not generic ad-speak.\nExample (English): DIALOGUE: "I literally wear this every event — the ruching hides everything."\nExample (Hindi): DIALOGUE: "मैं इसे हर इवेंट में पहनती हूं — रचिंग सब कुछ छुपा देती है।"\n`;
+    } else {
+        return 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n';
+    }
+})()}
+${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}CRITICAL: MINIMUM SHOT COUNT AND DETAIL REQUIREMENTS:
+- For ${duration}s video: write AT LEAST ${Math.max(Math.ceil(duration / 1.5), 4)} SHOT entries (e.g. a 5s video needs minimum 4 shots, 8s needs 6, 10s needs 7, 15s needs 10)
+- Each SHOT description MUST be at least 25 words — describe the exact camera angle (e.g. "extreme close-up at 85mm"), camera movement (e.g. "slow dolly right at 2°/s"), the subject's precise body language, hand placement, facial expression changes, product interaction, and any lighting shifts
+- Your TOTAL output MUST be between 800 and 1800 characters. If under 800 characters, you have FAILED. Write more detail.
+- Do NOT summarize multiple shots into one. Every 1-2 second window gets its own SHOT entry.
+
+SHOT 1 [00:00 - 00:01]: [Shot size + focal length e.g. "Medium close-up at 50mm"] / [Camera move e.g. "Slow push-in with 0.5° clockwise rotation"] / [Detailed avatar action: facial micro-expression, hand gesture, product interaction, body shift. At least 20 words describing exactly what happens in this time window.]
+SHOT 2 [00:01 - 00:03]: [Shot size + focal length] / [Camera move] / [Detailed action with product interaction]
+SHOT 3 [00:03 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
 
-VIVID AND HIGHLY DETAILED. Describe the scene frame by frame with rich, explicit visual details. Do not write a short summary—flesh out every action and camera movement to create a comprehensive cinematic prompt. The total length MUST be between 1000 and 1800 characters to ensure enough detail without exceeding API limits. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
+VIVID AND HIGHLY DETAILED. Describe the scene frame by frame with rich, explicit visual details. For EACH shot, describe: exact camera position and movement, the subject's face (micro-expressions, gaze direction, lip position), hands (what they touch, how they move), body posture changes, product placement and how light interacts with it, background element shifts. Do NOT write a short summary — flesh out EVERY action and camera movement to create a comprehensive cinematic prompt. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -246,6 +260,7 @@ VIVID AND HIGHLY DETAILED. Describe the scene frame by frame with rich, explicit
 
 function buildUserPrompt({ userBrief, productData, hasAvatar, settings }) {
     const p = productData || {};
+    const lang = settings?.language || 'English';
     return `USER BRIEF: "${userBrief || 'Create a compelling short-form video ad for this product.'}"
 
 PRODUCT INTELLIGENCE:
@@ -259,10 +274,11 @@ PRODUCT INTELLIGENCE:
 GENERATION SETTINGS:
   Duration: ${settings?.duration || 8}s
   Format: ${settings?.format || '9:16'}
+  Dialogue Language: ${lang} — write ALL dialogue lines in ${lang}
   Custom Dialogue: ${settings?.customDialogue || 'None'}
   Avatar provided: ${hasAvatar ? 'Yes — extract appearance from image, write them into scene specifically' : 'No — use functional label only, do not invent appearance'}
 
-Write the Seedance 2.0 prompt variant now. Remember: in medias res. The ad is already in progress when the camera starts.`;
+Write the Seedance 2.0 prompt variant now. Remember: in medias res. The ad is already in progress when the camera starts. Your output MUST be at least 800 characters with full SHOT-by-SHOT breakdown. Do NOT summarize.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -453,8 +469,9 @@ export async function runQAdsAgent({
     // ── 8. Validate — retry once if issues found ──────────────────────────────
     const issues = validateVariants(variants);
     if (issues.length > 0) {
+        const wordCount = variants[0]?.prompt?.split(/\s+/).length || 0;
         console.warn(`[Q-Ads Agent] Validation issues found: ${issues.join('; ')}. Retrying once...`);
-        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED. Issues found: ${issues.join('; ')}.\nReturn ONLY one valid prose paragraph labeled Variant A. No other text.`;
+        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED.\nIssues found: ${issues.join('; ')}.\nYour previous output was only ${wordCount} words — this is UNACCEPTABLE.\nYou MUST write at minimum 150 words with a full SHOT-by-SHOT breakdown covering every 1-2 second window of the ${settings?.duration || 8}s video.\nEach SHOT must describe camera angle, movement, subject action, product interaction, and lighting in vivid detail.\nReturn the output labeled Variant A. No other text.`;
         try {
             rawOutput = await callMultimodalAgent(
                 retrySystem,

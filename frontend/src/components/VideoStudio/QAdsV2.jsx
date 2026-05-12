@@ -31,6 +31,20 @@ const VIDEO_MODELS = [
     {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
     {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
 ]
+const LANGUAGES = [
+    {value:'English',label:'English',msIcon:'translate'},
+    {value:'Hindi',label:'हिन्दी',msIcon:'translate'},
+    {value:'Tamil',label:'தமிழ்',msIcon:'translate'},
+    {value:'Telugu',label:'తెలుగు',msIcon:'translate'},
+    {value:'Kannada',label:'ಕನ್ನಡ',msIcon:'translate'},
+    {value:'Malayalam',label:'മലയാളം',msIcon:'translate'},
+    {value:'Bengali',label:'বাংলা',msIcon:'translate'},
+    {value:'Marathi',label:'मराठी',msIcon:'translate'},
+    {value:'Gujarati',label:'ગુજરાતી',msIcon:'translate'},
+    {value:'Punjabi',label:'ਪੰਜਾਬੀ',msIcon:'translate'},
+    {value:'Urdu',label:'اردو',msIcon:'translate'},
+    {value:'Arabic',label:'العربية',msIcon:'translate'},
+]
 
 const css = `
 .qv2-root {
@@ -552,6 +566,14 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
     const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
     const [userBrief, setUserBrief] = useState('')
     const [hookShot, setHookShot] = useState(false)
+    const [language, setLanguage] = useState(() => {
+        const brandLang = activeBrand?.dna?.defaultLanguage
+        if (brandLang) {
+            const match = LANGUAGES.find(l => l.value.toLowerCase() === brandLang.toLowerCase())
+            return match ? match.value : 'English'
+        }
+        return 'English'
+    })
 
     // Modals
     const [showAvatar, setShowAvatar] = useState(false)
@@ -780,7 +802,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     presetId: selP,
                     userBrief,
                     productData: pData,
-                    settings: { duration, format, resolution, model: selectedModel, hookShot },
+                    settings: { duration, format, resolution, model: selectedModel, hookShot, language },
                     avatarUrl: avatarUrl || null,
                     productImageUrls: pImgs
                 })
@@ -794,7 +816,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
             setIsGeneratingPrompts(false)
             setPromptStage('')
         }
-    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, avatarUrl, activeBrand])
+    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, language, avatarUrl, activeBrand])
 
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
@@ -814,7 +836,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                     legend: variant.legend || '',
                     productImageUrls: productImgs,
                     avatarUrl: avatarUrl || null,
-                    settings: { duration, format, resolution, model: selectedModel, hookShot }
+                    settings: { duration, format, resolution, model: selectedModel, hookShot, language }
                 })
             })
 
@@ -1007,6 +1029,9 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>bolt</span>
                         <span>Hook</span>
                     </button>
+
+                    <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
+                    <CfgMenu value={language} onChange={setLanguage} options={LANGUAGES} icon="translate" />
 
                     <div style={{ flex: 1 }} />
 

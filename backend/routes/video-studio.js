@@ -4154,7 +4154,12 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         // - 'product' when only product images (skip face registration entirely)
         const imageRole = avatarFaceRefs.length > 0 ? 'character' : 'product';
 
-        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs, total refs=${allReferenceImages.length}`);
+        console.log(`[Q-Ads V2] Submitting variant ${variantId} — model=${selectedModel}, ${duration}s, res=${resolution}, lang=${parsedSettings.language || 'English'}, ${imageUrls.length} product images, ${avatarFaceRefs.length} face refs, total refs=${allReferenceImages.length}`);
+        if (imageUrls.length === 0) {
+            console.warn(`[Q-Ads V2] ⚠️ No product images provided — video model will rely on prompt text only for product appearance`);
+        } else {
+            imageUrls.forEach((u, i) => console.log(`[Q-Ads V2]   Product image ${i + 1}: ${u.substring(0, 80)}...`));
+        }
 
         // Determine correct imageRole for Atlas:
         //   'face'          — user provided avatar (UGC Pro style)
