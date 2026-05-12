@@ -3873,7 +3873,7 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
         const updatedProject = await VideoProject.findOneAndUpdate(
             { $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
             { $set: updatePayload },
-            { new: true }
+            { returnDocument: 'after' }
         ).catch(e => { console.warn('[Q-Ads V2 Status] DB update failed:', e.message); return null; });
         
         if (result.status === 'COMPLETED' || result.status === 'FAILED') {
@@ -5696,13 +5696,8 @@ router.get('/', protect, async (req, res) => {
             .setOptions({ allowDiskUse: true })
             .lean();
 
-        // Hint the correct compound index based on the filter shape
-        if (filter.user && filter.brand) {
-            query.hint({ user: 1, brand: 1, createdAt: -1 });
-        } else if (filter.user) {
-            query.hint({ user: 1, createdAt: -1 });
-        }
-        // superadmin without user filter: no hint (let MongoDB pick, but allowDiskUse will save it)
+        // NOTE: Do NOT use .hint() — the compound indexes may not exist on production MongoDB.
+        // allowDiskUse: true (set above) is sufficient to prevent 32MB sort overflow.
 
         const [projects, total] = await Promise.all([
             query.exec(),
