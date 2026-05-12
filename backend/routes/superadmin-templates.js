@@ -721,10 +721,14 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
         if (sourceType === 'VideoProject') {
             const project = await VideoProject.findById(sourceJobId);
             if (!project) return res.status(404).json({ success: false, error: 'VideoProject not found' });
-            extractedPrompt = project.backendPrompt || project.advancedConfig?.prompt;
-            // BUG-02 FIX: mirror video poster/thumbnail to S3 before storing
-            const rawPosterUrl = project.posterUrl || '';
-            previewUrl = rawPosterUrl ? await ensureS3Url(rawPosterUrl, `templates/preview-${Date.now()}.jpg`) : (project.resultVideoUrl || '');
+            extractedPrompt = project.backendPrompt || project.advancedConfig?.prompt || project.advancedConfig?.enhancedPrompt || '';
+            // Resolve video URL: finalVideoUrl > s3VideoUrl > generation.videoUrl > thumbnailUrl
+            const rawVideoUrl = project.finalVideoUrl
+                || project.generation?.s3VideoUrl
+                || project.generation?.videoUrl
+                || project.generation?.thumbnailUrl
+                || '';
+            previewUrl = rawVideoUrl ? await ensureS3Url(rawVideoUrl, `templates/preview-${Date.now()}.mp4`) : '';
             previewType = 'video';
             sourceJobId = project._id; // Ensure it's an ObjectId
         } else if (sourceType === 'GenerationJob') {
@@ -752,8 +756,10 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
             description,
             tags,
             studioOrigin,
+            studioSection: previewType === 'video' ? 'video_qads' : 'ai_create',
             previewUrl,
             previewImageUrl: previewUrl, // canonical S3 field — always mirrors previewUrl
+            previewVideoUrl: previewType === 'video' ? previewUrl : '',
             previewType,
             savedPrompt: extractedPrompt,
             sourceJobId,
