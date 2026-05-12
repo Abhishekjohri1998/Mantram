@@ -4220,7 +4220,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 title: `Q-Ad [${preset?.name || presetId}] Variant ${variantId}`,
                 backendPrompt: finalPrompt,
                 input: {
-                    brief: userBrief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
+                    brief: req.body.brief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
                     images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
                 },
                 generation: {
@@ -5660,6 +5660,8 @@ router.get('/', protect, async (req, res) => {
 
         if (req.user.role === 'superadmin') {
             if (brandId) filter.brand = brandId;
+            // Always set user for superadmin too — ensures compound index is used for sort
+            filter.user = req.user._id;
         } else {
             if (brandId) {
                 const brand = await Brand.findOne({
