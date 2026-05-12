@@ -1156,7 +1156,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         {/* Product Modal */}
         {showProduct && (
             <div className="scott-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowProduct(false) }}>
-                <div className="scott-modal" style={{ maxWidth: 520 }}>
+                <div className="scott-modal" style={{ maxWidth: 520, maxHeight: '85vh', overflowY: 'auto' }}>
                     <div className="scott-modal-hdr">
                         <div>
                             <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Add Product</div>
