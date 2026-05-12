@@ -50,6 +50,7 @@ const LZ_VIDEO_MODELS = {
     'veo-3.1-relaxed':'veo-3.1-relaxed',
     // Kling — reliable ✅
     'kling-3.0':      'kling-3.0',
+    'kling-3.0-o':    'kling-3.0',
 };
 
 /**
