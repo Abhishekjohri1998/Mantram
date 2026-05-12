@@ -1011,21 +1011,33 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
                     {/* Product block — shows first image + count badge if multiple */}
                     <button className={`scott-block-btn ${productUrl || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative' }}>
-                        {productImgs?.[0] && <img src={productImgs[0]} className="scott-block-img" alt="" />}
-                        <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
-                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>{productData ? 'READY' : productImgs.length > 0 ? `${productImgs.length} IMG` : 'PRODUCT'}</span>
-                        {productImgs.length > 1 && (
-                            <span style={{ position: 'absolute', top: 3, right: 3, background: '#10b981', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                                {productImgs.length}
-                            </span>
+                        {productImgs?.[0] ? (
+                            <>
+                                <img src={productImgs[0]} className="scott-block-img" alt="" style={{ opacity: 1 }} />
+                                {productImgs.length > 1 && (
+                                    <span style={{ position: 'absolute', top: 4, right: 4, background: '#10b981', color: '#fff', borderRadius: '50%', width: 14, height: 14, fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
+                                        {productImgs.length}
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
+                                <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>{productData ? 'READY' : 'PRODUCT'}</span>
+                            </>
                         )}
                     </button>
 
                     {/* Avatar block */}
-                    <button className={`scott-block-btn ${avatarUrl ? 'active' : ''}`} onClick={() => setShowAvatar(true)} style={{ width: 64, height: 56 }}>
-                        {avatarUrl && <img src={avatarUrl} className="scott-block-img" alt="" />}
-                        <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>person</span>
-                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>AVATAR</span>
+                    <button className={`scott-block-btn ${avatarUrl ? 'active' : ''}`} onClick={() => setShowAvatar(true)} style={{ width: 64, height: 56, position: 'relative' }}>
+                        {avatarUrl ? (
+                            <img src={avatarUrl} className="scott-block-img" alt="" style={{ opacity: 1 }} />
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>person</span>
+                                <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>AVATAR</span>
+                            </>
+                        )}
                     </button>
 
                     {/* Generate */}
