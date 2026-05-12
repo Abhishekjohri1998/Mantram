@@ -602,6 +602,38 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         if (onVideoComplete) onVideoComplete();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Hydrate generating projects into videoJobs to resume polling if user switched tabs
+    useEffect(() => {
+        if (!projects || projects.length === 0) return;
+        
+        const generating = projects.filter(p => 
+            (p.studioMode === 'q-ads-v2' || p.title?.startsWith('Q-Ad')) && 
+            (p.status === 'generating' || p.generation?.status === 'GENERATING') &&
+            !p.generation?.videoUrl && !p.finalVideoUrl
+        );
+        
+        if (generating.length > 0) {
+            setVideoJobs(prev => {
+                const updated = { ...prev };
+                let changed = false;
+                generating.forEach(p => {
+                    const variantId = p.title?.match(/Variant ([A-Z0-9])/i)?.[1] || p._id; 
+                    const jobId = p.generation?.requestId || p.generation?.taskId || p.generation?.falRequestId;
+                    if (jobId && !updated[variantId]) {
+                        updated[variantId] = {
+                            status: 'generating',
+                            progress: p.generation?.progress || 10,
+                            jobId,
+                            projectId: p._id
+                        };
+                        changed = true;
+                    }
+                });
+                return changed ? updated : prev;
+            });
+        }
+    }, [projects]);
+
     const [error, setError] = useState(null)
 
     useEffect(() => {
