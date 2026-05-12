@@ -63,6 +63,12 @@ import { isFashionCategory, resolveImageRole } from '../agents/videoStudio/promp
 import { buildVideoHash } from '../utils/videoHash.js';
 import { checkPromptSafety } from '../utils/promptSafety.js';
 import redis from '../utils/redisClient.js';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+const execFileAsync = promisify(execFile);
 
 const router = Router();
 
@@ -3829,6 +3835,243 @@ router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
     res.json({ success: true, duration: d, credits });
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Q-Ads V2 — Regional Language Voiceover Pipeline (TTS + FFmpeg Mux)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Language → Sarvam/TTS code mapping
+const QADS_LANG_TO_CODE = {
+    'Hindi': 'hi-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN', 'Bengali': 'bn-IN',
+    'Marathi': 'mr-IN', 'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN',
+    'Punjabi': 'pa-IN', 'English': 'en-IN', 'Arabic': 'ar-SA', 'Urdu': 'ur-PK',
+    'French': 'fr-FR', 'Spanish': 'es-ES', 'Portuguese': 'pt-BR', 'Japanese': 'ja-JP',
+    'Korean': 'ko-KR', 'Chinese': 'zh-CN',
+};
+
+const SARVAM_SUPPORTED = new Set(['hi-IN', 'ta-IN', 'te-IN', 'bn-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'en-IN']);
+
+// Auto-select best voice per language
+const QADS_AUTO_VOICE = {
+    'hi-IN': { speaker: 'anushka', name: 'Anushka' },
+    'ta-IN': { speaker: 'meera',   name: 'Meera (Tamil)' },
+    'te-IN': { speaker: 'meera',   name: 'Meera (Telugu)' },
+    'bn-IN': { speaker: 'meera',   name: 'Meera (Bengali)' },
+    'mr-IN': { speaker: 'meera',   name: 'Meera (Marathi)' },
+    'gu-IN': { speaker: 'meera',   name: 'Meera (Gujarati)' },
+    'kn-IN': { speaker: 'meera',   name: 'Meera (Kannada)' },
+    'ml-IN': { speaker: 'meera',   name: 'Meera (Malayalam)' },
+    'pa-IN': { speaker: 'meera',   name: 'Meera (Punjabi)' },
+    'en-IN': { speaker: 'anushka', name: 'Anushka (English)' },
+};
+
+/**
+ * Extract DIALOGUE lines from a Q-Ads prompt.
+ * Format: DIALOGUE: "exact words the presenter says"
+ */
+function extractDialogueLines(promptText) {
+    if (!promptText) return [];
+    // Match DIALOGUE: "..." patterns (double or single quotes, curly quotes)
+    const matches = [...promptText.matchAll(/DIALOGUE\s*:\s*["""]([^"""]+)["""]/gi)];
+    const lines = matches.map(m => m[1].trim()).filter(l => l.length > 3);
+    if (lines.length > 0) {
+        console.log(`🎤 [TTS] Extracted ${lines.length} dialogue line(s) from prompt`);
+    }
+    return lines;
+}
+
+/**
+ * Generate TTS audio for dialogue lines via Sarvam (Indian) or Google TTS.
+ * Returns S3 URL of the audio file, or null on failure.
+ */
+async function generateQAdsTTS(dialogueLines, language) {
+    if (!dialogueLines || dialogueLines.length === 0) return null;
+
+    const langCode = QADS_LANG_TO_CODE[language] || 'en-IN';
+    const isSarvamLang = SARVAM_SUPPORTED.has(langCode);
+    const fullScript = dialogueLines.join('. ');
+
+    console.log(`🎤 [TTS] Generating voiceover: lang=${language} (${langCode}), provider=${isSarvamLang ? 'Sarvam' : 'Google'}, script=${fullScript.substring(0, 100)}...`);
+
+    try {
+        if (isSarvamLang) {
+            return await generateSarvamTTSInternal(fullScript, langCode);
+        } else {
+            // For non-Indian languages, use Google Cloud TTS if configured
+            console.warn(`🎤 [TTS] Language ${language} (${langCode}) not supported by Sarvam — voiceover skipped`);
+            return null;
+        }
+    } catch (e) {
+        console.error(`❌ [TTS] Voiceover generation failed: ${e.message}`);
+        return null;
+    }
+}
+
+/**
+ * Internal Sarvam TTS call — reuses the same logic as the sarvam-tts endpoint.
+ */
+async function generateSarvamTTSInternal(text, langCode) {
+    const apiKey = process.env.SARVAM_API_KEY;
+    if (!apiKey) { console.warn('🎤 [TTS] Sarvam API key not configured — skipping'); return null; }
+
+    const voice = QADS_AUTO_VOICE[langCode] || { speaker: 'anushka' };
+    console.log(`🎤 [TTS] Sarvam: voice=${voice.speaker}, lang=${langCode}, text=${text.length} chars`);
+
+    const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-subscription-key': apiKey },
+        body: JSON.stringify({
+            inputs: [text.substring(0, 2000)],
+            target_language_code: langCode,
+            speaker: voice.speaker,
+            model: 'bulbul:v2',
+            pitch: 0,
+            pace: 1.0,
+            loudness: 1.5,
+            enable_preprocessing: true,
+        }),
+    });
+
+    if (!ttsResp.ok) {
+        const errBody = await ttsResp.text().catch(() => '');
+        throw new Error(`Sarvam TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
+    }
+
+    const ttsData = await ttsResp.json();
+    const audioBase64 = ttsData.audios?.[0];
+    if (!audioBase64) throw new Error('No audio returned from Sarvam');
+
+    const buffer = Buffer.from(audioBase64, 'base64');
+    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.wav`;
+    const audioUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
+    console.log(`✅ [TTS] Sarvam audio uploaded: ${audioUrl.substring(0, 70)}`);
+    return audioUrl;
+}
+
+/**
+ * Mux video + audio using FFmpeg → single MP4 with embedded voiceover.
+ * Downloads both files, runs FFmpeg, uploads result to S3.
+ */
+async function muxVideoWithAudio(videoUrl, audioUrl) {
+    const tmpDir = os.tmpdir();
+    const id = Date.now() + '-' + Math.random().toString(36).substring(7);
+    const videoPath = path.join(tmpDir, `qads-video-${id}.mp4`);
+    const audioPath = path.join(tmpDir, `qads-audio-${id}.wav`);
+    const outputPath = path.join(tmpDir, `qads-muxed-${id}.mp4`);
+
+    try {
+        console.log(`🎬 [FFmpeg] Downloading video for muxing...`);
+        // Download video
+        const videoResp = await fetch(videoUrl);
+        if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
+        const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+        fs.writeFileSync(videoPath, videoBuffer);
+
+        // Download audio
+        const audioResp = await fetch(audioUrl);
+        if (!audioResp.ok) throw new Error(`Failed to download audio: ${audioResp.status}`);
+        const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+        fs.writeFileSync(audioPath, audioBuffer);
+
+        console.log(`🎬 [FFmpeg] Muxing video (${(videoBuffer.length / 1024 / 1024).toFixed(1)}MB) + audio (${(audioBuffer.length / 1024).toFixed(0)}KB)...`);
+
+        // FFmpeg: merge video + audio, keep video codec, encode audio as AAC
+        // -shortest: stop when the shorter stream ends
+        // -map 0:v: take video from first input
+        // -map 1:a: take audio from second input
+        // -filter:a "volume=1.5": boost voiceover volume slightly
+        await execFileAsync('ffmpeg', [
+            '-y',
+            '-i', videoPath,
+            '-i', audioPath,
+            '-map', '0:v:0',
+            '-map', '1:a:0',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-filter:a', 'volume=1.5',
+            '-shortest',
+            '-movflags', '+faststart',
+            outputPath,
+        ], { timeout: 60000 });
+
+        // Upload muxed video to S3
+        const muxedBuffer = fs.readFileSync(outputPath);
+        const s3Key = `qads/muxed/${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`;
+        const muxedUrl = await uploadToS3(muxedBuffer, s3Key, 'video/mp4');
+        console.log(`✅ [FFmpeg] Muxed video uploaded: ${muxedUrl.substring(0, 70)} (${(muxedBuffer.length / 1024 / 1024).toFixed(1)}MB)`);
+        return muxedUrl;
+    } catch (e) {
+        console.error(`❌ [FFmpeg] Mux failed: ${e.message}`);
+        return null; // Caller will use the original video without voiceover
+    } finally {
+        // Clean up temp files
+        [videoPath, audioPath, outputPath].forEach(f => { try { fs.unlinkSync(f); } catch {} });
+    }
+}
+
+/**
+ * Async voiceover pipeline — runs AFTER video generation completes.
+ * 1. Extracts DIALOGUE lines from the prompt
+ * 2. Generates TTS audio in the selected language
+ * 3. Muxes audio into the video via FFmpeg
+ * 4. Updates VideoProject with the final muxed URL
+ */
+async function addVoiceoverToProject(project) {
+    try {
+        const language = project.generation?.language || 'English';
+        const prompt = project.backendPrompt || '';
+        const videoUrl = project.generation?.videoUrl || project.finalVideoUrl;
+
+        if (!videoUrl) { console.warn('🎤 [TTS] No video URL — skipping voiceover'); return; }
+
+        const dialogueLines = extractDialogueLines(prompt);
+        if (dialogueLines.length === 0) {
+            console.log(`🎤 [TTS] No DIALOGUE lines found in prompt — skipping voiceover`);
+            return;
+        }
+
+        console.log(`🎤 [TTS] Starting voiceover pipeline: ${dialogueLines.length} lines in ${language}`);
+
+        // Step 1: Generate TTS audio
+        const audioUrl = await generateQAdsTTS(dialogueLines, language);
+        if (!audioUrl) {
+            console.warn(`🎤 [TTS] TTS generation failed — video will have no voiceover`);
+            return;
+        }
+
+        // Step 2: Mux audio into video
+        const muxedUrl = await muxVideoWithAudio(videoUrl, audioUrl);
+        if (muxedUrl) {
+            // Update the project with the muxed video
+            await VideoProject.findByIdAndUpdate(project._id, {
+                $set: {
+                    finalVideoUrl: muxedUrl,
+                    'generation.videoUrl': muxedUrl,
+                    'generation.voiceoverUrl': audioUrl,
+                    'generation.voiceoverStatus': 'done',
+                },
+            });
+            console.log(`✅ [TTS] Voiceover muxed and project updated: ${project._id}`);
+        } else {
+            // FFmpeg failed — store audio URL separately as fallback
+            await VideoProject.findByIdAndUpdate(project._id, {
+                $set: {
+                    'generation.voiceoverUrl': audioUrl,
+                    'generation.voiceoverStatus': 'audio_only',
+                },
+            });
+            console.warn(`⚠️ [TTS] FFmpeg mux failed — audio stored separately: ${audioUrl.substring(0, 60)}`);
+        }
+    } catch (e) {
+        console.error(`❌ [TTS] Voiceover pipeline error: ${e.message}`);
+        try {
+            await VideoProject.findByIdAndUpdate(project._id, {
+                $set: { 'generation.voiceoverStatus': 'failed' },
+            });
+        } catch {}
+    }
+}
+
 // ── GET /api/video-studio/ugc-pro/qads/v2/status/:requestId ──
 // Polls Atlas Cloud for Q-Ads V2 video status and updates VideoProject.
 // V2 jobs store the Atlas taskId in generation.requestId (not generation.falRequestId).
@@ -3879,6 +4122,14 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
         if (result.status === 'COMPLETED' || result.status === 'FAILED') {
             if (updatedProject) {
                 console.log(`[Q-Ads V2 Status] ✅ DB updated: project=${updatedProject._id}, status=${updatedProject.status}, videoUrl=${(updatedProject.generation?.videoUrl || '').substring(0, 60)}...`);
+                
+                // 🎤 Trigger async voiceover pipeline for completed videos
+                // Fire-and-forget: the response returns immediately with the raw video.
+                // The muxed video (with voiceover) replaces it once TTS+FFmpeg completes.
+                if (result.status === 'COMPLETED' && updatedProject.generation?.language && updatedProject.generation.language.toLowerCase() !== 'english' && !updatedProject.generation?.voiceoverStatus) {
+                    console.log(`🎤 [TTS] Triggering async voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+                    addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
+                }
             } else {
                 console.warn(`[Q-Ads V2 Status] ⚠️ No matching VideoProject found for requestId=${requestId} — video will NOT persist in history!`);
             }
@@ -4226,6 +4477,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 generation: {
                     provider: genResult.provider || 'atlascloud',
                     model: selectedModel,
+                    language: parsedSettings.language || 'English',
                     falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,

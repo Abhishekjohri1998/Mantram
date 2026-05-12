@@ -920,6 +920,28 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                         }))
                         if (status === 'done' || status === 'failed') {
                             clearInterval(pollRefs.current[vid])
+                            // 🎤 For non-English languages, keep polling briefly for voiceover mux
+                            if (status === 'done' && language && language.toLowerCase() !== 'english') {
+                                setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'processing' } }))
+                                let voPollCount = 0
+                                const maxVoPolls = 12 // 60 seconds max (12 x 5s)
+                                pollRefs.current[`${vid}_vo`] = setInterval(async () => {
+                                    voPollCount++
+                                    try {
+                                        const voCheck = await api(`/video-studio/ugc-pro/qads/v2/status/${d.jobId || job.jobId || jobId}`)
+                                        if (voCheck?.videoUrl && voCheck.videoUrl !== d.videoUrl) {
+                                            // Muxed URL is different from original — voiceover is done
+                                            setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], videoUrl: voCheck.videoUrl, voiceoverStatus: 'done' } }))
+                                            clearInterval(pollRefs.current[`${vid}_vo`])
+                                            if (onVideoComplete) onVideoComplete()
+                                        } else if (voPollCount >= maxVoPolls) {
+                                            // Timeout — stop polling, use what we have
+                                            setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'timeout' } }))
+                                            clearInterval(pollRefs.current[`${vid}_vo`])
+                                        }
+                                    } catch { if (voPollCount >= maxVoPolls) clearInterval(pollRefs.current[`${vid}_vo`]) }
+                                }, 5000)
+                            }
                             // Refresh parent history panel so the completed video appears
                             if (status === 'done' && onVideoComplete) onVideoComplete()
                         }
@@ -989,7 +1011,19 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                 {/* Video output or generate button */}
                                 {job.status === 'done' && job.videoUrl ? (
                                     <div>
-                                        <video src={job.videoUrl} controls muted autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180 }} />
+                                        <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180 }} />
+                                        {job.voiceoverStatus === 'processing' && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', justifyContent: 'center' }}>
+                                                <span className="material-symbols-outlined spin" style={{ fontSize: 14, color: '#f59e0b' }}>mic</span>
+                                                <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Adding {language} voiceover...</span>
+                                            </div>
+                                        )}
+                                        {job.voiceoverStatus === 'done' && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', justifyContent: 'center' }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#10b981' }}>mic</span>
+                                                <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>Voiceover added ✓</span>
+                                            </div>
+                                        )}
                                         <a href={job.videoUrl} download target="_blank" rel="noreferrer" style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '6px 12px', borderRadius: 8, textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
                                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>Download
                                         </a>

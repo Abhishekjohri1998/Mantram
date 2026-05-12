@@ -234,19 +234,27 @@ MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in 
 ${(() => {
     const needsDialogue = preset.register && (preset.register.toLowerCase().includes('dialogue') || preset.register.toLowerCase().includes('conversational') || preset.register.toLowerCase().includes('talks to') || preset.register.toLowerCase().includes('peer-to-peer') || preset.register.toLowerCase().includes('instructional') || (preset.group === 'creator' && !preset.register.toLowerCase().includes('no dialogue')));
     const lang = settings?.language || 'English';
-    if (needsDialogue) {
-        return `DIALOGUE REQUIREMENT — this preset demands spoken words on camera:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nDIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written in ${lang}. The dialogue must sound natural and conversational in ${lang}, not translated.\nFormat: DIALOGUE: "[exact words the presenter says in ${lang}]"\nMake it natural, conversational, specific to this product. Not generic ad-speak.\nExample (English): DIALOGUE: "I literally wear this every event — the ruching hides everything."\nExample (Hindi): DIALOGUE: "मैं इसे हर इवेंट में पहनती हूं — रचिंग सब कुछ छुपा देती है।"\n`;
+    const isNonEnglish = lang.toLowerCase() !== 'english';
+    // Force dialogue for non-English languages even if preset doesn't require it,
+    // because regional language voiceover needs spoken text to synthesize.
+    if (needsDialogue || isNonEnglish) {
+        return `DIALOGUE REQUIREMENT — ${isNonEnglish ? 'MANDATORY (regional language selected)' : 'this preset demands spoken words on camera'}:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nDIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written in ${lang}. The dialogue must sound natural, colloquial, and conversational in ${lang} — NOT translated from English.\nFormat: DIALOGUE: "[exact words the presenter says in ${lang}]"\nWrite at least 4-6 distinct DIALOGUE lines across different shots. Make each line specific to the product, natural and conversational.\nExample (English): DIALOGUE: "I literally wear this every event — the ruching hides everything."\nExample (Hindi): DIALOGUE: "मैं इसे हर इवेंट में पहनती हूं — रचिंग सब कुछ छुपा देती है।"\n`;
     } else {
         return 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n';
     }
 })()}
 ${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}CRITICAL: MINIMUM SHOT COUNT AND DETAIL REQUIREMENTS:
 - For ${duration}s video: write AT LEAST ${Math.max(Math.ceil(duration / 1.5), 4)} SHOT entries (e.g. a 5s video needs minimum 4 shots, 8s needs 6, 10s needs 7, 15s needs 10)
-- Each SHOT description MUST be at least 25 words — describe the exact camera angle (e.g. "extreme close-up at 85mm"), camera movement (e.g. "slow dolly right at 2°/s"), the subject's precise body language, hand placement, facial expression changes, product interaction, and any lighting shifts
-- Your TOTAL output MUST be between 800 and 1800 characters. If under 800 characters, you have FAILED. Write more detail.
+- Each SHOT description MUST be at least 40 words. For EACH shot describe ALL of the following:
+  1. CAMERA: exact angle, focal length (e.g. "85mm telephoto"), movement type and speed (e.g. "slow dolly-in at 0.5m/s")
+  2. SUBJECT: facial micro-expression, eye direction, lip position, hand placement, body posture shift
+  3. PRODUCT: exact position in frame, how light interacts with surface, label orientation, size relative to hands
+  4. ENVIRONMENT: what's visible in background, any ambient movement (curtains, steam, hair, particles)
+  5. LIGHTING: direction, quality (soft/hard), color temperature, any shifts or flickers
+- Your TOTAL output MUST be between 1200 and 2000 characters. If under 1200 characters, you have FAILED. Write more detail.
 - Do NOT summarize multiple shots into one. Every 1-2 second window gets its own SHOT entry.
 
-SHOT 1 [00:00 - 00:01]: [Shot size + focal length e.g. "Medium close-up at 50mm"] / [Camera move e.g. "Slow push-in with 0.5° clockwise rotation"] / [Detailed avatar action: facial micro-expression, hand gesture, product interaction, body shift. At least 20 words describing exactly what happens in this time window.]
+SHOT 1 [00:00 - 00:01]: [Shot size + focal length e.g. "Medium close-up at 50mm"] / [Camera move e.g. "Slow push-in with 0.5° clockwise rotation"] / [Detailed avatar action: facial micro-expression, hand gesture, product interaction, body shift. At least 30 words describing exactly what happens in this time window.]
 SHOT 2 [00:01 - 00:03]: [Shot size + focal length] / [Camera move] / [Detailed action with product interaction]
 SHOT 3 [00:03 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
