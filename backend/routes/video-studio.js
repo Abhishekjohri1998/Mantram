@@ -3870,10 +3870,19 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 
         // V2 projects store taskId in generation.taskId, generation.requestId, and generation.falRequestId
         // Use $or to match all possible fields
-        await VideoProject.findOneAndUpdate(
+        const updatedProject = await VideoProject.findOneAndUpdate(
             { $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }], user: req.user._id },
-            { $set: updatePayload }
-        ).catch(e => console.warn('[Q-Ads V2 Status] DB update failed:', e.message));
+            { $set: updatePayload },
+            { new: true }
+        ).catch(e => { console.warn('[Q-Ads V2 Status] DB update failed:', e.message); return null; });
+        
+        if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+            if (updatedProject) {
+                console.log(`[Q-Ads V2 Status] ✅ DB updated: project=${updatedProject._id}, status=${updatedProject.status}, videoUrl=${(updatedProject.generation?.videoUrl || '').substring(0, 60)}...`);
+            } else {
+                console.warn(`[Q-Ads V2 Status] ⚠️ No matching VideoProject found for requestId=${requestId} — video will NOT persist in history!`);
+            }
+        }
 
         res.json({
             success: true,
@@ -4198,9 +4207,8 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             imageRole:        resolvedV2ImageRole,
         });
 
-
         // Persist as VideoProject for polling
-        const { VideoProject } = await import('../models/VideoProject.js').catch(() => ({ VideoProject: null }));
+        // NOTE: VideoProject is already imported at top of file (line 21), no dynamic import needed
         let projectId = null;
         if (VideoProject) {
             const project = await VideoProject.create({
