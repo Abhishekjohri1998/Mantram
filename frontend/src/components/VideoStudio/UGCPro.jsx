@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
 import AvatarPicker from './AvatarPicker'
-import ViralityMiniPanel from '../ViralityMiniPanel'
 
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -57,9 +56,18 @@ const VIDEO_MODELS_UGC = [
     { value: 'veo-3.1-fast',     label: 'Veo 3.1 Fast',  icon: 'movie' },
 ]
 const LANGUAGES = [
-    { id: 'english', label: 'English' }, { id: 'spanish', label: 'Spanish' },
-    { id: 'hindi', label: 'Hindi' }, { id: 'chinese', label: 'Chinese' },
-    { id: 'french', label: 'French' }, { id: 'german', label: 'German' },
+    { id: 'English',    label: 'English' },
+    { id: 'Hindi',      label: 'Hindi' },
+    { id: 'Tamil',      label: 'தமிழ்' },
+    { id: 'Telugu',     label: 'తెలుగు' },
+    { id: 'Kannada',    label: 'ಕನ್ನಡ' },
+    { id: 'Malayalam',  label: 'മലയാളം' },
+    { id: 'Bengali',    label: 'বাংলা' },
+    { id: 'Marathi',    label: 'मराठी' },
+    { id: 'Gujarati',   label: 'ગુજરાતી' },
+    { id: 'Punjabi',    label: 'ਪੰਜਾਬੀ' },
+    { id: 'Urdu',       label: 'اردو' },
+    { id: 'Arabic',     label: 'العربية' },
 ]
 
 /* ── Inline CSS matching Advanced Mode's Scott Panel ── */
@@ -145,8 +153,7 @@ function Dropdown({ value, onChange, options, label }) {
 
 /* ═══════════════════════════════════════════════════════════════════ */
 /* ── UGCVideoCard ── grid card for completed UGC history videos */
-function UGCVideoCard({ v, videoUrl, activeBrand, downloadVideo }) {
-    const [viralityOpen, setViralityOpen] = useState(false)
+function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
     return (
         <div className="ugc-video-card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
@@ -157,27 +164,106 @@ function UGCVideoCard({ v, videoUrl, activeBrand, downloadVideo }) {
                 <div className="ugc-video-overlay">
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button onClick={() => downloadVideo(videoUrl)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>download</span> Download
+                        <button onClick={() => onPreview(videoUrl)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(255,77,0,0.6)', backdropFilter: 'blur(8px)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>play_circle</span> Preview
                         </button>
-                        <button onClick={() => setViralityOpen(x => !x)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: viralityOpen ? '#ff4d00' : '#fff', background: viralityOpen ? 'rgba(255,77,0,0.2)' : 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>local_fire_department</span> Virality
-                        </button>
+                        {isAdmin && (
+                            <button onClick={() => onSaveTemplate(v)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(99,102,241,0.5)', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>bookmark_add</span> Template
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
-            {viralityOpen && videoUrl && (
-                <div style={{ padding: '6px 8px 8px', background: 'rgba(10,10,20,0.95)', borderTop: '1px solid rgba(255,77,0,0.15)' }}>
-                    <ViralityMiniPanel contentType="video" mediaUrl={videoUrl} brandId={activeBrand?._id} platform="instagram" />
-                </div>
-            )}
         </div>
     )
 }
 
-export default function UGCPro({ activeBrand, projects = [], canCreateVideo = true, onUpgradeRequired }) {
+// ── Save as Template Form (UGC Pro admin modal) ────────────────────────────
+function UGCSaveTemplateForm({ project, onClose }) {
+    const [name, setName] = useState(project.input?.productData?.productName || 'UGC Pro Template')
+    const [categories, setCategories] = useState([])
+    const [categoryId, setCategoryId] = useState('')
+    const [description, setDescription] = useState('')
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState('')
+    const [success, setSuccess] = useState(false)
+
+    useEffect(() => {
+        api('/superadmin/templates/categories').then(d => {
+            if (d.categories) setCategories(d.categories)
+        }).catch(() => {})
+    }, [])
+
+    const handleSave = async (e) => {
+        e.preventDefault()
+        if (!name.trim() || !categoryId) return setError('Name and category are required')
+        setSaving(true); setError('')
+        try {
+            await apiJson('/superadmin/templates/promote-from-job', {
+                sourceJobId: project._id,
+                sourceType: 'VideoProject',
+                name: name.trim(),
+                categoryId,
+                description,
+                studioOrigin: 'video',
+                tags: ['ugc-pro', 'video'],
+            })
+            setSuccess(true)
+            setTimeout(() => onClose(), 1500)
+        } catch (err) {
+            setError(err.message || 'Failed to save template')
+        } finally { setSaving(false) }
+    }
+
+    if (success) {
+        return (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 48, color: '#22c55e', marginBottom: 8 }}>check_circle</span>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Saved as template draft!</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Activate it in Super Admin › Template Manager</p>
+            </div>
+        )
+    }
+
+    const videoUrl = project.generation?.videoUrl || project.finalVideoUrl
+    return (
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {videoUrl && (
+                <div style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '9/16', maxHeight: 160, background: '#000' }}>
+                    <video src={videoUrl} muted autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+            )}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Template Name
+                <input value={name} onChange={e => setName(e.target.value)} required style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Category
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }}>
+                    <option value="">Select Category</option>
+                    {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Description (optional)
+                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Short description..." style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, outline: 'none' }} />
+            </label>
+            {error && <p style={{ color: '#ef4444', fontSize: 12, margin: 0 }}>{error}</p>}
+            <button type="submit" disabled={saving} style={{ background: '#6366f1', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.7 : 1, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{saving ? 'progress_activity' : 'bookmark_add'}</span>
+                {saving ? 'Saving...' : 'Save as Template'}
+            </button>
+        </form>
+    )
+}
+
+export default function UGCPro({ activeBrand, projects = [], canCreateVideo = true, onUpgradeRequired, user }) {
+    const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
+    const [previewVideo, setPreviewVideo] = useState(null)
+    const [savingTemplate, setSavingTemplate] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const [analyzing, setAnalyzing] = useState(false)
@@ -217,7 +303,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [hookShot, setHookShot] = useState(false)
     const [duration, setDuration] = useState(5)
     const [aspectRatio, setAspectRatio] = useState('9:16')
-    const [language, setLanguage] = useState('english')
+    const [language, setLanguage] = useState('English')
     const [cta, setCta] = useState('Shop now')
     const [selectedModel, setSelectedModel] = useState('seedance-2.0')
     const [showSettings, setShowSettings] = useState(false)
@@ -393,7 +479,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                 {gridVideos.map(v => {
                     const videoUrl = v.generation?.videoUrl
                     return (
-                        <UGCVideoCard key={v._id} v={v} videoUrl={videoUrl} activeBrand={activeBrand} downloadVideo={downloadVideo} />
+                        <UGCVideoCard key={v._id} v={v} videoUrl={videoUrl} onPreview={setPreviewVideo} onSaveTemplate={setSavingTemplate} isAdmin={isAdmin} />
                     )
                 })}
 
@@ -652,6 +738,44 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                     </div>
                 </div>
             </div>
+
+            {/* ── Video Preview Modal ── */}
+            {previewVideo && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
+                    <div style={{ position: 'relative', maxWidth: 420, width: '90%' }} onClick={e => e.stopPropagation()}>
+                        <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                        <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
+                            <a href={previewVideo} download="ugc-pro-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
+                            </a>
+                            <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Save as Template Modal (Admin Only) ── */}
+            {savingTemplate && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSavingTemplate(null)}>
+                    <div style={{ background: '#12121A', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#a855f7' }}>bookmark_add</span>
+                                Save as UGC Template
+                            </h2>
+                            <button onClick={() => setSavingTemplate(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <UGCSaveTemplateForm
+                            project={savingTemplate}
+                            onClose={() => setSavingTemplate(null)}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Avatar Picker */}
             <AvatarPicker

@@ -1235,7 +1235,7 @@ export default function VideoStudio() {
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
                 {studioMode === 'ugc-pro' && (
-                    <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}

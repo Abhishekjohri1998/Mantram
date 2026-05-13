@@ -3546,6 +3546,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
             generation: {
                 provider: usedProvider,
                 model: selectedModel,
+                language: parsedSettings.language || 'English',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
                 duration,
@@ -3573,29 +3574,67 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
 });
 
 // ── GET /api/video-studio/ugc-pro/status/:requestId ──
-// Poll MuAPI generation status (uses existing muapiClient) and update history
+// Poll Atlas Cloud status, mirror to S3, trigger voiceover pipeline
 router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollAtlasCloudStatus(req.params.requestId);
-        
-        // Update DB history to maintain sync
-        if (result && req.params.requestId) {
-            const updatePayload = {
-                'generation.progress': result.progress,
-                'generation.status': result.status === 'COMPLETED' ? 'COMPLETED' : (result.status === 'FAILED' ? 'FAILED' : 'GENERATING')
-            };
-            if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
-            if (result.error) updatePayload['generation.error'] = result.error;
-            if (result.status === 'COMPLETED' || result.status === 'FAILED') {
-                updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
-            }
-            await VideoProject.findOneAndUpdate(
-                { 'generation.requestId': req.params.requestId, user: req.user._id, studioMode: 'ugc-pro' },
-                updatePayload
-            );
+        const { requestId } = req.params;
+
+        // Guard against stale frontend state
+        if (!requestId || requestId === 'undefined' || requestId === 'null') {
+            return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
 
-        res.json({ success: true, ...result });
+        const result = await pollAtlasCloudStatus(requestId);
+        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
+
+        // Mirror completed videos to S3 (prevent provider URL expiry)
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            try {
+                const s3VideoUrl = await ensureS3Url(result.videoUrl, `ugc-pro/gen-video-${Date.now()}.mp4`);
+                if (s3VideoUrl) result.videoUrl = s3VideoUrl;
+            } catch (mirrorErr) {
+                console.warn(`[UGC Pro Status] S3 mirror failed: ${mirrorErr.message}`);
+            }
+        }
+
+        // Update DB history
+        const updatePayload = {
+            'generation.progress': result.progress || 0,
+            'generation.status': result.status === 'COMPLETED' ? 'COMPLETED' : (result.status === 'FAILED' ? 'FAILED' : 'GENERATING')
+        };
+        if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
+        if (result.error) updatePayload['generation.error'] = result.error;
+        if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+            updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
+        }
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            updatePayload.finalVideoUrl = result.videoUrl;
+        }
+
+        const updatedProject = await VideoProject.findOneAndUpdate(
+            { 'generation.requestId': requestId, user: req.user._id, studioMode: 'ugc-pro' },
+            { $set: updatePayload },
+            { returnDocument: 'after' }
+        ).catch(e => { console.warn('[UGC Pro Status] DB update failed:', e.message); return null; });
+
+        // 🎤 Trigger async voiceover pipeline for non-English completed videos
+        if (result.status === 'COMPLETED' && updatedProject) {
+            console.log(`[UGC Pro Status] ✅ DB updated: project=${updatedProject._id}, status=${updatedProject.status}`);
+            if (updatedProject.generation?.language &&
+                updatedProject.generation.language.toLowerCase() !== 'english' &&
+                !updatedProject.generation?.voiceoverStatus) {
+                console.log(`🎤 [TTS] Triggering UGC Pro voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+                addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] UGC Pro voiceover failed: ${e.message}`));
+            }
+        }
+
+        res.json({
+            success: true,
+            status: result.status,
+            progress: result.progress,
+            videoUrl: result.videoUrl || null,
+            error: result.error || null,
+        });
     } catch (err) {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
