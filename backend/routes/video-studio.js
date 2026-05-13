@@ -3881,16 +3881,34 @@ router.get('/ugc-pro/qads/credit-estimate', protect, (req, res) => {
 // Q-Ads V2 — Regional Language Voiceover Pipeline (TTS + FFmpeg Mux)
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Language → Sarvam/TTS code mapping
+// Language → TTS code mapping (Indian + Global)
 const QADS_LANG_TO_CODE = {
     'Hindi': 'hi-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN', 'Bengali': 'bn-IN',
     'Marathi': 'mr-IN', 'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN',
     'Punjabi': 'pa-IN', 'English': 'en-IN', 'Arabic': 'ar-SA', 'Urdu': 'ur-PK',
     'French': 'fr-FR', 'Spanish': 'es-ES', 'Portuguese': 'pt-BR', 'Japanese': 'ja-JP',
-    'Korean': 'ko-KR', 'Chinese': 'zh-CN',
+    'Korean': 'ko-KR', 'Chinese': 'zh-CN', 'German': 'de-DE', 'Italian': 'it-IT',
+    'Turkish': 'tr-TR', 'Thai': 'th-TH',
 };
 
 const SARVAM_SUPPORTED = new Set(['hi-IN', 'ta-IN', 'te-IN', 'bn-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'en-IN']);
+
+// OpenAI TTS: auto-select best voice per language family for natural delivery
+const OPENAI_VOICE_BY_LANG = {
+    'ar-SA': 'coral',   // Coral — warm, rich timbre suits Arabic
+    'ur-PK': 'coral',   // Coral — similar tonal quality for Urdu
+    'fr-FR': 'sage',    // Sage — smooth, sophisticated for European
+    'es-ES': 'nova',    // Nova — clear, expressive for Spanish
+    'pt-BR': 'nova',    // Nova — energetic for Brazilian Portuguese
+    'ja-JP': 'shimmer', // Shimmer — precise, clean for Japanese
+    'ko-KR': 'shimmer', // Shimmer — crisp for Korean
+    'zh-CN': 'alloy',   // Alloy — balanced for Mandarin
+    'de-DE': 'onyx',    // Onyx — authoritative for German
+    'it-IT': 'sage',    // Sage — warm, melodic for Italian
+    'tr-TR': 'echo',    // Echo — natural for Turkish
+    'th-TH': 'nova',    // Nova — versatile for Thai
+    'en-IN': 'nova',    // Nova — fallback if Sarvam fails
+};
 
 // Auto-select best voice per language
 const QADS_AUTO_VOICE = {
@@ -3912,17 +3930,21 @@ const QADS_AUTO_VOICE = {
  */
 function extractDialogueLines(promptText) {
     if (!promptText) return [];
-    // Match DIALOGUE: "..." patterns (double or single quotes, curly quotes)
-    const matches = [...promptText.matchAll(/DIALOGUE\s*:\s*["""]([^"""]+)["""]/gi)];
-    const lines = matches.map(m => m[1].trim()).filter(l => l.length > 3);
+    // Match DIALOGUE [emotion]: "text" (new) or DIALOGUE: "text" (legacy)
+    const matches = [...promptText.matchAll(/DIALOGUE\s*(?:\[([^\]]+)\])?\s*:\s*["""\u201C\u201D]([^"""\u201C\u201D]+)["""\u201C\u201D]/gi)];
+    const lines = matches.map(m => ({
+        text: m[2].trim(),
+        emotion: (m[1] || 'neutral').trim().split(',')[0].trim().toLowerCase(),
+    })).filter(l => l.text.length > 3);
     if (lines.length > 0) {
-        console.log(`🎤 [TTS] Extracted ${lines.length} dialogue line(s) from prompt`);
+        console.log(`🎤 [TTS] Extracted ${lines.length} dialogue line(s) with emotions: ${lines.map(l => l.emotion).join(', ')}`);
     }
     return lines;
 }
 
 /**
- * Generate TTS audio for dialogue lines via Sarvam (Indian) or Google TTS.
+ * Generate TTS audio for dialogue lines via Sarvam (Indian) or OpenAI (global).
+ * Now supports emotion-tagged dialogue for natural, emotional delivery.
  * Returns S3 URL of the audio file, or null on failure.
  */
 async function generateQAdsTTS(dialogueLines, language) {
@@ -3930,33 +3952,123 @@ async function generateQAdsTTS(dialogueLines, language) {
 
     const langCode = QADS_LANG_TO_CODE[language] || 'en-IN';
     const isSarvamLang = SARVAM_SUPPORTED.has(langCode);
-    const fullScript = dialogueLines.join('. ');
 
-    console.log(`🎤 [TTS] Generating voiceover: lang=${language} (${langCode}), provider=${isSarvamLang ? 'Sarvam' : 'Google'}, script=${fullScript.substring(0, 100)}...`);
+    // Normalize: support both new { text, emotion } and legacy string formats
+    const normalizedLines = dialogueLines.map(l =>
+        typeof l === 'string' ? { text: l, emotion: 'neutral' } : l
+    );
+
+    const fullScript = normalizedLines.map(l => l.text).join('. ');
+    const dominantEmotion = normalizedLines[0]?.emotion || 'neutral';
+    const provider = isSarvamLang ? 'Sarvam' : 'OpenAI';
+
+    console.log(`🎤 [TTS] Generating voiceover: lang=${language} (${langCode}), provider=${provider}, emotion=${dominantEmotion}, script=${fullScript.substring(0, 100)}...`);
 
     try {
         if (isSarvamLang) {
-            return await generateSarvamTTSInternal(fullScript, langCode);
+            return await generateSarvamTTSInternal(fullScript, langCode, dominantEmotion);
         } else {
-            // For non-Indian languages, use Google Cloud TTS if configured
-            console.warn(`🎤 [TTS] Language ${language} (${langCode}) not supported by Sarvam — voiceover skipped`);
-            return null;
+            // All non-Indian languages → OpenAI gpt-4o-mini-tts with full emotional steering
+            return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
         }
     } catch (e) {
-        console.error(`❌ [TTS] Voiceover generation failed: ${e.message}`);
+        console.error(`❌ [TTS] Voiceover generation failed (${provider}): ${e.message}`);
+        // If Sarvam fails, try OpenAI as fallback
+        if (isSarvamLang) {
+            try {
+                console.log(`🔄 [TTS] Sarvam failed, trying OpenAI fallback for ${language}...`);
+                return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
+            } catch (fallbackErr) {
+                console.error(`❌ [TTS] OpenAI fallback also failed: ${fallbackErr.message}`);
+            }
+        }
         return null;
     }
 }
 
 /**
- * Internal Sarvam TTS call — reuses the same logic as the sarvam-tts endpoint.
+ * OpenAI gpt-4o-mini-tts — Emotional, natural TTS for global languages.
+ * Uses the `instructions` parameter for emotion-steerable voice delivery.
+ * Voice is auto-selected per language family for optimal native quality.
  */
-async function generateSarvamTTSInternal(text, langCode) {
+async function generateOpenAITTS(text, emotion, language, langCode) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) { console.warn('🎤 [TTS] OpenAI API key not configured — skipping'); return null; }
+
+    // Emotion → voice instruction mapping (director-grade delivery notes)
+    const EMOTION_INSTRUCTIONS = {
+        excited:    'Speak with genuine excitement and high energy. Your voice rises naturally with enthusiasm. Fast-paced and infectious, like discovering something amazing you must share.',
+        warm:       'Speak warmly and conversationally, like talking to a close friend. Gentle, intimate tone with natural pauses. A slight smile in your voice.',
+        urgent:     'Speak with urgency and conviction. Direct, persuasive, slightly faster pace. Emphasize key action words. Create a sense of "you need this NOW."',
+        calm:       'Speak calmly and authoritatively. Measured pace, confident tone, clear enunciation. Like a trusted expert explaining with quiet confidence.',
+        playful:    'Speak playfully with a smile in your voice. Light, teasing energy with natural laughter undertones. Quick, bouncy delivery.',
+        dramatic:   'Speak dramatically with emotional weight. Slow, deliberate pauses between phrases. Build tension and let words land with gravity.',
+        curious:    'Speak with genuine curiosity and wonder. Rising intonation on key phrases. Draw the listener in with an inviting, questioning tone.',
+        confident:  'Speak with strong confidence and authority. Steady, unwavering, commanding attention. No hesitation. Bold and direct.',
+        mysterious: 'Speak in a low, intriguing tone. Slight whisper quality on key phrases. Draw the listener in with suspense.',
+        empathetic: 'Speak with deep empathy and understanding. Soft, caring, emotionally connected. Like you truly understand their pain point.',
+        neutral:    'Speak naturally and clearly with an engaging, professional tone. Warm but not overly emotional.',
+    };
+
+    const instruction = EMOTION_INSTRUCTIONS[emotion] || EMOTION_INSTRUCTIONS.neutral;
+    const voice = OPENAI_VOICE_BY_LANG[langCode] || 'nova';
+    const langNote = language !== 'English' ? ` Speak fluently in ${language} with an authentic native accent and natural rhythm.` : '';
+
+    console.log(`🎤 [TTS] OpenAI: voice=${voice}, emotion=${emotion}, lang=${language}, text=${text.length} chars`);
+
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: 'gpt-4o-mini-tts',
+            voice,
+            input: text.substring(0, 4000),
+            instructions: `${instruction}${langNote} This is a voiceover for a cinematic video advertisement. Deliver with natural pacing and breath.`,
+            response_format: 'mp3',
+        }),
+    });
+
+    if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        throw new Error(`OpenAI TTS failed (${response.status}): ${errBody.substring(0, 200)}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`;
+    const audioUrl = await uploadToS3(buffer, s3Key, 'audio/mpeg');
+    console.log(`✅ [TTS] OpenAI audio uploaded: ${audioUrl.substring(0, 70)}`);
+    return audioUrl;
+}
+
+/**
+ * Internal Sarvam TTS call with emotion-to-pitch/pace mapping.
+ * Emotion tags drive the vocal delivery characteristics for Indian languages.
+ */
+async function generateSarvamTTSInternal(text, langCode, emotion = 'neutral') {
     const apiKey = process.env.SARVAM_API_KEY;
     if (!apiKey) { console.warn('🎤 [TTS] Sarvam API key not configured — skipping'); return null; }
 
+    // Emotion → Sarvam pitch/pace/loudness mapping
+    const EMOTION_MAP = {
+        excited:    { pitch: 2, pace: 1.2, loudness: 1.8 },
+        warm:       { pitch: 0, pace: 0.9, loudness: 1.3 },
+        urgent:     { pitch: 1, pace: 1.3, loudness: 1.8 },
+        calm:       { pitch: -1, pace: 0.85, loudness: 1.2 },
+        playful:    { pitch: 2, pace: 1.1, loudness: 1.5 },
+        dramatic:   { pitch: -2, pace: 0.75, loudness: 1.6 },
+        curious:    { pitch: 1, pace: 1.0, loudness: 1.4 },
+        confident:  { pitch: 0, pace: 0.95, loudness: 1.7 },
+        mysterious: { pitch: -1, pace: 0.8, loudness: 1.1 },
+        empathetic: { pitch: 0, pace: 0.85, loudness: 1.2 },
+        neutral:    { pitch: 0, pace: 1.0, loudness: 1.5 },
+    };
+    const emo = EMOTION_MAP[emotion] || EMOTION_MAP.neutral;
+
     const voice = QADS_AUTO_VOICE[langCode] || { speaker: 'anushka' };
-    console.log(`🎤 [TTS] Sarvam: voice=${voice.speaker}, lang=${langCode}, text=${text.length} chars`);
+    console.log(`🎤 [TTS] Sarvam: voice=${voice.speaker}, lang=${langCode}, emotion=${emotion} (pitch=${emo.pitch}, pace=${emo.pace}), text=${text.length} chars`);
 
     const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
         method: 'POST',
@@ -3966,9 +4078,9 @@ async function generateSarvamTTSInternal(text, langCode) {
             target_language_code: langCode,
             speaker: voice.speaker,
             model: 'bulbul:v2',
-            pitch: 0,
-            pace: 1.0,
-            loudness: 1.5,
+            pitch: emo.pitch,
+            pace: emo.pace,
+            loudness: emo.loudness,
             enable_preprocessing: true,
         }),
     });

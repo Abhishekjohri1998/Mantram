@@ -202,6 +202,23 @@ RULES:
 5. The backendPrompt is the MOST IMPORTANT output — it goes directly to the AI video model.
 6. No text overlays, brand names, or logos in the backendPrompt — models handle these poorly.
 7. DO embed brand colour mood, lighting energy, and visual personality in the backendPrompt.
+8. Every shot with dialogue MUST include an emotion that drives delivery — think like a director giving notes to an actor.
+
+EMOTIONAL DIRECTION GUIDE (think like a film/ad director giving actor notes):
+- Each dialogue line MUST have an emotion tag that drives how it should be SPOKEN and PERFORMED
+- Emotions should ARC across the video — never use the same emotion twice in a row
+- Map emotions to both camera language AND voice delivery:
+  • excited → faster cuts, handheld energy, bright lighting, voice rises naturally
+  • dramatic → slow push-in, low key, heavy silence before the line, slow deliberate delivery
+  • warm → golden hour, soft focus, gentle smile, conversational intimate tone
+  • urgent → tight CU, rapid pace, staccato delivery, commanding attention
+  • mysterious → shadows, slow reveal, whispered tone, draw listener in
+  • confident → direct to camera, steady, authoritative framing, strong unwavering voice
+  • playful → wide lens, high-key bright, smile in the voice, teasing energy
+  • curious → MCU leaning in, rising intonation, inviting wonder
+  • empathetic → soft close-up, gentle pace, caring emotionally connected tone
+  • calm → locked-off static, measured pace, clear enunciation, professional authority
+- A great ad NEVER has monotone delivery — every line must feel emotionally distinct
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {
@@ -211,6 +228,7 @@ RESPONSE FORMAT — respond with ONLY valid JSON:
       "duration": 5,
       "visual": "What is seen on screen — highly detailed visual description",
       "dialogue": "Spoken words or voiceover, or empty string",
+      "emotion": "excited|calm|dramatic|urgent|warm|playful|serious|mysterious|empathetic|confident|curious",
       "camera": "Exact camera movement with speed and direction",
       "audio": "Background music mood + key sound effects",
       "transition": "cut|fade|dissolve|match-cut|whip-pan"
@@ -343,6 +361,19 @@ SHOT SIZES: ECU | CU | MCU | MS | MWS | WS | OTS | POV
 LENSES: 24mm=wide | 35mm=natural | 50mm=human | 85mm=portrait | 135mm=telephoto
 MOVES: push-in | pull-back | handheld | tracking | static | slide | snap-push | top-down | orbit | crane | rack-focus
 
+EMOTIONAL ARC & DIALOGUE DIRECTION:
+Every dialogue/voiceover line MUST include an emotion direction tag:
+Format: DIALOGUE [emotion]: "text"
+Emotions: excited | warm | urgent | calm | playful | dramatic | curious | confident | mysterious | empathetic
+
+The emotional arc should follow the narrative beat:
+- HOOK: curious / shocking / playful (grab attention, create intrigue)
+- BUILD: warm / conversational / excited (develop the story, build connection)
+- CLIMAX: dramatic / urgent / confident (deliver the payoff, emotional peak)
+- CTA: urgent / warm / confident (drive action, leave lasting impression)
+
+Never repeat the same emotion in consecutive dialogue lines. Think like a director coaching actors — each line must FEEL different.
+
 AD DIRECTOR PLAYBOOK:
 • Emotional/Testimonial → slow push-in, warm MCU, long takes (5-8s)
 • Product Reveal → overhead → dolly-in → 360° orbit → hero MS, rim light
@@ -359,7 +390,7 @@ RULES: 2200 char max. No negative prompts. No text overlays. Present tense. Pres
 
 RESPONSE FORMAT — ONLY valid JSON:
 {
-  "enhancedPrompt": "production-ready prompt with brand DNA embedded",
+  "enhancedPrompt": "production-ready prompt with brand DNA and emotion-tagged DIALOGUE lines embedded",
   "changes": ["list of specific enhancements made"]
 }`;
 };
@@ -530,6 +561,32 @@ ${hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attenti
 SHOT 2: [Shot size + focal length] / [Camera move] / [Action]
 SHOT 3: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — 8 to 15 shots based on duration]
+
+══════════════════════════════════
+DIALOGUE FORMAT — MANDATORY EMOTION TAGS:
+══════════════════════════════════
+Every shot where the avatar speaks MUST include dialogue in this EXACT format:
+DIALOGUE [emotion]: "[exact words the presenter says]"
+
+EMOTION TAGS (pick one per dialogue line — think like a director giving actor notes):
+- [excited, high energy] — product reveal, wow moment, unboxing surprise
+- [warm, conversational] — personal story, relatable moment, testimonial
+- [urgent, persuasive] — limited time, scarcity, call to action
+- [calm, authoritative] — expert opinion, feature explanation
+- [playful, teasing] — humor, sarcasm, self-deprecating hook
+- [dramatic, slow] — emotional payoff, transformation reveal
+- [curious, questioning] — opening hook, rhetorical question
+- [confident, direct] — strong recommendation, social proof
+- [empathetic, caring] — problem acknowledgment, understanding pain point
+
+EXAMPLES:
+DIALOGUE [excited, rising energy]: "I literally cannot go back to my old routine after this!"
+DIALOGUE [warm, intimate]: "Let me show you something that changed everything for me."
+DIALOGUE [urgent, direct]: "Okay but you NEED to try this before it sells out."
+DIALOGUE [curious, questioning]: "Has anyone else been struggling with this or is it just me?"
+DIALOGUE [playful, teasing]: "I was today years old when I found out this existed."
+
+RULE: Write at least 4-6 distinct DIALOGUE lines across different shots. Each line must sound natural and colloquial. Emotions MUST arc — never repeat the same emotion twice in a row.
 
 ══════════════════════════════════
 IMAGE TAGGING — MANDATORY:

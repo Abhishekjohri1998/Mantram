@@ -43,6 +43,16 @@ const LANGUAGES = [
     { id: 'Punjabi',    label: 'ਪੰਜਾਬੀ' },
     { id: 'Urdu',       label: 'اردو' },
     { id: 'Arabic',     label: 'العربية' },
+    { id: 'French',     label: 'Français' },
+    { id: 'Spanish',    label: 'Español' },
+    { id: 'Portuguese', label: 'Português' },
+    { id: 'Japanese',   label: '日本語' },
+    { id: 'Korean',     label: '한국어' },
+    { id: 'Chinese',    label: '中文' },
+    { id: 'German',     label: 'Deutsch' },
+    { id: 'Italian',    label: 'Italiano' },
+    { id: 'Turkish',    label: 'Türkçe' },
+    { id: 'Thai',       label: 'ไทย' },
 ]
 
 /* ── CSS ── */
