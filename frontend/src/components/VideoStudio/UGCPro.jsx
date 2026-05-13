@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { CreditTooltipWrapper } from '../CreditBadge'
 import AvatarPicker from './AvatarPicker'
 
@@ -123,41 +124,99 @@ const css = `
 /* ── Dropdown (matches Advanced Mode ConfigDropdown) ── */
 function Dropdown({ value, onChange, options, label }) {
     const [open, setOpen] = useState(false)
-    const ref = useRef(null)
-    const [pos, setPos] = useState({ bottom: 0, left: 0 })
+    const btnRef = useRef(null)
+    const menuRef = useRef(null)
+    const [pos, setPos] = useState({ top: 0, left: 0 })
 
+    /* Close on outside click — check both the button and the portal menu */
     useEffect(() => {
-        const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+        if (!open) return
+        const h = (e) => {
+            if (btnRef.current && btnRef.current.contains(e.target)) return
+            if (menuRef.current && menuRef.current.contains(e.target)) return
+            setOpen(false)
+        }
         document.addEventListener('mousedown', h)
         return () => document.removeEventListener('mousedown', h)
-    }, [])
+    }, [open])
 
     const toggleOpen = () => {
-        if (!open && ref.current) {
-            const rect = ref.current.getBoundingClientRect()
-            setPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left })
+        if (!open && btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect()
+            /* Position the menu above the button, aligned to its left edge */
+            const menuMaxH = Math.min(340, rect.top - 12)
+            setPos({
+                top: rect.top - menuMaxH - 6,
+                left: rect.left,
+                maxH: menuMaxH,
+            })
         }
         setOpen(!open)
     }
 
     const sel = options.find(o => o.value === value) || options[0]
+
+    const menu = open ? createPortal(
+        <div
+            ref={menuRef}
+            style={{
+                position: 'fixed',
+                top: pos.top,
+                left: pos.left,
+                minWidth: 180,
+                maxHeight: pos.maxH || 340,
+                overflowY: 'auto',
+                background: '#1a1a1e',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                padding: 6,
+                zIndex: 99999,
+                boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+            }}
+        >
+            {options.map(o => (
+                <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { onChange(o.value); setOpen(false) }}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '9px 12px',
+                        border: 'none',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background .15s',
+                        background: o.value === value ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        color: o.value === value ? '#fff' : 'rgba(255,255,255,0.6)',
+                    }}
+                    onMouseEnter={e => { if (o.value !== value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                    onMouseLeave={e => { if (o.value !== value) e.currentTarget.style.background = 'transparent' }}
+                >
+                    {o.value === value && <span style={{ fontSize: 14 }}>✓</span>}
+                    {o.label}
+                </button>
+            ))}
+        </div>,
+        document.body
+    ) : null
+
     return (
-        <div ref={ref}>
+        <div ref={btnRef}>
             <button type="button" className="ugc-cfg-btn" onClick={toggleOpen}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{sel?.icon || 'tune'}</span>
                 <span>{sel?.label}</span>
                 <span className="material-symbols-outlined" style={{ fontSize: 14, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}>expand_more</span>
             </button>
-            {open && (
-                <div style={{ position: 'fixed', bottom: pos.bottom, left: pos.left, minWidth: 160, maxHeight: 250, overflowY: 'auto', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 12, padding: 6, zIndex: 99999, boxShadow: '0 12px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {options.map(o => (
-                        <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false) }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 10px', border: 'none', borderRadius: 8, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all .2s', background: o.value === value ? 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))' : 'transparent', color: o.value === value ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>
-                            {o.label}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {menu}
         </div>
     )
 }
