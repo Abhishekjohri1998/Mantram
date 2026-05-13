@@ -138,7 +138,7 @@ function Dropdown({ value, onChange, options, label }) {
                 <span className="material-symbols-outlined" style={{ fontSize: 14, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}>expand_more</span>
             </button>
             {open && (
-                <div style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, minWidth: 160, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 12, padding: 6, zIndex: 200, boxShadow: '0 12px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, minWidth: 160, maxHeight: 250, overflowY: 'auto', background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 12, padding: 6, zIndex: 200, boxShadow: '0 12px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {options.map(o => (
                         <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false) }}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 10px', border: 'none', borderRadius: 8, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all .2s', background: o.value === value ? 'color-mix(in srgb, var(--sys-text) 6%, var(--sys-surface))' : 'transparent', color: o.value === value ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>
