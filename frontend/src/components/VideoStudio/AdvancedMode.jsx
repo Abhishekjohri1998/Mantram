@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import PublishModal from '../PublishModal'
 import { creatives as creativesAPI } from '../../services/api'
 import { CreditTooltipWrapper } from '../CreditBadge'
@@ -28,6 +29,21 @@ const MODELS = {
     'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p', '480p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." },
     'happyhorse-1.0': { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', msIcon: 'pets', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's cinematic model. Great motion, native audio, ref images, 1080p." },
 }
+
+const LANGUAGES = [
+    { id: 'English',    label: 'English' },
+    { id: 'Hindi',      label: 'Hindi' },
+    { id: 'Tamil',      label: 'தமிழ்' },
+    { id: 'Telugu',     label: 'తెలుగు' },
+    { id: 'Kannada',    label: 'ಕನ್ನಡ' },
+    { id: 'Malayalam',  label: 'മലയാളം' },
+    { id: 'Bengali',    label: 'বাংলা' },
+    { id: 'Marathi',    label: 'मराठी' },
+    { id: 'Gujarati',   label: 'ગુજરાતી' },
+    { id: 'Punjabi',    label: 'ਪੰਜਾਬੀ' },
+    { id: 'Urdu',       label: 'اردو' },
+    { id: 'Arabic',     label: 'العربية' },
+]
 
 /* ── CSS ── */
 const css = `
@@ -186,29 +202,98 @@ const css = `
 
 function ConfigDropdown({ value, onChange, options, label }) {
     const [open, setOpen] = useState(false)
-    const ref = useRef(null)
+    const btnRef = useRef(null)
+    const menuRef = useRef(null)
+    const [pos, setPos] = useState({ top: 0, left: 0 })
+
     useEffect(() => {
-        const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+        if (!open) return
+        const h = (e) => {
+            if (btnRef.current && btnRef.current.contains(e.target)) return
+            if (menuRef.current && menuRef.current.contains(e.target)) return
+            setOpen(false)
+        }
         document.addEventListener('mousedown', h)
         return () => document.removeEventListener('mousedown', h)
-    }, [])
+    }, [open])
+
+    const toggleOpen = () => {
+        if (!open && btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect()
+            const menuMaxH = Math.min(340, rect.top - 12)
+            setPos({
+                top: rect.top - menuMaxH - 6,
+                left: rect.left,
+                maxH: menuMaxH,
+            })
+        }
+        setOpen(!open)
+    }
+
     const sel = options.find(o => o.value === value) || options[0]
+
+    const menu = open ? createPortal(
+        <div
+            ref={menuRef}
+            style={{
+                position: 'fixed',
+                top: pos.top,
+                left: pos.left,
+                minWidth: 180,
+                maxHeight: pos.maxH || 340,
+                overflowY: 'auto',
+                background: '#1a1a1e',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                padding: 6,
+                zIndex: 99999,
+                boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+            }}
+        >
+            {options.map(o => (
+                <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { onChange(o.value); setOpen(false) }}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '9px 12px',
+                        border: 'none',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background .15s',
+                        background: o.value === value ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        color: o.value === value ? '#fff' : 'rgba(255,255,255,0.6)',
+                    }}
+                    onMouseEnter={e => { if (o.value !== value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                    onMouseLeave={e => { if (o.value !== value) e.currentTarget.style.background = 'transparent' }}
+                >
+                    {o.msIcon && <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{o.msIcon}</span>}
+                    {o.value === value && !o.msIcon && <span style={{ fontSize: 14 }}>✓</span>}
+                    {o.label}
+                </button>
+            ))}
+        </div>,
+        document.body
+    ) : null
+
     return (
-        <div className="vm-config-item" ref={ref}>
-            <button type="button" className={`vm-config-trigger ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}>
+        <div className="vm-config-item" ref={btnRef}>
+            <button type="button" className={`vm-config-trigger ${open ? 'open' : ''}`} onClick={toggleOpen}>
                 {sel?.msIcon && <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{sel.msIcon}</span>}
                 <span>{sel?.label}</span>
                 <span className="material-symbols-outlined" style={{ transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}>expand_more</span>
             </button>
-            {open && (
-                <div className="vm-config-menu">
-                    {options.map(o => (
-                        <button key={o.value} type="button" className={`vm-config-opt ${o.value === value ? 'sel' : ''}`} onClick={() => { onChange(o.value); setOpen(false) }}>
-                            {o.msIcon && <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{o.msIcon}</span>} {o.label}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {menu}
         </div>
     )
 }
@@ -478,6 +563,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const [extendPrompt, setExtendPrompt] = useState('')
     const [extendDuration, setExtendDuration] = useState(5)
     const [extending, setExtending] = useState(false)
+    const [language, setLanguage] = useState('English')
 
     const firstFrameRef = useRef(null)
     const lastFrameRef = useRef(null)
@@ -742,6 +828,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     lastImageUrl: lastFrame?.url || '',
                     generateAudio: !!m.has.audio, qualityMode: quality,
                     brandId: activeBrand?._id || null,
+                    language: language || 'English',
                     referenceImages: allRefUrls,
                     ...(m.has.negativePrompt && negativePrompt.trim() ? { negativePrompt: negativePrompt.trim() } : {}),
                     ...(m.has.seed && seed >= 0 ? { seed } : {}),
@@ -1405,6 +1492,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                             <ConfigDropdown value={aspectRatio} onChange={setAspectRatio} options={m.ratios.map(r => ({ value: r, label: r }))} label="Ratio" />
                             <ConfigDropdown value={resolution} onChange={setResolution} options={m.res.map(r => ({ value: r, label: r }))} label="Resolution" />
                             <ConfigDropdown value={duration} onChange={setDuration} options={m.durs.map(d => ({ value: d, label: `${d}s` }))} label="Duration" />
+                            <ConfigDropdown value={language} onChange={setLanguage} options={LANGUAGES.map(l => ({ value: l.id, label: l.label }))} label="Language" />
                         </div>
 
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>

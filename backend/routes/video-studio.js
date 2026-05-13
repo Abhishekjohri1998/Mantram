@@ -394,7 +394,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             prompt, model, duration, resolution, aspectRatio,
             firstImageUrl, lastImageUrl, referenceImages,
             generateAudio, qualityMode, brandId, shots,
-            refAudio, refVideo, idempotencyKey
+            refAudio, refVideo, idempotencyKey, language
         } = req.body;
 
         // 🔍 DIAGNOSTIC: Log start of handler
@@ -518,6 +518,9 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             contentHash,
             idempotencyKey: idempotencyKey || null,
             isDraft,
+            generation: {
+                language: language || 'English',
+            },
         });
 
         // 3. Plan duration if needed
@@ -546,7 +549,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
             const projectStatus = state.status === 'critique' ? 'completed' : 'advanced-generating';
             
             // Ensure generation.status is explicitly set so frontend polling detects completion
-            const genData = { ...state.generation };
+            const genData = { ...state.generation, language: language || 'English' };
             if (projectStatus === 'completed') {
                 genData.status = 'COMPLETED';
                 genData.progress = 100;
@@ -5768,6 +5771,18 @@ router.get('/:id/status', protect, async (req, res) => {
                             fs.rmSync(tmpDir, { recursive: true, force: true });
                         } catch (mixErr) {
                             console.warn(`⚠️ Voiceover auto-mix failed (video still available without VO):`, mixErr.message);
+                        }
+                    }
+
+                    // 🎤 Trigger async voiceover pipeline for non-English completed videos (Advanced Mode)
+                    if (finalVideoUrl && updated.generation?.language &&
+                        updated.generation.language.toLowerCase() !== 'english' &&
+                        !updated.generation?.voiceoverStatus &&
+                        !project.voiceoverPreview?.audioUrl) {
+                        console.log(`🎤 [TTS] Triggering Advanced Mode voiceover pipeline for project ${project._id} (lang: ${updated.generation.language})`);
+                        const freshProject = await VideoProject.findById(project._id);
+                        if (freshProject) {
+                            addVoiceoverToProject(freshProject).catch(e => console.error(`🎤 [TTS] Advanced voiceover failed: ${e.message}`));
                         }
                     }
 
