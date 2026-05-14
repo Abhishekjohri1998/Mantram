@@ -475,6 +475,38 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
         }, 5000)
     }
 
+    function startLongFormJobPolling(jobId, lfJobId, projectId) {
+        if (pollRefs.current[jobId]) clearInterval(pollRefs.current[jobId])
+        pollRefs.current[jobId] = setInterval(async () => {
+            try {
+                const s = await api(`/video-studio/long-form/status/${lfJobId}`)
+                if (s) {
+                    if (s.status === 'COMPLETED' && s.videoUrl) {
+                        clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
+                        updateJob(jobId, { status: 'done', progress: 100, videoUrl: s.videoUrl })
+                        if (projectId) {
+                            const syntheticProject = { _id: projectId, status: 'critique', generation: { videoUrl: s.videoUrl }, routing: {}, advancedConfig: {} }
+                            setGridVideos(prev => {
+                                if (prev.some(p => p._id === projectId)) return prev.map(p => p._id === projectId ? { ...p, status: 'critique', generation: { videoUrl: s.videoUrl } } : p)
+                                return [syntheticProject, ...prev]
+                            })
+                        }
+                        setTimeout(() => setJobs(prev => prev.filter(j => j.id !== jobId)), 3000)
+                    } else if (s.status === 'FAILED') {
+                        clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
+                        updateJob(jobId, { status: 'failed', error: s.error || 'Long-form generation failed' })
+                    } else {
+                        updateJob(jobId, {
+                            progress: s.progress || 10,
+                            phaseLabel: s.phaseLabel || 'Generating...',
+                            detail: s.detail || '',
+                        })
+                    }
+                }
+            } catch {}
+        }, 5000)
+    }
+
     // Persist active generating projects across reloads/navigation
     // Only re-hydrate projects that are recently active (< 30 min old)
     const REHYDRATE_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
@@ -513,10 +545,16 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     videoUrl: null,
                     error: null,
                     startTime: p.generation?.startedAt ? new Date(p.generation.startedAt).getTime() : Date.now(),
-                    highTrafficNotified: false
+                    highTrafficNotified: false,
+                    isLongForm: p.studioMode === 'long-form',
+                    longFormJobId: p.generation?.longFormJobId
                 });
                 if (!pollRefs.current[jobId]) {
-                    startJobPolling(jobId, p._id);
+                    if (p.studioMode === 'long-form') {
+                        startLongFormJobPolling(jobId, p.generation?.longFormJobId, p._id);
+                    } else {
+                        startJobPolling(jobId, p._id);
+                    }
                 }
                 added = true;
             }
@@ -884,30 +922,10 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     bgmPreset: 'cinematic',
                 }),
             })
-            updateJob(jobId, { longFormJobId: d.jobId, segments: d.segments, estimatedMinutes: d.estimatedMinutes })
+            updateJob(jobId, { projectId: d.projectId, longFormJobId: d.jobId, segments: d.segments, estimatedMinutes: d.estimatedMinutes })
 
             // Long-form polling
-            const lfJobId = d.jobId
-            const pollId = setInterval(async () => {
-                try {
-                    const s = await api(`/video-studio/long-form/status/${lfJobId}`)
-                    if (s) {
-                        if (s.status === 'COMPLETED' && s.videoUrl) {
-                            clearInterval(pollId)
-                            updateJob(jobId, { status: 'done', progress: 100, videoUrl: s.videoUrl })
-                        } else if (s.status === 'FAILED') {
-                            clearInterval(pollId)
-                            updateJob(jobId, { status: 'failed', error: s.error || 'Long-form generation failed' })
-                        } else {
-                            updateJob(jobId, {
-                                progress: s.progress || 10,
-                                phaseLabel: s.phaseLabel || 'Generating...',
-                                detail: s.detail || '',
-                            })
-                        }
-                    }
-                } catch {}
-            }, 5000)
+            startLongFormJobPolling(jobId, d.jobId, d.projectId)
         } catch (e) {
             setError(e.message)
             setJobs(prev => prev.filter(j => j.id !== jobId))
