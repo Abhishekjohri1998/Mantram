@@ -3510,28 +3510,35 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), asyn
         let usedProvider;
 
         if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') {
-            // Atlas Cloud path (reference-to-video with avatar face locking)
+            // Atlas Cloud path — R2V mode (Reference-to-Video)
+            // ALL images go as references (avatar + product), no starting frame.
+            // This matches Q-Ads V2 behavior: model locks onto product appearance throughout.
+            const allRefImages = imageUrls.slice(0, 9);
+            console.log(`[UGC Generate] R2V mode: ${allRefImages.length} reference images (no starting frame)`);
             genResult = await submitAtlasCloudVideoGeneration({
                 prompt,
-                imageUrl: imageUrls[0] || null,
+                imageUrl: null,
                 duration,
                 aspectRatio,
                 qualityMode: quality,
                 generateAudio: true,
-                referenceImages: imageUrls.slice(1),
+                referenceImages: allRefImages,
             });
             usedProvider = 'atlascloud';
         } else {
             // Kling / Veo / other models via falClient submitVideoGeneration
+            // Same R2V approach — all images as references
+            const allRefImages = imageUrls.slice(0, 9);
+            console.log(`[UGC Generate] R2V mode (${selectedModel}): ${allRefImages.length} reference images`);
             const result = await submitVideoGeneration({
                 model: selectedModel,
                 prompt,
-                imageUrl: imageUrls[0] || null,
+                imageUrl: null,
                 duration,
                 resolution,
                 aspectRatio,
                 generateAudio: true,
-                referenceImages: imageUrls.slice(1),
+                referenceImages: allRefImages,
             });
             genResult = { taskId: result.requestId, _payload: result._atlasCloudPayload };
             usedProvider = result.provider || selectedModel;
@@ -3925,8 +3932,9 @@ const QADS_AUTO_VOICE = {
 };
 
 /**
- * Extract DIALOGUE lines from a Q-Ads prompt.
- * Format: DIALOGUE: "exact words the presenter says"
+ * Extract DIALOGUE lines from a Q-Ads / UGC prompt.
+ * Supports: DIALOGUE [emotion]: "text" (new) and DIALOGUE: "text" (legacy)
+ * Returns: [{ text: string, emotion: string }]
  */
 function extractDialogueLines(promptText) {
     if (!promptText) return [];

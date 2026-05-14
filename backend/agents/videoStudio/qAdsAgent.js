@@ -238,7 +238,25 @@ ${(() => {
     // Force dialogue for non-English languages even if preset doesn't require it,
     // because regional language voiceover needs spoken text to synthesize.
     if (needsDialogue || isNonEnglish) {
-        return `DIALOGUE REQUIREMENT — ${isNonEnglish ? 'MANDATORY (regional language selected)' : 'this preset demands spoken words on camera'}:\nEvery shot with the avatar on screen MUST include a DIALOGUE line.\nDIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written in ${lang}. The dialogue must sound natural, colloquial, and conversational in ${lang} — NOT translated from English.\nFormat: DIALOGUE: "[exact words the presenter says in ${lang}]"\nWrite at least 4-6 distinct DIALOGUE lines across different shots. Make each line specific to the product, natural and conversational.\nExample (English): DIALOGUE: "I literally wear this every event — the ruching hides everything."\nExample (Hindi): DIALOGUE: "मैं इसे हर इवेंट में पहनती हूं — रचिंग सब कुछ छुपा देती है।"\n`;
+        return `DIALOGUE REQUIREMENT — ${isNonEnglish ? 'MANDATORY (regional language selected)' : 'this preset demands spoken words on camera'}:
+Every shot with the avatar on screen MUST include a DIALOGUE line.
+DIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written DIRECTLY in ${lang} using ${lang} script/characters. NOT English. NOT translated from English. Write as a native ${lang} speaker would naturally speak.
+${isNonEnglish ? `⚠️ CRITICAL: If ANY dialogue line is in English instead of ${lang}, the ENTIRE output is REJECTED. You MUST write in ${lang} only.` : ''}
+Format: DIALOGUE [emotion]: "[exact words the presenter says in ${lang}]"
+
+EMOTION TAGS (pick one per line — think like a director giving actor notes):
+- [excited] — product reveal, wow moment, unboxing surprise
+- [warm] — personal story, relatable moment, testimonial
+- [urgent] — limited time, scarcity, call to action
+- [calm] — expert opinion, feature explanation
+- [playful] — humor, sarcasm, self-deprecating hook
+- [dramatic] — emotional payoff, transformation reveal
+- [curious] — opening hook, rhetorical question
+- [confident] — strong recommendation, social proof
+
+Write at least 4-6 distinct DIALOGUE lines across different shots. Emotions MUST arc — never repeat the same emotion twice in a row.
+${isNonEnglish ? `Example (${lang}): DIALOGUE [excited]: "[write this in ${lang} script]"` : 'Example: DIALOGUE [curious]: "Has anyone else been struggling with this?"'}
+`;
     } else {
         return 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n';
     }
