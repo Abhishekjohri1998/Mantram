@@ -4114,61 +4114,71 @@ async function generateSarvamTTSInternal(text, langCode, emotion = 'neutral') {
  * Mux video + audio using FFmpeg → single MP4 with embedded voiceover.
  * Downloads both files, runs FFmpeg, uploads result to S3.
  */
-async function muxVideoWithAudio(videoUrl, audioUrl) {
+async function muxVideoWithAudio(videoUrl, audioUrl = null, bgmUrl = null) {
     const tmpDir = os.tmpdir();
     const id = Date.now() + '-' + Math.random().toString(36).substring(7);
     const videoPath = path.join(tmpDir, `qads-video-${id}.mp4`);
-    const audioPath = path.join(tmpDir, `qads-audio-${id}.wav`);
+    const audioPath = audioUrl ? path.join(tmpDir, `qads-audio-${id}.wav`) : null;
+    const bgmPath = bgmUrl ? path.join(tmpDir, `qads-bgm-${id}.mp3`) : null;
     const outputPath = path.join(tmpDir, `qads-muxed-${id}.mp4`);
 
     try {
         console.log(`🎬 [FFmpeg] Downloading video for muxing...`);
-        // Download video
         const videoResp = await fetch(videoUrl);
         if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
-        const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
-        fs.writeFileSync(videoPath, videoBuffer);
+        fs.writeFileSync(videoPath, Buffer.from(await videoResp.arrayBuffer()));
 
-        // Download audio
-        const audioResp = await fetch(audioUrl);
-        if (!audioResp.ok) throw new Error(`Failed to download audio: ${audioResp.status}`);
-        const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
-        fs.writeFileSync(audioPath, audioBuffer);
+        if (audioUrl) {
+            const audioResp = await fetch(audioUrl);
+            if (audioResp.ok) fs.writeFileSync(audioPath, Buffer.from(await audioResp.arrayBuffer()));
+            else console.warn(`⚠️ [FFmpeg] Failed to download voiceover.`);
+        }
 
-        console.log(`🎬 [FFmpeg] Muxing video (${(videoBuffer.length / 1024 / 1024).toFixed(1)}MB) + audio (${(audioBuffer.length / 1024).toFixed(0)}KB)...`);
+        if (bgmUrl) {
+            console.log(`🎵 [FFmpeg] Downloading background music...`);
+            const bgmResp = await fetch(bgmUrl);
+            if (bgmResp.ok) fs.writeFileSync(bgmPath, Buffer.from(await bgmResp.arrayBuffer()));
+            else console.warn(`⚠️ [FFmpeg] Failed to download BGM, proceeding without it.`);
+        }
 
-        // FFmpeg: merge video + audio, keep video codec, encode audio as AAC
-        // -shortest: stop when the shorter stream ends
-        // -map 0:v: take video from first input
-        // -map 1:a: take audio from second input
-        // -filter:a "volume=1.5": boost voiceover volume slightly
-        await execFileAsync('ffmpeg', [
-            '-y',
-            '-i', videoPath,
-            '-i', audioPath,
-            '-map', '0:v:0',
-            '-map', '1:a:0',
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            '-b:a', '192k',
-            '-filter:a', 'volume=1.5',
-            '-shortest',
-            '-movflags', '+faststart',
-            outputPath,
-        ], { timeout: 60000 });
+        const ffmpegArgs = ['-y', '-i', videoPath];
 
-        // Upload muxed video to S3
+        if (audioUrl && fs.existsSync(audioPath) && bgmUrl && fs.existsSync(bgmPath)) {
+            // Both Voiceover and BGM
+            ffmpegArgs.push('-i', audioPath);
+            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+            ffmpegArgs.push('-filter_complex', '[1:a]volume=1.5[vo];[2:a]volume=0.15[bgm];[vo][bgm]amix=inputs=2:duration=longest[aout]');
+            ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
+        } else if (audioUrl && fs.existsSync(audioPath)) {
+            // Only Voiceover
+            ffmpegArgs.push('-i', audioPath);
+            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+            ffmpegArgs.push('-filter:a', 'volume=1.5');
+        } else if (bgmUrl && fs.existsSync(bgmPath)) {
+            // Only BGM
+            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+            ffmpegArgs.push('-filter:a', 'volume=0.20');
+        } else {
+            // No audio to mux, just return the original video URL
+            return videoUrl;
+        }
+
+        ffmpegArgs.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', outputPath);
+
+        await execFileAsync('ffmpeg', ffmpegArgs, { timeout: 120000 });
+
         const muxedBuffer = fs.readFileSync(outputPath);
         const s3Key = `qads/muxed/${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`;
         const muxedUrl = await uploadToS3(muxedBuffer, s3Key, 'video/mp4');
-        console.log(`✅ [FFmpeg] Muxed video uploaded: ${muxedUrl.substring(0, 70)} (${(muxedBuffer.length / 1024 / 1024).toFixed(1)}MB)`);
+        console.log(`✅ [FFmpeg] Muxed video uploaded: ${muxedUrl.substring(0, 70)}`);
         return muxedUrl;
     } catch (e) {
         console.error(`❌ [FFmpeg] Mux failed: ${e.message}`);
         return null; // Caller will use the original video without voiceover
     } finally {
         // Clean up temp files
-        [videoPath, audioPath, outputPath].forEach(f => { try { fs.unlinkSync(f); } catch {} });
+        [videoPath, audioPath, bgmPath, outputPath].forEach(f => { if (f) { try { fs.unlinkSync(f); } catch {} } });
     }
 }
 
@@ -4184,46 +4194,60 @@ async function addVoiceoverToProject(project) {
         const language = project.generation?.language || 'English';
         const prompt = project.backendPrompt || '';
         const videoUrl = project.generation?.videoUrl || project.finalVideoUrl;
+        const bgmPreset = project.generation?.bgmPreset || project.advancedConfig?.bgmPreset || null;
 
         if (!videoUrl) { console.warn('🎤 [TTS] No video URL — skipping voiceover'); return; }
 
+        // Placeholder royalty-free URLs for BGM presets
+        const BGM_URLS = {
+            upbeat: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3', // Corporate Upbeat
+            cinematic: 'https://cdn.pixabay.com/audio/2022/02/07/audio_0319dd632e.mp3', // Epic Cinematic
+            emotional: 'https://cdn.pixabay.com/audio/2022/10/25/audio_27ab966bc7.mp3', // Emotional Piano
+            energetic: 'https://cdn.pixabay.com/audio/2023/04/27/audio_f5353ee5c0.mp3', // Energetic Pop
+            minimal: 'https://cdn.pixabay.com/audio/2022/03/15/audio_0710609b5a.mp3', // Minimal Tech
+        };
+
+        const bgmUrl = bgmPreset ? BGM_URLS[bgmPreset] : null;
+
         const dialogueLines = extractDialogueLines(prompt);
-        if (dialogueLines.length === 0) {
-            console.log(`🎤 [TTS] No DIALOGUE lines found in prompt — skipping voiceover`);
+        if (dialogueLines.length === 0 && !bgmUrl) {
+            console.log(`🎤 [TTS] No DIALOGUE lines and no BGM preset — skipping audio mix`);
             return;
         }
 
-        console.log(`🎤 [TTS] Starting voiceover pipeline: ${dialogueLines.length} lines in ${language}`);
-
-        // Step 1: Generate TTS audio
-        const audioUrl = await generateQAdsTTS(dialogueLines, language);
-        if (!audioUrl) {
-            console.warn(`🎤 [TTS] TTS generation failed — video will have no voiceover`);
-            return;
+        let audioUrl = null;
+        if (dialogueLines.length > 0) {
+            console.log(`🎤 [TTS] Starting voiceover pipeline: ${dialogueLines.length} lines in ${language}`);
+            audioUrl = await generateQAdsTTS(dialogueLines, language);
+            if (!audioUrl) {
+                console.warn(`🎤 [TTS] TTS generation failed — continuing with BGM only (if any)`);
+            }
         }
 
-        // Step 2: Mux audio into video
-        const muxedUrl = await muxVideoWithAudio(videoUrl, audioUrl);
+        // Mux audio/BGM into video
+        const muxedUrl = await muxVideoWithAudio(videoUrl, audioUrl, bgmUrl);
+        
         if (muxedUrl) {
             // Update the project with the muxed video
             await VideoProject.findByIdAndUpdate(project._id, {
                 $set: {
                     finalVideoUrl: muxedUrl,
                     'generation.videoUrl': muxedUrl,
-                    'generation.voiceoverUrl': audioUrl,
-                    'generation.voiceoverStatus': 'done',
+                    ...(audioUrl ? { 'generation.voiceoverUrl': audioUrl, 'generation.voiceoverStatus': 'done' } : {}),
                 },
             });
-            console.log(`✅ [TTS] Voiceover muxed and project updated: ${project._id}`);
+            console.log(`✅ [TTS] Audio mixed and project updated: ${project._id}`);
         } else {
             // FFmpeg failed — store audio URL separately as fallback
-            await VideoProject.findByIdAndUpdate(project._id, {
-                $set: {
-                    'generation.voiceoverUrl': audioUrl,
-                    'generation.voiceoverStatus': 'audio_only',
-                },
-            });
-            console.warn(`⚠️ [TTS] FFmpeg mux failed — audio stored separately: ${audioUrl.substring(0, 60)}`);
+            if (audioUrl) {
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    $set: {
+                        'generation.voiceoverUrl': audioUrl,
+                        'generation.voiceoverStatus': 'audio_only',
+                    },
+                });
+                console.warn(`⚠️ [TTS] FFmpeg mux failed — audio stored separately: ${audioUrl.substring(0, 60)}`);
+            }
         }
     } catch (e) {
         console.error(`❌ [TTS] Voiceover pipeline error: ${e.message}`);
