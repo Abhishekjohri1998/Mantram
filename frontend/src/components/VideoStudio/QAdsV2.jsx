@@ -17,7 +17,7 @@ async function api(path, opts = {}) {
 }
 import ViralityMiniPanel from '../ViralityMiniPanel'
 
-const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'}]
+const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'},{value:30,label:'30s',msIcon:'movie'},{value:45,label:'45s',msIcon:'movie'},{value:60,label:'60s',msIcon:'movie'},{value:90,label:'90s',msIcon:'movie'},{value:120,label:'120s',msIcon:'movie'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
 const RES = [{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
 const VIDEO_MODELS = [
@@ -967,76 +967,131 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         setVideoJobs(prev => ({ ...prev, [vid]: { status: 'generating', progress: 3 } }))
         setError(null)
 
+        const isLongForm = duration > 15
+
         try {
-            const res = await api('/video-studio/ugc-pro/qads/v2/generate-video', {
-                method: 'POST',
-                body: JSON.stringify({
-                    brandId: activeBrand?._id,
-                    presetId: selP,
-                    variantId: vid,
-                    prompt: variant.prompt,
-                    legend: variant.legend || '',
-                    productImageUrls: productImgs,
-                    avatarUrl: avatarUrl || null,
-                    settings: { duration, format, resolution, model: selectedModel, hookShot, language }
+            let jobId
+
+            if (isLongForm) {
+                // ═══ LONG-FORM ROUTE (30–120s) ═══
+                const res = await api('/video-studio/long-form/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        targetDuration: duration,
+                        model: selectedModel,
+                        prompt: variant.prompt,
+                        referenceImages: [...(productImgs || []), ...(avatarUrl ? [avatarUrl] : [])],
+                        imageRole: avatarUrl ? 'character' : 'product',
+                        language,
+                        aspectRatio: format,
+                        settings: { resolution, quality: 'high', hookShot },
+                        brandId: activeBrand?._id,
+                        productData,
+                        bgmPreset: 'cinematic',
+                    })
                 })
-            })
+                jobId = res.jobId
+                setVideoJobs(prev => ({ ...prev, [vid]: { status: 'generating', progress: 5, jobId, isLongForm: true, segments: res.segments, estimatedMinutes: res.estimatedMinutes } }))
 
-            const jobId = res.jobId || res.requestId || res.falRequestId
-            setVideoJobs(prev => ({ ...prev, [vid]: { status: 'generating', progress: 5, jobId } }))
-
-            // Start polling against the correct VideoProject endpoint
-            pollRefs.current[vid] = setInterval(async () => {
-                try {
-                    const d = await api(`/video-studio/ugc-pro/qads/v2/status/${jobId}`)
-                    if (d) {
-                        const status = d.status === 'COMPLETED' ? 'done'
-                            : d.status === 'FAILED' ? 'failed'
-                            : 'generating'
-                        setVideoJobs(prev => ({
-                            ...prev,
-                            [vid]: {
-                                ...prev[vid],
-                                status,
-                                progress: d.progress || prev[vid]?.progress,
-                                videoUrl: d.videoUrl || prev[vid]?.videoUrl,
-                                error: d.error
+                // Long-form polling — uses dedicated status endpoint with phase tracking
+                pollRefs.current[vid] = setInterval(async () => {
+                    try {
+                        const d = await api(`/video-studio/long-form/status/${jobId}`)
+                        if (d) {
+                            const status = d.status === 'COMPLETED' ? 'done'
+                                : d.status === 'FAILED' ? 'failed'
+                                : d.status === 'CANCELLED' ? 'failed'
+                                : 'generating'
+                            setVideoJobs(prev => ({
+                                ...prev,
+                                [vid]: {
+                                    ...prev[vid],
+                                    status,
+                                    progress: d.progress || prev[vid]?.progress,
+                                    videoUrl: d.videoUrl || prev[vid]?.videoUrl,
+                                    error: d.error,
+                                    phaseLabel: d.phaseLabel || prev[vid]?.phaseLabel,
+                                    detail: d.detail || '',
+                                    scenes: d.scenes || prev[vid]?.scenes,
+                                }
+                            }))
+                            if (status === 'done' || status === 'failed') {
+                                clearInterval(pollRefs.current[vid])
+                                if (status === 'done' && onVideoComplete) onVideoComplete()
                             }
-                        }))
-                        if (status === 'done' || status === 'failed') {
-                            clearInterval(pollRefs.current[vid])
-                            // 🎤 For non-English languages, keep polling briefly for voiceover mux
-                            if (status === 'done' && language && language.toLowerCase() !== 'english') {
-                                setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'processing' } }))
-                                let voPollCount = 0
-                                const maxVoPolls = 12 // 60 seconds max (12 x 5s)
-                                pollRefs.current[`${vid}_vo`] = setInterval(async () => {
-                                    voPollCount++
-                                    try {
-                                        const voCheck = await api(`/video-studio/ugc-pro/qads/v2/status/${d.jobId || job.jobId || jobId}`)
-                                        if (voCheck?.videoUrl && voCheck.videoUrl !== d.videoUrl) {
-                                            // Muxed URL is different from original — voiceover is done
-                                            setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], videoUrl: voCheck.videoUrl, voiceoverStatus: 'done' } }))
-                                            clearInterval(pollRefs.current[`${vid}_vo`])
-                                            if (onVideoComplete) onVideoComplete()
-                                        } else if (voPollCount >= maxVoPolls) {
-                                            // Timeout — stop polling, use what we have
-                                            setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'timeout' } }))
-                                            clearInterval(pollRefs.current[`${vid}_vo`])
-                                        }
-                                    } catch { if (voPollCount >= maxVoPolls) clearInterval(pollRefs.current[`${vid}_vo`]) }
-                                }, 5000)
-                            }
-                            // Refresh parent history panel so the completed video appears
-                            if (status === 'done' && onVideoComplete) onVideoComplete()
                         }
-                    }
-                } catch (_) {}
-            }, 5000)
+                    } catch (_) {}
+                }, 5000)
+
+            } else {
+                // ═══ STANDARD ROUTE (≤15s) ═══
+                const res = await api('/video-studio/ugc-pro/qads/v2/generate-video', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        brandId: activeBrand?._id,
+                        presetId: selP,
+                        variantId: vid,
+                        prompt: variant.prompt,
+                        legend: variant.legend || '',
+                        productImageUrls: productImgs,
+                        avatarUrl: avatarUrl || null,
+                        settings: { duration, format, resolution, model: selectedModel, hookShot, language }
+                    })
+                })
+
+                jobId = res.jobId || res.requestId || res.falRequestId
+                setVideoJobs(prev => ({ ...prev, [vid]: { status: 'generating', progress: 5, jobId } }))
+
+                // Standard polling
+                pollRefs.current[vid] = setInterval(async () => {
+                    try {
+                        const d = await api(`/video-studio/ugc-pro/qads/v2/status/${jobId}`)
+                        if (d) {
+                            const status = d.status === 'COMPLETED' ? 'done'
+                                : d.status === 'FAILED' ? 'failed'
+                                : 'generating'
+                            setVideoJobs(prev => ({
+                                ...prev,
+                                [vid]: {
+                                    ...prev[vid],
+                                    status,
+                                    progress: d.progress || prev[vid]?.progress,
+                                    videoUrl: d.videoUrl || prev[vid]?.videoUrl,
+                                    error: d.error
+                                }
+                            }))
+                            if (status === 'done' || status === 'failed') {
+                                clearInterval(pollRefs.current[vid])
+                                // 🎤 For non-English languages, keep polling briefly for voiceover mux
+                                if (status === 'done' && language && language.toLowerCase() !== 'english') {
+                                    setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'processing' } }))
+                                    let voPollCount = 0
+                                    const maxVoPolls = 12 // 60 seconds max (12 x 5s)
+                                    pollRefs.current[`${vid}_vo`] = setInterval(async () => {
+                                        voPollCount++
+                                        try {
+                                            const voCheck = await api(`/video-studio/ugc-pro/qads/v2/status/${d.jobId || jobId}`)
+                                            if (voCheck?.videoUrl && voCheck.videoUrl !== d.videoUrl) {
+                                                setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], videoUrl: voCheck.videoUrl, voiceoverStatus: 'done' } }))
+                                                clearInterval(pollRefs.current[`${vid}_vo`])
+                                                if (onVideoComplete) onVideoComplete()
+                                            } else if (voPollCount >= maxVoPolls) {
+                                                setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'timeout' } }))
+                                                clearInterval(pollRefs.current[`${vid}_vo`])
+                                            }
+                                        } catch { if (voPollCount >= maxVoPolls) clearInterval(pollRefs.current[`${vid}_vo`]) }
+                                    }, 5000)
+                                }
+                                if (status === 'done' && onVideoComplete) onVideoComplete()
+                            }
+                        }
+                    } catch (_) {}
+                }, 5000)
+            }
         } catch (e) {
             setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: e.message } }))
         }
-    }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand])
+    }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand, language, productData, canCreateVideo, onUpgradeRequired, onVideoComplete])
 
     useEffect(() => {
         return () => Object.values(pollRefs.current).forEach(clearInterval)
@@ -1116,11 +1171,19 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                     </div>
                                 ) : job.status === 'generating' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0' }}>
-                                        <span className="material-symbols-outlined spin" style={{ fontSize: 28, color: '#10b981' }}>autorenew</span>
+                                        <span className="material-symbols-outlined spin" style={{ fontSize: 28, color: job.isLongForm ? '#f59e0b' : '#10b981' }}>{job.isLongForm ? 'movie_creation' : 'autorenew'}</span>
                                         <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                                            <div style={{ height: '100%', width: `${job.progress || 5}%`, background: '#10b981', transition: 'width 1.5s linear' }} />
+                                            <div style={{ height: '100%', width: `${job.progress || 5}%`, background: job.isLongForm ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : '#10b981', transition: 'width 1.5s linear' }} />
                                         </div>
-                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{(VIDEO_MODELS.find(m => m.value === selectedModel)?.label || 'AI')} is generating...</div>
+                                        {job.isLongForm ? (
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>{job.phaseLabel || 'Starting...'}</div>
+                                                {job.detail && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{job.detail}</div>}
+                                                {job.segments && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{job.segments} scenes · ~{job.estimatedMinutes || '?'} min</div>}
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{(VIDEO_MODELS.find(m => m.value === selectedModel)?.label || 'AI')} is generating...</div>
+                                        )}
                                     </div>
                                 ) : job.status === 'failed' ? (
                                     <div style={{ color: '#ef4444', fontSize: 12, padding: '8px 0' }}>{job.error || 'Generation failed'}</div>

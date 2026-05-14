@@ -21,13 +21,13 @@ async function api(path, opts = {}) {
 }
 
 const MODELS = {
-    'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
-    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
-    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5], ratios: ['16:9', '9:16'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
-    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
-    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p', '480p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." },
-    'happyhorse-1.0': { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', msIcon: 'pets', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's cinematic model. Great motion, native audio, ref images, 1080p." },
+    'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10, 15, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
+    'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10, 15, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
+    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5, 8, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
+    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5, 10, 30, 45, 60], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
+    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p', '480p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." },
+    'happyhorse-1.0': { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', msIcon: 'pets', durs: [5, 10, 15, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's cinematic model. Great motion, native audio, ref images, 1080p." },
 }
 
 const LANGUAGES = [
@@ -854,6 +854,67 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
         setLoading(false)
     }
 
+    // ── Long-form route wrapper for Advanced Mode ──
+    async function handleLongFormGenerate(promptText, thumbUrl) {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
+        if (!canGenerate) { setError(`Max ${MAX_CONCURRENT} concurrent generations`); return }
+        setLoading(true); setError('')
+        const jobId = `job-${Date.now()}`
+        const allRefUrls = refImages.map(r => r.url).filter(Boolean)
+
+        setJobs(prev => [{
+            id: jobId, projectId: null, prompt: promptText, model, duration, aspectRatio, quality,
+            thumbUrl, progress: 3, status: 'generating', videoUrl: null, error: null,
+            startTime: Date.now(), isLongForm: true,
+        }, ...prev])
+
+        try {
+            const d = await api('/video-studio/long-form/generate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    targetDuration: duration,
+                    model,
+                    prompt: promptText,
+                    referenceImages: [...allRefUrls, ...(firstFrame?.url ? [firstFrame.url] : []), ...(i2vImage?.url ? [i2vImage.url] : [])],
+                    imageRole: 'product',
+                    language: language || 'English',
+                    aspectRatio,
+                    settings: { resolution, quality },
+                    brandId: activeBrand?._id,
+                    bgmPreset: 'cinematic',
+                }),
+            })
+            updateJob(jobId, { longFormJobId: d.jobId, segments: d.segments, estimatedMinutes: d.estimatedMinutes })
+
+            // Long-form polling
+            const lfJobId = d.jobId
+            const pollId = setInterval(async () => {
+                try {
+                    const s = await api(`/video-studio/long-form/status/${lfJobId}`)
+                    if (s) {
+                        if (s.status === 'COMPLETED' && s.videoUrl) {
+                            clearInterval(pollId)
+                            updateJob(jobId, { status: 'done', progress: 100, videoUrl: s.videoUrl })
+                        } else if (s.status === 'FAILED') {
+                            clearInterval(pollId)
+                            updateJob(jobId, { status: 'failed', error: s.error || 'Long-form generation failed' })
+                        } else {
+                            updateJob(jobId, {
+                                progress: s.progress || 10,
+                                phaseLabel: s.phaseLabel || 'Generating...',
+                                detail: s.detail || '',
+                            })
+                        }
+                    }
+                } catch {}
+            }, 5000)
+        } catch (e) {
+            setError(e.message)
+            setJobs(prev => prev.filter(j => j.id !== jobId))
+        }
+        setLoading(false)
+    }
+
     async function handleI2VGenerate() {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!canGenerate) { setError(`Max ${MAX_CONCURRENT} concurrent generations`); return }
@@ -1053,11 +1114,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         <div className="vm-job-overlay">
                             {job.status === 'generating' ? (
                                 <>
-                                    <span className="material-symbols-outlined vm-spin" style={{ fontSize: 28, color: '#7c3aed' }}>progress_activity</span>
-                                    <div className="vm-job-label" title={job.prompt}>{job.prompt?.slice(0, 50) || 'Generating…'}</div>
-                                    <div className="vm-job-bar"><div className="vm-job-bar-fill" style={{ width: `${job.progress || 3}%` }} /></div>
+                                    <span className="material-symbols-outlined vm-spin" style={{ fontSize: 28, color: job.isLongForm ? '#f59e0b' : '#7c3aed' }}>{job.isLongForm ? 'movie_creation' : 'progress_activity'}</span>
+                                    <div className="vm-job-label" title={job.prompt}>{job.isLongForm ? (job.phaseLabel || 'Planning scenes...') : (job.prompt?.slice(0, 50) || 'Generating…')}</div>
+                                    <div className="vm-job-bar"><div className="vm-job-bar-fill" style={{ width: `${job.progress || 3}%`, background: job.isLongForm ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : undefined }} /></div>
                                     <div className="vm-job-pct">{job.progress || 3}%</div>
-                                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{job.model} · {job.duration}s</div>
+                                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>{job.model} · {job.duration}s{job.isLongForm ? ` · ${job.segments || '?'} scenes` : ''}</div>
+                                    {job.isLongForm && job.detail && <div style={{ fontSize: 9, color: '#f59e0b', textAlign: 'center' }}>{job.detail}</div>}
                                     {job.startTime && Date.now() - job.startTime > 360000 && (
                                         <div className="mt-2 text-[9px] font-bold text-orange-400 flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[12px] animate-pulse">traffic</span>
@@ -1322,7 +1384,11 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                     : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>animation</span><span style={{ fontSize: 11 }}>{credits}</span></>}
                             </button>
                         ) : (
-                            <button className="vm-generate" onClick={handleGenerate} disabled={loading || !(m.has.multishot ? shots[0].prompt : prompt).trim() || !canGenerate}>
+                            <button className="vm-generate" onClick={() => {
+                                const finalPrompt = m.has.multishot ? shots.map(s => s.prompt).join(' | ') : prompt.trim()
+                                if (duration > 15) { handleLongFormGenerate(finalPrompt, firstFrame?.url || i2vImage?.url) }
+                                else { handleGenerate() }
+                            }} disabled={loading || !(m.has.multishot ? shots[0].prompt : prompt).trim() || !canGenerate}>
                                 {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: 16 }}>progress_activity</span></>
                                     : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>movie_creation</span><span style={{ fontSize: 11 }}>{credits}</span></>}
                             </button>

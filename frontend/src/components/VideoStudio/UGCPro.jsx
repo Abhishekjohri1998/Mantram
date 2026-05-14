@@ -765,7 +765,11 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
                                 { value: 10, label: '10s', icon: 'timer' },
                                 { value: 15, label: '15s', icon: 'timer' },
                                 { value: 20, label: '20s', icon: 'timer' },
-                                { value: 30, label: '30s', icon: 'timer' },
+                                { value: 30, label: '30s', icon: 'movie' },
+                                { value: 45, label: '45s', icon: 'movie' },
+                                { value: 60, label: '60s', icon: 'movie' },
+                                { value: 90, label: '90s', icon: 'movie' },
+                                { value: 120, label: '120s', icon: 'movie' },
                             ]} />
                             <Dropdown value={aspectRatio} onChange={v => setAspectRatio(v)} options={[
                                 { value: '9:16', label: '9:16', icon: 'crop_portrait' },

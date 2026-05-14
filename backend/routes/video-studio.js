@@ -63,6 +63,7 @@ import { isFashionCategory, resolveImageRole } from '../agents/videoStudio/promp
 import { buildVideoHash } from '../utils/videoHash.js';
 import { checkPromptSafety } from '../utils/promptSafety.js';
 import redis from '../utils/redisClient.js';
+import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -6768,6 +6769,174 @@ router.get('/:id/video', async (req, res) => {
         }
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LONG-FORM VIDEO GENERATION (30–120s)
+// Scene-based parallel generation → crossfade stitch → TTS → BGM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── POST /api/video-studio/long-form/generate ────────────────────────────────
+router.post('/long-form/generate', protect, async (req, res) => {
+    try {
+        const {
+            targetDuration, model, prompt, referenceImages, imageRole,
+            language, aspectRatio, settings, brandId, productData, bgmPreset,
+        } = req.body;
+
+        const dur = Math.min(Math.max(parseInt(targetDuration) || 30, 20), 120);
+
+        // Credit check
+        const costEst = estimateLongFormCost(model || 'seedance-2.0', dur, settings?.resolution || '1080p', settings?.quality || 'fast');
+        const user = req.user;
+        if (user.credits < costEst.totalCredits) {
+            return res.status(402).json({
+                success: false,
+                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${user.credits}.`,
+                required: costEst.totalCredits,
+                available: user.credits,
+            });
+        }
+
+        // Deduct credits upfront
+        user.credits -= costEst.totalCredits;
+        await user.save();
+
+        // Load brand context
+        let brandContext = '';
+        try {
+            const bc = await loadBrandContext(brandId);
+            brandContext = bc.brandContext || '';
+        } catch {}
+
+        console.log(`[Long-Form] Starting ${dur}s video — ${costEst.segments} segments, ${costEst.totalCredits} credits, model=${model || 'seedance-2.0'}`);
+
+        const jobId = startLongFormGeneration({
+            targetDuration: dur,
+            model: model || 'seedance-2.0',
+            prompt: prompt || '',
+            referenceImages: Array.isArray(referenceImages) ? referenceImages : [],
+            imageRole: imageRole || 'product',
+            language: language || 'English',
+            aspectRatio: aspectRatio || '9:16',
+            settings: settings || {},
+            userId: req.user._id,
+            brandId,
+            brandContext,
+            productData: typeof productData === 'string' ? JSON.parse(productData) : (productData || {}),
+            bgmPreset: bgmPreset || 'cinematic',
+        });
+
+        // Create VideoProject for history
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || null,
+            studioMode: 'long-form',
+            mode: 'long-form',
+            status: 'generating',
+            title: `Long-Form ${dur}s Video`,
+            backendPrompt: prompt || '',
+            input: {
+                brief: prompt?.substring(0, 500) || `${dur}s video`,
+                images: (referenceImages || []).map((u, i) => ({ url: u, source: 'upload', label: `ref-${i + 1}` })),
+            },
+            generation: {
+                provider: 'longform',
+                model: model || 'seedance-2.0',
+                language: language || 'English',
+                duration: dur,
+                aspectRatio: aspectRatio || '9:16',
+                longFormJobId: jobId,
+                progress: 0,
+                status: 'GENERATING',
+            },
+            advancedConfig: { duration: dur },
+        }).catch(e => { console.warn('[Long-Form] VideoProject create failed:', e.message); return null; });
+
+        res.json({
+            success: true,
+            jobId,
+            projectId: project?._id,
+            segments: costEst.segments,
+            totalCredits: costEst.totalCredits,
+            estimatedMinutes: costEst.estimatedTimeMinutes,
+        });
+    } catch (err) {
+        console.error('[Long-Form] Generate error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/long-form/status/:jobId ────────────────────────────
+router.get('/long-form/status/:jobId', protect, async (req, res) => {
+    try {
+        const status = getLongFormJobStatus(req.params.jobId);
+        if (!status) {
+            // Check if it's stored in a VideoProject
+            const project = await VideoProject.findOne({ 'generation.longFormJobId': req.params.jobId }).lean();
+            if (project?.generation?.videoUrl || project?.finalVideoUrl) {
+                return res.json({
+                    success: true,
+                    status: 'COMPLETED',
+                    progress: 100,
+                    videoUrl: project.finalVideoUrl || project.generation.videoUrl,
+                });
+            }
+            return res.status(404).json({ success: false, error: 'Job not found' });
+        }
+
+        // If completed, update VideoProject
+        if (status.status === 'COMPLETED' && status.videoUrl) {
+            await VideoProject.findOneAndUpdate(
+                { 'generation.longFormJobId': req.params.jobId },
+                {
+                    status: 'done',
+                    'generation.videoUrl': status.videoUrl,
+                    'generation.progress': 100,
+                    'generation.status': 'COMPLETED',
+                    finalVideoUrl: status.videoUrl,
+                }
+            ).catch(() => {});
+        }
+
+        res.json({
+            success: true,
+            status: status.status,
+            progress: status.progress,
+            phase: status.phase,
+            phaseLabel: status.phaseLabel,
+            detail: status.detail,
+            videoUrl: status.videoUrl,
+            error: status.error,
+            scenes: status.sceneStatuses,
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/long-form/cancel/:jobId ───────────────────────────
+router.post('/long-form/cancel/:jobId', protect, async (req, res) => {
+    const cancelled = cancelLongFormJob(req.params.jobId);
+    if (cancelled) {
+        await VideoProject.findOneAndUpdate(
+            { 'generation.longFormJobId': req.params.jobId },
+            { status: 'cancelled' }
+        ).catch(() => {});
+    }
+    res.json({ success: true, cancelled });
+});
+
+// ── GET /api/video-studio/long-form/estimate ─────────────────────────────────
+router.get('/long-form/estimate', protect, (req, res) => {
+    const { model, duration, resolution, mode } = req.query;
+    const est = estimateLongFormCost(
+        model || 'seedance-2.0',
+        parseInt(duration) || 30,
+        resolution || '1080p',
+        mode || 'fast'
+    );
+    res.json({ success: true, ...est });
 });
 
 
