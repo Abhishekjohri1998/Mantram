@@ -6887,7 +6887,7 @@ router.get('/long-form/status/:jobId', protect, async (req, res) => {
 
         // If completed, update VideoProject
         if (status.status === 'COMPLETED' && status.videoUrl) {
-            await VideoProject.findOneAndUpdate(
+            const updatedProject = await VideoProject.findOneAndUpdate(
                 { 'generation.longFormJobId': req.params.jobId },
                 {
                     status: 'done',
@@ -6895,8 +6895,15 @@ router.get('/long-form/status/:jobId', protect, async (req, res) => {
                     'generation.progress': 100,
                     'generation.status': 'COMPLETED',
                     finalVideoUrl: status.videoUrl,
-                }
-            ).catch(() => {});
+                },
+                { returnDocument: 'after' }
+            ).catch(() => null);
+
+            // 🎤 Trigger async voiceover pipeline for completed videos
+            if (updatedProject && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
+                console.log(`🎤 [TTS] Triggering async voiceover pipeline for long-form project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+                addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
+            }
         }
 
         res.json({
