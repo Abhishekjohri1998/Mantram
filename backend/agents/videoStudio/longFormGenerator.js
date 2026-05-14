@@ -1,7 +1,8 @@
 /**
  * Long-Form Video Generator — Orchestrates multi-segment video generation
  *
- * Pipeline: Scene Plan → Parallel Gen → FFmpeg Concat (crossfade) → TTS → BGM → Mux
+ * Pipeline: Scene Plan → Per-Scene TTS → Sequential Gen (with refAudio lip-sync)
+ *           → Frame Chain → FFmpeg Stitch (crossfade) → Audio Concat + BGM → Final Mux
  * Supports 30–120s videos across all AI video models.
  */
 
@@ -15,8 +16,38 @@ import { planScenes } from './scenePlanner.js';
 import { submitVideoGeneration, estimateCost } from './falClient.js';
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
+import {
+    extractLastFrameToS3,
+    muxAudioOntoVideo,
+    concatSceneAudios,
+    mixAudioAndMux,
+} from '../../utils/ffmpegUtils.js';
 
 const execFileAsync = promisify(execFile);
+
+// ── TTS Engine (Sarvam for Indian languages, OpenAI for global) ──────────────
+const LANG_TO_CODE = {
+    'Hindi': 'hi-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN', 'Bengali': 'bn-IN',
+    'Marathi': 'mr-IN', 'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN',
+    'Punjabi': 'pa-IN', 'English': 'en-IN', 'Arabic': 'ar-SA', 'Urdu': 'ur-PK',
+    'French': 'fr-FR', 'Spanish': 'es-ES', 'Portuguese': 'pt-BR', 'Japanese': 'ja-JP',
+    'Korean': 'ko-KR', 'Chinese': 'zh-CN', 'German': 'de-DE', 'Italian': 'it-IT',
+    'Turkish': 'tr-TR', 'Thai': 'th-TH',
+};
+const SARVAM_SUPPORTED = new Set(['hi-IN', 'ta-IN', 'te-IN', 'bn-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'en-IN']);
+const SARVAM_VOICES = {
+    'hi-IN': 'anushka', 'ta-IN': 'meera', 'te-IN': 'meera', 'bn-IN': 'meera',
+    'mr-IN': 'meera', 'gu-IN': 'meera', 'kn-IN': 'meera', 'ml-IN': 'meera',
+    'pa-IN': 'meera', 'en-IN': 'anushka',
+};
+const OPENAI_VOICES = {
+    'ar-SA': 'coral', 'ur-PK': 'coral', 'fr-FR': 'sage', 'es-ES': 'nova',
+    'pt-BR': 'nova', 'ja-JP': 'shimmer', 'ko-KR': 'shimmer', 'zh-CN': 'alloy',
+    'de-DE': 'onyx', 'it-IT': 'sage', 'tr-TR': 'echo', 'th-TH': 'nova', 'en-IN': 'nova',
+};
+
+// Models that support refAudio for native lip-sync
+const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'kling-3.0', 'kling-3.0-o']);
 
 // ── Background Music Presets ─────────────────────────────────────────────────
 // Royalty-free ambient music URLs (stored in S3 or public CDN)
@@ -170,12 +201,13 @@ async function runPipeline(jobId, params) {
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 2: Sequential Video Generation ═══
+        // ═══ Phase 2: Sequential Video Generation with Per-Scene TTS ═══
         const sceneVideos = new Array(scenes.length).fill(null);
+        const sceneAudioUrls = new Array(scenes.length).fill(null); // Per-scene TTS URLs
         let completedScenes = 0;
         let lastFrameUrl = null;
+        const supportsRefAudio = MODELS_WITH_REF_AUDIO.has(params.model);
 
-        // Process scenes sequentially for cinematic continuity
         for (let i = 0; i < scenes.length; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
 
@@ -183,57 +215,84 @@ async function runPipeline(jobId, params) {
             job.sceneStatuses[i] = { status: 'generating', progress: 0 };
 
             updateProgress(jobId, 'GENERATING',
-                `Scene ${i + 1}/${scenes.length} (${scene.role})`,
+                `Scene ${i + 1}/${scenes.length} — TTS + Video (${scene.role})`,
                 (completedScenes / scenes.length) * 100);
 
             try {
-                // Build scene prompt with reference image tags
+                // ── Step 2a: Generate per-scene TTS audio ──
+                let sceneTtsUrl = null;
+                if (scene.dialogue && scene.dialogue.length > 0) {
+                    try {
+                        const dialogueText = scene.dialogue.map(d => d.text || d).join('. ');
+                        const emotion = scene.dialogue[0]?.emotion || 'neutral';
+                        sceneTtsUrl = await generateSceneTTS(dialogueText, params.language, emotion);
+                        if (sceneTtsUrl) {
+                            console.log(`[LongForm ${jobId}] 🎤 Scene ${i + 1} TTS ready: ${sceneTtsUrl.substring(0, 60)}...`);
+                        }
+                    } catch (ttsErr) {
+                        console.warn(`[LongForm ${jobId}] ⚠️ Scene ${i + 1} TTS failed: ${ttsErr.message}`);
+                    }
+                }
+                sceneAudioUrls[i] = sceneTtsUrl;
+
+                // ── Step 2b: Build scene prompt ──
                 let scenePrompt = scene.visualPrompt || scene.prompt || params.prompt;
                 if (scene.camerawork) scenePrompt += `\n${scene.camerawork}`;
                 scenePrompt += '\nMaintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles.';
 
-                // Generate the scene video
+                // ── Step 2c: Generate scene video ──
                 const isSeedance = params.model.startsWith('seedance');
                 let genResult;
 
                 if (isSeedance) {
                     genResult = await submitAtlasCloudVideoGeneration({
                         prompt: scenePrompt,
-                        imageUrl: lastFrameUrl, // INJECT LAST FRAME FOR CONTINUITY
+                        imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: true,
+                        generateAudio: !sceneTtsUrl, // Disable native audio when TTS provided
                         referenceImages: params.referenceImages.slice(0, 9),
                         qualityMode: params.settings?.quality || 'fast',
                         imageRole: params.imageRole,
+                        refAudio: supportsRefAudio ? sceneTtsUrl : null,
                     });
                 } else {
                     genResult = await submitVideoGeneration({
                         model: params.model,
                         prompt: scenePrompt,
-                        imageUrl: lastFrameUrl, // INJECT LAST FRAME FOR CONTINUITY
+                        imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: true,
+                        generateAudio: !sceneTtsUrl,
                         referenceImages: params.referenceImages.slice(0, 9),
+                        refAudio: supportsRefAudio ? sceneTtsUrl : null,
                     });
                 }
 
                 // Poll until complete
-                const videoUrl = await pollUntilComplete(genResult, jobId, i, scenes.length);
+                let videoUrl = await pollUntilComplete(genResult, jobId, i, scenes.length);
+
+                // ── Step 2d: Post-mux TTS for models WITHOUT refAudio ──
+                if (sceneTtsUrl && !supportsRefAudio) {
+                    try {
+                        console.log(`[LongForm ${jobId}] 🔊 Post-muxing TTS onto scene ${i + 1} (model lacks refAudio)...`);
+                        videoUrl = await muxAudioOntoVideo(videoUrl, sceneTtsUrl);
+                    } catch (muxErr) {
+                        console.warn(`[LongForm ${jobId}] ⚠️ Post-mux failed for scene ${i + 1}: ${muxErr.message}`);
+                    }
+                }
+
                 sceneVideos[i] = videoUrl;
                 job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl };
                 completedScenes++;
 
-                // EXTRACT LAST FRAME for the next scene
+                // ── Step 2e: Extract last frame for next scene ──
                 if (i < scenes.length - 1) {
                     try {
-                        const { extractLastFrameToS3 } = await import('../../utils/ffmpegUtils.js');
                         lastFrameUrl = await extractLastFrameToS3(videoUrl);
-                        console.log(`[LongForm ${jobId}] Extracted last frame for scene ${i + 1}: ${lastFrameUrl}`);
+                        console.log(`[LongForm ${jobId}] 🖼️ Last frame for scene ${i + 1}: ${lastFrameUrl}`);
                     } catch (frameErr) {
-                        console.error(`[LongForm ${jobId}] Failed to extract last frame from scene ${i + 1}:`, frameErr.message);
-                        // If frame extraction fails, fallback to null (start fresh for next scene)
+                        console.error(`[LongForm ${jobId}] Failed to extract last frame: ${frameErr.message}`);
                         lastFrameUrl = null;
                     }
                 }
@@ -246,13 +305,12 @@ async function runPipeline(jobId, params) {
                 console.error(`[LongForm ${jobId}] Scene ${i + 1} failed: ${err.message}`);
                 job.sceneStatuses[i] = { status: 'failed', error: err.message };
 
-                // Retry once
+                // Retry once (without TTS to maximize success chance)
                 try {
                     console.log(`[LongForm ${jobId}] Retrying scene ${i + 1}...`);
-                    
                     const isSeedance = params.model.startsWith('seedance');
                     let retryResult;
-                    
+
                     if (isSeedance) {
                         retryResult = await submitAtlasCloudVideoGeneration({
                             prompt: scene.visualPrompt || params.prompt,
@@ -275,20 +333,20 @@ async function runPipeline(jobId, params) {
                             referenceImages: params.referenceImages.slice(0, 9),
                         });
                     }
-                    
-                    const retryUrl = await pollUntilComplete(retryResult, jobId, i, scenes.length);
+
+                    let retryUrl = await pollUntilComplete(retryResult, jobId, i, scenes.length);
+
+                    // Post-mux TTS on retry if available
+                    if (sceneAudioUrls[i] && !supportsRefAudio) {
+                        try { retryUrl = await muxAudioOntoVideo(retryUrl, sceneAudioUrls[i]); } catch {}
+                    }
+
                     sceneVideos[i] = retryUrl;
                     job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
                     completedScenes++;
-                    
+
                     if (i < scenes.length - 1) {
-                        try {
-                            const { extractLastFrameToS3 } = await import('../../utils/ffmpegUtils.js');
-                            lastFrameUrl = await extractLastFrameToS3(retryUrl);
-                            console.log(`[LongForm ${jobId}] Extracted last frame for scene ${i + 1} (after retry): ${lastFrameUrl}`);
-                        } catch (frameErr) {
-                            lastFrameUrl = null;
-                        }
+                        try { lastFrameUrl = await extractLastFrameToS3(retryUrl); } catch { lastFrameUrl = null; }
                     }
                 } catch (retryErr) {
                     console.error(`[LongForm ${jobId}] Scene ${i + 1} retry failed: ${retryErr.message}`);
@@ -320,21 +378,41 @@ async function runPipeline(jobId, params) {
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 4: FFmpeg Normalize + Crossfade Concat ═══
+        // ═══ Phase 4: FFmpeg Normalize + Crossfade Concat (video-only) ═══
         updateProgress(jobId, 'STITCHING', 'Normalizing and stitching...', 0);
         const finalVideoPath = await stitchWithCrossfade(tmpDir, segmentPaths, params.aspectRatio, jobId);
         updateProgress(jobId, 'STITCHING', 'Stitch complete', 100);
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 5: TTS Voiceover (if dialogues exist) ═══
-        updateProgress(jobId, 'TTS', 'Generating voiceover...', 0);
-        // TTS is handled externally by the route (addVoiceoverToProject) after upload
-        // We just upload the stitched video for now
+        // ═══ Phase 5: Audio Pipeline — Concat per-scene TTS + BGM Mix ═══
+        updateProgress(jobId, 'TTS', 'Building voiceover track...', 0);
 
-        // ═══ Phase 6: Upload final video ═══
-        updateProgress(jobId, 'MUXING', 'Uploading final video...', 50);
-        const finalBuffer = fs.readFileSync(finalVideoPath);
+        // Build per-scene audio data with matching durations
+        const sceneAudioData = scenes.map((scene, i) => ({
+            audioUrl: sceneAudioUrls[i],
+            sceneDuration: scene.duration,
+        }));
+
+        const voiceoverPath = await concatSceneAudios(sceneAudioData, tmpDir);
+        updateProgress(jobId, 'TTS', voiceoverPath ? 'Voiceover ready' : 'No voiceover', 100);
+
+        // BGM URLs
+        const BGM_URLS = {
+            upbeat: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3',
+            cinematic: 'https://cdn.pixabay.com/audio/2022/02/07/audio_0319dd632e.mp3',
+            emotional: 'https://cdn.pixabay.com/audio/2022/10/25/audio_27ab966bc7.mp3',
+            energetic: 'https://cdn.pixabay.com/audio/2023/04/27/audio_f5353ee5c0.mp3',
+            minimal: 'https://cdn.pixabay.com/audio/2022/03/15/audio_0710609b5a.mp3',
+        };
+        const bgmUrl = params.bgmPreset ? BGM_URLS[params.bgmPreset] : null;
+
+        // ═══ Phase 6: Final Mux (Video + Voiceover + BGM) → Upload ═══
+        updateProgress(jobId, 'MUXING', 'Mixing audio and uploading...', 0);
+        const finalMuxedPath = await mixAudioAndMux(finalVideoPath, voiceoverPath, bgmUrl, tmpDir);
+        updateProgress(jobId, 'MUXING', 'Uploading...', 50);
+
+        const finalBuffer = fs.readFileSync(finalMuxedPath);
         const s3Key = `video-studio/longform/${jobId}/final-${Date.now()}.mp4`;
         const videoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
 
@@ -421,7 +499,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-an', // Strip audio — will be replaced with TTS
+            '-an', // Strip audio — voiceover is built from per-scene TTS and muxed in Phase 6
             '-movflags', '+faststart',
             outPath,
         ], { timeout: 120000 });
@@ -490,4 +568,121 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
 
     console.log(`[LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments with crossfade → ${outputPath}`);
     return outputPath;
+}
+
+// ── Per-Scene TTS Engine ─────────────────────────────────────────────────────
+// Generates voiceover audio for a single scene's dialogue.
+// Sarvam Bulbul v2 for Indian languages, OpenAI gpt-4o-mini-tts for global.
+
+const EMOTION_INSTRUCTIONS = {
+    excited:    'Speak with genuine excitement and high energy. Fast-paced and infectious.',
+    warm:       'Speak warmly and conversationally, like talking to a close friend.',
+    urgent:     'Speak with urgency and conviction. Direct, persuasive, slightly faster pace.',
+    calm:       'Speak calmly and authoritatively. Measured pace, confident tone.',
+    playful:    'Speak playfully with a smile in your voice. Light, teasing energy.',
+    dramatic:   'Speak dramatically with emotional weight. Slow, deliberate pauses.',
+    curious:    'Speak with genuine curiosity and wonder. Rising intonation on key phrases.',
+    confident:  'Speak with strong confidence and authority. Steady, unwavering.',
+    mysterious: 'Speak in a low, intriguing tone. Slight whisper quality on key phrases.',
+    empathetic: 'Speak with deep empathy and understanding. Soft, caring.',
+    neutral:    'Speak naturally and clearly with an engaging, professional tone.',
+};
+
+const SARVAM_EMOTION_MAP = {
+    excited:   { pitch: 2, pace: 1.2, loudness: 1.8 },
+    warm:      { pitch: 0, pace: 0.9, loudness: 1.3 },
+    urgent:    { pitch: 1, pace: 1.3, loudness: 1.8 },
+    calm:      { pitch: -1, pace: 0.85, loudness: 1.2 },
+    playful:   { pitch: 2, pace: 1.1, loudness: 1.5 },
+    dramatic:  { pitch: -2, pace: 0.75, loudness: 1.6 },
+    curious:   { pitch: 1, pace: 1.0, loudness: 1.4 },
+    confident: { pitch: 0, pace: 0.95, loudness: 1.7 },
+    neutral:   { pitch: 0, pace: 1.0, loudness: 1.5 },
+};
+
+/**
+ * Generate TTS audio for a single scene's dialogue.
+ * @param {string} text - The dialogue text to speak
+ * @param {string} language - Language name (e.g. 'Hindi', 'English', 'French')
+ * @param {string} emotion - Emotion tag (e.g. 'excited', 'calm', 'urgent')
+ * @returns {Promise<string|null>} - S3 URL of the audio file, or null
+ */
+async function generateSceneTTS(text, language, emotion = 'neutral') {
+    if (!text || text.length < 5) return null;
+
+    const langCode = LANG_TO_CODE[language] || 'en-IN';
+    const isSarvam = SARVAM_SUPPORTED.has(langCode);
+
+    try {
+        if (isSarvam) {
+            return await _sarvamTTS(text, langCode, emotion);
+        } else {
+            return await _openaiTTS(text, emotion, language, langCode);
+        }
+    } catch (err) {
+        console.warn(`⚠️ [SceneTTS] Primary TTS failed (${isSarvam ? 'Sarvam' : 'OpenAI'}): ${err.message}`);
+        // Fallback: if Sarvam failed, try OpenAI
+        if (isSarvam) {
+            try { return await _openaiTTS(text, emotion, language, langCode); } catch {}
+        }
+        return null;
+    }
+}
+
+async function _sarvamTTS(text, langCode, emotion) {
+    const apiKey = process.env.SARVAM_API_KEY;
+    if (!apiKey) { console.warn('🎤 [SceneTTS] SARVAM_API_KEY not set'); return null; }
+
+    const emo = SARVAM_EMOTION_MAP[emotion] || SARVAM_EMOTION_MAP.neutral;
+    const speaker = SARVAM_VOICES[langCode] || 'anushka';
+
+    const resp = await fetch('https://api.sarvam.ai/text-to-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-subscription-key': apiKey },
+        body: JSON.stringify({
+            inputs: [text.substring(0, 2000)],
+            target_language_code: langCode,
+            speaker,
+            model: 'bulbul:v2',
+            pitch: emo.pitch,
+            pace: emo.pace,
+            loudness: emo.loudness,
+            enable_preprocessing: true,
+        }),
+    });
+
+    if (!resp.ok) throw new Error(`Sarvam TTS ${resp.status}`);
+    const data = await resp.json();
+    const audioBase64 = data.audios?.[0];
+    if (!audioBase64) throw new Error('No audio from Sarvam');
+
+    const buffer = Buffer.from(audioBase64, 'base64');
+    const s3Key = `video-studio/longform/tts/${Date.now()}-${Math.random().toString(36).substring(7)}.wav`;
+    return await uploadToS3(buffer, s3Key, 'audio/wav');
+}
+
+async function _openaiTTS(text, emotion, language, langCode) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) { console.warn('🎤 [SceneTTS] OPENAI_API_KEY not set'); return null; }
+
+    const instruction = EMOTION_INSTRUCTIONS[emotion] || EMOTION_INSTRUCTIONS.neutral;
+    const voice = OPENAI_VOICES[langCode] || 'nova';
+    const langNote = language !== 'English' ? ` Speak fluently in ${language} with an authentic native accent.` : '';
+
+    const resp = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'gpt-4o-mini-tts',
+            voice,
+            input: text.substring(0, 4000),
+            instructions: `${instruction}${langNote} This is a voiceover for a cinematic video advertisement.`,
+            response_format: 'mp3',
+        }),
+    });
+
+    if (!resp.ok) throw new Error(`OpenAI TTS ${resp.status}`);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    const s3Key = `video-studio/longform/tts/${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`;
+    return await uploadToS3(buffer, s3Key, 'audio/mpeg');
 }

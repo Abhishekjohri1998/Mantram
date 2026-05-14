@@ -392,6 +392,7 @@ export async function submitAtlasCloudVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, generateAudio = true,
     referenceImages = [], qualityMode = 'fast',
     imageRole = 'face', // 'face' (default, UGC Pro) | 'product' (Q-Ads — no face registration)
+    refAudio = null,    // TTS audio URL for native lip-sync (Seedance 2.0)
 }) {
     console.log(`🎞️ [Atlas] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | quality=${qualityMode}`);
 
@@ -553,8 +554,14 @@ export async function submitAtlasCloudVideoGeneration({
         prompt:         finalPrompt,
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
-        generate_audio: generateAudio !== false,
+        generate_audio: refAudio ? false : (generateAudio !== false), // Disable native audio when TTS is provided
     };
+
+    // 🎤 Pass TTS audio for native lip-sync (Seedance 2.0 supports audio-driven generation)
+    if (refAudio) {
+        taskInput.audio_url = refAudio;
+        console.log(`🎤 [Atlas] refAudio injected for lip-sync: ${refAudio.substring(0, 70)}...`);
+    }
 
     // reference_images: ONLY asset:// URIs — never raw https:// URLs
     // image_urls: scene first-frame anchors — ONLY when no reference_images are present
