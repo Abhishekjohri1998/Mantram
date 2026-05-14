@@ -6856,7 +6856,7 @@ router.post('/long-form/generate', protect, async (req, res) => {
             user: req.user._id,
             brand: brandId || null,
             studioMode: 'long-form',
-            mode: 'long-form',
+            mode: 'advanced',
             status: 'generating',
             title: `Long-Form ${dur}s Video`,
             backendPrompt: prompt || '',
@@ -6865,7 +6865,7 @@ router.post('/long-form/generate', protect, async (req, res) => {
                 images: (referenceImages || []).map((u, i) => ({ url: u, source: 'upload', label: `ref-${i + 1}` })),
             },
             generation: {
-                provider: 'longform',
+                provider: 'fal',
                 model: model || 'seedance-2.0',
                 language: language || 'English',
                 duration: dur,

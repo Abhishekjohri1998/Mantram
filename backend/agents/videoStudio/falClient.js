@@ -483,8 +483,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     }
 
     if (model === 'grok-imagine') {
-        const provider = activeProvider || 'grok';
-        if (provider === 'grok') {
+        // Always use native Grok API when GROK_API_KEY is set — never fall through to fal.ai
+        const grokApiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+        if (grokApiKey) {
             const result = await submitGrokVideoGeneration({
                 prompt: safePrompt,
                 imageUrl: s3ImageUrl,
@@ -501,7 +502,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 provider: 'grok'
             };
         }
-        // If provider !== 'grok', it will fall through to fal.ai routing below.
+        console.warn(`⚠️ [Grok] GROK_API_KEY not set — falling through to fal.ai (may fail)`);
     }
 
     // Kling models — route directly to LaoZhang
