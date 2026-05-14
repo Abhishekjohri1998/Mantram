@@ -170,38 +170,93 @@ async function runPipeline(jobId, params) {
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 2: Parallel Video Generation ═══
-        const MAX_CONCURRENT = 3;
+        // ═══ Phase 2: Sequential Video Generation ═══
         const sceneVideos = new Array(scenes.length).fill(null);
         let completedScenes = 0;
+        let lastFrameUrl = null;
 
-        // Process scenes in batches of MAX_CONCURRENT
-        for (let batch = 0; batch < scenes.length; batch += MAX_CONCURRENT) {
+        // Process scenes sequentially for cinematic continuity
+        for (let i = 0; i < scenes.length; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
 
-            const batchScenes = scenes.slice(batch, batch + MAX_CONCURRENT);
-            const batchPromises = batchScenes.map(async (scene, batchIdx) => {
-                const globalIdx = batch + batchIdx;
-                job.sceneStatuses[globalIdx] = { status: 'generating', progress: 0 };
+            const scene = scenes[i];
+            job.sceneStatuses[i] = { status: 'generating', progress: 0 };
+
+            updateProgress(jobId, 'GENERATING',
+                `Scene ${i + 1}/${scenes.length} (${scene.role})`,
+                (completedScenes / scenes.length) * 100);
+
+            try {
+                // Build scene prompt with reference image tags
+                let scenePrompt = scene.visualPrompt || scene.prompt || params.prompt;
+                if (scene.camerawork) scenePrompt += `\n${scene.camerawork}`;
+                scenePrompt += '\nMaintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles.';
+
+                // Generate the scene video
+                const isSeedance = params.model.startsWith('seedance');
+                let genResult;
+
+                if (isSeedance) {
+                    genResult = await submitAtlasCloudVideoGeneration({
+                        prompt: scenePrompt,
+                        imageUrl: lastFrameUrl, // INJECT LAST FRAME FOR CONTINUITY
+                        duration: scene.duration,
+                        aspectRatio: params.aspectRatio,
+                        generateAudio: true,
+                        referenceImages: params.referenceImages.slice(0, 9),
+                        qualityMode: params.settings?.quality || 'fast',
+                        imageRole: params.imageRole,
+                    });
+                } else {
+                    genResult = await submitVideoGeneration({
+                        model: params.model,
+                        prompt: scenePrompt,
+                        imageUrl: lastFrameUrl, // INJECT LAST FRAME FOR CONTINUITY
+                        duration: scene.duration,
+                        aspectRatio: params.aspectRatio,
+                        generateAudio: true,
+                        referenceImages: params.referenceImages.slice(0, 9),
+                    });
+                }
+
+                // Poll until complete
+                const videoUrl = await pollUntilComplete(genResult, jobId, i, scenes.length);
+                sceneVideos[i] = videoUrl;
+                job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl };
+                completedScenes++;
+
+                // EXTRACT LAST FRAME for the next scene
+                if (i < scenes.length - 1) {
+                    try {
+                        const { extractLastFrameToS3 } = await import('../../utils/ffmpegUtils.js');
+                        lastFrameUrl = await extractLastFrameToS3(videoUrl);
+                        console.log(`[LongForm ${jobId}] Extracted last frame for scene ${i + 1}: ${lastFrameUrl}`);
+                    } catch (frameErr) {
+                        console.error(`[LongForm ${jobId}] Failed to extract last frame from scene ${i + 1}:`, frameErr.message);
+                        // If frame extraction fails, fallback to null (start fresh for next scene)
+                        lastFrameUrl = null;
+                    }
+                }
 
                 updateProgress(jobId, 'GENERATING',
-                    `Scene ${globalIdx + 1}/${scenes.length} (${scene.role})`,
+                    `${completedScenes}/${scenes.length} scenes done`,
                     (completedScenes / scenes.length) * 100);
 
+            } catch (err) {
+                console.error(`[LongForm ${jobId}] Scene ${i + 1} failed: ${err.message}`);
+                job.sceneStatuses[i] = { status: 'failed', error: err.message };
+
+                // Retry once
                 try {
-                    // Build scene prompt with reference image tags
-                    let scenePrompt = scene.visualPrompt || scene.prompt || params.prompt;
-                    if (scene.camerawork) scenePrompt += `\n${scene.camerawork}`;
-                    scenePrompt += '\nMaintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles.';
-
-                    // Generate the scene video
+                    console.log(`[LongForm ${jobId}] Retrying scene ${i + 1}...`);
+                    
                     const isSeedance = params.model.startsWith('seedance');
-                    let genResult;
-
+                    let retryResult;
+                    
                     if (isSeedance) {
-                        genResult = await submitAtlasCloudVideoGeneration({
-                            prompt: scenePrompt,
-                            imageUrl: null,
+                        retryResult = await submitAtlasCloudVideoGeneration({
+                            prompt: scene.visualPrompt || params.prompt,
+                            imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
                             generateAudio: true,
@@ -210,55 +265,36 @@ async function runPipeline(jobId, params) {
                             imageRole: params.imageRole,
                         });
                     } else {
-                        genResult = await submitVideoGeneration({
-                            model: params.model,
-                            prompt: scenePrompt,
-                            imageUrl: null,
-                            duration: scene.duration,
-                            aspectRatio: params.aspectRatio,
-                            generateAudio: true,
-                            referenceImages: params.referenceImages.slice(0, 9),
-                        });
-                    }
-
-                    // Poll until complete
-                    const videoUrl = await pollUntilComplete(genResult, jobId, globalIdx, scenes.length);
-                    sceneVideos[globalIdx] = videoUrl;
-                    job.sceneStatuses[globalIdx] = { status: 'completed', progress: 100, videoUrl };
-                    completedScenes++;
-
-                    updateProgress(jobId, 'GENERATING',
-                        `${completedScenes}/${scenes.length} scenes done`,
-                        (completedScenes / scenes.length) * 100);
-
-                } catch (err) {
-                    console.error(`[LongForm ${jobId}] Scene ${globalIdx + 1} failed: ${err.message}`);
-                    job.sceneStatuses[globalIdx] = { status: 'failed', error: err.message };
-
-                    // Retry once
-                    try {
-                        console.log(`[LongForm ${jobId}] Retrying scene ${globalIdx + 1}...`);
-                        const retryResult = await submitVideoGeneration({
+                        retryResult = await submitVideoGeneration({
                             model: params.model,
                             prompt: scene.visualPrompt || params.prompt,
-                            imageUrl: null,
+                            imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
                             generateAudio: true,
                             referenceImages: params.referenceImages.slice(0, 9),
                         });
-                        const retryUrl = await pollUntilComplete(retryResult, jobId, globalIdx, scenes.length);
-                        sceneVideos[globalIdx] = retryUrl;
-                        job.sceneStatuses[globalIdx] = { status: 'completed', progress: 100, videoUrl: retryUrl };
-                        completedScenes++;
-                    } catch (retryErr) {
-                        console.error(`[LongForm ${jobId}] Scene ${globalIdx + 1} retry failed: ${retryErr.message}`);
-                        throw new Error(`Scene ${globalIdx + 1} failed after retry: ${retryErr.message}`);
                     }
+                    
+                    const retryUrl = await pollUntilComplete(retryResult, jobId, i, scenes.length);
+                    sceneVideos[i] = retryUrl;
+                    job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
+                    completedScenes++;
+                    
+                    if (i < scenes.length - 1) {
+                        try {
+                            const { extractLastFrameToS3 } = await import('../../utils/ffmpegUtils.js');
+                            lastFrameUrl = await extractLastFrameToS3(retryUrl);
+                            console.log(`[LongForm ${jobId}] Extracted last frame for scene ${i + 1} (after retry): ${lastFrameUrl}`);
+                        } catch (frameErr) {
+                            lastFrameUrl = null;
+                        }
+                    }
+                } catch (retryErr) {
+                    console.error(`[LongForm ${jobId}] Scene ${i + 1} retry failed: ${retryErr.message}`);
+                    throw new Error(`Scene ${i + 1} failed after retry: ${retryErr.message}`);
                 }
-            });
-
-            await Promise.all(batchPromises);
+            }
         }
 
         // Verify all scenes generated
