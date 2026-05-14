@@ -744,3 +744,107 @@ export async function extendGrokVideo({ videoUrl, prompt, duration = 6 }) {
     const data = await response.json();
     return { requestId: data.request_id, provider: 'grok' };
 }
+
+// ── Lip-Sync Post-Processing ─────────────────────────────────────────────────
+// For models that don't support refAudio, we generate the scene video first,
+// then run it through a lip-sync model to make the character's lips move
+// in sync with the TTS dialogue audio.
+
+const LIP_SYNC_ENDPOINT = 'fal-ai/sync-lipsync/v2';
+
+/**
+ * Submit a lip-sync job to fal.ai Sync Lipsync v2.
+ * Takes a scene video + TTS audio → returns video with lip-synced character.
+ *
+ * @param {string} videoUrl - S3/HTTP URL of the scene video
+ * @param {string} audioUrl - S3/HTTP URL of the TTS audio (mp3/wav)
+ * @returns {Promise<object>} - { requestId, statusUrl, resultUrl }
+ */
+export async function submitLipSync(videoUrl, audioUrl) {
+    const apiKey = getApiKey();
+
+    console.log(`👄 [LipSync] Submitting to ${LIP_SYNC_ENDPOINT}...`);
+    console.log(`   video: ${videoUrl.substring(0, 80)}...`);
+    console.log(`   audio: ${audioUrl.substring(0, 80)}...`);
+
+    const response = await fetch(`${FAL_BASE_URL}/${LIP_SYNC_ENDPOINT}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            video_url: videoUrl,
+            audio_url: audioUrl,
+            sync_mode: 'cut_off',
+        }),
+        signal: AbortSignal.timeout(35000),
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`fal.ai lip-sync failed (${response.status}): ${errText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ [LipSync] Job queued: requestId=${data.request_id}`);
+
+    return {
+        requestId: data.request_id,
+        statusUrl: data.status_url,
+        resultUrl: data.response_url,
+        provider: 'fal',
+    };
+}
+
+/**
+ * Poll a lip-sync job until it completes.
+ * Returns the URL of the lip-synced video.
+ *
+ * @param {object} lipSyncResult - Output from submitLipSync
+ * @param {number} maxWaitMs - Maximum time to wait (default 3 min)
+ * @returns {Promise<string>} - URL of the lip-synced video
+ */
+export async function pollLipSyncResult(lipSyncResult, maxWaitMs = 180000) {
+    const apiKey = getApiKey();
+    const { statusUrl, resultUrl } = lipSyncResult;
+    const startTime = Date.now();
+    const pollInterval = 3000;
+
+    while (Date.now() - startTime < maxWaitMs) {
+        await new Promise(r => setTimeout(r, pollInterval));
+
+        try {
+            const statusResp = await fetch(statusUrl, {
+                headers: { 'Authorization': `Key ${apiKey}` },
+                signal: AbortSignal.timeout(10000),
+            });
+
+            if (!statusResp.ok) {
+                console.warn(`👄 [LipSync] Poll status ${statusResp.status}, retrying...`);
+                continue;
+            }
+
+            const statusData = await statusResp.json();
+
+            if (statusData.status === 'COMPLETED') {
+                const resultResp = await fetch(resultUrl, {
+                    headers: { 'Authorization': `Key ${apiKey}` },
+                    signal: AbortSignal.timeout(10000),
+                });
+                const resultData = await resultResp.json();
+                const videoUrl = resultData.video?.url || resultData.output?.url || resultData.video_url || '';
+                if (!videoUrl) throw new Error('Lip-sync completed but no video URL in response');
+                console.log(`✅ [LipSync] Complete: ${videoUrl.substring(0, 80)}...`);
+                return videoUrl;
+            } else if (statusData.status === 'FAILED') {
+                throw new Error(`Lip-sync failed: ${statusData.error || 'Unknown error'}`);
+            }
+
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            console.log(`👄 [LipSync] Processing... (${elapsed}s elapsed)`);
+        } catch (err) {
+            if (err.message.includes('Lip-sync failed')) throw err;
+            console.warn(`👄 [LipSync] Poll error: ${err.message}`);
+        }
+    }
+
+    throw new Error(`Lip-sync timed out after ${maxWaitMs / 1000}s`);
+}

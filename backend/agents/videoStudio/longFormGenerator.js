@@ -13,7 +13,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import { planScenes } from './scenePlanner.js';
-import { submitVideoGeneration, estimateCost } from './falClient.js';
+import { submitVideoGeneration, estimateCost, submitLipSync, pollLipSyncResult } from './falClient.js';
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
 import {
@@ -272,13 +272,24 @@ async function runPipeline(jobId, params) {
                 // Poll until complete
                 let videoUrl = await pollUntilComplete(genResult, jobId, i, scenes.length);
 
-                // ── Step 2d: Post-mux TTS for models WITHOUT refAudio ──
+                // ── Step 2d: Lip-sync for models WITHOUT refAudio ──
+                // Use fal.ai Sync Lipsync to make the character's lips move with TTS
                 if (sceneTtsUrl && !supportsRefAudio) {
                     try {
-                        console.log(`[LongForm ${jobId}] 🔊 Post-muxing TTS onto scene ${i + 1} (model lacks refAudio)...`);
-                        videoUrl = await muxAudioOntoVideo(videoUrl, sceneTtsUrl);
-                    } catch (muxErr) {
-                        console.warn(`[LongForm ${jobId}] ⚠️ Post-mux failed for scene ${i + 1}: ${muxErr.message}`);
+                        console.log(`[LongForm ${jobId}] 👄 Lip-syncing scene ${i + 1} (model lacks refAudio)...`);
+                        const lipSyncJob = await submitLipSync(videoUrl, sceneTtsUrl);
+                        const lipSyncedUrl = await pollLipSyncResult(lipSyncJob, 180000);
+                        videoUrl = lipSyncedUrl;
+                        console.log(`[LongForm ${jobId}] ✅ Scene ${i + 1} lip-synced successfully`);
+                    } catch (lipErr) {
+                        console.warn(`[LongForm ${jobId}] ⚠️ Lip-sync failed for scene ${i + 1}: ${lipErr.message}`);
+                        // Fallback: just mux audio onto video (voiceover without lip movement)
+                        try {
+                            console.log(`[LongForm ${jobId}] 🔊 Falling back to audio mux for scene ${i + 1}...`);
+                            videoUrl = await muxAudioOntoVideo(videoUrl, sceneTtsUrl);
+                        } catch (muxErr) {
+                            console.warn(`[LongForm ${jobId}] ⚠️ Audio mux also failed: ${muxErr.message}`);
+                        }
                     }
                 }
 
@@ -397,13 +408,13 @@ async function runPipeline(jobId, params) {
         const voiceoverPath = await concatSceneAudios(sceneAudioData, tmpDir);
         updateProgress(jobId, 'TTS', voiceoverPath ? 'Voiceover ready' : 'No voiceover', 100);
 
-        // BGM URLs
+        // BGM URLs — using Pixabay download links (direct CDN)
         const BGM_URLS = {
-            upbeat: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3',
-            cinematic: 'https://cdn.pixabay.com/audio/2022/02/07/audio_0319dd632e.mp3',
-            emotional: 'https://cdn.pixabay.com/audio/2022/10/25/audio_27ab966bc7.mp3',
-            energetic: 'https://cdn.pixabay.com/audio/2023/04/27/audio_f5353ee5c0.mp3',
-            minimal: 'https://cdn.pixabay.com/audio/2022/03/15/audio_0710609b5a.mp3',
+            upbeat: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
+            cinematic: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_0319dd632e.mp3',
+            emotional: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_27ab966bc7.mp3',
+            energetic: 'https://cdn.pixabay.com/download/audio/2023/04/27/audio_f5353ee5c0.mp3',
+            minimal: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_0710609b5a.mp3',
         };
         const bgmUrl = params.bgmPreset ? BGM_URLS[params.bgmPreset] : null;
 
