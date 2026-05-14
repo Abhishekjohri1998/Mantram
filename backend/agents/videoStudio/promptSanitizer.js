@@ -15,15 +15,15 @@
 // These are HARD limits enforced before any API submission.
 // ─────────────────────────────────────────────────────────────────────────────
 export const PROVIDER_PROMPT_LIMITS = {
-    atlascloud:  4000,  // Atlas Cloud has no hard limit; using 4000 for rich scene detail
-    seedance:    4000,
-    muapi:       3800,  // MuAPI limit is 4000 chars; we use 3800 for safety margin
-    happyhorse:  4000,
+    atlascloud:  50000, // Unlimited director-level scenes
+    seedance:    50000,
+    muapi:       50000,
+    happyhorse:  50000,
     fal:         2000,
     kie:         2000,
     laozhang:    2000,
-    grok:        4000,
-    default:     2000,
+    grok:        50000,
+    default:     4000,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

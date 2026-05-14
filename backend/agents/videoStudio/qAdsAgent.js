@@ -269,7 +269,7 @@ ${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that gra
   3. PRODUCT: exact position in frame, how light interacts with surface, label orientation, size relative to hands
   4. ENVIRONMENT: what's visible in background, any ambient movement (curtains, steam, hair, particles)
   5. LIGHTING: direction, quality (soft/hard), color temperature, any shifts or flickers
-- Your TOTAL output MUST be between 1200 and 2000 characters. If under 1200 characters, you have FAILED. Write more detail.
+- Your TOTAL output MUST be extremely detailed, with no maximum character limit. Feel free to write up to 50,000 characters if required to describe the scene perfectly. If you write a short summary, you have FAILED.
 - Do NOT summarize multiple shots into one. Every 1-2 second window gets its own SHOT entry.
 
 SHOT 1 [00:00 - 00:01]: [Shot size + focal length e.g. "Medium close-up at 50mm"] / [Camera move e.g. "Slow push-in with 0.5° clockwise rotation"] / [Detailed avatar action: facial micro-expression, hand gesture, product interaction, body shift. At least 30 words describing exactly what happens in this time window.]
@@ -304,7 +304,7 @@ GENERATION SETTINGS:
   Custom Dialogue: ${settings?.customDialogue || 'None'}
   Avatar provided: ${hasAvatar ? 'Yes — extract appearance from image, write them into scene specifically' : 'No — use functional label only, do not invent appearance'}
 
-Write the Seedance 2.0 prompt variant now. Remember: in medias res. The ad is already in progress when the camera starts. Your output MUST be at least 800 characters with full SHOT-by-SHOT breakdown. Do NOT summarize.`;
+Write the Seedance 2.0 prompt variant now. Remember: in medias res. The ad is already in progress when the camera starts. Your output MUST be extremely detailed with a full SHOT-by-SHOT breakdown, acting as a director. There is no character limit; write as much detail as needed (up to 50K characters). Do NOT summarize.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +497,7 @@ export async function runQAdsAgent({
     if (issues.length > 0) {
         const wordCount = variants[0]?.prompt?.split(/\s+/).length || 0;
         console.warn(`[Q-Ads Agent] Validation issues found: ${issues.join('; ')}. Retrying once...`);
-        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED.\nIssues found: ${issues.join('; ')}.\nYour previous output was only ${wordCount} words — this is UNACCEPTABLE.\nYou MUST write at minimum 150 words with a full SHOT-by-SHOT breakdown covering every 1-2 second window of the ${settings?.duration || 8}s video.\nEach SHOT must describe camera angle, movement, subject action, product interaction, and lighting in vivid detail.\nReturn the output labeled Variant A. No other text.`;
+        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED.\nIssues found: ${issues.join('; ')}.\nYour previous output was only ${wordCount} words — this is UNACCEPTABLE.\nYou MUST write an extremely detailed full SHOT-by-SHOT breakdown covering every 1-2 second window of the ${settings?.duration || 8}s video, with NO maximum character limit.\nEach SHOT must describe camera angle, movement, subject action, product interaction, and lighting in vivid detail.\nReturn the output labeled Variant A. No other text.`;
         try {
             rawOutput = await callMultimodalAgent(
                 retrySystem,
