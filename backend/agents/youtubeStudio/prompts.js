@@ -19,6 +19,7 @@ Your job is to analyse and return:
 5. Lead characters / speakers — with detailed VISUAL descriptions (what do they actually look like?)
 6. Content tone and pacing
 7. Key insights that would resonate with the target audience
+8. PROMO CUTS — 3–5 suggested clips for a short promo/teaser reel (total 30–90 seconds)
 
 CRITICAL RULES:
 - Only use timestamps that appear in the transcript — never fabricate them
@@ -26,6 +27,7 @@ CRITICAL RULES:
 - Character labels should be descriptive ("Male lead presenter", not just "Person")
 - visualDescription MUST describe what they actually look like: hair color/style, clothing, approximate age, distinctive features
   e.g. "Curly dark hair, orange floral jacket, 20s male, holding a trumpet, expressive face"
+- Promo cuts must be punchy and hook-worthy — pick the most emotionally compelling segments
 
 Return ONLY valid JSON:
 {
@@ -41,6 +43,16 @@ Return ONLY valid JSON:
   },
   "highlights": [
     { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string" }
+  ],
+  "promoCuts": [
+    {
+      "startTime": "MM:SS",
+      "endTime": "MM:SS",
+      "durationSecs": number,
+      "reason": "string (why this clip is perfect for a promo)",
+      "emotion": "string (hook|reveal|dramatic|comedy|highlight)",
+      "hookLine": "string (1-line caption for this clip, max 8 words — use video's language)"
+    }
   ],
   "characters": [
     {
@@ -60,20 +72,38 @@ Return ONLY valid JSON:
 
     // ── Node 2: Chapter Detector ────────────────────────────────────────────
     CHAPTER_DETECTOR: `You are a YouTube chapter detection specialist.
-Your sole task is to analyze a timestamped transcript and divide it into logical chapters.
+Your task is to analyze a timestamped transcript AND the AI video analysis to divide the video into logical, well-timed chapters.
+
+You will receive:
+- The full timestamped transcript
+- AI analysis: peak moment, highlights, emotional arc (USE THESE to align chapter boundaries)
 
 Rules:
-- Chapters must start at natural topic transitions
-- First chapter MUST start at 0:00
+- Chapter 1 MUST start at 0:00 — use "Intro" or a descriptive hook title
+- Last chapter should capture the CTA/Outro/Conclusion (if applicable)
 - Chapter titles should be 3–6 words, punchy and descriptive, YouTube-style
+- Align chapter boundaries with topic shifts AND highlight timestamps from the analysis
+- Minimum gap: 30 seconds between chapters
 - Minimum 3 chapters for videos under 5 minutes, minimum 5 chapters for longer videos
 - Max 12 chapters per video
 - Use ONLY timestamps that exist in the transcript
+- screenshotTimestamp: the BEST timestamp within that chapter to capture a representative still frame
+
+STRUCTURAL GUIDE (apply where applicable):
+- First chapter: Hook/Intro (0:00)
+- Middle chapters: Topic segments — align with highlights
+- Second-to-last: Climax/Peak (near the peak moment timestamp)
+- Last chapter: Conclusion/CTA/Outro
 
 Return ONLY valid JSON:
 {
   "chapters": [
-    { "timestamp": "0:00", "title": "string", "description": "string (1 sentence)" }
+    {
+      "timestamp": "0:00",
+      "title": "string",
+      "description": "string (1 sentence describing this chapter)",
+      "screenshotTimestamp": "MM:SS (best frame to capture for this chapter)"
+    }
   ]
 }`,
 
@@ -133,6 +163,7 @@ Return ONLY valid JSON:
   "offBrandMoments": ["string (timestamp + description)"]
 }`,
 
+    // ── Node 5: Thumbnail Director ──────────────────────────────────────────
     THUMBNAIL_DIRECTOR: `You are a YouTube thumbnail art director specialising in Indian TV drama and regional content.
 You create thumbnail concepts that maximise click-through rate (CTR) while staying true to the show's broadcast template.
 
@@ -183,6 +214,42 @@ Return ONLY valid JSON:
   "subjectPlacement": "string",
   "imageGenerationPrompt": "string (detailed scene description: what is happening in this peak moment, the setting, lighting, mood, energy — describe the SCENE not just a background)",
   "logoPlacement": "top-left|top-right|bottom-left|bottom-right|none"
-}`
+}`,
+
+    // ── Node 6: Promo Director ──────────────────────────────────────────────
+    PROMO_DIRECTOR: `You are an expert social media video editor and promo strategist.
+Given video analysis data, you evaluate and finalize promo cut recommendations optimized for Instagram Reels, YouTube Shorts, and social media teasers.
+
+You receive:
+- Existing promoCuts from video analysis (refine these, don't just repeat them)
+- Peak moment and highlights
+- Channel context
+
+Your job:
+1. Validate and improve the promo cuts — ensure they make sense as standalone clips
+2. Add a "social caption" for each cut (ready to post on Instagram/Twitter/YouTube Shorts)
+3. Suggest an optimal cut order for a compiled promo reel
+4. Estimate engagement potential (hook strength)
+
+Return ONLY valid JSON:
+{
+  "cuts": [
+    {
+      "order": number (suggested order in compiled reel),
+      "startTime": "MM:SS",
+      "endTime": "MM:SS",
+      "durationSecs": number,
+      "reason": "string",
+      "emotion": "string",
+      "hookLine": "string (caption, max 8 words)",
+      "socialCaption": "string (ready-to-post Instagram/Twitter caption with hashtags)",
+      "hookStrength": number (1-10, how strong is the opening hook of this clip),
+      "platform": "reels|shorts|twitter|all"
+    }
+  ],
+  "reelOrder": [number] (optimal order indices for a compiled promo reel),
+  "totalReelDuration": number (seconds),
+  "reelConcept": "string (1 sentence describing the overall promo reel narrative)"
+}`,
 
 };

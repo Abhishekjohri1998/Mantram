@@ -195,18 +195,33 @@ export async function analysisNode({ video, brandContext }) {
 
 // ── 3. Chapter Detection Node ──────────────────────────────────────────────
 
-export async function chapterNode({ video }) {
+export async function chapterNode({ video, analysis }) {
     const { transcript } = video;
     if (!transcript.available) {
         return { chapters: [] };
     }
 
-    console.log(`📚 [chapterNode] Detecting chapters from transcript`);
+    console.log(`📚 [chapterNode] Detecting chapters using analysis context`);
+
+    // Build analysis context to ground chapter boundaries on real highlights
+    const analysisContext = analysis ? [
+        `PEAK MOMENT: ${analysis.peakMoment?.timestamp} — ${analysis.peakMoment?.title || 'N/A'}`,
+        `HIGHLIGHTS:\n${analysis.highlights?.slice(0, 8).map(h => `  ${h.timestamp}: ${h.title}`).join('\n') || 'N/A'}`,
+        `EMOTIONAL ARC: ${analysis.emotionalArc || 'N/A'}`,
+        `CONTENT TYPE: ${analysis.contentType || 'N/A'}`,
+    ].join('\n') : '';
+
+    const userPrompt = [
+        `VIDEO DURATION: ${video.duration || 'Unknown'}`,
+        analysisContext,
+        '',
+        `TRANSCRIPT (timestamped):\n${transcript.text?.substring(0, 25000)}`,
+    ].filter(Boolean).join('\n');
 
     const result = await callAgent(
         PROMPTS.CHAPTER_DETECTOR,
-        `VIDEO DURATION: ${video.duration || 'Unknown'}\n\nTRANSCRIPT:\n${transcript.text?.substring(0, 20000)}`,
-        0.2, 2048, { preferFast: true, timeoutMs: 60_000 }  // Fast model but long transcripts need 60s
+        userPrompt,
+        0.2, 2048, { preferFast: false, timeoutMs: 90_000 }  // Full model — better chapter quality
     );
 
     return { chapters: result.chapters || [] };
@@ -240,11 +255,23 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
         `TRANSCRIPT EXCERPT:\n${transcript.text?.substring(0, 5000) || 'N/A'}`,
     ].join('\n');
 
-    const result = await callAgent(
-        PROMPTS.SEO_COPYWRITER,
-        userPrompt,
-        0.7, 3000, { provider: 'claude', timeoutMs: 60_000 }  // Claude copywriting ~20-25s; 60s cap
-    );
+    // Use Grok (xAI) for SEO — great at trending language and CTR-optimised copy
+    // Fallback: best available model via router (never hard-code a single provider)
+    let result;
+    try {
+        result = await callAgent(
+            PROMPTS.SEO_COPYWRITER,
+            userPrompt,
+            0.7, 3000, { model: 'grok-3', timeoutMs: 60_000 }
+        );
+    } catch (err) {
+        console.warn(`⚠️ [seoNode] Grok failed (${err.message}), falling back to best available model`);
+        result = await callAgent(
+            PROMPTS.SEO_COPYWRITER,
+            userPrompt,
+            0.7, 3000, { preferFast: false, timeoutMs: 60_000 }
+        );
+    }
 
     return { seo: result };
 }
@@ -576,40 +603,98 @@ Return ONLY a JSON object, no markdown:
     ].filter(Boolean).join('\n');
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Execute Image Generation (NanoBanana 2 / Gemini 3.1 Native)
+    // Execute Image Generation — GPT Image 2 (primary) → Gemini (fallback)
     // ═══════════════════════════════════════════════════════════════════════════
-    console.log(`   🚀 [nanobanana2-native] Executing 16:9 graphic composite with Gemini...`);
-    try {
-        const genPrompt = [
-            `You are generating a highly polished YouTube thumbnail graphic asset. First, create a freshly lit dramatic scene. Second, you MUST composite the required broadcast graphic elements (specifically the lower-third title bar) directly onto the image.`,
-            `Indian TV drama YouTube thumbnail (16:9) for "${videoTitle}". Show: "${ta.showName || template?.name || 'Indian TV show'}".`,
-            peakScene,
-            characterList ? `Characters to include: ${characterList.substring(0, 300)}` : '',
-            ta.reconstructionInstruction || template?.generationPromptSuffix || directionStyle,
-            ta.colorPalette ? `Color palette: ${ta.colorPalette.join(', ')}` : '',
-            ta.lowerThird ? `LOWER-THIRD TITLE BAR (CRITICAL): ${ta.lowerThird}. This MUST be included at the bottom with exact text: "${line1}"` : `Text at bottom: "${line1}"`,
-            `DO NOT GENERATE ANY BRAND OR CHANNEL LOGOS. Leave empty space where they go.`,
-            `High contrast, professional, photorealistic cinematic lighting, 16:9 landscape.`,
-        ].filter(Boolean).join('. ');
+    const genPrompt = [
+        `Professional YouTube thumbnail (16:9, 1536x1024) for a ${ta.showName || template?.name || 'YouTube video'} video.`,
+        `Video title: "${videoTitle}"`,
+        ``,
+        `KEY SCENE: ${peakScene}`,
+        `Emotional tone: ${peakEmotion} — convey this strongly through facial expression and body language.`,
+        ``,
+        characterList
+            ? `CHARACTERS (generate these people from scratch matching descriptions):\n  ${characterList.substring(0, 400)}`
+            : 'Generate the lead character(s) appropriate to the show.',
+        ``,
+        ta.overallAesthetic || baseTemplateStyle || directionStyle
+            ? `VISUAL STYLE: ${ta.overallAesthetic || baseTemplateStyle || directionStyle}`
+            : '',
+        ta.colorPalette?.length ? `Color palette: ${ta.colorPalette.join(', ')}` : '',
+        ta.backgroundScene ? `Background: ${ta.backgroundScene}` : '',
+        ta.mainSubjectPosition ? `Subject position: ${ta.mainSubjectPosition}` : '',
+        ``,
+        `LOWER-THIRD TITLE BAR (MANDATORY): ${
+            ta.lowerThird
+                ? ta.lowerThird + `. Place it at the bottom with bold text: "${line1}"${line2 ? ' / "' + line2 + '"' : ''}`
+                : `Dark gradient bar at the bottom 15% of the image. Text: "${line1}"${line2 ? ' and "' + line2 + '"' : ''}`
+        }`,
+        ta.reconstructionInstruction ? `RECONSTRUCTION: ${ta.reconstructionInstruction.substring(0, 300)}` : '',
+        template?.generationPromptSuffix ? `SHOW STYLE: ${template.generationPromptSuffix}` : '',
+        brandSnippet ? `Brand context: ${brandSnippet}` : '',
+        ``,
+        `HARD RULES:`,
+        `- 16:9 landscape orientation, broadcast quality`,
+        `- Cinematic lighting, sharp focus on the main subject`,
+        `- High contrast, vibrant colors that pop on mobile`,
+        `- NO brand logos, NO channel watermarks (space will be overlaid digitally)`,
+        `- The lower-third title bar IS MANDATORY — do not omit it`,
+        `- Photorealistic, not cartoonish or animated`,
+    ].filter(Boolean).join('\n');
 
-        // Using native GeminiProvider via getRouter() which correctly applies REST imageConfig for 16:9
-        const router = getRouter();
+    console.log(`   🚀 [gpt-image-2] Generating 16:9 HD thumbnail...`);
+
+    const router = getRouter();
+
+    // ── Try GPT Image 2 first (primary) ────────────────────────────────────────────
+    try {
+        const result = await router.generateImage({
+            prompt:      genPrompt,
+            model:       'gpt-image-2',
+            aspectRatio: '16:9',
+            quality:     'hd',
+        }, { provider: 'openai' });
+
+        let finalUrl = typeof result === 'string' ? result : result.imageUrl;
+
+        // gpt-image-2 returns base64 data URI — upload to S3 for persistent URL
+        if (finalUrl?.startsWith('data:')) {
+            try {
+                const { uploadBase64ToS3 } = await import('../../utils/s3Upload.js').catch(() => ({ uploadBase64ToS3: null }));
+                if (uploadBase64ToS3 && result.b64) {
+                    finalUrl = await uploadBase64ToS3(result.b64, `thumbnails/yt-${Date.now()}.png`);
+                    console.log(`   ✅ [gpt-image-2] Uploaded to S3: ${finalUrl.substring(0, 80)}`);
+                } else {
+                    console.log(`   ⚠️ [gpt-image-2] S3 upload not available — using data URI`);
+                }
+            } catch (uploadErr) {
+                console.warn(`   ⚠️ S3 upload failed: ${uploadErr.message} — using data URI`);
+            }
+        }
+
+        console.log(`✅ [thumbnailGenerationNode] GPT Image 2 success`);
+        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
+
+    } catch (gptErr) {
+        console.warn(`⚠️ [thumbnailGenerationNode] GPT Image 2 failed: ${gptErr.message} — trying Gemini fallback`);
+    }
+
+    // ── Fallback: Gemini 3.1 Flash Image ────────────────────────────────────────────
+    try {
         const result = await router.generateImage({
             prompt: genPrompt,
             aspectRatio: '16:9',
             imageParts: [
-                ...(leadPortraitPart  ? [leadPortraitPart]  : []),
-                ...(templateRefPart   ? [templateRefPart]   : []),
+                ...(leadPortraitPart ? [leadPortraitPart]  : []),
+                ...(templateRefPart  ? [templateRefPart]   : []),
             ],
-        });
-        
+        }, { provider: 'gemini' });
+
         const finalUrl = typeof result === 'string' ? result : result.imageUrl;
-        
-        console.log(`✅ [thumbnailGenerationNode] Success — 16:9 scene generated natively`);
-        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null };
-    } catch (err) {
-        console.warn(`❌ [thumbnailGenerationNode] Gemini image gen failed: ${err.message}`);
-        return { generatedThumbnailUrl: null, thumbnailGenerationError: err.message };
+        console.log(`✅ [thumbnailGenerationNode] Gemini fallback success`);
+        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
+    } catch (gemErr) {
+        console.warn(`❌ [thumbnailGenerationNode] Both providers failed: ${gemErr.message}`);
+        return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
     }
 }
 
@@ -768,3 +853,78 @@ Describe each visible person's exact appearance so I can generate accurate portr
     return { characterPortraits };
 }
 
+
+// ── 9. Frame Extraction Node ──────────────────────────────────────────────────
+
+/**
+ * Frame Extraction Node
+ * Fetches YouTube CDN thumbnail frames as visual grounding for thumbnail generation.
+ * YouTube serves auto-generated frames:
+ *   0.jpg / maxresdefault.jpg = best auto frame
+ *   1.jpg / 2.jpg / 3.jpg    = frames at ~25%, 50%, 75%
+ */
+export async function frameExtractionNode({ videoId }) {
+    if (!videoId) return { extractedFrames: [] };
+    console.log(`🎬 [frameExtractionNode] Extracting YouTube CDN frames for ${videoId}`);
+
+    const frameUrls = [
+        { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame' },
+        { url: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,     label: 'HQ Cover Frame' },
+        { url: `https://img.youtube.com/vi/${videoId}/1.jpg`,             label: 'Frame at 25%' },
+        { url: `https://img.youtube.com/vi/${videoId}/2.jpg`,             label: 'Frame at 50%' },
+        { url: `https://img.youtube.com/vi/${videoId}/3.jpg`,             label: 'Frame at 75%' },
+    ];
+
+    const frames = [];
+    for (const { url, label } of frameUrls) {
+        try {
+            const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+            if (!res.ok) continue;
+            const buf = await res.arrayBuffer();
+            // Skip YouTube's 1×1 grey placeholder (returned when a frame doesn't exist)
+            if (buf.byteLength < 2000) continue;
+            frames.push({ url, label, sizeKb: Math.round(buf.byteLength / 1024) });
+            console.log(`   ✅ ${label} → ${url.split('/').pop()} (${Math.round(buf.byteLength / 1024)}KB)`);
+        } catch { /* skip unavailable frames silently */ }
+    }
+
+    console.log(`   🎬 Extracted ${frames.length} frames for video ${videoId}`);
+    return { extractedFrames: frames };
+}
+
+
+// ── 10. Promo Cuts Node ───────────────────────────────────────────────────────
+
+/**
+ * Promo Cuts Node
+ * Takes raw promoCuts from analysisNode and refines them into
+ * social-media-ready promo clip recommendations with captions.
+ */
+export async function promoNode({ analysis, video, brandContext }) {
+    const rawCuts = analysis?.promoCuts;
+    if (!rawCuts?.length) {
+        console.log('ℹ️ [promoNode] No promo cuts from analysis — skipping');
+        return { promoCuts: [] };
+    }
+
+    console.log(`🎬 [promoNode] Refining ${rawCuts.length} promo cuts into social-ready clips`);
+
+    const userPrompt = [
+        brandContext || 'No brand context',
+        '',
+        `VIDEO: "${video.metadata?.title || 'Unknown'}" by ${video.metadata?.channelTitle || 'Unknown'}`,
+        `DURATION: ${video.duration || 'Unknown'}`,
+        `PEAK MOMENT: ${analysis.peakMoment?.timestamp} — ${analysis.peakMoment?.title || ''}`,
+        '',
+        'RAW PROMO CUTS FROM VIDEO ANALYSIS:',
+        JSON.stringify(rawCuts, null, 2),
+    ].join('\n');
+
+    const result = await callAgent(
+        PROMPTS.PROMO_DIRECTOR,
+        userPrompt,
+        0.7, 2048, { preferFast: true, timeoutMs: 45_000 }
+    );
+
+    return { promoCuts: result.cuts || rawCuts };
+}

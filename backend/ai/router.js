@@ -93,12 +93,15 @@ class ModelRouter {
     }
 
     /**
-     * Get the image provider — Gemini only, NO OpenAI fallback
+     * Get the image provider.
+     * Priority: explicit preference → config default → openai (gpt-image-2) → gemini
+     * Both OpenAI and Gemini support image generation.
      */
     getImageProvider(preferences = {}) {
         const priority = [
             preferences.provider,
             config.ai.defaultImageProvider,
+            'openai',
             'gemini',
         ].filter(Boolean);
 
@@ -107,7 +110,7 @@ class ModelRouter {
                 return this.providers[name];
             }
         }
-        throw new Error('No image AI provider available. Gemini API key required.');
+        throw new Error('No image AI provider available. Add OPENAI_API_KEY or GEMINI_API_KEY to .env');
     }
 
     /**

@@ -140,6 +140,31 @@ const YoutubeProjectSchema = new mongoose.Schema({
         _id: false,
     }],
 
+    // New: Promo Cut Suggestions (from promoNode)
+    promoCuts: [{
+        order:        Number,
+        startTime:    String,
+        endTime:      String,
+        durationSecs: Number,
+        hookLine:     String,
+        reason:       String,
+        emotion:      String,
+        platform:     String,
+        socialCaption: String,
+        _id: false,
+    }],
+
+    // New: Extracted YouTube CDN frames (from frameExtractionNode)
+    extractedFrames: [{
+        url:     String,
+        label:   String,
+        sizeKb:  Number,
+        _id: false,
+    }],
+
+    // New: Which model generated the thumbnail
+    generatorModel: String,
+
 }, { timestamps: true });
 
 // Index for efficient user queries

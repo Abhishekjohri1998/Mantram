@@ -59,14 +59,16 @@ function copyText(text) { return navigator.clipboard.writeText(text) }
 // ── Phase 4: SSE Progress Tracker ────────────────────────────────────────────
 
 const NODE_LABELS = {
-    transcript:          { label: 'Transcript & Metadata',      icon: 'subtitles' },
-    analysis:            { label: 'AI Video Analysis',          icon: 'psychology' },
-    chapters:            { label: 'Chapter Detection',          icon: 'list_alt' },
-    seo:                 { label: 'SEO Copywriting (Claude)',   icon: 'search' },
-    brand:               { label: 'Brand Alignment Score',      icon: 'corporate_fare' },
-    thumbnailDirection:  { label: 'Thumbnail Concept (MCoT)',   icon: 'brush' },
-    thumbnailGeneration: { label: 'AI Thumbnail (NanoBanana 2)',icon: 'image' },
-    characters:          { label: 'Character Portraits',        icon: 'face' },
+    transcript:          { label: 'Transcript & Metadata',        icon: 'subtitles' },
+    analysis:            { label: 'AI Video Intelligence',        icon: 'psychology' },
+    frames:              { label: 'Frame Extraction',             icon: 'movie' },
+    chapters:            { label: 'Smart Chapters (AI-Grounded)', icon: 'list_alt' },
+    seo:                 { label: 'SEO Copywriting (Grok)',       icon: 'search' },
+    brand:               { label: 'Brand Alignment Score',        icon: 'corporate_fare' },
+    promo:               { label: 'Promo Cut Suggestions',        icon: 'cut' },
+    thumbnailDirection:  { label: 'Thumbnail Concept (MCoT)',     icon: 'brush' },
+    characters:          { label: 'Character Portraits',          icon: 'face' },
+    thumbnailGeneration: { label: 'AI Thumbnail (GPT Image 2)',   icon: 'image' },
 }
 
 function PipelineProgress({ projectId, onComplete }) {
@@ -266,7 +268,7 @@ function ShowTemplatePicker({ channelShows, templates, selectedShowId, selectedT
 
 function ProjectDetail({ project, onRefresh }) {
     const { analysis, seo, chapters, brandAlignment, thumbnailDirection, metadata, transcript,
-        generatedThumbnailUrl, characterPortraits } = project
+        generatedThumbnailUrl, characterPortraits, promoCuts, extractedFrames } = project
 
     const [templates, setTemplates] = useState([])
     const [selectedTemplateId, setSelectedTemplateId] = useState(project.appliedTemplateId || '')
@@ -597,11 +599,37 @@ function ProjectDetail({ project, onRefresh }) {
                             </button>
                         </div>
                         <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
-                            Uses real video characters + title · NanoBanana 2 reference-guided · ~10-15s
+                            Uses real video characters + title · GPT Image 2 HD (Gemini fallback) · ~10-15s
                         </p>
                     </div>
                 )}
             </Section>
+
+            {/* ── Extracted Video Frames (visual grounding) ── */}
+            {extractedFrames?.length > 0 && (
+                <Section title="Extracted Video Frames" icon="movie" defaultOpen={false}>
+                    <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                        These real frames from your video were used as visual grounding for thumbnail generation
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                        {extractedFrames.map((frame, i) => (
+                            <div key={i} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', position: 'relative' }}>
+                                <img src={frame.url} alt={frame.label}
+                                    style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }}
+                                    onError={e => { e.target.style.display = 'none' }} />
+                                <div style={{ padding: '6px 8px', background: 'var(--sys-surface)' }}>
+                                    <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'var(--sys-text-muted)' }}>{frame.label}</p>
+                                    {frame.sizeKb && <p style={{ margin: 0, fontSize: 10, color: 'var(--sys-text-muted)' }}>{frame.sizeKb}KB</p>}
+                                </div>
+                                <a href={frame.url} target="_blank" rel="noreferrer"
+                                    style={{ position: 'absolute', top: 6, right: 6, padding: '3px', borderRadius: 6, background: '#00000066', color: 'white', display: 'flex', alignItems: 'center' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+            )}
 
             {/* ── Phase 2: Character Portraits ── */}
             {(analysis?.characters?.length > 0 || localPortraits.length > 0) && (
@@ -692,6 +720,42 @@ function ProjectDetail({ project, onRefresh }) {
                             </div>
                         ))}
                     </div>
+                </Section>
+            )}
+
+            {/* Promo Cuts */}
+            {promoCuts?.length > 0 && (
+                <Section title="Promo Cut Suggestions" icon="cut" badge={promoCuts.length}>
+                    <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                        AI-suggested clips for Reels, Shorts, or teasers — ready for your editor
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {promoCuts.map((cut, i) => (
+                            <div key={i} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-primary)', color: 'white' }}>Cut {cut.order || i + 1}</span>
+                                    <a href={`${project.videoUrl}&t=${cut.startTime?.replace(':', 'm')}s`} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-primary)', textDecoration: 'none' }}>{cut.startTime} → {cut.endTime}</a>
+                                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-border)', color: 'var(--sys-text-muted)', fontWeight: 600 }}>{cut.durationSecs}s</span>
+                                    {cut.emotion && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#a855f715', color: '#a855f7', fontWeight: 600 }}>{cut.emotion}</span>}
+                                    {cut.platform && cut.platform !== 'all' && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 600 }}>{cut.platform}</span>}
+                                </div>
+                                {cut.hookLine && <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, fontStyle: 'italic' }}>"{cut.hookLine}"</p>}
+                                {cut.reason && <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>{cut.reason}</p>}
+                                {cut.socialCaption && (
+                                    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                        <span style={{ flex: 1, fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{cut.socialCaption.substring(0, 160)}</span>
+                                        <button onClick={() => copyText(cut.socialCaption)} style={{ flexShrink: 0, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 11 }}>content_copy</span>Caption
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={() => copyText(promoCuts.map((c, i) => `Cut ${i + 1}: ${c.startTime}–${c.endTime} (${c.durationSecs}s)\n"${c.hookLine}"\n${c.reason}`).join('\n\n'))}
+                        style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'var(--sys-primary-dim)', color: 'var(--sys-primary)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>content_copy</span> Copy Full Promo Brief
+                    </button>
                 </Section>
             )}
 
@@ -930,15 +994,19 @@ export default function YouTubeStudio() {
             <div className="studio-tab-bar" style={{ marginBottom: 24 }}>
                 <div className="studio-tab-row">
                     {[
-                        { id: 'analyse', icon: 'link', label: 'Analyse' },
-                        { id: 'result', icon: 'analytics', label: 'Result', disabled: !activeProject },
-                        { id: 'history', icon: 'history', label: `History (${projects.length})` },
-                        { id: 'settings', icon: 'tune', label: 'Settings' },
+                        { id: 'analyse',  icon: 'link',       label: 'Analyse' },
+                        { id: 'result',   icon: 'analytics',  label: 'Result',            disabled: !activeProject },
+                        { id: 'history',  icon: 'history',    label: `History (${projects.length})` },
+                        { id: 'channels', icon: 'tv',         label: 'Channel Setup',     badge: channels.length === 0 ? '!' : null },
+                        { id: 'settings', icon: 'tune',       label: 'Settings' },
                     ].map(t => (
                         <button key={t.id} disabled={t.disabled} onClick={() => setTab(t.id)}
                             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${tab === t.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'} ${t.disabled ? 'opacity-40 pointer-events-none' : ''}`}>
                             <span className={`material-symbols-outlined ${tab === t.id ? 'text-lg' : 'text-base opacity-70'}`}>{t.icon}</span>
                             {t.label}
+                            {t.id === 'channels' && channels.length === 0 && (
+                                <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: '#f59e0b', color: 'white', fontWeight: 700, marginLeft: 2 }}>Setup</span>
+                            )}
                             {t.id === 'settings' && activeTemplate && (
                                 <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: '#22c55e', color: 'white', fontWeight: 700, marginLeft: 2 }}>Template Active</span>
                             )}
@@ -956,9 +1024,45 @@ export default function YouTubeStudio() {
                         </div>
                         <h1 style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 800 }}>YouTube Studio</h1>
                         <p style={{ margin: 0, color: 'var(--sys-text-muted)', fontSize: 14 }}>
-                            Paste any YouTube URL. The AI watches the video, extracts transcripts, writes SEO copy, generates a thumbnail, and portraits every character — all brand-aligned.
+                            Paste any YouTube URL. The AI watches the video, extracts transcripts, writes SEO copy, generates thumbnails with GPT Image 2, and suggests promo cuts — all brand-aligned.
                         </p>
                     </div>
+
+                    {/* ── Channel Onboarding Banner (shown when no channels configured) ── */}
+                    {channels.length === 0 && (
+                        <div style={{ marginBottom: 20, padding: '20px 24px', borderRadius: 16, background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', border: '1px solid #e94560', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: -20, right: -20, width: 120, height: 120, borderRadius: '50%', background: '#e9456015', pointerEvents: 'none' }} />
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                                <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, background: '#e9456020', border: '1px solid #e9456040', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#e94560' }}>tv</span>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: 'white' }}>Set up your channel first</p>
+                                    <p style={{ margin: '0 0 16px', fontSize: 12, color: '#ffffff88', lineHeight: 1.5 }}>
+                                        Add your YouTube channel to unlock brand-aligned thumbnails, show templates, and accurate SEO copy in your channel's language.
+                                    </p>
+                                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                                        {[
+                                            { step: '1', label: 'Add your channel', icon: 'add_circle' },
+                                            { step: '2', label: 'Configure shows & templates', icon: 'palette' },
+                                            { step: '3', label: 'Analyse any video', icon: 'auto_awesome' },
+                                        ].map(s => (
+                                            <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#e94560', color: 'white', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{s.step}</span>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#e9456099' }}>{s.icon}</span>
+                                                <span style={{ fontSize: 12, color: '#ffffffaa' }}>{s.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => setTab('channels')}
+                                        style={{ marginTop: 16, padding: '9px 20px', borderRadius: 10, border: 'none', background: '#e94560', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+                                        Set Up My Channel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
                         {channels.length > 0 && (
@@ -1095,6 +1199,33 @@ export default function YouTubeStudio() {
                 </div>
             )}
 
+            {/* ── Channel Setup Tab ── */}
+            {tab === 'channels' && (
+                <div style={{ maxWidth: 860, margin: '0 auto' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: '16px 20px', borderRadius: 14, background: 'linear-gradient(135deg, var(--sys-primary)10, var(--sys-primary)05)', border: '1px solid var(--sys-primary)22' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-primary)' }}>tv</span>
+                        <div>
+                            <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Channel Setup</p>
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                                Add your YouTube channels, shows, and templates here. These power brand-aligned thumbnails, language detection, and SEO copy across all videos.
+                            </p>
+                        </div>
+                        {channels.length > 0 && (
+                            <span style={{ marginLeft: 'auto', fontSize: 11, padding: '4px 10px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {channels.length} channel{channels.length > 1 ? 's' : ''} configured ✓
+                            </span>
+                        )}
+                    </div>
+                    <YouTubeStudioSettings
+                        brandId={activeBrand?._id}
+                        activeTemplateId={activeTemplate?._id}
+                        channelsOnly={true}
+                        onChannelSaved={() => loadChannels()}
+                        onTemplateSelect={(template) => setActiveTemplate(template)}
+                    />
+                </div>
+            )}
+
             {/* ── Settings Tab ── */}
             {tab === 'settings' && (
                 <div style={{ maxWidth: 860, margin: '0 auto' }}>
@@ -1119,9 +1250,9 @@ export default function YouTubeStudio() {
                     <YouTubeStudioSettings
                         brandId={activeBrand?._id}
                         activeTemplateId={activeTemplate?._id}
+                        templatesOnly={true}
                         onTemplateSelect={(template) => {
                             setActiveTemplate(template)
-                            // Show brief confirmation
                         }}
                     />
                 </div>
@@ -1131,3 +1262,4 @@ export default function YouTubeStudio() {
         </DashboardLayout>
     )
 }
+

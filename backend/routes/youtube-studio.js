@@ -20,6 +20,7 @@ import {
     transcriptNode, analysisNode, chapterNode,
     seoNode, brandCriticNode, thumbnailDirectionNode,
     thumbnailGenerationNode, characterPortraitNode,
+    frameExtractionNode, promoNode,
 } from '../agents/youtubeStudio/nodes.js';
 import { extractVideoId } from '../agents/youtubeStudio/transcriptClient.js';
 import YoutubeProject from '../models/YoutubeProject.js';
@@ -199,37 +200,48 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
 
         const video = { videoId, youtubeUrl, metadata, transcript, duration };
 
-        // ── Nodes 2 & 3 in parallel: Analysis + Chapters ──────────────────
-        emit('analysis', 'running', { message: 'Gemini 2.5 Pro watching the video…' });
-        emit('chapters', 'running', { message: 'Detecting chapters from transcript…' });
+        // ── Nodes 2 & 3 in parallel: Analysis + Frame Extraction ───────────────
+        emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
+        emit('frames',    'running', { message: 'Extracting key video frames…' });
 
-        const [analysisRes, chaptersRes] = await Promise.all([
+        const [analysisRes, framesRes] = await Promise.all([
             analysisNode({ video, brandContext }),
-            chapterNode({ video }),
+            frameExtractionNode({ videoId }),
         ]);
         const { analysis } = analysisRes;
-        const { chapters } = chaptersRes;
+        const { extractedFrames } = framesRes;
 
         emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
-        emit('chapters', 'done', { count: chapters.length });
+        emit('frames',   'done', { count: extractedFrames.length });
         console.log(`✅ [Node 2] Analysis: ${analysis.contentType}, ${analysis.characters?.length} characters`);
-        console.log(`✅ [Node 3] Chapters: ${chapters.length} detected`);
+        console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
 
-        // ── Nodes 4 & 5 in parallel: SEO + Brand Critic ───────────────────
-        emit('seo', 'running', { message: 'Claude writing brand-aligned SEO copy…' });
+        // ── Node 3: Chapter Detection (AFTER analysis — uses highlights for alignment) ───
+        emit('chapters', 'running', { message: 'Detecting smart chapters (analysis-grounded)…' });
+        const { chapters } = await chapterNode({ video, analysis });
+        emit('chapters', 'done', { count: chapters.length });
+        console.log(`✅ [Node 3] Chapters: ${chapters.length} detected (analysis-grounded)`);
+
+        // ── Nodes 4, 5 & Promo in parallel: SEO + Brand Critic + Promo Cuts ──────
+        emit('seo',   'running', { message: 'Grok writing brand-aligned SEO copy…' });
         emit('brand', 'running', { message: 'Scoring brand alignment…' });
+        emit('promo', 'running', { message: 'Building promo/teaser cut suggestions…' });
 
-        const [seoRes, brandRes] = await Promise.all([
+        const [seoRes, brandRes, promoRes] = await Promise.all([
             seoNode({ video, analysis, chapters, brandContext }),
             brandCriticNode({ video, analysis, brandContext }),
+            promoNode({ analysis, video, brandContext }),
         ]);
         const { seo } = seoRes;
         const { brandAlignment } = brandRes;
+        const { promoCuts } = promoRes;
 
-        emit('seo', 'done', { recommendedTitle: seo?.recommendedTitle });
+        emit('seo',   'done', { recommendedTitle: seo?.recommendedTitle });
         emit('brand', 'done', { score: brandAlignment?.overallScore });
+        emit('promo', 'done', { count: promoCuts?.length || 0 });
         console.log(`✅ [Node 4] SEO: title="${seo?.recommendedTitle}"`);
         console.log(`✅ [Node 5] Brand: score=${brandAlignment?.overallScore}`);
+        console.log(`✅ [Node 5b] Promo: ${promoCuts?.length || 0} cuts`);
 
         // ── Node 6: Thumbnail Direction (MCoT — multimodal) ────────────────
         emit('thumbnailDirection', 'running', { message: 'Creating thumbnail concept (MCoT)…' });
@@ -276,17 +288,19 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
         emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
         console.log(`✅ [Node 7] Portraits: ${characterPortraits.filter(p => p.portraitUrl).length}/${analysis.characters?.length || 0}`);
 
-        // ── Node 8: Thumbnail Generation (Phase 3 — uses portraits as face anchors) ──
-        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail (fresh scene from template + character descriptions)…' });
-        const { generatedThumbnailUrl, thumbnailGenerationError } = await thumbnailGenerationNode({
+        // ── Node 8: Thumbnail Generation (Phase 3 — uses portraits + extracted frames) ──
+        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with GPT Image 2 (HD)…' });
+        const { generatedThumbnailUrl, thumbnailGenerationError, generatorModel } = await thumbnailGenerationNode({
             thumbnailDirection, video, brandContext, template,
             characterPortraits,   // ✅ Pass portraits so lead portrait is used as face anchor
+            extractedFrames,      // ✅ YouTube CDN frames for visual grounding
         });
         emit('thumbnailGeneration', 'done', {
             success: !!generatedThumbnailUrl,
+            model: generatorModel,
             error: thumbnailGenerationError,
         });
-        console.log(`✅ [Node 8] Thumbnail: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
+        console.log(`✅ [Node 8] Thumbnail via ${generatorModel || 'unknown'}: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
 
         // ── Persist all results ────────────────────────────────────────────
         const elapsed = Math.round((Date.now() - startMs) / 1000);
@@ -313,7 +327,10 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
                 appliedShowName: project.appliedShowName || null,
                 thumbnailDirection,
                 generatedThumbnailUrl: generatedThumbnailUrl || null,
+                generatorModel: generatorModel || null,
                 characterPortraits,
+                extractedFrames: extractedFrames || [],
+                promoCuts: promoCuts || [],
                 processingTimeSecs: elapsed,
                 completedAt: new Date(),
             },
