@@ -1,10 +1,30 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 export default function Comparison() {
+    const sectionRef = useRef(null);
+
+    // 3D scroll entrance
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start end", "center center"]
+    });
+    const rotateX3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [5, 0]),
+        { stiffness: 80, damping: 30 }
+    );
+    const z3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [-80, 0]),
+        { stiffness: 80, damping: 30 }
+    );
+
     return (
-        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 overflow-hidden">
+        <motion.section 
+            ref={sectionRef}
+            className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 overflow-hidden section-3d"
+            style={{ rotateX: rotateX3D, z: z3D }}
+        >
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 
                 {/* Section Header */}
@@ -22,16 +42,17 @@ export default function Comparison() {
                     </h2>
                 </motion.div>
 
-                {/* Comparison Grid */}
-                <div className="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto relative">
+                {/* Comparison Grid — split Z-depth hierarchy */}
+                <div className="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto relative" style={{ transformStyle: 'preserve-3d', perspective: '1200px' }}>
                     
-                    {/* Left Card: The Old Way */}
+                    {/* Left Card: The Old Way — recedes into background */}
                     <motion.div 
                         initial={{ opacity: 0, x: -40 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-100px" }}
                         transition={{ type: 'spring', stiffness: 60, delay: 0.1 }}
                         className="bg-[#121214] border border-white/5 rounded-3xl p-8 lg:p-10 flex flex-col justify-between"
+                        style={{ transform: 'translateZ(-30px)' }}
                     >
                         <div>
                             <div className="flex justify-between items-center mb-10 text-[11px] font-bold text-[#a1a1aa] uppercase tracking-widest">
@@ -83,13 +104,14 @@ export default function Comparison() {
                         </div>
                     </motion.div>
 
-                    {/* Right Card: The New Way */}
+                    {/* Right Card: The New Way — pushes forward, dominant */}
                     <motion.div 
                         initial={{ opacity: 0, x: 40 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, margin: "-100px" }}
                         transition={{ type: 'spring', stiffness: 60, delay: 0.2 }}
-                        className="bg-[#121214] border rounded-3xl p-8 lg:p-10 flex flex-col justify-between relative shadow-[0_0_40px_rgba(255,77,0,0.1)]" style={{ borderColor: `${BRAND.primary}40` }}
+                        className="bg-[#121214] border rounded-3xl p-8 lg:p-10 flex flex-col justify-between relative hover-3d-lift" 
+                        style={{ borderColor: `${BRAND.primary}40`, boxShadow: `0 0 40px rgba(255,77,0,0.1)`, transform: 'translateZ(30px)' }}
                     >
                         
                         {/* With Mantram Badge */}
@@ -151,6 +173,6 @@ export default function Comparison() {
 
                 </div>
             </div>
-        </section>
+        </motion.section>
     );
 }

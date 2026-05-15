@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import useReveal from '../../hooks/useReveal';
 import { BRAND } from '../../data/studios';
 
@@ -32,10 +33,29 @@ const STEPS = [
 
 export default function HowItWorks() {
     const revealRef = useReveal();
+    const sectionRef = useRef(null);
+
+    // 3D scroll-linked entrance
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start end", "center center"]
+    });
+    const rotateX3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [5, 0]),
+        { stiffness: 80, damping: 30 }
+    );
+    const z3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [-80, 0]),
+        { stiffness: 80, damping: 30 }
+    );
 
     return (
-        <section className="py-24 md:py-32 bg-[#0b0b0c] relative border-b border-white/5" ref={revealRef}>
-            <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <motion.section 
+            ref={sectionRef}
+            className="py-24 md:py-32 bg-[#0b0b0c] relative border-b border-white/5 section-3d" 
+            style={{ rotateX: rotateX3D, z: z3D }}
+        >
+            <div ref={revealRef} className="max-w-[1400px] mx-auto px-4 md:px-6">
                 
                 {/* Header */}
                 <div className="flex flex-col items-center text-center mb-16">
@@ -47,12 +67,16 @@ export default function HowItWorks() {
                     </h2>
                 </div>
 
-                {/* Steps Row */}
-                <div className="flex flex-wrap lg:flex-nowrap justify-center gap-4">
+                {/* Steps Row — Z-stacking forward */}
+                <div className="flex flex-wrap lg:flex-nowrap justify-center gap-4 z-step-stack" style={{ transformStyle: 'preserve-3d' }}>
                     {STEPS.map((step, i) => (
-                        <div 
+                        <motion.div 
                             key={i} 
-                            className="bg-[#121214] border border-white/5 rounded-2xl p-6 md:p-8 flex-1 min-w-[240px] hover:border-white/10 transition-colors group cursor-default"
+                            className="bg-[#121214] border border-white/5 rounded-2xl p-6 md:p-8 flex-1 min-w-[240px] hover:border-white/10 transition-colors group cursor-default hover-3d-lift"
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-50px" }}
+                            transition={{ duration: 0.5, delay: i * 0.08 }}
                         >
                             <span className="text-[10px] font-bold tracking-wider text-[#FF5A1F] uppercase mb-4 block">
                                 Step {step.num}
@@ -63,11 +87,11 @@ export default function HowItWorks() {
                             <p className="text-[#a1a1aa] text-[13px] leading-relaxed">
                                 {step.desc}
                             </p>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
 
             </div>
-        </section>
+        </motion.section>
     );
 }

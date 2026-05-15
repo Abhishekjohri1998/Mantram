@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 import { Infinity } from 'lucide-react';
 
@@ -105,6 +105,26 @@ const MODELS = [
 ];
 
 export default function IntelligenceLayer() {
+    const sectionRef = useRef(null);
+
+    // 3D scroll-linked tilt for the whole section
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start end", "center center"]
+    });
+    const rotateX3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [5, 0]),
+        { stiffness: 80, damping: 30 }
+    );
+    const z3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [-100, 0]),
+        { stiffness: 80, damping: 30 }
+    );
+    const scale3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [0.94, 1]),
+        { stiffness: 80, damping: 30 }
+    );
+
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {
@@ -119,7 +139,11 @@ export default function IntelligenceLayer() {
     };
 
     return (
-        <section className="py-24 md:py-32 relative border-y border-white/5 overflow-hidden">
+        <motion.section 
+            ref={sectionRef}
+            className="py-24 md:py-32 relative border-y border-white/5 overflow-hidden section-3d"
+            style={{ rotateX: rotateX3D, z: z3D, scale: scale3D }}
+        >
             {/* Background pattern */}
             <div className="absolute inset-0 z-0 opacity-[0.03]" 
                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} 
@@ -138,19 +162,20 @@ export default function IntelligenceLayer() {
                     </p>
                 </div>
 
-                {/* Models Grid */}
+                {/* Models Grid — staggered Z-depth */}
                 <motion.div 
                     variants={containerVariants}
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-50px" }}
-                    className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10"
+                    className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10 z-stagger"
+                    style={{ transformStyle: 'preserve-3d' }}
                 >
                     {MODELS.map((model, i) => (
                         <motion.div 
                             key={i}
                             variants={itemVariants}
-                            className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default"
+                            className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default hover-3d-lift"
                         >
                             <div className="flex justify-between items-start w-full">
                                 <div className="w-7 h-7 bg-white/90 rounded-md flex items-center justify-center shadow-sm border border-white/20 group-hover:bg-white transition-colors overflow-hidden p-1">
@@ -184,6 +209,6 @@ export default function IntelligenceLayer() {
                 </div>
 
             </div>
-        </section>
+        </motion.section>
     );
 }

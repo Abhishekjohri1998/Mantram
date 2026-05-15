@@ -1524,6 +1524,132 @@
   border-color: var(--sys-text);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   3D LANDING PAGE SYSTEM — Immersive scroll-driven 3D depth effects
+   Used by Landing.jsx and all section components in /components/landing/.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Main 3D perspective wrapper */
+.landing-3d-container {
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+  overflow-x: hidden;
+}
+
+/* Base 3D section — preserves 3D context for children */
+.section-3d {
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+/* Card-level 3D tilt — applies to pricing cards, studio cards */
+.card-3d-tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.03, 0.98, 0.52, 0.99);
+  will-change: transform;
+}
+.card-3d-tilt:hover {
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(255, 77, 0, 0.08);
+}
+
+/* Depth-layer utility classes */
+.depth-forward  { transform: translateZ(40px); }
+.depth-mid      { transform: translateZ(0px); }
+.depth-back     { transform: translateZ(-40px); }
+.depth-deep     { transform: translateZ(-100px); }
+
+/* ── 3D Floating Particles ── */
+.particles-3d-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transform-style: preserve-3d;
+  perspective: 1200px;
+  overflow: hidden;
+}
+
+.particle-3d {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
+  animation: float-particle-y ease-in-out infinite alternate;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@keyframes float-particle-y {
+  0%   { transform: translateZ(var(--pz, 0px)) translateY(0px)   translateX(0px); }
+  33%  { transform: translateZ(var(--pz, 0px)) translateY(-30px) translateX(15px); }
+  66%  { transform: translateZ(var(--pz, 0px)) translateY(20px)  translateX(-10px); }
+  100% { transform: translateZ(var(--pz, 0px)) translateY(-15px) translateX(5px); }
+}
+
+/* ── Section parallax depth layers ── */
+.parallax-layer-back {
+  transform: translateZ(-100px) scale(1.08);
+  transform-style: preserve-3d;
+}
+.parallax-layer-front {
+  transform: translateZ(60px) scale(0.95);
+  transform-style: preserve-3d;
+}
+
+/* ── Cinematic video reveal (ActionDemo) ── */
+.cinematic-reveal {
+  transform-style: preserve-3d;
+  transform-origin: 50% 100%;
+}
+
+/* ── 3D hover lift for cards ── */
+.hover-3d-lift {
+  transition: transform 0.5s cubic-bezier(0.03, 0.98, 0.52, 0.99), box-shadow 0.5s ease;
+}
+.hover-3d-lift:hover {
+  transform: translateZ(30px) translateY(-8px) !important;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 77, 0, 0.06);
+}
+
+/* ── Staggered Z-depth for grid children ── */
+.z-stagger > *:nth-child(6n+1) { transform: translateZ(0px); }
+.z-stagger > *:nth-child(6n+2) { transform: translateZ(15px); }
+.z-stagger > *:nth-child(6n+3) { transform: translateZ(30px); }
+.z-stagger > *:nth-child(6n+4) { transform: translateZ(20px); }
+.z-stagger > *:nth-child(6n+5) { transform: translateZ(10px); }
+.z-stagger > *:nth-child(6n+6) { transform: translateZ(25px); }
+
+/* ── Step Z-stack (HowItWorks) ── */
+.z-step-stack > *:nth-child(1) { transform: translateZ(0px); }
+.z-step-stack > *:nth-child(2) { transform: translateZ(10px); }
+.z-step-stack > *:nth-child(3) { transform: translateZ(20px); }
+.z-step-stack > *:nth-child(4) { transform: translateZ(30px); }
+.z-step-stack > *:nth-child(5) { transform: translateZ(40px); }
+
+/* ── 3D Reduced-motion overrides ── */
+@media (prefers-reduced-motion: reduce) {
+  .landing-3d-container { perspective: none; }
+  .section-3d { transform-style: flat; will-change: auto; }
+  .card-3d-tilt { transition: none; }
+  .particle-3d { animation: none; display: none; }
+  .particles-3d-container { display: none; }
+  .depth-forward, .depth-mid, .depth-back, .depth-deep { transform: none; }
+  .parallax-layer-back, .parallax-layer-front { transform: none; }
+  .hover-3d-lift:hover { transform: none !important; }
+  .z-stagger > *, .z-step-stack > * { transform: none; }
+}
+
+/* ── Mobile: tone down 3D for performance ── */
+@media (max-width: 768px) {
+  .landing-3d-container { perspective: 800px; }
+  .depth-forward  { transform: translateZ(15px); }
+  .depth-back     { transform: translateZ(-15px); }
+  .depth-deep     { transform: translateZ(-30px); }
+  .z-stagger > * { transform: translateZ(0px) !important; }
+  .z-step-stack > * { transform: translateZ(0px) !important; }
+  .hover-3d-lift:hover { transform: translateY(-4px) !important; }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Landing-page animation system. Pure CSS, no framework deps.
    Used by /pages/Landing.jsx and components in /components/landing/.

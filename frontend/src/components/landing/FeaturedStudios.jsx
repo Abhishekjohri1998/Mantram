@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 const SHOWCASES = [
@@ -63,15 +63,30 @@ function ShowcaseRow({ showcase, index }) {
     const yParallax = useTransform(scrollYProgress, [0, 1], ["-20%", "20%"]);
     const opacityFade = useTransform(scrollYProgress, [0, 0.4], [0, 1]);
 
+    // 3D: Image panel rotates in from the side
+    const imageRotateY = useSpring(
+        useTransform(scrollYProgress, [0, 0.5], [isReversed ? -10 : 10, 0]),
+        { stiffness: 60, damping: 25 }
+    );
+    const imageZ = useSpring(
+        useTransform(scrollYProgress, [0, 0.5], [-80, 0]),
+        { stiffness: 60, damping: 25 }
+    );
+    // 3D: Copy side gets slight forward Z-depth
+    const copyZ = useSpring(
+        useTransform(scrollYProgress, [0, 0.5], [40, 0]),
+        { stiffness: 60, damping: 25 }
+    );
+
     return (
         <motion.div 
             ref={containerRef} 
-            style={{ opacity: opacityFade }}
+            style={{ opacity: opacityFade, transformStyle: 'preserve-3d' }}
             className={`flex flex-col lg:flex-row items-center gap-16 lg:gap-24 ${isReversed ? 'lg:flex-row-reverse' : ''}`}
         >
             
-            {/* Copy Side */}
-            <div className="flex-1 w-full">
+            {/* Copy Side — slight forward depth */}
+            <motion.div className="flex-1 w-full" style={{ z: copyZ }}>
                 <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-6 block">
                     {showcase.eyebrow}
                 </span>
@@ -96,10 +111,13 @@ function ShowcaseRow({ showcase, index }) {
                 <button className="flex items-center gap-2 text-sm font-semibold text-white px-5 py-2.5 rounded-full transition-colors hover:bg-white/10 border border-white/10">
                     Learn more <ArrowRight className="w-4 h-4" />
                 </button>
-            </div>
+            </motion.div>
 
-            {/* Visual Side */}
-            <div className="flex-1 w-full">
+            {/* Visual Side — rotates in from side perspective */}
+            <motion.div 
+                className="flex-1 w-full" 
+                style={{ rotateY: imageRotateY, z: imageZ, transformStyle: 'preserve-3d' }}
+            >
                 {/* Container */}
                 <div 
                     className="w-full aspect-[4/3] rounded-3xl relative overflow-hidden flex items-center justify-center shadow-2xl transition-transform duration-700 hover:scale-[1.02]"
@@ -135,7 +153,7 @@ function ShowcaseRow({ showcase, index }) {
                         </>
                     )}
                 </div>
-            </div>
+            </motion.div>
             
         </motion.div>
     );

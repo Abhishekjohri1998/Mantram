@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import { BRAND, LANDING_FAQS } from '../../data/studios'
 import useReveal from '../../hooks/useReveal'
 
@@ -10,9 +11,30 @@ import useReveal from '../../hooks/useReveal'
 export default function FAQ() {
     const [open, setOpen] = useState(0)
     const ref = useReveal()
+    const sectionRef = useRef(null)
+
+    // 3D scroll entrance
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start end", "center center"]
+    })
+    const rotateX3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [4, 0]),
+        { stiffness: 80, damping: 30 }
+    )
+    const z3D = useSpring(
+        useTransform(scrollYProgress, [0, 1], [-60, 0]),
+        { stiffness: 80, damping: 30 }
+    )
+
     return (
-        <section ref={ref} id="faq" className="reveal py-20 md:py-28" aria-labelledby="faq-title">
-            <div className="max-w-3xl mx-auto px-4 md:px-6">
+        <motion.section 
+            ref={sectionRef} 
+            className="reveal py-20 md:py-28 section-3d" 
+            aria-labelledby="faq-title"
+            style={{ rotateX: rotateX3D, z: z3D }}
+        >
+            <div ref={ref} className="max-w-3xl mx-auto px-4 md:px-6">
                 <div className="text-center mb-12">
                     <span className="text-xs font-bold uppercase tracking-[0.3em]" style={{ color: BRAND.primary }}>
                         FAQ
@@ -22,7 +44,7 @@ export default function FAQ() {
                     </h2>
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2.5" style={{ transformStyle: 'preserve-3d' }}>
                     {LANDING_FAQS.map((f, i) => {
                         const isOpen = open === i
                         return (
@@ -32,6 +54,9 @@ export default function FAQ() {
                                 style={{
                                     background: 'rgba(255,255,255,0.02)',
                                     border: `1px solid ${isOpen ? BRAND.primary + '40' : 'rgba(255,255,255,0.06)'}`,
+                                    transform: isOpen ? 'translateZ(20px) scale(1.01)' : 'translateZ(0px)',
+                                    transition: 'transform 0.4s ease, border-color 0.3s ease, box-shadow 0.4s ease',
+                                    boxShadow: isOpen ? '0 10px 30px rgba(255, 77, 0, 0.06)' : 'none',
                                 }}
                             >
                                 <button
@@ -66,6 +91,6 @@ export default function FAQ() {
                     })}
                 </div>
             </div>
-        </section>
+        </motion.section>
     )
 }

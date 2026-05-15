@@ -19,6 +19,7 @@ import FAQ from '../components/landing/FAQ'
 import FinalCTA from '../components/landing/FinalCTA'
 import Footer from '../components/landing/Footer'
 import CursorGlow from '../components/landing/CursorGlow'
+import Particles3D from '../components/landing/Particles3D'
 
 import { BRAND } from '../data/studios'
 
@@ -29,6 +30,10 @@ import { BRAND } from '../data/studios'
  * Single responsibility here: orchestrate them and own the waitlist modal
  * state. Each section is independently editable; copy lives in the section
  * files (or in /data/studios.js for studio-specific content).
+ *
+ * 3D System: The outer wrapper uses CSS `perspective: 1200px` to create a
+ * 3D rendering context. Each section component applies its own scroll-linked
+ * rotateX / translateZ transforms via useScroll3D or inline Framer Motion.
  */
 export default function Landing() {
     const { isAuthenticated } = useAuth()
@@ -45,14 +50,16 @@ export default function Landing() {
                 aiSummary="Mantram AI is an agentic AI marketing operating system with 14 studios — Research, Brainstorm, Monthly Strategy, Content, Creative, Video, YouTube, Avatar, Brand, Social Media, Performance Marketing, Funnel, SEO, Retention. Brand DNA captured from a website scan is shared across all studios. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, HeyGen Avatars. Currently in early access (no free tier, credit-pack pricing from ₹149)."
             />
 
-            <div className="relative" style={{ background: '#0b0b0c', color: 'white' }}>
+            {/* 3D Perspective Container — gives all children a shared vanishing point */}
+            <div className="relative landing-3d-container" style={{ background: '#0b0b0c', color: 'white' }}>
                 <CursorGlow />
+                <Particles3D count={18} />
 
                 <Nav
                     isAuthenticated={isAuthenticated}
                 />
 
-                <main role="main" className="relative z-[2]">
+                <main role="main" className="relative z-[2]" style={{ transformStyle: 'preserve-3d' }}>
                     <Hero />
                     <FeaturedVideos />
                     <div id="templates"><ActionDemo /></div>
