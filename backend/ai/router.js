@@ -2,6 +2,8 @@ import config from '../config/env.js';
 import { GeminiProvider } from './providers/gemini.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { AnthropicProvider } from './providers/anthropic.js';
+// xAI (Grok) uses OpenAI-compatible API — reuse OpenAIProvider with different base URL
+// See: https://docs.x.ai/docs/overview
 import { AIProviderBusyError, AIProviderQuotaError, AIProviderModelError } from './errors.js';
 
 /**
@@ -36,6 +38,16 @@ class ModelRouter {
             apiKey: providerConfigs.openai?.apiKey,
             defaultModel: config.ai.defaultOpenAIModel || 'gpt-4o-mini',
         });
+        // xAI / Grok — OpenAI-compatible API, different base URL + API key
+        if (config.grok?.apiKey) {
+            const xaiProvider = new OpenAIProvider({
+                apiKey: config.grok.apiKey,
+                defaultModel: 'grok-3',
+            });
+            xaiProvider.name = 'xai';
+            xaiProvider.baseUrl = 'https://api.x.ai/v1';
+            this.providers.xai = xaiProvider;
+        }
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
             defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',

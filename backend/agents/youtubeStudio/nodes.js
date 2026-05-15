@@ -255,17 +255,17 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
         `TRANSCRIPT EXCERPT:\n${transcript.text?.substring(0, 5000) || 'N/A'}`,
     ].join('\n');
 
-    // Use Grok (xAI) for SEO — great at trending language and CTR-optimised copy
+    // Use xAI Grok for SEO — great at trending language and CTR-optimised copy
     // Fallback: best available model via router (never hard-code a single provider)
     let result;
     try {
         result = await callAgent(
             PROMPTS.SEO_COPYWRITER,
             userPrompt,
-            0.7, 3000, { model: 'grok-3', timeoutMs: 60_000 }
+            0.7, 3000, { provider: 'xai', timeoutMs: 60_000 }   // Grok-3 via xAI OpenAI-compatible endpoint
         );
     } catch (err) {
-        console.warn(`⚠️ [seoNode] Grok failed (${err.message}), falling back to best available model`);
+        console.warn(`⚠️ [seoNode] xAI/Grok failed (${err.message}), falling back to best available model`);
         result = await callAgent(
             PROMPTS.SEO_COPYWRITER,
             userPrompt,
@@ -390,10 +390,22 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
  * Models: PRIMARY = gemini-3.1-flash-image-preview via @google/genai SDK
  *         FALLBACK = fal-ai/flux-pro/v1.1
  */
-export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [] }) {
+export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [], extractedFrames = [] }) {
     const videoTitle    = video?.metadata?.title       || '';
     const characters    = video?.analysis?.characters  || [];
     const peakMoment    = video?.analysis?.peakMoment  || null;
+
+    // ── Best extracted frame — use as visual context reference ───────────────────
+    // HD frame (maxresdefault) is preferred; fall back to hqdefault
+    const bestFrame = extractedFrames.find(f => f.label === 'HD Cover Frame') 
+        || extractedFrames.find(f => f.label === 'HQ Cover Frame')
+        || extractedFrames[0] 
+        || null;
+    const referenceFrameUrl = bestFrame?.url || null;
+    if (referenceFrameUrl) {
+        console.log(`   🎬 Using extracted frame as visual reference: ${bestFrame.label} (${bestFrame.sizeKb}KB)`);
+    }
+
 
     // ── Text overlay ────────────────────────────────────────────────────────────
     const line1 = thumbnailDirection?.textOverlay?.line1
@@ -631,6 +643,7 @@ Return ONLY a JSON object, no markdown:
         ta.reconstructionInstruction ? `RECONSTRUCTION: ${ta.reconstructionInstruction.substring(0, 300)}` : '',
         template?.generationPromptSuffix ? `SHOW STYLE: ${template.generationPromptSuffix}` : '',
         brandSnippet ? `Brand context: ${brandSnippet}` : '',
+        referenceFrameUrl ? `VISUAL REFERENCE: A real extracted frame from this video is provided below. Use it for character appearance, setting, and color palette reference only — generate a fresh cinematic composition.` : '',
         ``,
         `HARD RULES:`,
         `- 16:9 landscape orientation, broadcast quality`,

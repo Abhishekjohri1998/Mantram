@@ -929,7 +929,7 @@ function TemplateEditor({ template, onSave, onClose }) {
 
 // ── Main Settings Component ───────────────────────────────────────────────────
 
-export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activeTemplateId }) {
+export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activeTemplateId, channelsOnly = false, templatesOnly = false, onChannelSaved }) {
     const [channels, setChannels]           = useState([])
     const [templates, setTemplates]         = useState([])
     const [loading, setLoading]             = useState(true)
@@ -949,9 +949,11 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
             ])
             setChannels(ch || [])
             setTemplates(tmpl || [])
+            // Notify parent (e.g. YouTubeStudio.jsx) so it can refresh its channel list
+            onChannelSaved?.(ch || [])
         } catch (e) { console.error('Settings load failed:', e.message) }
         setLoading(false)
-    }, [])
+    }, [onChannelSaved])
 
     useEffect(() => { loadData() }, [loadData])
 
@@ -1070,9 +1072,10 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
                 )}
             </div>
 
-            <div style={{ borderBottom: '1px solid var(--sys-border)', marginBottom: 28 }} />
+            {!channelsOnly && <div style={{ borderBottom: '1px solid var(--sys-border)', marginBottom: 28 }} />}
 
-            {/* ── Templates Section ── */}
+            {/* ── Templates Section — hidden when channelsOnly ── */}
+            {!channelsOnly && (
             <div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1174,6 +1177,7 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
                     </div>
                 )}
             </div>
+            )}
         </div>
     )
 }
