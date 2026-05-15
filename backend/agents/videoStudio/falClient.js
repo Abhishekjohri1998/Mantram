@@ -550,6 +550,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 generateAudio: generateAudio !== false,
                 referenceImages: s3ReferenceImages.filter(Boolean),
                 resolution: resolution || '720p',
+                refAudio: s3RefAudio || null, // Pass TTS audio for lip-sync
             });
             return {
                 requestId: result.taskId,

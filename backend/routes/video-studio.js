@@ -6190,6 +6190,47 @@ router.get('/', protect, async (req, res) => {
             console.warn('⚠️ Auto-expire phase failed (non-fatal):', autoExpireErr.message);
         }
 
+        // ── STEP 0b: Long-form catch-up sync ──
+        // If a long-form project is still 'generating' but the background pipeline
+        // already completed (in-memory job has videoUrl), update the DB immediately.
+        // This handles: user closed tab → backend pipeline finished → user reopened.
+        try {
+            const longFormStuck = projects.filter(p =>
+                p.status === 'generating' && p.generation?.longFormJobId
+            );
+            for (const p of longFormStuck) {
+                const jobStatus = getLongFormJobStatus(p.generation.longFormJobId);
+                if (jobStatus?.status === 'COMPLETED' && jobStatus.videoUrl) {
+                    console.log(`🔄 [Long-Form CatchUp] Syncing project ${p._id} → done (video found in memory)`);
+                    p.status = 'done';
+                    p.finalVideoUrl = jobStatus.videoUrl;
+                    if (!p.generation) p.generation = {};
+                    p.generation.videoUrl = jobStatus.videoUrl;
+                    p.generation.progress = 100;
+                    p.generation.status = 'COMPLETED';
+                    VideoProject.findByIdAndUpdate(p._id, {
+                        status: 'done',
+                        finalVideoUrl: jobStatus.videoUrl,
+                        'generation.videoUrl': jobStatus.videoUrl,
+                        'generation.progress': 100,
+                        'generation.status': 'COMPLETED',
+                    }).exec().catch(e => console.warn(`⚠️ Long-form catch-up DB update failed for ${p._id}:`, e.message));
+                } else if (jobStatus?.status === 'FAILED') {
+                    p.status = 'failed';
+                    if (!p.generation) p.generation = {};
+                    p.generation.status = 'FAILED';
+                    p.generation.error = jobStatus.error || 'Long-form generation failed';
+                    VideoProject.findByIdAndUpdate(p._id, {
+                        status: 'failed',
+                        'generation.status': 'FAILED',
+                        'generation.error': jobStatus.error || 'Long-form generation failed',
+                    }).exec().catch(() => {});
+                }
+            }
+        } catch (lfSyncErr) {
+            console.warn('⚠️ Long-form catch-up sync failed (non-fatal):', lfSyncErr.message);
+        }
+
         // ── Auto-sync stuck generating projects (NON-BLOCKING) ──
         // Wrapped in try-catch so it never crashes the main response
         try {

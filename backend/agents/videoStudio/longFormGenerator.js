@@ -47,7 +47,8 @@ const OPENAI_VOICES = {
 };
 
 // Models that support refAudio for native lip-sync
-const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'kling-3.0', 'kling-3.0-o']);
+// HappyHorse 1.0 supports audio_url via Atlas Cloud for audio-driven generation
+const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'kling-3.0', 'kling-3.0-o', 'happyhorse-1.0']);
 
 // ── Background Music Presets ─────────────────────────────────────────────────
 // Royalty-free ambient music URLs (stored in S3 or public CDN)
@@ -198,6 +199,17 @@ async function runPipeline(jobId, params) {
         job.scenes = scenes;
         job.sceneStatuses = scenes.map(() => ({ status: 'pending', progress: 0 }));
         updateProgress(jobId, 'PLANNING', `${scenes.length} scenes planned`, 100);
+
+        // ── Sarvam API key pre-validation for regional languages ──
+        const langCode = LANG_TO_CODE[params.language] || 'en-IN';
+        const needsSarvam = SARVAM_SUPPORTED.has(langCode);
+        if (needsSarvam && !process.env.SARVAM_API_KEY) {
+            console.error(`[LongForm ${jobId}] ❌ SARVAM_API_KEY not set but language '${params.language}' (${langCode}) requires Sarvam TTS. Voiceovers will be SKIPPED.`);
+        } else if (needsSarvam) {
+            console.log(`[LongForm ${jobId}] ✅ Sarvam TTS validated for '${params.language}' (${langCode})`);
+        } else {
+            console.log(`[LongForm ${jobId}] 🌐 Using OpenAI TTS for '${params.language}' (${langCode})`);
+        }
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
@@ -434,6 +446,33 @@ async function runPipeline(jobId, params) {
         job.completedAt = new Date();
 
         console.log(`[LongForm ${jobId}] ✅ Complete: ${videoUrl.substring(0, 80)}...`);
+
+        // ═══ Auto-Persist to MongoDB ═══
+        // This ensures the VideoProject is updated even if the frontend never polls
+        // the /long-form/status endpoint (e.g., user closed the tab).
+        try {
+            const mongoose = (await import('mongoose')).default;
+            const VideoProject = mongoose.model('VideoProject');
+            const persisted = await VideoProject.findOneAndUpdate(
+                { 'generation.longFormJobId': jobId },
+                {
+                    status: 'done',
+                    finalVideoUrl: videoUrl,
+                    'generation.videoUrl': videoUrl,
+                    'generation.progress': 100,
+                    'generation.status': 'COMPLETED',
+                },
+                { returnDocument: 'after' }
+            );
+            if (persisted) {
+                console.log(`[LongForm ${jobId}] ✅ Auto-persisted to MongoDB — project ${persisted._id} status=done`);
+            } else {
+                console.warn(`[LongForm ${jobId}] ⚠️ No VideoProject found with longFormJobId=${jobId}`);
+            }
+        } catch (dbErr) {
+            console.error(`[LongForm ${jobId}] ⚠️ Auto-persist to MongoDB failed: ${dbErr.message}`);
+        }
+
         return videoUrl;
 
     } finally {
@@ -619,22 +658,39 @@ const SARVAM_EMOTION_MAP = {
  * @returns {Promise<string|null>} - S3 URL of the audio file, or null
  */
 async function generateSceneTTS(text, language, emotion = 'neutral') {
-    if (!text || text.length < 5) return null;
+    if (!text || text.length < 5) {
+        console.log(`🎤 [SceneTTS] Skipping — text too short (${text?.length || 0} chars)`);
+        return null;
+    }
 
     const langCode = LANG_TO_CODE[language] || 'en-IN';
     const isSarvam = SARVAM_SUPPORTED.has(langCode);
 
+    console.log(`🎤 [SceneTTS] Generating TTS: lang=${language} (${langCode}), provider=${isSarvam ? 'Sarvam' : 'OpenAI'}, emotion=${emotion}, text="${text.substring(0, 60)}..."`);
+
     try {
         if (isSarvam) {
-            return await _sarvamTTS(text, langCode, emotion);
+            // ── STRICT Sarvam-only for regional Indian languages ──
+            // Do NOT fall back to OpenAI — it produces poor phonetic quality
+            // for Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Kannada, Malayalam, Punjabi
+            const audioUrl = await _sarvamTTS(text, langCode, emotion);
+            if (audioUrl) {
+                console.log(`🎤 [SceneTTS] ✅ Sarvam TTS success: ${audioUrl.substring(0, 60)}...`);
+            }
+            return audioUrl;
         } else {
-            return await _openaiTTS(text, emotion, language, langCode);
+            const audioUrl = await _openaiTTS(text, emotion, language, langCode);
+            if (audioUrl) {
+                console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
+            }
+            return audioUrl;
         }
     } catch (err) {
-        console.warn(`⚠️ [SceneTTS] Primary TTS failed (${isSarvam ? 'Sarvam' : 'OpenAI'}): ${err.message}`);
-        // Fallback: if Sarvam failed, try OpenAI
+        console.error(`❌ [SceneTTS] TTS FAILED (${isSarvam ? 'Sarvam' : 'OpenAI'}): ${err.message}`);
         if (isSarvam) {
-            try { return await _openaiTTS(text, emotion, language, langCode); } catch {}
+            // For regional languages, do NOT fall back to OpenAI.
+            // Log a clear error so the operator knows to fix the Sarvam API key / quota.
+            console.error(`❌ [SceneTTS] Sarvam TTS failed for ${language} (${langCode}). No fallback to OpenAI for regional languages. Scene will have NO voiceover.`);
         }
         return null;
     }

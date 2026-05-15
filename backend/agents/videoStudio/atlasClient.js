@@ -646,8 +646,9 @@ export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, durati
 export async function submitHappyHorseVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, generateAudio = true,
     referenceImages = [], resolution = '720p',
+    refAudio = null, // TTS audio URL for native lip-sync (audio-driven generation)
 }) {
-    console.log(`🐴 [HappyHorse] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
+    console.log(`🐴 [HappyHorse] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | refAudio=${refAudio ? 'yes' : 'no'}`);
 
     // Extract ZH prompt from Universal Director bilingual JSON
     let finalPromptText = prompt;
@@ -698,8 +699,14 @@ export async function submitHappyHorseVideoGeneration({
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
         resolution:     res,
-        generate_audio: generateAudio !== false,
+        generate_audio: refAudio ? false : (generateAudio !== false), // Disable native audio when TTS provided
     };
+
+    // 🎤 Pass TTS audio for native lip-sync (HappyHorse supports audio-driven generation)
+    if (refAudio) {
+        taskInput.audio_url = refAudio;
+        console.log(`🎤 [HappyHorse] refAudio injected for lip-sync: ${refAudio.substring(0, 70)}...`);
+    }
 
     // I2V: pass first-frame image
     if (s3ImageUrls.length > 0) {

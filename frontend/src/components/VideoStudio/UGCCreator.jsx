@@ -866,7 +866,7 @@ export default function UGCCreator({ activeBrand }) {
                                         <div className="ugc2-pill-group">
                                             <label>Duration</label>
                                             <div className="ugc2-pill-wrap">
-                                                {['15s', '30s', '60s'].map(d => <button key={d} className={`ugc2-pill ${duration === d ? 'on' : ''}`} onClick={() => setDuration(d)}>{d}</button>)}
+                                                {['15s', '20s', '30s', '60s'].map(d => <button key={d} className={`ugc2-pill ${duration === d ? 'on' : ''}`} onClick={() => setDuration(d)}>{d}</button>)}
                                             </div>
                                         </div>
                                     </div>
