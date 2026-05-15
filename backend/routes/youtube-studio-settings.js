@@ -203,10 +203,12 @@ router.post('/channel-configs/extract', protect, async (req, res) => {
         let resolvedUrl = null;
 
         // Pattern: @handle anywhere in the URL or bare @handle
-        const handleMatch = url.match(/(?:youtube\.com\/)?@([A-Za-z0-9_.-]+)/i);
-        const channelIdMatch = url.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/i);
-        const legacyCustomMatch = url.match(/youtube\.com\/c\/([A-Za-z0-9_.-]+)/i);
-        const legacyUserMatch = url.match(/youtube\.com\/user\/([A-Za-z0-9_.-]+)/i);
+        // YouTube handles allow: letters, digits, underscores, hyphens, dots
+        // e.g. @xdotai-in  @my.channel  @tech_guru_2  @hello-world-yt
+        const handleMatch      = url.match(/(?:youtube\.com\/)?@([A-Za-z0-9_.-][A-Za-z0-9_.\-]*)/i);
+        const channelIdMatch   = url.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/i);
+        const legacyCustomMatch = url.match(/youtube\.com\/c\/([A-Za-z0-9_.\-]+)/i);
+        const legacyUserMatch  = url.match(/youtube\.com\/user\/([A-Za-z0-9_.\-]+)/i);
 
         if (handleMatch) {
             handle = handleMatch[1];
@@ -220,8 +222,8 @@ router.post('/channel-configs/extract', protect, async (req, res) => {
         } else if (legacyUserMatch) {
             handle = legacyUserMatch[1];
             resolvedUrl = `https://www.youtube.com/user/${handle}`;
-        } else if (/^[A-Za-z0-9_.-]+$/.test(url.replace('@', ''))) {
-            // Bare handle or name — treat as handle
+        } else if (/^[A-Za-z0-9_.\-]+$/.test(url.replace('@', ''))) {
+            // Bare handle or name (with optional hyphen) — treat as handle
             handle = url.replace('@', '');
             resolvedUrl = `https://www.youtube.com/@${handle}`;
         } else {
