@@ -1,15 +1,17 @@
 /**
  * YouTube Studio — Agent Nodes (MCoT Pipeline)
- * 
+ *
  * Node execution order:
- *   1. transcriptNode         → fetch captions + metadata
- *   2. analysisNode           → MCoT video intelligence (Gemini watches video)
- *   3. chapterNode            → chapter detection from transcript
- *   4. seoNode                → brand-aligned titles, description, tags
- *   5. brandCriticNode        → brand alignment scoring
- *   6. thumbnailDirectionNode → MCoT thumbnail creative direction (JSON)
- *   7. thumbnailGenerationNode→ FLUX Pro image generation via FAL.ai
- *   8. characterPortraitNode  → Gemini generates AI portraits from character descriptions
+ *   1.  transcriptNode         → fetch captions + metadata
+ *   2.  analysisNode           → MCoT video intelligence (Gemini watches video)
+ *   2b. frameExtractionNode    → YouTube CDN frames for visual grounding
+ *   3.  chapterNode            → chapter detection (grounded in analysis)
+ *   4.  seoNode                → SEO titles/description/tags via Grok
+ *   5.  brandCriticNode        → brand alignment scoring
+ *   5b. promoNode              → refines promoCuts → social-ready clips
+ *   6.  thumbnailDirectionNode → MCoT thumbnail creative direction (JSON)
+ *   7.  characterPortraitNode  → visual-grounded AI portraits → S3
+ *   8.  thumbnailGenerationNode→ GPT Image 2 → S3 (no base64 stored)
  */
 
 import { callAgent, callMultimodalAgent } from '../shared/agentUtils.js';
@@ -19,6 +21,7 @@ import {
     formatTranscriptText, parseIsoDuration, extractVideoId
 } from './transcriptClient.js';
 import { getRouter } from '../../ai/router.js';
+import { uploadBase64ToS3, persistToS3 } from '../../utils/s3Upload.js';
 
 const FAL_BASE = 'https://queue.fal.run';
 // FAL_API_KEY is what's in .env — FAL_KEY is the alternate alias some clients expect
@@ -667,29 +670,38 @@ Return ONLY a JSON object, no markdown:
             quality:     'hd',
         }, { provider: 'openai' });
 
-        let finalUrl = typeof result === 'string' ? result : result.imageUrl;
+        // gpt-image-2 returns b64_json — upload to S3 immediately, never store data: URIs
+        const rawUrl   = typeof result === 'string' ? result : result.imageUrl;
+        const b64Raw   = result?.b64 || result?.b64_json || null;
+        const isDataUri = rawUrl?.startsWith('data:');
 
-        // gpt-image-2 returns base64 data URI — upload to S3 for persistent URL
-        if (finalUrl?.startsWith('data:')) {
-            try {
-                const { uploadBase64ToS3 } = await import('../../utils/s3Upload.js').catch(() => ({ uploadBase64ToS3: null }));
-                if (uploadBase64ToS3 && result.b64) {
-                    finalUrl = await uploadBase64ToS3(result.b64, `thumbnails/yt-${Date.now()}.png`);
-                    console.log(`   ✅ [gpt-image-2] Uploaded to S3: ${finalUrl.substring(0, 80)}`);
-                } else {
-                    console.log(`   ⚠️ [gpt-image-2] S3 upload not available — using data URI`);
-                }
-            } catch (uploadErr) {
-                console.warn(`   ⚠️ S3 upload failed: ${uploadErr.message} — using data URI`);
-            }
+        let finalUrl;
+        if (b64Raw) {
+            // Preferred: raw b64 string — decode and upload
+            const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
+            finalUrl = await uploadBase64ToS3(b64Raw, s3Key);
+            console.log(`   ✅ [gpt-image-2] b64 → S3: ${finalUrl.substring(0, 80)}`);
+        } else if (isDataUri) {
+            // Fallback: data: URI → strip prefix, extract b64, upload
+            const b64Stripped = rawUrl.split(',')[1];
+            const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}.png`;
+            finalUrl = await uploadBase64ToS3(b64Stripped, s3Key);
+            console.log(`   ✅ [gpt-image-2] data URI → S3: ${finalUrl.substring(0, 80)}`);
+        } else if (rawUrl?.startsWith('http')) {
+            // Already a URL (unlikely for gpt-image-2) — persist via ensureS3Url
+            finalUrl = await persistToS3(rawUrl, 'yt-studio/thumbnails');
+            console.log(`   ✅ [gpt-image-2] URL → S3: ${finalUrl.substring(0, 80)}`);
+        } else {
+            throw new Error('GPT Image 2 returned no usable image data');
         }
 
-        console.log(`✅ [thumbnailGenerationNode] GPT Image 2 success`);
+        console.log(`✅ [thumbnailGenerationNode] GPT Image 2 success → S3`);
         return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
 
     } catch (gptErr) {
         console.warn(`⚠️ [thumbnailGenerationNode] GPT Image 2 failed: ${gptErr.message} — trying Gemini fallback`);
     }
+
 
     // ── Fallback: Gemini 3.1 Flash Image ────────────────────────────────────────────
     try {
@@ -702,14 +714,17 @@ Return ONLY a JSON object, no markdown:
             ],
         }, { provider: 'gemini' });
 
-        const finalUrl = typeof result === 'string' ? result : result.imageUrl;
-        console.log(`✅ [thumbnailGenerationNode] Gemini fallback success`);
-        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
+        const rawUrl = typeof result === 'string' ? result : result.imageUrl;
+        // Gemini may return data: URI or a temporary storage URL — persist both to S3
+        const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
+        console.log(`✅ [thumbnailGenerationNode] Gemini fallback success → S3`);
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
     } catch (gemErr) {
         console.warn(`❌ [thumbnailGenerationNode] Both providers failed: ${gemErr.message}`);
         return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
     }
 }
+
 
 
 
@@ -841,14 +856,19 @@ Describe each visible person's exact appearance so I can generate accurate portr
                     aspectRatio: '1:1',
                     imageParts,
                 });
-                console.log(`   ✅ Portrait generated for: ${char.label}`);
+                // Persist portrait to S3 — no data: URIs or temporary provider URLs stored
+                const rawPortraitUrl = result.imageUrl || (typeof result === 'string' ? result : null);
+                const portraitUrl = rawPortraitUrl
+                    ? await persistToS3(rawPortraitUrl, `yt-studio/portraits`)
+                    : null;
+                console.log(`   ✅ Portrait generated and persisted for: ${char.label}`);
                 return {
                     label:           char.label,
                     role:            char.role,
                     firstAppearance: char.firstAppearance,
                     screenTimePct:   char.screenTimePct,
                     visualDescription: visualDescriptions[char.label] || null,
-                    portraitUrl:     result.imageUrl,
+                    portraitUrl,
                 };
             } catch (err) {
                 console.warn(`   ⚠️ Portrait failed for ${char.label}: ${err.message}`);
@@ -856,6 +876,7 @@ Describe each visible person's exact appearance so I can generate accurate portr
             }
         })
     );
+
 
     const characterPortraits = portraits
         .filter(r => r.status === 'fulfilled')

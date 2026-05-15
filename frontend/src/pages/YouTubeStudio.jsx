@@ -172,6 +172,126 @@ function ProjectCard({ project, onOpen }) {
     )
 }
 
+// ── Template Quick-Access Panel ───────────────────────────────────────────────
+// Shown below Channel Setup — compact grid of templates with select/seed/settings links.
+
+function TemplateQuickAccess({ activeTemplate, onSelect, brandId }) {
+    const [templates, setTemplates] = useState([])
+    const [loading, setLoading]     = useState(true)
+    const [seeding, setSeeding]     = useState(false)
+
+    const reload = async () => {
+        setLoading(true)
+        try {
+            const d = await api('/yt-studio-settings/templates')
+            setTemplates(d.templates || [])
+        } catch {}
+        setLoading(false)
+    }
+
+    useEffect(() => { reload() }, [])
+
+    async function seedStarters() {
+        setSeeding(true)
+        try {
+            await api('/yt-studio-settings/templates/seed-starters', { method: 'POST' })
+            await reload()
+        } catch (e) { alert('Seed failed: ' + e.message) }
+        setSeeding(false)
+    }
+
+    const hasStarters = templates.some(t => t.isStarter)
+
+    return (
+        <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--sys-border)' }}>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--sys-primary)' }}>collections</span>
+                <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Thumbnail Templates</p>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>
+                        {templates.length > 0 ? `${templates.length} template${templates.length !== 1 ? 's' : ''} — click to set active for thumbnail generation` : 'No templates yet — load starters or go to Settings'}
+                    </p>
+                </div>
+                {!hasStarters && (
+                    <button onClick={seedStarters} disabled={seeding}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 9, background: '#6366f115', color: '#6366f1', fontWeight: 700, fontSize: 11, border: '1px solid #6366f133', cursor: seeding ? 'wait' : 'pointer', flexShrink: 0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>auto_awesome</span>
+                        {seeding ? 'Loading…' : 'Load Starters'}
+                    </button>
+                )}
+            </div>
+
+            {loading ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[1,2,3,4].map(i => (
+                        <div key={i} style={{ width: 120, height: 68, borderRadius: 10, background: 'var(--sys-border)', opacity: 0.5, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                    ))}
+                </div>
+            ) : templates.length === 0 ? (
+                <div style={{ padding: '28px 20px', textAlign: 'center', border: '2px dashed var(--sys-border)', borderRadius: 12 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>collections</span>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>No templates configured</p>
+                    <button onClick={seedStarters} disabled={seeding}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 9, background: '#6366f1', color: 'white', fontWeight: 700, fontSize: 12, border: 'none', cursor: seeding ? 'wait' : 'pointer' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                        {seeding ? 'Loading…' : 'Load 10 Starter Templates'}
+                    </button>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+                    {templates.slice(0, 12).map(t => {
+                        const isActive = activeTemplate?._id === t._id
+                        return (
+                            <button key={t._id} onClick={() => onSelect?.(isActive ? null : t)}
+                                style={{
+                                    padding: '10px 10px 8px',
+                                    borderRadius: 10,
+                                    border: `2px solid ${isActive ? 'var(--sys-primary)' : 'var(--sys-border)'}`,
+                                    background: isActive ? 'var(--sys-primary)08' : 'var(--sys-surface)',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    position: 'relative',
+                                    transition: 'all .15s',
+                                }}>
+                                {/* Color swatch bar */}
+                                <div style={{ height: 6, borderRadius: 4, background: t.visual?.primaryColor || '#888', marginBottom: 8 }} />
+                                {/* Name */}
+                                <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: isActive ? 18 : 0 }}>{t.name}</p>
+                                <p style={{ margin: 0, fontSize: 9, color: 'var(--sys-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.classification?.theme || 'General'}</p>
+                                {/* Active check */}
+                                {isActive && (
+                                    <span className="material-symbols-outlined" style={{ position: 'absolute', top: 6, right: 6, fontSize: 14, color: 'var(--sys-primary)' }}>check_circle</span>
+                                )}
+                                {/* Starter badge */}
+                                {t.isStarter && (
+                                    <span style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 8, padding: '1px 5px', borderRadius: 8, background: '#6366f120', color: '#6366f1', fontWeight: 800 }}>STARTER</span>
+                                )}
+                            </button>
+                        )
+                    })}
+                    {templates.length > 12 && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: 10, border: '2px dashed var(--sys-border)', fontSize: 11, color: 'var(--sys-text-muted)', fontWeight: 600 }}>
+                            +{templates.length - 12} more in Settings
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Active indicator */}
+            {activeTemplate && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: '#22c55e10', border: '1px solid #22c55e30' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#22c55e' }}>check_circle</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', flex: 1 }}>Active: {activeTemplate.name}</span>
+                    <button onClick={() => onSelect?.(null)} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid #ef444433', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>Clear</button>
+                </div>
+            )}
+
+            <style>{`@keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 0.8; } }`}</style>
+        </div>
+    )
+}
+
 // ── Show Template Picker ──────────────────────────────────────────────────────
 // Used in ProjectDetail to select which show's template to apply for thumbnail regen.
 
@@ -730,27 +850,56 @@ function ProjectDetail({ project, onRefresh }) {
                         AI-suggested clips for Reels, Shorts, or teasers — ready for your editor
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {promoCuts.map((cut, i) => (
-                            <div key={i} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-primary)', color: 'white' }}>Cut {cut.order || i + 1}</span>
-                                    <a href={`${project.videoUrl}&t=${cut.startTime?.replace(':', 'm')}s`} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-primary)', textDecoration: 'none' }}>{cut.startTime} → {cut.endTime}</a>
-                                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-border)', color: 'var(--sys-text-muted)', fontWeight: 600 }}>{cut.durationSecs}s</span>
-                                    {cut.emotion && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#a855f715', color: '#a855f7', fontWeight: 600 }}>{cut.emotion}</span>}
-                                    {cut.platform && cut.platform !== 'all' && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 600 }}>{cut.platform}</span>}
-                                </div>
-                                {cut.hookLine && <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, fontStyle: 'italic' }}>"{cut.hookLine}"</p>}
-                                {cut.reason && <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>{cut.reason}</p>}
-                                {cut.socialCaption && (
-                                    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                        <span style={{ flex: 1, fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{cut.socialCaption.substring(0, 160)}</span>
-                                        <button onClick={() => copyText(cut.socialCaption)} style={{ flexShrink: 0, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 11 }}>content_copy</span>Caption
-                                        </button>
+                        {promoCuts.map((cut, i) => {
+                            // hookStrength: 1–10 score from promoNode
+                            const strength = typeof cut.hookStrength === 'number' ? Math.min(10, Math.max(0, cut.hookStrength)) : null;
+                            const strengthColor = strength >= 8 ? '#22c55e' : strength >= 5 ? '#f59e0b' : '#ef4444';
+                            const strengthLabel = strength >= 8 ? 'High' : strength >= 5 ? 'Med' : 'Low';
+                            return (
+                                <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--sys-surface)', border: `1px solid ${strength >= 8 ? '#22c55e22' : 'var(--sys-border)'}`, position: 'relative', overflow: 'hidden' }}>
+                                    {/* hookStrength accent bar — top edge */}
+                                    {strength !== null && (
+                                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--sys-border)' }}>
+                                            <div style={{ height: '100%', width: `${strength * 10}%`, background: strengthColor, transition: 'width .4s ease', borderRadius: '3px 3px 0 0' }} />
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-primary)', color: 'white' }}>Cut {cut.order || i + 1}</span>
+                                        <a href={`${project.videoUrl}&t=${cut.startTime?.replace(':', 'm')}s`} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-primary)', textDecoration: 'none' }}>{cut.startTime} → {cut.endTime}</a>
+                                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--sys-border)', color: 'var(--sys-text-muted)', fontWeight: 600 }}>{cut.durationSecs}s</span>
+                                        {cut.emotion && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#a855f715', color: '#a855f7', fontWeight: 600 }}>{cut.emotion}</span>}
+                                        {cut.platform && cut.platform !== 'all' && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#22c55e15', color: '#22c55e', fontWeight: 600 }}>{cut.platform}</span>}
+                                        {/* hookStrength badge */}
+                                        {strength !== null && (
+                                            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: strengthColor }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>bolt</span>
+                                                Hook {strengthLabel} {strength}/10
+                                            </span>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        ))}
+                                    {/* hookStrength mini bar */}
+                                    {strength !== null && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <span style={{ fontSize: 10, color: 'var(--sys-text-muted)', fontWeight: 600, width: 64, flexShrink: 0 }}>Hook Strength</span>
+                                            <div style={{ flex: 1, height: 5, borderRadius: 4, background: 'var(--sys-border)', overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${strength * 10}%`, background: `linear-gradient(90deg, ${strengthColor}99, ${strengthColor})`, transition: 'width .4s ease' }} />
+                                            </div>
+                                            <span style={{ fontSize: 10, fontWeight: 800, color: strengthColor, minWidth: 16, textAlign: 'right' }}>{strength}</span>
+                                        </div>
+                                    )}
+                                    {cut.hookLine && <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, fontStyle: 'italic' }}>"{ cut.hookLine}"</p>}
+                                    {cut.reason && <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>{cut.reason}</p>}
+                                    {cut.socialCaption && (
+                                        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                            <span style={{ flex: 1, fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.5 }}>{cut.socialCaption.substring(0, 160)}</span>
+                                            <button onClick={() => copyText(cut.socialCaption)} style={{ flexShrink: 0, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text-muted)', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 11 }}>content_copy</span>Caption
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                     <button onClick={() => copyText(promoCuts.map((c, i) => `Cut ${i + 1}: ${c.startTime}–${c.endTime} (${c.durationSecs}s)\n"${c.hookLine}"\n${c.reason}`).join('\n\n'))}
                         style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'var(--sys-primary-dim)', color: 'var(--sys-primary)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -759,28 +908,69 @@ function ProjectDetail({ project, onRefresh }) {
                 </Section>
             )}
 
-            {/* Chapters */}
-            {chapters?.length > 0 && (
-                <Section title="AI Chapters" icon="list_alt" badge={chapters.length}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-                        {chapters.map((c, i) => (
-                            <div key={i} style={{ display: 'flex', gap: 12, padding: '8px 12px', borderRadius: 6, borderBottom: '1px solid var(--sys-border)' }}>
-                                <a href={`${project.videoUrl}&t=${c.timestamp?.replace(':', 'm')}s`}
-                                    target="_blank" rel="noreferrer"
-                                    style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-primary)', minWidth: 40, textDecoration: 'none' }}>{c.timestamp}</a>
-                                <div>
-                                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{c.title}</p>
-                                    {c.description && <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>{c.description}</p>}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <button onClick={() => copyText(chapters.map(c => `${c.timestamp} ${c.title}`).join('\n'))}
-                        style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--sys-primary-dim)', color: 'var(--sys-primary)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>content_copy</span> Copy chapters for YouTube
-                    </button>
-                </Section>
-            )}
+
+            {/* Chapters — with screenshotTimestamp frame previews */}
+            {chapters?.length > 0 && (() => {
+                // Extract YouTube video ID from URL for frame thumbnails
+                const ytId = project.videoId || project.videoUrl?.match(/[?&]v=([^&]+)/)?.[1] || '';
+                return (
+                    <Section title="AI Chapters" icon="list_alt" badge={chapters.length}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                            {chapters.map((c, i) => {
+                                // screenshotTimestamp: seconds integer for YouTube CDN frame URL
+                                // Falls back to parsing c.timestamp ("MM:SS" or "HH:MM:SS")
+                                let frameSeek = c.screenshotTimestamp || null;
+                                if (!frameSeek && c.timestamp) {
+                                    const parts = c.timestamp.split(':').map(Number);
+                                    frameSeek = parts.length === 3
+                                        ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                                        : parts[0] * 60 + (parts[1] || 0);
+                                }
+                                // YouTube CDN thumbnail for specific second — no API key needed
+                                // Note: YouTube only serves auto-generated keyframes (~every 3s)
+                                // so the actual frame shown may be ±a few seconds off
+                                const frameUrl = (ytId && frameSeek != null)
+                                    ? `https://img.youtube.com/vi_webp/${ytId}/${Math.max(1, Math.floor(frameSeek))}.webp`
+                                    : null;
+
+                                return (
+                                    <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', alignItems: 'flex-start' }}>
+                                        {/* Frame thumbnail */}
+                                        <a href={`${project.videoUrl}&t=${c.timestamp?.replace(':', 'm')}s`} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                                            {frameUrl ? (
+                                                <img
+                                                    src={frameUrl}
+                                                    alt={`Frame at ${c.timestamp}`}
+                                                    style={{ width: 80, height: 45, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--sys-border)', display: 'block', background: 'var(--sys-border)' }}
+                                                    onError={e => { e.target.style.display = 'none' }}
+                                                />
+                                            ) : (
+                                                <div style={{ width: 80, height: 45, borderRadius: 6, background: 'var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-text-muted)', opacity: 0.4 }}>movie</span>
+                                                </div>
+                                            )}
+                                        </a>
+                                        {/* Chapter info */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                                                <a href={`${project.videoUrl}&t=${c.timestamp?.replace(':', 'm')}s`}
+                                                    target="_blank" rel="noreferrer"
+                                                    style={{ fontSize: 12, fontWeight: 800, color: 'var(--sys-primary)', textDecoration: 'none', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{c.timestamp}</a>
+                                                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                                            </div>
+                                            {c.description && <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.4 }}>{c.description}</p>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <button onClick={() => copyText(chapters.map(c => `${c.timestamp} ${c.title}`).join('\n'))}
+                            style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--sys-primary-dim)', color: 'var(--sys-primary)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>content_copy</span> Copy chapters for YouTube
+                        </button>
+                    </Section>
+                );
+            })()}
 
             {/* SEO */}
             {seo && (
@@ -1202,12 +1392,13 @@ export default function YouTubeStudio() {
             {/* ── Channel Setup Tab ── */}
             {tab === 'channels' && (
                 <div style={{ maxWidth: 860, margin: '0 auto' }}>
+                    {/* Header banner */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: '16px 20px', borderRadius: 14, background: 'linear-gradient(135deg, var(--sys-primary)10, var(--sys-primary)05)', border: '1px solid var(--sys-primary)22' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-primary)' }}>tv</span>
                         <div>
                             <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Channel Setup</p>
                             <p style={{ margin: 0, fontSize: 12, color: 'var(--sys-text-muted)' }}>
-                                Add your YouTube channels, shows, and templates here. These power brand-aligned thumbnails, language detection, and SEO copy across all videos.
+                                Configure your channels and thumbnail templates. Both power brand-aligned thumbnail generation and SEO copy across all videos.
                             </p>
                         </div>
                         {channels.length > 0 && (
@@ -1216,12 +1407,21 @@ export default function YouTubeStudio() {
                             </span>
                         )}
                     </div>
+
+                    {/* Channels section */}
                     <YouTubeStudioSettings
                         brandId={activeBrand?._id}
                         activeTemplateId={activeTemplate?._id}
                         channelsOnly={true}
                         onChannelSaved={() => loadChannels()}
                         onTemplateSelect={(template) => setActiveTemplate(template)}
+                    />
+
+                    {/* ── Template Quick-Access ── */}
+                    <TemplateQuickAccess
+                        activeTemplate={activeTemplate}
+                        onSelect={setActiveTemplate}
+                        brandId={activeBrand?._id}
                     />
                 </div>
             )}
