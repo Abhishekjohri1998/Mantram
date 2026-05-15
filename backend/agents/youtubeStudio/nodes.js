@@ -313,13 +313,14 @@ export async function brandCriticNode({ video, analysis, brandContext }) {
 
 // ── 6. Thumbnail Direction Node (MCoT) ─────────────────────────────────────
 
-export async function thumbnailDirectionNode({ video, analysis, seo, brandContext }) {
-    console.log(`🎨 [thumbnailDirectionNode] Creating peak-moment thumbnail concept`);
+export async function thumbnailDirectionNode({ video, analysis, seo, brandContext, extractedFrames = [] }) {
+    console.log(`🎨 [thumbnailDirectionNode] Creative Director — Screen-Grounded CTR Strategy`);
 
-    const existingThumbnail = video.metadata.thumbnailUrl;
-    const peakMoment        = analysis.peakMoment;
-    const characters        = analysis.characters || [];
+    const peakMoment  = analysis.peakMoment;
+    const characters  = analysis.characters || [];
+    const videoTitle  = video.metadata.title || '';
 
+    // ── Build character context ───────────────────────────────────────────────
     const characterContext = characters.length
         ? characters.map(c =>
             `  - ${c.label} (${c.role}, ${c.screenTimePct}% screen time)` +
@@ -330,7 +331,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 
     const peakMomentContext = peakMoment
         ? [
-            `PEAK MOMENT — base the thumbnail on THIS scene:`,
+            `PEAK MOMENT — the most dramatic/emotional moment in the video:`,
             `  Timestamp: ${peakMoment.timestamp}`,
             `  What happens: ${peakMoment.title}`,
             `  Visual scene: ${peakMoment.sceneDescription}`,
@@ -338,12 +339,45 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
           ].join('\n')
         : `TOP HIGHLIGHT: ${analysis.highlights?.[0]?.title || 'Not identified'}`;
 
+    // ── Fetch screen grabs as inline images for Gemini Vision ────────────────
+    // Pass ALL extracted frames (CDN frames) so the Creative Director can SEE
+    // the actual video content and pick the most emotionally powerful frame.
+    const frameImageParts = [];
+    if (extractedFrames.length > 0) {
+        console.log(`   📸 Fetching ${extractedFrames.length} screen grabs for Creative Director vision analysis...`);
+        for (const frame of extractedFrames.slice(0, 6)) { // max 6 frames to stay within token budget
+            if (!frame.url) continue;
+            try {
+                const res = await fetch(frame.url, { signal: AbortSignal.timeout(10000) });
+                if (!res.ok) { console.warn(`   ⚠️ Frame fetch failed: ${frame.label} (${res.status})`); continue; }
+                const buf = await res.arrayBuffer();
+                const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+                frameImageParts.push({
+                    inlineData: { data: Buffer.from(buf).toString('base64'), mimeType },
+                    _label: frame.label,
+                });
+                console.log(`   ✅ Frame loaded: ${frame.label} (${Math.round(buf.byteLength / 1024)}KB)`);
+            } catch (e) {
+                console.warn(`   ⚠️ Frame ${frame.label} failed: ${e.message}`);
+            }
+        }
+    }
+
+    if (frameImageParts.length === 0) {
+        console.warn(`   ⚠️ No screen grabs available — Creative Director working from text descriptions only`);
+    } else {
+        console.log(`   🎬 Creative Director has ${frameImageParts.length} real video frames to analyze`);
+    }
+
+    // ── Build the user prompt for the Creative Director ───────────────────────
     const userPrompt = [
         brandContext || 'No brand context',
         '',
-        `VIDEO TITLE: ${video.metadata.title}`,
+        `VIDEO TITLE: ${videoTitle}`,
         `SUMMARY: ${analysis.summary}`,
         `EMOTIONAL ARC: ${analysis.emotionalArc}`,
+        `CONTENT TYPE: ${analysis.contentType || 'unknown'}`,
+        `TONE: ${analysis.tone || 'unknown'}`,
         '',
         peakMomentContext,
         '',
@@ -351,23 +385,80 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
         characterContext,
         '',
         `KEY HIGHLIGHTS: ${analysis.highlights?.slice(0, 3).map(h => h.title).join(', ') || ''}`,
-        `RECOMMENDED TITLE: ${seo?.recommendedTitle || ''}`,
-        `THUMBNAIL TEXT IDEA: ${seo?.thumbnailTextSuggestion || ''}`,
         '',
-        `ORIGINAL THUMBNAIL URL: ${existingThumbnail || 'None'} (for color/style reference)`,
+        `SEO INTELLIGENCE (use for clickbait copy):`,
+        `  Recommended title: ${seo?.recommendedTitle || ''}`,
+        `  CTR titles: ${seo?.titles?.map(t => t.text).slice(0, 3).join(' | ') || ''}`,
+        `  Thumbnail text suggestion: ${seo?.thumbnailTextSuggestion || ''}`,
+        `  SEO keywords: ${seo?.seoKeywords?.slice(0, 6).join(', ') || ''}`,
+        '',
+        frameImageParts.length > 0
+            ? `SCREEN GRABS PROVIDED: ${frameImageParts.length} real frames from this video are attached as images. Analyze them visually — identify the most emotionally powerful frame, the character expressions, the color palette, and the composition. Ground your thumbnail concept in what you actually SEE in these frames.`
+            : `NOTE: No screen grabs available. Base your concept on the text descriptions above.`,
     ].join('\n');
 
-    // MCoT: pass existing thumbnail for visual reference (palette, style, characters)
-    const imageUrls = existingThumbnail ? [existingThumbnail] : [];
-    const result = await callMultimodalAgent(
-        PROMPTS.THUMBNAIL_DIRECTOR,
-        userPrompt,
-        imageUrls,
-        { temperature: 0.7, maxTokens: 2048 }
-    );
+    // ── Call Gemini Vision directly (supports inline image arrays) ────────────
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY;
+    if (!geminiKey) {
+        // Fallback to text-only callMultimodalAgent
+        console.warn(`   ⚠️ No GEMINI_API_KEY — falling back to text-only creative direction`);
+        const result = await callMultimodalAgent(
+            PROMPTS.THUMBNAIL_DIRECTOR,
+            userPrompt,
+            [],
+            { temperature: 0.75, maxTokens: 2500 }
+        );
+        return { thumbnailDirection: result };
+    }
 
-    return { thumbnailDirection: result };
+    try {
+        const parts = [
+            { text: PROMPTS.THUMBNAIL_DIRECTOR + '\n\n---\n\n' + userPrompt },
+            ...frameImageParts.map(({ inlineData }) => ({ inlineData })),
+        ];
+
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: { temperature: 0.75, maxOutputTokens: 2500, responseMimeType: 'application/json' },
+                }),
+                signal: AbortSignal.timeout(45000),
+            }
+        );
+
+        const d = await resp.json();
+        const raw = d.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+        const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        const match = cleaned.match(/\{[\s\S]*\}/);
+
+        if (match) {
+            const result = JSON.parse(match[0]);
+            console.log(`✅ [thumbnailDirectionNode] Creative direction complete:`);
+            console.log(`   CTR strategy: ${result.ctrStrategy?.substring(0, 80)}`);
+            console.log(`   Screen grab insight: ${result.screenGrabInsight?.substring(0, 80)}`);
+            console.log(`   Overlay: "${result.textOverlay?.line1}" | Power word: ${result.textOverlay?.powerWordUsed}`);
+            console.log(`   Clickbait variants: ${result.clickbaitCopyVariants?.length || 0} generated`);
+            console.log(`   Est. CTR: ${result.ctrScoreEstimate}%`);
+            return { thumbnailDirection: result };
+        } else {
+            throw new Error(`Creative Director returned non-JSON: ${raw.substring(0, 100)}`);
+        }
+    } catch (e) {
+        console.warn(`   ⚠️ Gemini Vision creative direction failed: ${e.message} — falling back to text-only`);
+        const result = await callMultimodalAgent(
+            PROMPTS.THUMBNAIL_DIRECTOR,
+            userPrompt,
+            [],
+            { temperature: 0.75, maxTokens: 2500 }
+        );
+        return { thumbnailDirection: result };
+    }
 }
+
 
 
 /**
@@ -620,42 +711,70 @@ Return ONLY a JSON object, no markdown:
     // ═══════════════════════════════════════════════════════════════════════════
     // Execute Image Generation — GPT Image 2 (primary) → Gemini (fallback)
     // ═══════════════════════════════════════════════════════════════════════════
+    // ── Build CTR-optimized generation prompt from Creative Director output ──────
+    // Use the best clickbait copy variant as the overlay text (Creative Director's top pick)
+    const bestClickbaitCopy = thumbnailDirection?.clickbaitCopyVariants?.[0] || line1;
+
     const genPrompt = [
-        `Professional YouTube thumbnail (16:9, 1536x1024) for a ${ta.showName || template?.name || 'YouTube video'} video.`,
+        `Professional YouTube thumbnail (16:9, 1536x1024).`,
         `Video title: "${videoTitle}"`,
         ``,
-        `KEY SCENE: ${peakScene}`,
-        `Emotional tone: ${peakEmotion} — convey this strongly through facial expression and body language.`,
+        `=== CREATIVE DIRECTOR BRIEF ===`,
+        thumbnailDirection?.ctrStrategy ? `CTR STRATEGY: ${thumbnailDirection.ctrStrategy}` : '',
+        thumbnailDirection?.screenGrabInsight ? `VISUAL GROUNDING (from actual video frames): ${thumbnailDirection.screenGrabInsight}` : '',
+        thumbnailDirection?.concept ? `THUMBNAIL CONCEPT: ${thumbnailDirection.concept}` : '',
+        ``,
+        `=== KEY SCENE TO DEPICT ===`,
+        thumbnailDirection?.imageGenerationPrompt
+            ? `SCENE: ${thumbnailDirection.imageGenerationPrompt}`
+            : `SCENE: ${peakScene}`,
+        `Emotional tone: ${peakEmotion} — convey this STRONGLY through facial expression and body language.`,
+        `Composition: ${thumbnailDirection?.composition || 'center-subject'}`,
+        `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}`,
         ``,
         characterList
             ? `CHARACTERS (generate these people from scratch matching descriptions):\n  ${characterList.substring(0, 400)}`
-            : 'Generate the lead character(s) appropriate to the show.',
+            : 'Generate the lead character(s) appropriate to the content.',
         ``,
         ta.overallAesthetic || baseTemplateStyle || directionStyle
             ? `VISUAL STYLE: ${ta.overallAesthetic || baseTemplateStyle || directionStyle}`
             : '',
-        ta.colorPalette?.length ? `Color palette: ${ta.colorPalette.join(', ')}` : '',
-        ta.backgroundScene ? `Background: ${ta.backgroundScene}` : '',
+        `Dominant color: ${thumbnailDirection?.dominantColor || ta.colorPalette?.[0] || '#FF4500'}`,
+        ta.colorPalette?.length ? `Full color palette: ${ta.colorPalette.join(', ')}` : '',
+        ta.backgroundScene ? `Background scene type: ${ta.backgroundScene}` : '',
         ta.mainSubjectPosition ? `Subject position: ${ta.mainSubjectPosition}` : '',
         ``,
-        `LOWER-THIRD TITLE BAR (MANDATORY): ${
-            ta.lowerThird
-                ? ta.lowerThird + `. Place it at the bottom with bold text: "${line1}"${line2 ? ' / "' + line2 + '"' : ''}`
-                : `Dark gradient bar at the bottom 15% of the image. Text: "${line1}"${line2 ? ' and "' + line2 + '"' : ''}`
-        }`,
+        `=== TEXT OVERLAYS (MANDATORY — COMPOSITE DIRECTLY ON IMAGE) ===`,
+        `MAIN TITLE TEXT: "${bestClickbaitCopy}"`,
+        `Text style: ${thumbnailDirection?.textOverlay?.style || 'bold-block'} — color ${thumbnailDirection?.textOverlay?.color || '#FFFFFF'} — GIANT SIZE — must be readable at 160px thumbnail`,
+        line2 ? `SECONDARY TEXT: "${line2}"` : '',
+        ta.lowerThird
+            ? `LOWER-THIRD BAR: ${ta.lowerThird}. Contains the episode/title text.`
+            : `LOWER-THIRD GRADIENT BAR: Dark gradient bar at bottom 15% of image. Text inside: "${bestClickbaitCopy}"`,
         ta.reconstructionInstruction ? `RECONSTRUCTION: ${ta.reconstructionInstruction.substring(0, 300)}` : '',
-        template?.generationPromptSuffix ? `SHOW STYLE: ${template.generationPromptSuffix}` : '',
-        brandSnippet ? `Brand context: ${brandSnippet}` : '',
-        referenceFrameUrl ? `VISUAL REFERENCE: A real extracted frame from this video is provided below. Use it for character appearance, setting, and color palette reference only — generate a fresh cinematic composition.` : '',
         ``,
-        `HARD RULES:`,
-        `- 16:9 landscape orientation, broadcast quality`,
-        `- Cinematic lighting, sharp focus on the main subject`,
-        `- High contrast, vibrant colors that pop on mobile`,
-        `- NO brand logos, NO channel watermarks (space will be overlaid digitally)`,
-        `- The lower-third title bar IS MANDATORY — do not omit it`,
-        `- Photorealistic, not cartoonish or animated`,
+        `=== GRAPHIC ELEMENTS (APPLY THESE) ===`,
+        thumbnailDirection?.graphicElements
+            ? thumbnailDirection.graphicElements
+            : `Add bold visual emphasis — arrows or highlight circles to direct attention to the main subject's expression`,
+        ``,
+        template?.generationPromptSuffix ? `SHOW STYLE DIRECTIVE: ${template.generationPromptSuffix}` : '',
+        brandSnippet ? `Brand context: ${brandSnippet}` : '',
+        referenceFrameUrl
+            ? `VISUAL REFERENCE: A real extracted frame from this video is provided. Use it for character appearance, scene setting, color palette — then generate a FRESH, heightened, cinematic version of that moment.`
+            : '',
+        ``,
+        `=== CTR HARD RULES ===`,
+        `- 16:9 landscape orientation, 1536x1024px output`,
+        `- Main subject's FACE must show EXTREME EMOTION — this is the #1 CTR driver`,
+        `- HIGH CONTRAST between subject and background — subject must POP`,
+        `- Cinematic dramatic lighting — use chiaroscuro, rim lighting, or color contrast`,
+        `- Text must be COMPOSITE ON THE IMAGE — bold, outlined, giant — readable at 160px`,
+        `- NO brand logos, NO channel watermarks (will be overlaid digitally later)`,
+        `- Photorealistic, broadcast quality, not cartoonish`,
+        `- Make it look like the #1 most-clicked thumbnail in this video's niche`,
     ].filter(Boolean).join('\n');
+
 
     console.log(`   🚀 [gpt-image-2] Generating 16:9 HD thumbnail...`);
 

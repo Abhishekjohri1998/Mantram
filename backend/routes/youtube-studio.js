@@ -243,11 +243,17 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
         console.log(`✅ [Node 5] Brand: score=${brandAlignment?.overallScore}`);
         console.log(`✅ [Node 5b] Promo: ${promoCuts?.length || 0} cuts`);
 
-        // ── Node 6: Thumbnail Direction (MCoT — multimodal) ────────────────
-        emit('thumbnailDirection', 'running', { message: 'Creating thumbnail concept (MCoT)…' });
-        const { thumbnailDirection } = await thumbnailDirectionNode({ video, analysis, seo, brandContext });
-        emit('thumbnailDirection', 'done', { concept: thumbnailDirection?.concept?.substring(0, 80) });
-        console.log(`✅ [Node 6] Thumbnail direction: "${thumbnailDirection?.concept?.substring(0, 60)}"`);
+        // ── Node 6: Thumbnail Direction — Creative Director + Screen Grab Vision ─
+        emit('thumbnailDirection', 'running', { message: 'Creative Director analyzing video frames (CTR strategy)…' });
+        const { thumbnailDirection } = await thumbnailDirectionNode({
+            video, analysis, seo, brandContext,
+            extractedFrames,   // ✅ Real video frames → Creative Director sees actual content
+        });
+        emit('thumbnailDirection', 'done', {
+            concept: thumbnailDirection?.concept?.substring(0, 80),
+            ctrScore: thumbnailDirection?.ctrScoreEstimate,
+        });
+        console.log(`✅ [Node 6] Creative Director: CTR=${thumbnailDirection?.ctrScoreEstimate}% | "${thumbnailDirection?.ctrStrategy?.substring(0, 60)}"`);
 
         // ── Fetch Channel & Template Context ─────────────────────────────────────
         // Priority: (1) show-level templateId > (2) channel defaultTemplateId
@@ -395,6 +401,7 @@ router.post('/:id/thumbnail', protect, async (req, res) => {
             brandContext,
             template,
             characterPortraits: project.characterPortraits || [],  // ✅ Use stored portraits as face anchors
+            extractedFrames:    project.extractedFrames    || [],  // ✅ Use stored frames as visual ref
         });
 
         if (generatedThumbnailUrl) {
