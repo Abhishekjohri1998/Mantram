@@ -940,6 +940,12 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
     const [showTemplateEditor, setShowTemplateEditor] = useState(false)
     const [filterTheme, setFilterTheme]     = useState('all')
 
+    // Keep onChannelSaved in a ref so it never invalidates loadData's useCallback deps.
+    // Calling onChannelSaved inside loadData created an infinite loop:
+    //   loadData → onChannelSaved → parent re-render → new fn ref → new loadData → loop.
+    const onChannelSavedRef = useRef(onChannelSaved)
+    useEffect(() => { onChannelSavedRef.current = onChannelSaved }, [onChannelSaved])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
@@ -949,11 +955,12 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
             ])
             setChannels(ch || [])
             setTemplates(tmpl || [])
-            // Notify parent (e.g. YouTubeStudio.jsx) so it can refresh its channel list
-            onChannelSaved?.(ch || [])
+            // NOTE: do NOT call onChannelSaved here — it would cause an infinite loop
+            // (parent re-render → new fn ref → new loadData → useEffect re-runs).
+            // onChannelSaved is called explicitly after save/delete/default mutations below.
         } catch (e) { console.error('Settings load failed:', e.message) }
         setLoading(false)
-    }, [onChannelSaved])
+    }, []) // ← empty deps: loadData is stable for the lifetime of this component
 
     useEffect(() => { loadData() }, [loadData])
 
@@ -970,6 +977,7 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
         try {
             await api(`/yt-studio-settings/channel-configs/${id}/default`, { method: 'POST' })
             await loadData()
+            onChannelSavedRef.current?.()
         } catch (e) { alert(e.message) }
     }
 
@@ -977,6 +985,7 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
         try {
             await api(`/yt-studio-settings/channel-configs/${id}`, { method: 'DELETE' })
             await loadData()
+            onChannelSavedRef.current?.()
         } catch (e) { alert(e.message) }
     }
 
@@ -1021,7 +1030,12 @@ export default function YouTubeStudioSettings({ brandId, onTemplateSelect, activ
                 <ChannelEditor
                     channel={editingChannel}
                     templates={templates.filter(t => !t.isArchived)}
-                    onSave={async () => { setShowChannelEditor(false); setEditingChannel(null); await loadData() }}
+                    onSave={async () => {
+                        setShowChannelEditor(false)
+                        setEditingChannel(null)
+                        await loadData()
+                        onChannelSavedRef.current?.()
+                    }}
                     onClose={() => { setShowChannelEditor(false); setEditingChannel(null) }}
                 />
             )}
