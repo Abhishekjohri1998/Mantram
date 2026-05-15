@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 export default function Hero({ onAgencyDemo }) {
@@ -13,13 +13,6 @@ export default function Hero({ onAgencyDemo }) {
 
     const yText = useTransform(scrollYProgress, [0, 1], ["0%", "10%"]);
     const opacityText = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-
-    // 3D depth transforms — text floats forward, glow recedes
-    const textZ = useTransform(scrollYProgress, [0, 1], [80, 0]);
-    const textRotateX = useTransform(scrollYProgress, [0, 0.5], [0, 3]);
-    const glowZ = useTransform(scrollYProgress, [0, 1], [-100, -200]);
-    const smoothTextZ = useSpring(textZ, { stiffness: 80, damping: 30 });
-    const smoothGlowZ = useSpring(glowZ, { stiffness: 60, damping: 25 });
 
     // Initial stagger animation
     const containerVariants = {
@@ -36,35 +29,24 @@ export default function Hero({ onAgencyDemo }) {
     };
 
     return (
-        <section ref={containerRef} className="relative pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden flex flex-col items-center text-center min-h-[85vh] justify-center section-3d">
-            {/* Ambient background glow — pushed deep into Z-space */}
-            <motion.div 
-                style={{ 
-                    y: useTransform(scrollYProgress, [0, 1], ["0%", "100%"]), 
-                    opacity: opacityText,
-                    z: smoothGlowZ,
-                }}
+        <section ref={containerRef} className="relative pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden flex flex-col items-center text-center min-h-[85vh] justify-center">
+            {/* Ambient background glow */}
+            <motion.div
+                style={{ y: useTransform(scrollYProgress, [0, 1], ["0%", "100%"]), opacity: opacityText }}
                 className="absolute inset-0 pointer-events-none -z-10 flex items-center justify-center"
             >
-                <div 
+                <div
                     className="w-[800px] h-[600px] rounded-full blur-[150px] opacity-20 mix-blend-screen"
                     style={{ background: 'radial-gradient(circle, #FF5A1F 0%, rgba(255,90,31,0) 70%)' }}
                 />
             </motion.div>
 
-            {/* Text content — floats forward in 3D space */}
-            <motion.div 
-                className="max-w-4xl mx-auto px-4 md:px-6 flex flex-col items-center" 
+            <motion.div
+                className="max-w-4xl mx-auto px-4 md:px-6 flex flex-col items-center"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
-                style={{ 
-                    y: yText, 
-                    opacity: opacityText,
-                    z: smoothTextZ,
-                    rotateX: textRotateX,
-                    transformStyle: 'preserve-3d',
-                }}
+                style={{ y: yText, opacity: opacityText }}
             >
                 {/* Top Pill */}
                 <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8 border border-[#FF5A1F]/30 bg-[#FF5A1F]/5">
@@ -87,22 +69,22 @@ export default function Hero({ onAgencyDemo }) {
 
                 {/* CTAs */}
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
-                    <Link 
+                    <Link
                         to="/auth?mode=signup"
                         className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                         style={{ background: BRAND.primary }}
                     >
                         Book a Demo <span aria-hidden="true">→</span>
                     </Link>
-                    
-                    <Link 
+
+                    <Link
                         to="/auth?mode=signup"
                         className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2 border border-white/20"
                     >
                         Request Access
                     </Link>
-                    
-                    <button 
+
+                    <button
                         onClick={onAgencyDemo}
                         className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-[#a1a1aa] hover:text-white transition-all hover:bg-white/5 flex items-center justify-center gap-2 border border-white/10 group"
                     >

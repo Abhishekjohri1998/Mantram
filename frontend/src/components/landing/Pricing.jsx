@@ -1,30 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import useReveal from '../../hooks/useReveal';
 import { BRAND } from '../../data/studios';
 import { apiFetch } from '../../services/api';
 
 export default function Pricing() {
     const revealRef = useReveal();
-    const sectionRef = useRef(null);
     const [packages, setPackages] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // 3D scroll entrance
-    const { scrollYProgress } = useScroll({
-        target: sectionRef,
-        offset: ["start end", "center center"]
-    });
-    const rotateX3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [5, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const z3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-80, 0]),
-        { stiffness: 80, damping: 30 }
-    );
 
     useEffect(() => {
         const fetchPackages = async () => {
@@ -45,26 +29,10 @@ export default function Pricing() {
         fetchPackages();
     }, []);
 
-    // 3D tilt handler for pricing cards
-    const handleMouseMove = useCallback((e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width - 0.5;
-        const y = (e.clientY - rect.top) / rect.height - 0.5;
-        e.currentTarget.style.transform = `perspective(800px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg) translateY(-4px)`;
-    }, []);
-
-    const handleMouseLeave = useCallback((e) => {
-        e.currentTarget.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) translateY(0px)';
-    }, []);
-
     return (
-        <motion.section 
-            ref={sectionRef}
-            className="py-24 md:py-32 bg-[#0b0b0c] relative section-3d" 
-            style={{ rotateX: rotateX3D, z: z3D }}
-        >
-            <div ref={revealRef} className="max-w-[1400px] mx-auto px-4 md:px-6">
-                
+        <section className="py-24 md:py-32 bg-[#0b0b0c] relative" ref={revealRef}>
+            <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+
                 {/* Header */}
                 <div className="flex flex-col items-center text-center mb-16">
                     <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-4 block">
@@ -84,34 +52,31 @@ export default function Pricing() {
                         {packages.map((pack) => {
                             const isPopular = pack.badge && pack.badge.length > 0;
                             const cardColor = pack.color || '#6366f1';
-                            
+
                             return (
-                                <div 
-                                    key={pack._id} 
-                                    className="bg-[#121214] rounded-2xl p-8 flex flex-col relative card-3d-tilt"
+                                <div
+                                    key={pack._id}
+                                    className="bg-[#121214] rounded-2xl p-8 flex flex-col relative transition-transform hover:-translate-y-1"
                                     style={{
                                         borderColor: isPopular ? cardColor : 'rgba(255,255,255,0.05)',
                                         borderWidth: '1px',
                                         borderStyle: 'solid',
                                         boxShadow: isPopular ? `0 0 40px ${cardColor}20` : 'none',
-                                        zIndex: isPopular ? 10 : 1,
-                                        transition: 'transform 0.4s cubic-bezier(0.03, 0.98, 0.52, 0.99), box-shadow 0.4s ease',
+                                        zIndex: isPopular ? 10 : 1
                                     }}
-                                    onMouseMove={handleMouseMove}
-                                    onMouseLeave={handleMouseLeave}
                                 >
                                     {isPopular && (
-                                        <div 
+                                        <div
                                             className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full whitespace-nowrap"
                                             style={{ backgroundColor: cardColor }}
                                         >
                                             {pack.badge}
                                         </div>
                                     )}
-                                    
+
                                     <h3 className="text-white font-serif text-2xl mb-1">{pack.name}</h3>
                                     <p className="text-[#a1a1aa] text-sm mb-6 h-10 line-clamp-2">{pack.description || pack.tagline}</p>
-                                    
+
                                     <div className="text-white font-serif text-4xl tracking-tight mb-8">
                                         {pack.contactForPricing ? (
                                             <span className="text-2xl mt-2 block">Custom Pricing</span>
@@ -123,20 +88,20 @@ export default function Pricing() {
                                             </>
                                         )}
                                     </div>
-                                    
+
                                     <div className="flex-1 flex flex-col gap-4 text-[14px] text-[#a1a1aa] font-medium mb-8">
                                         {pack.features && pack.features.map((feature, idx) => (
                                             <span key={idx} className="flex items-start gap-3">
-                                                <Check 
-                                                    className="w-5 h-5 shrink-0 mt-0.5" 
-                                                    style={{ color: cardColor }} 
-                                                /> 
+                                                <Check
+                                                    className="w-5 h-5 shrink-0 mt-0.5"
+                                                    style={{ color: cardColor }}
+                                                />
                                                 <span className="leading-snug">{feature.name}</span>
                                             </span>
                                         ))}
                                     </div>
-                                    
-                                    <Link 
+
+                                    <Link
                                         to={pack.contactForPricing ? "mailto:sales@mantram.ai" : "/auth?mode=signup"}
                                         className="w-full py-3.5 rounded-xl text-white font-bold text-sm transition-colors text-center block mt-auto border"
                                         style={isPopular ? {
@@ -165,6 +130,6 @@ export default function Pricing() {
                     </div>
                 )}
             </div>
-        </motion.section>
+        </section>
     );
 }

@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 const SHOWCASES = [
@@ -59,42 +59,27 @@ function ShowcaseRow({ showcase, index }) {
     });
 
     const isReversed = showcase.reverse;
-    
+
     const yParallax = useTransform(scrollYProgress, [0, 1], ["-20%", "20%"]);
     const opacityFade = useTransform(scrollYProgress, [0, 0.4], [0, 1]);
 
-    // 3D: Image panel rotates in from the side
-    const imageRotateY = useSpring(
-        useTransform(scrollYProgress, [0, 0.5], [isReversed ? -10 : 10, 0]),
-        { stiffness: 60, damping: 25 }
-    );
-    const imageZ = useSpring(
-        useTransform(scrollYProgress, [0, 0.5], [-80, 0]),
-        { stiffness: 60, damping: 25 }
-    );
-    // 3D: Copy side gets slight forward Z-depth
-    const copyZ = useSpring(
-        useTransform(scrollYProgress, [0, 0.5], [40, 0]),
-        { stiffness: 60, damping: 25 }
-    );
-
     return (
-        <motion.div 
-            ref={containerRef} 
-            style={{ opacity: opacityFade, transformStyle: 'preserve-3d' }}
+        <motion.div
+            ref={containerRef}
+            style={{ opacity: opacityFade }}
             className={`flex flex-col lg:flex-row items-center gap-16 lg:gap-24 ${isReversed ? 'lg:flex-row-reverse' : ''}`}
         >
-            
-            {/* Copy Side — slight forward depth */}
-            <motion.div className="flex-1 w-full" style={{ z: copyZ }}>
+
+            {/* Copy Side */}
+            <div className="flex-1 w-full">
                 <span className="text-[11px] font-bold tracking-widest text-[#FF5A1F] uppercase mb-6 block">
                     {showcase.eyebrow}
                 </span>
-                
+
                 <h2 className="text-4xl md:text-5xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
                     {showcase.title}
                 </h2>
-                
+
                 <p className="text-[#a1a1aa] text-lg leading-relaxed mb-8">
                     {showcase.description}
                 </p>
@@ -111,24 +96,21 @@ function ShowcaseRow({ showcase, index }) {
                 <button className="flex items-center gap-2 text-sm font-semibold text-white px-5 py-2.5 rounded-full transition-colors hover:bg-white/10 border border-white/10">
                     Learn more <ArrowRight className="w-4 h-4" />
                 </button>
-            </motion.div>
+            </div>
 
-            {/* Visual Side — rotates in from side perspective */}
-            <motion.div 
-                className="flex-1 w-full" 
-                style={{ rotateY: imageRotateY, z: imageZ, transformStyle: 'preserve-3d' }}
-            >
+            {/* Visual Side */}
+            <div className="flex-1 w-full">
                 {/* Container */}
-                <div 
+                <div
                     className="w-full aspect-[4/3] rounded-3xl relative overflow-hidden flex items-center justify-center shadow-2xl transition-transform duration-700 hover:scale-[1.02]"
                     style={{ backgroundColor: showcase.placeholderColor }}
                 >
                     {showcase.image ? (
                         <>
-                            <img 
-                                src={showcase.image} 
-                                alt={showcase.eyebrow} 
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-105" 
+                            <img
+                                src={showcase.image}
+                                alt={showcase.eyebrow}
+                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-105"
                             />
                             {/* Inner border/shadow to blend the image into the card nicely */}
                             <div className="absolute inset-0 border border-white/10 rounded-3xl pointer-events-none mix-blend-overlay" />
@@ -136,25 +118,25 @@ function ShowcaseRow({ showcase, index }) {
                     ) : (
                         <>
                             {/* Diagonal striped overlay for that technical blueprint feel */}
-                            <motion.div 
+                            <motion.div
                                 className="absolute -top-[50%] -bottom-[50%] -left-[50%] -right-[50%] opacity-10 mix-blend-overlay"
                                 style={{
                                     backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)',
                                     y: yParallax
                                 }}
                             />
-                            
+
                             {/* Inner glowing element */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
-                            
+
                             <span className="relative z-10 text-[10px] font-bold text-white/50 tracking-[0.2em] uppercase">
                                 {showcase.placeholderText}
                             </span>
                         </>
                     )}
                 </div>
-            </motion.div>
-            
+            </div>
+
         </motion.div>
     );
 }

@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 import { Infinity } from 'lucide-react';
 
@@ -56,12 +56,12 @@ const HailuoIcon = (props) => (
 );
 const FluxIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <circle cx="12" cy="6" r="2.5"/><circle cx="17.7" cy="10.1" r="2.5"/><circle cx="15.5" cy="16.9" r="2.5"/><circle cx="8.5" cy="16.9" r="2.5"/><circle cx="6.3" cy="10.1" r="2.5"/><circle cx="12" cy="12" r="1.5"/>
+    <circle cx="12" cy="6" r="2.5" /><circle cx="17.7" cy="10.1" r="2.5" /><circle cx="15.5" cy="16.9" r="2.5" /><circle cx="8.5" cy="16.9" r="2.5" /><circle cx="6.3" cy="10.1" r="2.5" /><circle cx="12" cy="12" r="1.5" />
   </svg>
 );
 const IdeogramIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="8" cy="12" r="2" fill="currentColor"/>
+    <rect x="2" y="7" width="20" height="10" rx="5" /><circle cx="8" cy="12" r="2" fill="currentColor" />
   </svg>
 );
 const RecraftIcon = (props) => (
@@ -81,134 +81,109 @@ const SunoIcon = (props) => (
 );
 
 const MODELS = [
-    // Row 1
-    { name: 'GPT-5', vendor: 'OpenAI', domain: 'openai.com', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
-    { name: 'Claude 4.5', vendor: 'Anthropic', domain: 'anthropic.com', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
-    { name: 'Gemini 2.5', vendor: 'Google', domain: 'google.com', tag: 'MULTIMODAL', icon: GeminiIcon, color: '#6366f1' },
-    { name: 'Grok 4', vendor: 'xAI', domain: 'x.ai', tag: 'REASONING', icon: GrokIcon, color: '#a1a1aa' },
-    { name: 'Llama 4', vendor: 'Meta', domain: 'meta.com', tag: 'OPEN', icon: Infinity, color: '#f59e0b' },
-    { name: 'Mistral L', vendor: 'Mistral', domain: 'mistral.ai', tag: 'OPEN', icon: MistralIcon, color: '#f59e0b' },
-    // Row 2
-    { name: 'Sora 2', vendor: 'OpenAI', domain: 'openai.com', tag: 'VIDEO', icon: OpenAIIcon, color: '#a1a1aa' },
-    { name: 'Veo 3', vendor: 'Google', domain: 'google.com', tag: 'VIDEO', icon: GoogleIcon, color: '#a1a1aa' },
-    { name: 'Kling 2.0', vendor: 'Kuaishou', domain: 'klingai.com', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
-    { name: 'Seedance', vendor: 'ByteDance', domain: 'bytedance.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
-    { name: 'Runway G4', vendor: 'Runway', domain: 'runwayml.com', tag: 'VIDEO', icon: RunwayIcon, color: '#a1a1aa' },
-    { name: 'Hailuo 02', vendor: 'MiniMax', domain: 'hailuo.ai', tag: 'VIDEO', icon: HailuoIcon, color: '#a1a1aa' },
-    // Row 3
-    { name: 'Flux 1.1', vendor: 'BFL', domain: 'blackforestlabs.ai', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
-    { name: 'Imagen 4', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
-    { name: 'Ideogram', vendor: 'Ideogram', domain: 'ideogram.ai', tag: 'IMAGE', icon: IdeogramIcon, color: '#a1a1aa' },
-    { name: 'Recraft V3', vendor: 'Recraft', domain: 'recraft.ai', tag: 'IMAGE', icon: RecraftIcon, color: '#a1a1aa' },
-    { name: 'ElevenLabs', vendor: 'ElevenLabs', domain: 'elevenlabs.io', tag: 'VOICE', icon: ElevenLabsIcon, color: '#a1a1aa' },
-    { name: 'Suno V4', vendor: 'Suno', domain: 'suno.com', tag: 'MUSIC', icon: SunoIcon, color: '#a1a1aa' },
+  // Row 1
+  { name: 'GPT-5', vendor: 'OpenAI', domain: 'openai.com', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
+  { name: 'Claude 4.5', vendor: 'Anthropic', domain: 'anthropic.com', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
+  { name: 'Gemini 2.5', vendor: 'Google', domain: 'google.com', tag: 'MULTIMODAL', icon: GeminiIcon, color: '#6366f1' },
+  { name: 'Grok 4', vendor: 'xAI', domain: 'x.ai', tag: 'REASONING', icon: GrokIcon, color: '#a1a1aa' },
+  { name: 'Llama 4', vendor: 'Meta', domain: 'meta.com', tag: 'OPEN', icon: Infinity, color: '#f59e0b' },
+  { name: 'Mistral L', vendor: 'Mistral', domain: 'mistral.ai', tag: 'OPEN', icon: MistralIcon, color: '#f59e0b' },
+  // Row 2
+  { name: 'Sora 2', vendor: 'OpenAI', domain: 'openai.com', tag: 'VIDEO', icon: OpenAIIcon, color: '#a1a1aa' },
+  { name: 'Veo 3', vendor: 'Google', domain: 'google.com', tag: 'VIDEO', icon: GoogleIcon, color: '#a1a1aa' },
+  { name: 'Kling 2.0', vendor: 'Kuaishou', domain: 'klingai.com', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
+  { name: 'Seedance', vendor: 'ByteDance', domain: 'bytedance.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
+  { name: 'Runway G4', vendor: 'Runway', domain: 'runwayml.com', tag: 'VIDEO', icon: RunwayIcon, color: '#a1a1aa' },
+  { name: 'Hailuo 02', vendor: 'MiniMax', domain: 'hailuo.ai', tag: 'VIDEO', icon: HailuoIcon, color: '#a1a1aa' },
+  // Row 3
+  { name: 'Flux 1.1', vendor: 'BFL', domain: 'blackforestlabs.ai', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
+  { name: 'Imagen 4', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
+  { name: 'Ideogram', vendor: 'Ideogram', domain: 'ideogram.ai', tag: 'IMAGE', icon: IdeogramIcon, color: '#a1a1aa' },
+  { name: 'Recraft V3', vendor: 'Recraft', domain: 'recraft.ai', tag: 'IMAGE', icon: RecraftIcon, color: '#a1a1aa' },
+  { name: 'ElevenLabs', vendor: 'ElevenLabs', domain: 'elevenlabs.io', tag: 'VOICE', icon: ElevenLabsIcon, color: '#a1a1aa' },
+  { name: 'Suno V4', vendor: 'Suno', domain: 'suno.com', tag: 'MUSIC', icon: SunoIcon, color: '#a1a1aa' },
 ];
 
 export default function IntelligenceLayer() {
-    const sectionRef = useRef(null);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
 
-    // 3D scroll-linked tilt for the whole section
-    const { scrollYProgress } = useScroll({
-        target: sectionRef,
-        offset: ["start end", "center center"]
-    });
-    const rotateX3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [5, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const z3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-100, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const scale3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [0.94, 1]),
-        { stiffness: 80, damping: 30 }
-    );
+  const itemVariants = {
+    hidden: { opacity: 0, scale: 0.95, y: 10 },
+    visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+  };
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05 }
-        }
-    };
+  return (
+    <section className="py-24 md:py-32 relative border-y border-white/5 overflow-hidden">
+      {/* Background pattern */}
+      <div className="absolute inset-0 z-0 opacity-[0.03]"
+        style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }}
+      />
 
-    const itemVariants = {
-        hidden: { opacity: 0, scale: 0.95, y: 10 },
-        visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
-    };
+      <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center">
 
-    return (
-        <motion.section 
-            ref={sectionRef}
-            className="py-24 md:py-32 relative border-y border-white/5 overflow-hidden section-3d"
-            style={{ rotateX: rotateX3D, z: z3D, scale: scale3D }}
+        {/* Header */}
+        <div className="text-center mb-16 max-w-3xl">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
+            Powered by every frontier model.<br />
+            <span className="italic" style={{ color: BRAND.primary }}>Not a wrapper. An orchestrator.</span>
+          </h2>
+          <p className="text-lg text-[#a1a1aa] leading-relaxed max-w-2xl mx-auto">
+            Mantram routes each task to the model that does it best — and switches as the frontier moves. You get the output. We handle the orchestration, fallback, and cost.
+          </p>
+        </div>
+
+        {/* Models Grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }}
+          className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10"
         >
-            {/* Background pattern */}
-            <div className="absolute inset-0 z-0 opacity-[0.03]" 
-                style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} 
-            />
-
-            <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10 flex flex-col items-center">
-                
-                {/* Header */}
-                <div className="text-center mb-16 max-w-3xl">
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif mb-6 leading-[1.1]">
-                        Powered by every frontier model.<br />
-                        <span className="italic" style={{ color: BRAND.primary }}>Not a wrapper. An orchestrator.</span>
-                    </h2>
-                    <p className="text-lg text-[#a1a1aa] leading-relaxed max-w-2xl mx-auto">
-                        Mantram routes each task to the model that does it best — and switches as the frontier moves. You get the output. We handle the orchestration, fallback, and cost.
-                    </p>
+          {MODELS.map((model, i) => (
+            <motion.div
+              key={i}
+              variants={itemVariants}
+              className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default"
+            >
+              <div className="flex justify-between items-start w-full">
+                <div className="w-7 h-7 bg-white/90 rounded-md flex items-center justify-center shadow-sm border border-white/20 group-hover:bg-white transition-colors overflow-hidden p-1">
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${model.domain}&sz=128`}
+                    alt={model.vendor}
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                  />
+                  <model.icon className="w-5 h-5 text-black hidden" strokeWidth={1.5} />
                 </div>
+                <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: model.color }}>
+                  {model.tag}
+                </span>
+              </div>
+              <div className="mt-auto">
+                <span className="block text-[15px] font-bold text-white mb-0.5 group-hover:text-[#FF5A1F] transition-colors">{model.name}</span>
+                <span className="block text-[11px] text-[#a1a1aa]">{model.vendor}</span>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
 
-                {/* Models Grid — staggered Z-depth */}
-                <motion.div 
-                    variants={containerVariants}
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, margin: "-50px" }}
-                    className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10 z-stagger"
-                    style={{ transformStyle: 'preserve-3d' }}
-                >
-                    {MODELS.map((model, i) => (
-                        <motion.div 
-                            key={i}
-                            variants={itemVariants}
-                            className="bg-[#121214] border border-white/5 rounded-2xl p-4 flex flex-col justify-between h-32 hover:bg-white/5 hover:border-white/20 transition-all group cursor-default hover-3d-lift"
-                        >
-                            <div className="flex justify-between items-start w-full">
-                                <div className="w-7 h-7 bg-white/90 rounded-md flex items-center justify-center shadow-sm border border-white/20 group-hover:bg-white transition-colors overflow-hidden p-1">
-                                    <img 
-                                        src={`https://www.google.com/s2/favicons?domain=${model.domain}&sz=128`} 
-                                        alt={model.vendor} 
-                                        className="w-full h-full object-contain"
-                                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
-                                    />
-                                    <model.icon className="w-5 h-5 text-black hidden" strokeWidth={1.5} />
-                                </div>
-                                <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: model.color }}>
-                                    {model.tag}
-                                </span>
-                            </div>
-                            <div className="mt-auto">
-                                <span className="block text-[15px] font-bold text-white mb-0.5 group-hover:text-[#FF5A1F] transition-colors">{model.name}</span>
-                                <span className="block text-[11px] text-[#a1a1aa]">{model.vendor}</span>
-                            </div>
-                        </motion.div>
-                    ))}
-                </motion.div>
+        {/* Bottom Pill */}
+        <div className="inline-flex items-center gap-3 bg-[#121214] border border-white/10 rounded-full py-3 px-6 shadow-xl relative overflow-hidden group">
+          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22c55e' }} />
+          <span className="text-sm font-medium text-[#a1a1aa] relative z-10">
+            Auto-routing engine picks the right model per task — and you can override anytime.
+          </span>
+        </div>
 
-                {/* Bottom Pill */}
-                <div className="inline-flex items-center gap-3 bg-[#121214] border border-white/10 rounded-full py-3 px-6 shadow-xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22c55e' }} />
-                    <span className="text-sm font-medium text-[#a1a1aa] relative z-10">
-                        Auto-routing engine picks the right model per task — and you can override anytime.
-                    </span>
-                </div>
-
-            </div>
-        </motion.section>
-    );
+      </div>
+    </section>
+  );
 }

@@ -1,6 +1,4 @@
-import { useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
 import { BRAND, STUDIOS } from '../../data/studios'
 
 /**
@@ -13,27 +11,8 @@ export default function Footer() {
     const distStudios = STUDIOS.filter(s => s.group === 'Distribute')
     const optStudios = STUDIOS.filter(s => s.group === 'Optimize')
 
-    const footerRef = useRef(null)
-    const { scrollYProgress } = useScroll({
-        target: footerRef,
-        offset: ["start end", "end end"]
-    })
-    const z3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-50, 0]),
-        { stiffness: 80, damping: 30 }
-    )
-    const opacity3D = useSpring(
-        useTransform(scrollYProgress, [0, 0.6], [0.7, 1]),
-        { stiffness: 80, damping: 30 }
-    )
-
     return (
-        <motion.footer 
-            ref={footerRef}
-            className="border-t pt-16 pb-10 section-3d" 
-            style={{ borderColor: 'rgba(255,255,255,0.06)', z: z3D, opacity: opacity3D }} 
-            role="contentinfo"
-        >
+        <footer className="border-t pt-16 pb-10" style={{ borderColor: 'rgba(255,255,255,0.06)' }} role="contentinfo">
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 <div className="grid md:grid-cols-7 gap-8 mb-12">
                     <div className="md:col-span-2">
@@ -56,10 +35,10 @@ export default function Footer() {
                         </div>
                     </div>
 
-                    <FooterLinkGroup title="Plan"       items={planStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
-                    <FooterLinkGroup title="Create"     items={createStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
+                    <FooterLinkGroup title="Plan" items={planStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
+                    <FooterLinkGroup title="Create" items={createStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
                     <FooterLinkGroup title="Distribute" items={distStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
-                    <FooterLinkGroup title="Optimize"   items={optStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
+                    <FooterLinkGroup title="Optimize" items={optStudios.map(s => ({ name: s.name, to: `/studio/${s.slug}` }))} />
                     <FooterLinkGroup
                         title="Resources"
                         items={[
@@ -83,7 +62,7 @@ export default function Footer() {
                     </div>
                 </div>
             </div>
-        </motion.footer>
+        </footer>
     )
 }
 

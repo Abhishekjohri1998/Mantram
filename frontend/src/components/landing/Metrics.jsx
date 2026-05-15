@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, useInView, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { BRAND } from '../../data/studios';
 
 const METRICS = [
@@ -12,7 +12,7 @@ const METRICS = [
 function AnimatedNumber({ textValue }) {
     const isNumberWithSuffix = textValue.match(/^([\d.]+)(.*)$/);
     if (!isNumberWithSuffix) return <span>{textValue}</span>;
-    
+
     const targetNum = parseFloat(isNumberWithSuffix[1]);
     const suffix = isNumberWithSuffix[2];
     const [display, setDisplay] = useState(0);
@@ -27,10 +27,10 @@ function AnimatedNumber({ textValue }) {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
                 const easeProgress = 1 - Math.pow(1 - progress, 4);
-                
+
                 const currentVal = targetNum * easeProgress;
                 setDisplay(Number.isInteger(targetNum) ? Math.round(currentVal) : currentVal.toFixed(1));
-                
+
                 if (progress < 1) {
                     window.requestAnimationFrame(step);
                 }
@@ -43,34 +43,10 @@ function AnimatedNumber({ textValue }) {
 }
 
 export default function Metrics() {
-    const sectionRef = useRef(null);
-
-    // 3D scroll-linked entrance — numbers fly in from Z-depth
-    const { scrollYProgress } = useScroll({
-        target: sectionRef,
-        offset: ["start end", "center center"]
-    });
-    const rotateX3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [6, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const z3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-120, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const scale3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [0.9, 1]),
-        { stiffness: 80, damping: 30 }
-    );
-
     return (
-        <motion.section 
-            ref={sectionRef}
-            className="py-24 md:py-32 relative bg-[#0b0b0c] section-3d"
-            style={{ rotateX: rotateX3D, z: z3D, scale: scale3D }}
-        >
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c]">
             <div className="max-w-7xl mx-auto px-4 md:px-6">
-                
+
                 {/* Section Header */}
                 <div className="flex flex-col items-center text-center mb-20">
                     <h2 className="text-4xl md:text-5xl lg:text-6xl tracking-tight text-white font-serif max-w-2xl">
@@ -82,20 +58,20 @@ export default function Metrics() {
                 </div>
 
                 {/* Metrics Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 relative" style={{ transformStyle: 'preserve-3d' }}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 relative">
                     {/* Divider Lines (Desktop) */}
                     <div className="hidden md:block absolute top-0 bottom-0 left-[25%] w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
                     <div className="hidden md:block absolute top-0 bottom-0 left-[50%] w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
                     <div className="hidden md:block absolute top-0 bottom-0 left-[75%] w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
 
                     {METRICS.map((metric, i) => (
-                        <motion.div 
-                            key={i} 
+                        <motion.div
+                            key={i}
                             className="flex flex-col items-start px-4"
-                            initial={{ opacity: 0, y: 20, z: -200 }}
-                            whileInView={{ opacity: 1, y: 0, z: 0 }}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-100px" }}
-                            transition={{ duration: 0.8, delay: i * 0.12, type: 'spring', stiffness: 60 }}
+                            transition={{ duration: 0.6, delay: i * 0.1 }}
                         >
                             <span className="text-5xl md:text-6xl font-serif mb-4" style={{ color: BRAND.primary }}>
                                 <AnimatedNumber textValue={metric.value} />
@@ -107,6 +83,6 @@ export default function Metrics() {
                 </div>
 
             </div>
-        </motion.section>
+        </section>
     );
 }

@@ -1,26 +1,11 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { ArrowRight } from 'lucide-react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion } from 'framer-motion';
 import useReveal from '../../hooks/useReveal';
 import { BRAND, STUDIOS, STUDIO_ICONS } from '../../data/studios';
 
 export default function StudiosShowcase() {
     const revealRef = useReveal();
-    const sectionRef = useRef(null);
-
-    // 3D scroll-linked tilt
-    const { scrollYProgress } = useScroll({
-        target: sectionRef,
-        offset: ["start end", "center center"]
-    });
-    const rotateX3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [5, 0]),
-        { stiffness: 80, damping: 30 }
-    );
-    const z3D = useSpring(
-        useTransform(scrollYProgress, [0, 1], [-100, 0]),
-        { stiffness: 80, damping: 30 }
-    );
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -36,13 +21,9 @@ export default function StudiosShowcase() {
     };
 
     return (
-        <motion.section 
-            ref={sectionRef}
-            className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 section-3d" 
-            style={{ rotateX: rotateX3D, z: z3D }}
-        >
-            <div ref={revealRef} className="max-w-7xl mx-auto px-4 md:px-6">
-                
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5" ref={revealRef}>
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
+
                 {/* Header Row */}
                 <div className="flex flex-col lg:flex-row justify-between items-start gap-12 mb-16">
                     <div>
@@ -61,25 +42,23 @@ export default function StudiosShowcase() {
                     </div>
                 </div>
 
-                {/* Grid — alternating Z-depths */}
-                <motion.div 
+                {/* Grid */}
+                <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-100px" }}
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 z-stagger"
-                    style={{ transformStyle: 'preserve-3d' }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                 >
                     {STUDIOS.map((studio, i) => (
-                        <motion.a 
+                        <motion.a
                             key={studio.slug}
                             variants={itemVariants}
                             href={`/studio/${studio.slug}`}
-                            className={`group bg-[#121214] border rounded-2xl p-6 flex flex-col justify-between hover:bg-white/5 transition-all min-h-[220px] hover-3d-lift ${
-                                i === 0 
-                                    ? 'border-[#FF4D00]' 
+                            className={`group bg-[#121214] border rounded-2xl p-6 flex flex-col justify-between hover:bg-white/5 transition-all min-h-[220px] ${i === 0
+                                    ? 'border-[#FF4D00]'
                                     : 'border-white/5 hover:border-white/20'
-                            }`}
+                                }`}
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div className="text-[#FF4D00]">
@@ -112,6 +91,6 @@ export default function StudiosShowcase() {
                 </motion.div>
 
             </div>
-        </motion.section>
+        </section>
     );
 }
