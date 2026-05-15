@@ -163,11 +163,18 @@ app.set('trust proxy', 1);
 const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log'];
 const BOT_SCAN_PATHS = [
     'wp-admin', 'wp-content', 'vendor', 'phpunit', '.env', '.git', '.ssh', '.ssl', '.well-known',
-    'boaform', 'shell', 'cgi-bin', 'autodiscover', 'config', '/admin/', 'sdk/weblanguage',
-    'pdown', 'web-language', 'scripts', 'docker-compose', 'artisan', 'sidekiq', 'phpinfo',
+    'boaform', 'shell', 'cgi-bin', 'autodiscover', 'sdk/weblanguage',
+    'pdown', 'web-language', 'docker-compose', 'artisan', 'sidekiq',
     'k8s/', 'node_modules/', 'portal/', 'old/', 'temp/', 'lib/', 'helper/',
-    'backup', 'database', 'credentials', 'secrets', 'debug', 'remote-sync', '.dockerfunc'
+    'backup', 'database', 'credentials', 'secrets', 'remote-sync', '.dockerfunc',
+    // NOTE: 'config', 'debug', 'scripts', '/admin/' removed — matched real API paths as substrings.
+    // e.g. 'config' falsely blocked /api/yt-studio-settings/channel-configs → 444.
+    // Use BOT_SCAN_SEGMENT_WORDS below for whole-segment matching instead.
 ];
+
+// These words must appear as a FULL path segment (e.g. /config/ or /debug/)
+// NOT as a substring (so /channel-configs/ is NOT blocked, but /config/ IS).
+const BOT_SCAN_SEGMENT_WORDS = ['config', 'debug', 'scripts', 'phpinfo'];
 
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
@@ -177,6 +184,7 @@ app.use((req, res, next) => {
     const isBotScan = (
         BOT_SCAN_EXTENSIONS.some(ext => path.endsWith(ext)) ||
         BOT_SCAN_PATHS.some(p => path.includes(p)) ||
+        BOT_SCAN_SEGMENT_WORDS.some(w => new RegExp('(^|/)' + w + '(/|$)').test(path)) ||
         /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.\~]*$/i.test(path) ||
         /~$/.test(path) ||
         /\/\/(index|test|db)\.\w+/.test(path)
