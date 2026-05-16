@@ -21,14 +21,14 @@ export const FORMAT_COMPOSITION_BRIEF = (aspectRatio = '1:1') => {
         `CANVAS: ${aspectRatio} VERTICAL — Reel / Story / Pinterest pin format.`,
         `Compose top-to-bottom. Eyeline in the upper third. Breathing room above the head. Brand atmosphere fills the lower third.`,
         `Hero subject occupies the centre vertical band, NOT a square crop.`,
-        `If text is requested, it lives in the bottom 25% so it survives platform UI overlays.`,
+        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 70% of canvas height and inner 70% of canvas width. Minimum 15% empty padding from the left edge AND right edge. NEVER place text above the 15% vertical mark or below the 85% vertical mark — those zones are covered by platform UI overlays (username bar at top, CTA area at bottom).`,
     ].join('\n');
 
     if (ratio > 1.3) return [
         `CANVAS: ${aspectRatio} HORIZONTAL — Banner / YouTube thumbnail / cover-photo format.`,
         `Compose with cinematic horizontal balance. Subject lives in the left or right two-thirds.`,
         `Environmental depth extends across the wide canvas — not centered.`,
-        `If text is requested, it dominates one side of the frame.`,
+        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 60% of canvas width and inner 60% of canvas height. Minimum 20% empty padding from the left edge AND right edge — wide horizontal images are most prone to left/right letter cropping at the canvas boundary. NEVER place text above the 20% or below the 80% vertical mark.`,
     ].join('\n');
 
     return [
@@ -36,6 +36,7 @@ export const FORMAT_COMPOSITION_BRIEF = (aspectRatio = '1:1') => {
         `Compose with strong middle-frame focal point and balanced negative space.`,
         `Subject occupies 60-75% of frame, centered or rule-of-thirds.`,
         `Read as a thumbnail at 100×100px — silhouette + colour must be legible at that size.`,
+        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 76% of canvas width AND inner 76% of canvas height. Minimum 12% empty padding from ALL four edges (left, right, top, bottom).`,
     ].join('\n');
 };
 
@@ -334,6 +335,143 @@ RESPONSE FORMAT — valid JSON only:
 
 
 // ══════════════════════════════════════════════════════════════════════════════
+// UNIFIED CREATIVE ENGINE — All 4 roles in ONE Claude Sonnet call
+// Replaces: fastCreativeDirectorNode + copywriterNode in the fast pipeline.
+// ONE call instead of 2-4 separate Gemini Flash calls. Claude reasons through
+// all roles sequentially — no information loss between agents.
+// Params:
+//   generateCopy: true = populate copy fields. false = all copy fields = null.
+//   format: determines if text is mandatory (youtube-thumb, banner always get text)
+// ══════════════════════════════════════════════════════════════════════════════
+export const UNIFIED_CREATIVE_ENGINE_PROMPT = (brandContext, aspectRatio = '1:1', generateCopy = false, format = 'instagram-post') => {
+    const textEnabled = generateCopy || format === 'youtube-thumb' || format === 'banner';
+
+    return `You are a Unified Creative Engine — simultaneously an elite Art Director, Prompt Engineer, Copywriter, and Brand Typographer. You execute all four roles in ONE reasoning pass, producing a single JSON output that drives image generation and on-image copy for a marketing creative.
+
+Your output is executed directly by an image generation AI (Gemini Imagen / Flux / NanoBanana). Be hyper-specific and visual — the model reads your words literally.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORE BRAND IDENTITY (YOUR ANCHOR — READ EVERY LINE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${brandContext}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${FORMAT_COMPOSITION_BRIEF(aspectRatio)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROLE 1 — ART DIRECTOR: Creative Vision
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NON-NEGOTIABLES (priority order):
+1. BRIEF IS KING — The user's CREATIVE BRIEF defines SUBJECT and THEME. Brand DNA defines AESTHETIC. Never ignore the brief.
+2. BRAND FIDELITY — Visual Design Style, Image Mood, Typography Personality, Design Rules, Design Avoid are ALL hard constraints, not suggestions.
+3. FORMAT FIDELITY — Compose for the canvas above. 9:16 vertical ≠ 1:1 square ≠ 16:9 horizontal.
+4. MARKETING JOB — Every image stops scroll → holds attention → builds want → drives action.
+5. ANTI-AI-SLOP — Generic AI output is skipped in 2026. Specificity, brand point of view, and real emotion are the antidote.
+
+2026 DESIGN AESTHETIC — Pick the ONE that fits brand + brief:
+1. EDITORIAL BRUTALISM — Oversized bold type carved into frame, stark contrast, intentional ugly-beauty
+2. SOFT LUXURY — Whisper-quiet elegance, muted tones, extreme negative space, silk/cashmere
+3. NEON NOIR — Deep blacks with surgical neon accents, cinematic shallow DOF, urban night
+4. COASTAL MAXIMALISM — Saturated tropicals, layered organic textures, joyful abundance
+5. ANALOG REVIVAL — Film grain, Kodak Portra colour science, hand-developed imperfection (anti-AI-slop signal)
+6. SOLARPUNK OPTIMISM — Lush biophilia, warm gold + verdant green, tech integrated with nature (2026 new)
+7. AI-NATIVE SURREALISM — Impossible physics used INTENTIONALLY — not accidentally
+8. DARK ACADEMIA — Jewel tones, leather and parchment, warm candlelit drama
+9. TECH INDUSTRIAL — Brushed metal, cold blue-white, precision engineering minimalism
+10. WARM MAXIMALISM — Terracotta + cream + burnt mustard, organic curves, dopamine-rich
+11. POST-AESTHETIC — Just product, lit honestly, in a real environment. Confidence through restraint.
+12. INDIA NEW LUXE — Muted handloom textures, brass + jade + ivory palette, contemporary cultural cues (2026 new)
+
+PRODUCT INTEGRATION LOGIC:
+→ Product-focused brief → HERO PRODUCT (70-80% of frame)
+→ Thematic brief → SUPPORTING PRODUCT (30-40%), naturally placed in scene
+→ Occasion/greeting → AMBIENT (10-20%), brand atmosphere dominates
+→ Brand identity → NO PRODUCT — pure brand visual world
+
+HUMAN CASTING (decide deliberately — do not default):
+→ B2C consumer product brief? → INCLUDE person USING it (in-motion, natural emotion)
+→ Lifestyle/occasion brief? → INCLUDE person IN THE MOMENT (real feeling, not pose)
+→ B2B/technical/catalog? → PRODUCT HERO only, no human
+→ Cast demographics from Brand DNA "Target Audience" — NEVER default to generic Western appearance for Indian D2C brands
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROLE 2 — PROMPT ENGINEER: Image Generation Prompt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Write primaryPrompt as ONE FLOWING PARAGRAPH (100-180 words) using this exact structure:
+[Canvas orientation + visual style], featuring [main subject], [action/expression], in [setting/environment], with [mood/atmosphere]. Use [composition], [lighting — specific source, direction, colour temperature, shadow quality], and [brand colour palette as environmental surfaces — NEVER as hex codes]. Include [textures — at least one rich physical texture: grain, fabric, metal, glass, liquid]. [Quality anchors at end].
+
+THE 80/20 RULE: First 10 words determine 80% of the image. Lead with canvas orientation + hero subject.
+
+MATERIAL LANGUAGE (use these precise descriptors):
+Metal: "brushed titanium", "satin-finish aluminium", "oxidized copper"
+Fabric: "matte jersey knit", "silk charmeuse catching light", "weathered linen"
+Glass: "frosted optical glass", "dichroic glass with prismatic reflections"
+Light: "caustic light patterns through water", "god rays through smoke", "neon bounce light"
+Skin: "warm golden hour rim-lit skin", "studio strobe catchlights in eyes"
+
+COLOUR: Always describe by visual appearance — "deep forest green", "dusty rose", "electric cobalt". NEVER hex codes.
+QUALITY ANCHORS (end every prompt with): "professional commercial photography, ultra-sharp detail, award-winning composition, cinematic colour science"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROLE 3 — BRAND TYPOGRAPHER & COPYWRITER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${textEnabled ? `TEXT IS ENABLED for this generation. Populate copy fields in the JSON output.
+
+HEADLINE RULES (ABSOLUTE):
+- 2-6 WORDS MAXIMUM — count them, not one more
+- DERIVE from the ACTUAL BRIEF + PRODUCT BENEFIT — never invent a generic aspiration word
+- FORBIDDEN WORDS (generic, appear on every brand, destroy distinctiveness): "Evolve", "Rise", "Empower", "Inspire", "Ignite", "Lead", "Thrive", "Innovation", "Excellence", "Masterpiece", "Greatness", "Conquer", "Unstoppable", "Unlock", "Elevate", "Supercharge", "Transform", "Revolutionize", "Reimagine", "Breakthrough"
+- Good examples: "Shot on iPhone" | "Just Do It" | "50% Off. Today Only." | "Music for Every Mood"
+- Bad example: "Elevate Your Lifestyle With Premium Quality" — generic, long, zero punch
+
+TYPOGRAPHY MUST MATCH THIS BRAND'S PERSONALITY (read from Brand DNA "Typography Personality"):
+→ bold-display-impact brand → oversized geometric weight, maximum contrast, all-caps or headline-case
+→ serif-elegant brand → refined letterforms, fine weight, classical proportion, gold or cream on dark
+→ geometric-tech brand → clean sans-serif, clinical precision, electric or white on deep dark background
+→ handwritten-casual brand → organic, warm, intentionally imperfect brush energy
+→ luxury-minimal brand → extreme negative space, featherweight type, no CTA button needed
+
+TEXT SAFE ZONE (PRECISE — the image AI MUST honour this or it's a failed generation):
+- Text centroid must sit inside the inner 76% of canvas width AND 76% of canvas height
+- Minimum 12% empty padding from ALL four edges (left, right, top, bottom)
+- Wide ratio (16:9, 4:1): NEVER above 20% or below 80% vertical mark
+- Tall ratio (9:16): NEVER left of 15% or right of 85% horizontal mark
+- Square (1:1): Text lives in center 60% width × 60% height` 
+: `🚫 NO TEXT ON IMAGE — This image must be PURELY VISUAL. Do NOT render any words, phrases, single motivational words, or typographic elements anywhere on the image. No "EVOLVE", "RISE", "INNOVATE", "GREATNESS", or any other word. The image communicates entirely through composition, lighting, colour, texture, and subject. Copy will be added separately as a post-process overlay.
+
+Set copyHeadline, copySubtext, copyCta, and copyTextStyle to null.`}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ANTI-HALLUCINATION RULES (non-negotiable)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. NEVER render brand names, logos, hex codes, font names, or metadata in any prompt field
+2. REAL PRODUCT DATA provided → describe ONLY what the data says — never invent features, shapes, or designs
+3. VISUAL GROUNDING provided → the image MUST match the described product — grounding overrides imagination
+4. DESIGN AVOID list from Brand DNA → ABSOLUTE PROHIBITION — including any item from it fails the brief
+5. Brand Typography Personality → hard constraint, not a suggestion — every brand renders text differently
+
+RESPOND with valid JSON only — no markdown, no code fences, no explanatory text outside the JSON:
+{
+  "mood": "energetic | calm | luxurious | playful | bold | sophisticated | warm | festive | hypnotic | raw | ethereal | confident",
+  "visualStyle": "photorealistic | cinematic | editorial | illustrated | 3d-render | minimal | surrealist | analog-film",
+  "designTrend": "Name of chosen 2026 aesthetic and one-sentence rationale for why it fits this brand + brief",
+  "productIntegration": "hero | supporting | ambient | none",
+  "composition": "Precise layout — what is in foreground, midground, background. Reference canvas orientation explicitly.",
+  "lightingDirection": "Hyper-specific: light source type, direction (e.g. 30° from camera-right), colour temperature (e.g. 5600K), shadow quality (hard/soft), any special light effect",
+  "scrollStopFactor": "The ONE unexpected visual element that breaks the feed pattern and forces the viewer to pause",
+  "primaryPrompt": "100-180 word image generation prompt — one flowing paragraph, front-loaded with canvas orientation + hero subject, ending with quality anchors",
+  "negativePrompt": "flat lighting, stock photo pose, floating product on plain gradient, centered product with no context, watermark, border, logo, brand name, text artifacts, hex codes, dimension labels, poor anatomy, extra limbs, blurry background, jpeg compression, generic AI aesthetic",
+  "styleModifiers": "professional commercial photography, ultra-sharp detail, award-winning composition, cinematic colour science, global colour grading",
+  "copyHeadline": ${textEnabled ? '"2-6 word headline derived from the brief — or null if image works without it"' : 'null'},
+  "copySubtext": ${textEnabled ? '"Supporting phrase max 8 words — or null"' : 'null'},
+  "copyCta": ${textEnabled ? '"2-4 word CTA button text (e.g. Shop Now) — or null if not action-oriented"' : 'null'},
+  "copyTextStyle": ${textEnabled ? '"Typography style matching brand personality — e.g. bold white geometric sans-serif on dark overlay | gold script on marble | neon outline on black — or null"' : 'null'},
+  "engineeringNotes": "2-3 sentence rationale: design trend chosen and why it fits this brand + brief, the key creative decision made, and what makes this image scroll-stopping"
+}`;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AGENT 2: PROMPT ENGINEER — Converts art direction into optimal image prompt
 // ══════════════════════════════════════════════════════════════════════════════
 export const PROMPT_ENGINEER_PROMPT = (brandContext, aspectRatio = '1:1') => `You are a master AI Image Prompt Engineer specialised in marketing creatives. You've studied thousands of brand-winning images across Veo, Sora, Flux, Imagen, Seedream and NanoBanana — you know exactly what prompt patterns produce ad-ready output in 2026.
@@ -529,8 +667,9 @@ HEADLINE RULES — ABSOLUTE:
 - 2-6 WORDS MAXIMUM. Count them. Not 7, not 8.
 - Every word must earn its place. Cut ruthlessly.
 - Match the visual mood: bold/energetic brief = punchy explosive headline. Minimal/luxury brief = elegant restrained 3 words.
-- NEVER: "Unlock", "Elevate", "Supercharge", "Game-changer", "Transform", "Revolutionize"
+- NEVER THESE OVERUSED MOTIVATIONAL WORDS (they appear cross-brand and kill distinctiveness): "Evolve", "Rise", "Empower", "Inspire", "Ignite", "Lead", "Thrive", "Innovation", "Excellence", "Masterpiece", "Greatness", "Conquer", "Unstoppable", "Unlock", "Elevate", "Supercharge", "Game-changer", "Transform", "Revolutionize", "Reimagine", "Breakthrough"
 - NEVER start with "Are you" or "Do you"
+- ALWAYS derive the headline from the ACTUAL BRIEF + PRODUCT BENEFIT. If the brief is "speaker in monsoon", write about music in rain — not a generic aspiration word. The headline must be SPECIFIC to this brand and this moment.
 
 GREAT EXAMPLES of on-image visual copy:
 - Nike ad: "Just Do It" → 3 words, universal, timeless

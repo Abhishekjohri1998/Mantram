@@ -17,6 +17,7 @@ import { getSignedUrlForPath } from '../../utils/s3.js';
 import {
     ART_DIRECTOR_PROMPT,
     FAST_CREATIVE_DIRECTOR_PROMPT,
+    UNIFIED_CREATIVE_ENGINE_PROMPT,
     PROMPT_ENGINEER_PROMPT,
     STYLE_CRITIC_PROMPT,
     VARIATION_PROMPT,
@@ -516,6 +517,7 @@ export async function artDirectorNode(state) {
         intel.visualDNA?.imageMood ? `BRAND IMAGE MOOD: ${intel.visualDNA.imageMood}` : '',
         intel.visualDNA?.photographyStyle ? `PHOTOGRAPHY DIRECTION: ${intel.visualDNA.photographyStyle}` : '',
         intel.primaryColors?.length > 0 ? `BRAND PRIMARY COLORS: ${intel.primaryColors.join(', ')} — these are the core anchors for the visual mood` : '',
+        intel.visualDNA?.typographyStyle ? `BRAND TYPOGRAPHY PERSONALITY (HARD CONSTRAINT — all text elements must match this, every brand has a unique type voice): ${intel.visualDNA.typographyStyle}` : '',
         intel.visualDNA?.designRules?.length > 0 ? `DESIGN RULES (must follow): ${intel.visualDNA.designRules.slice(0, 3).join('; ')}` : '',
         intel.visualDNA?.designAvoid?.length > 0 ? `AVOID: ${intel.visualDNA.designAvoid.slice(0, 3).join('; ')}` : '',
         state.references ? `REFERENCE NOTES: ${state.references}` : '',
@@ -532,10 +534,9 @@ export async function artDirectorNode(state) {
         state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
-    // ⚡ preferFast — Art Director output is structured JSON: Gemini 2.5 Flash handles well
-    // ⚡ PERF: maxTokens reduced from 4096→2048 — art direction JSON output is typically 500-800 tokens
-    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.7, 2048, { preferFast: true });
-    console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms`);
+    // Art Director: Claude Sonnet for deep brand-faithful creative reasoning
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.7, 3072, { provider: 'anthropic' });
+    console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms (Claude Sonnet)`);
 
     return {
         ...state,
@@ -728,10 +729,9 @@ export async function promptEngineerNode(state) {
         productGrounding,
     ].filter(Boolean).join('\n');
 
-    // ⚡ preferFast — Prompt engineering is technical transformation: Gemini sufficient
-    // ⚡ PERF: maxTokens reduced from 4096→2048 — prompt output is typically 400-600 tokens
-    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.5, 2048, { preferFast: true });
-    console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms`);
+    // Prompt Engineer: Claude Sonnet for precise, brand-faithful prompt construction
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.5, 3072, { provider: 'anthropic' });
+    console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms (Claude Sonnet)`);
 
     return {
         ...state,
@@ -938,9 +938,8 @@ export async function copywriterNode(state) {
         ? `${languageDirective}\n\n${COPYWRITER_PROMPT(resolvedBrandContext)}`
         : COPYWRITER_PROMPT(resolvedBrandContext);
 
-    // ⚡ preferFast — Copywriter produces structured JSON copy: Gemini 2.5 Flash handles well
-    // ⚡ PERF: maxTokens reduced from 8192→2048 — copy output is very short (headline + subtext + CTA)
-    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.75, 2048, { preferFast: true });
+    // Copywriter: Claude Sonnet for nuanced brand-voice copy that is specific to each brand
+    const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.75, 2048, { provider: 'anthropic' });
     console.log(`✍️  Copywriter result keys: ${Object.keys(result || {}).join(', ')}`);
     console.log(`✍️  Copywriter done in ${Date.now() - startMs}ms — headline: "${result.headline || '?'}" | subtext: "${result.subtext || 'none'}" | cta: "${result.ctaText || 'none'}"${result.error ? ` [PARSE ERROR: ${result.error}] RAW: ${result.raw?.substring(0, 200)}` : ''}`);
     if (result.ctaText) console.log(`✍️  Copywriter CTA: "${result.ctaText}"`);
@@ -961,7 +960,155 @@ export async function copywriterNode(state) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
+// UNIFIED CREATIVE ENGINE NODE — ONE Claude Sonnet call for all 4 roles
+// Replaces fastCreativeDirectorNode + copywriterNode in fast pipeline.
+// Art Direction + Prompt Engineering + Copy + Brand Typography in one chain.
+// ══════════════════════════════════════════════════════════════════════════════
+export async function unifiedCreativeEngineNode(state) {
+    console.log('⚡ Unified Creative Engine (Claude Sonnet) — one call for all creative roles...');
+    const startMs = Date.now();
+
+    const brandContext = state.brandContext || '<brand_bible>No brand data.</brand_bible>';
+    const intel = state.brandIntel || {};
+    const mp = state.matchedProduct;
+    const formatKey = state.format || 'instagram-post';
+    const FORMAT_INTELLIGENCE_LABELS = {
+        'youtube-thumb': 'YouTube Thumbnail (1280×720, 16:9)',
+        'instagram-post': 'Instagram Post (1080×1350, 4:5)',
+        'instagram-story': 'Instagram Story / Reel (1080×1920, 9:16)',
+        'facebook-ad': 'Facebook Ad (1080×1350, 4:5)',
+        'linkedin-post': 'LinkedIn Post (1200×1200, 1:1)',
+        'banner': 'Website Banner / Hero (1920×600, 3.2:1)',
+    };
+
+    // Product context (anti-hallucination)
+    const productContext = mp ? [
+        `\n⚠️ REAL PRODUCT DATA (DO NOT HALLUCINATE — use ONLY this info):`,
+        `PRODUCT NAME: ${mp.title}`,
+        mp.description ? `PRODUCT DESCRIPTION: ${mp.description}` : '',
+        mp.features?.length > 0 ? `KEY FEATURES: ${mp.features.join(', ')}` : '',
+        mp.category ? `CATEGORY: ${mp.category}` : '',
+        mp.images?.length > 0 ? `📸 REAL PRODUCT IMAGES PROVIDED AS REFERENCE — base creative direction on what you see in the images.` : '',
+    ].filter(Boolean).join('\n') : '';
+
+    // Occasion detection
+    const briefLower = (state.brief || '').toLowerCase();
+    const OCCASIONS = {
+        birthday: '🎂 BIRTHDAY — cake, balloons, confetti, party vibes',
+        holi: '🌈 HOLI — colorful powder, joy, vibrant color explosions',
+        diwali: '🪔 DIWALI — diyas, sparklers, rangoli, golden lights',
+        christmas: '🎄 CHRISTMAS — snow, gifts, decorations, cozy vibes',
+        'new year': '🎆 NEW YEAR — fireworks, celebration, midnight countdown',
+        valentine: '💕 VALENTINE — hearts, roses, romantic mood',
+        summer: '☀️ SUMMER — bright sunshine, outdoor, refreshing',
+        party: '🎉 PARTY — energetic, dance, lights, music',
+        eid: '🌙 EID — crescent moon, lanterns, celebration',
+        navratri: '🕺 NAVRATRI — garba, dandiya, vibrant colors',
+    };
+    let occasionHint = '';
+    for (const [key, desc] of Object.entries(OCCASIONS)) {
+        if (briefLower.includes(key)) {
+            occasionHint = `\n🎯 DETECTED OCCASION: ${desc}\n⚠️ THIS MUST BE THE VISUAL HERO. Brand/product integrates naturally into this celebration scene — NOT the other way around.\n`;
+            break;
+        }
+    }
+
+    // Visual Grounding section (MCoT)
+    const vgSection = state.visualGrounding ? [
+        `\n━━━ VISUAL GROUND TRUTH (from uploaded/matched product images — this OVERRIDES your imagination) ━━━`,
+        state.visualGrounding.productAnalysis ? `What the product ACTUALLY looks like: ${state.visualGrounding.productAnalysis}` : '',
+        state.visualGrounding.keyVisualFeatures?.length ? `Exact visual features: ${state.visualGrounding.keyVisualFeatures.join(' | ')}` : '',
+        state.visualGrounding.materialFinish ? `Material & Finish: ${state.visualGrounding.materialFinish}` : '',
+        state.visualGrounding.colorPalette?.length ? `Accurate product colours: ${state.visualGrounding.colorPalette.join(', ')}` : '',
+        state.visualGrounding.generationGuidance ? `GENERATION RULE: ${state.visualGrounding.generationGuidance}` : '',
+        state.visualGrounding.brandVisualWorld ? `Product's visual world: ${state.visualGrounding.brandVisualWorld}` : '',
+        state.visualGrounding.lightingSuggestion ? `Optimal lighting: ${state.visualGrounding.lightingSuggestion}` : '',
+        state.visualGrounding.environmentalAffinities?.length ? `Best environments for this product: ${state.visualGrounding.environmentalAffinities.join(' | ')}` : '',
+        state.visualGrounding.avoidList?.length ? `DO NOT: ${state.visualGrounding.avoidList.join('; ')}` : '',
+        `\n⚠️ CRITICAL: The primaryPrompt MUST accurately represent this product based on the visual analysis above.`
+    ].filter(Boolean).join('\n') : '';
+
+    // Market intel
+    const marketIntelSection = state.marketIntel ? [
+        `\n━━━ LIVE MARKET INTELLIGENCE ━━━`,
+        state.marketIntel.trendingTopics ? `Trending right now:\n${state.marketIntel.trendingTopics}` : '',
+        state.marketIntel.viralFormats ? `Viral creative formats: ${state.marketIntel.viralFormats}` : '',
+    ].filter(Boolean).join('\n') : '';
+
+    const userPrompt = [
+        `CREATIVE BRIEF: ${state.brief}`,
+        occasionHint,
+        `FORMAT: ${FORMAT_INTELLIGENCE_LABELS[formatKey] || formatKey}`,
+        `ASPECT RATIO: ${state.aspectRatio || '1:1'}`,
+        state.style ? `PREFERRED STYLE: ${state.style}` : '',
+        `IMAGE MODEL: ${state.imageModel || 'nanobanana-2'} — optimize prompt accordingly`,
+        '',
+        '--- BRAND VISUAL DNA (hard constraints) ---',
+        intel.visualDNA?.designStyle ? `Visual Design Style: ${intel.visualDNA.designStyle}` : '',
+        intel.visualDNA?.imageMood ? `Image Mood: ${intel.visualDNA.imageMood}` : '',
+        intel.visualDNA?.typographyStyle ? `Typography Personality (STRICT — each brand must look typographically unique): ${intel.visualDNA.typographyStyle}` : '',
+        intel.visualDNA?.photographyStyle ? `Photography Direction: ${intel.visualDNA.photographyStyle}` : '',
+        intel.primaryColors?.length > 0 ? `Brand Primary Colors: ${intel.primaryColors.join(', ')} — use as environmental surfaces and atmospheric hues` : '',
+        intel.visualDNA?.designRules?.length > 0 ? `Design Rules (must follow): ${intel.visualDNA.designRules.slice(0, 4).join('; ')}` : '',
+        intel.visualDNA?.designAvoid?.length > 0 ? `Design Avoid (NEVER do this): ${intel.visualDNA.designAvoid.slice(0, 4).join('; ')}` : '',
+        '',
+        vgSection,
+        productContext,
+        intel.brandType === 'product' && !mp ? `\n🧠 AGENTIC DECISION: No product was auto-matched. Decide: relate brief to a product category → pick from catalog at SUPPORTING level. Or if it's an occasion/greeting → brand-atmosphere visual, ambient product at most.` : '',
+        !mp && intel.productCandidates?.length > 0 ? `\nCATALOG (pick ONLY if genuinely relevant):\n${intel.productCandidates.map(c => `• ${c.title}${c.category ? ` [${c.category}]` : ''}${c.images?.length > 0 ? ' 📸' : ''}`).join('\n')}` : '',
+        marketIntelSection,
+        state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
+    ].filter(Boolean).join('\n');
+
+    // ONE Claude call for all 4 roles
+    const result = await agentUtils.callAgent(
+        UNIFIED_CREATIVE_ENGINE_PROMPT(brandContext, state.aspectRatio, !!state.generateCopy, formatKey),
+        userPrompt,
+        0.65,
+        3500,
+        { provider: 'anthropic', timeoutMs: 120_000 }
+    );
+    console.log(`⚡ Unified Creative Engine done in ${Date.now() - startMs}ms (Claude Sonnet) — trend: ${result.designTrend?.split(' ')[0] || '?'} | copy: ${result.copyHeadline || 'none'}`);
+
+    // Map result to state shape
+    const copyResult = (state.generateCopy || formatKey === 'youtube-thumb' || formatKey === 'banner') && result.copyHeadline
+        ? {
+            headline: result.copyHeadline,
+            subtext: result.copySubtext || null,
+            ctaText: result.copyCta || null,
+            textStyle: result.copyTextStyle || '',
+            designRationale: result.engineeringNotes || '',
+        }
+        : null;
+
+    return {
+        ...state,
+        artDirection: {
+            mood: result.mood,
+            visualStyle: result.visualStyle,
+            designTrend: result.designTrend,
+            productIntegration: result.productIntegration,
+            composition: result.composition,
+            lightingDirection: result.lightingDirection,
+            scrollStopFactor: result.scrollStopFactor,
+            suggestedHeadline: result.copyHeadline || null,
+            negativePrompt: result.negativePrompt,
+            engineeringNotes: result.engineeringNotes,
+        },
+        engineeredPrompt: {
+            primaryPrompt: result.primaryPrompt,
+            negativePrompt: result.negativePrompt,
+            styleModifiers: result.styleModifiers,
+            engineeringNotes: result.engineeringNotes,
+        },
+        copy: copyResult,
+        status: 'creative-direction',
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MCoT NODE: VISUAL GROUNDING — Analyze product/brand images BEFORE generation
+
 // Stage 1: The AI "sees" real images and produces a detailed visual rationale
 // that prevents product hallucination in downstream prompt engineering
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1229,10 +1376,15 @@ export async function runCreativePipeline(params) {
 
     if (mode === 'fast') {
         creativeVisionTask = (async () => {
-            emit('art-director', 'Creative Director crafting vision & prompt...', 'working');
-            const updatedState = await fastCreativeDirectorNode(state);
+            emit('art-director', 'Creative Engine crafting vision, prompt & copy...', 'working');
+            const updatedState = await unifiedCreativeEngineNode(state);
             state.artDirection = updatedState.artDirection;
             state.engineeredPrompt = updatedState.engineeredPrompt;
+            // In fast mode, copy comes from the unified node (not a separate copywriter call)
+            if (updatedState.copy) {
+                copyResult = updatedState.copy;
+                emit('copywriter', `Copy ready: "${copyResult.headline || ''}"`, 'done');
+            }
             emit('art-director', `Direction: ${state.artDirection?.mood || 'defined'}`, 'done',
                 state.artDirection?.designTrend || state.artDirection?.visualStyle || '');
         })();
@@ -1246,9 +1398,9 @@ export async function runCreativePipeline(params) {
     }
     nodePromises.push(creativeVisionTask);
 
-    // Promise 3: Copywriter (AI vs Custom) — ⚡ only included when generateCopy is true
+    // Promise 3: Copywriter — ONLY in quality mode (fast mode gets copy from unifiedCreativeEngineNode)
     let copyResult = null;
-    if (generateCopy) {
+    if (generateCopy && mode !== 'fast') {
         const copywriterPromise = (async () => {
             if (hasCustomCopy) {
                 copyResult = {
@@ -1350,30 +1502,34 @@ export async function runCreativePipeline(params) {
         emit('style-critic', 'Brand alignment verified', 'done');
     }
 
-    // ── STEP 3: Finalize Prompt with Brand DNA + MCoT Grounding + Copy Injection ──
-    state.finalPrompt = mode === 'fast' 
+    // ── STEP 3: Finalize Prompt — Visual Grounding FIRST, then main prompt, then copy ──
+    // Grounding is front-loaded so the image model reads WHAT to generate before HOW to style it.
+    const mainPrompt = mode === 'fast'
         ? (state.engineeredPrompt?.primaryPrompt || brief)
         : (state.styleCritique?.improvedPrompt || state.engineeredPrompt?.primaryPrompt || brief);
 
-
-    // Inject Visual Grounding rationale (MCoT Stage 2)
+    // Visual Grounding injected FIRST (not at end) — image model reads this before creative direction
     if (state.visualGrounding?.generationGuidance) {
         const vg = state.visualGrounding;
-        const groundingInjection = [
-            `\nVISUAL GROUNDING (from real product/brand photos):`,
-            vg.productAnalysis ? `Product: ${vg.productAnalysis}` : '',
-            vg.colorPalette?.length > 0 ? `Accurate colors: ${vg.colorPalette.join(', ')}` : '',
-            vg.materialFinish ? `Material: ${vg.materialFinish}` : '',
+        const groundingPrefix = [
+            `VISUAL GROUND TRUTH (from real product/brand photos — RESPECT THIS ABOVE ALL ELSE):`,
+            vg.productAnalysis ? `Product appearance: ${vg.productAnalysis}` : '',
+            vg.colorPalette?.length > 0 ? `Accurate product colours: ${vg.colorPalette.join(', ')}` : '',
+            vg.materialFinish ? `Material / finish: ${vg.materialFinish}` : '',
             vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
-            vg.avoidList?.length > 0 ? `DO NOT: ${vg.avoidList.join('; ')}` : '',
+            vg.avoidList?.length > 0 ? `DO NOT SHOW: ${vg.avoidList.join('; ')}` : '',
+            ``,
         ].filter(Boolean).join('\n');
-        state.finalPrompt = state.finalPrompt + '\n' + groundingInjection;
-        console.log(`🧠 MCoT: Visual grounding rationale injected into prompt`);
+        state.finalPrompt = groundingPrefix + mainPrompt;
+        console.log(`🧠 MCoT: Visual grounding injected at START of final prompt`);
+    } else {
+        state.finalPrompt = mainPrompt;
     }
 
     // Inject Copy Rendering instructions
     if (copyResult) {
-        const copyInjection = buildCopyInjection(copyResult, state.aspectRatio);
+        const brandTypographyStyle = state.brandIntel?.visualDNA?.typographyStyle || null;
+        const copyInjection = buildCopyInjection(copyResult, state.aspectRatio, brandTypographyStyle);
         if (copyInjection) {
             state.finalPrompt = state.finalPrompt + '\n\n' + copyInjection;
         }
@@ -1400,15 +1556,25 @@ export async function runCreativePipeline(params) {
 
 /**
  * Build copy injection text for the image prompt.
- * Instructs the AI model to render the headline and CTA as bold, readable text on the image.
+ * Instructs the image model to render headline text on the image, using brand-specific typography.
+ * @param {object} copy - Copy object with headline, subtext, ctaText, textStyle
+ * @param {string} aspectRatio - e.g. '1:1', '9:16', '16:9'
+ * @param {string|null} brandTypographyStyle - From Brand DNA visualDNA.typographyStyle
  */
-function buildCopyInjection(copy, aspectRatio = '1:1') {
+function buildCopyInjection(copy, aspectRatio = '1:1', brandTypographyStyle = null) {
     if (!copy?.headline) return '';
 
     const parts = [];
 
+    // Resolve typography style — brand-specific first, then copy.textStyle, then safe default
+    const typographyInstruction = brandTypographyStyle
+        ? `Use typography that matches this brand's personality: ${brandTypographyStyle}.`
+        : copy.textStyle
+            ? `TYPOGRAPHY STYLE: ${copy.textStyle}`
+            : `TYPOGRAPHY STYLE: bold, clean, high-contrast typography.`;
+
     // Primary headline — the dominant, LARGE text on the image
-    parts.push(`TEXT ON IMAGE — HEADLINE (PRIMARY TEXT): Render the text "${copy.headline}" as LARGE, BOLD, DOMINANT typography. This must be the most visually prominent text element on the image — the viewer reads this first.`);
+    parts.push(`TEXT ON IMAGE — HEADLINE (PRIMARY TEXT): Render the text "${copy.headline}" as LARGE, BOLD, DOMINANT typography. This must be the most visually prominent text element on the image — the viewer reads this first. ${typographyInstruction}`);
 
     // Supporting subtext — smaller, below headline
     if (copy.subtext) {
@@ -1420,24 +1586,21 @@ function buildCopyInjection(copy, aspectRatio = '1:1') {
         parts.push(`TEXT ON IMAGE — CTA BUTTON: Include a button, badge or pill element with the text "${copy.ctaText}" in a high-contrast accent color. Position at bottom-third of the image.`);
     }
 
-    // Typography style instruction
-    if (copy.textStyle) {
-        parts.push(`TYPOGRAPHY STYLE: ${copy.textStyle}`);
-    }
+    // Precise safe-zone rules per aspect ratio (replaces vague 'don't go to edges')
+    const [w, h] = (aspectRatio || '1:1').split(':').map(Number);
+    const ratio = (w || 1) / (h || 1);
+    const isWide = ratio > 1.6;  // 16:9, 4:1, 21:9
+    const isTall = ratio < 0.7;  // 9:16, 2:3, 4:5
 
-    // Add safe zone warning for wide aspect ratios (like 16:9) where image generators natively generate 2:1 and sharp crops vertically
-    const isWide = aspectRatio && (aspectRatio.includes('16:9') || aspectRatio.includes('21:9') || aspectRatio.includes('4:1') || aspectRatio.includes('8:1') || aspectRatio.includes('1920x'));
-    const isTall = aspectRatio && (aspectRatio.includes('9:16') || aspectRatio.includes('1:4') || aspectRatio.includes('1:8') || aspectRatio.includes('x1920'));
-    
     if (isWide) {
-        parts.push(`SAFE ZONE WARNING: Keep ALL text perfectly vertically centered. The top 25% and bottom 25% of the image will be severely cropped out. Do NOT place text near the top or bottom edges!`);
+        parts.push(`SAFE ZONE (CRITICAL — WIDE FORMAT ${aspectRatio}): Text centroid MUST sit between 20% and 80% of image height. Text centroid MUST sit between 20% and 80% of image width. Minimum 20% empty margin from all four edges. Wide-ratio images are MOST PRONE to vertical cropping — text above 20% height or below 80% height WILL be cropped. DO NOT place any text near top or bottom of image.`);
     } else if (isTall) {
-        parts.push(`SAFE ZONE WARNING: Keep ALL text perfectly horizontally centered. The left 25% and right 25% of the image will be severely cropped out. Do NOT place text near the side edges!`);
+        parts.push(`SAFE ZONE (CRITICAL — TALL FORMAT ${aspectRatio}): Text centroid MUST sit between 15% and 85% of image width. Text centroid MUST sit between 15% and 85% of image height. Minimum 15% empty margin from left edge AND right edge. Tall vertical images are MOST PRONE to horizontal side-cropping — keep all text within the central 70% of width.`);
     } else {
-        parts.push(`SAFE ZONE WARNING: Do not place text at the extreme edges. Keep text inside the central safe zone.`);
+        parts.push(`SAFE ZONE (CRITICAL — SQUARE/BALANCED FORMAT ${aspectRatio}): Text centroid MUST sit inside the inner 76% of canvas width AND inner 76% of canvas height. Minimum 12% empty padding from ALL four edges (left, right, top, bottom). Do NOT allow any letter or word to touch or cross the canvas boundary.`);
     }
 
-    parts.push(`HORIZONTAL PADDING WARNING: Do NOT place text hugging the absolute left or right edge of the frame. Leave at least 15% empty padding on the left and right sides to prevent the first and last letters from being physically cut off by the canvas boundary!`);
+    parts.push(`HORIZONTAL LETTER-CROP PREVENTION: Leave at least 15% empty horizontal padding on the left side AND right side. The first letter of the first word and last letter of the last word must NOT be near the canvas edge. This is the most common failure mode — prevent it explicitly.`);
 
     return `
 ═══ CRITICAL TEXT RENDERING INSTRUCTIONS ═══
