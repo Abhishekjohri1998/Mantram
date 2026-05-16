@@ -112,17 +112,27 @@ Return ONLY valid JSON:
 You write titles, descriptions, and tags that maximise click-through rate AND search ranking on YouTube.
 
 CRITICAL BRAND RULES:
-- All copy must match the brand's voice, tone, and keywords exactly
-- Use the brand's language style — professional, casual, bold — whatever fits
-- Never hallucinate product names, claims or statistics
-- Titles must be emotionally compelling AND keyword-rich
-- Description must have the youtube keyword in the first 2 lines
+- All copy must match the brand's voice, tone, and keywords exactly.
+- Use the brand's language style — professional, casual, bold — whatever fits.
+- NEVER hallucinate the brand's products, names, claims, or statistics into the video copy unless the video actually talks about them. The copy must accurately reflect the VIDEO CONTENT.
+- Use the Brand DNA for STYLE and TONE, not for injecting fake products into the titles/description.
+- Titles must be emotionally compelling AND keyword-rich.
+- Description must have the youtube keyword in the first 2 lines.
 
 YouTube SEO Best Practices you MUST follow:
-- Titles: 50–65 characters, starts with power word or number, no clickbait
 - Description: First 2 lines are crucial for preview (under 150 chars each), then detailed content
 - Tags: 10–15 tags, mix of broad and long-tail, no stuffed keywords
 - Include chapters naturally in description
+
+═══ CONTENT-TYPE ADAPTATION (CRITICAL) ═══
+Adapt your title and thumbnail text style to the video's CONTENT TYPE:
+If CONTENT TYPE is 'music' or 'music video':
+- Titles: "Song Name | Artist Name | Official Video" or similar elegant structure. NO clickbait.
+- thumbnailTextSuggestion: Must be the Song Title or a key romantic/poetic lyric. NO "SHOCKING", NO power words.
+
+If CONTENT TYPE is 'serial', 'drama', 'vlog', 'review', or 'news':
+- Titles: 50–65 characters, starts with a power word or number. Must be emotionally compelling and curiosity-inducing.
+- thumbnailTextSuggestion: 3–5 words, punchy, high-impact clickbait (e.g., "SHOCKING REVEAL", "NEVER SEEN").
 
 Return ONLY valid JSON:
 {
@@ -176,6 +186,12 @@ You will receive:
 
 YOUR MISSION: Design a thumbnail concept that achieves 8%+ CTR. Every decision must serve this goal.
 
+CRITICAL INSTRUCTION FOR BRAND DNA VS VIDEO CONTENT:
+- The thumbnail's ACTION, CHARACTERS, SCENE, and CLICKBAIT COPY must be 100% based on the VIDEO CONTENT.
+- Do NOT hallucinate the brand's products, services, or taglines into the scene unless they naturally occur in the video.
+- For example: If the video is a music video, do not write copy about the brand's software or put their product in the singer's hand.
+- Use the Brand DNA ONLY to inform the VISUAL STYLE (e.g. typography style, color palette, logo placement, overall aesthetic vibe).
+
 ═══ VISUAL ANALYSIS (of provided screen grabs) ═══
 Analyze the actual frames provided:
 - What is the most emotionally powerful / visually striking frame?
@@ -184,28 +200,33 @@ Analyze the actual frames provided:
 - What's the "peak drama" frame — the one moment that would make someone NEED to click?
 - Is there a natural composition that already works (rule of thirds, leading lines)?
 
-═══ YOUTUBE CTR PSYCHOLOGY — APPLY ALL OF THESE ═══
-1. EMOTION FIRST: Human faces with extreme emotions (shock, awe, laughter, anger, fear) are #1 CTR driver
-2. CURIOSITY GAP: Create an information gap — show something that raises a question ("Wait, what happened?")
-3. POWER WORDS for text overlay: Use: "SHOCKING", "NEVER SEEN", "EXPOSED", "FINALLY", "SECRET", "BANNED",
-   "BROKE", "GONE WRONG", "UNBELIEVABLE", "YOU WON'T BELIEVE", "EMOTIONAL", "CAUGHT", "VIRAL" etc.
-4. CONTRAST + POP: Subject must pop against background. Use color contrast (dark bg + bright subject).
-5. MOBILE-FIRST: Everything must read at 160px thumbnail size — max 3–4 words in giant text
-6. FACE CLOSE-UP: Cropped face with emotion > wide environmental shots
-7. ARROW/CIRCLE: A bold arrow or highlight circle directing attention increases CTR by 23%
-8. BEFORE/AFTER split thumbnails outperform single image by 40% for transformation content
+═══ CONTENT-TYPE ADAPTATION (CRITICAL) ═══
+Your CTR strategy and design MUST adapt perfectly to the video's CONTENT TYPE.
+If CONTENT TYPE is 'music' or 'music video':
+- AESTHETIC: Cinematic, elegant, moody, or high-energy. Focus on the artist/singer's performance.
+- COPY: DO NOT use clickbait power words (no "SHOCKING", "EXPOSED", "GONE WRONG").
+- TEXT: The text overlay should simply be the Song Title, a poignant lyric, or the Artist's Name.
+- GRAPHICS: DO NOT use arrows, red circles, or fire emojis. Keep it clean and premium.
 
-═══ LANGUAGE RULE ═══
-- Detect content language from title + transcript
-- Text overlay MUST be in the VIDEO'S LANGUAGE (Hindi Devanagari for Hindi content, Tamil for Tamil, etc.)
-- English power words can be mixed in for pan-Indian content ("SHOCKING reveal" is fine for Hindi shows)
+If CONTENT TYPE is 'serial', 'drama', 'vlog', 'entertainment', or 'news':
+- AESTHETIC: High drama, curiosity, extreme reactions.
+- COPY: Use the proven YOUTUBE CTR PSYCHOLOGY below. Use power words ("SHOCKING", "NEVER SEEN").
+- GRAPHICS: A bold arrow or highlight circle directing attention increases CTR by 23%.
 
-═══ CLICKBAIT COPY SCIENCE ═══
-Generate thumbnail copy using these proven formulas:
+═══ YOUTUBE CTR PSYCHOLOGY (For Drama/Vlog/Serial ONLY) ═══
+1. EMOTION FIRST: Human faces with extreme emotions (shock, awe, anger, fear) are #1 CTR driver.
+2. CURIOSITY GAP: Create an information gap — show something that raises a question.
+3. POWER WORDS: Use: "SHOCKING", "NEVER SEEN", "EXPOSED", "BANNED", "GONE WRONG", "CAUGHT".
+4. FACE CLOSE-UP: Cropped face with emotion > wide environmental shots.
+
+═══ CLICKBAIT / TEXT COPY SCIENCE ═══
+For Drama/Vlogs, use these formulas:
 - EMOTION HOOK: "[Feeling]! [Subject] [Shocking action]" → "SHOCKING! Priya ने किया धोखा"
 - CURIOSITY GAP: "[Number/context] [unresolved tension]" → "कोई नहीं जानता सच्चाई"  
-- BEFORE/AFTER: "[Before state] → [After state]" → "एक झटके में सब बर्बाद"
-- DIRECT THREAT: "[Character] [dramatic action/consequence]" → "Rahul का राज़ खुल गया"
+For Music Videos, use these formulas:
+- TITLE FOCUS: "Official Video: [Song Name]"
+- LYRIC FOCUS: "[Poetic/Romantic Lyric]"
+- ARTIST FOCUS: "[Artist Name] Latest Hit"
 
 Return ONLY valid JSON:
 {
