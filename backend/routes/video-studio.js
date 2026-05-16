@@ -42,7 +42,7 @@ import {
     ugcAvatarNode,
     ugcPromptBuilderNode,
 } from '../agents/videoStudio/nodes.js';
-import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration } from '../agents/videoStudio/falClient.js';
+import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration, getUnifiedGenerationStatus } from '../agents/videoStudio/falClient.js';
 import { submitAtlasCloudImageToVideo, submitAtlasCloudVideoExtend } from '../agents/videoStudio/atlasClient.js';
 import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, getHeyGenVideoStatus, generateVideoWithAudio, uploadAssetToHeyGen, createPhotoAvatar, getPhotoAvatarStatus, checkPhotoGenStatus, generateVideoAgent, generatePlacementPoses, generatePlacementVideo, registerWebhook, generateLooks, addMotion, listAvatarGroups, listAvatarLooks } from '../agents/videoStudio/heygenClient.js';
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
@@ -3595,7 +3595,12 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
             return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
 
-        const result = await pollAtlasCloudStatus(requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
 
         // Mirror completed videos to S3 (prevent provider URL expiry)
@@ -3803,7 +3808,12 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
 // ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollAtlasCloudStatus(req.params.requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': req.params.requestId }, { 'generation.requestId': req.params.requestId }, { 'generation.taskId': req.params.requestId }]
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, req.params.requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
 
         // 🛡️ SAFE MODE PIVOT: If Seedance blocked due to real person face detection,
         // automatically resubmit without the avatar image (product-only mode)
@@ -4271,8 +4281,12 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
         
-        const result = await pollAtlasCloudStatus(requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
 
+        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
 
         // Update VideoProject with latest status/videoUrl
@@ -4969,7 +4983,12 @@ router.get('/motion-graphics/status/:requestId', protect, async (req, res) => {
             return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
 
-        const result = await pollAtlasCloudStatus(requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.requestId': requestId }, { 'generation.taskId': requestId }, { 'generation.falRequestId': requestId }], user: req.user._id, studioMode: 'motion-graphics'
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
 
         const updatePayload = { 'generation.progress': result.progress || 0 };

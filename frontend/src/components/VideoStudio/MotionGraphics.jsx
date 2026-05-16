@@ -29,6 +29,7 @@ const PRESETS = [
 
 const RATIOS = ['9:16', '16:9', '1:1', '4:3']
 const DURATIONS = [5, 8, 10, 15]
+const RESOLUTIONS = ['480p', '720p', '1080p']
 const MODELS = [
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
     { value: 'seedance-2.0-fast', label: 'Seedance 2 Fast' },
@@ -184,6 +185,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
     const [ratio, setRatio] = useState('9:16')
     const [duration, setDuration] = useState(8)
     const [model, setModel] = useState('seedance-2.0')
+    const [resolution, setResolution] = useState('1080p')
     const [stage, setStage] = useState('idle') // idle | uploading | analyzing | prompting | generating | done | error
     const [analysis, setAnalysis] = useState(null)
     const [motionPrompt, setMotionPrompt] = useState('')
@@ -283,7 +285,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     styleId: style,
                     duration,
                     aspectRatio: ratio,
-                    resolution: '1080p',
+                    resolution,
                     model,
                 }),
             })
@@ -308,7 +310,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     styleId: style,
                     duration,
                     aspectRatio: ratio,
-                    resolution: '1080p',
+                    resolution,
                     model,
                 }),
             })
@@ -422,6 +424,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                             value={brief} onChange={e => setBrief(e.target.value)} disabled={busy} />
                     </div>
                     <CfgDrop value={ratio} onChange={setRatio} options={RATIOS} icon="aspect_ratio" />
+                    <CfgDrop value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="high_quality" />
                     <CfgDrop value={duration} onChange={v => setDuration(Number(v))}
                         options={DURATIONS.map(d => ({ value: d, label: `${d}s` }))} icon="timer" />
                     <CfgDrop value={model} onChange={setModel} options={MODELS} icon="smart_toy" />
