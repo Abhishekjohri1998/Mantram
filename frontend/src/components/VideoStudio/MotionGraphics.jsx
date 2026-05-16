@@ -199,24 +199,26 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
 
     const busy = ['analyzing', 'prompting', 'generating'].includes(stage)
 
-    // ── Upload images: read as base64 for local preview + S3 for backend ──
-    // Uses /api/media/upload (the real endpoint, accepts base64 imageData)
+    // ── Upload images directly to S3 via multipart upload ──
     const handleFiles = useCallback(async (files) => {
         const arr = Array.from(files).slice(0, 4)
         const newImgs = []
         for (const f of arr) {
+            // Local preview
             const reader = new FileReader()
             const dataUrl = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(f) })
+            
             try {
-                // POST base64 to /api/media/upload → returns permanent S3 URL
-                const d = await api('/media/upload', {
+                const form = new FormData()
+                form.append('file', f)
+                const d = await api('/media/image-reference', {
                     method: 'POST',
-                    body: JSON.stringify({ imageData: dataUrl, folder: 'motion-graphics' }),
+                    body: form,
                 })
                 newImgs.push({ url: d.url, preview: dataUrl, name: f.name })
-            } catch {
-                // Fallback: keep base64 — Gemini analyze accepts it inline; video gen will skip it
-                newImgs.push({ url: dataUrl, preview: dataUrl, name: f.name })
+            } catch (err) {
+                console.error('S3 upload failed:', err)
+                setError('Failed to upload image to S3. Please try again.')
             }
         }
         setImages(prev => [...prev, ...newImgs].slice(0, 4))
@@ -226,26 +228,6 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         e.preventDefault(); setDrag(false)
         handleFiles(e.dataTransfer.files)
     }, [handleFiles])
-
-    // ── Helper: ensure all image URLs are S3 http URLs (upload base64 ones first) ──
-    const ensureHttpUrls = async (imgs) => {
-        const result = []
-        for (const img of imgs) {
-            if (img.url.startsWith('http')) {
-                result.push(img.url)
-            } else if (img.url.startsWith('data:image/')) {
-                // base64 fallback — upload to S3 now
-                try {
-                    const d = await api('/media/upload', {
-                        method: 'POST',
-                        body: JSON.stringify({ imageData: img.url, folder: 'motion-graphics' }),
-                    })
-                    result.push(d.url)
-                } catch { /* skip — can't upload */ }
-            }
-        }
-        return result
-    }
 
     // ── Main pipeline ──
     const handleGenerate = async () => {
@@ -293,9 +275,9 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
             setError('Prompt generation failed: ' + e.message); setStage('error'); return
         }
 
-        // Stage 3: Ensure all images are S3 URLs (Seedance rejects base64)
+        // Stage 3: Generate video using S3 URLs
         setStage('generating'); setProgress(5)
-        const s3ImageUrls = await ensureHttpUrls(images)
+        const s3ImageUrls = images.map(i => i.url)
 
         try {
             const d = await api('/video-studio/motion-graphics/generate-video', {
@@ -322,15 +304,14 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
     const handleRegenerate = async () => {
         if (!editedPrompt.trim()) return
         setError(''); setVideoUrl(null); setProgress(5); setStage('generating')
-        // Ensure S3 URLs before submitting
-        const s3ImageUrls = await ensureHttpUrls(images)
+        
         try {
             const d = await api('/video-studio/motion-graphics/generate-video', {
                 method: 'POST',
                 body: JSON.stringify({
                     brandId: activeBrand?._id,
                     prompt: editedPrompt,
-                    imageUrls: s3ImageUrls,
+                    imageUrls: images.map(i => i.url),
                     styleId: style,
                     duration,
                     aspectRatio: ratio,
