@@ -1797,7 +1797,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     try {
         console.log(`🎨 Using: ${selectedModelId} (Vertex AI)...`);
         
-        const data = await generateImageWithVertex(parts, selectedModelId, temperature);
+        const data = await generateImageWithVertex(parts, selectedModelId, temperature, { aspectRatio, imageSize });
 
         const resParts = data.candidates?.[0]?.content?.parts || [];
         for (const part of resParts) {

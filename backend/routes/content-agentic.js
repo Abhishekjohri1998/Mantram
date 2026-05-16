@@ -1167,7 +1167,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
 
         let data;
         try {
-            data = await generateImageWithVertex(contentParts, modelId);
+            data = await generateImageWithVertex(contentParts, modelId, 0.4, { aspectRatio });
         } catch(e) {
             console.error(`❌ NanoBanana 2 error: ${e.message}`);
             return res.status(500).json({ success: false, error: `Image generation failed: ${e.message}` });

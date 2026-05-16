@@ -500,8 +500,18 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         const { prompt, size = '1024x1024', referenceImages = [], brandId } = req.body
         if (!prompt) return res.status(400).json({ error: 'Prompt is required' })
 
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
-        if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
+        // Derive aspect ratio from WxH size for Vertex AI imageConfig
+        const sizeToAR = (s) => {
+            const [w, h] = (s || '1024x1024').split('x').map(Number);
+            if (!w || !h || w === h) return '1:1';
+            const r = w / h;
+            if (r > 1.7) return '16:9';
+            if (r > 1.2) return '4:3';
+            if (r < 0.6) return '9:16';
+            if (r < 0.85) return '3:4';
+            return '1:1';
+        };
+        const canvasAR = sizeToAR(size);
 
         // ── MCoT: Visual Grounding (if brand context available) ──
         let mcotGrounding = null;
@@ -639,7 +649,7 @@ Make it look like it was produced by a world-class creative studio.`
 
         for (const modelId of models) {
             try {
-                const data = await generateImageWithVertex(parts, modelId);
+                const data = await generateImageWithVertex(parts, modelId, 0.4, { aspectRatio: canvasAR });
                 const resParts = data.candidates?.[0]?.content?.parts || []
                 for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
@@ -677,9 +687,6 @@ router.post('/ai-edit', protect, requireCredits('canvasGenerate'), async (req, r
     try {
         const { prompt, imageBase64, additionalImages = [] } = req.body
         if (!prompt || !imageBase64) return res.status(400).json({ error: 'Prompt and imageBase64 required' })
-
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
-        if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -875,10 +882,6 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
         const { prompt, imageBase64, maskBase64, replaceImageBase64 } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })
 
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
-        if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
-
-        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
         const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
         const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
 
@@ -933,10 +936,6 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
         const { imageBase64, action = 'remove', bgPrompt } = req.body
         if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' })
 
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY
-        if (!imageKey) return res.status(400).json({ error: 'GEMINI_API_KEY not configured' })
-
-        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
         const base64Data = imageBase64.includes('base64,') ? imageBase64.split('base64,')[1] : imageBase64
         const mimeType = imageBase64.startsWith('data:') ? imageBase64.split(';')[0].split(':')[1] : 'image/png'
 
