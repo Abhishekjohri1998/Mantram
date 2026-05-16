@@ -4717,7 +4717,7 @@ const MG_STYLE_PRESETS = {
     minimal:   { label: 'Minimal Clean',   emoji: '◻️', tempHint: 0.6, keywords: 'clean precise motion, breathing white space, geometric precision, subtle scale pulse, quiet confidence, restrained elegance' },
     cinematic: { label: 'Cinematic',       emoji: '🎥', tempHint: 0.8, keywords: 'filmic color grade, slow push-in, anamorphic lens flare, cinematic depth of field pull, dramatic lighting contrast, epic scale' },
     glitch:    { label: 'Glitch / Cyber',  emoji: '🌐', tempHint: 0.95,keywords: 'digital glitch distortion, RGB channel split, neon scan lines, cyber grid overlay, data corruption aesthetic, holographic flicker' },
-    3d:        { label: '3D Extrude',      emoji: '🎲', tempHint: 0.8, keywords: '3D extrusion reveal, volumetric depth, perspective rotation, ambient occlusion shadows, material sheen, studio three-point lighting' },
+    '3d':      { label: '3D Extrude',      emoji: '🎲', tempHint: 0.8, keywords: '3D extrusion reveal, volumetric depth, perspective rotation, ambient occlusion shadows, material sheen, studio three-point lighting' },
     custom:    { label: 'Custom Style',    emoji: '🎨', tempHint: 0.85, keywords: '' },
 };
 
