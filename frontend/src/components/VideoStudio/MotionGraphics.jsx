@@ -235,17 +235,13 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         if (images.length === 0) { setError('Upload at least one logo or image first'); return }
         setError(''); setVideoUrl(null); setProgress(0)
 
-        const brandName = activeBrand?.name || ''
-        // imageUrls for Gemini analysis — includes base64 (Gemini loads inline)
-        const imageUrlsAll = images.map(i => i.url)
-
         // Stage 1: Analyze with Gemini Vision
         setStage('analyzing')
         let assetAnalysis = analysis
         try {
             const d = await api('/video-studio/motion-graphics/analyze', {
                 method: 'POST',
-                body: JSON.stringify({ imageUrls: imageUrlsAll, brandName, userBrief: brief }),
+                body: JSON.stringify({ imageUrls: images.map(i => i.url), userBrief: brief }),
             })
             assetAnalysis = d.analysis
             setAnalysis(d.analysis)
@@ -264,7 +260,6 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     styleId: style,
                     customStyle,
                     userBrief: brief,
-                    brandName,
                     duration,
                 }),
             })
@@ -283,7 +278,6 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
             const d = await api('/video-studio/motion-graphics/generate-video', {
                 method: 'POST',
                 body: JSON.stringify({
-                    brandId: activeBrand?._id,
                     prompt: finalPrompt, // use AI prompt at generate time; user edits apply on Re-animate
                     imageUrls: s3ImageUrls,
                     styleId: style,
@@ -309,7 +303,6 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
             const d = await api('/video-studio/motion-graphics/generate-video', {
                 method: 'POST',
                 body: JSON.stringify({
-                    brandId: activeBrand?._id,
                     prompt: editedPrompt,
                     imageUrls: images.map(i => i.url),
                     styleId: style,

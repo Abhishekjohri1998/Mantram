@@ -4731,7 +4731,7 @@ router.get('/motion-graphics/presets', protect, async (req, res) => {
 // Gemini Vision: deep-read uploaded logo/slides for brand identity signals
 router.post('/motion-graphics/analyze', protect, async (req, res) => {
     try {
-        const { imageUrls, brandName, userBrief } = req.body;
+        const { imageUrls, userBrief } = req.body;
         if (!imageUrls || imageUrls.length === 0) {
             return res.status(400).json({ success: false, error: 'At least one image is required' });
         }
@@ -4757,7 +4757,6 @@ router.post('/motion-graphics/analyze', protect, async (req, res) => {
 
 Analyze the provided brand asset image(s) and return a precise JSON object that will be used to write a creative animation prompt.
 
-${brandName ? `BRAND NAME: ${brandName}` : ''}
 ${userBrief ? `USER DIRECTION: "${userBrief}"` : ''}
 IMAGES PROVIDED: ${labelsList.join(', ')}
 
@@ -4817,7 +4816,7 @@ Return ONLY valid JSON in this exact shape:
 // Claude claude-sonnet-4-6: Motion Graphic Designer writes the Seedance 2 animation prompt
 router.post('/motion-graphics/generate-prompt', protect, async (req, res) => {
     try {
-        const { analysis, styleId, customStyle, userBrief, brandName, duration = 8 } = req.body;
+        const { analysis, styleId, customStyle, userBrief, duration = 8 } = req.body;
         if (!analysis) return res.status(400).json({ success: false, error: 'Asset analysis is required' });
 
         const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -4859,7 +4858,6 @@ BRAND ASSET ANALYSIS:
 
 ANIMATION STYLE: ${styleName}
 STYLE DNA: ${styleKeywords}
-${brandName ? `BRAND: ${brandName}` : ''}
 ${userBrief ? `USER'S CREATIVE DIRECTION: "${userBrief}"` : ''}
 TARGET DURATION: ${duration} seconds
 OUTPUT FORMAT: Seedance 2 video generation (text-to-video / image-to-video)
