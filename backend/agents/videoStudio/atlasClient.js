@@ -324,6 +324,10 @@ async function submitAtlasCloudPayload(payload) {
         atlasPayload.audio = cdnAudio;
         atlasPayload.ref_audio = cdnAudio;
     }
+    
+    if (payload.input?.video_url) {
+        atlasPayload.video_url = payload.input.video_url;
+    }
 
     const rawImageUrls  = payload.input?.image_urls       || [];
     const rawRefImages  = payload.input?.reference_images || [];
@@ -752,30 +756,30 @@ export async function submitHappyHorseVideoGeneration({
 // ── Public: InfiniteTalk Audio-Driven Video Generation ────────────────────────
 
 export async function submitInfiniteTalkVideoGeneration({
-    prompt, imageUrl, refAudio, duration, resolution = '720p',
+    prompt, imageUrl, videoUrl, refAudio, duration, resolution = '720p',
 }) {
-    if (!imageUrl) throw new Error('InfiniteTalk requires a portrait image (imageUrl).');
+    if (!imageUrl && !videoUrl) throw new Error('InfiniteTalk requires either a portrait image (imageUrl) or a reference video (videoUrl).');
     if (!refAudio) throw new Error('InfiniteTalk requires an audio track (refAudio).');
 
-    console.log(`🗣️ [InfiniteTalk] submitVideoGeneration: imageUrl=yes | refAudio=yes`);
+    console.log(`🗣️ [InfiniteTalk] submitVideoGeneration: videoUrl=${videoUrl ? 'yes' : 'no'} | imageUrl=${imageUrl ? 'yes' : 'no'} | refAudio=yes`);
 
     const finalPrompt = truncatePrompt((prompt || '').replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim());
 
-    // Prepare image
-    const s3Url = await ensureS3Url(imageUrl, 'video-studio/infinitetalk');
-    const url = s3Url ? await ensureAssetCompatible(s3Url) : null;
-    if (!url) throw new Error('Failed to prepare image for InfiniteTalk');
-
-    const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15); // Wait, docs say up to 10 mins, but for studio limits we keep it to 15s
-
-    console.log(`🎯 [InfiniteTalk] model=atlascloud/infinitetalk | dur=${dur}s | res=${resolution}`);
-
     const taskInput = {
         prompt:         finalPrompt,
-        image_urls:     [url],
         audio_url:      refAudio,
-        duration:       dur,
+        duration:       Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15),
     };
+
+    if (videoUrl) {
+        taskInput.video_url = videoUrl;
+    } else if (imageUrl) {
+        // Prepare image
+        const s3Url = await ensureS3Url(imageUrl, 'video-studio/infinitetalk');
+        const url = s3Url ? await ensureAssetCompatible(s3Url) : null;
+        if (!url) throw new Error('Failed to prepare image for InfiniteTalk');
+        taskInput.image_urls = [url];
+    }
 
     const payload = { model: 'infinitetalk', task_type: 'atlascloud/infinitetalk', input: taskInput };
     const taskId  = await submitAtlasCloudPayload(payload);
