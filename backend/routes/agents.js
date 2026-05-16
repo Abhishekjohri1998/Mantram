@@ -1473,6 +1473,16 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
                 return res.status(200).json({ success: false, error: `${modelCfg.name} requires FAL_KEY to be configured. Please try NanoBanana 2 or NanoBanana Pro instead.` });
             }
 
+            // Fix any NaN credits before processing
+            try {
+                await User.updateMany(
+                    { 'credits': { $type: 'double', $eq: NaN } },
+                    { $set: { 'credits': 0 } }
+                );
+            } catch (err) {
+                console.warn('Failed to fix NaN credits:', err.message);
+            }
+
             // Warn user: fal.ai models don't support reference images
             const falWarnings = [];
             if (styleRef || characterRef) {
