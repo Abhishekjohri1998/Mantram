@@ -17,10 +17,10 @@ export const creativeTypes = [
     { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080\u00D71350', aspectRatio: '4:5' },
     { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200\u00D71200', aspectRatio: '1:1' },
     { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280\u00D7720', aspectRatio: '16:9' },
-    { id: 'banner', icon: 'web', label: 'Banner', size: '1920\u00D7600', aspectRatio: '16:9' },
+    { id: 'banner', icon: 'web', label: 'Banner', size: '1920\u00D7600', aspectRatio: '16:5', w: 1920, h: 600 },
     { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000\u00D73000', aspectRatio: '2:3', w: 2000, h: 3000 },
     { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920\u00D71080', aspectRatio: '16:9', w: 1920, h: 1080 },
-    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480\u00D73508', aspectRatio: '2:3', w: 2480, h: 3508 },
+    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480\u00D73508', aspectRatio: '5:7', w: 2480, h: 3508 },
     { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200\u00D71200', aspectRatio: '1:1', w: 1200, h: 1200 },
     { id: 'custom-size', icon: 'tune', label: 'Custom Size', size: 'Custom', aspectRatio: null },
 ]
