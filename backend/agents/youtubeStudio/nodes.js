@@ -899,139 +899,41 @@ Return ONLY a JSON object, no markdown:
 export async function characterPortraitNode({ analysis, video, brandContext }) {
     const characters   = analysis?.characters || [];
     const referenceUrl = video?.metadata?.thumbnailUrl || null;
-    const videoTitle   = video?.metadata?.title || 'YouTube video';
+    const ytId         = video?.videoId || (video?.youtubeUrl && video.youtubeUrl.split('v=')[1]);
 
     if (!characters.length) {
         console.log('ℹ️ [characterPortraitNode] No characters identified — skipping');
         return { characterPortraits: [] };
     }
 
-    console.log(`👤 [characterPortraitNode] Visual-grounded portraits for ${characters.length} character(s)`);
-    console.log(`   Reference URL: ${referenceUrl || 'none'}`);
+    console.log(`👤 [characterPortraitNode] Fetching visual screen grabs for ${characters.length} character(s)`);
 
-    const router = getRouter();
-
-    // ── Pre-load reference thumbnail once (shared across all portrait requests) ─
-    let referenceB64   = null;
-    let referenceMime  = 'image/jpeg';
-
-    if (referenceUrl) {
-        try {
-            const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(10000) });
-            if (imgRes.ok) {
-                const buf    = await imgRes.arrayBuffer();
-                referenceB64 = Buffer.from(buf).toString('base64');
-                referenceMime = imgRes.headers.get('content-type') || 'image/jpeg';
-                console.log(`   ✅ Reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB) — shared across portraits`);
-            }
-        } catch (err) {
-            console.warn(`   ⚠️ Could not load reference thumbnail: ${err.message}`);
+    const characterPortraits = characters.slice(0, 3).map((char) => {
+        let frameSeek = null;
+        if (char.firstAppearance) {
+            const parts = char.firstAppearance.split(':').map(Number);
+            frameSeek = parts.length === 3
+                ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                : parts[0] * 60 + (parts[1] || 0);
         }
-    }
 
-    // ── Step 1: Get visual descriptions for each character via Gemini Vision ──
-    // This uses the reference thumbnail to get precise visual details
-    let visualDescriptions = {};
-    if (referenceB64) {
-        try {
-            const descResult = await callMultimodalAgent(
-                `You are a character identification specialist.
-Given a YouTube video thumbnail, identify each visible person and describe their physical appearance in detail.
-For each person you can see, provide: hair color and style, approximate age, skin tone, clothing description, distinctive features.
-Return ONLY valid JSON:
-{
-  "characters": [
-    { "position": "left|center|right|foreground|background", "description": "detailed visual description" }
-  ]
-}`,
-                `Thumbnail from YouTube video: "${videoTitle}".
-The video has these characters: ${characters.map(c => `${c.label} (${c.role})`).join(', ')}.
-Describe each visible person's exact appearance so I can generate accurate portraits.`,
-                [`data:${referenceMime};base64,${referenceB64}`],
-                { temperature: 0.1, maxTokens: 1024 }
-            );
-            if (descResult?.characters) {
-                // Map descriptions by index to characters (ordered by screen position)
-                descResult.characters.forEach((desc, i) => {
-                    if (i < characters.length) {
-                        visualDescriptions[characters[i].label] = desc.description;
-                    }
-                });
-                console.log(`   ✅ Visual descriptions obtained for ${Object.keys(visualDescriptions).length} characters`);
-            }
-        } catch (err) {
-            console.warn(`   ⚠️ Visual description pass failed: ${err.message} — using label-only fallback`);
-        }
-    }
+        const portraitUrl = (ytId && frameSeek != null)
+            ? `https://img.youtube.com/vi_webp/${ytId}/${Math.max(1, Math.floor(frameSeek))}.webp`
+            : referenceUrl;
 
-    // ── Step 2: Generate portraits with visual grounding ──────────────────────
-    const portraits = await Promise.allSettled(
-        characters.slice(0, 3).map(async (char) => {
-
-            const visualDesc = visualDescriptions[char.label]
-                ? `Based on the reference image, this person has: ${visualDescriptions[char.label]}`
-                : `${char.label}, a ${char.role || 'presenter'} in this video.`;
-
-            // Hint about where in the frame the person appears
-            const positionHint = char.position
-                ? `They are typically positioned: ${char.position.replace(/-/g, ' ')}.`
-                : '';
-
-            const prompt = [
-                `Professional portrait photograph of a real person from YouTube video "${videoTitle}".`,
-                visualDesc,
-                positionHint,
-                referenceB64
-                    ? `IMPORTANT: Use the reference image provided. Reproduce EXACTLY this specific person's appearance.`
-                      + ` Do NOT invent or blend with a different person.`
-                    : '',
-                `Clean studio portrait style, professional lighting, sharp focus on this person's face.`,
-                `High quality, 1:1 square format, YouTube content creator headshot.`,
-                `Neutral or softly blurred background. No text or watermarks.`,
-            ].filter(Boolean).join(' ');
-
-            // Build imageParts with reference if available
-            const imageParts = referenceB64
-                ? [{
-                    inlineData: { data: referenceB64, mimeType: referenceMime },
-                    text: `Reference thumbnail: identify and portrait the "${char.label}" person shown here.`,
-                }]
-                : [];
-
-            try {
-                const result = await router.generateImage({
-                    prompt,
-                    aspectRatio: '1:1',
-                    imageParts,
-                });
-                // Persist portrait to S3 — no data: URIs or temporary provider URLs stored
-                const rawPortraitUrl = result.imageUrl || (typeof result === 'string' ? result : null);
-                const portraitUrl = rawPortraitUrl
-                    ? await persistToS3(rawPortraitUrl, `yt-studio/portraits`)
-                    : null;
-                console.log(`   ✅ Portrait generated and persisted for: ${char.label}`);
-                return {
-                    label:           char.label,
-                    role:            char.role,
-                    firstAppearance: char.firstAppearance,
-                    screenTimePct:   char.screenTimePct,
-                    visualDescription: visualDescriptions[char.label] || null,
-                    portraitUrl,
-                };
-            } catch (err) {
-                console.warn(`   ⚠️ Portrait failed for ${char.label}: ${err.message}`);
-                return { label: char.label, role: char.role, portraitUrl: null, error: err.message };
-            }
-        })
-    );
-
-
-    const characterPortraits = portraits
-        .filter(r => r.status === 'fulfilled')
-        .map(r => r.value);
+        console.log(`   ✅ Real character portrait mapped for: ${char.label}`);
+        return {
+            label:           char.label,
+            role:            char.role,
+            firstAppearance: char.firstAppearance,
+            screenTimePct:   char.screenTimePct,
+            visualDescription: char.visualDescription || null,
+            portraitUrl,
+        };
+    });
 
     const successCount = characterPortraits.filter(p => p.portraitUrl).length;
-    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits generated (visually grounded)`);
+    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits mapped from video frames`);
     return { characterPortraits };
 }
 

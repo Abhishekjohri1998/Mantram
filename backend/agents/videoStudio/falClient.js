@@ -404,7 +404,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
             try {
                 const result = await submitAtlasCloudVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: seedanceMode,
                     refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
@@ -426,7 +426,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         try {
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', qualityMode: seedanceMode,
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
@@ -438,7 +438,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'atlascloud' || provider === 'piapi') {
                 const result = await submitAtlasCloudVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: seedanceMode,
                     refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,

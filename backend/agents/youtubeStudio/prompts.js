@@ -44,7 +44,7 @@ Return ONLY valid JSON:
   "highlights": [
     { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string" }
   ],
-  "promoCuts": [
+  "promoCuts": [ // YOU MUST ALWAYS OUTPUT AT LEAST 2 PROMO CUTS EVEN IF THE VIDEO IS SHORT
     {
       "startTime": "MM:SS",
       "endTime": "MM:SS",

@@ -727,7 +727,7 @@ function ProjectDetail({ project, onRefresh }) {
 
             {/* ── Extracted Video Frames (visual grounding) ── */}
             {extractedFrames?.length > 0 && (
-                <Section title="Extracted Video Frames" icon="movie" defaultOpen={false}>
+                <Section title="Extracted Video Frames" icon="movie" defaultOpen={true}>
                     <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--sys-text-muted)' }}>
                         These real frames from your video were used as visual grounding for thumbnail generation
                     </p>
