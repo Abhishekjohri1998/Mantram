@@ -31,9 +31,9 @@ function buildSystemPrompt({ brandContext, preset, trendingContext, competitorCo
     const hasTrending = !!trendingContext;
     const hasCompetitor = !!competitorContext;
 
-    return `You are a professional ad director and Seedance 2.0 prompt engineer. Your job is to take a product brief and brand context and write ONE cinematic prompt that functions as directing instructions for an AI video model.
+    return `You are a master film director and screenwriter crafting a continuous, cinematic scene. Your job is to take a product brief and brand context and write ONE fluid, highly detailed narrative description that functions as directing instructions for an AI video model.
 
-You write exactly like a cinematographer writing a shot note — specific, physical, present tense, no interpretation, no emotion words. You describe only what the camera sees and the microphone hears.
+Focus on a seamless "series-like" story flow rather than disjointed, random camera cuts. Write a continuous, flowing narrative paragraph that gracefully moves through the action. Ensure there are no breaking flows. Describe the mood, atmosphere, character intent, and action, blending cinematic staging (camera tracking, lighting) seamlessly into the narrative. You describe what the camera sees, what the microphone hears, and the emotional resonance of the scene.
 
 TARGET MODEL: Seedance 2.0
 DURATION: ${duration}s | FORMAT: ${format}
@@ -261,23 +261,23 @@ ${isNonEnglish ? `Example (${lang}): DIALOGUE [excited]: "[write this in ${lang}
         return 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n';
     }
 })()}
-${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy — e.g. the avatar struggles to hold a giant version of the product, the product magically floats away, or the avatar looks shocked as the product unexpectedly appears. Make it absurd and funny. Use the same shot notation below.\n\n` : ''}CRITICAL: MINIMUM SHOT COUNT AND DETAIL REQUIREMENTS:
-- For ${duration}s video: write AT LEAST ${Math.max(Math.ceil(duration / 1.5), 4)} SHOT entries (e.g. a 5s video needs minimum 4 shots, 8s needs 6, 10s needs 7, 15s needs 10)
-- Each SHOT description MUST be at least 40 words. For EACH shot describe ALL of the following:
-  1. CAMERA: exact angle, focal length (e.g. "85mm telephoto"), movement type and speed (e.g. "slow dolly-in at 0.5m/s")
-  2. SUBJECT: facial micro-expression, eye direction, lip position, hand placement, body posture shift
-  3. PRODUCT: exact position in frame, how light interacts with surface, label orientation, size relative to hands
-  4. ENVIRONMENT: what's visible in background, any ambient movement (curtains, steam, hair, particles)
-  5. LIGHTING: direction, quality (soft/hard), color temperature, any shifts or flickers
-- Your TOTAL output MUST be extremely detailed, with no maximum character limit. Feel free to write up to 50,000 characters if required to describe the scene perfectly. If you write a short summary, you have FAILED.
-- Do NOT summarize multiple shots into one. Every 1-2 second window gets its own SHOT entry.
+${settings?.hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product (@image2 if avatar is used, else @image1) MUST be the source of comedy. Make it absurd and funny, but weave it naturally into the continuous narrative.\n\n` : ''}CRITICAL: NARRATIVE FLOW AND DETAIL REQUIREMENTS:
+- Your task is to write a single, continuous, highly detailed narrative scene that runs for the full ${duration}s video duration.
+- DO NOT break the scene into mechanical "SHOT 1", "SHOT 2" fragments. This causes the AI video model to create random camera movements and broken flows.
+- Instead, write a fluid, series-style description that seamlessly transitions camera movements and actions without jarring cuts.
+- The camera should float, track, or pan smoothly through the scene, maintaining visual consistency and a continuous story flow.
+- Describe ALL of the following seamlessly within your narrative:
+  1. CAMERA: exact angle, focal length, continuous movement type and speed.
+  2. SUBJECT: facial micro-expression, eye direction, lip position, hand placement, body posture shift, and emotional intent.
+  3. PRODUCT: exact position in frame, how light interacts with surface, label orientation, size relative to hands.
+  4. ENVIRONMENT: what's visible in background, any ambient movement (curtains, steam, hair, particles).
+  5. LIGHTING: direction, quality (soft/hard), color temperature, any shifts.
+- Your TOTAL output MUST be extremely detailed, acting as a complete director's treatment for the scene. Do NOT write a short summary.
 
-SHOT 1 [00:00 - 00:01]: [Shot size + focal length e.g. "Medium close-up at 50mm"] / [Camera move e.g. "Slow push-in with 0.5° clockwise rotation"] / [Detailed avatar action: facial micro-expression, hand gesture, product interaction, body shift. At least 30 words describing exactly what happens in this time window.]
-SHOT 2 [00:01 - 00:03]: [Shot size + focal length] / [Camera move] / [Detailed action with product interaction]
-SHOT 3 [00:03 - 00:04]: [Shot size + focal length] / [Camera move] / [Action]
-[Continue — strictly define shots WITH TIMELINE MARKERS until reaching the total duration (${settings?.duration || 8}s). YOU MUST USE THIS EXACT "SHOT N [MM:SS - MM:SS]:" FORMAT. DO NOT WRITE A PLAIN PARAGRAPH.]
+SCENE NARRATIVE:
+[Write the full, unbroken story description here in 1-2 massive paragraphs. Blend the camera directions naturally into the prose (e.g., "The camera slowly pushes in on the model as she..."). Focus on a high-end cinematic, series-like aesthetic. Flesh out EVERY action and movement to create a comprehensive prompt. Every word earns its place by describing the physical reality and emotional weight of the scene.]
 
-VIVID AND HIGHLY DETAILED. Describe the scene frame by frame with rich, explicit visual details. For EACH shot, describe: exact camera position and movement, the subject's face (micro-expressions, gaze direction, lip position), hands (what they touch, how they move), body posture changes, product placement and how light interacts with it, background element shifts. Do NOT write a short summary — flesh out EVERY action and camera movement to create a comprehensive cinematic prompt. No poetic padding. Every word earns its place by describing something the camera sees or the microphone hears. Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth movements. Generate video without subtitles."`;
+Last line of the prompt MUST be exactly: "Maintain visual consistency throughout. Ensure natural smooth continuous movements without jarring cuts. Generate video without subtitles."`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +497,7 @@ export async function runQAdsAgent({
     if (issues.length > 0) {
         const wordCount = variants[0]?.prompt?.split(/\s+/).length || 0;
         console.warn(`[Q-Ads Agent] Validation issues found: ${issues.join('; ')}. Retrying once...`);
-        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED.\nIssues found: ${issues.join('; ')}.\nYour previous output was only ${wordCount} words — this is UNACCEPTABLE.\nYou MUST write an extremely detailed full SHOT-by-SHOT breakdown covering every 1-2 second window of the ${settings?.duration || 8}s video, with NO maximum character limit.\nEach SHOT must describe camera angle, movement, subject action, product interaction, and lighting in vivid detail.\nReturn the output labeled Variant A. No other text.`;
+        const retrySystem = systemPrompt + `\n\nPREVIOUS OUTPUT WAS REJECTED.\nIssues found: ${issues.join('; ')}.\nYour previous output was only ${wordCount} words — this is UNACCEPTABLE.\nYou MUST write an extremely detailed continuous narrative scene covering the full ${settings?.duration || 8}s video duration, with NO maximum character limit.\nEnsure the narrative flows seamlessly and describes camera angle, movement, subject action, product interaction, and lighting in vivid detail without jarring cuts.\nReturn the output labeled Variant A. No other text.`;
         try {
             rawOutput = await callMultimodalAgent(
                 retrySystem,
