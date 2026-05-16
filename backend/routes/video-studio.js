@@ -6959,14 +6959,16 @@ router.get('/long-form/status/:jobId', protect, async (req, res) => {
                     'generation.videoUrl': status.videoUrl,
                     'generation.progress': 100,
                     'generation.status': 'COMPLETED',
+                    'generation.voiceoverStatus': 'done',
                     finalVideoUrl: status.videoUrl,
                 },
                 { returnDocument: 'after' }
             ).catch(() => null);
 
             // 🎤 Trigger async voiceover pipeline for completed videos
-            if (updatedProject && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
-                console.log(`🎤 [TTS] Triggering async voiceover pipeline for long-form project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+            // 🛑 SKIP for long-form because it already has per-scene TTS & lip-sync baked in
+            if (updatedProject && updatedProject.studioMode !== 'long-form' && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
+                console.log(`🎤 [TTS] Triggering async voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                 addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
             }
         }

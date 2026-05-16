@@ -48,7 +48,7 @@ const OPENAI_VOICES = {
 
 // Models that support refAudio for native lip-sync
 // HappyHorse 1.0 supports audio_url via Atlas Cloud for audio-driven generation
-const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'kling-3.0', 'kling-3.0-o', 'happyhorse-1.0']);
+const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0']);
 
 // ── Background Music Presets ─────────────────────────────────────────────────
 // Royalty-free ambient music URLs (stored in S3 or public CDN)
@@ -461,6 +461,7 @@ async function runPipeline(jobId, params) {
                     'generation.videoUrl': videoUrl,
                     'generation.progress': 100,
                     'generation.status': 'COMPLETED',
+                    'generation.voiceoverStatus': 'done',
                 },
                 { returnDocument: 'after' }
             );
