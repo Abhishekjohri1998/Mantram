@@ -114,6 +114,11 @@ async function ensureAssetCompatible(imageUrl) {
         const res = await fetch(imageUrl);
         const buffer = Buffer.from(await res.arrayBuffer());
         const contentType = res.headers.get('content-type') || '';
+        
+        if (contentType.startsWith('audio/')) {
+            return imageUrl; // Audio doesn't need image resizing/conversion
+        }
+        
         const meta = await sharp(buffer).metadata();
 
         const UNSUPPORTED_FORMATS = ['avif', 'tiff', 'svg', 'heic', 'heif'];
@@ -165,6 +170,12 @@ async function uploadMediaToAtlasCDN(imageUrl) {
             finalBuffer = await sharp(Buffer.from(arrayBuffer)).jpeg({ quality: 90 }).toBuffer();
             finalType = 'image/jpeg';
             extension = 'jpg';
+        } else if (contentType.startsWith('audio/')) {
+            // Support audio uploads for audio-driven video models like InfiniteTalk
+            finalBuffer = Buffer.from(arrayBuffer);
+            finalType = contentType;
+            extension = contentType.includes('wav') ? 'wav' : 'mp3';
+            console.log(`🔊 [Atlas CDN] Processing audio upload: ${extension}`);
         } else {
             finalBuffer = Buffer.from(arrayBuffer);
             finalType = contentType;
@@ -307,7 +318,11 @@ async function submitAtlasCloudPayload(payload) {
     };
 
     if (payload.input?.audio_url) {
-        atlasPayload.audio_url = payload.input.audio_url;
+        console.log(`🔊 [Atlas] Uploading audio track to Atlas CDN...`);
+        const cdnAudio = await uploadMediaToAtlasCDN(payload.input.audio_url);
+        atlasPayload.audio_url = cdnAudio;
+        atlasPayload.audio = cdnAudio;
+        atlasPayload.ref_audio = cdnAudio;
     }
 
     const rawImageUrls  = payload.input?.image_urls       || [];
@@ -340,6 +355,9 @@ async function submitAtlasCloudPayload(payload) {
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
             if (uploaded) {
                 atlasPayload.image = uploaded; // Both I2V and InfiniteTalk use 'image'
+                if (isInfiniteTalk) {
+                    atlasPayload.image_url = uploaded; // Just in case it expects image_url
+                }
             }
         }
     }
