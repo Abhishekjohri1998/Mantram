@@ -1,13 +1,26 @@
 /**
  * Shopify Service
  * Handles Shopify OAuth, product fetch, and sync operations.
- * Uses Shopify Storefront/Admin REST API.
+ * Uses the official @shopify/shopify-api library.
  */
 
-const SHOPIFY_API_VERSION = '2025-01';
+import '@shopify/shopify-api/adapters/node';
+import { shopifyApi, ApiVersion, Session } from '@shopify/shopify-api';
+import config from '../config/env.js';
+
+// Initialize the official Shopify API client
+export const shopify = shopifyApi({
+    apiKey: config.shopify.apiKey || process.env.SHOPIFY_API_KEY || 'dummy',
+    apiSecretKey: config.shopify.apiSecret || process.env.SHOPIFY_API_SECRET || 'dummy',
+    scopes: (config.shopify.scope || 'read_products,read_orders,read_customers,read_inventory').split(','),
+    hostName: (process.env.BACKEND_URL || 'localhost:3001').replace(/^https?:\/\//, ''),
+    hostScheme: (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith('https')) ? 'https' : 'http',
+    apiVersion: ApiVersion.January25,
+    isEmbeddedApp: false, // Set to true if rendering within Shopify Admin iframe
+});
 
 /**
- * Build Shopify OAuth authorization URL
+ * Build Shopify OAuth authorization URL (Manual fallback)
  */
 export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products,read_orders,read_customers,read_inventory') {
     const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -31,74 +44,111 @@ export async function exchangeShopifyToken(shopDomain, clientId, clientSecret, c
     return await response.json(); // { access_token, scope }
 }
 
-// ── Generic paginated fetcher ──
-async function paginatedFetch(accessToken, url) {
-    const all = [];
-    while (url) {
-        const response = await fetch(url, {
-            headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-        });
-        if (!response.ok) throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
-        const data = await response.json();
-        const key = Object.keys(data).find(k => Array.isArray(data[k]));
-        if (key) all.push(...data[key]);
-        const linkHeader = response.headers.get('link');
-        url = null;
-        if (linkHeader) {
-            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-            if (nextMatch) url = nextMatch[1];
-        }
-    }
-    return all;
+/**
+ * Create an offline session object for the REST client
+ */
+function getShopifySession(shopDomain, accessToken) {
+    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return new Session({
+        id: `offline_${cleanDomain}`,
+        shop: cleanDomain,
+        state: 'offline',
+        isOnline: false,
+        accessToken,
+    });
 }
 
 /**
- * Fetch all products from a Shopify store (paginated)
+ * Fetch all products from a Shopify store using official REST client (paginated)
  */
 export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=${limit}&status=active`;
-    const products = await paginatedFetch(accessToken, url);
-    console.log(`  📦 Fetched ${products.length} products from Shopify`);
-    return products;
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
+    const allProducts = [];
+    let response = await client.get({
+        path: 'products',
+        query: { limit, status: 'active' }
+    });
+    
+    if (response.body?.products) allProducts.push(...response.body.products);
+    
+    while (response.pageInfo?.nextPage) {
+        response = await client.get(response.pageInfo.nextPage);
+        if (response.body?.products) allProducts.push(...response.body.products);
+    }
+    
+    console.log(`  📦 Fetched ${allProducts.length} products from Shopify`);
+    return allProducts;
 }
 
 /**
- * Fetch orders from Shopify (paginated, last N days)
+ * Fetch orders from Shopify using official REST client (paginated)
  */
 export async function fetchShopifyOrders(accessToken, shopDomain, { days = 60, status = 'any', limit = 250 } = {}) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/orders.json?limit=${limit}&status=${status}&created_at_min=${since}&order=created_at+desc`;
-    const orders = await paginatedFetch(accessToken, url);
-    console.log(`  🧾 Fetched ${orders.length} orders from Shopify (last ${days} days)`);
-    return orders;
+    const allOrders = [];
+    
+    let response = await client.get({
+        path: 'orders',
+        query: { limit, status, created_at_min: since, order: 'created_at desc' }
+    });
+    
+    if (response.body?.orders) allOrders.push(...response.body.orders);
+    
+    while (response.pageInfo?.nextPage) {
+        response = await client.get(response.pageInfo.nextPage);
+        if (response.body?.orders) allOrders.push(...response.body.orders);
+    }
+    
+    console.log(`  🧾 Fetched ${allOrders.length} orders from Shopify (last ${days} days)`);
+    return allOrders;
 }
 
 /**
- * Fetch customers from Shopify (paginated)
+ * Fetch customers from Shopify using official REST client (paginated)
  */
 export async function fetchShopifyCustomers(accessToken, shopDomain, { limit = 250 } = {}) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/customers.json?limit=${limit}&order=created_at+desc`;
-    const customers = await paginatedFetch(accessToken, url);
-    console.log(`  👥 Fetched ${customers.length} customers from Shopify`);
-    return customers;
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
+    const allCustomers = [];
+    let response = await client.get({
+        path: 'customers',
+        query: { limit, order: 'created_at desc' }
+    });
+    
+    if (response.body?.customers) allCustomers.push(...response.body.customers);
+    
+    while (response.pageInfo?.nextPage) {
+        response = await client.get(response.pageInfo.nextPage);
+        if (response.body?.customers) allCustomers.push(...response.body.customers);
+    }
+    
+    console.log(`  👥 Fetched ${allCustomers.length} customers from Shopify`);
+    return allCustomers;
 }
 
 /**
  * Fetch order count
  */
 export async function fetchShopifyOrderCount(accessToken, shopDomain, { days = 60, status = 'any' } = {}) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const response = await fetch(
-        `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/orders/count.json?status=${status}&created_at_min=${since}`,
-        { headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' } }
-    );
-    if (!response.ok) return 0;
-    const data = await response.json();
-    return data.count || 0;
+    
+    try {
+        const response = await client.get({
+            path: 'orders/count',
+            query: { status, created_at_min: since }
+        });
+        return response.body?.count || 0;
+    } catch (e) {
+        return 0;
+    }
 }
 
 /**
@@ -141,35 +191,33 @@ export function transformShopifyProduct(shopifyProduct, userId, brandId) {
  * Fetch a single product by Shopify ID
  */
 export async function fetchShopifyProduct(accessToken, shopDomain, productId) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const response = await fetch(
-        `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/products/${productId}.json`,
-        { headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' } }
-    );
-    if (!response.ok) throw new Error(`Shopify: Product ${productId} not found`);
-    const data = await response.json();
-    return data.product;
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
+    const response = await client.get({
+        path: `products/${productId}`
+    });
+    return response.body?.product;
 }
 
 /**
  * Get Shopify shop info
  */
 export async function getShopInfo(accessToken, shopDomain) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const response = await fetch(
-        `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
-        { headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' } }
-    );
-    if (!response.ok) throw new Error('Failed to get shop info');
-    const data = await response.json();
-    return data.shop;
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
+    const response = await client.get({ path: 'shop' });
+    return response.body?.shop;
 }
 
 /**
  * Register mandatory and custom webhooks for a shop
  */
 export async function registerShopifyWebhooks(accessToken, shopDomain, backendUrl) {
-    const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
     const topics = [
         'orders/create',
         'orders/updated',
@@ -180,22 +228,18 @@ export async function registerShopifyWebhooks(accessToken, shopDomain, backendUr
     const results = [];
     for (const topic of topics) {
         try {
-            const response = await fetch(`https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`, {
-                method: 'POST',
-                headers: {
-                    'X-Shopify-Access-Token': accessToken,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+            const response = await client.post({
+                path: 'webhooks',
+                data: {
                     webhook: {
                         topic,
                         address: `${backendUrl}/api/shopify/webhooks/${topic.replace('/', '-')}`,
                         format: 'json',
                     }
-                }),
+                },
+                type: 'application/json'
             });
-            const data = await response.json();
-            results.push({ topic, success: response.ok, data });
+            results.push({ topic, success: true, data: response.body });
         } catch (e) {
             results.push({ topic, success: false, error: e.message });
         }
