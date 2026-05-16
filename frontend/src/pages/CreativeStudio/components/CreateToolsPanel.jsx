@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, useEffect } from 'react'
 import PromptArea from './PromptArea'
 import { IMAGE_MODELS, CAMERA_SHOT_PRESETS, creativeTypes, styles, ASPECT_RATIOS, templateCategories } from '../constants'
 import VoiceInput from '../../../components/VoiceInput'
@@ -20,6 +20,22 @@ const CreateToolsPanel = memo(({
     generateCopy, setGenerateCopy, setRefPickerSlot, setRefPickerTab
 }) => {
     
+    const currentModel = IMAGE_MODELS.find(m => m.id === imageModel)
+    const modelNativeRatios = currentModel?.nativeRatios || ['1:1','4:5','9:16','3:4','16:9','4:3','3:2','2:3']
+
+    // Filter formats: only show what this model can generate natively (no cropping)
+    const availableFormats = creativeTypes.filter(ct =>
+        !ct.aspectRatio || ct.id === 'custom-size' || modelNativeRatios.includes(ct.aspectRatio)
+    )
+
+    // Auto-correct selectedType when model changes and current format isn't supported
+    useEffect(() => {
+        const isAvailable = availableFormats.find(ct => ct.id === selectedType)
+        if (!isAvailable && availableFormats.length > 0) {
+            setSelectedType(availableFormats[0].id)
+        }
+    }, [imageModel]) // eslint-disable-line react-hooks/exhaustive-deps
+
     const selectedTypeInfo = creativeTypes.find(t => t.id === selectedType)
     const modelStatuses = useModelStatus()
     const activeStatus = modelStatuses[imageModel] || { status: 'healthy', message: '' }
@@ -81,11 +97,14 @@ const CreateToolsPanel = memo(({
                     )}
                 </div>
                 <div className="grid grid-cols-2 gap-1">
-                    {creativeTypes.map(ct => (
+                    {availableFormats.map(ct => (
                         <button key={ct.id} onClick={() => setSelectedType(ct.id)}
                             className={`studio-btn-pill flex items-center gap-1.5 ${selectedType === ct.id ? 'active' : ''}`}>
                             <span className="material-symbols-outlined text-xs">{ct.icon}</span>
-                            <span className="truncate">{ct.label}</span>
+                            <div className="flex flex-col items-start min-w-0">
+                                <span className="truncate text-[10px] leading-tight">{ct.label}</span>
+                                {ct.aspectRatio && <span className="text-[8px] opacity-50 font-mono leading-none">{ct.aspectRatio}</span>}
+                            </div>
                         </button>
                     ))}
                 </div>
@@ -430,7 +449,7 @@ const CreateToolsPanel = memo(({
                                                     {modelStatuses[m.id]?.status === 'overloaded' ? '⚡ Heavy Load' : '⏳ Busy'}
                                                 </span>
                                             ) : (
-                                                m.desc
+                                                <>{m.desc} · <span className="text-[var(--sys-primary)] font-mono">{m.nativeRatios?.length || '?'} ratios</span></>
                                             )}
                                         </span>
                                     </div>
