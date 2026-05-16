@@ -1,51 +1,90 @@
-const { VertexAI } = require('@google-cloud/vertexai');
+/**
+ * Vertex AI Image Generation Helper — Direct REST API
+ * 
+ * Uses direct REST calls to the Vertex AI endpoint instead of the deprecated
+ * @google-cloud/vertexai SDK, which silently drops imageConfig parameters
+ * (aspectRatio, imageSize) causing images to be cropped to 1:1 default.
+ * 
+ * Authentication: Uses GOOGLE_APPLICATION_CREDENTIALS service account JSON.
+ */
+import { GoogleAuth } from 'google-auth-library';
 
-const project = process.env.GCP_PROJECT_ID || 'mantram-vertex';
-const location = process.env.GCP_LOCATION || 'us-central1';
+const project  = process.env.GCP_PROJECT_ID || 'mantram-vertex';
+const location = process.env.GCP_LOCATION  || 'us-central1';
 
-const vertexAI = new VertexAI({ project, location });
+// Reusable auth client — scoped to Vertex AI
+const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+});
 
 /**
- * Shared helper for generating images (and text responses) with Vertex AI models.
- * @param {Array} parts - The array of parts (text and/or inlineData)
- * @param {string} modelId - The model to use (e.g., 'gemini-3.1-flash-image-preview')
- * @param {number} temperature - Generation temperature
- * @param {object} [imageConfig] - Optional image configuration
- * @param {string} [imageConfig.aspectRatio] - e.g. '1:1', '16:9', '9:16', '4:3', '3:4'
- * @param {string} [imageConfig.imageSize] - e.g. '1K', '2K', '4K'
- * @returns {Promise<Object>} The raw Vertex API response
+ * Generate images via Vertex AI REST API with full imageConfig support.
+ *
+ * @param {Array}  parts                     – Content parts (text + inlineData)
+ * @param {string} [modelId]                 – Model name, e.g. 'gemini-3.1-flash-image-preview'
+ * @param {number} [temperature=0.4]         – Generation temperature
+ * @param {object} [imageConfig={}]          – Image configuration
+ * @param {string} [imageConfig.aspectRatio] – '1:1','16:9','9:16','4:3','3:4','3:2','2:3'
+ * @param {string} [imageConfig.imageSize]   – '1K','2K','4K'
+ * @returns {Promise<object>} Raw API response (candidates array)
  */
-async function generateImageWithVertex(parts, modelId = 'gemini-3.1-flash-image-preview', temperature = 0.4, imageConfig = {}) {
-    const genConfig = {
+export async function generateImageWithVertex(
+    parts,
+    modelId = 'gemini-3.1-flash-image-preview',
+    temperature = 0.4,
+    imageConfig = {}
+) {
+    // ── Build generationConfig with imageConfig for proper aspect ratio ──
+    const generationConfig = {
         temperature,
         responseModalities: ['TEXT', 'IMAGE'],
     };
 
     // Attach imageConfig for aspect ratio & resolution control
-    // This tells Vertex AI the exact output dimensions instead of relying on prompt hints
-    if (imageConfig && (imageConfig.aspectRatio || imageConfig.imageSize)) {
-        genConfig.imageConfig = {};
-        if (imageConfig.aspectRatio) genConfig.imageConfig.aspectRatio = imageConfig.aspectRatio;
-        if (imageConfig.imageSize)  genConfig.imageConfig.imageSize  = imageConfig.imageSize;
+    const hasAR   = imageConfig.aspectRatio && imageConfig.aspectRatio !== '1:1';
+    const hasSize = !!imageConfig.imageSize;
+    if (hasAR || hasSize) {
+        generationConfig.imageConfig = {};
+        if (hasAR)   generationConfig.imageConfig.aspectRatio = imageConfig.aspectRatio;
+        if (hasSize) generationConfig.imageConfig.imageSize   = imageConfig.imageSize;
+        console.log(`📐 [Vertex AI] imageConfig: AR=${imageConfig.aspectRatio || 'default'}, size=${imageConfig.imageSize || 'default'}`);
     }
 
-    const generativeModel = vertexAI.getGenerativeModel({
-        model: modelId,
-        generationConfig: genConfig,
-    });
-
-    const request = {
-        contents: [
-            {
-                role: 'user',
-                parts: parts
-            }
-        ]
+    // ── Build request body ──
+    const body = {
+        contents: [{ role: 'user', parts }],
+        generationConfig,
     };
 
-    // The SDK returns { response: { candidates: [...] } }
-    const result = await generativeModel.generateContent(request);
-    return result.response;
-}
+    // ── Get access token from service account ──
+    const client = await auth.getClient();
+    const accessToken = (await client.getAccessToken()).token;
 
-module.exports = { generateImageWithVertex };
+    // ── Direct REST call to Vertex AI ──
+    const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`;
+
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000), // 2 min timeout for image gen
+    });
+
+    if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        const errMsg = `Vertex AI ${modelId} error (${resp.status}): ${errText.substring(0, 300)}`;
+        console.error(`❌ ${errMsg}`);
+        throw new Error(errMsg);
+    }
+
+    const data = await resp.json();
+
+    if (data.error) {
+        throw new Error(`Vertex AI error: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+
+    return data;
+}

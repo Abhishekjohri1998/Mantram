@@ -1762,7 +1762,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
 // Used for NanoBanana 2 and NanoBanana Pro. NO auto-fallback chain.
 // If the model is busy (503), returns modelBusy flag so frontend can notify user.
 async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModelId = 'gemini-3.1-flash-image-preview') {
-    const { generateImageWithVertex } = require('../services/vertexImage');
+    const { generateImageWithVertex } = await import('../services/vertexImage.js');
 
     // Build content parts — images as inlineData, then text prompt last
     const parts = [];

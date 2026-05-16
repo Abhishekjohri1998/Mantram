@@ -1134,7 +1134,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         }
 
         // ── Fallback: Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
-        const { generateImageWithVertex } = require('../services/vertexImage');
+        const { generateImageWithVertex } = await import('../services/vertexImage.js');
         const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
         const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${arConfig.geminiInstruction}). `;
 
