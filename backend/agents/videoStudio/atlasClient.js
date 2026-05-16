@@ -306,8 +306,13 @@ async function submitAtlasCloudPayload(payload) {
         return_last_frame: false,
     };
 
+    if (payload.input?.audio_url) {
+        atlasPayload.audio_url = payload.input.audio_url;
+    }
+
     const rawImageUrls  = payload.input?.image_urls       || [];
     const rawRefImages  = payload.input?.reference_images || [];
+    const isInfiniteTalk = atlasModel.includes('infinitetalk');
 
     if (isR2V) {
         // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
@@ -328,13 +333,13 @@ async function submitAtlasCloudPayload(payload) {
                 console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
             }
         }
-    } else if (isI2V) {
+    } else if (isI2V || isInfiniteTalk) {
         const allImages = [...rawImageUrls, ...rawRefImages];
         if (allImages.length > 0) {
-            console.log(`📸 [Atlas I2V] Uploading first frame to Atlas CDN...`);
+            console.log(`📸 [Atlas I2V/InfiniteTalk] Uploading first frame to Atlas CDN...`);
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
             if (uploaded) {
-                atlasPayload.image = uploaded;
+                atlasPayload.image = uploaded; // Both I2V and InfiniteTalk use 'image'
             }
         }
     }
