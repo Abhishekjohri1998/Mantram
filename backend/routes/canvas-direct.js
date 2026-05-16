@@ -1188,10 +1188,10 @@ router.post('/canvas-voiceover', protect, async (req, res) => {
         const { text, language, speaker, speed } = req.body;
         if (!text?.trim()) return res.status(400).json({ error: 'Text is required' });
 
-        const sarvamKey = process.env.SARVAM_API_KEY;
-        if (!sarvamKey) return res.status(500).json({ error: 'TTS not configured (SARVAM_API_KEY missing)' });
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (!geminiKey) return res.status(500).json({ error: 'TTS not configured (GEMINI_API_KEY missing)' });
 
-        console.log(`🎙️ Canvas Voiceover: ${text.length} chars, lang=${language || 'en-IN'}, speaker=${speaker || 'anushka'}`);
+        console.log(`🎙️ Canvas Voiceover: ${text.length} chars, lang=${language || 'en-IN'}, speaker=${speaker || 'Aoede'}`);
 
         const cleanText = text
             .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
@@ -1199,34 +1199,37 @@ router.post('/canvas-voiceover', protect, async (req, res) => {
 
         if (!cleanText || cleanText.length < 2) return res.status(400).json({ error: 'No speakable text after cleanup' });
 
-        const response = await fetch('https://api.sarvam.ai/text-to-speech', {
+        const promptText = `Please speak the following text fluently in ${language || 'regional language'} with an expressive tone:\n\n${cleanText.substring(0, 2000)}`;
+
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + geminiKey, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'api-subscription-key': sarvamKey },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                inputs: [cleanText.substring(0, 2000)],
-                target_language_code: language || 'en-IN',
-                speaker: speaker || 'anushka',
-                model: 'bulbul:v2',
-                pitch: 0,
-                pace: speed || 1.0,
-                loudness: 1.5,
-                enable_preprocessing: true,
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: {
+                    responseModalities: ['AUDIO'],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker || 'Aoede' } }
+                    }
+                }
             }),
         });
 
         if (!response.ok) {
             const errBody = await response.text().catch(() => '');
-            throw new Error(`Sarvam TTS failed: ${response.status} ${errBody.substring(0, 100)}`);
+            throw new Error(`Gemini TTS failed: ${response.status} ${errBody.substring(0, 100)}`);
         }
 
         const data = await response.json();
-        const audioBase64 = data.audios?.[0];
-        if (!audioBase64) throw new Error('No audio in TTS response');
+        const audioPart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+        if (!audioPart?.inlineData?.data) throw new Error('No audio in Gemini TTS response');
 
         // Upload to S3 for persistence
-        const audioBuffer = Buffer.from(audioBase64, 'base64');
-        const s3Key = `canvas-voiceover/${req.user._id}/${Date.now()}-vo.wav`;
-        const audioUrl = await uploadToS3(audioBuffer, s3Key, 'audio/wav');
+        const audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
+        const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+        const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+        const s3Key = `canvas-voiceover/${req.user._id}/${Date.now()}-vo.${ext}`;
+        const audioUrl = await uploadToS3(audioBuffer, s3Key, mimeType);
 
         console.log(`✅ Canvas Voiceover generated: ${audioUrl.substring(0, 60)}`);
 
@@ -1234,8 +1237,8 @@ router.post('/canvas-voiceover', protect, async (req, res) => {
             success: true,
             audioUrl,
             duration: Math.ceil(cleanText.split(/\s+/).length / 2.5), // rough estimate: 2.5 words/sec
-            format: 'wav',
-            provider: 'sarvam-bulbul-v2',
+            format: ext,
+            provider: 'gemini-3.1-flash-tts',
         });
     } catch (err) {
         console.error('Canvas voiceover error:', err.message);

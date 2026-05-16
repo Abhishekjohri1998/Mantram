@@ -114,6 +114,11 @@ async function ensureAssetCompatible(imageUrl) {
         const res = await fetch(imageUrl);
         const buffer = Buffer.from(await res.arrayBuffer());
         const contentType = res.headers.get('content-type') || '';
+        
+        if (contentType.startsWith('audio/')) {
+            return imageUrl; // Audio doesn't need image resizing/conversion
+        }
+        
         const meta = await sharp(buffer).metadata();
 
         const UNSUPPORTED_FORMATS = ['avif', 'tiff', 'svg', 'heic', 'heif'];
@@ -165,6 +170,12 @@ async function uploadMediaToAtlasCDN(imageUrl) {
             finalBuffer = await sharp(Buffer.from(arrayBuffer)).jpeg({ quality: 90 }).toBuffer();
             finalType = 'image/jpeg';
             extension = 'jpg';
+        } else if (contentType.startsWith('audio/')) {
+            // Support audio uploads for audio-driven video models like InfiniteTalk
+            finalBuffer = Buffer.from(arrayBuffer);
+            finalType = contentType;
+            extension = contentType.includes('wav') ? 'wav' : 'mp3';
+            console.log(`🔊 [Atlas CDN] Processing audio upload: ${extension}`);
         } else {
             finalBuffer = Buffer.from(arrayBuffer);
             finalType = contentType;
@@ -306,8 +317,21 @@ async function submitAtlasCloudPayload(payload) {
         return_last_frame: false,
     };
 
+    if (payload.input?.audio_url) {
+        console.log(`🔊 [Atlas] Uploading audio track to Atlas CDN...`);
+        const cdnAudio = await uploadMediaToAtlasCDN(payload.input.audio_url);
+        atlasPayload.audio_url = cdnAudio;
+        atlasPayload.audio = cdnAudio;
+        atlasPayload.ref_audio = cdnAudio;
+    }
+    
+    if (payload.input?.video_url) {
+        atlasPayload.video_url = payload.input.video_url;
+    }
+
     const rawImageUrls  = payload.input?.image_urls       || [];
     const rawRefImages  = payload.input?.reference_images || [];
+    const isInfiniteTalk = atlasModel.includes('infinitetalk');
 
     if (isR2V) {
         // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
@@ -328,13 +352,16 @@ async function submitAtlasCloudPayload(payload) {
                 console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
             }
         }
-    } else if (isI2V) {
+    } else if (isI2V || isInfiniteTalk) {
         const allImages = [...rawImageUrls, ...rawRefImages];
         if (allImages.length > 0) {
-            console.log(`📸 [Atlas I2V] Uploading first frame to Atlas CDN...`);
+            console.log(`📸 [Atlas I2V/InfiniteTalk] Uploading first frame to Atlas CDN...`);
             const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
             if (uploaded) {
-                atlasPayload.image = uploaded;
+                atlasPayload.image = uploaded; // Both I2V and InfiniteTalk use 'image'
+                if (isInfiniteTalk) {
+                    atlasPayload.image_url = uploaded; // Just in case it expects image_url
+                }
             }
         }
     }
@@ -726,6 +753,38 @@ export async function submitHappyHorseVideoGeneration({
     const payload = { model: 'happyhorse', task_type: modelName, input: taskInput };
     const taskId  = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model: 'happyhorse-1.0', _payload: payload, type: 'generation' };
+}
+// ── Public: InfiniteTalk Audio-Driven Video Generation ────────────────────────
+
+export async function submitInfiniteTalkVideoGeneration({
+    prompt, imageUrl, videoUrl, refAudio, duration, resolution = '720p',
+}) {
+    if (!imageUrl && !videoUrl) throw new Error('InfiniteTalk requires either a portrait image (imageUrl) or a reference video (videoUrl).');
+    if (!refAudio) throw new Error('InfiniteTalk requires an audio track (refAudio).');
+
+    console.log(`🗣️ [InfiniteTalk] submitVideoGeneration: videoUrl=${videoUrl ? 'yes' : 'no'} | imageUrl=${imageUrl ? 'yes' : 'no'} | refAudio=yes`);
+
+    const finalPrompt = truncatePrompt((prompt || '').replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim());
+
+    const taskInput = {
+        prompt:         finalPrompt,
+        audio_url:      refAudio,
+        duration:       Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15),
+    };
+
+    if (videoUrl) {
+        taskInput.video_url = videoUrl;
+    } else if (imageUrl) {
+        // Prepare image
+        const s3Url = await ensureS3Url(imageUrl, 'video-studio/infinitetalk');
+        const url = s3Url ? await ensureAssetCompatible(s3Url) : null;
+        if (!url) throw new Error('Failed to prepare image for InfiniteTalk');
+        taskInput.image_urls = [url];
+    }
+
+    const payload = { model: 'infinitetalk', task_type: 'atlascloud/infinitetalk', input: taskInput };
+    const taskId  = await submitAtlasCloudPayload(payload);
+    return { taskId, provider: 'atlascloud', model: 'infinitetalk', _payload: payload, type: 'generation' };
 }
 
 // ── Public: Resubmit ─────────────────────────────────────────────────────────

@@ -144,6 +144,8 @@ const videoProjectSchema = new mongoose.Schema({
         startedAt: { type: Date },
         completedAt: { type: Date },
         error: { type: String, default: '' },
+        longFormJobId: { type: String, default: '' },
+        voiceoverStatus: { type: String, default: '' },
     },
 
     // ── Step 7: Critic Agent Output ──

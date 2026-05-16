@@ -351,13 +351,13 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
 
     // History sync from parent props
     const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && p.generation?.videoUrl)
+        return projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
     })
 
     useEffect(() => {
         setGridVideos(prev => {
             const existingIds = new Set(prev.map(p => p._id))
-            const incoming = projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && p.generation?.videoUrl)
+            const incoming = projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
             const newOnes = incoming.filter(p => !existingIds.has(p._id))
             return newOnes.length ? [...newOnes, ...prev] : prev
         })
@@ -557,7 +557,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
 
                 {/* Completed videos from History */}
                 {gridVideos.map(v => {
-                    const videoUrl = v.generation?.videoUrl
+                    const videoUrl = v.generation?.videoUrl || v.finalVideoUrl
                     return (
                         <UGCVideoCard key={v._id} v={v} videoUrl={videoUrl} onPreview={setPreviewVideo} onSaveTemplate={setSavingTemplate} isAdmin={isAdmin} />
                     )

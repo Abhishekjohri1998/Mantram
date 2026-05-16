@@ -1758,14 +1758,11 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     };
 }
 
-// ── Gemini image generation via REST API ────────────────────────────────
+// ── Gemini image generation via Vertex AI ────────────────────────────────
 // Used for NanoBanana 2 and NanoBanana Pro. NO auto-fallback chain.
 // If the model is busy (503), returns modelBusy flag so frontend can notify user.
 async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModelId = 'gemini-3.1-flash-image-preview') {
-    const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-    if (!imageKey) throw new Error('Gemini API key not configured');
-
-    const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    const { generateImageWithVertex } = require('../services/vertexImage');
 
     // Build content parts — images as inlineData, then text prompt last
     const parts = [];
@@ -1782,7 +1779,7 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     let usedModel = selectedModelId;
 
     const imageCount = parts.filter(p => p.inlineData).length;
-    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (${selectedModelId}) ══════`);
+    console.log(`\n══════ CREATIVE STUDIO IMAGE GENERATION (${selectedModelId} via Vertex AI) ══════`);
     console.log(`🖼️  Reference images: ${imageCount}`);
     console.log(`📐 Aspect ratio: ${aspectRatio} | Resolution: ${imageSize}`);
     console.log(`📝 Prompt (first 200 chars): ${promptText.substring(0, 200)}...`);
@@ -1798,34 +1795,9 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     const warnings = [];
 
     try {
-        console.log(`🎨 Using: ${selectedModelId}...`);
-        const url = `${baseUrl}/models/${selectedModelId}:generateContent?key=${imageKey}`;
-        const fetchOptions = {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: {
-                    responseModalities: ['TEXT', 'IMAGE'],
-                    temperature,
-                },
-            }),
-        };
-
-        const resp = await fetch(url, fetchOptions);
-
-        const data = await resp.json();
-        if (data.error) {
-            const errMsg = data.error?.message || JSON.stringify(data.error);
-            const lowerMsg = String(errMsg).toLowerCase();
-
-            // Check for busy/overload — return modelBusy flag for frontend notification
-            if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || resp.status === 503 || resp.status === 429) {
-                console.log(`🔴 ${selectedModelId} is BUSY — returning modelBusy flag`);
-                return { imageUrl: null, model: selectedModelId, textResponse: '', warnings: [], modelBusy: true };
-            }
-            throw new Error(`${selectedModelId}: ${errMsg}`);
-        }
+        console.log(`🎨 Using: ${selectedModelId} (Vertex AI)...`);
+        
+        const data = await generateImageWithVertex(parts, selectedModelId, temperature);
 
         const resParts = data.candidates?.[0]?.content?.parts || [];
         for (const part of resParts) {
@@ -1844,6 +1816,13 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
         }
     } catch (e) {
         if (e.message?.includes('modelBusy')) throw e; // re-throw busy
+        const lowerMsg = String(e.message).toLowerCase();
+        
+        // Check for busy/overload — return modelBusy flag for frontend notification
+        if (lowerMsg.includes('high demand') || lowerMsg.includes('busy') || lowerMsg.includes('quota') || lowerMsg.includes('503') || lowerMsg.includes('429')) {
+            console.log(`🔴 ${selectedModelId} is BUSY — returning modelBusy flag`);
+            return { imageUrl: null, model: selectedModelId, textResponse: '', warnings: [], modelBusy: true };
+        }
         console.error(`❌ ${selectedModelId} error:`, e.message);
         throw e;
     }

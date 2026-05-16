@@ -635,19 +635,11 @@ CREATIVE PRINCIPLES:
 Make it look like it was produced by a world-class creative studio.`
         parts.push({ text: textPrompt })
 
+        const { generateImageWithVertex } = require('../services/vertexImage');
+
         for (const modelId of models) {
             try {
-                const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ role: 'user', parts }],
-                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-                    }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error.message)
+                const data = await generateImageWithVertex(parts, modelId);
                 const resParts = data.candidates?.[0]?.content?.parts || []
                 for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
@@ -784,22 +776,13 @@ CREATIVE RULES:
 Output the modified image.`
         parts.push({ text: editText })
 
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
         let imageUrl = null
 
         for (const modelId of models) {
             try {
-                const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ role: 'user', parts }],
-                        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-                    }),
-                })
-                const data = await resp.json()
-                if (data.error) throw new Error(data.error.message)
+                const data = await generateImageWithVertex(parts, modelId);
                 const resParts = data.candidates?.[0]?.content?.parts || []
                 for (const part of resParts) {
                     if (part.inlineData?.mimeType?.startsWith('image/')) {
@@ -857,18 +840,10 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
             parts.push({ text: `Edit this image: ${prompt}. Keep all unaffected areas identical. Output the modified image.` })
         }
 
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'
-        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error.message)
+        const data = await generateImageWithVertex(parts, modelId);
+        
         const resParts = data.candidates?.[0]?.content?.parts || []
         let imageUrl = null
         for (const part of resParts) {
@@ -924,18 +899,9 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
             parts.push({ text: `RETOUCH TASK: I have provided an image and a black-and-white mask. WHITE areas in the mask indicate the region to retouch. ${prompt || 'Clean up and retouch the masked area to look seamless and natural'}. CRITICAL: Keep all pixels outside the white mask EXACTLY the same. Output the complete modified image.` })
         }
 
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'
-        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user', parts }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error.message)
+        const data = await generateImageWithVertex(parts, modelId);
         const resParts = data.candidates?.[0]?.content?.parts || []
         let imageUrl = null
         for (const part of resParts) {
@@ -981,24 +947,13 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
             promptText = `Replace ONLY the background of this image with: ${bgPrompt || 'a clean, professional studio background'}. CRITICAL: Keep the foreground subject(s) completely identical — same pose, same colors, same details. Only change what is behind/around the subject. Blend the new background seamlessly. Output the full modified image.`
         }
 
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'
-        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    role: 'user',
-                    parts: [
-                        { inlineData: { mimeType, data: base64Data } },
-                        { text: promptText },
-                    ],
-                }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-            }),
-        })
-        const data = await resp.json()
-        if (data.error) throw new Error(data.error.message)
+        const parts = [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: promptText },
+        ];
+        const data = await generateImageWithVertex(parts, modelId);
         const resParts = data.candidates?.[0]?.content?.parts || []
         let imageUrl = null
         for (const part of resParts) {

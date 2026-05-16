@@ -20,6 +20,13 @@ npm install --omit=dev
 
 cd /home/ec2-user/Mantram
 
+# ── Restore GCP credentials after every deploy ──
+echo "🔑 Restoring GCP credentials..."
+mkdir -p "$APP_DIR/secrets"
+cp /home/ec2-user/secrets/gcp-service-account.json "$APP_DIR/secrets/gcp-service-account.json"
+sed -i 's|GOOGLE_APPLICATION_CREDENTIALS=.*|GOOGLE_APPLICATION_CREDENTIALS=/home/ec2-user/secrets/gcp-service-account.json|g' "$APP_DIR/.env"
+echo "✅ GCP credentials restored"
+
 # Start or restart PM2 — always pointing at Mantram/backend directly
 if pm2 describe mantram-server > /dev/null 2>&1; then
     echo "🔄 Restarting with updated env..."

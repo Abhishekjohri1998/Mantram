@@ -53,7 +53,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus } from '../agents/videoStudio/atlasClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
@@ -1307,27 +1307,36 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                         }
                     }
                 } else if (voProvider === 'sarvam') {
-                    const sarvamKey = process.env.SARVAM_API_KEY;
-                    if (sarvamKey) {
-                        const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+                    // Replaced Sarvam with Gemini 3.1 Flash TTS for regional languages
+                    const geminiKey = process.env.GEMINI_API_KEY;
+                    if (geminiKey) {
+                        const promptText = `Please speak the following text fluently in regional language with an expressive tone:\n\n${storyboard.voiceoverScript.substring(0, 2000)}`;
+                        
+                        const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + geminiKey, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'api-subscription-key': sarvamKey },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                inputs: [storyboard.voiceoverScript.substring(0, 2000)],
-                                target_language_code: session.voiceover.langCode || 'en-IN',
-                                speaker: session.voiceover.voiceId || 'anushka',
-                                model: 'bulbul:v2',
-                                pace: session.voiceover.speed || 1.0,
+                                contents: [{ parts: [{ text: promptText }] }],
+                                generationConfig: {
+                                    responseModalities: ['AUDIO'],
+                                    speechConfig: {
+                                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+                                    }
+                                }
                             }),
                         });
                         if (ttsResp.ok) {
                             const ttsData = await ttsResp.json();
-                            const audioBase64 = ttsData.audios?.[0];
-                            if (audioBase64) {
-                                const buffer = Buffer.from(audioBase64, 'base64');
-                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.wav`;
-                                voiceoverUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
+                            const audioPart = ttsData.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+                            if (audioPart?.inlineData?.data) {
+                                const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
+                                const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+                                const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.${ext}`;
+                                voiceoverUrl = await uploadToS3(buffer, s3Key, mimeType);
                             }
+                        } else {
+                            console.warn(`   ⚠️ Gemini TTS generation failed:`, await ttsResp.text());
                         }
                     }
                 }
@@ -2258,9 +2267,6 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
         if (!prompt?.trim()) return res.status(400).json({ success: false, error: 'Enhancement prompt is required' });
         if (!imageBase64 && !imageUrl) return res.status(400).json({ success: false, error: 'Image is required' });
 
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
-
         console.log(`🎨 Enhancing photo with Nanobanana 2: prompt="${prompt.substring(0, 60)}"`);
 
         // Get image as base64
@@ -2284,44 +2290,29 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
             imgMime = imgResp.headers.get('content-type') || 'image/png';
         }
 
-        // Call NanoBanana 2 (Gemini 3.1 Flash Image Preview) with the image + edit prompt
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiKey}`;
 
-        const geminiResp = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                // systemInstruction locks the model into photography mode — prevents 3D/illustration output
-                systemInstruction: {
-                    parts: [{ text: 'You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.' }]
-                },
-                contents: [{
-                    role: 'user',
-                    parts: [
-                        { inlineData: { mimeType: imgMime, data: imgBase64 } },
-                        { text: `Edit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.` },
-                    ],
-                }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
-            }),
-            signal: AbortSignal.timeout(60000),
-        });
+        const promptText = `SYSTEM INSTRUCTION: You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.\n\nEdit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.`;
 
-        if (!geminiResp.ok) {
-            const errText = await geminiResp.text();
-            console.error('Nanobanana 2 enhance error:', geminiResp.status, errText.substring(0, 300));
-            throw new Error(`Nanobanana 2 enhancement failed (${geminiResp.status})`);
+        const parts = [
+            { inlineData: { mimeType: imgMime, data: imgBase64 } },
+            { text: promptText },
+        ];
+
+        let geminiData;
+        try {
+            geminiData = await generateImageWithVertex(parts, modelId, 0.1);
+        } catch(e) {
+            console.error('Nanobanana 2 enhance error:', e.message);
+            throw new Error(`Nanobanana 2 enhancement failed: ${e.message}`);
         }
 
-        const geminiData = await geminiResp.json();
-        if (geminiData.error) throw new Error(geminiData.error.message);
-
         // Extract the generated image from response parts
-        const parts = geminiData.candidates?.[0]?.content?.parts || [];
+        const responseParts = geminiData.candidates?.[0]?.content?.parts || [];
         let enhancedBase64 = null;
         let enhancedMime = 'image/png';
-        for (const part of parts) {
+        for (const part of responseParts) {
             if (part.inlineData?.mimeType?.startsWith('image/')) {
                 enhancedBase64 = part.inlineData.data;
                 enhancedMime = part.inlineData.mimeType;
@@ -3979,23 +3970,23 @@ async function generateQAdsTTS(dialogueLines, language) {
 
     const fullScript = normalizedLines.map(l => l.text).join('. ');
     const dominantEmotion = normalizedLines[0]?.emotion || 'neutral';
-    const provider = isSarvamLang ? 'Sarvam' : 'OpenAI';
+    const provider = isSarvamLang ? 'Gemini' : 'OpenAI';
 
     console.log(`🎤 [TTS] Generating voiceover: lang=${language} (${langCode}), provider=${provider}, emotion=${dominantEmotion}, script=${fullScript.substring(0, 100)}...`);
 
     try {
         if (isSarvamLang) {
-            return await generateSarvamTTSInternal(fullScript, langCode, dominantEmotion);
+            return await generateGeminiTTSInternal(fullScript, language, langCode, dominantEmotion);
         } else {
             // All non-Indian languages → OpenAI gpt-4o-mini-tts with full emotional steering
             return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
         }
     } catch (e) {
         console.error(`❌ [TTS] Voiceover generation failed (${provider}): ${e.message}`);
-        // If Sarvam fails, try OpenAI as fallback
+        // If Gemini fails, try OpenAI as fallback
         if (isSarvamLang) {
             try {
-                console.log(`🔄 [TTS] Sarvam failed, trying OpenAI fallback for ${language}...`);
+                console.log(`🔄 [TTS] Gemini failed, trying OpenAI fallback for ${language}...`);
                 return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
             } catch (fallbackErr) {
                 console.error(`❌ [TTS] OpenAI fallback also failed: ${fallbackErr.message}`);
@@ -4063,60 +4054,50 @@ async function generateOpenAITTS(text, emotion, language, langCode) {
 }
 
 /**
- * Internal Sarvam TTS call with emotion-to-pitch/pace mapping.
+ * Internal Gemini TTS call for regional languages.
  * Emotion tags drive the vocal delivery characteristics for Indian languages.
  */
-async function generateSarvamTTSInternal(text, langCode, emotion = 'neutral') {
-    const apiKey = process.env.SARVAM_API_KEY;
-    if (!apiKey) { console.warn('🎤 [TTS] Sarvam API key not configured — skipping'); return null; }
+async function generateGeminiTTSInternal(text, language, langCode, emotion = 'neutral') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) { console.warn('🎤 [TTS] Gemini API key not configured — skipping'); return null; }
 
-    // Emotion → Sarvam pitch/pace/loudness mapping
-    const EMOTION_MAP = {
-        excited:    { pitch: 2, pace: 1.2, loudness: 1.8 },
-        warm:       { pitch: 0, pace: 0.9, loudness: 1.3 },
-        urgent:     { pitch: 1, pace: 1.3, loudness: 1.8 },
-        calm:       { pitch: -1, pace: 0.85, loudness: 1.2 },
-        playful:    { pitch: 2, pace: 1.1, loudness: 1.5 },
-        dramatic:   { pitch: -2, pace: 0.75, loudness: 1.6 },
-        curious:    { pitch: 1, pace: 1.0, loudness: 1.4 },
-        confident:  { pitch: 0, pace: 0.95, loudness: 1.7 },
-        mysterious: { pitch: -1, pace: 0.8, loudness: 1.1 },
-        empathetic: { pitch: 0, pace: 0.85, loudness: 1.2 },
-        neutral:    { pitch: 0, pace: 1.0, loudness: 1.5 },
-    };
-    const emo = EMOTION_MAP[emotion] || EMOTION_MAP.neutral;
+    console.log(`🎤 [TTS] Gemini: voice=Aoede, lang=${language} (${langCode}), emotion=${emotion}, text=${text.length} chars`);
 
-    const voice = QADS_AUTO_VOICE[langCode] || { speaker: 'anushka' };
-    console.log(`🎤 [TTS] Sarvam: voice=${voice.speaker}, lang=${langCode}, emotion=${emotion} (pitch=${emo.pitch}, pace=${emo.pace}), text=${text.length} chars`);
+    const promptText = `Please speak the following text fluently in ${language} with a ${emotion} tone:\n\n${text.substring(0, 2000)}`;
 
-    const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+    const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + apiKey, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-subscription-key': apiKey },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            inputs: [text.substring(0, 2000)],
-            target_language_code: langCode,
-            speaker: voice.speaker,
-            model: 'bulbul:v2',
-            pitch: emo.pitch,
-            pace: emo.pace,
-            loudness: emo.loudness,
-            enable_preprocessing: true,
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+                }
+            }
         }),
     });
 
     if (!ttsResp.ok) {
         const errBody = await ttsResp.text().catch(() => '');
-        throw new Error(`Sarvam TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
+        throw new Error(`Gemini TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
     }
 
     const ttsData = await ttsResp.json();
-    const audioBase64 = ttsData.audios?.[0];
-    if (!audioBase64) throw new Error('No audio returned from Sarvam');
+    const audioPart = ttsData.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+    
+    if (!audioPart?.inlineData?.data) {
+        throw new Error('No audio in Gemini TTS response');
+    }
 
-    const buffer = Buffer.from(audioBase64, 'base64');
-    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.wav`;
-    const audioUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
-    console.log(`✅ [TTS] Sarvam audio uploaded: ${audioUrl.substring(0, 70)}`);
+    const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
+    const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+    const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const audioUrl = await uploadToS3(buffer, s3Key, mimeType);
+    
+    console.log(`✅ [TTS] Gemini audio uploaded: ${audioUrl.substring(0, 70)}`);
     return audioUrl;
 }
 
@@ -4225,17 +4206,26 @@ async function addVoiceoverToProject(project) {
             return;
         }
 
-        let audioUrl = null;
-        if (dialogueLines.length > 0) {
+        let audioUrl = project.generation?.voiceoverUrl || null;
+        if (!audioUrl && dialogueLines.length > 0) {
             console.log(`🎤 [TTS] Starting voiceover pipeline: ${dialogueLines.length} lines in ${language}`);
             audioUrl = await generateQAdsTTS(dialogueLines, language);
             if (!audioUrl) {
                 console.warn(`🎤 [TTS] TTS generation failed — continuing with BGM only (if any)`);
             }
+        } else if (audioUrl) {
+            console.log(`🎤 [TTS] Using pre-generated audio for lip-sync: ${audioUrl.substring(0, 50)}...`);
         }
 
-        // Mux audio/BGM into video
-        const muxedUrl = await muxVideoWithAudio(videoUrl, audioUrl, bgmUrl);
+        let muxedUrl = null;
+
+        if (project.generation?.model === 'infinitetalk' || project.generation?.requiresInfiniteTalk) {
+            console.log(`✅ [TTS] Video generated/lip-synced by InfiniteTalk — audio is natively synced. Bypassing FFmpeg muxing.`);
+            muxedUrl = videoUrl; // Audio is already in the video
+        } else {
+            // Mux audio/BGM into video
+            muxedUrl = await muxVideoWithAudio(videoUrl, audioUrl, bgmUrl);
+        }
         
         if (muxedUrl) {
             // Update the project with the muxed video
@@ -4281,22 +4271,75 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
         
-        const project = await VideoProject.findOne({
-            $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
+        // Find the project first to see if it has Stage 2 lip-sync required
+        let project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }],
+            user: req.user._id
         });
-        const provider = project?.generation?.provider || 'atlascloud';
 
-        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
-        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
+        if (!project) {
+            console.warn(`[Q-Ads V2 Status] ⚠️ No matching VideoProject found for requestId=${requestId}`);
+        }
+
+        let activeTaskId = requestId;
+        let isStage2 = false;
+
+        // If we are in Stage 2 (InfiniteTalk), poll that task ID instead!
+        if (project?.generation?.infiniteTalkTaskId) {
+            activeTaskId = project.generation.infiniteTalkTaskId;
+            isStage2 = true;
+        }
+
+        const provider = project?.generation?.provider || 'atlascloud';
+        
+        // Pass the activeTaskId to the unified status function. If stage 2, it's an InfiniteTalk AtlasCloud task.
+        const result = await getUnifiedGenerationStatus(
+            isStage2 ? 'atlascloud' : provider, 
+            activeTaskId, 
+            project?.generation?.statusUrl, 
+            project?.generation?.resultUrl
+        );
+
+        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: isStage2 ? 60 : 10 });
 
         // Update VideoProject with latest status/videoUrl
-        const updatePayload = { 'generation.progress': result.progress || 0 };
+        const updatePayload = { 'generation.progress': isStage2 ? Math.max(result.progress || 0, 50) : (result.progress || 0) };
         
         if (result.status === 'COMPLETED' && result.videoUrl) {
             console.log(`[Q-Ads V2] Mirroring video to S3: ${result.videoUrl.substring(0, 80)}...`);
             const s3VideoUrl = await ensureS3Url(result.videoUrl, `qads/gen-video-${Date.now()}.mp4`);
             if (s3VideoUrl) {
                 result.videoUrl = s3VideoUrl;
+            }
+        }
+
+        // --- STAGE 2 INTERCEPT (V2V Lip-Sync) ---
+        // If Stage 1 (Cinematic) is completed, but we require InfiniteTalk and haven't started it yet...
+        if (!isStage2 && result.status === 'COMPLETED' && project?.generation?.requiresInfiniteTalk) {
+            console.log(`🗣️ [Q-Ads V2 Status] Stage 1 (Cinematic) complete. Submitting to InfiniteTalk for V2V lip-sync...`);
+            const { submitInfiniteTalkVideoGeneration } = await import('../agents/videoStudio/atlasClient.js');
+            
+            try {
+                const itResult = await submitInfiniteTalkVideoGeneration({
+                    prompt: project.backendPrompt || '',
+                    videoUrl: result.videoUrl,
+                    refAudio: project.generation.voiceoverUrl,
+                    duration: project.generation.duration || 5,
+                    resolution: '720p',
+                });
+                
+                console.log(`🗣️ [InfiniteTalk] Stage 2 Task queued: ${itResult.taskId}`);
+                updatePayload['generation.infiniteTalkTaskId'] = itResult.taskId;
+                
+                // Override result to keep frontend polling
+                result.status = 'IN_PROGRESS';
+                result.progress = 50;
+                result.videoUrl = null; // hide base video from frontend until lip-sync is done
+                isStage2 = true;
+            } catch (err) {
+                console.error(`❌ [InfiniteTalk] Stage 2 submission failed: ${err.message}`);
+                // Proceed with fallback (no lip-sync, FFmpeg audio mix)
+                updatePayload['generation.requiresInfiniteTalk'] = false;
             }
         }
         
@@ -4652,14 +4695,30 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         // Order matters: qAdsAgent sets <<<image_1>>> = product, <<<image_2>>> = avatar
         const finalReferenceImages = [...imageUrls, ...avatarFaceRefs].slice(0, 9);
 
-        const genResult = await submitVideoGeneration({
+        // ── SYNC TTS GENERATION FOR AUDIO-DRIVEN VIDEO ──
+        // Generate TTS audio *before* video generation so we can pass it to the video model
+        const dialogueLines = extractDialogueLines(finalPrompt);
+        let audioUrl = null;
+        if (dialogueLines.length > 0) {
+            console.log(`🎤 [Q-Ads V2] Pre-generating TTS for audio-driven video...`);
+            audioUrl = await generateQAdsTTS(dialogueLines, parsedSettings.language || 'English');
+        }
+
+        let genResult;
+        let finalModel = selectedModel;
+        
+        // We will run InfiniteTalk as a Stage 2 lip-sync pass AFTER the cinematic video is generated.
+        const requiresInfiniteTalk = avatarFaceRefs.length > 0 && audioUrl;
+
+        genResult = await submitVideoGeneration({
             prompt:           finalPrompt,
             model:            selectedModel,
             duration,
             aspectRatio,
             resolution,
             qualityMode:      'high',
-            generateAudio:    true,
+            generateAudio:    !audioUrl, // disable native audio if we generated TTS
+            refAudio:         audioUrl,
             imageUrl:         null,                     // No starting frame, pure R2V
             referenceImages:  finalReferenceImages,     // Avatar + Product(s) → Asset Library
             imageRole:        resolvedV2ImageRole,
@@ -4680,10 +4739,11 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                 input: {
                     brief: req.body.brief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
                     images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
+                    avatarUrl: avatarFaceRefs[0] || null, // Save avatarUrl for InfiniteTalk Stage 2
                 },
                 generation: {
                     provider: genResult.provider || 'atlascloud',
-                    model: selectedModel,
+                    model: finalModel, // Ensure the selected final model is saved
                     language: parsedSettings.language || 'English',
                     falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
@@ -4692,6 +4752,10 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     aspectRatio,
                     progress: 0,
                     status: 'GENERATING',
+                    // Save the pre-generated audio if available
+                    voiceoverUrl: audioUrl || '',
+                    voiceoverStatus: audioUrl ? 'done' : '',
+                    requiresInfiniteTalk, // Flag to trigger Stage 2 Video-to-Video lip-sync
                 },
             }).catch(e => { console.warn('[Q-Ads V2 Gen] VideoProject create failed:', e.message); return null; });
             projectId = project?._id;
@@ -7287,14 +7351,16 @@ router.get('/long-form/status/:jobId', protect, async (req, res) => {
                     'generation.videoUrl': status.videoUrl,
                     'generation.progress': 100,
                     'generation.status': 'COMPLETED',
+                    'generation.voiceoverStatus': 'done',
                     finalVideoUrl: status.videoUrl,
                 },
                 { returnDocument: 'after' }
             ).catch(() => null);
 
             // 🎤 Trigger async voiceover pipeline for completed videos
-            if (updatedProject && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
-                console.log(`🎤 [TTS] Triggering async voiceover pipeline for long-form project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+            // 🛑 SKIP for long-form because it already has per-scene TTS & lip-sync baked in
+            if (updatedProject && updatedProject.studioMode !== 'long-form' && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
+                console.log(`🎤 [TTS] Triggering async voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                 addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
             }
         }
