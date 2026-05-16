@@ -3978,23 +3978,23 @@ async function generateQAdsTTS(dialogueLines, language) {
 
     const fullScript = normalizedLines.map(l => l.text).join('. ');
     const dominantEmotion = normalizedLines[0]?.emotion || 'neutral';
-    const provider = isSarvamLang ? 'Sarvam' : 'OpenAI';
+    const provider = isSarvamLang ? 'Gemini' : 'OpenAI';
 
     console.log(`🎤 [TTS] Generating voiceover: lang=${language} (${langCode}), provider=${provider}, emotion=${dominantEmotion}, script=${fullScript.substring(0, 100)}...`);
 
     try {
         if (isSarvamLang) {
-            return await generateSarvamTTSInternal(fullScript, langCode, dominantEmotion);
+            return await generateGeminiTTSInternal(fullScript, language, langCode, dominantEmotion);
         } else {
             // All non-Indian languages → OpenAI gpt-4o-mini-tts with full emotional steering
             return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
         }
     } catch (e) {
         console.error(`❌ [TTS] Voiceover generation failed (${provider}): ${e.message}`);
-        // If Sarvam fails, try OpenAI as fallback
+        // If Gemini fails, try OpenAI as fallback
         if (isSarvamLang) {
             try {
-                console.log(`🔄 [TTS] Sarvam failed, trying OpenAI fallback for ${language}...`);
+                console.log(`🔄 [TTS] Gemini failed, trying OpenAI fallback for ${language}...`);
                 return await generateOpenAITTS(fullScript, dominantEmotion, language, langCode);
             } catch (fallbackErr) {
                 console.error(`❌ [TTS] OpenAI fallback also failed: ${fallbackErr.message}`);
@@ -4062,60 +4062,50 @@ async function generateOpenAITTS(text, emotion, language, langCode) {
 }
 
 /**
- * Internal Sarvam TTS call with emotion-to-pitch/pace mapping.
+ * Internal Gemini TTS call for regional languages.
  * Emotion tags drive the vocal delivery characteristics for Indian languages.
  */
-async function generateSarvamTTSInternal(text, langCode, emotion = 'neutral') {
-    const apiKey = process.env.SARVAM_API_KEY;
-    if (!apiKey) { console.warn('🎤 [TTS] Sarvam API key not configured — skipping'); return null; }
+async function generateGeminiTTSInternal(text, language, langCode, emotion = 'neutral') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) { console.warn('🎤 [TTS] Gemini API key not configured — skipping'); return null; }
 
-    // Emotion → Sarvam pitch/pace/loudness mapping
-    const EMOTION_MAP = {
-        excited:    { pitch: 2, pace: 1.2, loudness: 1.8 },
-        warm:       { pitch: 0, pace: 0.9, loudness: 1.3 },
-        urgent:     { pitch: 1, pace: 1.3, loudness: 1.8 },
-        calm:       { pitch: -1, pace: 0.85, loudness: 1.2 },
-        playful:    { pitch: 2, pace: 1.1, loudness: 1.5 },
-        dramatic:   { pitch: -2, pace: 0.75, loudness: 1.6 },
-        curious:    { pitch: 1, pace: 1.0, loudness: 1.4 },
-        confident:  { pitch: 0, pace: 0.95, loudness: 1.7 },
-        mysterious: { pitch: -1, pace: 0.8, loudness: 1.1 },
-        empathetic: { pitch: 0, pace: 0.85, loudness: 1.2 },
-        neutral:    { pitch: 0, pace: 1.0, loudness: 1.5 },
-    };
-    const emo = EMOTION_MAP[emotion] || EMOTION_MAP.neutral;
+    console.log(`🎤 [TTS] Gemini: voice=Aoede, lang=${language} (${langCode}), emotion=${emotion}, text=${text.length} chars`);
 
-    const voice = QADS_AUTO_VOICE[langCode] || { speaker: 'anushka' };
-    console.log(`🎤 [TTS] Sarvam: voice=${voice.speaker}, lang=${langCode}, emotion=${emotion} (pitch=${emo.pitch}, pace=${emo.pace}), text=${text.length} chars`);
+    const promptText = `Please speak the following text fluently in ${language} with a ${emotion} tone:\n\n${text.substring(0, 2000)}`;
 
-    const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+    const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + apiKey, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-subscription-key': apiKey },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            inputs: [text.substring(0, 2000)],
-            target_language_code: langCode,
-            speaker: voice.speaker,
-            model: 'bulbul:v2',
-            pitch: emo.pitch,
-            pace: emo.pace,
-            loudness: emo.loudness,
-            enable_preprocessing: true,
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+                }
+            }
         }),
     });
 
     if (!ttsResp.ok) {
         const errBody = await ttsResp.text().catch(() => '');
-        throw new Error(`Sarvam TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
+        throw new Error(`Gemini TTS failed (${ttsResp.status}): ${errBody.substring(0, 200)}`);
     }
 
     const ttsData = await ttsResp.json();
-    const audioBase64 = ttsData.audios?.[0];
-    if (!audioBase64) throw new Error('No audio returned from Sarvam');
+    const audioPart = ttsData.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+    
+    if (!audioPart?.inlineData?.data) {
+        throw new Error('No audio in Gemini TTS response');
+    }
 
-    const buffer = Buffer.from(audioBase64, 'base64');
-    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.wav`;
-    const audioUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
-    console.log(`✅ [TTS] Sarvam audio uploaded: ${audioUrl.substring(0, 70)}`);
+    const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
+    const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+    const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+    const s3Key = `qads/voiceover/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const audioUrl = await uploadToS3(buffer, s3Key, mimeType);
+    
+    console.log(`✅ [TTS] Gemini audio uploaded: ${audioUrl.substring(0, 70)}`);
     return audioUrl;
 }
 

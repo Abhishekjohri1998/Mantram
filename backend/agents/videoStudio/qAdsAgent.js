@@ -346,7 +346,13 @@ function parseVariants(rawText) {
                 .replace(/<<<image_\d+>>>\s*=.*\n?/g, '')
                 .replace(/[ \t]{2,}/g, ' ')
                 .trim();
-            variants.push({ variantId: label, prompt: cleanBody, legend });
+                
+            // Extract emotions from DIALOGUE [emotion]: "text" patterns
+            const emotionsMatch = [...cleanBody.matchAll(/DIALOGUE\s*(?:\[([^\]]+)\])?/gi)];
+            const emotions = emotionsMatch.map(m => (m[1] || 'neutral').trim().split(',')[0].trim().toLowerCase()).filter(Boolean);
+            const uniqueEmotions = [...new Set(emotions)];
+
+            variants.push({ variantId: label, prompt: cleanBody, legend, emotions: uniqueEmotions });
         }
     }
 
