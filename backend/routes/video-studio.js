@@ -2309,10 +2309,10 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
         }
 
         // Extract the generated image from response parts
-        const parts = geminiData.candidates?.[0]?.content?.parts || [];
+        const responseParts = geminiData.candidates?.[0]?.content?.parts || [];
         let enhancedBase64 = null;
         let enhancedMime = 'image/png';
-        for (const part of parts) {
+        for (const part of responseParts) {
             if (part.inlineData?.mimeType?.startsWith('image/')) {
                 enhancedBase64 = part.inlineData.data;
                 enhancedMime = part.inlineData.mimeType;
