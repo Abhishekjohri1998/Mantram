@@ -199,20 +199,23 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
 
     const busy = ['analyzing', 'prompting', 'generating'].includes(stage)
 
-    // ── Upload images (base64 → S3 via existing upload endpoint) ──
+    // ── Upload images: read as base64 for local preview + S3 for backend ──
+    // Uses /api/media/upload (the real endpoint, accepts base64 imageData)
     const handleFiles = useCallback(async (files) => {
         const arr = Array.from(files).slice(0, 4)
         const newImgs = []
         for (const f of arr) {
             const reader = new FileReader()
             const dataUrl = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(f) })
-            // Upload to get S3 URL
             try {
-                const form = new FormData(); form.append('file', f)
-                const d = await api('/upload/image', { method: 'POST', body: form })
+                // POST base64 to /api/media/upload → returns permanent S3 URL
+                const d = await api('/media/upload', {
+                    method: 'POST',
+                    body: JSON.stringify({ imageData: dataUrl, folder: 'motion-graphics' }),
+                })
                 newImgs.push({ url: d.url, preview: dataUrl, name: f.name })
             } catch {
-                // Fallback: store as base64 (analyze endpoint accepts inline data)
+                // Fallback: keep base64 — Gemini analyze accepts it inline; video gen will skip it
                 newImgs.push({ url: dataUrl, preview: dataUrl, name: f.name })
             }
         }
@@ -224,6 +227,26 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         handleFiles(e.dataTransfer.files)
     }, [handleFiles])
 
+    // ── Helper: ensure all image URLs are S3 http URLs (upload base64 ones first) ──
+    const ensureHttpUrls = async (imgs) => {
+        const result = []
+        for (const img of imgs) {
+            if (img.url.startsWith('http')) {
+                result.push(img.url)
+            } else if (img.url.startsWith('data:image/')) {
+                // base64 fallback — upload to S3 now
+                try {
+                    const d = await api('/media/upload', {
+                        method: 'POST',
+                        body: JSON.stringify({ imageData: img.url, folder: 'motion-graphics' }),
+                    })
+                    result.push(d.url)
+                } catch { /* skip — can't upload */ }
+            }
+        }
+        return result
+    }
+
     // ── Main pipeline ──
     const handleGenerate = async () => {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
@@ -231,15 +254,16 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         setError(''); setVideoUrl(null); setProgress(0)
 
         const brandName = activeBrand?.name || ''
-        const imageUrls = images.map(i => i.url)
+        // imageUrls for Gemini analysis — includes base64 (Gemini loads inline)
+        const imageUrlsAll = images.map(i => i.url)
 
-        // Stage 1: Analyze
+        // Stage 1: Analyze with Gemini Vision
         setStage('analyzing')
         let assetAnalysis = analysis
         try {
             const d = await api('/video-studio/motion-graphics/analyze', {
                 method: 'POST',
-                body: JSON.stringify({ imageUrls, brandName, userBrief: brief }),
+                body: JSON.stringify({ imageUrls: imageUrlsAll, brandName, userBrief: brief }),
             })
             assetAnalysis = d.analysis
             setAnalysis(d.analysis)
@@ -247,7 +271,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
             setError('Analysis failed: ' + e.message); setStage('error'); return
         }
 
-        // Stage 2: Generate prompt via Claude
+        // Stage 2: Generate prompt via Claude Motion Designer
         setStage('prompting')
         let finalPrompt = ''
         try {
@@ -269,15 +293,17 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
             setError('Prompt generation failed: ' + e.message); setStage('error'); return
         }
 
-        // Stage 3: Generate video
+        // Stage 3: Ensure all images are S3 URLs (Seedance rejects base64)
         setStage('generating'); setProgress(5)
+        const s3ImageUrls = await ensureHttpUrls(images)
+
         try {
             const d = await api('/video-studio/motion-graphics/generate-video', {
                 method: 'POST',
                 body: JSON.stringify({
                     brandId: activeBrand?._id,
-                    prompt: editedPrompt || finalPrompt,
-                    imageUrls,
+                    prompt: finalPrompt, // use AI prompt at generate time; user edits apply on Re-animate
+                    imageUrls: s3ImageUrls,
                     styleId: style,
                     duration,
                     aspectRatio: ratio,
@@ -292,17 +318,19 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         }
     }
 
-    // ── Regenerate with edited prompt ──
+    // ── Regenerate with edited prompt (Re-animate button) ──
     const handleRegenerate = async () => {
         if (!editedPrompt.trim()) return
         setError(''); setVideoUrl(null); setProgress(5); setStage('generating')
+        // Ensure S3 URLs before submitting
+        const s3ImageUrls = await ensureHttpUrls(images)
         try {
             const d = await api('/video-studio/motion-graphics/generate-video', {
                 method: 'POST',
                 body: JSON.stringify({
                     brandId: activeBrand?._id,
                     prompt: editedPrompt,
-                    imageUrls: images.map(i => i.url),
+                    imageUrls: s3ImageUrls,
                     styleId: style,
                     duration,
                     aspectRatio: ratio,

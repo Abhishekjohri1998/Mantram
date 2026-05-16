@@ -4342,6 +4342,12 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 async function fetchImageAsInlineData(imageUrl) {
     if (!imageUrl || typeof imageUrl !== 'string') return null
     try {
+        // Handle base64 data URIs directly (fallback when S3 upload failed on frontend)
+        if (imageUrl.startsWith('data:image/')) {
+            const match = imageUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!match) return null;
+            return { inlineData: { mimeType: match[1], data: match[2] } };
+        }
         let fetchUrl = imageUrl
         const isOurS3 = imageUrl.includes('amazonaws.com') && (
             imageUrl.includes('mantram-assets') ||
