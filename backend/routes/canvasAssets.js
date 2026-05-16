@@ -636,8 +636,6 @@ Make it look like it was produced by a world-class creative studio.`
         parts.push({ text: textPrompt })
 
         const { generateImageWithVertex } = require('../services/vertexImage');
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
-        let imageUrl = null
 
         for (const modelId of models) {
             try {
