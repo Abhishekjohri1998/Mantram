@@ -2267,9 +2267,6 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
         if (!prompt?.trim()) return res.status(400).json({ success: false, error: 'Enhancement prompt is required' });
         if (!imageBase64 && !imageUrl) return res.status(400).json({ success: false, error: 'Image is required' });
 
-        const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
-
         console.log(`🎨 Enhancing photo with Nanobanana 2: prompt="${prompt.substring(0, 60)}"`);
 
         // Get image as base64
@@ -2293,38 +2290,23 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
             imgMime = imgResp.headers.get('content-type') || 'image/png';
         }
 
-        // Call NanoBanana 2 (Gemini 3.1 Flash Image Preview) with the image + edit prompt
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiKey}`;
 
-        const geminiResp = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                // systemInstruction locks the model into photography mode — prevents 3D/illustration output
-                systemInstruction: {
-                    parts: [{ text: 'You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.' }]
-                },
-                contents: [{
-                    role: 'user',
-                    parts: [
-                        { inlineData: { mimeType: imgMime, data: imgBase64 } },
-                        { text: `Edit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.` },
-                    ],
-                }],
-                generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.1 },
-            }),
-            signal: AbortSignal.timeout(60000),
-        });
+        const promptText = `SYSTEM INSTRUCTION: You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.\n\nEdit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.`;
 
-        if (!geminiResp.ok) {
-            const errText = await geminiResp.text();
-            console.error('Nanobanana 2 enhance error:', geminiResp.status, errText.substring(0, 300));
-            throw new Error(`Nanobanana 2 enhancement failed (${geminiResp.status})`);
+        const parts = [
+            { inlineData: { mimeType: imgMime, data: imgBase64 } },
+            { text: promptText },
+        ];
+
+        let geminiData;
+        try {
+            geminiData = await generateImageWithVertex(parts, modelId, 0.1);
+        } catch(e) {
+            console.error('Nanobanana 2 enhance error:', e.message);
+            throw new Error(`Nanobanana 2 enhancement failed: ${e.message}`);
         }
-
-        const geminiData = await geminiResp.json();
-        if (geminiData.error) throw new Error(geminiData.error.message);
 
         // Extract the generated image from response parts
         const parts = geminiData.candidates?.[0]?.content?.parts || [];

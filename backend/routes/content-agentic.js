@@ -1134,10 +1134,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         }
 
         // ── Fallback: Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
-        const imageKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!imageKey) return res.status(500).json({ success: false, error: 'Image generation API key not configured' });
-
-        const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+        const { generateImageWithVertex } = require('../services/vertexImage');
         const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
         const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${arConfig.geminiInstruction}). `;
 
@@ -1168,30 +1165,12 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
 
         contentParts.push({ text: arInstruction + imagePrompt });
 
-        const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 90_000);
-        
-        let resp;
+        let data;
         try {
-            resp = await fetch(url, fetchOptions({
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: contentParts }],
-                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 },
-                }),
-                signal: controller.signal
-            }));
-        } finally {
-            clearTimeout(timeoutId);
-        }
-
-        const data = await resp.json();
-        if (data.error) {
-            console.error(`❌ NanoBanana 2 error: ${data.error.message}`);
-            return res.status(500).json({ success: false, error: `Image generation failed: ${data.error.message}` });
+            data = await generateImageWithVertex(contentParts, modelId);
+        } catch(e) {
+            console.error(`❌ NanoBanana 2 error: ${e.message}`);
+            return res.status(500).json({ success: false, error: `Image generation failed: ${e.message}` });
         }
 
         // Extract image from response
