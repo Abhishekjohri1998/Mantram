@@ -417,7 +417,7 @@ export async function uploadImageToHostedUrl(base64DataUri) {
 
 export async function submitAtlasCloudVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, generateAudio = true,
-    referenceImages = [], qualityMode = 'fast',
+    referenceImages = [], qualityMode = 'fast', resolution = '720p',
     imageRole = 'face', // 'face' (default, UGC Pro) | 'product' (Q-Ads — no face registration)
     refAudio = null,    // TTS audio URL for native lip-sync (Seedance 2.0)
 }) {
@@ -581,6 +581,7 @@ export async function submitAtlasCloudVideoGeneration({
         prompt:         finalPrompt,
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
+        resolution:     resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'),
         generate_audio: refAudio ? false : (generateAudio !== false), // Disable native audio when TTS is provided
     };
 

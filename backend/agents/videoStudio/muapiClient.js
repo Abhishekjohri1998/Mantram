@@ -106,6 +106,7 @@ export async function submitMuApiVideoGeneration({
     prompt,
     imageUrl,
     duration = 5,
+    resolution = '720p',
     aspectRatio = '16:9',
     qualityMode = 'fast',
     generateAudio = true,
@@ -128,6 +129,7 @@ export async function submitMuApiVideoGeneration({
     const payload = {
         prompt: finalPromptText,
         duration: mapDuration(duration),
+        resolution: resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'),
         aspect_ratio: mapAspectRatio(aspectRatio),
         quality: mapQuality(qualityMode),
         remove_watermark: true,

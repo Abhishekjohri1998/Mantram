@@ -42,7 +42,7 @@ import {
     ugcAvatarNode,
     ugcPromptBuilderNode,
 } from '../agents/videoStudio/nodes.js';
-import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration } from '../agents/videoStudio/falClient.js';
+import { estimateCost, getModelsInfo, MODEL_CAPABILITIES, submitVideoGeneration, getUnifiedGenerationStatus } from '../agents/videoStudio/falClient.js';
 import { submitAtlasCloudImageToVideo, submitAtlasCloudVideoExtend } from '../agents/videoStudio/atlasClient.js';
 import { listAvatars, listVoices, generateUGCVideo, generatePhotoAvatarVideo, getHeyGenVideoStatus, generateVideoWithAudio, uploadAssetToHeyGen, createPhotoAvatar, getPhotoAvatarStatus, checkPhotoGenStatus, generateVideoAgent, generatePlacementPoses, generatePlacementVideo, registerWebhook, generateLooks, addMotion, listAvatarGroups, listAvatarLooks } from '../agents/videoStudio/heygenClient.js';
 import { generateUGCScript, UGC_STYLES } from '../agents/videoStudio/ugcScriptGenerator.js';
@@ -3586,7 +3586,12 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
             return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
         }
 
-        const result = await pollAtlasCloudStatus(requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
 
         // Mirror completed videos to S3 (prevent provider URL expiry)
@@ -3794,7 +3799,12 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
 // ── GET /api/video-studio/ugc-pro/qads/status/:requestId ──
 router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
     try {
-        const result = await pollAtlasCloudStatus(req.params.requestId);
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.falRequestId': req.params.requestId }, { 'generation.requestId': req.params.requestId }, { 'generation.taskId': req.params.requestId }]
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, req.params.requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
 
         // 🛡️ SAFE MODE PIVOT: If Seedance blocked due to real person face detection,
         // automatically resubmit without the avatar image (product-only mode)
@@ -4280,7 +4290,15 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
             isStage2 = true;
         }
 
-        const result = await pollAtlasCloudStatus(activeTaskId);
+        const provider = project?.generation?.provider || 'atlascloud';
+        
+        // Pass the activeTaskId to the unified status function. If stage 2, it's an InfiniteTalk AtlasCloud task.
+        const result = await getUnifiedGenerationStatus(
+            isStage2 ? 'atlascloud' : provider, 
+            activeTaskId, 
+            project?.generation?.statusUrl, 
+            project?.generation?.resultUrl
+        );
 
         if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: isStage2 ? 60 : 10 });
 
@@ -4381,6 +4399,12 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
 async function fetchImageAsInlineData(imageUrl) {
     if (!imageUrl || typeof imageUrl !== 'string') return null
     try {
+        // Handle base64 data URIs directly (fallback when S3 upload failed on frontend)
+        if (imageUrl.startsWith('data:image/')) {
+            const match = imageUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!match) return null;
+            return { inlineData: { mimeType: match[1], data: match[2] } };
+        }
         let fetchUrl = imageUrl
         const isOurS3 = imageUrl.includes('amazonaws.com') && (
             imageUrl.includes('mantram-assets') ||
@@ -4757,6 +4781,314 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
     }
 });
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MOTION GRAPHICS STUDIO — Seedance 2 powered logo & asset animation
+// ══════════════════════════════════════════════════════════════════════════════
+
+const MG_STYLE_PRESETS = {
+    dynamic:   { label: 'Dynamic Motion',  emoji: '⚡', tempHint: 0.9, keywords: 'high-energy, kinetic motion, bold transforms, rapid acceleration, impact frames, chromatic trails, dynamic zoom bursts' },
+    elegant:   { label: 'Elegant',         emoji: '✨', tempHint: 0.7, keywords: 'smooth graceful motion, golden particle drift, silky transitions, luxury slow-motion, soft lens flare, refined easing curves' },
+    funky:     { label: 'Funky',           emoji: '🎸', tempHint: 1.0, keywords: 'retro glitch pops, saturated color bursts, rhythmic bounce, disco shimmer, organic wobbly deformation, syncopated rhythm' },
+    intro:     { label: 'Intro Reveal',    emoji: '🎬', tempHint: 0.8, keywords: 'cinematic logo reveal from darkness, volumetric light build-up, dramatic shadow sweep, majestic emergence, orchestral crescendo feel' },
+    outro:     { label: 'Outro / Sign-Off',emoji: '🎭', tempHint: 0.7, keywords: 'peaceful settling, particle dust dispersal, gentle fade to black, brand lockup hold, elegant dissolve, serene closing movement' },
+    minimal:   { label: 'Minimal Clean',   emoji: '◻️', tempHint: 0.6, keywords: 'clean precise motion, breathing white space, geometric precision, subtle scale pulse, quiet confidence, restrained elegance' },
+    cinematic: { label: 'Cinematic',       emoji: '🎥', tempHint: 0.8, keywords: 'filmic color grade, slow push-in, anamorphic lens flare, cinematic depth of field pull, dramatic lighting contrast, epic scale' },
+    glitch:    { label: 'Glitch / Cyber',  emoji: '🌐', tempHint: 0.95,keywords: 'digital glitch distortion, RGB channel split, neon scan lines, cyber grid overlay, data corruption aesthetic, holographic flicker' },
+    '3d':      { label: '3D Extrude',      emoji: '🎲', tempHint: 0.8, keywords: '3D extrusion reveal, volumetric depth, perspective rotation, ambient occlusion shadows, material sheen, studio three-point lighting' },
+    custom:    { label: 'Custom Style',    emoji: '🎨', tempHint: 0.85, keywords: '' },
+};
+
+// ── GET /api/video-studio/motion-graphics/presets ──
+router.get('/motion-graphics/presets', protect, async (req, res) => {
+    const presets = Object.entries(MG_STYLE_PRESETS).map(([id, p]) => ({ id, ...p }));
+    res.json({ success: true, presets });
+});
+
+// ── POST /api/video-studio/motion-graphics/analyze ──
+// Gemini Vision: deep-read uploaded logo/slides for brand identity signals
+router.post('/motion-graphics/analyze', protect, async (req, res) => {
+    try {
+        const { imageUrls, userBrief } = req.body;
+        if (!imageUrls || imageUrls.length === 0) {
+            return res.status(400).json({ success: false, error: 'At least one image is required' });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not configured' });
+
+        // Load image parts
+        const parts = [];
+        const labelsList = [];
+        for (let i = 0; i < Math.min(imageUrls.length, 4); i++) {
+            const part = await fetchImageAsInlineData(imageUrls[i]);
+            if (part) {
+                parts.push(part);
+                labelsList.push(`IMAGE ${i + 1}`);
+            }
+        }
+        if (parts.length === 0) {
+            return res.status(400).json({ success: false, error: 'Could not load any of the provided images' });
+        }
+
+        const analysisPrompt = `You are a senior Motion Graphics Director with 20 years of experience at top studios.
+
+Analyze the provided brand asset image(s) and return a precise JSON object that will be used to write a creative animation prompt.
+
+${userBrief ? `USER DIRECTION: "${userBrief}"` : ''}
+IMAGES PROVIDED: ${labelsList.join(', ')}
+
+Analyze EVERY detail:
+1. LOGO GEOMETRY — exact shapes, letterforms, icon elements, symmetry, negative space
+2. COLOR PALETTE — exact colors (hex-like descriptions), dominant hue, accent colors, contrast ratio
+3. BRAND PERSONALITY — premium/playful/corporate/bold/minimal — infer from visual language
+4. TEXT ELEMENTS — fonts present, weight, tracking, style (serif/sans/display/script)
+5. COMPOSITION — where is the focal point, visual balance, white space usage
+6. ANIMATION POTENTIAL — which elements could move, natural motion direction, recommended entrance/exit
+
+Return ONLY valid JSON in this exact shape:
+{
+  "logoGeometry": "...",
+  "colorPalette": { "primary": "...", "secondary": "...", "accent": "...", "bg": "..." },
+  "brandPersonality": "...",
+  "textElements": "...",
+  "composition": "...",
+  "animatableElements": ["element1", "element2"],
+  "naturalMotionDirection": "...",
+  "recommendedStyle": "dynamic|elegant|funky|intro|outro|minimal|cinematic|glitch|3d",
+  "moodKeywords": ["keyword1", "keyword2", "keyword3"],
+  "technicalNotes": "..."
+}`;
+
+        parts.push({ text: analysisPrompt });
+
+        const geminiResp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' },
+                }),
+                signal: AbortSignal.timeout(40_000),
+            }
+        );
+
+        const geminiData = await geminiResp.json();
+        if (geminiData.error) throw new Error(geminiData.error.message);
+
+        const rawText = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '{}';
+        let analysis = {};
+        try { analysis = JSON.parse(rawText); } catch { analysis = { raw: rawText }; }
+
+        console.log(`[Motion Graphics] Asset analysis complete: ${Object.keys(analysis).length} fields extracted`);
+        res.json({ success: true, analysis });
+    } catch (err) {
+        console.error('[Motion Graphics] Analyze error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/motion-graphics/generate-prompt ──
+// Claude claude-sonnet-4-6: Motion Graphic Designer writes the Seedance 2 animation prompt
+router.post('/motion-graphics/generate-prompt', protect, async (req, res) => {
+    try {
+        const { analysis, styleId, customStyle, userBrief, duration = 8 } = req.body;
+        if (!analysis) return res.status(400).json({ success: false, error: 'Asset analysis is required' });
+
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (!anthropicKey) return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
+
+        const preset = MG_STYLE_PRESETS[styleId] || MG_STYLE_PRESETS.dynamic;
+        const styleKeywords = styleId === 'custom' ? (customStyle || 'creative motion') : preset.keywords;
+        const styleName = styleId === 'custom' ? customStyle : preset.label;
+        const temperature = preset.tempHint || 0.85;
+
+        const systemPrompt = `You are the world's most creative Motion Graphics Director — a visionary who has crafted title sequences for major film studios, brand launches for Fortune 500 companies, and award-winning logo animations.
+
+Your specialty: writing PRECISE, CINEMATIC, TECHNICALLY DETAILED animation prompts for AI video models (specifically Seedance 2) that produce jaw-dropping motion graphics.
+
+RULES FOR YOUR PROMPTS:
+1. Be SPECIFIC, not vague. "Logo scales up 20% with overshoot easing" not "logo animates in"
+2. Describe EVERY motion beat — entrance, mid-hold, exit or loop
+3. Include particle systems, light effects, environmental atmosphere
+4. Specify camera behavior explicitly (static / slow push / orbit / zoom)
+5. Describe timing: what happens at 0s, 1s, 2s, 3s, etc.
+6. Include color treatment (warm/cool grade, saturation boost, contrast)
+7. Describe sound-design-inspired motion (even though no audio) — "beat-driven", "staccato pops"
+8. ALWAYS start with the visual opening state, not brand context
+9. Write ONE continuous flowing paragraph — no bullet points, no headers
+10. Max 400 words. Dense, specific, cinematic.`;
+
+        const userMessage = `Create a Seedance 2 motion graphics animation prompt for this brand asset.
+
+BRAND ASSET ANALYSIS:
+- Logo Geometry: ${analysis.logoGeometry || 'N/A'}
+- Color Palette: Primary: ${analysis.colorPalette?.primary || 'N/A'} | Secondary: ${analysis.colorPalette?.secondary || 'N/A'} | Accent: ${analysis.colorPalette?.accent || 'N/A'}
+- Brand Personality: ${analysis.brandPersonality || 'N/A'}
+- Text Elements: ${analysis.textElements || 'N/A'}
+- Composition: ${analysis.composition || 'N/A'}
+- Animatable Elements: ${(analysis.animatableElements || []).join(', ') || 'N/A'}
+- Natural Motion Direction: ${analysis.naturalMotionDirection || 'N/A'}
+- Mood Keywords: ${(analysis.moodKeywords || []).join(', ') || 'N/A'}
+- Technical Notes: ${analysis.technicalNotes || 'N/A'}
+
+ANIMATION STYLE: ${styleName}
+STYLE DNA: ${styleKeywords}
+${userBrief ? `USER'S CREATIVE DIRECTION: "${userBrief}"` : ''}
+TARGET DURATION: ${duration} seconds
+OUTPUT FORMAT: Seedance 2 video generation (text-to-video / image-to-video)
+
+Write the animation prompt now. Be the motion graphics director the brand deserves.`;
+
+        const claudeResp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': anthropicKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 1024,
+                temperature,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userMessage }],
+            }),
+            signal: AbortSignal.timeout(45_000),
+        });
+
+        const claudeData = await claudeResp.json();
+        if (claudeData.error) throw new Error(claudeData.error.message);
+
+        const motionPrompt = claudeData.content?.[0]?.text?.trim() || '';
+        if (!motionPrompt) throw new Error('Claude returned empty prompt');
+
+        console.log(`[Motion Graphics] Claude prompt generated: ${motionPrompt.length} chars, style=${styleId}`);
+        res.json({ success: true, motionPrompt, styleId, styleName });
+    } catch (err) {
+        console.error('[Motion Graphics] generate-prompt error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/motion-graphics/generate-video ──
+// Submit to Seedance 2 via Atlas Cloud
+router.post('/motion-graphics/generate-video', protect, requireCredits('qAdsGenerate'), async (req, res) => {
+    try {
+        const { brandId, prompt, imageUrls = [], styleId, duration = 8, aspectRatio = '16:9', resolution = '1080p', model = 'seedance-2.0' } = req.body;
+        if (!prompt?.trim()) return res.status(400).json({ success: false, error: 'prompt is required' });
+
+        const validImages = (Array.isArray(imageUrls) ? imageUrls : []).filter(u => u && u.startsWith('http'));
+        console.log(`[Motion Graphics] Submitting: model=${model}, ${duration}s, ${aspectRatio}, ${resolution}, style=${styleId}, ${validImages.length} ref images`);
+
+        const genResult = await submitVideoGeneration({
+            prompt: prompt.trim(),
+            model,
+            duration: Math.min(parseInt(duration), 15),
+            aspectRatio,
+            resolution,
+            qualityMode: 'high',
+            generateAudio: false,
+            imageUrl: validImages[0] || null,
+            referenceImages: validImages.slice(1, 4),
+            imageRole: 'product',
+        });
+
+        // Persist as VideoProject for history
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || undefined,
+            studioMode: 'motion-graphics',
+            mode: 'motion-graphics',
+            status: 'generating',
+            title: `Motion Graphics [${(MG_STYLE_PRESETS[styleId]?.label || styleId || 'Custom')}]`,
+            backendPrompt: prompt.trim(),
+            input: {
+                brief: prompt.trim().substring(0, 200),
+                images: validImages.map((u, i) => ({ url: u, source: 'upload', label: `asset-${i + 1}` })),
+            },
+            generation: {
+                provider: genResult.provider || 'atlascloud',
+                model,
+                falRequestId: genResult.requestId || genResult.taskId,
+                taskId: genResult.requestId || genResult.taskId,
+                requestId: genResult.requestId || genResult.taskId,
+                duration: Math.min(parseInt(duration), 15),
+                aspectRatio,
+                progress: 0,
+                status: 'GENERATING',
+            },
+            advancedConfig: { styleId, aspectRatio, duration, resolution },
+        }).catch(e => { console.warn('[Motion Graphics] VideoProject create failed:', e.message); return null; });
+
+        res.json({
+            success: true,
+            projectId: project?._id || null,
+            requestId: genResult.requestId || genResult.taskId,
+            provider: 'atlascloud',
+            prompt: prompt.trim(),
+            duration: Math.min(parseInt(duration), 15),
+            aspectRatio,
+        });
+    } catch (err) {
+        console.error('[Motion Graphics] generate-video error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/motion-graphics/status/:requestId ──
+// Poll Atlas Cloud for motion graphics video status
+router.get('/motion-graphics/status/:requestId', protect, async (req, res) => {
+    try {
+        const { requestId } = req.params;
+        if (!requestId || requestId === 'undefined') {
+            return res.json({ success: true, status: 'FAILED', error: 'Invalid request ID' });
+        }
+
+        const project = await VideoProject.findOne({
+            $or: [{ 'generation.requestId': requestId }, { 'generation.taskId': requestId }, { 'generation.falRequestId': requestId }], user: req.user._id, studioMode: 'motion-graphics'
+        });
+        const provider = project?.generation?.provider || 'atlascloud';
+
+        const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
+        if (!result) return res.json({ success: true, status: 'IN_PROGRESS', progress: 10 });
+
+        const updatePayload = { 'generation.progress': result.progress || 0 };
+
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            const s3VideoUrl = await ensureS3Url(result.videoUrl, `motion-graphics/video-${Date.now()}.mp4`);
+            if (s3VideoUrl) result.videoUrl = s3VideoUrl;
+        }
+
+        if (result.videoUrl) updatePayload['generation.videoUrl'] = result.videoUrl;
+        if (result.error)    updatePayload['generation.error']    = result.error;
+        if (result.status === 'COMPLETED' || result.status === 'FAILED') {
+            updatePayload.status = result.status === 'COMPLETED' ? 'done' : 'failed';
+            updatePayload['generation.status'] = result.status;
+        }
+        if (result.status === 'COMPLETED' && result.videoUrl) {
+            updatePayload.finalVideoUrl = result.videoUrl;
+        }
+
+        await VideoProject.findOneAndUpdate(
+            { $or: [{ 'generation.requestId': requestId }, { 'generation.taskId': requestId }, { 'generation.falRequestId': requestId }], user: req.user._id, studioMode: 'motion-graphics' },
+            { $set: updatePayload }
+        ).catch(e => console.warn('[Motion Graphics Status] DB update failed:', e.message));
+
+        res.json({
+            success: true,
+            status: result.status,
+            progress: result.progress,
+            videoUrl: result.videoUrl || null,
+            error: result.error || null,
+        });
+    } catch (err) {
+        console.error('[Motion Graphics Status] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/:id/select — User picks a concept → script director

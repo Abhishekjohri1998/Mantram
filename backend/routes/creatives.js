@@ -460,7 +460,9 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
         try {
             // ── ⚡ OPT 4: Pipeline timeout 45s → 20s — if stuck, raw prompt works fine ──
             const pipelineTimeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Pipeline timeout (20s) — using raw prompt')), 20_000)
+                // 65s: Claude Sonnet unified call takes 22-28s + VG (5-8s) + Brand Intel (2-5s) = ~35-40s.
+                // 65s gives a comfortable margin before we fall back to raw prompt.
+                setTimeout(() => reject(new Error('Pipeline timeout (65s) — using raw prompt')), 65_000)
             );
             pipelineResult = await Promise.race([
                 runCreativePipeline({
@@ -2301,7 +2303,7 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         // Import the full agentic pipeline runner
         const { runCreativePipeline } = await import('../agents/creativeStudio/nodes.js');
 
-        // Run pipeline in FAST mode — Brand Intel + Visual Grounding + Fast Creative Director
+        // Run pipeline in FAST mode — Brand Intel + Visual Grounding + Unified Creative Engine (Claude Sonnet)
         // This is the same pipeline used during image generation, just without the image generation step
         const pipelineResult = await runCreativePipeline({
             brandId,
@@ -2310,7 +2312,7 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
             aspectRatio: aspectRatio || '1:1',
             style: style || '',
             imageModel: imageModel || 'nanobanana-2',
-            mode: 'fast',        // uses fastCreativeDirectorNode (Art Director + Prompt Engineer in 1 call)
+            mode: 'fast',        // uses unifiedCreativeEngineNode (Art Director + PE + Copywriter + Typographer in 1 Claude call)
             generateCopy: false, // no copy during enhancement
         });
 
@@ -2325,9 +2327,14 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         // Clean up any pipeline-injected metadata headers (VISUAL GROUNDING sections etc.) for display
         let cleanPrompt = enhancedPrompt;
         // Strip visual grounding injection block if it appears (it's for the model, not for display)
-        const groundingIdx = cleanPrompt.indexOf('\nVISUAL GROUNDING (from real product/brand photos):');
+        // The grounding block is now front-loaded with this header:
+        const groundingIdx = cleanPrompt.indexOf('VISUAL GROUND TRUTH (from real product/brand photos');
         if (groundingIdx !== -1) {
-            cleanPrompt = cleanPrompt.substring(0, groundingIdx).trim();
+            // Find where the actual image prompt starts (after the grounding block)
+            const promptStartIdx = cleanPrompt.indexOf('\n\n', groundingIdx);
+            cleanPrompt = promptStartIdx !== -1
+                ? cleanPrompt.substring(promptStartIdx).trim()
+                : cleanPrompt.substring(0, groundingIdx).trim();
         }
 
         console.log(`✨ [EnhancePrompt] Done in ${pipelineResult.pipelineTimeMs}ms — enhanced from ${prompt.length} to ${cleanPrompt.length} chars`);
@@ -4236,17 +4243,24 @@ router.post('/lifestyle-mockup', protect, requireStudio('creativeStudio'), requi
                     console.log(`🎨 Brand harmonize colors: ${colorList}`);
                 }
 
-                // Agentic scene enhancement — use ArtDirector to create a richer scene
+                // Agentic scene enhancement — use Unified Creative Engine to build a richer scene
+                // Wrapped with 45s timeout (Claude Sonnet now drives this path)
                 try {
-                    const pipelineResult = await runCreativePipeline({
-                        brandId,
-                        brief: `Product lifestyle mockup scene: ${enhancedScene}. Style: professional product photography.`,
-                        format: 'lifestyle-mockup',
-                        aspectRatio,
-                        style: 'photorealistic',
-                        imageModel: 'nanobanana-2',
-                        mode: 'fast', // Always fast for mockups — speed matters
-                    });
+                    const mockupPipelineTimeout = new Promise((_, rej) =>
+                        setTimeout(() => rej(new Error('Mockup pipeline timeout (45s)')), 45_000)
+                    );
+                    const pipelineResult = await Promise.race([
+                        runCreativePipeline({
+                            brandId,
+                            brief: `Product lifestyle mockup scene: ${enhancedScene}. Style: professional product photography.`,
+                            format: 'lifestyle-mockup',
+                            aspectRatio,
+                            style: 'photorealistic',
+                            imageModel: 'nanobanana-2',
+                            mode: 'fast', // Always fast for mockups — speed matters
+                        }),
+                        mockupPipelineTimeout,
+                    ]);
                     if (pipelineResult.finalPrompt) {
                         enhancedScene = pipelineResult.finalPrompt;
                         console.log(`🤖 Agentic scene enhanced in ${pipelineResult.pipelineTimeMs}ms`);

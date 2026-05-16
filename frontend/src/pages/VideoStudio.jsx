@@ -13,6 +13,7 @@ import UGCPro from '../components/VideoStudio/UGCPro'
 import QAds from '../components/VideoStudio/QAds'
 import QAdsV2 from '../components/VideoStudio/QAdsV2'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
+import MotionGraphics from '../components/VideoStudio/MotionGraphics'
 import VideoUpgradeModal from '../components/VideoUpgradeModal'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow'
@@ -878,6 +879,7 @@ export default function VideoStudio() {
                             { id: 'q-ads', icon: 'ads_click', label: 'Q-Ads' },
                             { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
+                            { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             // { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setStudioMode(tab.id)}
@@ -1246,6 +1248,11 @@ export default function VideoStudio() {
                 {/* ── VIDEO AGENT MODE ── */}
                 {studioMode === 'agent' && (
                     <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                )}
+
+                {/* ── MOTION GRAPHICS MODE ── */}
+                {studioMode === 'motion-graphics' && (
+                    <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
                 {/* ── STORYBOARD MODE ── */}

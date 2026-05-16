@@ -3,11 +3,11 @@
  */
 
 import config from '../../config/env.js';
-import { submitKieVideoGeneration } from './kieClient.js';
-import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration } from './atlasClient.js';
-import { submitMuApiVideoGeneration } from './muapiClient.js';
+import { submitKieVideoGeneration, getKieGenerationStatus } from './kieClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
+import { submitMuApiVideoGeneration, getMuApiGenerationStatus } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
-import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
+import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoStatus } from './laozhangClient.js';
 import { getSetting } from '../../models/SystemSettings.js';
 import { getActiveProvider } from '../../ai/providerRouting.js';
 
@@ -352,7 +352,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo, imageRole }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
 
     // Enforce provider-specific prompt length limits
@@ -404,10 +404,10 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
             try {
                 const result = await submitAtlasCloudVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: seedanceMode,
-                    refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-r2v',
@@ -421,12 +421,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }
         
         // Standard routing (no face refs) — use active provider or cascade
-        const provider = activeProvider || 'muapi';
+        const provider = 'atlascloud'; // Forced per user request (no muapi credits)
         console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
         try {
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', qualityMode: seedanceMode,
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
@@ -438,10 +438,10 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'atlascloud' || provider === 'piapi') {
                 const result = await submitAtlasCloudVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: seedanceMode,
-                    refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
@@ -616,6 +616,22 @@ export async function extendVideoGeneration({ model, parentTaskId, prompt, durat
         }
     }
     return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
+}
+
+export async function getUnifiedGenerationStatus(provider, requestId, statusUrl, resultUrl) {
+    if (provider === 'muapi') {
+        return await getMuApiGenerationStatus(requestId);
+    } else if (provider === 'atlascloud') {
+        return await getAtlasCloudGenerationStatus(requestId);
+    } else if (provider === 'laozhang') {
+        return await getLaozhangVideoStatus(requestId);
+    } else if (provider === 'kie') {
+        return await getKieGenerationStatus(requestId);
+    } else if (provider === 'grok') {
+        return await getGrokGenerationStatus(requestId);
+    } else {
+        return await getGenerationStatus(requestId, statusUrl, resultUrl);
+    }
 }
 
 export async function getGenerationStatus(requestId, statusUrl, resultUrl) {

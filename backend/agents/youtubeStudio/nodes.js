@@ -241,8 +241,7 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
         : '';
 
     const userPrompt = [
-        brandContext || 'No brand context',
-        '',
+        `=== VIDEO CONTENT (THIS DICTATES THE ACTUAL COPY) ===`,
         `VIDEO TITLE: ${metadata.title || 'Unknown'}`,
         `CHANNEL: ${metadata.channelTitle}`,
         `VIEWS: ${metadata.viewCount?.toLocaleString()}`,
@@ -256,6 +255,10 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
         chapterText,
         '',
         `TRANSCRIPT EXCERPT:\n${transcript.text?.substring(0, 5000) || 'N/A'}`,
+        '',
+        `=== BRAND DNA (THIS DICTATES VOICE, TONE AND KEYWORDS ONLY) ===`,
+        `CRITICAL INSTRUCTION: Do NOT hallucinate brand products, services, or taglines into the copy if they are not actually in the video content. The video content is the ground truth. Use Brand DNA ONLY for the stylistic voice, tone, and formatting.`,
+        brandContext || 'No brand context',
     ].join('\n');
 
     // Use xAI Grok for SEO — great at trending language and CTR-optimised copy
@@ -371,8 +374,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
 
     // ── Build the user prompt for the Creative Director ───────────────────────
     const userPrompt = [
-        brandContext || 'No brand context',
-        '',
+        `=== VIDEO CONTENT (THIS DICTATES THE SCENE, ACTION, AND COPY) ===`,
         `VIDEO TITLE: ${videoTitle}`,
         `SUMMARY: ${analysis.summary}`,
         `EMOTIONAL ARC: ${analysis.emotionalArc}`,
@@ -395,6 +397,10 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
         frameImageParts.length > 0
             ? `SCREEN GRABS PROVIDED: ${frameImageParts.length} real frames from this video are attached as images. Analyze them visually — identify the most emotionally powerful frame, the character expressions, the color palette, and the composition. Ground your thumbnail concept in what you actually SEE in these frames.`
             : `NOTE: No screen grabs available. Base your concept on the text descriptions above.`,
+        '',
+        `=== BRAND DNA (THIS DICTATES VISUAL STYLE AND VIBE ONLY) ===`,
+        `CRITICAL INSTRUCTION: Do NOT hallucinate brand products, services, or brand messaging into the video's thumbnail scene or copy. The scene and copy must be 100% about the VIDEO CONTENT above. Use the Brand DNA *only* to inform color palette, font styles, and overall aesthetic vibe.`,
+        brandContext || 'No brand context',
     ].join('\n');
 
     // ── Call Gemini Vision directly (supports inline image arrays) ────────────
@@ -788,46 +794,69 @@ Return ONLY a JSON object, no markdown:
     ].filter(Boolean).join('\n');
 
 
-    console.log(`   🚀 [gpt-image-2] Generating 16:9 HD thumbnail...`);
+    console.log(`   🚀 [gemini] Generating 16:9 HD thumbnail...`);
     console.log(`   Overlay text: "${overlayText}" | Lower-third: "${bestClickbaitCopy.substring(0, 50)}"`);
 
     const router = getRouter();
-    const openaiProvider = router.providers.openai;
 
-    // ── Try GPT Image 2 — with screen grab reference if available ────────────────────
-    // Use generateImageEdit when we have a reference frame (passes image as actual input)
-    // Use generateImage (text-to-image) as fallback when no frame is available
+    // ── Inject explicit image role labels for Gemini ──
+    const imageParts = [
+        ...(referenceFramePart ? [referenceFramePart] : []),  // ✅ actual video frame
+        ...(leadPortraitPart   ? [leadPortraitPart]   : []),  // ✅ character portrait
+        ...(templateRefPart    ? [templateRefPart]    : []),  // ✅ template style guide
+    ];
+
+    let finalPrompt = genPrompt;
+    if (imageParts.length > 0) {
+        const imageRolePreamble = [
+            `\nREFERENCE IMAGES PROVIDED (${imageParts.length} image${imageParts.length > 1 ? 's' : ''}):`,
+        ];
+        
+        let idx = 1;
+        if (referenceFramePart) {
+            imageRolePreamble.push(`- IMAGE ${idx++}: SCREEN GRAB REFERENCE — Your output MUST feature this EXACT scene and people. Reproduce the characters, colors, and setting with maximum fidelity. Do NOT substitute or hallucinate.`);
+        }
+        if (leadPortraitPart) {
+            imageRolePreamble.push(`- IMAGE ${idx++}: LEAD CHARACTER PORTRAIT — Use this for face preservation. Maintain the person's likeness, skin tone, and features accurately.`);
+        }
+        if (templateRefPart) {
+            imageRolePreamble.push(`- IMAGE ${idx++}: STYLE TEMPLATE REFERENCE — Use this to match the graphic design layout, color palette, and broadcast aesthetic.`);
+        }
+        
+        imageRolePreamble.push(`CRITICAL: The reference images are the GROUND TRUTH. Your generated image must be visually consistent with them.\n`);
+        finalPrompt = imageRolePreamble.join('\n') + '\n' + genPrompt;
+    }
+
     try {
-        let finalUrl;
+        const result = await router.generateImage({
+            prompt: finalPrompt,
+            aspectRatio: '16:9',
+            imageParts: imageParts,
+        }, { provider: 'gemini' });
 
-        if (referenceFramePart && openaiProvider?.isAvailable() && typeof openaiProvider.generateImageEdit === 'function') {
-            // PRIMARY: generateImageEdit — GPT Image 2 sees the actual video frame
-            console.log(`   🎬 [gpt-image-2 edit] Using screen grab reference frame as visual anchor...`);
-            const editResult = await openaiProvider.generateImageEdit({
-                prompt: genPrompt,
-                referenceImageBase64: referenceFramePart.inlineData.data,
-                referenceImageMime: referenceFramePart.inlineData.mimeType,
-                size: '1536x1024',
-            });
-            const b64 = editResult?.b64 || editResult?.b64_json;
-            if (!b64) throw new Error('generateImageEdit returned no b64');
-            const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}-edit.png`;
-            finalUrl = await uploadBase64ToS3(b64, s3Key);
-            console.log(`   ✅ [gpt-image-2 edit] Screen-grounded → S3: ${finalUrl.substring(0, 80)}`);
-        } else {
-            // FALLBACK: text-to-image (no frame available or generateImageEdit not available)
-            console.log(`   🎨 [gpt-image-2 generate] Text-to-image (no screen grab available)...`);
-            const result = await router.generateImage({
-                prompt:      genPrompt,
+        const rawUrl = typeof result === 'string' ? result : result.imageUrl;
+        const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
+        console.log(`✅ [thumbnailGenerationNode] Gemini image generation success → S3: ${finalUrl?.substring(0, 80)}`);
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
+
+    } catch (gemErr) {
+        console.warn(`❌ [thumbnailGenerationNode] Gemini failed: ${gemErr.message}`);
+        
+        // ── Fallback to OpenAI GPT Image 2 if Gemini fails ──
+        try {
+            console.log(`   🎨 [gpt-image-2 generate] Falling back to text-to-image...`);
+            const fallbackResult = await router.generateImage({
+                prompt:      genPrompt, // use original text-only prompt
                 model:       'gpt-image-2',
                 aspectRatio: '16:9',
                 quality:     'hd',
             }, { provider: 'openai' });
 
-            const rawUrl   = typeof result === 'string' ? result : result.imageUrl;
-            const b64Raw   = result?.b64 || result?.b64_json || null;
+            const rawUrl   = typeof fallbackResult === 'string' ? fallbackResult : fallbackResult.imageUrl;
+            const b64Raw   = fallbackResult?.b64 || fallbackResult?.b64_json || null;
             const isDataUri = rawUrl?.startsWith('data:');
 
+            let finalUrl;
             if (b64Raw) {
                 const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
                 finalUrl = await uploadBase64ToS3(b64Raw, s3Key);
@@ -840,36 +869,12 @@ Return ONLY a JSON object, no markdown:
             } else {
                 throw new Error('GPT Image 2 returned no usable image data');
             }
-            console.log(`   ✅ [gpt-image-2 generate] → S3: ${finalUrl.substring(0, 80)}`);
+            console.log(`   ✅ [gpt-image-2 generate fallback] → S3: ${finalUrl.substring(0, 80)}`);
+            return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2-fallback' };
+        } catch (gptErr) {
+            console.warn(`❌ [thumbnailGenerationNode] Both providers failed: ${gptErr.message}`);
+            return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
         }
-
-        console.log(`✅ [thumbnailGenerationNode] GPT Image 2 success → S3`);
-        return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: referenceFramePart ? 'gpt-image-2-edit' : 'gpt-image-2' };
-
-    } catch (gptErr) {
-        console.warn(`⚠️ [thumbnailGenerationNode] GPT Image 2 failed: ${gptErr.message} — trying Gemini fallback`);
-    }
-
-
-    // ── Fallback: Gemini 3.1 Flash Image — include screen grab as reference ────────
-    try {
-        const result = await router.generateImage({
-            prompt: genPrompt,
-            aspectRatio: '16:9',
-            imageParts: [
-                ...(referenceFramePart ? [referenceFramePart] : []),  // ✅ actual video frame
-                ...(leadPortraitPart   ? [leadPortraitPart]   : []),  // ✅ character portrait
-                ...(templateRefPart    ? [templateRefPart]    : []),  // ✅ template style guide
-            ],
-        }, { provider: 'gemini' });
-
-        const rawUrl = typeof result === 'string' ? result : result.imageUrl;
-        const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
-        console.log(`✅ [thumbnailGenerationNode] Gemini fallback success → S3`);
-        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
-    } catch (gemErr) {
-        console.warn(`❌ [thumbnailGenerationNode] Both providers failed: ${gemErr.message}`);
-        return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
     }
 }
 
@@ -899,139 +904,41 @@ Return ONLY a JSON object, no markdown:
 export async function characterPortraitNode({ analysis, video, brandContext }) {
     const characters   = analysis?.characters || [];
     const referenceUrl = video?.metadata?.thumbnailUrl || null;
-    const videoTitle   = video?.metadata?.title || 'YouTube video';
+    const ytId         = video?.videoId || (video?.youtubeUrl && video.youtubeUrl.split('v=')[1]);
 
     if (!characters.length) {
         console.log('ℹ️ [characterPortraitNode] No characters identified — skipping');
         return { characterPortraits: [] };
     }
 
-    console.log(`👤 [characterPortraitNode] Visual-grounded portraits for ${characters.length} character(s)`);
-    console.log(`   Reference URL: ${referenceUrl || 'none'}`);
+    console.log(`👤 [characterPortraitNode] Fetching visual screen grabs for ${characters.length} character(s)`);
 
-    const router = getRouter();
-
-    // ── Pre-load reference thumbnail once (shared across all portrait requests) ─
-    let referenceB64   = null;
-    let referenceMime  = 'image/jpeg';
-
-    if (referenceUrl) {
-        try {
-            const imgRes = await fetch(referenceUrl, { signal: AbortSignal.timeout(10000) });
-            if (imgRes.ok) {
-                const buf    = await imgRes.arrayBuffer();
-                referenceB64 = Buffer.from(buf).toString('base64');
-                referenceMime = imgRes.headers.get('content-type') || 'image/jpeg';
-                console.log(`   ✅ Reference thumbnail loaded (${Math.round(buf.byteLength / 1024)}KB) — shared across portraits`);
-            }
-        } catch (err) {
-            console.warn(`   ⚠️ Could not load reference thumbnail: ${err.message}`);
+    const characterPortraits = characters.slice(0, 3).map((char) => {
+        let frameSeek = null;
+        if (char.firstAppearance) {
+            const parts = char.firstAppearance.split(':').map(Number);
+            frameSeek = parts.length === 3
+                ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                : parts[0] * 60 + (parts[1] || 0);
         }
-    }
 
-    // ── Step 1: Get visual descriptions for each character via Gemini Vision ──
-    // This uses the reference thumbnail to get precise visual details
-    let visualDescriptions = {};
-    if (referenceB64) {
-        try {
-            const descResult = await callMultimodalAgent(
-                `You are a character identification specialist.
-Given a YouTube video thumbnail, identify each visible person and describe their physical appearance in detail.
-For each person you can see, provide: hair color and style, approximate age, skin tone, clothing description, distinctive features.
-Return ONLY valid JSON:
-{
-  "characters": [
-    { "position": "left|center|right|foreground|background", "description": "detailed visual description" }
-  ]
-}`,
-                `Thumbnail from YouTube video: "${videoTitle}".
-The video has these characters: ${characters.map(c => `${c.label} (${c.role})`).join(', ')}.
-Describe each visible person's exact appearance so I can generate accurate portraits.`,
-                [`data:${referenceMime};base64,${referenceB64}`],
-                { temperature: 0.1, maxTokens: 1024 }
-            );
-            if (descResult?.characters) {
-                // Map descriptions by index to characters (ordered by screen position)
-                descResult.characters.forEach((desc, i) => {
-                    if (i < characters.length) {
-                        visualDescriptions[characters[i].label] = desc.description;
-                    }
-                });
-                console.log(`   ✅ Visual descriptions obtained for ${Object.keys(visualDescriptions).length} characters`);
-            }
-        } catch (err) {
-            console.warn(`   ⚠️ Visual description pass failed: ${err.message} — using label-only fallback`);
-        }
-    }
+        const portraitUrl = (ytId && frameSeek != null)
+            ? `https://img.youtube.com/vi_webp/${ytId}/${Math.max(1, Math.floor(frameSeek))}.webp`
+            : referenceUrl;
 
-    // ── Step 2: Generate portraits with visual grounding ──────────────────────
-    const portraits = await Promise.allSettled(
-        characters.slice(0, 3).map(async (char) => {
-
-            const visualDesc = visualDescriptions[char.label]
-                ? `Based on the reference image, this person has: ${visualDescriptions[char.label]}`
-                : `${char.label}, a ${char.role || 'presenter'} in this video.`;
-
-            // Hint about where in the frame the person appears
-            const positionHint = char.position
-                ? `They are typically positioned: ${char.position.replace(/-/g, ' ')}.`
-                : '';
-
-            const prompt = [
-                `Professional portrait photograph of a real person from YouTube video "${videoTitle}".`,
-                visualDesc,
-                positionHint,
-                referenceB64
-                    ? `IMPORTANT: Use the reference image provided. Reproduce EXACTLY this specific person's appearance.`
-                      + ` Do NOT invent or blend with a different person.`
-                    : '',
-                `Clean studio portrait style, professional lighting, sharp focus on this person's face.`,
-                `High quality, 1:1 square format, YouTube content creator headshot.`,
-                `Neutral or softly blurred background. No text or watermarks.`,
-            ].filter(Boolean).join(' ');
-
-            // Build imageParts with reference if available
-            const imageParts = referenceB64
-                ? [{
-                    inlineData: { data: referenceB64, mimeType: referenceMime },
-                    text: `Reference thumbnail: identify and portrait the "${char.label}" person shown here.`,
-                }]
-                : [];
-
-            try {
-                const result = await router.generateImage({
-                    prompt,
-                    aspectRatio: '1:1',
-                    imageParts,
-                });
-                // Persist portrait to S3 — no data: URIs or temporary provider URLs stored
-                const rawPortraitUrl = result.imageUrl || (typeof result === 'string' ? result : null);
-                const portraitUrl = rawPortraitUrl
-                    ? await persistToS3(rawPortraitUrl, `yt-studio/portraits`)
-                    : null;
-                console.log(`   ✅ Portrait generated and persisted for: ${char.label}`);
-                return {
-                    label:           char.label,
-                    role:            char.role,
-                    firstAppearance: char.firstAppearance,
-                    screenTimePct:   char.screenTimePct,
-                    visualDescription: visualDescriptions[char.label] || null,
-                    portraitUrl,
-                };
-            } catch (err) {
-                console.warn(`   ⚠️ Portrait failed for ${char.label}: ${err.message}`);
-                return { label: char.label, role: char.role, portraitUrl: null, error: err.message };
-            }
-        })
-    );
-
-
-    const characterPortraits = portraits
-        .filter(r => r.status === 'fulfilled')
-        .map(r => r.value);
+        console.log(`   ✅ Real character portrait mapped for: ${char.label}`);
+        return {
+            label:           char.label,
+            role:            char.role,
+            firstAppearance: char.firstAppearance,
+            screenTimePct:   char.screenTimePct,
+            visualDescription: char.visualDescription || null,
+            portraitUrl,
+        };
+    });
 
     const successCount = characterPortraits.filter(p => p.portraitUrl).length;
-    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits generated (visually grounded)`);
+    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits mapped from video frames`);
     return { characterPortraits };
 }
 
@@ -1092,14 +999,17 @@ export async function promoNode({ analysis, video, brandContext }) {
     console.log(`🎬 [promoNode] Refining ${rawCuts.length} promo cuts into social-ready clips`);
 
     const userPrompt = [
-        brandContext || 'No brand context',
-        '',
+        `=== VIDEO CONTENT (THIS DICTATES THE ACTUAL PROMO CUTS AND CLIP CONTENT) ===`,
         `VIDEO: "${video.metadata?.title || 'Unknown'}" by ${video.metadata?.channelTitle || 'Unknown'}`,
         `DURATION: ${video.duration || 'Unknown'}`,
         `PEAK MOMENT: ${analysis.peakMoment?.timestamp} — ${analysis.peakMoment?.title || ''}`,
         '',
         'RAW PROMO CUTS FROM VIDEO ANALYSIS:',
         JSON.stringify(rawCuts, null, 2),
+        '',
+        `=== BRAND DNA (THIS DICTATES SOCIAL MEDIA TONE ONLY) ===`,
+        `CRITICAL INSTRUCTION: Do NOT hallucinate brand products, services, or brand-specific messaging into the hook lines or clip descriptions if they are not actually in the video. The promo cuts must accurately reflect the VIDEO CONTENT. Use the Brand DNA ONLY for the stylistic tone and voice of the captions.`,
+        brandContext || 'No brand context',
     ].join('\n');
 
     const result = await callAgent(
