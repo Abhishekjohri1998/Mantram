@@ -1307,27 +1307,36 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                         }
                     }
                 } else if (voProvider === 'sarvam') {
-                    const sarvamKey = process.env.SARVAM_API_KEY;
-                    if (sarvamKey) {
-                        const ttsResp = await fetch('https://api.sarvam.ai/text-to-speech', {
+                    // Replaced Sarvam with Gemini 3.1 Flash TTS for regional languages
+                    const geminiKey = process.env.GEMINI_API_KEY;
+                    if (geminiKey) {
+                        const promptText = `Please speak the following text fluently in regional language with an expressive tone:\n\n${storyboard.voiceoverScript.substring(0, 2000)}`;
+                        
+                        const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + geminiKey, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'api-subscription-key': sarvamKey },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                inputs: [storyboard.voiceoverScript.substring(0, 2000)],
-                                target_language_code: session.voiceover.langCode || 'en-IN',
-                                speaker: session.voiceover.voiceId || 'anushka',
-                                model: 'bulbul:v2',
-                                pace: session.voiceover.speed || 1.0,
+                                contents: [{ parts: [{ text: promptText }] }],
+                                generationConfig: {
+                                    responseModalities: ['AUDIO'],
+                                    speechConfig: {
+                                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
+                                    }
+                                }
                             }),
                         });
                         if (ttsResp.ok) {
                             const ttsData = await ttsResp.json();
-                            const audioBase64 = ttsData.audios?.[0];
-                            if (audioBase64) {
-                                const buffer = Buffer.from(audioBase64, 'base64');
-                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.wav`;
-                                voiceoverUrl = await uploadToS3(buffer, s3Key, 'audio/wav');
+                            const audioPart = ttsData.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+                            if (audioPart?.inlineData?.data) {
+                                const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
+                                const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+                                const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
+                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.${ext}`;
+                                voiceoverUrl = await uploadToS3(buffer, s3Key, mimeType);
                             }
+                        } else {
+                            console.warn(`   ⚠️ Gemini TTS generation failed:`, await ttsResp.text());
                         }
                     }
                 }
