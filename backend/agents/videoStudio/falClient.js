@@ -421,7 +421,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }
         
         // Standard routing (no face refs) — use active provider or cascade
-        const provider = activeProvider || 'atlascloud';
+        const provider = 'atlascloud'; // Forced per user request (no muapi credits)
         console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
         try {
             if (provider === 'muapi') {
