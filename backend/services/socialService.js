@@ -14,31 +14,21 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     // The isolated Instagram OAuth is only for consumer accounts or specific Basic Display apps.
     const appId = config.facebook.appId;
 
-    // Since we authorize both Facebook Pages and linked Instagram accounts simultaneously,
-    // we must request the superset of all necessary permissions.
-    // Base scopes needed for Facebook Pages
+    // Base scopes needed for Facebook Pages (Publishing only)
     const fbScopes = [
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_posts',
-        'pages_manage_engagement',
-        'pages_read_user_content',
-        'pages_manage_metadata',   // Required for webhook subscriptions via subscribed_apps
-        'business_management',
         'public_profile'
     ];
 
-    // Instagram scopes — always included because Meta's unified OAuth
-    // covers both platforms simultaneously. Users expect comment automation
-    // to work regardless of which platform they selected during connect.
+    // Instagram scopes needed for publishing
     const igScopes = [
         'instagram_basic',
-        'instagram_content_publish',
-        'instagram_manage_insights',
-        'instagram_manage_comments'  // Required for comment auto-reply
+        'instagram_content_publish'
     ];
 
-    // Always request the full set of permissions
+    // Request only the essential publishing permissions
     const requestedScopes = [...fbScopes, ...igScopes];
 
     const scopes = requestedScopes.join(',');

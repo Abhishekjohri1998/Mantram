@@ -45,8 +45,6 @@ const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 const META_SCOPES = [
     'ads_management',
     'ads_read',
-    'business_management',
-    'pages_read_engagement',
 ].join(',');
 
 /**
