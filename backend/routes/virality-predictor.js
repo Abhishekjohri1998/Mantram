@@ -136,8 +136,7 @@ Respond ONLY in valid JSON matching this exact schema:
 }`;
 
     try {
-        // Use Gemini provider directly with multimodal parts
-        const gemini = geminiProvider;
+        // Use Gemini API directly with multimodal parts
         const model = 'gemini-2.5-flash'; // Best available for vision tasks
 
         // Call Gemini API directly with video/image parts
