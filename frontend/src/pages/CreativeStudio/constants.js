@@ -17,11 +17,11 @@ export const creativeTypes = [
     { id: 'facebook-ad', icon: 'ads_click', label: 'Facebook Ad', size: '1080\u00D71350', aspectRatio: '4:5' },
     { id: 'linkedin-post', icon: 'work', label: 'LinkedIn Post', size: '1200\u00D71200', aspectRatio: '1:1' },
     { id: 'youtube-thumb', icon: 'smart_display', label: 'YouTube Thumb', size: '1280\u00D7720', aspectRatio: '16:9' },
-    { id: 'banner', icon: 'web', label: 'Banner', size: '1920\u00D7600', aspectRatio: '16:9' },
-    { id: 'film-poster', icon: 'movie', label: 'Film Poster', size: '2000\u00D73000', aspectRatio: '2:3', w: 2000, h: 3000 },
-    { id: 'hd-wide', icon: 'monitor', label: 'HD 16:9', size: '1920\u00D71080', aspectRatio: '16:9', w: 1920, h: 1080 },
-    { id: 'a4-portrait', icon: 'description', label: 'A4 Portrait', size: '2480\u00D73508', aspectRatio: '2:3', w: 2480, h: 3508 },
-    { id: 'square-hd', icon: 'crop_square', label: 'Square HD', size: '1200\u00D71200', aspectRatio: '1:1', w: 1200, h: 1200 },
+    { id: 'banner',      icon: 'web',         label: 'Banner',      size: '1920\u00D7600',  aspectRatio: '16:9' },
+    { id: 'film-poster', icon: 'movie',        label: 'Film Poster', size: '2000\u00D73000', aspectRatio: '2:3'  },
+    { id: 'hd-wide',     icon: 'monitor',      label: 'HD 16:9',     size: '1920\u00D71080', aspectRatio: '16:9' },
+    { id: 'a4-portrait', icon: 'description',  label: 'A4 Portrait', size: '2480\u00D73508', aspectRatio: '2:3'  },
+    { id: 'square-hd',   icon: 'crop_square',  label: 'Square HD',   size: '1200\u00D71200', aspectRatio: '1:1'  },
     { id: 'custom-size', icon: 'tune', label: 'Custom Size', size: 'Custom', aspectRatio: null },
 ]
 
@@ -396,14 +396,17 @@ export const CAMERA_SHOT_PRESETS = [
 ];
 
 // ── Image Models ──
+// nativeRatios: ratios the model generates WITHOUT any post-crop (Sharp bypass).
+// Format picker filters creativeTypes to only show formats in this list.
+const _G = ['1:1','4:5','9:16','3:4','16:9','4:3','3:2','2:3','21:9']; // Gemini native set
 export const IMAGE_MODELS = [
-    { id: 'nanobanana-2', name: 'NanoBanana 2', icon: 'auto_awesome', desc: 'Default \u2022 Fast \u2022 Best with references', provider: 'LaoZhang', badge: '\u26A1', color: '#a855f7' },
-    { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond', desc: 'Premium quality \u2022 Better details', provider: 'LaoZhang', badge: '\uD83D\uDC8E', color: '#ec4899' },
-    { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1', icon: 'bolt', desc: 'Photorealistic \u2022 Great anatomy', provider: 'LaoZhang', badge: '\uD83D\uDD25', color: '#f97316' },
-    { id: 'flux-2-pro', name: 'Flux 2 Pro', icon: 'stars', desc: 'Latest Flux \u2022 Premium photorealism', provider: 'LaoZhang', badge: '\u2728', color: '#eab308' },
-    { id: 'seedream-5', name: 'Seedream 5', icon: 'park', desc: 'Creative \u2022 Artistic style', provider: 'LaoZhang', badge: '\uD83C\uDF31', color: '#22c55e' },
-    { id: 'ideogram', name: 'Ideogram v3', icon: 'text_fields', desc: 'Best for text in images', provider: 'LaoZhang', badge: '\uD83C\uDFA8', color: '#06b6d4' },
-    { id: 'grok-imagen', name: 'Grok Imagen', icon: 'smart_toy', desc: 'xAI \u2022 High quality generation', provider: 'xAI', badge: '\uD83E\uDD16', color: '#ef4444' },
+    { id: 'nanobanana-2',   name: 'NanoBanana 2',   icon: 'auto_awesome', desc: 'Default \u2022 Fast \u2022 Best with references', provider: 'Gemini', badge: '\u26A1', color: '#a855f7', nativeRatios: _G },
+    { id: 'nanobanana-pro', name: 'NanoBanana Pro', icon: 'diamond',      desc: 'Premium quality \u2022 Better details',        provider: 'Gemini', badge: '\uD83D\uDC8E', color: '#ec4899', nativeRatios: _G },
+    { id: 'flux-pro-v1.1', name: 'Flux Pro v1.1',  icon: 'bolt',         desc: 'Photorealistic \u2022 Great anatomy',          provider: 'Gemini', badge: '\uD83D\uDD25', color: '#f97316', nativeRatios: _G },
+    { id: 'flux-2-pro',    name: 'Flux 2 Pro',     icon: 'stars',        desc: 'Latest Flux \u2022 Premium photorealism',      provider: 'Gemini', badge: '\u2728',  color: '#eab308', nativeRatios: _G },
+    { id: 'seedream-5',    name: 'Seedream 5',     icon: 'park',         desc: 'Creative \u2022 Artistic style',               provider: 'Gemini', badge: '\uD83C\uDF31', color: '#22c55e', nativeRatios: _G },
+    { id: 'ideogram',      name: 'Ideogram v3',    icon: 'text_fields',  desc: 'Best for text in images',                 provider: 'Gemini', badge: '\uD83C\uDFA8', color: '#06b6d4', nativeRatios: _G },
+    { id: 'grok-imagen',   name: 'Grok Imagen',    icon: 'smart_toy',    desc: 'xAI \u2022 Square only (1:1)',                 provider: 'xAI',    badge: '\uD83E\uDD16', color: '#ef4444', nativeRatios: ['1:1'] },
 ];
 
 // ── Animate Models ──

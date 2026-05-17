@@ -978,7 +978,12 @@ export async function unifiedCreativeEngineNode(state) {
         'instagram-story': 'Instagram Story / Reel (1080×1920, 9:16)',
         'facebook-ad': 'Facebook Ad (1080×1350, 4:5)',
         'linkedin-post': 'LinkedIn Post (1200×1200, 1:1)',
-        'banner': 'Website Banner / Hero (1920×600, 3.2:1)',
+        'banner': 'Website Banner / Hero (1920×600, 16:5 = 3.2:1 — ultra-wide horizontal strip)',
+        'film-poster': 'Film Poster (2000×3000, 2:3 — tall vertical)',
+        'hd-wide': 'HD Video Frame (1920×1080, 16:9)',
+        'a4-portrait': 'A4 Portrait Print (2480×3508, 5:7 ≈ ISO A4)',
+        'square-hd': 'Square HD (1200×1200, 1:1)',
+        'lifestyle-mockup': 'Lifestyle Mockup Scene',
     };
 
     // Product context (anti-hallucination)
@@ -1589,15 +1594,18 @@ function buildCopyInjection(copy, aspectRatio = '1:1', brandTypographyStyle = nu
     // Precise safe-zone rules per aspect ratio (replaces vague 'don't go to edges')
     const [w, h] = (aspectRatio || '1:1').split(':').map(Number);
     const ratio = (w || 1) / (h || 1);
-    const isWide = ratio > 1.6;  // 16:9, 4:1, 21:9
+    const isUltraWide = ratio > 2.5; // 16:5 banner, 3:1, 21:9
+    const isWide = ratio > 1.6 && !isUltraWide; // 16:9, 4:3
     const isTall = ratio < 0.7;  // 9:16, 2:3, 4:5
 
-    if (isWide) {
-        parts.push(`SAFE ZONE (CRITICAL — WIDE FORMAT ${aspectRatio}): Text centroid MUST sit between 20% and 80% of image height. Text centroid MUST sit between 20% and 80% of image width. Minimum 20% empty margin from all four edges. Wide-ratio images are MOST PRONE to vertical cropping — text above 20% height or below 80% height WILL be cropped. DO NOT place any text near top or bottom of image.`);
+    if (isUltraWide) {
+        parts.push(`SAFE ZONE (CRITICAL — ULTRA-WIDE BANNER ${aspectRatio}): This canvas is an extremely short, wide horizontal strip. Text MUST sit between 30% and 70% of image HEIGHT (top/bottom 30% crop on web). Text must sit between 5% and 50% of image WIDTH — place text in the LEFT HALF, subject in the right half (or vice versa). NEVER center text across the full width.`);
+    } else if (isWide) {
+        parts.push(`SAFE ZONE (CRITICAL — WIDE FORMAT ${aspectRatio}): Text centroid MUST sit between 20% and 80% of image height AND 20% and 80% of image width. Minimum 20% empty margin from all four edges. Wide-ratio images are MOST PRONE to vertical cropping.`);
     } else if (isTall) {
-        parts.push(`SAFE ZONE (CRITICAL — TALL FORMAT ${aspectRatio}): Text centroid MUST sit between 15% and 85% of image width. Text centroid MUST sit between 15% and 85% of image height. Minimum 15% empty margin from left edge AND right edge. Tall vertical images are MOST PRONE to horizontal side-cropping — keep all text within the central 70% of width.`);
+        parts.push(`SAFE ZONE (CRITICAL — TALL FORMAT ${aspectRatio}): Text centroid MUST sit between 15% and 85% of image width AND height. Minimum 15% empty margin from left/right. Keep all text within central 70% of width.`);
     } else {
-        parts.push(`SAFE ZONE (CRITICAL — SQUARE/BALANCED FORMAT ${aspectRatio}): Text centroid MUST sit inside the inner 76% of canvas width AND inner 76% of canvas height. Minimum 12% empty padding from ALL four edges (left, right, top, bottom). Do NOT allow any letter or word to touch or cross the canvas boundary.`);
+        parts.push(`SAFE ZONE (CRITICAL — SQUARE/BALANCED FORMAT ${aspectRatio}): Text centroid MUST sit inside inner 76% of canvas width AND height. Minimum 12% empty padding from ALL four edges.`);
     }
 
     parts.push(`HORIZONTAL LETTER-CROP PREVENTION: Leave at least 15% empty horizontal padding on the left side AND right side. The first letter of the first word and last letter of the last word must NOT be near the canvas edge. This is the most common failure mode — prevent it explicitly.`);

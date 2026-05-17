@@ -21,14 +21,21 @@ export const FORMAT_COMPOSITION_BRIEF = (aspectRatio = '1:1') => {
         `CANVAS: ${aspectRatio} VERTICAL — Reel / Story / Pinterest pin format.`,
         `Compose top-to-bottom. Eyeline in the upper third. Breathing room above the head. Brand atmosphere fills the lower third.`,
         `Hero subject occupies the centre vertical band, NOT a square crop.`,
-        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 70% of canvas height and inner 70% of canvas width. Minimum 15% empty padding from the left edge AND right edge. NEVER place text above the 15% vertical mark or below the 85% vertical mark — those zones are covered by platform UI overlays (username bar at top, CTA area at bottom).`,
+        `TEXT SAFE ZONE (PRECISE): Text centroid inside inner 70% height × 70% width. Minimum 15% padding left/right. Never above 15% or below 85% vertical (platform UI zones).`,
+    ].join('\n');
+
+    if (ratio > 2.5) return [
+        `CANVAS: ${aspectRatio} ULTRA-WIDE BANNER — Website hero banner / email header format. This is an EXTREMELY horizontal strip (3:1 or wider).`,
+        `The scene must span the FULL width as a panoramic environment. Subject positioned left or right third — NOT centered.`,
+        `The wide empty space is intentional: it accommodates overlaid text or CTA on the opposite side.`,
+        `Do NOT crop subject at top or bottom — the canvas is short vertically, so keep all important content in the central 60% of height.`,
+        `TEXT SAFE ZONE (PRECISE): NEVER place text in the top 25% or bottom 25% (very short vertically — immediate crop). Text centroid must sit between 30% and 70% of canvas height.`,
     ].join('\n');
 
     if (ratio > 1.3) return [
-        `CANVAS: ${aspectRatio} HORIZONTAL — Banner / YouTube thumbnail / cover-photo format.`,
-        `Compose with cinematic horizontal balance. Subject lives in the left or right two-thirds.`,
-        `Environmental depth extends across the wide canvas — not centered.`,
-        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 60% of canvas width and inner 60% of canvas height. Minimum 20% empty padding from the left edge AND right edge — wide horizontal images are most prone to left/right letter cropping at the canvas boundary. NEVER place text above the 20% or below the 80% vertical mark.`,
+        `CANVAS: ${aspectRatio} HORIZONTAL — YouTube thumbnail / widescreen cover format.`,
+        `Compose with cinematic horizontal balance. Subject in left or right two-thirds, environmental depth across the wide canvas.`,
+        `TEXT SAFE ZONE (PRECISE): Text centroid inside inner 60% width × 60% height. Minimum 20% padding from left/right edges. Never above 20% or below 80% vertical mark.`,
     ].join('\n');
 
     return [
@@ -36,9 +43,10 @@ export const FORMAT_COMPOSITION_BRIEF = (aspectRatio = '1:1') => {
         `Compose with strong middle-frame focal point and balanced negative space.`,
         `Subject occupies 60-75% of frame, centered or rule-of-thirds.`,
         `Read as a thumbnail at 100×100px — silhouette + colour must be legible at that size.`,
-        `TEXT SAFE ZONE (PRECISE — non-negotiable): Text centroid must sit inside the inner 76% of canvas width AND inner 76% of canvas height. Minimum 12% empty padding from ALL four edges (left, right, top, bottom).`,
+        `TEXT SAFE ZONE (PRECISE): Text centroid inside inner 76% width × 76% height. Minimum 12% padding from ALL four edges.`,
     ].join('\n');
 };
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AGENT 1: ART DIRECTOR — Defines creative vision from brand DNA + brief
@@ -344,7 +352,7 @@ RESPONSE FORMAT — valid JSON only:
 //   format: determines if text is mandatory (youtube-thumb, banner always get text)
 // ══════════════════════════════════════════════════════════════════════════════
 export const UNIFIED_CREATIVE_ENGINE_PROMPT = (brandContext, aspectRatio = '1:1', generateCopy = false, format = 'instagram-post') => {
-    const textEnabled = generateCopy || format === 'youtube-thumb' || format === 'banner';
+    const textEnabled = !!generateCopy; // TOGGLE IS THE ONLY SWITCH — format never forces text on
 
     return `You are a Unified Creative Engine — simultaneously an elite Art Director, Prompt Engineer, Copywriter, and Brand Typographer. You execute all four roles in ONE reasoning pass, producing a single JSON output that drives image generation and on-image copy for a marketing creative.
 
@@ -398,20 +406,13 @@ HUMAN CASTING (decide deliberately — do not default):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ROLE 2 — PROMPT ENGINEER: Image Generation Prompt
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Write primaryPrompt as ONE FLOWING PARAGRAPH (100-180 words) using this exact structure:
-[Canvas orientation + visual style], featuring [main subject], [action/expression], in [setting/environment], with [mood/atmosphere]. Use [composition], [lighting — specific source, direction, colour temperature, shadow quality], and [brand colour palette as environmental surfaces — NEVER as hex codes]. Include [textures — at least one rich physical texture: grain, fabric, metal, glass, liquid]. [Quality anchors at end].
+Write primaryPrompt as a FOCUSED, VISUAL DESCRIPTION (60-90 words). Shorter, keyword-rich prompts outperform verbose prose with all image models (NanoBanana, Flux, Imagen).
 
-THE 80/20 RULE: First 10 words determine 80% of the image. Lead with canvas orientation + hero subject.
+PROMPT STRUCTURE: [canvas orientation + visual style], [hero subject + action], [environment + atmosphere], [lighting — specific source and quality], [brand-palette environmental surfaces — NO hex codes], [one specific texture], [quality anchors].
 
-MATERIAL LANGUAGE (use these precise descriptors):
-Metal: "brushed titanium", "satin-finish aluminium", "oxidized copper"
-Fabric: "matte jersey knit", "silk charmeuse catching light", "weathered linen"
-Glass: "frosted optical glass", "dichroic glass with prismatic reflections"
-Light: "caustic light patterns through water", "god rays through smoke", "neon bounce light"
-Skin: "warm golden hour rim-lit skin", "studio strobe catchlights in eyes"
-
-COLOUR: Always describe by visual appearance — "deep forest green", "dusty rose", "electric cobalt". NEVER hex codes.
-QUALITY ANCHORS (end every prompt with): "professional commercial photography, ultra-sharp detail, award-winning composition, cinematic colour science"
+Front-load the most important visual element in the first 8 words (that's 80% of the model's attention).
+COLOUR: describe by appearance — "deep forest green", "dusty rose". NEVER hex codes.
+QUALITY ANCHORS (end every prompt with): "professional commercial photography, ultra-sharp, award-winning, cinematic colour science"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ROLE 3 — BRAND TYPOGRAPHER & COPYWRITER
