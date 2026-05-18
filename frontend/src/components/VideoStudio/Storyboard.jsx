@@ -46,7 +46,7 @@ const DIRECTOR_MODELS = [
 
 const IMAGE_MODELS = [
     { value: 'gpt-image-2', label: 'GPT Image 2' },
-    { value: 'nanobanana', label: 'NanoBanana Pro' }
+    { value: 'nanobanana-2', label: 'NanoBanana 2' }
 ];
 
 function CfgMenu({ value, onChange, options, icon }) {

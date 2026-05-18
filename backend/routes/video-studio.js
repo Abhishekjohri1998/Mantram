@@ -7646,20 +7646,25 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
             ];
         }
 
-        // KEY FIX: Move the storyboard image from the "First Frame" anchor into the "Reference Images" array.
-        // This prevents Seedance from literally starting the video with the hallucinated product in the storyboard grid,
-        // and instead forces it to use the grid as a structural reference while pulling the real product and avatar from the references.
-        const combinedReferences = [
-            { url: imageUrl, role: 'storyboard' },
-            ...referenceImages
-        ];
+        // KEY FIX: Seedance reference-to-video REQUIRES an initial first frame (image_urls). 
+        // If we omit it (null), it silently falls back to T2V and drops ALL reference images.
+        // We MUST use the real product image as the First Frame to ensure the video starts with the exact product, not the hallucinated storyboard product.
+        const productRef = referenceImages.find(r => r.role === 'product');
+        const firstFrameUrl = productRef ? productRef.url : imageUrl;
+        
+        // We filter out the chosen first frame from references to avoid duplication,
+        // and we inject the storyboard poster as a structural reference.
+        const combinedReferences = referenceImages.filter(r => r.url !== firstFrameUrl);
+        if (firstFrameUrl !== imageUrl) {
+            combinedReferences.unshift({ url: imageUrl, role: 'storyboard' });
+        }
 
-        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${combinedReferences.length}, storyboard is ref[0]`);
+        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${combinedReferences.length}, firstFrameUrl starts with: ${firstFrameUrl?.substring(0, 50)}`);
 
         let taskId = null;
         try {
             const genResult = await submitAtlasCloudVideoGeneration({
-                imageUrl: null, // Force T2V mode guided by references
+                imageUrl: firstFrameUrl, // Start with the real product (or storyboard fallback)
                 prompt: videoPrompt || "Follow the attached storyboard exact visual flow.",
                 duration: duration || 10,
                 aspectRatio: format,

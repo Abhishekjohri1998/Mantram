@@ -66,7 +66,17 @@ export async function generateStoryboardPoster(
 ) {
     const stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
     const ar = format || '16:9';
-    const finalPrompt = `${stylePrefix} ${imagePrompt} ${STYLE_SUFFIX}`;
+    let finalPrompt = `${stylePrefix} ${imagePrompt} ${STYLE_SUFFIX}`;
+    
+    const hasProductRefs = rawProductBuffers.length > 0 || productImageUrls.length > 0;
+    const hasAvatarRef = !!rawAvatarBuffer || !!avatarUrl;
+    
+    if (hasProductRefs || hasAvatarRef) {
+        finalPrompt += `\n\nCRITICAL INSTRUCTION: You have been provided with reference images. You MUST use them exactly as they appear.`;
+        if (hasProductRefs) finalPrompt += ` The product in the storyboard MUST perfectly match the attached product reference image (exact shape, color, branding).`;
+        if (hasAvatarRef) finalPrompt += ` The presenter in the storyboard MUST perfectly match the attached face/avatar reference image.`;
+        finalPrompt += ` Do NOT hallucinate new products or generic faces.`;
+    }
 
     // Normalise model choice
     const useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
