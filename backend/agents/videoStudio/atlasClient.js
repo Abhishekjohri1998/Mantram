@@ -445,13 +445,17 @@ export async function submitAtlasCloudVideoGeneration({
     }
 
     // Step 2 — ensure all face refs are on S3 AND compatible (format + 300x300 min)
+    const referenceMeta = []; // To store { s3Url, role }
     if (referenceImages && referenceImages.length > 0) {
         console.log(`📸 Ensuring ${referenceImages.length} face ref(s) on S3 + compatible...`);
         const uploaded = await Promise.all(referenceImages.map(async img => {
-            const s3Url = await ensureS3Url(img, 'video-studio/atlascloud');
-            return s3Url ? await ensureAssetCompatible(s3Url) : null;
+            const rawUrl = typeof img === 'object' ? img.url : img;
+            const role = typeof img === 'object' ? img.role : imageRole;
+            const s3Url = await ensureS3Url(rawUrl, 'video-studio/atlascloud');
+            const compatibleUrl = s3Url ? await ensureAssetCompatible(s3Url) : null;
+            return compatibleUrl ? { url: compatibleUrl, role } : null;
         }));
-        uploaded.forEach(url => { if (url) faceS3Urls.push(url); });
+        uploaded.forEach(item => { if (item) { faceS3Urls.push(item.url); referenceMeta.push(item); } });
     }
 
     // 🛡️ SAFE MODE BYPASS (Seedance-native):
@@ -499,22 +503,27 @@ export async function submitAtlasCloudVideoGeneration({
     const tagOffset = firstFrameAssetUris.length;
 
     if (faceAssetUris.length > 0) {
-        const faceTags = faceAssetUris.map((_, i) => `@image${i + 1 + tagOffset}`).join(', ');
-        let anchorText;
-
-        if (imageRole === 'face') {
-            anchorText = `${faceTags} — visual reference for the presenter in this video. Maintain consistent appearance throughout every frame.`;
-        } else if (imageRole === 'fashion-model') {
-            anchorText = `${faceTags} — visual reference for the outfit. Maintain the exact garment style, fabric texture, color, and fit throughout every frame. The clothing is the subject of this video.`;
-        } else if (imageRole === 'character') {
-            anchorText = `${faceTags} — visual reference for the animated character. Maintain exact consistency in every frame.`;
-        } else {
-            anchorText = `${faceTags} — visual reference for the product. Maintain exact shape, color, and surface detail throughout every frame.`;
-        }
-
-        cleanedPrompt = `${anchorText} ${cleanedPrompt}`;
-        const roleLabel = imageRole === 'face' ? '👤 Presenter-ref' : imageRole === 'fashion-model' ? '👗 Garment-ref' : '📦 Product-ref';
-        console.log(`${roleLabel} injected for ${faceAssetUris.length} ref(s): ${faceTags}`);
+        let injectedPrompt = cleanedPrompt;
+        faceAssetUris.forEach((assetUri, index) => {
+            const role = referenceMeta[index]?.role || imageRole;
+            const tag = `@image${index + 1 + tagOffset}`;
+            
+            let anchorText;
+            if (role === 'storyboard') {
+                anchorText = `${tag} — visual reference for the exact storyboard layout, camera angles, and shot sequence. Follow this structural guide perfectly.`;
+            } else if (role === 'face') {
+                anchorText = `${tag} — visual reference for the presenter in this video. Maintain consistent appearance throughout every frame.`;
+            } else if (role === 'fashion-model') {
+                anchorText = `${tag} — visual reference for the outfit. Maintain the exact garment style, fabric texture, color, and fit throughout every frame. The clothing is the subject of this video.`;
+            } else if (role === 'character') {
+                anchorText = `${tag} — visual reference for the animated character. Maintain exact consistency in every frame.`;
+            } else {
+                anchorText = `${tag} — visual reference for the product. Maintain exact shape, color, and surface detail throughout every frame.`;
+            }
+            injectedPrompt = `${anchorText} ${injectedPrompt}`;
+            console.log(`[Atlas] Injected role '${role}' for ${tag}`);
+        });
+        cleanedPrompt = injectedPrompt;
     } 
     
     if (firstFrameAssetUris.length > 0) {

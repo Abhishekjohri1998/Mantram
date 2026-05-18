@@ -7628,36 +7628,46 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
             if (project) {
                 dbProductImgs = project.input?.images?.map(img => img.url).filter(Boolean) || [];
                 dbAvatar = project.input?.avatarUrl || null;
-                // If there's an avatar, use ONLY the avatar for face consistency.
-                // Seedance hallucinates if told a product image is a 'face'.
-                // The product is already in the storyboard poster (imageUrl) which is @image1.
-                referenceImages = dbAvatar ? [dbAvatar] : dbProductImgs;
-                console.log(`[Storyboard Animate] Loaded refs from DB: ${referenceImages.length} (avatar-priority)`);
+                // Pass both avatar and product with explicit roles so Seedance doesn't hallucinate
+                referenceImages = [
+                    ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
+                    ...dbProductImgs.map(url => ({ url, role: 'product' }))
+                ];
+                console.log(`[Storyboard Animate] Loaded refs from DB: ${referenceImages.length} (mixed roles)`);
             }
         }
 
         if (referenceImages.length === 0) {
             const parsedProductImgs = typeof productImageUrls === 'string' ? JSON.parse(productImageUrls) : (productImageUrls || []);
             const prodUrls = parsedProductImgs.filter(u => u?.startsWith('http')).slice(0, 2);
-            referenceImages = avatarUrl ? [avatarUrl] : prodUrls;
+            referenceImages = [
+                ...(avatarUrl ? [{ url: avatarUrl, role: 'face' }] : []),
+                ...prodUrls.map(url => ({ url, role: 'product' }))
+            ];
         }
 
-        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${referenceImages.length}, imageUrl starts with: ${imageUrl?.substring(0, 50)}`);
+        // KEY FIX: Move the storyboard image from the "First Frame" anchor into the "Reference Images" array.
+        // This prevents Seedance from literally starting the video with the hallucinated product in the storyboard grid,
+        // and instead forces it to use the grid as a structural reference while pulling the real product and avatar from the references.
+        const combinedReferences = [
+            { url: imageUrl, role: 'storyboard' },
+            ...referenceImages
+        ];
+
+        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${combinedReferences.length}, storyboard is ref[0]`);
 
         let taskId = null;
         try {
-            const hasAvatar = referenceImages.includes(avatarUrl) || (projectId && referenceImages.some(r => r === avatarUrl || r.includes('avatar')));
-            
             const genResult = await submitAtlasCloudVideoGeneration({
-                imageUrl,
-                prompt: videoPrompt || "Use the attached storyboard image as the exact reference.",
+                imageUrl: null, // Force T2V mode guided by references
+                prompt: videoPrompt || "Follow the attached storyboard exact visual flow.",
                 duration: duration || 10,
                 aspectRatio: format,
-                referenceImages,
+                referenceImages: combinedReferences,
                 generateAudio: true,
                 qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
                 resolution,
-                imageRole: hasAvatar ? 'face' : 'fashion-model'
+                imageRole: 'mixed' // handled explicitly by reference roles in atlasClient
             });
             taskId = genResult.taskId;
 

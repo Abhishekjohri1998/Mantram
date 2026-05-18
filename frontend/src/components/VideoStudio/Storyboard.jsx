@@ -35,7 +35,8 @@ const MODELS = [
 const RESOLUTIONS = [
     { value: '480p', label: '480p SD' },
     { value: '720p', label: '720p HD' },
-    { value: '1080p', label: '1080p FHD' }
+    { value: '1080p', label: '1080p FHD' },
+    { value: '2k', label: '2K QHD' }
 ];
 
 const DIRECTOR_MODELS = [
@@ -92,7 +93,7 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
     const [format, setFormat] = useState('9:16'); // Default to 9:16 for storyboard grids
     const [duration, setDuration] = useState(5);
     const [model, setModel] = useState('seedance-2.0-fast');
-    const [resolution, setResolution] = useState('480p');
+    const [resolution, setResolution] = useState('2k');
     const [directorModel, setDirectorModel] = useState('claude'); // 'claude' or 'gemini'
     const [imageModel, setImageModel] = useState('gpt-image-2'); // 'nanobanana' or 'gemini'
 
