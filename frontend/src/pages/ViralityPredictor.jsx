@@ -1,29 +1,22 @@
 /**
- * ViralityPredictor.jsx — Full Studio Page
+ * ViralityPredictor.jsx — Neural Virality Engine v2
  *
  * A dedicated studio for AI-powered virality analysis.
- * Upload any image or video → 3-model AI pipeline produces a Virality Score Map.
- *
- * Models used:
- *  - Gemini 2.5 Flash  → native video/image analysis
- *  - Grok 3            → real-time web research (what's viral NOW)
- *  - Claude Sonnet 4   → synthesis, scoring, brand-specific tips
- *
- * Route: /virality-predictor
+ * Upload any image or video (via direct S3 presign) → 3-model AI pipeline produces a Neural Virality Score Map.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useBrand } from '../context/BrandContext';
-import { viralityPredictor } from '../services/api';
+import { viralityPredictor, apiFetch } from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
 import './ViralityPredictor.css';
 
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONFIG = {
-    viral_ready:    { label: '🔥 Viral Ready',    color: '#ff4d00', glow: 'rgba(255,77,0,0.4)',    bg: 'rgba(255,77,0,0.12)' },
-    high_potential: { label: '⚡ High Potential', color: '#f59e0b', glow: 'rgba(245,158,11,0.4)',  bg: 'rgba(245,158,11,0.12)' },
-    growing:        { label: '📈 Growing',         color: '#10b981', glow: 'rgba(16,185,129,0.3)',  bg: 'rgba(16,185,129,0.10)' },
-    needs_work:     { label: '💡 Needs Work',      color: '#6366f1', glow: 'rgba(99,102,241,0.3)',  bg: 'rgba(99,102,241,0.10)' },
+    viral_ready:    { label: '🔥 Viral Ready',    color: 'var(--sys-primary)', glow: 'var(--sys-primary-dim)',  bg: 'var(--sys-primary-dim)' },
+    high_potential: { label: '⚡ High Potential', color: '#f59e0b', glow: 'rgba(245,158,11,0.4)',  bg: 'rgba(245,158,11,0.1)' },
+    growing:        { label: '📈 Growing',         color: '#3b82f6', glow: 'rgba(59,130,246,0.4)',  bg: 'rgba(59,130,246,0.1)' },
+    needs_work:     { label: '💡 Needs Work',      color: '#6366f1', glow: 'rgba(99,102,241,0.3)',  bg: 'rgba(99,102,241,0.1)' },
 };
 
 const PLATFORMS = [
@@ -35,95 +28,114 @@ const PLATFORMS = [
     { id: 'facebook',  label: 'Facebook',  icon: 'thumb_up' },
 ];
 
-const SCORE_LABELS = {
-    hookStrength:    { label: 'Hook Strength',   icon: 'anchor',           desc: 'Will it stop the scroll in the first 3 seconds?' },
-    emotionalPull:   { label: 'Emotional Pull',  icon: 'favorite',         desc: 'Does it trigger a shareable emotion?' },
-    trendAlignment:  { label: 'Trend Alignment', icon: 'trending_up',      desc: 'Is it riding what\'s viral RIGHT NOW?' },
-    visualQuality:   { label: 'Visual Quality',  icon: 'auto_awesome',     desc: 'Composition, lighting, color, motion quality' },
-    brandClarity:    { label: 'Brand Clarity',   icon: 'verified',         desc: 'Clear brand message without being salesy' },
-    platformFit:     { label: 'Platform Fit',    icon: 'devices',          desc: 'Format & style matches platform algorithm' },
-};
+const NEURAL_REGIONS = [
+    { id: 'visualCortex', label: 'Visual Cortex', desc: 'Visual quality, motion, text overlay' },
+    { id: 'auditoryCortex', label: 'Auditory Cortex', desc: 'Audio energy, beat sync, voice clarity' },
+    { id: 'attentionControl', label: 'Attention Control', desc: 'Hook strength, pattern interrupts' },
+    { id: 'limbicSystem', label: 'Limbic System', desc: 'Emotional pull, social currency' },
+    { id: 'languageNetwork', label: 'Language Network', desc: 'Narrative velocity, brand clarity' },
+];
 
-// ── Animated Score Bar ────────────────────────────────────────────────────
-function ScoreBar({ score, color }) {
-    const [width, setWidth] = useState(0);
-    useEffect(() => {
-        const t = setTimeout(() => setWidth(score), 100);
-        return () => clearTimeout(t);
-    }, [score]);
-
-    const barColor = score >= 80 ? '#ff4d00' : score >= 65 ? '#f59e0b' : score >= 50 ? '#10b981' : '#6366f1';
+// ── SVG Brain Heatmap ─────────────────────────────────────────────────────
+function BrainHeatmap({ scores }) {
+    // Determine which regions have high activation to trigger CSS pulse animations
+    const highAct = (score) => score > 75 ? 'pulse-high' : score > 50 ? 'pulse-med' : '';
+    
     return (
-        <div className="vp-score-bar-track">
-            <div className="vp-score-bar-fill" style={{ width: `${width}%`, backgroundColor: color || barColor }} />
+        <div className="vp-brain-wrap">
+            <svg viewBox="0 0 400 400" className="vp-brain-svg">
+                <defs>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                    <linearGradient id="brain-base" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="rgba(255,255,255,0.05)" />
+                        <stop offset="100%" stopColor="rgba(255,255,255,0.02)" />
+                    </linearGradient>
+                </defs>
+                
+                {/* Base Brain Outline (Abstracted) */}
+                <path d="M 200 40 C 120 40, 60 100, 50 180 C 40 260, 100 320, 180 340 L 200 360 L 220 340 C 300 320, 360 260, 350 180 C 340 100, 280 40, 200 40 Z" 
+                    fill="url(#brain-base)" stroke="rgba(255,255,255,0.15)" strokeWidth="2" strokeLinejoin="round"/>
+                
+                {/* Internal Folds (Abstract) */}
+                <path d="M 120 100 Q 160 140 200 80 Q 240 140 280 100 M 80 160 Q 140 180 200 140 Q 260 180 320 160 M 70 240 Q 150 220 200 260 Q 250 220 330 240 M 140 300 Q 200 280 260 300" 
+                    fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+
+                {/* Region Hotspots */}
+                {/* Visual Cortex (Back/Bottom) */}
+                <circle cx="200" cy="300" r="35" className={`vp-hotspot visual ${highAct(scores.visualCortex)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.visualCortex || 0)/100 }} />
+                
+                {/* Auditory Cortex (Sides) */}
+                <circle cx="100" cy="220" r="30" className={`vp-hotspot auditory ${highAct(scores.auditoryCortex)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.auditoryCortex || 0)/100 }} />
+                <circle cx="300" cy="220" r="30" className={`vp-hotspot auditory ${highAct(scores.auditoryCortex)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.auditoryCortex || 0)/100 }} />
+
+                {/* Attention Control (Frontal Lobe) */}
+                <circle cx="200" cy="100" r="45" className={`vp-hotspot attention ${highAct(scores.attentionControl)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.attentionControl || 0)/100 }} />
+
+                {/* Limbic System (Deep Center) */}
+                <circle cx="200" cy="190" r="40" className={`vp-hotspot limbic ${highAct(scores.limbicSystem)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.limbicSystem || 0)/100 }} />
+
+                {/* Language Network (Temporal/Frontal crossover) */}
+                <circle cx="140" cy="150" r="35" className={`vp-hotspot language ${highAct(scores.languageNetwork)}`} filter="url(#glow)" 
+                    style={{ opacity: (scores.languageNetwork || 0)/100 }} />
+            </svg>
+            <div className="vp-brain-scanline" />
         </div>
     );
 }
 
-// ── Radar Chart (SVG) ────────────────────────────────────────────────────
-function RadarChart({ scores }) {
-    const keys   = Object.keys(SCORE_LABELS);
-    const values = keys.map(k => (scores[k] || 0) / 100);
-    const n      = keys.length;
-    const cx     = 150; const cy = 150; const r = 110;
-
-    const angle  = (i) => (i * 2 * Math.PI) / n - Math.PI / 2;
-    const point  = (i, v) => ({
-        x: cx + r * v * Math.cos(angle(i)),
-        y: cy + r * v * Math.sin(angle(i)),
-    });
-
-    const gridLevels = [0.2, 0.4, 0.6, 0.8, 1.0];
-    const dataPath   = values.map((v, i) => {
-        const p = point(i, v);
-        return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`;
-    }).join(' ') + ' Z';
-
-    const gridPath = (v) => keys.map((_, i) => {
-        const p = point(i, v);
-        return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`;
-    }).join(' ') + ' Z';
+// ── Retention Curve Chart ─────────────────────────────────────────────────
+function RetentionCurve({ curve }) {
+    if (!curve || curve.length === 0) return null;
+    
+    // Normalize data to 100x100 SVG space
+    const maxSec = curve[curve.length - 1].second || 1;
+    const points = curve.map(p => {
+        const x = (p.second / maxSec) * 100;
+        const y = 100 - p.score; // Invert Y (0 at top in SVG)
+        return `${x},${y}`;
+    }).join(' L ');
+    
+    // Add bottom corners to close the path for the fill area
+    const areaPoints = `0,100 L ${points} L 100,100 Z`;
 
     return (
-        <svg viewBox="0 0 300 300" className="vp-radar">
-            <defs>
-                <radialGradient id="radarGrad" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#ff4d00" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.08" />
-                </radialGradient>
-            </defs>
-
-            {/* Grid circles */}
-            {gridLevels.map((v, gi) => (
-                <path key={gi} d={gridPath(v)} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-            ))}
-
-            {/* Axis lines */}
-            {keys.map((_, i) => {
-                const p = point(i, 1);
-                return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />;
-            })}
-
-            {/* Data area */}
-            <path d={dataPath} fill="url(#radarGrad)" stroke="#ff4d00" strokeWidth="2" strokeLinejoin="round" />
-
-            {/* Data dots */}
-            {values.map((v, i) => {
-                const p = point(i, v);
-                return <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ff4d00" stroke="#fff" strokeWidth="1.5" />;
-            })}
-
-            {/* Labels */}
-            {keys.map((k, i) => {
-                const p = point(i, 1.25);
-                return (
-                    <text key={k} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central"
-                        fontSize="9" fill="rgba(255,255,255,0.7)" fontFamily="Inter, sans-serif">
-                        {SCORE_LABELS[k].label}
-                    </text>
-                );
-            })}
-        </svg>
+        <div className="vp-curve-container">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="vp-curve-svg">
+                <defs>
+                    <linearGradient id="curve-fill" x1="0" y1="0" x2="0" y2="100%">
+                        <stop offset="0%" stopColor="var(--sys-primary)" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="var(--sys-primary)" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                
+                {/* Grid lines */}
+                <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.05)" />
+                <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.05)" />
+                <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.05)" />
+                
+                <path d={`M ${areaPoints}`} fill="url(#curve-fill)" className="vp-curve-area" />
+                <path d={`M ${points}`} fill="none" stroke="var(--sys-primary)" strokeWidth="2" strokeLinejoin="round" className="vp-curve-line" />
+            </svg>
+            <div className="vp-curve-labels">
+                <span>0s</span>
+                <span>{maxSec}s</span>
+            </div>
+            <div className="vp-curve-y-labels">
+                <span>100%</span>
+                <span>50%</span>
+            </div>
+        </div>
     );
 }
 
@@ -138,9 +150,11 @@ export default function ViralityPredictor() {
     const [contentType, setContentType] = useState('image');
     const [platform,    setPlatform]    = useState('instagram');
     const [caption,     setCaption]     = useState('');
+    
     const [isDragging,  setIsDragging]  = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [loading,     setLoading]     = useState(false);
-    const [stage,       setStage]       = useState('');   // loading stage text
+    const [stage,       setStage]       = useState('');
     const [result,      setResult]      = useState(null);
     const [error,       setError]       = useState('');
 
@@ -151,8 +165,10 @@ export default function ViralityPredictor() {
         setFile(f);
         setContentType(isVid ? 'video' : 'image');
         setPreviewUrl(URL.createObjectURL(f));
+        setMediaUrl(''); // clear URL if user selected local file
         setResult(null);
         setError('');
+        setUploadProgress(0);
     }, []);
 
     const onDrop = useCallback((e) => {
@@ -162,13 +178,57 @@ export default function ViralityPredictor() {
         if (f) handleFile(f);
     }, [handleFile]);
 
-    // ── Convert file to base64 ──────────────────────────────────────────
-    const toBase64 = (f) => new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result?.split(',')[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(f);
-    });
+    // ── Upload via Presigned S3 ─────────────────────────────────────────
+    const uploadFileToS3 = async (f) => {
+        setStage('Uploading file securely...');
+        setUploadProgress(10);
+        
+        try {
+            // Upload directly via backend to bypass S3 CORS issues
+            const formData = new FormData();
+            formData.append('file', f);
+
+            // Need to use XMLHttpRequest to track upload progress with FormData
+            const token = localStorage.getItem('mantram_token') || localStorage.getItem('token');
+            const apiUrl = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '') + '/virality/upload';
+            
+            const s3Url = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', apiUrl, true);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const p = Math.round((e.loaded / e.total) * 100);
+                        setUploadProgress(10 + Math.floor(p * 0.8)); // 10-90% range
+                    }
+                };
+                
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const res = JSON.parse(xhr.responseText);
+                            if (res.success && res.s3Url) resolve(res.s3Url);
+                            else reject(new Error(res.error || 'Upload failed'));
+                        } catch (e) {
+                            reject(new Error('Invalid response from server'));
+                        }
+                    } else {
+                        reject(new Error(`Server error: ${xhr.status}`));
+                    }
+                };
+                
+                xhr.onerror = () => reject(new Error('Network error during upload'));
+                xhr.send(formData);
+            });
+
+            setUploadProgress(100);
+            return s3Url;
+        } catch (err) {
+            console.error(err);
+            throw new Error('File upload failed. ' + err.message);
+        }
+    };
 
     // ── Submit for analysis ─────────────────────────────────────────────
     const handleAnalyze = async () => {
@@ -176,87 +236,87 @@ export default function ViralityPredictor() {
         setLoading(true);
         setError('');
         setResult(null);
-
-        const stages = [
-            '🎬 Gemini is analyzing your content...',
-            '🌐 Grok is researching real-time trends...',
-            '🧠 Claude is synthesizing your virality score...',
-        ];
-        let stageIdx = 0;
-        setStage(stages[0]);
-        const stageTimer = setInterval(() => {
-            stageIdx = Math.min(stageIdx + 1, stages.length - 1);
-            setStage(stages[stageIdx]);
-        }, 12000);
+        setUploadProgress(0);
 
         try {
-            let mediaBase64 = null;
-            let uploadedUrl = mediaUrl || null;
-
-            if (file && !mediaUrl) {
-                mediaBase64 = await toBase64(file);
+            let finalMediaUrl = mediaUrl;
+            
+            // Phase 1: Upload if local file
+            if (file) {
+                finalMediaUrl = await uploadFileToS3(file);
+                setMediaUrl(finalMediaUrl); // Save for re-runs
             }
+
+            // Phase 2: AI Analysis pipeline
+            const stages = [
+                '🎬 Gemini Neural Analysis in progress...',
+                '🌐 Grok scanning real-time algorithms...',
+                '🧠 Claude synthesizing Neural Score Map...',
+            ];
+            let stageIdx = 0;
+            setStage(stages[0]);
+            
+            const stageTimer = setInterval(() => {
+                stageIdx = Math.min(stageIdx + 1, stages.length - 1);
+                setStage(stages[stageIdx]);
+            }, 15000); // Slower interval for video processing
 
             const data = await viralityPredictor.predict({
                 contentType,
-                mediaUrl: uploadedUrl || undefined,
-                mediaBase64: mediaBase64 || undefined,
+                mediaUrl: finalMediaUrl,
                 brandId: brand?._id,
                 platform,
                 contentText: caption || undefined,
             });
 
+            clearInterval(stageTimer);
             setResult(data.prediction);
         } catch (err) {
             setError(err.message || 'Analysis failed. Please try again.');
         } finally {
-            clearInterval(stageTimer);
             setLoading(false);
             setStage('');
+            setUploadProgress(0);
         }
     };
 
     const tier = result ? (TIER_CONFIG[result.tier] || TIER_CONFIG.growing) : null;
 
     return (
-        <DashboardLayout
-            title="Virality Predictor"
-            subtitle="3-model AI analysis — Gemini Vision · Grok Trends · Claude Intelligence"
-        >
-        <div className="vp-root">
-            {/* Sub-header with credit badge */}
+        <DashboardLayout title="Neural Virality Engine">
+        <div className="vp-root dark-neural">
+            {/* Header */}
             <div className="vp-header">
                 <div className="vp-header-title">
-                    <span className="material-symbols-outlined vp-header-icon">local_fire_department</span>
+                    <span className="material-symbols-outlined vp-header-icon">network_node</span>
                     <div>
-                        <h1>Virality Predictor</h1>
-                        <p>Upload content → AI predicts viral potential with actionable brand-specific tips</p>
+                        <h1>Neural Virality Engine</h1>
+                        <p>20-dimension content analysis via Gemini Files API + Grok Real-Time Intelligence</p>
                     </div>
                 </div>
                 <div className="vp-credit-badge">
                     <span className="material-symbols-outlined">toll</span>
-                    3 credits per analysis
+                    3 credits
                 </div>
             </div>
 
             <div className="vp-layout">
                 {/* Left — Upload + Config */}
                 <div className="vp-left">
-                    {/* Upload Zone */}
                     <div className="vp-card">
                         <div className="vp-card-label">
                             <span className="material-symbols-outlined">upload</span>
-                            Upload Content
+                            Content Source
                         </div>
 
-                        {previewUrl ? (
+                        {previewUrl || mediaUrl ? (
                             <div className="vp-preview-wrap">
                                 {contentType === 'video' ? (
-                                    <video src={previewUrl} className="vp-preview-media" controls muted />
+                                    <video src={previewUrl || mediaUrl} className="vp-preview-media" controls muted />
                                 ) : (
-                                    <img src={previewUrl} className="vp-preview-media" alt="Preview" />
+                                    <img src={previewUrl || mediaUrl} className="vp-preview-media" alt="Preview" />
                                 )}
-                                <button className="vp-preview-remove" onClick={() => { setFile(null); setPreviewUrl(null); setResult(null); }}>
+                                <button className="vp-preview-remove" onClick={() => { setFile(null); setPreviewUrl(null); setMediaUrl(''); setResult(null); }}>
                                     <span className="material-symbols-outlined">close</span>
                                 </button>
                                 <div className="vp-preview-badge">{contentType === 'video' ? '🎬 Video' : '🖼 Image'}</div>
@@ -270,19 +330,18 @@ export default function ViralityPredictor() {
                                 onDrop={onDrop}
                             >
                                 <span className="material-symbols-outlined vp-drop-icon">cloud_upload</span>
-                                <p className="vp-drop-title">Drop your image or video here</p>
-                                <p className="vp-drop-sub">or click to browse • JPG, PNG, MP4, MOV</p>
+                                <p className="vp-drop-title">Drop video or image here</p>
+                                <p className="vp-drop-sub">Direct S3 upload • Supports large video files up to 200MB</p>
                                 <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
                             </div>
                         )}
 
-                        {/* OR URL input */}
                         <div className="vp-url-row">
                             <span className="vp-url-divider">OR</span>
                             <input
                                 type="url"
                                 className="vp-url-input"
-                                placeholder="Paste a content URL (S3, CDN, video link...)"
+                                placeholder="Paste platform S3 or CDN URL"
                                 value={mediaUrl}
                                 onChange={(e) => { setMediaUrl(e.target.value); setFile(null); setPreviewUrl(null); }}
                             />
@@ -293,7 +352,7 @@ export default function ViralityPredictor() {
                     <div className="vp-card">
                         <div className="vp-card-label">
                             <span className="material-symbols-outlined">devices</span>
-                            Target Platform
+                            Target Algorithm
                         </div>
                         <div className="vp-platform-grid">
                             {PLATFORMS.map(p => (
@@ -311,11 +370,11 @@ export default function ViralityPredictor() {
                     <div className="vp-card">
                         <div className="vp-card-label">
                             <span className="material-symbols-outlined">edit_note</span>
-                            Caption / Copy <span className="vp-optional">(optional)</span>
+                            Caption / Copy
                         </div>
                         <textarea
                             className="vp-caption-input"
-                            placeholder="Paste the caption or text you're posting with this content..."
+                            placeholder="Optional: Paste caption text to include Language Network analysis..."
                             value={caption}
                             onChange={(e) => setCaption(e.target.value)}
                             rows={3}
@@ -325,20 +384,23 @@ export default function ViralityPredictor() {
                     {/* CTA */}
                     {error && <div className="vp-error"><span className="material-symbols-outlined">error</span>{error}</div>}
                     <button
-                        className="vp-analyze-btn"
+                        className={`vp-analyze-btn ${loading ? 'loading' : ''}`}
                         disabled={loading || (!file && !mediaUrl)}
                         onClick={handleAnalyze}
                     >
                         {loading ? (
                             <>
                                 <div className="vp-spinner" />
-                                {stage}
+                                {uploadProgress > 0 && uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : stage}
                             </>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined">local_fire_department</span>
-                                Predict Virality — 3 Credits
+                                <span className="material-symbols-outlined">psychology</span>
+                                Run Neural Analysis
                             </>
+                        )}
+                        {uploadProgress > 0 && uploadProgress < 100 && (
+                            <div className="vp-btn-progress" style={{ width: `${uploadProgress}%` }} />
                         )}
                     </button>
                 </div>
@@ -348,110 +410,133 @@ export default function ViralityPredictor() {
                     {!result && !loading && (
                         <div className="vp-empty-state">
                             <div className="vp-empty-glow" />
-                            <span className="material-symbols-outlined vp-empty-icon">local_fire_department</span>
-                            <h2>Upload content to predict its virality</h2>
-                            <p>Our 3-model AI pipeline analyzes visual quality, emotional pull, and real-time trend alignment to score your content's viral potential.</p>
-                            <ul className="vp-feature-list">
-                                <li><span className="material-symbols-outlined">check_circle</span> Full video analysis (not just frames)</li>
-                                <li><span className="material-symbols-outlined">check_circle</span> Real-time Grok trend research</li>
-                                <li><span className="material-symbols-outlined">check_circle</span> Brand-specific viral tips</li>
-                                <li><span className="material-symbols-outlined">check_circle</span> Platform-optimized recommendations</li>
-                            </ul>
+                            <span className="material-symbols-outlined vp-empty-icon">network_node</span>
+                            <h2>Upload content to generate a Neural Score Map</h2>
+                            <p>Our V2 pipeline analyzes 20 dimensions of visual, auditory, and narrative mechanics natively via Gemini Pro, combined with real-time Grok algorithm trend data.</p>
                         </div>
                     )}
 
                     {loading && (
                         <div className="vp-loading-state">
                             <div className="vp-loading-orb" />
-                            <h2>Analyzing your content...</h2>
-                            <p className="vp-loading-stage">{stage}</p>
-                            <div className="vp-loading-steps">
-                                <div className={`vp-step ${stage.includes('Gemini') ? 'active' : stage ? 'done' : ''}`}>
-                                    <span className="material-symbols-outlined">auto_awesome</span>
-                                    Gemini Vision Analysis
-                                </div>
-                                <div className={`vp-step ${stage.includes('Grok') ? 'active' : stage.includes('Claude') ? 'done' : ''}`}>
-                                    <span className="material-symbols-outlined">travel_explore</span>
-                                    Grok Real-Time Research
-                                </div>
-                                <div className={`vp-step ${stage.includes('Claude') ? 'active' : ''}`}>
-                                    <span className="material-symbols-outlined">psychology</span>
-                                    Claude Synthesis
-                                </div>
-                            </div>
+                            <h2>{stage || 'Initializing Engine...'}</h2>
+                            <div className="vp-loading-scanline" />
                         </div>
                     )}
 
                     {result && tier && (
                         <div className="vp-results">
-                            {/* Overall Score Hero */}
-                            <div className="vp-score-hero" style={{ '--tier-color': tier.color, '--tier-glow': tier.glow, '--tier-bg': tier.bg }}>
-                                <div className="vp-score-circle">
-                                    <svg viewBox="0 0 120 120">
-                                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
-                                        <circle cx="60" cy="60" r="52" fill="none" stroke={tier.color}
-                                            strokeWidth="8" strokeLinecap="round"
-                                            strokeDasharray={`${2 * Math.PI * 52 * result.overallScore / 100} ${2 * Math.PI * 52}`}
-                                            strokeDashoffset={2 * Math.PI * 52 * 0.25}
-                                            style={{ transition: 'stroke-dasharray 1.5s ease' }} />
-                                    </svg>
-                                    <div className="vp-score-number">{result.overallScore}</div>
-                                </div>
-                                <div className="vp-score-info">
-                                    <div className="vp-tier-badge" style={{ backgroundColor: tier.bg, color: tier.color, border: `1px solid ${tier.color}40` }}>
-                                        {tier.label}
-                                    </div>
-                                    <p className="vp-verdict">{result.verdict}</p>
-                                    {result.comparedToBenchmark && (
-                                        <div className="vp-benchmark">
-                                            <span className="material-symbols-outlined">bar_chart</span>
-                                            {result.comparedToBenchmark === 'above' ? 'Above' : result.comparedToBenchmark === 'at' ? 'At' : 'Below'} category benchmark ({result.categoryBenchmark}/100)
+                            
+                            {/* Top Hero: Score + Metrics + Brain */}
+                            <div className="vp-hero-card" style={{ '--tier-color': tier.color, '--tier-glow': tier.glow }}>
+                                <div className="vp-hero-left">
+                                    <div className="vp-score-wrapper">
+                                        <div className="vp-score-label">Viral Potential</div>
+                                        <div className="vp-score-huge">
+                                            {result.overallScore}<span>/100</span>
                                         </div>
-                                    )}
+                                        <div className="vp-tier-badge" style={{ backgroundColor: tier.bg, color: tier.color, border: `1px solid ${tier.color}40` }}>
+                                            {tier.label}
+                                        </div>
+                                    </div>
+                                    <div className="vp-metrics-row">
+                                        <div className="vp-metric">
+                                            <div className="vp-metric-val">{result.metrics?.hookScore || 0}</div>
+                                            <div className="vp-metric-lbl">Hook Score</div>
+                                        </div>
+                                        <div className="vp-metric">
+                                            <div className="vp-metric-val">{result.metrics?.holdRate || 0}%</div>
+                                            <div className="vp-metric-lbl">Est. Hold Rate</div>
+                                        </div>
+                                        {contentType === 'video' && result.metrics?.peakHookTimestamp > 0 && (
+                                            <div className="vp-metric">
+                                                <div className="vp-metric-val">0:0{result.metrics?.peakHookTimestamp}</div>
+                                                <div className="vp-metric-lbl">Peak Timestamp</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="vp-hero-right">
+                                    <BrainHeatmap scores={result.scores || {}} />
                                 </div>
                             </div>
 
-                            {/* Radar + Score Bars */}
-                            <div className="vp-score-grid">
-                                <div className="vp-radar-wrap">
-                                    <RadarChart scores={result.scores} />
-                                </div>
-                                <div className="vp-score-bars">
-                                    {Object.entries(SCORE_LABELS).map(([key, meta]) => {
-                                        const score = result.scores?.[key] ?? 0;
-                                        const barColor = score >= 80 ? '#ff4d00' : score >= 65 ? '#f59e0b' : score >= 50 ? '#10b981' : '#6366f1';
+                            {/* Neural Activation Grid + Retention */}
+                            <div className="vp-neural-grid">
+                                <div className="vp-activation-panel">
+                                    <div className="vp-section-label">
+                                        <span className="material-symbols-outlined">psychology</span>
+                                        Neural Activation Maps
+                                    </div>
+                                    {NEURAL_REGIONS.map(reg => {
+                                        const score = result.scores?.[reg.id] || 0;
+                                        // Auditory is 0 for images, handle gracefully
+                                        if (contentType === 'image' && reg.id === 'auditoryCortex') return null;
+                                        
                                         return (
-                                            <div key={key} className="vp-score-row">
-                                                <div className="vp-score-meta">
-                                                    <span className="material-symbols-outlined">{meta.icon}</span>
-                                                    <div>
-                                                        <div className="vp-score-name">{meta.label}</div>
-                                                        <div className="vp-score-desc">{meta.desc}</div>
-                                                    </div>
+                                            <div key={reg.id} className="vp-act-row">
+                                                <div className="vp-act-info">
+                                                    <div className="vp-act-name">{reg.label}</div>
+                                                    <div className="vp-act-desc">{reg.desc}</div>
                                                 </div>
-                                                <div className="vp-score-right">
-                                                    <ScoreBar score={score} color={barColor} />
-                                                    <span className="vp-score-num" style={{ color: barColor }}>{score}</span>
+                                                <div className="vp-act-bar-wrap">
+                                                    <div className="vp-act-track">
+                                                        <div className="vp-act-fill" style={{ width: `${score}%` }} />
+                                                    </div>
+                                                    <div className="vp-act-score">{score}%</div>
                                                 </div>
                                             </div>
                                         );
                                     })}
+                                    {result.scores?.focusDrift > 0 && (
+                                        <div className="vp-act-row drift">
+                                            <div className="vp-act-info">
+                                                <div className="vp-act-name text-red">Focus Drift Risk</div>
+                                                <div className="vp-act-desc">Likelihood of audience swiping away</div>
+                                            </div>
+                                            <div className="vp-act-bar-wrap">
+                                                <div className="vp-act-track drift-track">
+                                                    <div className="vp-act-fill drift-fill" style={{ width: `${result.scores.focusDrift}%` }} />
+                                                </div>
+                                                <div className="vp-act-score text-red">{result.scores.focusDrift}%</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                                
+                                {contentType === 'video' && result.retentionCurve && (
+                                    <div className="vp-retention-panel">
+                                        <div className="vp-section-label">
+                                            <span className="material-symbols-outlined">show_chart</span>
+                                            Predicted Retention Curve
+                                        </div>
+                                        <RetentionCurve curve={result.retentionCurve} />
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Trend Context */}
+                            {/* Verdict */}
+                            <div className="vp-verdict-box">
+                                <span className="material-symbols-outlined">quick_reference_all</span>
+                                <p>{result.verdict}</p>
+                            </div>
+
+                            {/* Grok Trend Intelligence */}
                             {result.trendContext && (
                                 <div className="vp-trend-box">
                                     <div className="vp-section-label">
                                         <span className="material-symbols-outlined">travel_explore</span>
-                                        Real-Time Trend Intelligence (Grok)
+                                        Real-Time Algorithm Intel (Grok)
                                     </div>
                                     <p>{result.trendContext}</p>
-                                    {result.competitorContext && (
-                                        <p className="vp-competitor-line">
-                                            <span className="material-symbols-outlined">insights</span>
-                                            {result.competitorContext}
-                                        </p>
+                                    
+                                    {result.trendingSounds?.length > 0 && (
+                                        <div className="vp-intel-row mt-3">
+                                            <strong>Trending Audio:</strong>
+                                            <div className="vp-intel-tags">
+                                                {result.trendingSounds.map(s => <span key={s} className="vp-tag-audio"><span className="material-symbols-outlined">music_note</span>{s}</span>)}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -461,7 +546,7 @@ export default function ViralityPredictor() {
                                 <div className="vp-insight-card vp-strengths">
                                     <div className="vp-section-label">
                                         <span className="material-symbols-outlined">thumb_up</span>
-                                        What's Working
+                                        Activation Strengths
                                     </div>
                                     <ul>
                                         {(result.strengths || []).map((s, i) => (
@@ -472,7 +557,7 @@ export default function ViralityPredictor() {
                                 <div className="vp-insight-card vp-improvements">
                                     <div className="vp-section-label">
                                         <span className="material-symbols-outlined">build</span>
-                                        What to Improve
+                                        Friction Points
                                     </div>
                                     <ul>
                                         {(result.improvements || []).map((s, i) => (
@@ -482,22 +567,11 @@ export default function ViralityPredictor() {
                                 </div>
                             </div>
 
-                            {/* Quick Win */}
-                            {result.quickWin && (
-                                <div className="vp-quick-win">
-                                    <span className="material-symbols-outlined">bolt</span>
-                                    <div>
-                                        <strong>Quick Win</strong>
-                                        <p>{result.quickWin}</p>
-                                    </div>
-                                </div>
-                            )}
-
                             {/* Viral Tips */}
                             <div className="vp-tips-section">
                                 <div className="vp-section-label">
                                     <span className="material-symbols-outlined">tips_and_updates</span>
-                                    Tips to Go Viral — {brand?.dna?.industry || 'Your Category'} Specific
+                                    Viral Hooks & Tips — {brand?.dna?.industry || 'Your Category'}
                                 </div>
                                 <div className="vp-tips-grid">
                                     {(result.tipsToGoViral || []).map((tip, i) => (
@@ -508,68 +582,6 @@ export default function ViralityPredictor() {
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Posting Strategy */}
-                            <div className="vp-strategy-row">
-                                {result.bestPlatforms?.length > 0 && (
-                                    <div className="vp-strategy-card">
-                                        <div className="vp-section-label">
-                                            <span className="material-symbols-outlined">devices</span>
-                                            Best Platforms
-                                        </div>
-                                        <div className="vp-platform-tags">
-                                            {result.bestPlatforms.map(p => (
-                                                <span key={p} className="vp-ptag">{p}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {result.bestPostTime && (
-                                    <div className="vp-strategy-card">
-                                        <div className="vp-section-label">
-                                            <span className="material-symbols-outlined">schedule</span>
-                                            Best Post Time
-                                        </div>
-                                        <p className="vp-strategy-value">{result.bestPostTime}</p>
-                                    </div>
-                                )}
-                                {result.estimatedReach && (
-                                    <div className="vp-strategy-card">
-                                        <div className="vp-section-label">
-                                            <span className="material-symbols-outlined">groups</span>
-                                            Estimated Reach
-                                        </div>
-                                        <p className="vp-strategy-value vp-reach">{result.estimatedReach}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Hashtags */}
-                            {result.recommendedHashtags?.length > 0 && (
-                                <div className="vp-card vp-hashtag-section">
-                                    <div className="vp-section-label">
-                                        <span className="material-symbols-outlined">tag</span>
-                                        Recommended Hashtags
-                                    </div>
-                                    <div className="vp-hashtag-grid">
-                                        {result.recommendedHashtags.map(h => (
-                                            <span key={h} className="vp-hashtag">{h}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Analysis Metadata */}
-                            <div className="vp-meta-footer">
-                                <span className="material-symbols-outlined">info</span>
-                                Analyzed on {new Date(result.analysisMetadata?.analysisDate).toLocaleDateString()} using {result.analysisMetadata?.modelsUsed?.join(' · ')}
-                            </div>
-
-                            {/* Re-analyze */}
-                            <button className="vp-reanalyze-btn" onClick={() => setResult(null)}>
-                                <span className="material-symbols-outlined">refresh</span>
-                                Analyze Another Piece of Content
-                            </button>
                         </div>
                     )}
                 </div>

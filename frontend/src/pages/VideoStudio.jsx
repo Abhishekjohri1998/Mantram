@@ -176,6 +176,7 @@ export default function VideoStudio() {
     const [showHistory, setShowHistory] = useState(false)
     const [playingVideo, setPlayingVideo] = useState(null)
     const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
+    const [showGenVirality, setShowGenVirality] = useState(false) // Toggle for virality panel on newly generated video
     const [advancedRefillData, setAdvancedRefillData] = useState(null)
     const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
     const [historyTab, setHistoryTab] = useState('all') // 'all' | 'completed' | 'progress' | 'drafts'
@@ -2398,6 +2399,11 @@ export default function VideoStudio() {
                                     <span className="material-symbols-outlined">check_circle</span>
                                     Accept & Save
                                 </button>
+                                <button onClick={() => setShowGenVirality(!showGenVirality)} disabled={loading}
+                                    className={`flex-1 py-4 rounded-2xl border font-bold hover:shadow-xl hover:shadow-none transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 ${showGenVirality ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-primary)] text-primary' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text)]'}`}>
+                                    <span className="material-symbols-outlined text-primary">local_fire_department</span>
+                                    Check Virality
+                                </button>
                                 {generation?.videoUrl && (
                                     <button onClick={() => handleDownloadVideo(projectId ? `${API_BASE}/video-studio/${projectId}/video` : generation.videoUrl, 'video')}
                                         className="px-6 py-4 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] font-medium hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-2 cursor-pointer">
@@ -2409,6 +2415,18 @@ export default function VideoStudio() {
                                     <SaveAsTemplateButton jobId={projectId} jobType="VideoProject" studioOrigin="video" prompt={backendPrompt || ''} />
                                 )}
                             </div>
+
+                            {/* Virality Panel for newly generated video */}
+                            {showGenVirality && (generation?.videoUrl || generation?.s3VideoUrl) && (
+                                <div className="mt-2 mb-6">
+                                    <ViralityMiniPanel
+                                        contentType="video"
+                                        mediaUrl={projectId ? `${API_BASE}/video-studio/${projectId}/video` : (generation.s3VideoUrl || generation.videoUrl)}
+                                        brandId={activeBrand?._id}
+                                        platform="instagram"
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
                 </>) /* end storyboard mode */
