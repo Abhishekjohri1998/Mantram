@@ -148,11 +148,11 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
                 setProductImages(prev => [...prev, { file: r.product.image, preview: r.product.image }]);
                 if (r.product.title && !productName) setProductName(r.product.title);
             } else {
-                setProductImages(prev => [...prev, { file: url, preview: url }]);
+                alert("Could not extract a product image from this URL. Please upload the image manually.");
             }
         } catch (e) {
             console.error('Failed to scrape URL:', e);
-            setProductImages(prev => [...prev, { file: url, preview: url }]);
+            alert("Failed to scrape URL. The website might be blocking bots. Please upload the image manually.");
         } finally {
             setIsScrapingUrl(false);
             setProductUrlInput('');
