@@ -473,8 +473,8 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
             userPrompt,
             temperature,
             maxTokens,
-            images: validImages, // Gemini provider natively handles URL→base64 conversion
-        }, { provider: 'gemini' }); // MUST force Gemini, as Anthropic provider drops images
+            images: validImages, 
+        }, { provider: options.provider || 'gemini' });
 
         const text = result.text || '';
         console.log(`🧠 MCoT: Multimodal response received in ${Date.now() - startMs}ms (${text.length} chars)`);

@@ -47,6 +47,12 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
         const isOurS3 = imageUrl.includes('mantram-assets') || 
                         (imageUrl.includes('.amazonaws.com') && imageUrl.includes('s3.ap-south-1'));
         
+        // ── Our CloudFront CDN URL? Fetch with auth headers ──
+        const isOurCloudFront = imageUrl.includes('d138p2zntq2uob.cloudfront.net') ||
+                                imageUrl.includes('cloudfront.net/d2c/') ||
+                                imageUrl.includes('cloudfront.net/storyboard/') ||
+                                imageUrl.includes('cloudfront.net/video-studio/');
+        
         if (isOurS3) {
             try {
                 const { getObjectStream } = await import('../../utils/s3.js');
@@ -74,16 +80,22 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
             }
         }
 
+        // ── Standard HTTP fetch (with browser-like headers to prevent 403 blocks) ──
+        const fetchHeaders = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Mantram-AI/1.0; image-reference-fetcher)',
+            'Accept': 'image/webp,image/jpeg,image/png,image/*',
+        };
+
         // ⚡ HEAD-check before full download — skip dead URLs instantly
         try {
-            const headResp = await fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
+            const headResp = await fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000), headers: fetchHeaders });
             if (headResp && !headResp.ok) {
                 console.warn(`⚡ Skipping dead ref URL (HTTP ${headResp.status}): ${imageUrl.substring(0, 60)}`);
                 return null;
             }
         } catch (_) { /* HEAD failed — try full download anyway */ }
 
-        const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(8000) }); // ⚡ 8s (was 12s)
+        const resp = await fetch(imageUrl, { signal: AbortSignal.timeout(15000), headers: fetchHeaders });
         if (!resp.ok) {
             console.warn(`⚠️ Ref image fetch failed: HTTP ${resp.status} for ${imageUrl.substring(0, 80)}`);
             return null;
@@ -123,8 +135,18 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
 
     // ── Fetch + RESIZE reference images to keep payload small ──
     const fetchedRefParts = [];
+    const modelId = options.model || 'gpt-image-2';
+    
+    // Determine provider based on model, avoiding Gemini as requested
+    let provider = 'openai';
+    if (modelId.includes('gemini') || modelId.includes('imagen')) {
+        provider = 'gemini';
+    }
+
+    let finalPrompt = prompt;
+
     if (referenceImageUrls.length > 0) {
-        console.log(`🖼️ Fetching & resizing ${referenceImageUrls.length} reference images...`);
+        console.log(`🖼️ Fetching & resizing ${referenceImageUrls.length} reference images for fallback...`);
         for (const url of referenceImageUrls.slice(0, 2)) {
             const resized = await fetchAndResizeImage(url);
             if (resized) {
@@ -140,22 +162,28 @@ export async function geminiImageGenerate(prompt, imageParts = [], temperature =
         ...imageParts.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
     ];
 
-    const safeARs = ["1:1","9:16","16:9","4:3","3:4","4:5","5:4","2:3","3:2"];
-    const nativeAR = safeARs.includes(aspectRatio) ? aspectRatio : '1:1';
-
     try {
         const { getRouter } = await import('../../ai/router.js');
         const router = getRouter();
         
-        console.log(`🖼️ Calling router.generateImage with Gemini natively...`);
+        const modelId = options.model || 'gpt-image-2';
+        
+        // Determine provider based on model, avoiding Gemini as requested
+        let provider = 'openai';
+        if (modelId.includes('gemini') || modelId.includes('imagen')) {
+            provider = 'gemini';
+        }
+
+        console.log(`🖼️ Calling router.generateImage with ${provider} (model: ${modelId})...`);
+        
         const result = await router.generateImage({
-            prompt: prompt,
-            aspectRatio: nativeAR,
-            model: 'gemini-3.1-flash-image-preview',
+            prompt: finalPrompt,
+            aspectRatio: options.aspectRatio || '16:9',
+            model: modelId,
             imageParts: parts,
             temperature: temperature
         }, {
-            provider: 'gemini'
+            provider: provider
         });
 
         if (!result || !result.imageUrl) {

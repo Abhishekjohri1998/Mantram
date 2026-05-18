@@ -313,7 +313,7 @@ export class GeminiProvider extends BaseProvider {
 
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 180_000); // 180s per attempt (accommodates heavy prompts + refs)
+                    const timeoutId = setTimeout(() => controller.abort(), 240_000); // 240s per attempt (accommodates heavy prompts + refs)
                     try {
                         response = await fetch(url, fetchOptions({
                             method: 'POST',

@@ -43,7 +43,12 @@ export default {
                 gcpLocation: process.env.GCP_LOCATION || 'us-central1',
                 googleApplicationCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
             },
-            openai: { apiKey: process.env.OPENAI_API_KEY },
+            openai: {
+                apiKey: process.env.OPENAI_API_KEY,
+                // LaoZhang proxy — preferred for gpt-image-2 (supports /images/edits with ref images)
+                laozhangApiKey: process.env.LAOZHANG_API_KEY,
+                laozhangBaseUrl: process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1',
+            },
             anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
         },
     },

@@ -52,13 +52,12 @@ function resolveModelName(qualityMode, imageCount) {
     // Per Atlas Cloud docs, the correct model namespace is atlascloud/workflow/seedance-2.0/...
     const tier = qualityMode === 'quality' ? 'seedance-2.0' : 'seedance-2.0-fast';
     if (imageCount > 1) {
-        // Force seedance-2.0 for reference-to-video as fast tier might have stricter constraints or lack full R2V support
-        console.log(`📌 Atlas: ${imageCount} images → reference-to-video (seedance-2.0)`);
-        return `atlascloud/workflow/seedance-2.0/reference-to-video`;
+        console.log(`📌 Atlas: ${imageCount} images → reference-to-video (${tier})`);
+        return `atlascloud/workflow/${tier}/reference-to-video`;
     }
     if (imageCount === 1) {
-        console.log(`📌 Atlas: 1 image → image-to-video (seedance-2.0)`);
-        return `atlascloud/workflow/seedance-2.0/image-to-video`;
+        console.log(`📌 Atlas: 1 image → image-to-video (${tier})`);
+        return `atlascloud/workflow/${tier}/image-to-video`;
     }
     return `atlascloud/workflow/${tier}/text-to-video`;
 }
@@ -456,22 +455,20 @@ export async function submitAtlasCloudVideoGeneration({
     }
 
     // 🛡️ SAFE MODE BYPASS (Seedance-native):
-    // If the user provided a first frame (imageUrl) but NO face references, Seedance defaults to
-    // `image-to-video` which STRICTLY BLOCKS real people.
-    // By copying the first frame to the Face Assets list, we force Seedance into `reference-to-video` mode.
-    // This allows real people to be animated natively in Seedance 2.0 without changing the model.
-    //
-    // ROLES:
-    //  - 'product'       → standalone product (no human), skip bypass
-    //  - 'face'          → real human avatar (UGC Pro), apply bypass + full face registration
-    //  - 'fashion-model' → garment brand model (human wearing clothes), apply bypass + asset registration
-    //                       but use garment-focused face-lock language (not face-identity language)
-    //  - 'character'     → 3D/animated avatar, skip face registration
-    const bypassRoles = ['face', 'fashion-model'];
-    if (bypassRoles.includes(imageRole) && firstFrameUrls.length === 1 && faceS3Urls.length === 0) {
-        console.log(`🛡️ [${imageRole}] Promoting first frame to Face Asset to bypass Seedance I2V real-person safety filter...`);
-        faceS3Urls.push(firstFrameUrls[0]);
-        firstFrameUrls.pop(); // Remove it from firstFrameUrls so it's not sent as a raw URL which triggers the filter
+    // Register the first frame as an Asset if we have faceS3Urls (so Atlas doesn't merge raw image_urls with asset reference_images)
+    // or if the bypass is triggered. This ensures we never send a raw URL alongside an asset URI.
+    let firstFrameAssetUris = [];
+    if (firstFrameUrls.length > 0) {
+        if (faceS3Urls.length > 0 || ['face', 'fashion-model'].includes(imageRole)) {
+            console.log(`🛡️ Promoting first frame to Asset to bypass Seedance I2V safety filters...`);
+            firstFrameAssetUris = await prepFaceReferencesAsAssets(firstFrameUrls);
+            if (firstFrameAssetUris.length === 0) {
+                console.warn(`⚠️ First frame asset registration failed — falling back to raw URLs`);
+                firstFrameAssetUris = firstFrameUrls;
+            }
+        } else {
+            firstFrameAssetUris = firstFrameUrls; // safe to use raw if no references are present
+        }
     }
 
     // Step 3 — KEY: Convert face S3 URLs → asset:// URIs via Atlas Asset Library
@@ -491,90 +488,52 @@ export async function submitAtlasCloudVideoGeneration({
     }
 
     // Step 4 — Sanitize the incoming prompt text before building @image tags
-    // RC#4: Strip curly-brace blocks (parsed as template syntax by Atlas NLP) and
-    //        ALL-CAPS brand-name tokens from WARDROBE/STYLE lines.
     let cleanedPrompt = finalPromptText
-        .replace(/@image\d+/gi, '')                             // strip old @image refs — will be re-added below
-        .replace(/\{[^}]{0,300}\}/g, '')                        // RC#4: strip {curly brace blocks}
-        .replace(/\bWARDROBE\s*:\s*([A-Z][A-Z0-9 ]{3,}\b)+/g,  // RC#2: strip BRAND NAME prefix from WARDROBE lines
+        .replace(/@image\d+/gi, '')
+        .replace(/\{[^}]{0,300}\}/g, '')
+        .replace(/\bWARDROBE\s*:\s*([A-Z][A-Z0-9 ]{3,}\b)+/g,
             (m) => m.replace(/\b[A-Z]{3,}(?:\s+[A-Z]{3,})*\b/, '').replace(/[ \t]{2,}/g, ' '))
         .replace(/[ \t]{2,}/g, ' ')
         .trim();
 
-    // RC#1 FIX — Only inject "real person" face-lock text when imageRole is explicitly 'face'.
-    // For product / garment / character / undefined roles: inject neutral visual-consistency
-    // anchoring text that does NOT contain trigger words ("real person", "facial geometry",
-    // "skin tone") which cause Seedance's safety classifier to reject the request.
+    const tagOffset = firstFrameAssetUris.length;
+
     if (faceAssetUris.length > 0) {
-        const faceTags = faceAssetUris.map((_, i) => `@image${i + 1}`).join(', ');
+        const faceTags = faceAssetUris.map((_, i) => `@image${i + 1 + tagOffset}`).join(', ');
         let anchorText;
 
         if (imageRole === 'face') {
-            // ✅ ONLY role where "real person" language is appropriate and intentional.
-            // The image IS a confirmed human avatar uploaded by the user for UGC Pro.
             anchorText = `${faceTags} — visual reference for the presenter in this video. Maintain consistent appearance throughout every frame.`;
         } else if (imageRole === 'fashion-model') {
-            // Garment/apparel brand: the image is clothing (possibly worn by a model).
-            // Lead with GARMENT as the subject — never mention "real person".
             anchorText = `${faceTags} — visual reference for the outfit. Maintain the exact garment style, fabric texture, color, and fit throughout every frame. The clothing is the subject of this video.`;
         } else if (imageRole === 'character') {
             anchorText = `${faceTags} — visual reference for the animated character. Maintain exact consistency in every frame.`;
         } else {
-            // 'product' or any unrecognised role — purely visual consistency anchor.
             anchorText = `${faceTags} — visual reference for the product. Maintain exact shape, color, and surface detail throughout every frame.`;
         }
 
         cleanedPrompt = `${anchorText} ${cleanedPrompt}`;
-
-        // RC#3 FIX — Do NOT auto-append @Image{n} tags for firstFrameUrls when face assets
-        // are already present. Atlas maps reference_images → @image1..N and image_urls
-        // separately; auto-generating a combined index like @Image3 creates a phantom
-        // reference that Atlas cannot resolve, causing payload validation failures.
-        // The firstFrame image will be used by Atlas implicitly as the scene anchor.
         const roleLabel = imageRole === 'face' ? '👤 Presenter-ref' : imageRole === 'fashion-model' ? '👗 Garment-ref' : '📦 Product-ref';
         console.log(`${roleLabel} injected for ${faceAssetUris.length} ref(s): ${faceTags}`);
-    } else if (firstFrameUrls.length > 0) {
-        // No face/reference assets — firstFrame is @image1, just anchor it once.
+    } 
+    
+    if (firstFrameAssetUris.length > 0) {
         if (!cleanedPrompt.toLowerCase().includes('@image1')) {
-            cleanedPrompt += ` @image1 is the visual reference for this scene.`;
+            cleanedPrompt += ` @image1 is the visual reference for the exact starting frame of this scene.`;
         }
     }
 
     let finalPrompt = truncatePrompt(cleanedPrompt.replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim());
 
-    // Step 5 — CRITICAL: Split faceAssetUris into asset:// URIs vs raw fallback URLs
-    // reference_images field in Atlas API accepts ONLY asset:// URIs.
-    // Any raw https:// URL in reference_images bypasses the Asset Library and
-    // directly triggers Seedance's real-person safety filter — causing immediate rejection.
-    //
-    // If prepFaceReferencesAsAssets() partially failed (some images registered, some didn't),
-    // the raw fallback URLs must be routed to image_urls, NOT reference_images.
     const registeredAssetUris = faceAssetUris.filter(u => u && u.startsWith('asset://'));
     const rawFallbackUrls     = faceAssetUris.filter(u => u && !u.startsWith('asset://'));
 
-    if (rawFallbackUrls.length > 0) {
-        console.warn(`⚠️ [Atlas] ${rawFallbackUrls.length} image(s) failed asset registration — routing to image_urls to prevent reference_images contamination`);
-        rawFallbackUrls.forEach(u => firstFrameUrls.push(u));
-    }
-
-    // Re-build the prompt anchor text to match ONLY the registered asset count
-    // so there are no phantom @image tags that reference unregistered images.
-    if (registeredAssetUris.length !== faceAssetUris.length && registeredAssetUris.length > 0) {
-        const correctedTags = registeredAssetUris.map((_, i) => `@image${i + 1}`).join(', ');
-        const oldTags = faceAssetUris.map((_, i) => `@image${i + 1}`).join(', ');
-        // Replace the old tag list in the prompt with the corrected count
-        if (finalPrompt.includes(oldTags)) {
-            finalPrompt = finalPrompt.replace(oldTags, correctedTags);
-            console.log(`📝 [Atlas] Corrected @image tags in prompt: ${oldTags} → ${correctedTags}`);
-        }
-    }
-
-    const imageCount     = registeredAssetUris.length + firstFrameUrls.length;
+    const imageCount     = registeredAssetUris.length + firstFrameAssetUris.length;
     const effectiveCount = registeredAssetUris.length > 0 ? Math.max(imageCount, 2) : imageCount;
     const modelName      = resolveModelName(qualityMode, effectiveCount);
     const dur            = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15);
 
-    console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | assetRefs=${registeredAssetUris.length} | rawFallbacks=${rawFallbackUrls.length} | firstFrame=${firstFrameUrls.length}`);
+    console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | assetRefs=${registeredAssetUris.length} | firstFrame=${firstFrameAssetUris.length}`);
     console.log(`📝 [Atlas] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
 
     const taskInput = {
@@ -582,31 +541,21 @@ export async function submitAtlasCloudVideoGeneration({
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
         resolution:     resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'),
-        generate_audio: refAudio ? false : (generateAudio !== false), // Disable native audio when TTS is provided
+        generate_audio: refAudio ? false : (generateAudio !== false),
     };
 
-    // 🎤 Pass TTS audio for native lip-sync (Seedance 2.0 supports audio-driven generation)
     if (refAudio) {
         taskInput.audio_url = refAudio;
         console.log(`🎤 [Atlas] refAudio injected for lip-sync: ${refAudio.substring(0, 70)}...`);
     }
 
-    // reference_images: ONLY asset:// URIs — never raw https:// URLs
-    // image_urls: scene first-frame anchors — ONLY when no reference_images are present
-    //
-    // ⚠️ CRITICAL: Atlas merges both fields into Seedance's reference_images before
-    // submission. Any URL in image_urls ends up alongside asset:// URIs in
-    // Seedance's reference_images, causing the real-person safety filter to fire.
-    // When face assets are registered, they provide sufficient visual anchoring alone.
-    if (registeredAssetUris.length > 0) {
-        taskInput.reference_images = registeredAssetUris;
-        // Do NOT add image_urls — Atlas would merge them into Seedance's reference_images
-        if (firstFrameUrls.length > 0) {
-            console.log(`🚫 [Atlas] Suppressing image_urls (${firstFrameUrls.length} URLs) — reference_images present; Atlas merges both causing safety rejection`);
-        }
-    } else if (firstFrameUrls.length > 0) {
-        // No face assets — safe to use image_urls for pure I2V anchoring
-        taskInput.image_urls = firstFrameUrls;
+    const finalReferenceImages = [...registeredAssetUris, ...rawFallbackUrls];
+    if (finalReferenceImages.length > 0) {
+        taskInput.reference_images = finalReferenceImages;
+    }
+    
+    if (firstFrameAssetUris.length > 0) {
+        taskInput.image_urls = firstFrameAssetUris;
     }
 
     const payload = { model: 'seedance', task_type: modelName, input: taskInput };

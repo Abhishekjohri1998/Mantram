@@ -37,6 +37,9 @@ class ModelRouter {
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
             defaultModel: config.ai.defaultOpenAIModel || 'gpt-4o-mini',
+            // LaoZhang proxy — required for gpt-image-2 /images/edits (ref images)
+            laozhangApiKey: providerConfigs.openai?.laozhangApiKey,
+            laozhangBaseUrl: providerConfigs.openai?.laozhangBaseUrl,
         });
         // xAI / Grok — OpenAI-compatible API, different base URL + API key
         if (config.grok?.apiKey) {

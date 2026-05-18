@@ -64,6 +64,9 @@ import { buildVideoHash } from '../utils/videoHash.js';
 import { checkPromptSafety } from '../utils/promptSafety.js';
 import redis from '../utils/redisClient.js';
 import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
+import { runStoryboardDirector } from '../agents/videoStudio/storyboardDirector.js';
+import { generateStoryboardPoster } from '../agents/videoStudio/storyboardFrames.js';
+import { stitchVideoClips } from '../utils/videoStitcher.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -7405,5 +7408,398 @@ router.get('/long-form/estimate', protect, (req, res) => {
     res.json({ success: true, ...est });
 });
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STORYBOARD STUDIO — AI Ad Film Director → Frame Generation → Animation
+// ══════════════════════════════════════════════════════════════════════════════
+
+const storyboardUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+// ── POST /api/video-studio/storyboard/create ─────────────────────────────────
+// Step 1: Director Brain (Claude) generates shot plan + Gemini generates frames
+// Returns full storyboard JSON with frameUrls
+router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), storyboardUpload.fields([
+    { name: 'productImages', maxCount: 4 },
+    { name: 'avatarImage', maxCount: 1 },
+]), async (req, res) => {
+    try {
+        const {
+            brandId, brief, productName, productFeatures,
+            style = 'hyperrealistic', duration = '30', format = '9:16',
+            productImageUrls: bodyProductImgUrls,
+            avatarUrl: bodyAvatarUrl,
+            directorModel = 'claude',
+            imageModel = 'nanobanana'
+        } = req.body;
+
+        const totalDuration = Math.max(5, Math.min(300, parseInt(duration) || 30));
+
+        // ══════ DIAGNOSTIC LOGGING ══════
+        console.log(`\n🔍 [Storyboard Create] ══ INCOMING REQUEST DUMP ══`);
+        console.log(`  req.files keys: ${JSON.stringify(Object.keys(req.files || {}))}`);
+        console.log(`  productImages files: ${req.files?.productImages?.length || 0}`);
+        console.log(`  avatarImage files: ${req.files?.avatarImage?.length || 0}`);
+        console.log(`  body.productImageUrls: ${JSON.stringify(bodyProductImgUrls)?.substring(0, 200)}`);
+        console.log(`  body.avatarUrl: ${bodyAvatarUrl?.substring(0, 100)}`);
+        console.log(`  body.imageModel: ${imageModel}`);
+        console.log(`  body.brief: ${brief?.substring(0, 80)}`);
+
+        // Upload any new product images
+        const productImageUrls = [];
+        if (req.files?.productImages?.length) {
+            for (const f of req.files.productImages) {
+                const s3Key = `storyboard/products/${req.user._id}/${Date.now()}-${f.originalname}`;
+                const url = await uploadToS3(f.buffer, s3Key, f.mimetype);
+                console.log(`  ✅ Product image uploaded to S3: ${url}`);
+                productImageUrls.push(url);
+            }
+        }
+        // Also accept pre-existing S3 URLs from body
+        if (bodyProductImgUrls) {
+            let parsed = [];
+            if (Array.isArray(bodyProductImgUrls)) {
+                parsed = bodyProductImgUrls;
+            } else if (typeof bodyProductImgUrls === 'string') {
+                try {
+                    parsed = JSON.parse(bodyProductImgUrls);
+                } catch(e) {
+                    parsed = [bodyProductImgUrls]; // Not JSON, assume raw URL
+                }
+            }
+            productImageUrls.push(...(Array.isArray(parsed) ? parsed : [parsed]).filter(u => u?.startsWith('http')));
+        }
+
+        // Upload avatar if provided as file
+        let avatarUrl = bodyAvatarUrl || null;
+        if (req.files?.avatarImage?.[0]) {
+            const f = req.files.avatarImage[0];
+            const s3Key = `storyboard/avatars/${req.user._id}/${Date.now()}-${f.originalname}`;
+            avatarUrl = await uploadToS3(f.buffer, s3Key, f.mimetype);
+            console.log(`  ✅ Avatar image uploaded to S3: ${avatarUrl}`);
+        }
+
+        console.log(`  📸 FINAL productImageUrls (${productImageUrls.length}): ${JSON.stringify(productImageUrls)}`);
+        console.log(`  🧑 FINAL avatarUrl: ${avatarUrl}`);
+        console.log(`[Storyboard Create] brand=${brandId}, duration=${totalDuration}s, style=${style}, imgs=${productImageUrls.length}, avatar=${!!avatarUrl}`);
+        console.log(`🔍 [Storyboard Create] ══ END DUMP ══\n`);
+
+        // Step 1: Director Brain — generate shot plan via Claude
+        const plan = await runStoryboardDirector({
+            brandId,
+            brief,
+            productName,
+            productFeatures,
+            productImageUrls,
+            avatarUrl,
+            style,
+            duration: totalDuration,
+            format,
+            userId: req.user._id,
+            directorModel,
+        });
+
+        // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2
+        // Pass raw file buffers directly (bypasses S3 re-download which can silently fail)
+        const rawProductBuffers = (req.files?.productImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
+        const rawAvatarBuffer = req.files?.avatarImage?.[0] ? { buffer: req.files.avatarImage[0].buffer, mimeType: req.files.avatarImage[0].mimetype } : null;
+
+        console.log(`[Storyboard Create] Passing ${rawProductBuffers.length} raw buffers + avatar=${!!rawAvatarBuffer} directly to poster generator`);
+
+        const posterDataUrl = await generateStoryboardPoster(
+            plan.imagePrompt,
+            style,
+            format,
+            productImageUrls,   // S3 URLs (fallback if no raw buffers)
+            avatarUrl,
+            imageModel,
+            rawProductBuffers,  // raw multer buffers — no re-download needed
+            rawAvatarBuffer
+        );
+
+        // Upload data URI → S3 so the frontend gets a real HTTP URL (not a giant base64 blob)
+        let posterUrl = posterDataUrl;
+        if (posterDataUrl && posterDataUrl.startsWith('data:')) {
+            try {
+                posterUrl = await ensureS3Url(posterDataUrl, `storyboard/posters/${req.user._id}`);
+                console.log(`[Storyboard Create] Poster uploaded to S3: ${posterUrl?.substring(0, 80)}...`);
+            } catch (s3Err) {
+                console.warn(`[Storyboard Create] S3 upload failed, using data URI: ${s3Err.message}`);
+                posterUrl = posterDataUrl;
+            }
+        }
+
+        plan.imageUrl = posterUrl;
+
+        // Persist as a storyboard VideoProject
+        const project = await VideoProject.create({
+            user: req.user._id,
+            brand: brandId || null,
+            studioMode: 'storyboard',
+            status: 'storyboard-ready',
+            title: `Storyboard — ${productName || brief?.substring(0, 40) || 'Ad Film'}`,
+            input: {
+                brief,
+                productName,
+                images: productImageUrls.map(url => ({ url, source: 'upload' })),
+                avatarUrl,
+            },
+            storyboard: {
+                imagePrompt: plan.imagePrompt,
+                videoPrompt: plan.videoPrompt,
+                imageUrl: plan.imageUrl,
+                taskId: null,
+                status: 'pending',
+                titleCard: plan.titleCard || null,
+                narrativeArc: plan.narrativeArc || null,
+                hookStrategy: plan.hookStrategy,
+                totalDuration: plan.totalDuration,
+                format,
+                style,
+            },
+        });
+
+        res.json({
+            success: true,
+            projectId: project._id,
+            plan,
+        });
+    } catch (err) {
+        console.error('[Storyboard Create] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/storyboard/regen-poster ───────────────────────────
+// Regenerate the main storyboard poster (after user edits prompt)
+router.post('/storyboard/regen-poster', protect, async (req, res) => {
+    try {
+        const { projectId, imagePrompt, style = 'hyperrealistic', format = '9:16', imageModel = 'nanobanana' } = req.body;
+
+        // Import frame generator
+        const { generateStoryboardPoster } = await import('../agents/videoStudio/storyboardFrames.js');
+
+        const posterUrl = await generateStoryboardPoster(imagePrompt, style, format, [], null, imageModel);
+
+        if (!posterUrl) throw new Error('Poster generation failed');
+
+        // Update the storyboard in DB if projectId provided
+        if (projectId) {
+            await VideoProject.findByIdAndUpdate(projectId, {
+                $set: { 
+                    'storyboard.imageUrl': posterUrl,
+                    'storyboard.imagePrompt': imagePrompt
+                }
+            });
+        }
+
+        res.json({ success: true, imageUrl: posterUrl });
+    } catch (err) {
+        console.error('[Storyboard Regen Poster] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/storyboard/animate ────────────────────────────────
+// Step 3: Animate each storyboard frame via I2V (Seedance 2.0)
+// After all shots done (>15s total), auto-stitch into final film
+router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'), async (req, res) => {
+    try {
+        const {
+            projectId,
+            imageUrl,
+            videoPrompt,
+            duration,
+            format = '9:16',
+            resolution = '480p',
+            productImageUrls = [],
+            avatarUrl,
+            model = 'seedance-2.0-fast',
+            brandId,
+        } = req.body;
+
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'No imageUrl provided' });
+
+        // Reference images: Prefer DB values, fallback to body
+        let referenceImages = [];
+        let dbAvatar = null;
+        let dbProductImgs = [];
+        if (projectId) {
+            const project = await VideoProject.findById(projectId);
+            if (project) {
+                dbProductImgs = project.input?.images?.map(img => img.url).filter(Boolean) || [];
+                dbAvatar = project.input?.avatarUrl || null;
+                // If there's an avatar, use ONLY the avatar for face consistency.
+                // Seedance hallucinates if told a product image is a 'face'.
+                // The product is already in the storyboard poster (imageUrl) which is @image1.
+                referenceImages = dbAvatar ? [dbAvatar] : dbProductImgs;
+                console.log(`[Storyboard Animate] Loaded refs from DB: ${referenceImages.length} (avatar-priority)`);
+            }
+        }
+
+        if (referenceImages.length === 0) {
+            const parsedProductImgs = typeof productImageUrls === 'string' ? JSON.parse(productImageUrls) : (productImageUrls || []);
+            const prodUrls = parsedProductImgs.filter(u => u?.startsWith('http')).slice(0, 2);
+            referenceImages = avatarUrl ? [avatarUrl] : prodUrls;
+        }
+
+        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${referenceImages.length}, imageUrl starts with: ${imageUrl?.substring(0, 50)}`);
+
+        let taskId = null;
+        try {
+            const hasAvatar = referenceImages.includes(avatarUrl) || (projectId && referenceImages.some(r => r === avatarUrl || r.includes('avatar')));
+            
+            const genResult = await submitAtlasCloudVideoGeneration({
+                imageUrl,
+                prompt: videoPrompt || "Use the attached storyboard image as the exact reference.",
+                duration: duration || 10,
+                aspectRatio: format,
+                referenceImages,
+                generateAudio: true,
+                qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
+                resolution,
+                imageRole: hasAvatar ? 'face' : 'fashion-model'
+            });
+            taskId = genResult.taskId;
+
+            // Update DB
+            if (projectId) {
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    $set: { 
+                        'storyboard.taskId': taskId, 
+                        'storyboard.status': 'animating',
+                        status: 'animating'
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn(`[Storyboard Animate] Submission failed: ${err.message}`);
+            return res.status(500).json({ success: false, error: err.message });
+        }
+
+        res.json({
+            success: true,
+            projectId,
+            taskId,
+        });
+    } catch (err) {
+        console.error('[Storyboard Animate] Critical Error:', err);
+        if (err.response) {
+            err.response.text().then(text => console.error('[Storyboard Animate] Error Response:', text)).catch(() => {});
+        }
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'storyboardAnimateRefund', `Storyboard animate failed: ${safeErrorMessage(err)}`, 'video');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/storyboard/status/:projectId ───────────────────────
+// Poll animation status for the single video
+router.get('/storyboard/status/:projectId', protect, async (req, res) => {
+    try {
+        const project = await VideoProject.findOne({ _id: req.params.projectId, user: req.user._id });
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        const storyboard = project.storyboard || {};
+        const taskId = storyboard.taskId;
+
+        if (!taskId) return res.status(400).json({ success: false, error: 'No animation task found' });
+
+        if (storyboard.status === 'done' || storyboard.finalVideoUrl) {
+            return res.json({
+                success: true,
+                projectId: project._id,
+                allDone: true,
+                finalVideoUrl: storyboard.finalVideoUrl || project.finalVideoUrl,
+                status: 'COMPLETED'
+            });
+        }
+
+        if (storyboard.status === 'failed') {
+            return res.json({
+                success: true,
+                projectId: project._id,
+                allDone: false,
+                anyFailed: true,
+                error: storyboard.error,
+                status: 'FAILED'
+            });
+        }
+
+        try {
+            const result = await getUnifiedGenerationStatus('atlascloud', taskId, null, null);
+            
+            let updatedStatus = storyboard.status;
+            let updatedProgress = storyboard.progress || 10;
+            let finalVideoUrl = null;
+            let error = null;
+
+            if (result?.status === 'COMPLETED' && result.videoUrl) {
+                // Mirror to S3
+                finalVideoUrl = await ensureS3Url(result.videoUrl, `storyboard/final/${project._id}/final-film.mp4`) || result.videoUrl;
+                updatedStatus = 'done';
+                updatedProgress = 100;
+                
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    'storyboard.status': 'done',
+                    'storyboard.progress': 100,
+                    'storyboard.finalVideoUrl': finalVideoUrl,
+                    status: 'done',
+                    finalVideoUrl,
+                });
+            } else if (result?.status === 'FAILED') {
+                updatedStatus = 'failed';
+                error = result.error || 'Generation failed';
+                
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    'storyboard.status': 'failed',
+                    'storyboard.error': error,
+                });
+            } else {
+                updatedProgress = result?.progress || storyboard.progress || 10;
+                
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    'storyboard.progress': updatedProgress,
+                });
+            }
+
+            res.json({
+                success: true,
+                projectId: project._id,
+                allDone: updatedStatus === 'done',
+                anyFailed: updatedStatus === 'failed',
+                overallProgress: updatedProgress,
+                finalVideoUrl,
+                status: updatedStatus === 'done' ? 'COMPLETED' : updatedStatus === 'failed' ? 'FAILED' : 'IN_PROGRESS',
+            });
+
+        } catch (pollErr) {
+            console.warn(`[SB Status] Poll error: ${pollErr.message}`);
+            res.json({
+                success: true,
+                projectId: project._id,
+                allDone: false,
+                status: 'IN_PROGRESS'
+            });
+        }
+    } catch (err) {
+        console.error('[Storyboard Status] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/storyboard/history ─────────────────────────────────
+// Returns user's storyboard project history
+router.get('/storyboard/history', protect, async (req, res) => {
+    try {
+        const projects = await VideoProject.find({
+            user: req.user._id,
+            studioMode: 'storyboard',
+        }).sort({ createdAt: -1 }).limit(20).lean();
+        res.json({ success: true, projects });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
 
 export default router;

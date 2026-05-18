@@ -180,6 +180,66 @@ async function signProductAssets(product) {
     return p;
 }
 
+// POST /api/products/scrape-url — Light scrape for a single product URL without DB persistence
+router.post('/scrape-url', protect, async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ success: false, error: 'URL is required' });
+
+        let siteUrl = url.trim();
+        if (!/^https?:\/\//i.test(siteUrl)) siteUrl = `https://${siteUrl}`;
+
+        if (!isUrlSafe(siteUrl)) {
+            return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network. Use a public URL.' });
+        }
+
+        // Just use cheerio to fetch standard open graph tags
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(siteUrl, {
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            timeout: 10000
+        });
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        const title = $('meta[property="og:title"]').attr('content') || $('title').text() || 'Product';
+        const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+        let imageUrl = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || '';
+
+        // fallback image
+        if (!imageUrl) {
+            const firstImg = $('img').first().attr('src');
+            if (firstImg) {
+                imageUrl = firstImg.startsWith('http') ? firstImg : new URL(firstImg, siteUrl).toString();
+            }
+        }
+
+        let finalImageUrl = imageUrl;
+        if (imageUrl) {
+            const { ensureS3Url } = await import('../utils/s3.js');
+            finalImageUrl = await ensureS3Url(imageUrl, 'products/scraped');
+        }
+
+        res.json({
+            success: true,
+            product: {
+                title,
+                description,
+                image: finalImageUrl,
+                url: siteUrl
+            }
+        });
+
+    } catch (e) {
+        console.error('URL Scrape Error:', e);
+        res.status(500).json({ success: false, error: safeErrorMessage(e) });
+    }
+});
+
 // POST /api/products/scan-website — Agentic product sync from brand website
 router.post('/scan-website', protect, async (req, res) => {
     try {

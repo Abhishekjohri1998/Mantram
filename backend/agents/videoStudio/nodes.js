@@ -800,12 +800,26 @@ export async function enhancePromptNode(state) {
         const targetModel = state.model || 'seedance-2.0';
         const userPrompt = `Enhance this video generation prompt for the ${targetModel} model:\n\n"${state.prompt}"\n\nDesired duration: ${state.duration || 5}s\nAspect ratio: ${state.aspectRatio || '16:9'}\nKey requirement: follow the exact prompt structure for ${targetModel} as described in your instructions.`;
 
-        const result = await callFastAgent(
-            PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
-            userPrompt,
-            0.5,
-            4096
-        );
+        // Quality toggle: 'high' → Claude (better quality, ~2x cost), 'fast' → Gemini Flash (default)
+        const useHighQuality = state.qualityMode === 'high';
+        let result;
+
+        if (useHighQuality) {
+            console.log('✨ enhancePromptNode: HIGH QUALITY mode — using Claude');
+            result = await agentUtils.callAgent(
+                PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
+                userPrompt,
+                null, // use default model (Claude)
+                { temperature: 0.5, maxTokens: 4096 }
+            );
+        } else {
+            result = await callFastAgent(
+                PROMPT_ENHANCER_PROMPT(brandContext, styleMemory, targetModel),
+                userPrompt,
+                0.5,
+                4096
+            );
+        }
 
         if (!result || result.error) {
             console.warn('⚠️ Prompt enhancement AI failed (parse error or empty), using original prompt.');
@@ -830,6 +844,7 @@ export async function enhancePromptNode(state) {
         };
     }
 }
+
 
 /**
  * Node: Duration Planner (Gemini Flash)

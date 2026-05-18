@@ -380,6 +380,8 @@ export const products = {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/products?${query}`);
     },
+    scanWebsite: (data) => apiFetch('/products/scan-website', { method: 'POST', body: JSON.stringify(data) }),
+    scrapeUrl: (url) => apiFetch('/products/scrape-url', { method: 'POST', body: JSON.stringify({ url }) }),
     get: (id) => apiFetch(`/products/${id}`),
     create: (data) => apiFetch('/products', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => apiFetch(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -387,7 +389,6 @@ export const products = {
     aiEnrich: (id) => apiFetch(`/products/${id}/ai-enrich`, { method: 'POST' }),
     generateListing: (id, platform) => apiFetch(`/products/${id}/generate-listing`, { method: 'POST', body: JSON.stringify({ platform }) }),
     platforms: () => apiFetch('/products/meta/platforms'),
-    scanWebsite: (data) => apiFetch('/products/scan-website', { method: 'POST', body: JSON.stringify(data) }),
     scanFromWebsite: (brandId, websiteUrl) => apiFetch('/products/scan-website', { method: 'POST', body: JSON.stringify({ brandId, websiteUrl }) }),
     repairImages: (brandId) => apiFetch('/products/repair-images', { method: 'POST', body: JSON.stringify({ brandId }) }),
     smartMatch: (data) => apiFetch('/products/smart-match', { method: 'POST', body: JSON.stringify(data) }),

@@ -13,7 +13,7 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Current pipeline status ──
     status: {
         type: String,
-        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'image-review', 'generating', 'multi-generating', 'critique', 'editing', 'done', 'completed', 'failed', 'advanced-generating'],
+        enum: ['brainstorm', 'script', 'voiceover', 'references', 'routing', 'image-review', 'generating', 'multi-generating', 'critique', 'editing', 'done', 'completed', 'failed', 'advanced-generating', 'storyboard-ready', 'animating'],
         default: 'brainstorm',
     },
     checkpoint: { type: Number, default: 0 }, // for resumability
@@ -167,6 +167,47 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Final Output ──
     finalVideoUrl: { type: String, default: '' },
     creditsUsed: { type: Number, default: 0 },
+
+    // ── Storyboard Studio — AI Ad Film Pipeline ──
+    storyboard: {
+        imagePrompt: { type: String, default: '' },
+        videoPrompt: { type: String, default: '' },
+        imageUrl: { type: String, default: '' },
+        taskId: { type: String, default: '' }, // For video animation task
+        status: { type: String, enum: ['pending', 'animating', 'done', 'failed'], default: 'pending' },
+        progress: { type: Number, default: 0 },
+        error: { type: String, default: '' },
+        
+        // Legacy (kept for backwards compat)
+        shots: [{
+            shotNum: { type: Number },
+            shotLabel: { type: String, default: '' },
+            duration: { type: Number, default: 4 },
+            style: { type: String, enum: ['hyperrealistic', '3d', '2d'], default: 'hyperrealistic' },
+            frameUrl: { type: String, default: '' },      // Gemini Imagen generated frame
+            framePrompt: { type: String, default: '' },   // Prompt used for frame generation
+            videoPrompt: { type: String, default: '' },   // I2V prompt for Seedance animation
+            dialogue: { type: String, default: '' },
+            emotion: { type: String, default: '' },
+            camera: { type: String, default: '' },
+            animatedUrl: { type: String, default: '' },   // Final animated clip URL
+            taskId: { type: String, default: '' },        // Atlas Cloud task ID
+            status: { type: String, enum: ['pending', 'animating', 'done', 'failed'], default: 'pending' },
+            progress: { type: Number, default: 0 },
+            error: { type: String, default: '' },
+        }],
+        titleCard: {
+            text: { type: String, default: '' },
+            subtext: { type: String, default: '' },
+            style: { type: String, default: 'clean-minimal' },
+        },
+        narrativeArc: { type: String, default: '' },
+        hookStrategy: { type: String, default: '' },
+        totalDuration: { type: Number, default: 0 },
+        format: { type: String, default: '9:16' },
+        style: { type: String, enum: ['hyperrealistic', '3d', '2d'], default: 'hyperrealistic' },
+        finalVideoUrl: { type: String, default: '' },     // Stitched final film
+    },
 
     // ── Analytics counters ──
     downloadCount: { type: Number, default: 0 },  // incremented on each download

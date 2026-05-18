@@ -9,6 +9,10 @@ export class OpenAIProvider extends BaseProvider {
         super(config);
         this.name = 'openai';
         this.baseUrl = 'https://api.openai.com/v1';
+        // LaoZhang proxy — used automatically for gpt-image-2 when key is available
+        // This mirrors exactly how Creative Studio's openaiImageGenerate() works
+        this.lzApiKey = config.laozhangApiKey;
+        this.lzBaseUrl = config.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, imageParts }) {
@@ -94,22 +98,19 @@ export class OpenAIProvider extends BaseProvider {
      *
      * For thumbnails (16:9) → 1536x1024, quality: hd
      */
-    async generateImage({ prompt, size = '1024x1024', model, quality, aspectRatio, imageParts }) {
-        const modelId = model || this.config.defaultImageModel || 'dall-e-3';
+    async generateImage({ prompt, size = '1024x1024', model, quality, aspectRatio, imageParts, image_url }) {
+        let modelId = model || this.config.defaultImageModel || 'dall-e-3';
+        if (modelId === 'nanobanana') modelId = 'gpt-image-2'; // NanoBanana is an alias for gpt-image-2
+
         const isGptImage2 = modelId === 'gpt-image-2';
 
         // Aspect ratio → size mapping
-        const aspectToSize = {
-            '1:1':   '1024x1024',
-            '16:9':  '1536x1024',
-            '9:16':  '1024x1536',
-            '4:3':   '1536x1024',
-            '3:4':   '1024x1536',
-            '4:5':   '1024x1536',
-        };
         const sizeMap = {
-            '1K': '1024x1024', '1k': '1024x1024', '2K': '1024x1024', '2k': '1024x1024',
-            '1:1': '1024x1024', '4:5': '1024x1536', '5:4': '1536x1024',
+            '1:1': '1024x1024', '16:9': '1536x1024', '9:16': '1024x1536', '4:5': '1024x1024', '5:4': '1536x1024',
+            '21:9': '1536x1024', '2:1': '1536x1024', '1:2': '1024x1536',
+        };
+        // specific fallback mappings
+        const aspectToSize = {
             '9:16': '1024x1536', '16:9': '1536x1024', '3:4': '1024x1536', '4:3': '1536x1024',
             '2:3': '1024x1536', '3:2': '1536x1024',
         };
@@ -125,16 +126,21 @@ export class OpenAIProvider extends BaseProvider {
             size: isGptImage2 ? finalSize : (finalSize === 'auto' ? '1024x1024' : finalSize),
         };
 
+        if (image_url) {
+            body.image_url = image_url;
+            console.log(`   ℹ️ gpt-image-2: Injecting S3 URL natively into API payload -> ${image_url.substring(0,60)}...`);
+        }
+
         if (isGptImage2) {
-            body.quality = quality || 'hd';
-            body.response_format = 'b64_json';  // gpt-image-2 default — more reliable than URL
-            // Reference images for gpt-image-2 (for style/composition grounding)
+            body.quality = quality || 'high';
+            // Reference images for gpt-image-2 — must go through LaoZhang /images/edits
             if (imageParts?.length) {
-                // gpt-image-2 supports input images via the /images/edits endpoint
-                // For generations with reference, we encode them in the prompt context
-                // (gpt-image-2 in generations mode takes text prompts only; edits endpoint takes images)
-                // We note the reference in the prompt instead
-                console.log(`   ℹ️ gpt-image-2: ${imageParts.length} reference image(s) — context injected into prompt`);
+                if (!this.lzApiKey) {
+                    console.warn('   ⚠️  gpt-image-2 ref images require LAOZHANG_API_KEY (no fallback). Ignoring refs.');
+                } else {
+                    console.log(`   ℹ️  gpt-image-2: ${imageParts.length} reference image(s) — routing to LaoZhang /images/edits`);
+                    return this.generateImageEdit({ prompt, imageParts, size: finalSize });
+                }
             }
         } else {
             // dall-e-3
@@ -180,7 +186,7 @@ export class OpenAIProvider extends BaseProvider {
      * Allows reference images for style/character grounding
      * Uses multipart/form-data (not JSON) per API spec
      */
-    async generateImageEdit({ prompt, referenceImageBase64, referenceImageMime = 'image/jpeg', size = '1536x1024' }) {
+    async generateImageEdit({ prompt, imageParts = [], size = '1536x1024' }) {
         const allowedSizes = ['1024x1024', '1024x1536', '1536x1024'];
         const finalSize = allowedSizes.includes(size) ? size : '1536x1024';
 
@@ -191,19 +197,29 @@ export class OpenAIProvider extends BaseProvider {
         formData.append('model', 'gpt-image-2');
         formData.append('prompt', prompt);
         formData.append('size', finalSize);
-        formData.append('quality', 'hd');
+        formData.append('quality', 'high');
         formData.append('n', '1');
-        formData.append('response_format', 'b64_json');
 
-        if (referenceImageBase64) {
-            const imgBuffer = Buffer.from(referenceImageBase64, 'base64');
-            const blob = new Blob([imgBuffer], { type: referenceImageMime });
-            formData.append('image[]', blob, 'reference.jpg');
+        // LaoZhang proxy supports multiple 'image[]' parameters for character/style injection
+        for (let i = 0; i < imageParts.length; i++) {
+            const part = imageParts[i].inlineData;
+            if (part && part.data) {
+                const imgBuffer = Buffer.from(part.data, 'base64');
+                const blob = new Blob([imgBuffer], { type: part.mimeType || 'image/jpeg' });
+                const ext = (part.mimeType || '').includes('png') ? 'png' : 'jpg';
+                formData.append('image[]', blob, `reference_${i}.${ext}`);
+            }
         }
 
-        const response = await fetch(`${this.baseUrl}/images/edits`, {
+        // ── Always use LaoZhang proxy for /images/edits (native OpenAI doesn't support gpt-image-2 edits) ──
+        const editApiKey = this.lzApiKey || this.apiKey;
+        const editBaseUrl = this.lzApiKey ? this.lzBaseUrl : this.baseUrl;
+        if (!editApiKey) throw new Error('No API key for image edit — set LAOZHANG_API_KEY or OPENAI_API_KEY');
+        console.log(`   📡 Sending to: ${editBaseUrl}/images/edits (${this.lzApiKey ? 'LaoZhang' : 'Direct OpenAI'})`);
+
+        const response = await fetch(`${editBaseUrl}/images/edits`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${this.apiKey}` },
+            headers: { 'Authorization': `Bearer ${editApiKey}` },
             body: formData,
         });
 
@@ -213,11 +229,11 @@ export class OpenAIProvider extends BaseProvider {
         }
 
         const item = data.data?.[0];
-        if (!item?.b64_json) throw new Error('OpenAI image edit returned no b64_json');
+        if (!item) throw new Error('OpenAI image edit returned empty data array');
 
         return {
-            imageUrl: `data:image/png;base64,${item.b64_json}`,
-            b64: item.b64_json,
+            imageUrl: item.b64_json ? `data:image/png;base64,${item.b64_json}` : item.url,
+            b64: item.b64_json || null,
             model: 'gpt-image-2',
             provider: 'openai',
         };

@@ -14,6 +14,7 @@ import QAds from '../components/VideoStudio/QAds'
 import QAdsV2 from '../components/VideoStudio/QAdsV2'
 import VideoAgent from '../components/VideoStudio/VideoAgent'
 import MotionGraphics from '../components/VideoStudio/MotionGraphics'
+import Storyboard from '../components/VideoStudio/Storyboard'
 import VideoUpgradeModal from '../components/VideoUpgradeModal'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow'
@@ -881,7 +882,7 @@ export default function VideoStudio() {
                             { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
-                            // { id: 'storyboard', icon: 'view_timeline', label: 'Storyboard' },
+                            { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
                         ].map(tab => (
                             <button key={tab.id} onClick={() => setStudioMode(tab.id)}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
@@ -1256,8 +1257,18 @@ export default function VideoStudio() {
                     <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
                 )}
 
-                {/* ── STORYBOARD MODE ── */}
-                {studioMode === 'storyboard' && (<>
+                {/* ── STORYBOARD MODE — New AI Ad Film Director ── */}
+                {studioMode === 'storyboard' && (
+                    <Storyboard
+                        activeBrand={activeBrand}
+                        canCreateVideo={canCreateVideo}
+                        onUpgradeRequired={() => setShowUpgradeModal(true)}
+                        user={user}
+                    />
+                )}
+
+                {/* ── OLD STORYBOARD PIPELINE (archived below — do not render) ── */}
+                {false && studioMode === 'storyboard-old' && (<>
 
                     {/* ── Progress Steps ── */}
                     <div className="flex flex-wrap items-center gap-y-3 gap-x-1 video-tabs-container pt-4 pb-6 mt-4 relative w-full z-10">
