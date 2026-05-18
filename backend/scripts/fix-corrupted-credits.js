@@ -1,68 +1,75 @@
-/**
- * fix-corrupted-credits.js
- *
- * One-time repair: finds User documents where `credits` is stored as a
- * non-object (number, NaN, null, undefined) and resets it to a valid
- * subdocument with safe defaults so `$inc: { 'credits.bonus': N }` works.
- *
- * Usage:
- *   cd backend
- *   node scripts/fix-corrupted-credits.js
- */
-
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-dotenv.config();
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || process.env.DATABASE_URL;
-if (!MONGO_URI) { console.error('No MONGODB_URI in .env'); process.exit(1); }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-await mongoose.connect(MONGO_URI);
-console.log('✅ MongoDB connected');
+dotenv.config({ path: join(__dirname, '../.env') });
 
-const db = mongoose.connection.db;
-const users = db.collection('users');
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('MongoDB Connected');
+    } catch (err) {
+        console.error(err.message);
+        process.exit(1);
+    }
+};
 
-// Find all users where credits is NOT an object (null, NaN, number, string, etc.)
-// MongoDB type codes: 1 = double, 2 = string, 10 = null
-// We want to find where credits is NOT of type 3 (object/document)
-const cursor = users.find({
-    $or: [
-        { credits: { $type: 'double' } },   // stored as number (incl. NaN)
-        { credits: { $type: 'string' } },   // stored as string
-        { credits: null },                   // null
-        { credits: { $exists: false } },     // missing entirely
-    ]
-});
+const fixCredits = async () => {
+    await connectDB();
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
 
-let fixed = 0;
-let total = 0;
+    // Find users where credits is not an object
+    const corruptedUsers = await usersCollection.find({ credits: { $type: "double" } }).toArray();
+    
+    console.log(`Found ${corruptedUsers.length} users with corrupted credits (type double/NaN).`);
 
-for await (const doc of cursor) {
-    total++;
-    const oldVal = doc.credits;
-    console.log(`  🔧 Fixing user ${doc._id} (${doc.email}) — credits was: ${JSON.stringify(oldVal)}`);
-
-    await users.updateOne(
-        { _id: doc._id },
-        {
-            $set: {
-                credits: {
-                    total: 100,   // default free plan allowance
-                    used:  0,
-                    bonus: 0,
-                    topUp: 0,
-                    resetDate: null,
-                    topUpExpiry: null,
-                }
+    for (const user of corruptedUsers) {
+        console.log(`Fixing user: ${user.email}`);
+        await usersCollection.updateOne(
+            { _id: user._id },
+            { 
+                $set: { 
+                    credits: {
+                        total: 100,
+                        used: 0,
+                        bonus: 0,
+                        topUp: 0
+                    }
+                } 
             }
-        }
-    );
-    fixed++;
-}
+        );
+        console.log(`Fixed user: ${user.email}`);
+    }
 
-console.log(`\n✅ Done — fixed ${fixed} / ${total} corrupted documents`);
-if (fixed === 0) console.log('   No corrupted documents found.');
+    // Also check for null credits or any other non-object types
+    const nullCreditsUsers = await usersCollection.find({ credits: null }).toArray();
+    console.log(`Found ${nullCreditsUsers.length} users with null credits.`);
+    for (const user of nullCreditsUsers) {
+         console.log(`Fixing user: ${user.email}`);
+        await usersCollection.updateOne(
+            { _id: user._id },
+            { 
+                $set: { 
+                    credits: {
+                        total: 100,
+                        used: 0,
+                        bonus: 0,
+                        topUp: 0
+                    }
+                } 
+            }
+        );
+        console.log(`Fixed user: ${user.email}`);
+    }
 
-await mongoose.disconnect();
-process.exit(0);
+    console.log('Done fixing users.');
+    process.exit(0);
+};
+
+fixCredits();
