@@ -80,7 +80,7 @@ function CfgMenu({ value, onChange, options, icon }) {
 // ── Single Poster Display (Inline below) ──
 
 // ── Main Storyboard Component ────────────────────────────────────────────────
-export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequired, user }) {
+export default function Storyboard({ activeBrand, projects = [], onVideoComplete, canCreateVideo, onUpgradeRequired, user }) {
     // ── Input state ──
     const [brief, setBrief] = useState('');
     const [productName, setProductName] = useState('');
@@ -107,6 +107,7 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
     const [projectId, setProjectId] = useState(null);
     const [error, setError] = useState('');
     const [finalVideoUrl, setFinalVideoUrl] = useState(null);
+    const [previewVideo, setPreviewVideo] = useState(null);
     const [overallProgress, setOverallProgress] = useState(0);
     const [regenLoading, setRegenLoading] = useState(false);
     
@@ -287,6 +288,7 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
                 if (data.allDone || data.status === 'COMPLETED') {
                     clearInterval(pollRef.current);
                     setPhase('complete');
+                    onVideoComplete?.();
                 } else if (data.status === 'FAILED') {
                     clearInterval(pollRef.current);
                     setError('Animation generation failed.');
@@ -296,7 +298,7 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
                 console.warn('Poll error:', e.message);
             }
         }, 4000);
-    }, [projectId]);
+    }, [projectId, onVideoComplete]);
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -304,6 +306,7 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
     const isLoading = phase === 'directing' || phase === 'storyboarding';
 
     return (
+        <>
         <div className="sb-root">
             {/* ── HEADER ── */}
             <div className="sb-header">
@@ -580,6 +583,48 @@ export default function Storyboard({ activeBrand, canCreateVideo, onUpgradeRequi
                     )}
                 </div>
             )}
+
+            {/* History Grid */}
+            {projects && projects.length > 0 && (
+                <div style={{ width: '100%', maxWidth: '1200px', marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <h3 style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Previously Generated</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', width: '100%' }}>
+                        {projects.filter(p => p.studioMode === 'storyboard' && (p.storyboard?.finalVideoUrl || p.finalVideoUrl)).map(p => {
+                            const url = p.storyboard?.finalVideoUrl || p.finalVideoUrl;
+                            return (
+                                <div key={p._id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', aspectRatio: p.storyboard?.format === '16:9' ? '16/9' : p.storyboard?.format === '1:1' ? '1/1' : '9/16' }} onClick={() => setPreviewVideo(url)}>
+                                    <video src={url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                    <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '20px', backdropFilter: 'blur(4px)' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fff' }}>play_circle</span>
+                                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>Preview</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
         </div>
+        
+        {/* Video Preview Modal */}
+        {previewVideo && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
+                <div style={{ position: 'relative', maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
+                    <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                    <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
+                        <a href={previewVideo} download="storyboard-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
+                        </a>
+                        <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }

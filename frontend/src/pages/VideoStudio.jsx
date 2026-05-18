@@ -1261,6 +1261,8 @@ export default function VideoStudio() {
                 {studioMode === 'storyboard' && (
                     <Storyboard
                         activeBrand={activeBrand}
+                        projects={projects}
+                        onVideoComplete={() => fetchHistory(50)}
                         canCreateVideo={canCreateVideo}
                         onUpgradeRequired={() => setShowUpgradeModal(true)}
                         user={user}
