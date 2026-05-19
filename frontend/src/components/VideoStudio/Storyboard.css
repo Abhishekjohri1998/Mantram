@@ -437,6 +437,8 @@
 .sb-final-title { font-size: 18px; font-weight: 700; color: var(--sys-text); margin: 0; }
 .sb-final-video {
     max-width: 400px; width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
     border-radius: 12px;
     border: 2px solid var(--sys-primary);
 }

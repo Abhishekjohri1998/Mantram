@@ -632,16 +632,18 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         
         {/* Video Preview Modal */}
         {previewVideo && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
-                <div style={{ position: 'relative', maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
-                    <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
-                    <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
-                        <a href={previewVideo} download="storyboard-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
-                        </a>
-                        <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
-                        </button>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }} onClick={() => setPreviewVideo(null)}>
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%' }}>
+                        <video src={previewVideo} controls autoPlay style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 20px 80px rgba(0,0,0,0.6)', objectFit: 'contain' }} />
+                        <div style={{ position: 'absolute', top: -48, right: 0, display: 'flex', gap: 8 }}>
+                            <a href={previewVideo} download="storyboard-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Download
+                            </a>
+                            <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
