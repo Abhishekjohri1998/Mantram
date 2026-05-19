@@ -3276,7 +3276,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         {/* Full video element preview */}
                                                         <div className="relative">
                                                             <video src={animateVideoUrl} controls autoPlay loop muted playsInline
-                                                                className="w-full max-h-[300px] xl:max-h-[380px] bg-black/50" />
+                                                                className="cs-video-preview" />
+
                                                             <div className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-bold text-white tracking-widest uppercase border border-white/20 flex items-center gap-1.5 shadow-lg"><span className="material-symbols-outlined text-[12px]">check_circle</span> Render Complete</div>
                                                         </div>
                                                         <div className="p-4 bg-[var(--sys-surface)] border-t border-[var(--sys-border)] flex items-center justify-between gap-3">
@@ -3541,13 +3542,13 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                 {/* Generated Image */}
                                 <div className="relative rounded-xl overflow-hidden border border-[var(--sys-border)] bg-[var(--sys-surface)] cursor-pointer group mb-3"
-                                    style={{ maxHeight: '500px' }}
+                                    style={{ maxHeight: 'min(70vh, 500px)' }}
                                     onClick={() => result.imageUrl && setZoomImage(result.imageUrl)}>
                                     {result.imageUrl ? (
                                         <>
                                             <img src={result.imageUrl} alt={result.title || 'Generated creative'} loading="eager" decoding="async"
                                                 className="w-full h-auto object-contain"
-                                                style={{ maxHeight: '500px' }}
+                                                style={{ maxHeight: 'min(70vh, 500px)' }}
                                                 onError={(e) => {
                                                     // Retry once after a short delay (base64 images can be slow to decode)
                                                     if (!e.target.dataset.retried) {
@@ -6012,7 +6013,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                 )}
                                 {animateVideoUrl ? (
                                     <div className="rounded-2xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5">
-                                        <video src={animateVideoUrl} controls autoPlay loop muted playsInline className="w-full max-h-[300px] bg-black/50" />
+                                        <video src={animateVideoUrl} controls autoPlay loop muted playsInline className="cs-video-preview" />
                                         <div className="p-3 flex gap-2">
                                             <a href={animateVideoUrl} download="logo-animation.mp4" className="studio-btn-primary flex-1">
                                                 <span className="material-symbols-outlined text-[18px]">cloud_download</span>Save Video
