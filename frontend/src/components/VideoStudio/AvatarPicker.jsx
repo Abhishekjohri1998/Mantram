@@ -392,6 +392,10 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                         onClick={() => { setGender(gender==='female'?'all':'female'); setFilter('all'); resetCreate() }}>
                         <span className="material-symbols-outlined">female</span> Female
                     </button>
+                    <button className={`avpk-sb-item ${gender==='unspecified'?'active':''}`}
+                        onClick={() => { setGender(gender==='unspecified'?'all':'unspecified'); setFilter('all'); resetCreate() }}>
+                        <span className="material-symbols-outlined">transgender</span> Other
+                    </button>
                 </div>
 
                 {/* ── Main ────────────────────────────────────────────────── */}

@@ -19,6 +19,7 @@ import TemplateLibrary from './TemplateLibrary'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import ViralityMiniPanel from '../components/ViralityMiniPanel'
 import './CreativeStudio/CreativeStudio.css'
+import AvatarPicker from '../components/VideoStudio/AvatarPicker'
 
 
 // ── TemplateSuggestionRow — horizontally scrollable, non-shifting, silent-fail ──
@@ -1168,11 +1169,29 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [guidedForm, setGuidedForm] = useState(null)
     const [refPickerSlot, setRefPickerSlot] = useState(null)
     const [refPickerTab, setRefPickerTab] = useState('upload')
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+    const [avatarPickerTarget, setAvatarPickerTarget] = useState(null)
     const [brandImages, setBrandImages] = useState([])
     const [showCharTags, setShowCharTags] = useState(false)
     const [charTagFilter, setCharTagFilter] = useState('')
     const [zoomImage, setZoomImage] = useState(null)
     const [expandedReasoning, setExpandedReasoning] = useState(null) // MCoT Thinking Mode: which creative ID's reasoning is shown
+
+    const handleAvatarSelect = useCallback((avatar) => {
+        const target = avatarPickerTarget || '';
+        if (target === 'csCharacterImage') {
+            setCsCharacterImage(avatar.imageUrl);
+        } else if (target === 'character') {
+            setReferenceImages(prev => ({ ...prev, character: avatar.imageUrl }));
+        } else if (target.startsWith('character-')) {
+            const idxStr = target.split('-')[1];
+            if (idxStr === 'add' || idxStr === '0') {
+                setCharacters(prev => [...prev, { name: avatar.name || `Character ${prev.length + 1}`, image: avatar.imageUrl }]);
+            } else {
+                setCharacters(prev => [...prev, { name: avatar.name || `Character ${prev.length + 1}`, image: avatar.imageUrl }]);
+            }
+        }
+    }, [avatarPickerTarget]);
 
     // ── Refs ──
     const psMaskCanvasRef = useRef(null)
@@ -4454,7 +4473,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     )}
                                     {/* Character slots */}
                                     {characters.length === 0 && (
-                                        <button onClick={() => { setRefPickerSlot('character-0'); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                        <button onClick={() => { setAvatarPickerTarget('character-0'); setShowAvatarPicker(true) }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                                             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person</span>
                                             <span className="text-[9px] font-medium">Character</span>
                                         </button>
@@ -4469,7 +4488,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                     ))}
                                     {/* Add slot */}
                                     {characters.length < 13 && (
-                                        <button onClick={() => { setRefPickerSlot(`character-${characters.length}`); setRefPickerTab('upload') }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
+                                        <button onClick={() => { setAvatarPickerTarget(`character-${characters.length}`); setShowAvatarPicker(true) }} className="w-full aspect-square rounded-xl border border-dashed border-[var(--sys-border)] bg-[var(--sys-surface)] hover:border-[var(--sys-primary)]/50 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]">
                                             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
                                             <span className="text-[9px] font-medium">Add</span>
                                         </button>
@@ -4929,7 +4948,14 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-[var(--sys-bg)]/80 backdrop-blur py-0.5">{ref.label}</span>
                                                     </div>
                                                 ) : (
-                                                    <button onClick={() => { setRefPickerSlot(ref.key); setRefPickerTab('upload') }} className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
+                                                    <button onClick={() => { 
+                                                        if (ref.key === 'character') {
+                                                            setAvatarPickerTarget('character');
+                                                            setShowAvatarPicker(true);
+                                                        } else {
+                                                            setRefPickerSlot(ref.key); setRefPickerTab('upload') 
+                                                        }
+                                                    }} className="w-full flex flex-col items-center justify-center aspect-video rounded-xl border border-dashed border-[var(--sys-border)] hover:border-[var(--sys-text)] hover:bg-[var(--sys-surface)] cursor-pointer transition-all">
                                                         <span className="material-symbols-outlined text-[16px] text-[var(--sys-text-muted)] mb-0.5">{ref.icon}</span>
                                                         <span className="text-[9px] font-bold text-[var(--sys-text-muted)]">{ref.label}</span>
                                                     </button>
@@ -11561,15 +11587,9 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 </button>
                                             </div>
                                         ) : (
-                                            <label className="w-full h-16 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors bg-[var(--sys-bg)]/50 group">
+                                            <button onClick={() => { setAvatarPickerTarget('csCharacterImage'); setShowAvatarPicker(true) }} className="w-full h-16 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--sys-border)] cursor-pointer hover:border-primary/40 transition-colors bg-[var(--sys-bg)]/50 group">
                                                 <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[18px] group-hover:text-primary transition-colors">person_add</span>
-                                                <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                                                    const file = e.target.files?.[0]; if (!file) return;
-                                                    const reader = new FileReader();
-                                                    reader.onload = (ev) => setCsCharacterImage(ev.target.result);
-                                                    reader.readAsDataURL(file);
-                                                }} />
-                                            </label>
+                                            </button>
                                         )}
                                         <span className="text-[9px] text-[var(--sys-text-muted)]">Character</span>
                                     </div>
@@ -11732,6 +11752,14 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
             {showTemplateLibrary && (
                 <TemplateLibrary overlayMode={true} studioFilter="creative" onCloseOverlay={() => setShowTemplateLibrary(false)} />
             )}
+
+            {/* ========== AVATAR PICKER OVERLAY ========== */}
+            <AvatarPicker
+                isOpen={showAvatarPicker}
+                onClose={() => { setShowAvatarPicker(false); setAvatarPickerTarget(null); }}
+                onSelect={handleAvatarSelect}
+                activeBrand={activeBrand}
+            />
         </DashboardLayout>
     )
 }

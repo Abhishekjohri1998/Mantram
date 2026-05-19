@@ -427,7 +427,13 @@ router.get('/library', protect, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .limit(100)
                 .lean(),
-            Avatar.find({ createdByRole: 'superadmin', isPublished: true, isActive: true })
+            Avatar.find({
+                $or: [
+                    { isTemplate: true },
+                    { createdByRole: 'superadmin', isPublished: true }
+                ],
+                isActive: true
+            })
                 .select('name imageUrl resolution frameType generationMode isFeatured')
                 .sort({ isFeatured: -1, createdAt: -1 })
                 .limit(50)
@@ -478,8 +484,8 @@ router.post('/save', protect, async (req, res) => {
         }
 
         // Only superadmins can set createdByRole to superadmin or isPublished to true
-        const effectiveRole = (req.user.role === 'superadmin' && createdByRole === 'superadmin') ? 'superadmin' : 'user';
-        const effectivePublished = effectiveRole === 'superadmin' ? !!isPublished : false;
+        const effectiveRole = (req.user.role === 'superadmin') ? 'superadmin' : 'user';
+        const effectivePublished = effectiveRole === 'superadmin' ? true : false;
 
         const avatar = await Avatar.create({
             name: trimmedName,

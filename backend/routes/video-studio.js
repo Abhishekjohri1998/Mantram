@@ -3018,7 +3018,13 @@ router.get('/ugc-pro/avatars', protect, async (req, res) => {
         const userId = req.user._id;
 
         // Build query for templates
-        const templateQuery = { isTemplate: true, isActive: true };
+        const templateQuery = { 
+            $or: [
+                { isTemplate: true },
+                { isPublished: true, createdByRole: 'superadmin' }
+            ],
+            isActive: true 
+        };
         // Build query for user's own avatars
         const userQuery = { createdBy: userId, isTemplate: false };
 
@@ -3080,9 +3086,11 @@ router.post('/ugc-pro/avatars', protect, ugcUpload.single('avatarImage'), async 
             name: name || '',
             imageUrl: finalUrl,
             gender: gender || 'unspecified',
-            isTemplate: false,
+            isTemplate: req.user.role === 'superadmin',
             createdBy: req.user._id,
             source: 'upload',
+            createdByRole: req.user.role === 'superadmin' ? 'superadmin' : 'user',
+            isPublished: req.user.role === 'superadmin'
         });
 
         res.json({ success: true, avatar });
