@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
+import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -387,8 +388,9 @@ export default function QAds({ activeBrand, projects = [] }) {
 
                 {/* Completed videos */}
                 {gridVideos.map(v => (
-                    <div key={v._id} className="qa-bg-item">
+                    <div key={v._id} className="qa-bg-item has-vha" style={{ position: 'relative' }}>
                         <video src={v.generation?.videoUrl} muted loop playsInline onMouseEnter={e => e.target.play()} onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }} />
+                        <VideoHoverActions videoUrl={v.generation?.videoUrl} />
                         <div className="qa-bg-overlay">
                             <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'Q-Ad'}</span>
                             {v.input?.categoryId && (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import AvatarPicker from './AvatarPicker'
 import PublishModal from '../PublishModal'
+import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -610,9 +611,10 @@ function SaveTemplateForm({ project, onClose, api: apiFn }) {
 
 function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     const vRef = useRef(null)
-    const videoUrl = project.generation?.videoUrl
-    return <div className="qv2-bi">
+    const videoUrl = project.generation?.videoUrl || project.finalVideoUrl
+    return <div className="qv2-bi has-vha" style={{ position: 'relative' }}>
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
+        <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} />
         <div className="qv2-bi-ov">
             <button className="qv2-bi-btn preview-btn" onClick={() => onPreview(videoUrl)}>
                 <span className="material-symbols-outlined" style={{fontSize: 14}}>play_circle</span>
@@ -1151,7 +1153,10 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                 {/* Video output or generate button */}
                                 {job.status === 'done' && job.videoUrl ? (
                                     <div>
-                                        <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180 }} />
+                                        <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                                            <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
+                                            <VideoHoverActions videoUrl={job.videoUrl} onPreview={setPreviewVideo} />
+                                        </div>
                                         {job.voiceoverStatus === 'processing' && (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', justifyContent: 'center' }}>
                                                 <span className="material-symbols-outlined spin" style={{ fontSize: 14, color: '#f59e0b' }}>mic</span>

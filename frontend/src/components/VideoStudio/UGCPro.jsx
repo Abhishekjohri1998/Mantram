@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { CreditTooltipWrapper } from '../CreditBadge'
 import AvatarPicker from './AvatarPicker'
+import VideoHoverActions from './VideoHoverActions'
 
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -236,11 +237,12 @@ function Dropdown({ value, onChange, options, label }) {
 function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
     return (
         <div className="ugc-video-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            <div className="has-vha" style={{ position: 'relative', flex: 1, minHeight: 0 }}>
                 <video src={videoUrl} muted loop playsInline
                     onMouseEnter={e => e.target.play()}
                     onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} />
                 <div className="ugc-video-overlay">
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>

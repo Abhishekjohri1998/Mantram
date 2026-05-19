@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import './Storyboard.css';
 import AvatarPicker from './AvatarPicker';
 import { products } from '../../services/api';
+import VideoHoverActions from './VideoHoverActions';
 
 const API = '/api/video-studio';
 
@@ -597,9 +598,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
                     {/* Final film player */}
                     {phase === 'complete' && finalVideoUrl && (
-                        <div className="sb-final-player">
+                        <div className="sb-final-player has-vha" style={{ position: 'relative', display: 'inline-block' }}>
                             <h3 className="sb-final-title">🎬 Final Ad Film</h3>
                             <video src={finalVideoUrl} controls className="sb-final-video" />
+                            <VideoHoverActions videoUrl={finalVideoUrl} onPreview={setPreviewVideo} />
                         </div>
                     )}
                 </div>
@@ -613,7 +615,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         {projects.filter(p => p.studioMode === 'storyboard' && (p.storyboard?.finalVideoUrl || p.finalVideoUrl)).map(p => {
                             const url = p.storyboard?.finalVideoUrl || p.finalVideoUrl;
                             return (
-                                <div key={p._id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', aspectRatio: p.storyboard?.format === '16:9' ? '16/9' : p.storyboard?.format === '1:1' ? '1/1' : '9/16' }} onClick={() => setPreviewVideo(url)}>
+                                <div key={p._id} className="has-vha" style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', aspectRatio: p.storyboard?.format === '16:9' ? '16/9' : p.storyboard?.format === '1:1' ? '1/1' : '9/16' }} onClick={() => setPreviewVideo(url)}>
                                     <video src={url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '20px', backdropFilter: 'blur(4px)' }}>
@@ -621,6 +623,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                             <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>Preview</span>
                                         </div>
                                     </div>
+                                    <VideoHoverActions videoUrl={url} onPreview={setPreviewVideo} />
                                 </div>
                             );
                         })}

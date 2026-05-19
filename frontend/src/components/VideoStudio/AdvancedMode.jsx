@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import PublishModal from '../PublishModal'
 import { creatives as creativesAPI } from '../../services/api'
 import { CreditTooltipWrapper } from '../CreditBadge'
+import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 const MAX_CONCURRENT = 3
@@ -1182,11 +1183,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         refImages: ac.referenceImages || [],
                     }
                     return (
-                        <div key={p._id || i} className="vm-bg-item">
+                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative' }}>
                             <PosterThumbnail
                                 src={videoSrc}
                                 poster={posterUrl}
                             />
+                            <VideoHoverActions videoUrl={videoSrc} onPreview={() => setViewVideo(viewData)} />
                             {/* pointer-events: none on overlay, auto on buttons only */}
                             <div className="vm-bg-overlay">
                                 <div className="vm-bg-overlay-btns">

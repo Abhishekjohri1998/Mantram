@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -639,11 +640,12 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
                                 {msg.completedScenes && msg.completedScenes.length > 0 && (
                                     <div className="mt-3 space-y-2">
                                         {msg.completedScenes.map((sc, j) => (
-                                            <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black">
+                                            <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black relative has-vha">
                                                 <div style={{ aspectRatio: '16/9' }}>
-                                                    <video src={sc.videoUrl} controls className="w-full h-full" />
+                                                    <video src={sc.videoUrl} controls className="w-full h-full block" />
                                                 </div>
-                                                <div className="flex items-center justify-between p-2">
+                                                <VideoHoverActions videoUrl={sc.videoUrl} />
+                                                <div className="flex items-center justify-between p-2 relative z-10">
                                                     <span className="text-[10px] text-[var(--sys-text-muted)]">{sc.id === 'compiled' ? '🎬 Final Video' : `Scene ${j + 1}`}</span>
                                                     <button onClick={() => handleDownload(sc.videoUrl, sc.id === 'compiled' ? 'final-video' : `scene-${j + 1}`)}
                                                         className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[10px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer">

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -479,7 +480,10 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                         {/* Video Result */}
                         {videoUrl && (
                             <>
-                                <video className="mg-result-video" src={videoUrl} controls autoPlay loop playsInline />
+                                <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                                    <video className="mg-result-video" src={videoUrl} controls autoPlay loop playsInline style={{ display: 'block' }} />
+                                    <VideoHoverActions videoUrl={videoUrl} />
+                                </div>
                                 <div className="mg-action-row">
                                     <button className="mg-action-btn primary" onClick={handleDownload}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download

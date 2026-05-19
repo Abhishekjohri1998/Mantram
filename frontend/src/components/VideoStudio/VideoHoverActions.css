@@ -1,0 +1,43 @@
+.vha-wrapper {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 6px;
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 10;
+}
+
+/* We expect the parent container to show .vha-wrapper on hover */
+*:hover > .vha-wrapper,
+.has-vha:hover .vha-wrapper {
+    opacity: 1;
+}
+
+.vha-wrapper button, .vha-wrapper a {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.vha-wrapper button:hover, .vha-wrapper a:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.vha-wrapper .material-symbols-outlined {
+    font-size: 16px;
+}

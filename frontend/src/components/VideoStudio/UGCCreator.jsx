@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CreditTooltipWrapper } from '../CreditBadge'
 import PublishModal from '../PublishModal'
+import VideoHoverActions from './VideoHoverActions'
 
 const API = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -709,7 +710,10 @@ export default function UGCCreator({ activeBrand }) {
                     <div className="ugc2-progress-view">
                         {videoUrl ? (
                             <div className="ugc2-done-card">
-                                <video src={videoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 16 }} />
+                                <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: 400 }}>
+                                    <video src={videoUrl} controls style={{ width: '100%', borderRadius: 16, display: 'block' }} />
+                                    <VideoHoverActions videoUrl={videoUrl} />
+                                </div>
                                 <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                                     <a href={videoUrl} download className="ugc2-btn-pri">Download</a>
                                     <button className="ugc2-btn-sec" onClick={() => setPublishUrl(videoUrl)}>Publish to Socials</button>
