@@ -193,7 +193,6 @@ router.post('/scrape-url', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network. Use a public URL.' });
         }
 
-        // Just use cheerio to fetch standard open graph tags
         const fetch = (await import('node-fetch')).default;
         const response = await fetch(siteUrl, {
             headers: { 
@@ -209,8 +208,53 @@ router.post('/scrape-url', protect, async (req, res) => {
         const title = $('meta[property="og:title"]').attr('content') || $('title').text() || 'Product';
         const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
         let imageUrl = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || '';
+        let allImages = [];
 
-        // fallback image
+        // ── SHOPIFY: Use /products/{handle}.json for the real gallery images ──
+        // og:image on Shopify stores is unreliable — it often returns an unrelated/generic
+        // product image (e.g., the first product in the catalog, not the one being viewed).
+        // The Shopify JSON API always returns the correct variant images for the specific product.
+        try {
+            const parsed = new URL(siteUrl);
+            const pathParts = parsed.pathname.split('/');
+            const productsIdx = pathParts.indexOf('products');
+            if (productsIdx !== -1 && pathParts[productsIdx + 1]) {
+                const handle = pathParts[productsIdx + 1].split('?')[0];
+                const shopifyJsonUrl = `${parsed.origin}/products/${handle}.json`;
+                console.log(`[scrape-url] Trying Shopify product API: ${shopifyJsonUrl}`);
+                const shopifyResp = await fetch(shopifyJsonUrl, {
+                    headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+                    timeout: 8000,
+                });
+                if (shopifyResp.ok) {
+                    const shopifyData = await shopifyResp.json();
+                    if (shopifyData?.product?.images?.length > 0) {
+                        allImages = shopifyData.product.images.map(img => img.src);
+                        imageUrl = allImages[0]; // Use first real product image, not og:image
+                        console.log(`[scrape-url] ✅ Shopify API: ${allImages.length} real product images for "${shopifyData.product.title}"`);
+                    }
+                }
+            }
+        } catch (shopifyErr) {
+            console.log(`[scrape-url] Shopify API skipped (${shopifyErr.message}), using og:image`);
+        }
+
+        // ── FALLBACK: Extract gallery images from HTML ──
+        if (allImages.length === 0) {
+            $('img[src*="cdn.shopify"], .product__media img, .product-image img, .product-gallery img').each((_, el) => {
+                const src = $(el).attr('src') || $(el).attr('data-src') || '';
+                if (src && src.includes('cdn.shopify') && !src.includes('icon') && !src.includes('logo')) {
+                    try {
+                        const cleanSrc = src.replace(/_\d+x\d*\./g, '.').split('?')[0];
+                        const fullUrl = cleanSrc.startsWith('http') ? cleanSrc : `https:${cleanSrc}`;
+                        if (!allImages.includes(fullUrl)) allImages.push(fullUrl);
+                    } catch {}
+                }
+            });
+            if (allImages.length > 0) imageUrl = allImages[0];
+        }
+
+        // ── FINAL FALLBACK: og:image or first img tag ──
         if (!imageUrl) {
             const firstImg = $('img').first().attr('src');
             if (firstImg) {
@@ -218,11 +262,24 @@ router.post('/scrape-url', protect, async (req, res) => {
             }
         }
 
+        if (allImages.length === 0 && imageUrl) allImages = [imageUrl];
+
+        const { ensureS3Url } = await import('../utils/s3.js');
+
+        // Mirror primary image to S3
         let finalImageUrl = imageUrl;
         if (imageUrl) {
-            const { ensureS3Url } = await import('../utils/s3.js');
-            finalImageUrl = await ensureS3Url(imageUrl, 'products/scraped');
+            finalImageUrl = await ensureS3Url(imageUrl, 'products/scraped').catch(() => imageUrl);
         }
+
+        // Mirror ALL gallery images to S3 in parallel (up to 4)
+        const finalAllImages = await Promise.all(
+            allImages.slice(0, 4).map(imgUrl =>
+                ensureS3Url(imgUrl, 'products/scraped').catch(() => imgUrl)
+            )
+        );
+
+        console.log(`[scrape-url] Returning ${finalAllImages.length} images for: "${title}"`);
 
         res.json({
             success: true,
@@ -230,6 +287,7 @@ router.post('/scrape-url', protect, async (req, res) => {
                 title,
                 description,
                 image: finalImageUrl,
+                images: finalAllImages,  // ✅ All real product gallery images for AI grounding
                 url: siteUrl
             }
         });
@@ -239,6 +297,7 @@ router.post('/scrape-url', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(e) });
     }
 });
+
 
 // POST /api/products/scan-website — Agentic product sync from brand website
 router.post('/scan-website', protect, async (req, res) => {

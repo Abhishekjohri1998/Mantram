@@ -7503,10 +7503,35 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             directorModel,
         });
 
-        // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2
+        // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
         // Pass raw file buffers directly (bypasses S3 re-download which can silently fail)
-        const rawProductBuffers = (req.files?.productImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
+        let rawProductBuffers = (req.files?.productImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
         const rawAvatarBuffer = req.files?.avatarImage?.[0] ? { buffer: req.files.avatarImage[0].buffer, mimeType: req.files.avatarImage[0].mimetype } : null;
+
+        // ✅ KEY FIX: When product images arrive as URLs (scraped via URL, not file-uploaded),
+        // rawProductBuffers will be empty and NanoBanana will hallucinate because it never
+        // receives actual image pixels. We eagerly download the S3 URLs to buffers here.
+        if (rawProductBuffers.length === 0 && productImageUrls.length > 0) {
+            console.log(`[Storyboard Create] rawProductBuffers empty — downloading ${Math.min(productImageUrls.length, 2)} URL images to buffers...`);
+            const downloadBuffer = async (url) => {
+                try {
+                    const resp = await fetch(url, { 
+                        headers: { 'User-Agent': 'Mozilla/5.0' }, 
+                        signal: AbortSignal.timeout(15000) 
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const buf = Buffer.from(await resp.arrayBuffer());
+                    const mimeType = resp.headers.get('content-type') || 'image/jpeg';
+                    return { buffer: buf, mimeType };
+                } catch (e) {
+                    console.warn(`[Storyboard Create] Failed to download product image buffer: ${e.message}`);
+                    return null;
+                }
+            };
+            const downloaded = await Promise.all(productImageUrls.slice(0, 2).map(downloadBuffer));
+            rawProductBuffers = downloaded.filter(Boolean);
+            console.log(`[Storyboard Create] Downloaded ${rawProductBuffers.length} product image buffers from URLs`);
+        }
 
         console.log(`[Storyboard Create] Passing ${rawProductBuffers.length} raw buffers + avatar=${!!rawAvatarBuffer} directly to poster generator`);
 
@@ -7517,10 +7542,11 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             productImageUrls,   // S3 URLs (fallback if no raw buffers)
             avatarUrl,
             imageModel,
-            rawProductBuffers,  // raw multer buffers — no re-download needed
+            rawProductBuffers,  // raw buffers — contains actual pixel data
             rawAvatarBuffer,
             imageSizeForModel   // ✅ Pass resolved imageSize (e.g. '2K') to NanoBanana
         );
+
 
         // Upload data URI → S3 so the frontend gets a real HTTP URL (not a giant base64 blob)
         let posterUrl = posterDataUrl;
@@ -7581,12 +7607,52 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
     try {
         const { projectId, imagePrompt, style = 'hyperrealistic', format = '9:16', imageModel = 'nanobanana' } = req.body;
 
+        // ✅ FIX: Load the project's saved product images from DB so the regenerated poster
+        // is grounded to the actual product — not hallucinated from scratch
+        let productImageUrls = [];
+        let avatarUrl = null;
+        if (projectId) {
+            const proj = await VideoProject.findById(projectId).select('input').lean();
+            if (proj?.input?.images?.length > 0) {
+                productImageUrls = proj.input.images.map(img => img.url).filter(Boolean);
+            }
+            avatarUrl = proj?.input?.avatarUrl || null;
+        }
+
+        // Download product image URLs to buffers so NanoBanana gets actual pixel data
+        let rawProductBuffers = [];
+        if (productImageUrls.length > 0) {
+            const dlBuf = async (url) => {
+                try {
+                    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
+                    if (!resp.ok) return null;
+                    return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: resp.headers.get('content-type') || 'image/jpeg' };
+                } catch { return null; }
+            };
+            rawProductBuffers = (await Promise.all(productImageUrls.slice(0, 2).map(dlBuf))).filter(Boolean);
+        }
+
+        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!avatarUrl}, model=${imageModel}`);
+
         // Import frame generator
         const { generateStoryboardPoster } = await import('../agents/videoStudio/storyboardFrames.js');
 
-        const posterUrl = await generateStoryboardPoster(imagePrompt, style, format, [], null, imageModel);
+        const posterDataUrl = await generateStoryboardPoster(
+            imagePrompt, style, format,
+            productImageUrls,     // S3 URL fallback
+            avatarUrl,
+            imageModel,
+            rawProductBuffers,    // actual pixel data
+            null                  // no raw avatar buffer on regen
+        );
 
-        if (!posterUrl) throw new Error('Poster generation failed');
+        if (!posterDataUrl) throw new Error('Poster generation failed');
+
+        // Upload data URI → S3
+        let posterUrl = posterDataUrl;
+        if (posterDataUrl.startsWith('data:')) {
+            posterUrl = await ensureS3Url(posterDataUrl, `storyboard/posters/${req.user._id}`).catch(() => posterDataUrl);
+        }
 
         // Update the storyboard in DB if projectId provided
         if (projectId) {
@@ -7604,6 +7670,7 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
+
 
 // ── POST /api/video-studio/storyboard/animate ────────────────────────────────
 // Step 3: Animate each storyboard frame via I2V (Seedance 2.0)

@@ -145,8 +145,21 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         setIsScrapingUrl(true);
         try {
             const r = await products.scrapeUrl(url);
-            if (r?.product?.image) {
-                setProductImages(prev => [...prev, { file: r.product.image, preview: r.product.image }]);
+            if (r?.product) {
+                // ✅ FIX: Use all gallery images from Shopify API, not just og:image
+                const galleryImages = r.product.images?.length > 0
+                    ? r.product.images
+                    : r.product.image ? [r.product.image] : [];
+
+                if (galleryImages.length > 0) {
+                    setProductImages(prev => [
+                        ...prev,
+                        ...galleryImages.map(imgUrl => ({ file: imgUrl, preview: imgUrl }))
+                    ]);
+                    console.log(`[Storyboard] Scraped ${galleryImages.length} product images from URL`);
+                } else {
+                    alert("Could not extract a product image from this URL. Please upload the image manually.");
+                }
                 if (r.product.title && !productName) setProductName(r.product.title);
             } else {
                 alert("Could not extract a product image from this URL. Please upload the image manually.");
@@ -159,6 +172,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             setProductUrlInput('');
         }
     };
+
 
     // ── Regen single poster ──
     const handleRegenPoster = useCallback(async () => {

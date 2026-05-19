@@ -53,7 +53,8 @@ Write an incredibly detailed and imaginative prompt to generate ONE single image
 - INJECT extreme creativity: use dynamic camera angles (low-angle hero shots, sweeping aerials, macro close-ups, Dutch angles, kinetic tracking).
 - SPECIFY professional lighting (volumetric god rays, chiaroscuro, neon rim lights, softbox diffusion).
 - Detail the EXACT sequence of fast cuts, props, character actions, and product hero moments.
-- Example: "Create a breathtaking high-end ${format} luxury pitch deck storyboard in a ${gridLayout} grid (${estimatedShots} frames). Pixar 3D style. The layout must resemble an elite agency presentation. Structured fast-cut flow: 1. Extreme macro close-up of condensation on the product -> 2. Kinetic whip-pan revealing the presenter in volumetric lighting -> 3. Low-angle tracking shot -> 4. Sweeping aerial... Each frame must have typography underneath describing the camera motion."
+- CRITICAL: The prompt MUST start with "Reference image attached — reproduce the exact product/garment shown with its precise colors, silhouette, and details in every frame." This ensures the image model uses the actual product reference and does NOT hallucinate a generic or different product.
+- Example: "Reference image attached — reproduce the exact product/garment shown with its precise colors, silhouette, and details in every frame. Create a breathtaking high-end ${format} luxury pitch deck storyboard in a ${gridLayout} grid (${estimatedShots} frames). Pixar 3D style. The layout must resemble an elite agency presentation. Structured fast-cut flow: 1. Extreme macro close-up of condensation on the product -> 2. Kinetic whip-pan revealing the presenter in volumetric lighting -> 3. Low-angle tracking shot -> 4. Sweeping aerial... Each frame must have typography underneath describing the camera motion."
 
 ═══════════════════════════════════════════════════════
 PROMPT 2 RULES: videoPrompt (For the Video Animation)
@@ -72,7 +73,7 @@ Return ONLY valid JSON. No markdown. No explanation. No code fences.
 The JSON must match this exact schema:
 
 {
-  "imagePrompt": "Create a breathtaking high-end...",
+  "imagePrompt": "Reference image attached — reproduce the exact product/garment shown...",
   "videoPrompt": "Use the attached storyboard image as the exact reference..."
 }
 `;
