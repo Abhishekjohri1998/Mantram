@@ -422,13 +422,23 @@ export default function NexusBar() {
                                     break
                                 }
 
-                                case 'intent':
+                                // ── INTENT: merged case (avatar intercept + action state) ──
+                                case 'intent': {
                                     pendingAction = data.action
                                     setStreamingAction(data.action)
+                                    // Avatar intercept: video_create without images already uploaded
+                                    if (data.intent === 'video_create' && pendingImageUrls.length === 0) {
+                                        setMessages(prev => [...prev, {
+                                            role: 'avatar_prompt',
+                                            message: 'to make a video, I need a character or product image! 🎬 pick an avatar or upload an image below',
+                                        }])
+                                        setPendingVideoMessage(msg)
+                                        setShowAvatarPicker(true)
+                                    }
                                     break
+                                }
 
                                 case 'step_update':
-                                    // Video pipeline step tracker
                                     setVideoStep(data)
                                     setStreamingText(data.label || '⚙️ Working...')
                                     break
@@ -464,6 +474,7 @@ export default function NexusBar() {
                                     const finalReply = stripThink(rawFinal)
                                     setStreamingText('')
                                     setVideoStep(null)
+                                    setLoading(false)  // ← RE-ENABLE input after every response
                                     setMessages(prev => [...prev, {
                                         role: 'assistant',
                                         content: finalReply,
@@ -481,6 +492,7 @@ export default function NexusBar() {
                                 case 'error':
                                     setStreamingText('')
                                     setVideoStep(null)
+                                    setLoading(false)  // ← RE-ENABLE input on error
                                     setMessages(prev => [...prev, {
                                         role: 'assistant',
                                         content: data.message || 'oops, try again? 😊'
@@ -503,22 +515,6 @@ export default function NexusBar() {
                                         content: data.content,
                                         platform: data.platform,
                                     }])
-                                    break
-                                }
-
-                                case 'intent': {
-                                    pendingAction = data.action
-                                    setStreamingAction(data.action)
-                                    // ── Avatar intercept: video_create without images ──
-                                    if (data.intent === 'video_create' && pendingImageUrls.length === 0) {
-                                        // Show avatar picker prompt card
-                                        setMessages(prev => [...prev, {
-                                            role: 'avatar_prompt',
-                                            message: 'to make a video, I need a character or product image! 🎬 pick an avatar or upload an image below',
-                                        }])
-                                        setPendingVideoMessage(msg)
-                                        setShowAvatarPicker(true)
-                                    }
                                     break
                                 }
 

@@ -364,25 +364,30 @@ function classifyIntent(message) {
         }
     }
 
-    // Content creation intents
-    if (/\b(write|create|generate|draft)\s+(a\s+)?(post|blog|caption|article|newsletter|content|copy|script)\b/i.test(lower)) {
+    // Content creation intents — expanded to catch tweet/reel/story/tiktok variants
+    if (
+        /\b(write|create|generate|draft|give\s+me|make)\s+(a\s+|me\s+a\s+|me\s+)?(post|blog|caption|article|newsletter|content|copy|script|tweet|reel|tiktok|story|status|bio|tagline|slogan|ad\s+copy|email|pitch|dm|message|announcement|thread)\b/i.test(lower) ||
+        /\b(instagram|linkedin|twitter|x\s+post|facebook|youtube|whatsapp|pinterest|snapchat)\s+(caption|post|copy|content|bio|story|reel|thread)\b/i.test(lower) ||
+        /\b(write|draft|create)\s+(content|copy)\b/i.test(lower)
+    ) {
         return { intent: 'content_create', studioTarget: 'content' };
     }
 
     // AI Photoshoot intent — user uploaded image + wants a shoot
-    if (/\b(photoshoot|photo shoot|product shot|product photo|ai shoot|shoot this|lifestyle shot|model shot|put.*in.*background|place.*in.*scene)\b/i.test(lower)) {
+    if (/\b(photoshoot|photo\s+shoot|product\s+shot|product\s+photo|ai\s+shoot|shoot\s+(this|my|the)|lifestyle\s+shot|model\s+shot|put.*in.*background|place.*in.*scene|shoot\s+it|add\s+(a\s+)?background|remove\s+background)\b/i.test(lower)) {
         return { intent: 'photoshoot', studioTarget: 'creative' };
     }
 
     // Video creation intent — full pipeline
-    if (/\b(create|make|generate|produce)\s+(a\s+)?(video|promo|ad film|reel|short film|video ad|promotional video|brand video)\b/i.test(lower)) {
+    if (/\b(create|make|generate|produce)\s+(a\s+)?(video|promo|ad\s+film|reel|short\s+film|video\s+ad|promotional\s+video|brand\s+video|product\s+video|youtube\s+video|tiktok\s+video)\b/i.test(lower)) {
         return { intent: 'video_create', studioTarget: 'video' };
     }
 
-    // Image creation intents — Proximity based matching
-    const visualVerbs = '(create|generate|show|imagine|make|draw|paint|sketch|give|design|visualize|illustrate)';
-    const visualNouns = '(image|picture|photo|visual|graphic|poster|concept|illustration|scene|banner|creative|artwork|drawing|painting)';
-    if (new RegExp(`\\b${visualVerbs}\\b.*\\b${visualNouns}\\b`, 'i').test(lower)) {
+    // Image creation intents — expanded to catch logo, thumbnail, infographic, banner
+    const visualVerbs = '(create|generate|show|imagine|make|draw|paint|sketch|give|design|visualize|illustrate|build|produce)';
+    const visualNouns = '(image|picture|photo|visual|graphic|poster|concept|illustration|scene|banner|creative|artwork|drawing|painting|logo|thumbnail|infographic|mockup|cover|flyer|carousel)';
+    if (new RegExp(`\\b${visualVerbs}\\b.*\\b${visualNouns}\\b`, 'i').test(lower) ||
+        new RegExp(`\\b${visualNouns}\\b.*\\b(for|of|about|showing|featuring)\\b`, 'i').test(lower)) {
         return { intent: 'image_create', studioTarget: 'creative' };
     }
 
@@ -662,8 +667,8 @@ Rules:
         // ── Save draft to Content Studio (fire-and-forget) ────────────────────
         if (brandId) {
             try {
-                const baseUrl = process.env.API_BASE_URL || 'http://localhost:5000';
-                const internalToken = makeInternalToken(user._id.toString());
+                const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+                const internalToken = makeInternalToken(user);
                 await fetch(`${baseUrl}/api/content/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
@@ -1127,7 +1132,13 @@ router.post('/stream', protect, async (req, res) => {
         }
 
         // ── Photoshoot intent — execute directly, skip LLM chat ──
-        if (intentResult.intent === 'photoshoot' && images && images.length > 0) {
+        if (intentResult.intent === 'photoshoot') {
+            if (!images || images.length === 0) {
+                // Ask user to upload an image first
+                sendSSE('done', { reply: 'to do an AI photoshoot I need a product or reference image! 📸 tap the image icon below to upload one, then say "photoshoot" again', language });
+                return res.end();
+            }
+
             // ── Credit check ──
             const creditBalance = getCreditBalance(req.user);
             const SHOOT_COST = 25; // matches DEFAULT_CREDIT_COSTS.photoshoot
@@ -1216,8 +1227,57 @@ router.post('/stream', protect, async (req, res) => {
             return res.end();
         }
 
+        // ── Image create intent — direct execution (no SIGNAL tag dependency) ──
         if (intentResult.intent === 'image_create') {
             sendSSE('intent', { intent: 'image_create', prompt: message });
+
+            // Build brand context for the image
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+
+            sendSSE('step_update', { step: 'generating', label: '🎨 Creating your visual...' });
+            try {
+                const imageResult = await internalGenerateCreative({
+                    body: {
+                        brandId,
+                        prompt: [
+                            message,
+                            brandName ? `for ${brandName} brand` : '',
+                            brandContextStr ? brandContextStr.slice(0, 300) : '',
+                            'Professional commercial quality, high resolution, vibrant',
+                        ].filter(Boolean).join('. '),
+                        type: 'instagram-post',
+                        refImageUrls: images || [],
+                        options: { imageModel: 'nanobanana-2', aspectRatio: '1:1', imageSize: '1K' },
+                        source: 'nexus_image_create',
+                    },
+                    user: req.user,
+                    creditsDeducted: 0,
+                    jobId: `nexus-img-${Date.now()}`,
+                });
+                const imageUrl = imageResult?.creative?.imageUrl || imageResult?.imageUrl || null;
+                if (imageUrl) {
+                    sendSSE('image_generated', { imageUrl, prompt: message, subtype: 'generated' });
+                    NexusHistory.create({
+                        userId, brandId, subject: autoTagSubject(message), type: 'image',
+                        messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'Image generated' }],
+                        outputs: [{ type: 'image', url: imageUrl, prompt: message }],
+                    }).catch(() => {});
+                    sendSSE('done', { reply: `here's your visual! 🎨 tap to view full-size — say 'edit' to adjust, or 'photoshoot' with a product image for brand-specific results`, language });
+                } else {
+                    // Fallthrough: let Fidato handle with SIGNAL tag
+                    sendSSE('done', { reply: `couldn't generate that image 😅 try describing it differently, or upload a reference image!`, language });
+                }
+            } catch (imgErr) {
+                console.error('[Nexus image_create] Failed:', imgErr.message);
+                sendSSE('done', { reply: `image generation hit an error 😅 try again!`, language });
+            }
+            return res.end();
         }
 
         // ── Content create intent — dedicated copy engine ──
