@@ -73,20 +73,20 @@ const css = `
 
 .avpk-grid {
     flex:1; overflow-y:auto; padding:16px 20px;
-    display:grid; grid-template-columns:repeat(5,1fr); gap:12px; align-content:start;
+    display:grid; grid-template-columns:repeat(5,1fr); grid-auto-rows:max-content; gap:12px; align-content:start;
 }
 .avpk-grid::-webkit-scrollbar { width:4px; }
 .avpk-grid::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
 
 .avpk-skeleton {
-    aspect-ratio:9/16; border-radius:12px;
+    width:100%; aspect-ratio:9/16; border-radius:12px; align-self:start;
     background:linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
     background-size:200% 100%;
     animation:avpk-shimmer 1.6s infinite;
 }
 .avpk-card {
-    aspect-ratio:9/16; border-radius:12px; overflow:hidden;
-    position:relative; cursor:pointer;
+    width:100%; aspect-ratio:9/16; border-radius:12px; overflow:hidden;
+    position:relative; cursor:pointer; align-self:start;
     background:#1b1b20; border:2px solid transparent; transition:all 0.2s;
 }
 .avpk-card:hover { border-color:rgba(255,255,255,0.22); transform:translateY(-2px); }
@@ -126,8 +126,8 @@ const css = `
 }
 
 .avpk-create-card {
-    aspect-ratio:9/16; border-radius:12px; overflow:hidden;
-    position:relative; cursor:pointer;
+    width:100%; aspect-ratio:9/16; border-radius:12px; overflow:hidden;
+    position:relative; cursor:pointer; align-self:start;
     background:rgba(255,255,255,0.025);
     border:2px dashed rgba(255,255,255,0.11);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
