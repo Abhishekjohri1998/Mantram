@@ -429,7 +429,7 @@ router.get('/library', protect, async (req, res) => {
         const userId = req.user._id;
         const [myAvatars, publicAvatars] = await Promise.all([
             Avatar.find({ createdBy: userId, isActive: true })
-                .select('name imageUrl resolution frameType generationMode source createdAt')
+                .select('name imageUrl resolution frameType generationMode source gender createdAt')
                 .sort({ createdAt: -1 })
                 .limit(100)
                 .lean(),
@@ -440,7 +440,7 @@ router.get('/library', protect, async (req, res) => {
                 ],
                 isActive: true
             })
-                .select('name imageUrl resolution frameType generationMode isFeatured')
+                .select('name imageUrl resolution frameType generationMode gender isFeatured')
                 .sort({ isFeatured: -1, createdAt: -1 })
                 .limit(50)
                 .lean(),
