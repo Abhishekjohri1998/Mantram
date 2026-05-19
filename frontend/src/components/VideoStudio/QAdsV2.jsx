@@ -614,7 +614,7 @@ function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     const videoUrl = project.generation?.videoUrl || project.finalVideoUrl
     return <div className="qv2-bi has-vha" style={{ position: 'relative' }}>
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
-        <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} />
+        <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} project={project} />
         <div className="qv2-bi-ov">
             {isAdmin && (
                 <button className="qv2-bi-btn template-btn" onClick={() => onSaveTemplate(project)}>
@@ -1151,7 +1151,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                     <div>
                                         <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                                             <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
-                                            <VideoHoverActions videoUrl={job.videoUrl} onPreview={setPreviewVideo} />
+                                            <VideoHoverActions videoUrl={job.videoUrl} onPreview={setPreviewVideo} project={job} />
                                         </div>
                                         {job.voiceoverStatus === 'processing' && (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', justifyContent: 'center' }}>

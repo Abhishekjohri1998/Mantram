@@ -117,6 +117,38 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const productInputRef = useRef();
     const avatarInputRef = useRef();
 
+    // ── Reuse Project Settings ──
+    const handleReuse = useCallback((project) => {
+        if (!project) return;
+        
+        // 1. Brief/Prompt
+        if (project.input?.brief) setBrief(project.input.brief);
+        else if (project.storyboard?.videoPrompt || project.storyboard?.imagePrompt) {
+            setBrief(project.storyboard.videoPrompt || project.storyboard.imagePrompt);
+        } else if (project.title) {
+            setBrief(project.title);
+        }
+
+        // 2. Images
+        if (project.input?.images?.length > 0) {
+            setProductImages(project.input.images.map(img => ({ file: img.url, preview: img.url })));
+        } else if (project.storyboard?.imageUrl) {
+            setProductImages([{ file: project.storyboard.imageUrl, preview: project.storyboard.imageUrl }]);
+        }
+
+        // 3. Config (format, model, etc)
+        if (project.storyboard?.format) setFormat(project.storyboard.format);
+        if (project.routing?.selectedModel) setModel(project.routing.selectedModel);
+        if (project.routing?.resolution) setResolution(project.routing.resolution);
+        if (project.generation?.duration) setDuration(project.generation.duration);
+
+        // Reset to input phase so the Scott box is visible
+        setPhase('input');
+        
+        // Scroll to the Scott box
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
     // ── Product image upload ──
     const handleProductImages = (e) => {
         const files = Array.from(e.target.files || []).slice(0, 4);
@@ -601,7 +633,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         <div className="sb-final-player has-vha" style={{ position: 'relative', display: 'inline-block' }}>
                             <h3 className="sb-final-title">🎬 Final Ad Film</h3>
                             <video src={finalVideoUrl} controls className="sb-final-video" />
-                            <VideoHoverActions videoUrl={finalVideoUrl} onPreview={setPreviewVideo} />
+                            <VideoHoverActions videoUrl={finalVideoUrl} onPreview={setPreviewVideo} project={projects?.find(p => (p.storyboard?.finalVideoUrl || p.finalVideoUrl) === finalVideoUrl)} onReuse={handleReuse} />
                         </div>
                     )}
                 </div>
@@ -611,13 +643,14 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             {projects && projects.length > 0 && (
                 <div style={{ width: '100%', maxWidth: '1200px', marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <h3 style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Previously Generated</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', width: '100%' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', width: '100%' }}>
                         {projects.filter(p => p.studioMode === 'storyboard' && (p.storyboard?.finalVideoUrl || p.finalVideoUrl)).map(p => {
                             const url = p.storyboard?.finalVideoUrl || p.finalVideoUrl;
+                            
                             return (
-                                <div key={p._id} className="has-vha" style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', aspectRatio: p.storyboard?.format === '16:9' ? '16/9' : p.storyboard?.format === '1:1' ? '1/1' : '9/16' }} onClick={() => setPreviewVideo(url)}>
-                                    <video src={url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                    <VideoHoverActions videoUrl={url} onPreview={setPreviewVideo} />
+                                <div key={p._id} className="has-vha" style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', height: '320px', flex: '0 0 auto', width: 'auto' }} onClick={() => setPreviewVideo(url)}>
+                                    <video src={url} autoPlay loop muted playsInline style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block', minWidth: '180px' }} />
+                                    <VideoHoverActions videoUrl={url} onPreview={setPreviewVideo} project={p} onReuse={handleReuse} />
                                 </div>
                             );
                         })}

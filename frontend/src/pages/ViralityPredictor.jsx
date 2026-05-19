@@ -6,6 +6,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useBrand } from '../context/BrandContext';
 import { viralityPredictor, apiFetch } from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
@@ -141,6 +142,7 @@ function RetentionCurve({ curve }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 export default function ViralityPredictor() {
+    const location = useLocation();
     const { brand }  = useBrand();
     const fileRef    = useRef();
 
@@ -157,6 +159,13 @@ export default function ViralityPredictor() {
     const [stage,       setStage]       = useState('');
     const [result,      setResult]      = useState(null);
     const [error,       setError]       = useState('');
+
+    useEffect(() => {
+        if (location.state?.videoUrl) {
+            setMediaUrl(location.state.videoUrl);
+            setContentType('video');
+        }
+    }, [location.state?.videoUrl]);
 
     // ── File handling ───────────────────────────────────────────────────
     const handleFile = useCallback((f) => {

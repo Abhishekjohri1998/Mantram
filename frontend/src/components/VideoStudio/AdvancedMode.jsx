@@ -71,10 +71,10 @@ const css = `
 .vm-layout * { pointer-events: auto; }
 
 /* Background Grid */
-.vm-bg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 24px; padding-bottom: 400px; pointer-events: auto; opacity: 0.9; }
-@media(max-width: 1024px) { .vm-bg-grid { grid-template-columns: repeat(3, 1fr); padding-bottom: 500px; } }
-@media(max-width: 768px) { .vm-bg-grid { grid-template-columns: repeat(2, 1fr); padding-bottom: 500px; } }
-.vm-bg-item { aspect-ratio: 16/9; width: 100%; object-fit: cover; border-radius: 8px; opacity: 1.0; transition: opacity .4s, transform .5s; position: relative; overflow: hidden; pointer-events: auto; background: var(--sys-surface); border: 1px solid var(--sys-border); }
+.vm-bg-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 24px; padding-bottom: 400px; pointer-events: auto; opacity: 0.9; }
+@media(max-width: 1024px) { .vm-bg-grid { padding-bottom: 500px; } }
+@media(max-width: 768px) { .vm-bg-grid { padding-bottom: 500px; } }
+.vm-bg-item { height: 340px; object-fit: cover; border-radius: 8px; opacity: 1.0; transition: opacity .4s, transform .5s; position: relative; overflow: hidden; pointer-events: auto; background: var(--sys-surface); border: 1px solid var(--sys-border); }
 .vm-bg-item video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .vm-bg-item:hover { opacity: 0.88; transform: scale(1.02); z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
@@ -343,28 +343,29 @@ const PosterThumbnail = ({ src, poster }) => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Layer 1: Poster image (fades out on hover) */}
-            {isVisible && hasPoster && (
-                <img src={posterUrl} loading="lazy" alt=""
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none',
-                        opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'absolute', inset: 0, zIndex: 2 }} />
+            {isVisible && hasPoster ? (
+                <>
+                    <img src={posterUrl} loading="lazy" alt=""
+                        style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block',
+                            opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'relative', zIndex: 2 }} />
+                    {isHovered && (
+                        <video ref={videoRef} src={src}
+                            style={{ height: '100%', width: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: 0 }}
+                            muted loop playsInline preload="auto" />
+                    )}
+                </>
+            ) : (
+                isVisible && src && (
+                    <video ref={videoRef} src={src}
+                        style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
+                        muted loop playsInline preload="metadata"
+                        onLoadedData={e => { e.target.currentTime = 1 }}
+                    />
+                )
             )}
 
-            {/* Layer 2: Video element
-                 - Has poster: only mount on hover
-                 - No poster: always mount with preload=metadata to grab a frame */}
-            {isVisible && src && (hasPoster ? isHovered : true) && (
-                <video ref={videoRef} src={src}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-                    muted loop playsInline
-                    preload={hasPoster ? 'auto' : 'metadata'}
-                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
-                />
-            )}
-
-            {/* Layer 3: Loading skeleton */}
             {!isVisible && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.02)' }} />
+                <div style={{ position: 'relative', width: '340px', height: '100%', background: 'rgba(255,255,255,0.02)' }} />
             )}
         </div>
     )
@@ -975,11 +976,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     // ── Reuse: restore all settings INCLUDING images into the Scott Panel ──
     function handleReuse(p) {
         const ac = p.advancedConfig || {}
-        const thePrompt = ac.enhancedPrompt || ac.prompt || p.input?.brief || p.title || ''
-        const theModel = p.routing?.selectedModel || ac.model || 'seedance-2.0'
-        const theDuration = Number(ac.duration) || 5
-        const theAspect = ac.aspectRatio || '16:9'
-        const theQuality = ac.qualityMode || ac.mode || 'fast'
+        const sb = p.storyboard || {}
+        const thePrompt = ac.enhancedPrompt || ac.prompt || sb.videoPrompt || sb.imagePrompt || p.backendPrompt || p.input?.brief || p.title || ''
+        const theModel = p.routing?.selectedModel || p.generation?.model || ac.model || 'seedance-2.0'
+        const theDuration = Number(ac.duration) || Number(p.generation?.duration) || 5
+        const theAspect = ac.aspectRatio || p.generation?.aspectRatio || sb.format || '16:9'
+        const theQuality = ac.qualityMode || ac.mode || p.routing?.mode || 'fast'
 
         let finalUI = thePrompt
             setZhPrompt('')
@@ -994,15 +996,26 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                 }
             } catch { }
         setPrompt(finalUI)
+        
+        // Ensure multishot arrays are also populated in case the model requires it
+        if (ac.shots && ac.shots.length > 0) {
+            setShots(ac.shots.map(s => ({ prompt: s.visual || s.prompt || s.dialogue || '' })))
+        } else {
+            setShots([{ prompt: finalUI }])
+        }
+
         if (MODELS[theModel]) setModel(theModel)
         setDuration(theDuration)
         setAspectRatio(theAspect)
         setQuality(theQuality)
 
         // Restore images
-        if (ac.firstImageUrl) setFirstFrame({ url: ac.firstImageUrl, source: 'refill' })
+        const firstImg = ac.firstImageUrl || sb.imageUrl || p.generation?.thumbnailUrl || p.input?.images?.[0]?.url || '';
+        if (firstImg) setFirstFrame({ url: firstImg, source: 'refill' })
         else setFirstFrame(null)
-        if (ac.lastImageUrl) setLastFrame({ url: ac.lastImageUrl, source: 'refill' })
+        
+        const lastImg = ac.lastImageUrl || '';
+        if (lastImg) setLastFrame({ url: lastImg, source: 'refill' })
         else setLastFrame(null)
         if (ac.referenceImages?.length > 0) {
             setRefImages(ac.referenceImages.map((r, i) => ({
@@ -1182,13 +1195,21 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         lastImageUrl: ac.lastImageUrl || '',
                         refImages: ac.referenceImages || [],
                     }
+                    
                     return (
-                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative' }}>
+                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative', flex: '0 0 auto', height: '340px', width: 'auto' }}>
                             <PosterThumbnail
                                 src={videoSrc}
                                 poster={posterUrl}
                             />
-                            <VideoHoverActions videoUrl={videoSrc} onPreview={() => setViewVideo(viewData)} />
+                            <VideoHoverActions 
+                                videoUrl={videoSrc} 
+                                onPreview={() => setViewVideo(viewData)} 
+                                project={p}
+                                onReuse={handleReuse}
+                                onExtractFirstFrame={(url) => setFirstFrame({ url, source: 'extracted' })}
+                                onExtractLastFrame={(url) => setLastFrame({ url, source: 'extracted' })}
+                            />
                         </div>
                     )
                 })}
@@ -1202,7 +1223,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
 
                 {/* Empty placeholder slots (only after loaded) */}
                 {projectsLoaded && [...Array(Math.max(0, 12 - jobs.length - Math.min(gridVideos.length, Math.max(0, 16 - jobs.length))))].map((_, i) => (
-                    <div key={`empty-${i}`} className="vm-bg-item" style={{ background: 'rgba(0,0,0,0.02)', border: '1px dashed var(--sys-border)' }} />
+                    <div key={`empty-${i}`} className="vm-bg-item" style={{ flex: '0 0 auto', height: '340px', aspectRatio: '16/9', background: 'rgba(0,0,0,0.02)', border: '1px dashed var(--sys-border)' }} />
                 ))}
             </div>
 

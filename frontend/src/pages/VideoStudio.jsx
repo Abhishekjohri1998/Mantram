@@ -146,6 +146,19 @@ export default function VideoStudio() {
     const [selectedTemplate, setSelectedTemplate] = useState(null)
     const [searchParams, setSearchParams] = useSearchParams()
     const [initialTemplateId, setInitialTemplateId] = useState(null)
+    const [likedVideos, setLikedVideos] = useState([])
+
+    useEffect(() => {
+        const fetchLiked = () => {
+            try {
+                const liked = JSON.parse(localStorage.getItem('mantram_liked_videos') || '[]');
+                setLikedVideos(liked);
+            } catch (e) {}
+        };
+        fetchLiked();
+        window.addEventListener('likedVideosChanged', fetchLiked);
+        return () => window.removeEventListener('likedVideosChanged', fetchLiked);
+    }, []);
 
     // Project state
     const [projectId, setProjectId] = useState(null)
@@ -859,6 +872,7 @@ export default function VideoStudio() {
         const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
         const isCompleted = p.status === 'done' || p.status === 'critique' || p.status === 'completed' || hasVideo;
         
+        if (historyTab === 'liked') return likedVideos.includes(p._id);
         if (historyTab === 'completed') return isCompleted;
         if (historyTab === 'progress') return !isCompleted && isGenerating;
         if (historyTab === 'drafts') return !isCompleted && !isGenerating;
@@ -915,7 +929,7 @@ export default function VideoStudio() {
 
                             {/* Tab Filters */}
                             <div className="flex bg-[var(--sys-surface)] border border-[var(--sys-border)] p-1 rounded-xl">
-                                {['all', 'drafts', 'progress', 'completed'].map(tab => (
+                                {['all', 'liked', 'drafts', 'progress', 'completed'].map(tab => (
                                     <button key={tab} onClick={() => setHistoryTab(tab)}
                                         className={`px-3 py-1 text-[11px] font-medium rounded-lg transition-all cursor-pointer capitalize ${historyTab === tab ? 'bg-[var(--sys-border)] text-[var(--sys-text)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
                                         {tab === 'progress' ? 'rendering' : tab}

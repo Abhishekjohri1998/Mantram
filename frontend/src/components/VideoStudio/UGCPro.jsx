@@ -242,7 +242,7 @@ function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
                     onMouseEnter={e => e.target.play()}
                     onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} />
+                <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} project={v} />
                 <div className="ugc-video-overlay">
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
@@ -27,6 +27,7 @@ const typeIcons = {
 
 export default function PublishSchedule() {
     const navigate = useNavigate()
+    const location = useLocation()
     const { activeBrand } = useBrand()
 
     const [readyContent, setReadyContent] = useState([])
@@ -61,6 +62,20 @@ export default function PublishSchedule() {
     }, [activeBrand?._id])
 
     useEffect(() => { fetchHistory() }, [fetchHistory])
+
+    useEffect(() => {
+        if (location.state?.autoPublish) {
+            setPublishItem({
+                content: location.state.caption || '',
+                imageUrl: location.state.videoUrl || '', // We use imageUrl prop for both image and video in PublishModal
+                type: 'video'
+            });
+            setIsPublishModalOpen(true);
+            
+            // Clear state so it doesn't re-open on refresh
+            window.history.replaceState({}, document.title)
+        }
+    }, [location.state]);
 
     const publishedPosts = socialPosts.filter(p => p.status === 'published')
     const scheduledPosts = socialPosts.filter(p => p.status === 'scheduled')
