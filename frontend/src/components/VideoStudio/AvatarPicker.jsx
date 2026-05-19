@@ -324,7 +324,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                 const saveName = genSelectedSlots.length > 1 ? `${avatarName.trim()} #${index + 1}` : avatarName.trim()
                 return api('/avatar-studio/save', {
                     method:'POST', headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({ name:saveName, selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured', options: createMode==='generate' ? genOptions : {} })
+                    body:JSON.stringify({ name:saveName, selectedUrl:v.url, generationMode:createMode==='prompt'?'directPrompt':'structured', options: createMode==='generate' ? genOptions : { directPrompt } })
                 })
             })
             await Promise.all(promises.filter(Boolean))

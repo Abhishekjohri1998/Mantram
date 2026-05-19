@@ -210,11 +210,17 @@ async function generateOneVariant(slot, prompt, size, modelKey = DEFAULT_MODEL, 
 }
 
 // Map genderExpression values → Avatar schema enum (male|female|unspecified)
-function mapGenderEnum(genderExpression) {
-    if (!genderExpression) return 'unspecified';
-    const g = genderExpression.toLowerCase();
-    if (g === 'masculine' || g === 'male') return 'male';
-    if (g === 'feminine' || g === 'female') return 'female';
+function mapGenderEnum(genderExpression, directPrompt = '') {
+    if (genderExpression) {
+        const g = genderExpression.toLowerCase();
+        if (g === 'masculine' || g === 'male') return 'male';
+        if (g === 'feminine' || g === 'female') return 'female';
+    }
+    if (directPrompt) {
+        const p = directPrompt.toLowerCase();
+        if (/\b(man|men|boy|boys|male|guy|guys|gentleman|gentlemen)\b/.test(p)) return 'male';
+        if (/\b(woman|women|girl|girls|female|lady|ladies|gal|gals)\b/.test(p)) return 'female';
+    }
     return 'unspecified';
 }
 
@@ -227,7 +233,7 @@ function autoSaveAvatar(url, options, userId) {
     Avatar.create({
         name,
         imageUrl: url,
-        gender: mapGenderEnum(options.genderExpression),
+        gender: mapGenderEnum(options.genderExpression, options._prompt || options.directPrompt || ''),
         isTemplate: false,
         isActive: true,
         source: 'generated',
@@ -491,7 +497,7 @@ router.post('/save', protect, async (req, res) => {
         const avatar = await Avatar.create({
             name: trimmedName,
             imageUrl: selectedUrl,
-            gender: mapGenderEnum(options.genderExpression),
+            gender: mapGenderEnum(options.genderExpression, promptUsed || options.directPrompt || ''),
             isTemplate: effectiveRole === 'superadmin', // legacy flag for backwards compat
             isActive: true,
             source: 'generated',
