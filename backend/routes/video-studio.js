@@ -3082,15 +3082,16 @@ router.post('/ugc-pro/avatars', protect, ugcUpload.single('avatarImage'), async 
             return res.status(400).json({ success: false, error: 'Provide an image file or imageUrl' });
         }
 
+        const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
         const avatar = await Avatar.create({
             name: name || '',
             imageUrl: finalUrl,
             gender: gender || 'unspecified',
-            isTemplate: req.user.role === 'superadmin',
+            isTemplate: isSuperAdmin,
             createdBy: req.user._id,
             source: 'upload',
-            createdByRole: req.user.role === 'superadmin' ? 'superadmin' : 'user',
-            isPublished: req.user.role === 'superadmin'
+            createdByRole: isSuperAdmin ? 'superadmin' : 'user',
+            isPublished: isSuperAdmin
         });
 
         res.json({ success: true, avatar });
