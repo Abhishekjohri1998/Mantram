@@ -23,11 +23,14 @@ import { getSmartRouter } from '../ai/smartRouter.js';
 import { agentUtils } from '../agents/shared/agentUtils.js';
 import redis from '../utils/redisClient.js';
 import User from '../models/User.js';
+import NexusHistory from '../models/NexusHistory.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../utils/brandLanguage.js';
 import multer from 'multer';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { internalGenerateCreative } from './creatives.js';
+import jwt from 'jsonwebtoken';
+import { deductCredits, getCreditCosts, getCreditBalance } from '../middleware/credits.js';
 
 const router = Router();
 
@@ -361,16 +364,30 @@ function classifyIntent(message) {
         }
     }
 
-    // Content creation intents (Phase 2 — for now just flag them)
-    if (/\b(write|create|generate|draft)\s+(a\s+)?(post|blog|caption|article|newsletter|content|copy)\b/i.test(lower)) {
+    // Content creation intents — expanded to catch tweet/reel/story/tiktok variants
+    if (
+        /\b(write|create|generate|draft|give\s+me|make)\s+(a\s+|me\s+a\s+|me\s+)?(post|blog|caption|article|newsletter|content|copy|script|tweet|reel|tiktok|story|status|bio|tagline|slogan|ad\s+copy|email|pitch|dm|message|announcement|thread)\b/i.test(lower) ||
+        /\b(instagram|linkedin|twitter|x\s+post|facebook|youtube|whatsapp|pinterest|snapchat)\s+(caption|post|copy|content|bio|story|reel|thread)\b/i.test(lower) ||
+        /\b(write|draft|create)\s+(content|copy)\b/i.test(lower)
+    ) {
         return { intent: 'content_create', studioTarget: 'content' };
     }
 
-    // Image creation intents — Proximity based matching (Verb ... Noun) to handle adjectives & articles
-    const visualVerbs = '(create|generate|show|imagine|make|draw|paint|sketch|give|design|visualize|illustrate)';
-    const visualNouns = '(image|picture|photo|visual|graphic|poster|concept|illustration|scene|banner|creative|artwork|drawing|painting)';
-    
-    if (new RegExp(`\\b${visualVerbs}\\b.*\\b${visualNouns}\\b`, 'i').test(lower)) {
+    // AI Photoshoot intent — user uploaded image + wants a shoot
+    if (/\b(photoshoot|photo\s+shoot|product\s+shot|product\s+photo|ai\s+shoot|shoot\s+(this|my|the)|lifestyle\s+shot|model\s+shot|put.*in.*background|place.*in.*scene|shoot\s+it|add\s+(a\s+)?background|remove\s+background)\b/i.test(lower)) {
+        return { intent: 'photoshoot', studioTarget: 'creative' };
+    }
+
+    // Video creation intent — full pipeline
+    if (/\b(create|make|generate|produce)\s+(a\s+)?(video|promo|ad\s+film|reel|short\s+film|video\s+ad|promotional\s+video|brand\s+video|product\s+video|youtube\s+video|tiktok\s+video)\b/i.test(lower)) {
+        return { intent: 'video_create', studioTarget: 'video' };
+    }
+
+    // Image creation intents — expanded to catch logo, thumbnail, infographic, banner
+    const visualVerbs = '(create|generate|show|imagine|make|draw|paint|sketch|give|design|visualize|illustrate|build|produce)';
+    const visualNouns = '(image|picture|photo|visual|graphic|poster|concept|illustration|scene|banner|creative|artwork|drawing|painting|logo|thumbnail|infographic|mockup|cover|flyer|carousel)';
+    if (new RegExp(`\\b${visualVerbs}\\b.*\\b${visualNouns}\\b`, 'i').test(lower) ||
+        new RegExp(`\\b${visualNouns}\\b.*\\b(for|of|about|showing|featuring)\\b`, 'i').test(lower)) {
         return { intent: 'image_create', studioTarget: 'creative' };
     }
 
@@ -381,6 +398,295 @@ function classifyIntent(message) {
 
     // Default — treat as chat
     return { intent: 'chat' };
+}
+
+// ============================================================================
+// HELPER — Generate internal JWT token for inter-service calls
+// ============================================================================
+function makeInternalToken(user) {
+    const secret = process.env.JWT_SECRET || 'mantram-secret';
+    return jwt.sign({ _id: user._id, email: user.email, plan: user.plan, role: user.role }, secret, { expiresIn: '5m' });
+}
+
+// ============================================================================
+// HELPER — Auto-tag subject from first user message
+// ============================================================================
+function autoTagSubject(message) {
+    const m = message.trim();
+    // Truncate and capitalise
+    const clean = m.length > 80 ? m.slice(0, 77) + '...' : m;
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+// ============================================================================
+// HELPER — Detect primary type from intent
+// ============================================================================
+function intentToHistoryType(intent) {
+    if (['image_create', 'photoshoot'].includes(intent)) return 'image';
+    if (intent === 'video_create') return 'video';
+    if (intent === 'content_create') return 'content';
+    if (intent === 'brainstorm') return 'research';
+    return 'chat';
+}
+
+// ============================================================================
+// CAPABILITY — AI Photoshoot (reference-guided image gen)
+// ============================================================================
+async function executePhotoshoot({ message, images, brandId, user, brandContext, brandName, sendSSE }) {
+    sendSSE('step_update', { step: 'analyzing', label: '🧠 Analyzing your image...' });
+
+    // Run MCoT visual analysis on uploaded image(s)
+    let visualContext = '';
+    if (images && images.length > 0) {
+        try {
+            const mcotResult = await agentUtils.callMultimodalAgent(
+                FIDATO_VISUAL_ANALYSIS_PROMPT,
+                `Analyze this product/person image for an AI photoshoot. Brief: "${message}"`,
+                images,
+                { temperature: 0.2, maxTokens: 2048 }
+            );
+            if (mcotResult && !mcotResult.error) {
+                visualContext = [
+                    mcotResult.productAnalysis ? `Product: ${mcotResult.productAnalysis}` : '',
+                    mcotResult.visualStyle ? `Current Style: ${mcotResult.visualStyle}` : '',
+                    mcotResult.mood ? `Mood: ${mcotResult.mood}` : '',
+                    mcotResult.colorPalette?.length ? `Colors: ${mcotResult.colorPalette.join(', ')}` : '',
+                ].filter(Boolean).join('. ');
+            }
+        } catch (e) { /* non-blocking */ }
+    }
+
+    sendSSE('step_update', { step: 'generating', label: '🎨 Creating your photoshoot...' });
+
+    // Build a rich photoshoot prompt using brand + brief + visual context
+    const photoshootPrompt = [
+        message,
+        visualContext ? `\nReference analysis: ${visualContext}` : '',
+        brandName ? `\nBrand: ${brandName}` : '',
+        brandContext ? `\nBrand style: ${brandContext.slice(0, 300)}` : '',
+        '\nProfessional commercial photography quality. High resolution. Studio-grade lighting.',
+    ].filter(Boolean).join('');
+
+    try {
+        const result = await internalGenerateCreative({
+            body: {
+                brandId,
+                prompt: photoshootPrompt,
+                type: 'instagram-post',
+                refImageUrls: images || [],
+                options: { imageModel: 'gpt-image-2', aspectRatio: '1:1', imageSize: '1K' },
+                source: 'nexus_photoshoot',
+            },
+            user,
+            creditsDeducted: 0,
+            jobId: `nexus-shoot-${Date.now()}`,
+        });
+
+        const imageUrl = result?.creative?.imageUrl || result?.imageUrl || null;
+        if (imageUrl) {
+            sendSSE('image_generated', { imageUrl, prompt: photoshootPrompt, subtype: 'photoshoot' });
+            return { success: true, imageUrl };
+        }
+        return { success: false };
+    } catch (err) {
+        console.error('[Nexus Photoshoot] Failed:', err.message);
+        return { success: false };
+    }
+}
+
+// ============================================================================
+// CAPABILITY — Full Video Pipeline (Script → Storyboard → Animate)
+// ============================================================================
+async function executeVideoCreate({ message, images, avatarUrl, brandId, user, brandContext, brandName, sendSSE }) {
+    const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+    const internalToken = makeInternalToken(user);
+
+    // Step 1 — Write the script
+    sendSSE('step_update', { step: 'script', label: '✍️ Writing your video script...' });
+    const ai = getRouter();
+    let script = '';
+    try {
+        const scriptResult = await ai.generateText({
+            systemPrompt: `You are a cinematic video director. Write a tight shot-by-shot script for a 15-30 second brand video. Return ONLY the script in this format:\nSHOT 1: [visual description] | VOICEOVER: [text]\nSHOT 2: [visual description] | VOICEOVER: [text]\n...up to 4 shots max. No intro, no explanation.`,
+            userPrompt: `Brief: "${message}"\nBrand: ${brandName || 'the brand'}\n${brandContext ? 'Brand context: ' + brandContext.slice(0, 400) : ''}`,
+            maxTokens: 600,
+            temperature: 0.8,
+        });
+        script = scriptResult.text || '';
+    } catch (e) {
+        script = `SHOT 1: Product hero shot, cinematic lighting | VOICEOVER: Introducing ${brandName || 'something new'}\nSHOT 2: Close up details, slow motion | VOICEOVER: Built for those who demand the best`;
+    }
+    sendSSE('script_ready', { script });
+
+    // Step 2 — Generate storyboard frame images
+    sendSSE('step_update', { step: 'storyboard', label: '🖼️ Creating storyboard frames...' });
+    const shots = script.split('\n').filter(l => l.trim().startsWith('SHOT')).slice(0, 4);
+    const frameUrls = [];
+
+    for (const shot of shots) {
+        const visualDesc = shot.split('|')[0].replace(/^SHOT\s*\d+:\s*/i, '').trim();
+        const framePrompt = [
+            visualDesc,
+            brandName ? `, for ${brandName} brand` : '',
+            ', cinematic, 16:9, commercial photography, vibrant'
+        ].join('');
+        try {
+            const frameResult = await internalGenerateCreative({
+                body: {
+                    brandId,
+                    prompt: framePrompt,
+                    type: 'instagram-post',
+                    refImageUrls: images || [],
+                    options: { imageModel: 'nanobanana-2', aspectRatio: '16:9', imageSize: '1K' },
+                    source: 'nexus_storyboard',
+                },
+                user,
+                creditsDeducted: 0,
+                jobId: `nexus-frame-${Date.now()}`,
+            });
+            const url = frameResult?.creative?.imageUrl || frameResult?.imageUrl;
+            if (url) frameUrls.push({ url, prompt: framePrompt });
+        } catch (e) { /* skip failed frame */ }
+    }
+    sendSSE('storyboard_ready', { frames: frameUrls });
+
+    // Step 3 — Queue video generation via Seedance
+    sendSSE('step_update', { step: 'video', label: '🎬 Generating your video...' });
+
+    // Build the final Seedance prompt from the script
+    const seedancePrompt = shots.map((s, i) => {
+        const visual = s.split('|')[0].replace(/^SHOT\s*\d+:\s*/i, '').trim();
+        const vo = (s.split('|')[1] || '').replace(/^\s*VOICEOVER:\s*/i, '').trim();
+        return `[Scene ${i + 1}] ${visual}${vo ? '. ' + vo : ''}`;
+    }).join(' → ');
+
+    const refImages = [
+        ...(frameUrls.length > 0 ? [{ url: frameUrls[0].url, role: 'style_ref' }] : []),
+        ...(images?.length > 0 ? [{ url: images[0], role: 'product' }] : []),
+        ...(avatarUrl ? [{ url: avatarUrl, role: 'face' }] : []),
+    ];
+
+    try {
+        const videoResp = await fetch(`${baseUrl}/api/video-studio/advanced/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${internalToken}`,
+            },
+            body: JSON.stringify({
+                model: 'seedance-2.0',
+                prompt: seedancePrompt,
+                duration: 5,
+                aspectRatio: '16:9',
+                qualityMode: 'quality',
+                brandId,
+                refImages,
+                source: 'nexus_video',
+            }),
+            signal: AbortSignal.timeout(30000),
+        });
+        const videoData = await videoResp.json();
+        const projectId = videoData?.projectId || videoData?.jobId;
+        sendSSE('video_queued', {
+            projectId,
+            script,
+            frames: frameUrls,
+            message: 'your video is being generated! check Video Studio in 60-90 seconds, or I'll notify you when it's ready 🎬',
+        });
+        return { success: true, projectId };
+    } catch (err) {
+        console.error('[Nexus Video] Queue failed:', err.message);
+        sendSSE('video_queued', {
+            script,
+            frames: frameUrls,
+            message: 'script and storyboard done! head to Video Studio to generate the final video 🎬',
+        });
+        return { success: false };
+    }
+}
+
+/**
+ * ══════════════════════════════════════════════════════════
+ * CAPABILITY PILLAR 3 — Content Engine
+ * Generates platform-specific copy inline and saves draft
+ * ══════════════════════════════════════════════════════════
+ */
+async function executeContent({ message, brandId, brandContext, brandName, user, sendSSE }) {
+    // ── Detect platform from message ──────────────────────────────────────────
+    const lower = message.toLowerCase();
+    const platform =
+        lower.includes('instagram') ? 'Instagram' :
+        lower.includes('linkedin') ? 'LinkedIn' :
+        lower.includes('twitter') || lower.includes('x post') ? 'Twitter/X' :
+        lower.includes('facebook') ? 'Facebook' :
+        lower.includes('email') || lower.includes('newsletter') ? 'Email Newsletter' :
+        lower.includes('youtube') ? 'YouTube Description' :
+        lower.includes('blog') ? 'Blog Post' :
+        lower.includes('whatsapp') ? 'WhatsApp Status' :
+        lower.includes('ad copy') || lower.includes('advertisement') ? 'Ad Copy' :
+        'Social Media'; // fallback
+
+    sendSSE('step_update', { step: 'content', label: `✍️ Writing ${platform} copy…` });
+
+    const grokKey = process.env.GROK_API_KEY;
+    const brandCtxBlock = brandContext ? `\n\nBRAND CONTEXT:\n${brandContext.slice(0, 800)}` : '';
+    const systemPrompt = `You are a top-tier brand copywriter for ${brandName || 'this brand'}.${brandCtxBlock}
+Write compelling, platform-native ${platform} copy based on the user's brief.
+Rules:
+- Match the exact tone, format, and length conventions for ${platform}
+- Include relevant hashtags for social platforms
+- Use emojis strategically (not excessively)
+- Make it punchy, scroll-stopping, and on-brand
+- For Instagram: max 2200 chars, hook in first line
+- For LinkedIn: professional tone, story-driven, 300-800 chars
+- For Twitter/X: max 280 chars, punchy
+- For Email: subject line on first line, then body
+- Output ONLY the final copy — no preamble, no meta-commentary`;
+
+    try {
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+            body: JSON.stringify({
+                model: 'grok-3-mini-fast',
+                stream: false,
+                max_tokens: 800,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: message },
+                ],
+            }),
+        });
+        const data = await resp.json();
+        const copy = data.choices?.[0]?.message?.content?.trim() || '';
+        if (!copy) return { success: false };
+
+        // ── Emit content_ready SSE (frontend renders ContentCard) ─────────────
+        sendSSE('content_ready', { content: copy, platform });
+
+        // ── Save draft to Content Studio (fire-and-forget) ────────────────────
+        if (brandId) {
+            try {
+                const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+                const internalToken = makeInternalToken(user);
+                await fetch(`${baseUrl}/api/content/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
+                    body: JSON.stringify({
+                        brandId, platform, brief: message,
+                        tone: 'brand-aligned', type: 'nexus_generated',
+                        content: copy, draft: true,
+                    }),
+                    signal: AbortSignal.timeout(15000),
+                }).catch(() => {});
+            } catch { /* non-blocking */ }
+        }
+
+        return { success: true, copy, platform };
+    } catch (err) {
+        console.error('[Nexus Content] Failed:', err.message);
+        return { success: false };
+    }
 }
 
 /**
@@ -825,20 +1131,178 @@ router.post('/stream', protect, async (req, res) => {
             return res.end();
         }
 
-        if (intentResult.intent === 'image_create') {
-            sendSSE('intent', { intent: 'image_create', prompt: message });
-            // continue to chat so Fidato can say "I'm on it!"
+        // ── Photoshoot intent — execute directly, skip LLM chat ──
+        if (intentResult.intent === 'photoshoot') {
+            if (!images || images.length === 0) {
+                // Ask user to upload an image first
+                sendSSE('done', { reply: 'to do an AI photoshoot I need a product or reference image! 📸 tap the image icon below to upload one, then say "photoshoot" again', language });
+                return res.end();
+            }
+
+            // ── Credit check ──
+            const creditBalance = getCreditBalance(req.user);
+            const SHOOT_COST = 25; // matches DEFAULT_CREDIT_COSTS.photoshoot
+            if (!creditBalance.unlimited && creditBalance.remaining < SHOOT_COST) {
+                sendSSE('done', { reply: `you need ${SHOOT_COST} credits for an AI photoshoot, but you only have ${creditBalance.remaining} left 😬 upgrade your plan to continue!` });
+                return res.end();
+            }
+
+            // ── History storage check ──
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount >= NexusHistory.MAX_CONVERSATIONS) {
+                sendSSE('done', { reply: `your history is full (${NexusHistory.MAX_CONVERSATIONS} conversations)! delete some old threads from the History panel before creating more 🗂️` });
+                return res.end();
+            }
+
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+            sendSSE('intent', { intent: 'photoshoot' });
+            const result = await executePhotoshoot({ message, images, brandId, user: req.user, brandContext: brandContextStr, brandName, sendSSE });
+
+            // ── Deduct credits on success ──
+            if (result.success) {
+                await deductCredits(userId, 'photoshoot', SHOOT_COST, brandId).catch(() => {});
+                // ── Write to NexusHistory ──
+                NexusHistory.create({
+                    userId, brandId, subject: autoTagSubject(message), type: 'image',
+                    messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'AI Photoshoot generated' }],
+                    outputs: [{ type: 'image', url: result.imageUrl, prompt: message }],
+                }).catch(() => {});
+            }
+
+            const reply = result.success
+                ? `here's your AI photoshoot! 📸 tap to zoom, download, or say 'edit' to adjust`
+                : `shoot didn't work this time 😅 try uploading a clearer image and describe the setting!`;
+            sendSSE('done', { reply, language });
+            return res.end();
         }
 
+        // ── Video create intent — full pipeline ──
+        if (intentResult.intent === 'video_create') {
+            // ── Credit check (dynamic video cost — use a floor of 34 for Seedance 5s) ──
+            const creditBalance = getCreditBalance(req.user);
+            const VIDEO_COST_FLOOR = 34;
+            if (!creditBalance.unlimited && creditBalance.remaining < VIDEO_COST_FLOOR) {
+                sendSSE('done', { reply: `you need at least ${VIDEO_COST_FLOOR} credits to create a video — you have ${creditBalance.remaining} left 😬 upgrade to continue!` });
+                return res.end();
+            }
+
+            // ── History storage check ──
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount >= NexusHistory.MAX_CONVERSATIONS) {
+                sendSSE('done', { reply: `your history is full (${NexusHistory.MAX_CONVERSATIONS} conversations)! delete some old threads from the History panel first 🗂️` });
+                return res.end();
+            }
+
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+            sendSSE('intent', { intent: 'video_create' });
+            const avatarUrl = req.body.avatarUrl || null;
+            const result = await executeVideoCreate({ message, images, avatarUrl, brandId, user: req.user, brandContext: brandContextStr, brandName, sendSSE });
+
+            // ── Write to NexusHistory (frames + projectId) ──
+            NexusHistory.create({
+                userId, brandId, subject: autoTagSubject(message), type: 'video',
+                messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'Video project created' }],
+                outputs: [
+                    ...(result.frames?.map(f => ({ type: 'image', url: f.url, prompt: f.prompt })) || []),
+                    ...(result.projectId ? [{ type: 'video', url: null, prompt: `Video Studio project #${result.projectId}` }] : []),
+                ],
+            }).catch(() => {});
+
+            const reply = result.success
+                ? `video queued! 🎬 I've written the script, created storyboard frames, and sent it to our video engine — check Video Studio in ~90 seconds!`
+                : `got the script and storyboard done! head to Video Studio to generate the final video 🎬`;
+            sendSSE('done', { reply, language });
+            return res.end();
+        }
+
+        // ── Image create intent — direct execution (no SIGNAL tag dependency) ──
+        if (intentResult.intent === 'image_create') {
+            sendSSE('intent', { intent: 'image_create', prompt: message });
+
+            // Build brand context for the image
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+
+            sendSSE('step_update', { step: 'generating', label: '🎨 Creating your visual...' });
+            try {
+                const imageResult = await internalGenerateCreative({
+                    body: {
+                        brandId,
+                        prompt: [
+                            message,
+                            brandName ? `for ${brandName} brand` : '',
+                            brandContextStr ? brandContextStr.slice(0, 300) : '',
+                            'Professional commercial quality, high resolution, vibrant',
+                        ].filter(Boolean).join('. '),
+                        type: 'instagram-post',
+                        refImageUrls: images || [],
+                        options: { imageModel: 'nanobanana-2', aspectRatio: '1:1', imageSize: '1K' },
+                        source: 'nexus_image_create',
+                    },
+                    user: req.user,
+                    creditsDeducted: 0,
+                    jobId: `nexus-img-${Date.now()}`,
+                });
+                const imageUrl = imageResult?.creative?.imageUrl || imageResult?.imageUrl || null;
+                if (imageUrl) {
+                    sendSSE('image_generated', { imageUrl, prompt: message, subtype: 'generated' });
+                    NexusHistory.create({
+                        userId, brandId, subject: autoTagSubject(message), type: 'image',
+                        messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'Image generated' }],
+                        outputs: [{ type: 'image', url: imageUrl, prompt: message }],
+                    }).catch(() => {});
+                    sendSSE('done', { reply: `here's your visual! 🎨 tap to view full-size — say 'edit' to adjust, or 'photoshoot' with a product image for brand-specific results`, language });
+                } else {
+                    // Fallthrough: let Fidato handle with SIGNAL tag
+                    sendSSE('done', { reply: `couldn't generate that image 😅 try describing it differently, or upload a reference image!`, language });
+                }
+            } catch (imgErr) {
+                console.error('[Nexus image_create] Failed:', imgErr.message);
+                sendSSE('done', { reply: `image generation hit an error 😅 try again!`, language });
+            }
+            return res.end();
+        }
+
+        // ── Content create intent — dedicated copy engine ──
         if (intentResult.intent === 'content_create') {
             sendSSE('intent', { intent: 'content_create', prompt: message });
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+            const result = await executeContent({ message, brandId, brandContext: brandContextStr, brandName, user: req.user, sendSSE });
+            const reply = result.success
+                ? `here's your ${result.platform} copy! ✍️ tap Copy to use it, or hit Publish to schedule it — saved as draft in Content Studio too!`
+                : `hmm, couldn't write that copy 😅 try again with more details about what you need!`;
+            sendSSE('done', { reply, language });
+            return res.end();
         }
 
         if (intentResult.intent === 'brainstorm') {
             sendSSE('intent', { intent: 'brainstorm', prompt: message });
         }
 
-        // Creation intents — fall through to LLM streaming so Fidato handles them directly
+        // Chat + brainstorm — fall through to LLM streaming
 
         // Chat — restore history from Redis + stream the response
         const history = await getNexusHistory(userId);
@@ -1079,6 +1543,27 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         // DO NOT send TTS through SSE (200KB+ base64 breaks stream parsing)
         // Frontend calls /api/nexus/tts separately
 
+        // ── NexusHistory write-back for LLM-handled intents ──
+        try {
+            const intentType = intentToHistoryType(intentResult?.intent);
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount < NexusHistory.MAX_CONVERSATIONS) {
+                const outputs = [];
+                if (streamImageUrl) outputs.push({ type: 'image', url: streamImageUrl, prompt: streamImagePrompt });
+                if (intentType === 'content' && streamCleanReply) outputs.push({ type: 'content', url: null, prompt: streamCleanReply.slice(0, 500) });
+                NexusHistory.create({
+                    userId, brandId,
+                    subject: autoTagSubject(message),
+                    type: intentType,
+                    messages: [
+                        { role: 'user', content: message },
+                        { role: 'assistant', content: streamCleanReply?.slice(0, 1000) || '' },
+                    ],
+                    outputs,
+                }).catch(() => {});
+            }
+        } catch { /* non-blocking */ }
+
         // Send final done event
         sendSSE('done', {
             reply: streamCleanReply,
@@ -1086,6 +1571,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             voiceReady: voiceMode, // tells frontend to call /tts
             mcotAnalysis: streamMcotAnalysis || undefined,
         });
+
 
     } catch (error) {
         console.error('Nexus stream error:', error.message);
@@ -1359,6 +1845,88 @@ router.get('/notifications', protect, async (req, res) => {
     } catch (error) {
         console.error('Nexus notifications error:', error.message);
         res.json({ success: true, notifications: [], count: 0 });
+    }
+});
+
+// ============================================================================
+// GET /api/nexus/history — List conversation threads for the user
+// ============================================================================
+router.get('/history', protect, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { brandId, type, limit = 20 } = req.query;
+        const query = { userId, isDeleted: false };
+        if (brandId) query.brandId = brandId;
+        if (type) query.type = type;
+
+        const threads = await NexusHistory
+            .find(query)
+            .sort({ updatedAt: -1 })
+            .limit(parseInt(limit))
+            .select('subject type outputs isPinned createdAt updatedAt brandId')
+            .lean();
+
+        res.json({ success: true, threads, count: threads.length });
+    } catch (err) {
+        console.error('Nexus history GET error:', err.message);
+        res.json({ success: true, threads: [], count: 0 });
+    }
+});
+
+// ============================================================================
+// GET /api/nexus/history/:id — Get a single thread with full messages
+// ============================================================================
+router.get('/history/:id', protect, async (req, res) => {
+    try {
+        const thread = await NexusHistory.findOne({ _id: req.params.id, userId: req.user._id, isDeleted: false });
+        if (!thread) return res.status(404).json({ success: false, error: 'Thread not found' });
+        res.json({ success: true, thread });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ============================================================================
+// DELETE /api/nexus/history/:id — Soft-delete a conversation thread
+// ============================================================================
+router.delete('/history/:id', protect, async (req, res) => {
+    try {
+        await NexusHistory.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
+            { isDeleted: true }
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ============================================================================
+// PATCH /api/nexus/history/:id — Rename subject of a thread
+// ============================================================================
+router.patch('/history/:id', protect, async (req, res) => {
+    try {
+        const { subject, isPinned } = req.body;
+        const update = {};
+        if (subject) update.subject = subject.slice(0, 120);
+        if (typeof isPinned === 'boolean') update.isPinned = isPinned;
+        await NexusHistory.findOneAndUpdate({ _id: req.params.id, userId: req.user._id }, update);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ============================================================================
+// GET /api/nexus/history/count — Check if user is at the storage limit
+// ============================================================================
+router.get('/history/count', protect, async (req, res) => {
+    try {
+        const count = await NexusHistory.countForUser(req.user._id);
+        const max = NexusHistory.MAX_CONVERSATIONS;
+        res.json({ success: true, count, max, isFull: count >= max });
+    } catch (err) {
+        res.json({ success: true, count: 0, max: 20, isFull: false });
     }
 });
 
