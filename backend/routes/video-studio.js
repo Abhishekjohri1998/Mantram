@@ -7426,11 +7426,16 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         const {
             brandId, brief, productName, productFeatures,
             style = 'hyperrealistic', duration = '30', format = '9:16',
+            resolution = '2k',
             productImageUrls: bodyProductImgUrls,
             avatarUrl: bodyAvatarUrl,
             directorModel = 'claude',
             imageModel = 'nanobanana'
         } = req.body;
+
+        // Map resolution string to NanoBanana imageSize token
+        const RESOLUTION_TO_IMAGESIZE = { '480p': '1K', '720p': '1K', '1080p': '1K', '2k': '2K', '4k': '4K' };
+        const imageSizeForModel = RESOLUTION_TO_IMAGESIZE[resolution] || '2K';
 
         const totalDuration = Math.max(5, Math.min(300, parseInt(duration) || 30));
 
@@ -7513,7 +7518,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             avatarUrl,
             imageModel,
             rawProductBuffers,  // raw multer buffers — no re-download needed
-            rawAvatarBuffer
+            rawAvatarBuffer,
+            imageSizeForModel   // ✅ Pass resolved imageSize (e.g. '2K') to NanoBanana
         );
 
         // Upload data URI → S3 so the frontend gets a real HTTP URL (not a giant base64 blob)

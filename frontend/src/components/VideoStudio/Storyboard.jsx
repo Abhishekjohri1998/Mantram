@@ -199,6 +199,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             fd.append('style', defaultStyle);
             fd.append('duration', String(duration));
             fd.append('format', format);
+            fd.append('resolution', resolution); // ✅ Pass resolution so NanoBanana uses correct imageSize
             productImages.forEach(pi => {
                 if (typeof pi.file === 'string') fd.append('productImageUrls', pi.file);
                 else fd.append('productImages', pi.file);
@@ -252,7 +253,13 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                     duration,
                     format,
                     resolution,
-                    productImageUrls: productImages.filter(pi => typeof pi === 'string'),
+                    // ✅ FIX: productImages is always { file, preview } objects, never raw strings.
+                    // Extract the URL from .file when it's a string (scraped/S3 URL), skip File blobs.
+                    productImageUrls: productImages
+                        .map(pi => typeof pi.file === 'string' ? pi.file : null)
+                        .filter(Boolean),
+                    // ✅ Also send avatar URL if it's a string reference
+                    avatarUrl: avatarImage && typeof avatarImage.file === 'string' ? avatarImage.file : undefined,
                     model,
                     brandId: activeBrand?._id,
                 }),

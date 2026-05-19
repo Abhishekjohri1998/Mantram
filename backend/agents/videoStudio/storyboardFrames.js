@@ -63,6 +63,7 @@ export async function generateStoryboardPoster(
     imageModel = 'gpt-image-2',
     rawProductBuffers = [],
     rawAvatarBuffer = null,
+    imageSize = '2K',  // ✅ NanoBanana resolution: '1K' | '2K' | '4K'
 ) {
     const stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
     const ar = format || '16:9';
@@ -91,7 +92,7 @@ export async function generateStoryboardPoster(
     const TIMEOUT_MS = 240000;
 
     if (useNanoBanana) {
-        return await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS);
+        return await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize);
     } else {
         return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS);
     }
@@ -189,7 +190,7 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 }
 
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
-async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS) {
+async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K') {
     const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 
     try {
@@ -228,10 +229,10 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         // Text prompt last (Gemini requirement)
         parts.push({ text: finalPrompt });
 
-        console.log(`[SB Poster][NanoBanana] ${GEMINI_MODEL} | inlineData parts=${parts.filter(p => p.inlineData).length} | ar=${ar}`);
+        console.log(`[SB Poster][NanoBanana] ${GEMINI_MODEL} | inlineData parts=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${imageSize}`);
 
         const data = await Promise.race([
-            generateImageWithVertex(parts, GEMINI_MODEL, 0.4, { aspectRatio: ar, imageSize: '1K' }),
+            generateImageWithVertex(parts, GEMINI_MODEL, 0.4, { aspectRatio: ar, imageSize }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('NanoBanana timeout')), TIMEOUT_MS)),
         ]);
 
