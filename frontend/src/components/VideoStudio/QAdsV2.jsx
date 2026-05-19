@@ -616,10 +616,6 @@ function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
         <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} />
         <div className="qv2-bi-ov">
-            <button className="qv2-bi-btn preview-btn" onClick={() => onPreview(videoUrl)}>
-                <span className="material-symbols-outlined" style={{fontSize: 14}}>play_circle</span>
-                Preview
-            </button>
             {isAdmin && (
                 <button className="qv2-bi-btn template-btn" onClick={() => onSaveTemplate(project)}>
                     <span className="material-symbols-outlined" style={{fontSize: 14}}>bookmark_add</span>

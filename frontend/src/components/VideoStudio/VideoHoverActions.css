@@ -41,3 +41,38 @@
 .vha-wrapper .material-symbols-outlined {
     font-size: 16px;
 }
+
+.vha-more-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: #111;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 20;
+}
+
+.vha-more-menu button {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 6px 10px;
+    font-size: 12px;
+    gap: 8px;
+    border-radius: 4px;
+    color: white;
+}
+
+.vha-more-menu button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: none;
+}
+
+.vha-more-menu button .material-symbols-outlined {
+    font-size: 14px;
+}

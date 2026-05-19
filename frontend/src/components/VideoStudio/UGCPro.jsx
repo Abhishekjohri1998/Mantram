@@ -246,10 +246,7 @@ function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
                 <div className="ugc-video-overlay">
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v.input?.productData?.productName || 'UGC Video'}</span>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button onClick={() => onPreview(videoUrl)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(255,77,0,0.6)', backdropFilter: 'blur(8px)' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>play_circle</span> Preview
-                        </button>
+
                         {isAdmin && (
                             <button onClick={() => onSaveTemplate(v)}
                                 style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', color: '#fff', background: 'rgba(99,102,241,0.5)', backdropFilter: 'blur(8px)' }}>

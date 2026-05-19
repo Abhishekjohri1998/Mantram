@@ -617,12 +617,6 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                             return (
                                 <div key={p._id} className="has-vha" style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#111', cursor: 'pointer', aspectRatio: p.storyboard?.format === '16:9' ? '16/9' : p.storyboard?.format === '1:1' ? '1/1' : '9/16' }} onClick={() => setPreviewVideo(url)}>
                                     <video src={url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                    <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '20px', backdropFilter: 'blur(4px)' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fff' }}>play_circle</span>
-                                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>Preview</span>
-                                        </div>
-                                    </div>
                                     <VideoHoverActions videoUrl={url} onPreview={setPreviewVideo} />
                                 </div>
                             );

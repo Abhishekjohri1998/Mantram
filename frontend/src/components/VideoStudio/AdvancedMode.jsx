@@ -1189,28 +1189,6 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                 poster={posterUrl}
                             />
                             <VideoHoverActions videoUrl={videoSrc} onPreview={() => setViewVideo(viewData)} />
-                            {/* pointer-events: none on overlay, auto on buttons only */}
-                            <div className="vm-bg-overlay">
-                                <div className="vm-bg-overlay-btns">
-                                    <button className="vm-bg-overlay-btn primary" onClick={() => setViewVideo(viewData)}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>play_circle</span> View
-                                    </button>
-                                    <button className="vm-bg-overlay-btn" onClick={() => downloadVideo(videoSrc, p.title || 'video')}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span> Download
-                                    </button>
-                                    <button className="vm-bg-overlay-btn" onClick={() => setPublishUrl(videoSrc)}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>share</span> Publish
-                                    </button>
-                                    <button className="vm-bg-overlay-btn" onClick={() => handleReuse(p)}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>replay</span> Reuse
-                                    </button>
-                                    {promptText && (
-                                        <button className="vm-bg-overlay-btn" onClick={() => navigator.clipboard.writeText(promptText)}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>content_copy</span> Copy
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
                         </div>
                     )
                 })}
