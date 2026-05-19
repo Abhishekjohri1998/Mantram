@@ -30,6 +30,7 @@ import multer from 'multer';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { internalGenerateCreative } from './creatives.js';
 import jwt from 'jsonwebtoken';
+import { deductCredits, getCreditCosts, getCreditBalance } from '../middleware/credits.js';
 
 const router = Router();
 
@@ -1043,6 +1044,21 @@ router.post('/stream', protect, async (req, res) => {
 
         // ── Photoshoot intent — execute directly, skip LLM chat ──
         if (intentResult.intent === 'photoshoot' && images && images.length > 0) {
+            // ── Credit check ──
+            const creditBalance = getCreditBalance(req.user);
+            const SHOOT_COST = 25; // matches DEFAULT_CREDIT_COSTS.photoshoot
+            if (!creditBalance.unlimited && creditBalance.remaining < SHOOT_COST) {
+                sendSSE('done', { reply: `you need ${SHOOT_COST} credits for an AI photoshoot, but you only have ${creditBalance.remaining} left 😬 upgrade your plan to continue!` });
+                return res.end();
+            }
+
+            // ── History storage check ──
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount >= NexusHistory.MAX_CONVERSATIONS) {
+                sendSSE('done', { reply: `your history is full (${NexusHistory.MAX_CONVERSATIONS} conversations)! delete some old threads from the History panel before creating more 🗂️` });
+                return res.end();
+            }
+
             let brandContextStr = '', brandName = '';
             if (brandId) {
                 try {
@@ -1052,15 +1068,42 @@ router.post('/stream', protect, async (req, res) => {
             }
             sendSSE('intent', { intent: 'photoshoot' });
             const result = await executePhotoshoot({ message, images, brandId, user: req.user, brandContext: brandContextStr, brandName, sendSSE });
+
+            // ── Deduct credits on success ──
+            if (result.success) {
+                await deductCredits(userId, 'photoshoot', SHOOT_COST, brandId).catch(() => {});
+                // ── Write to NexusHistory ──
+                NexusHistory.create({
+                    userId, brandId, subject: autoTagSubject(message), type: 'image',
+                    messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'AI Photoshoot generated' }],
+                    outputs: [{ type: 'image', url: result.imageUrl, prompt: message }],
+                }).catch(() => {});
+            }
+
             const reply = result.success
-                ? 'here's your AI photoshoot! 📸 tap to zoom, download, or say \'edit\' to adjust'
-                : 'shoot didn\'t work this time 😅 try uploading a clearer image and describe the setting!';
+                ? `here's your AI photoshoot! 📸 tap to zoom, download, or say 'edit' to adjust`
+                : `shoot didn't work this time 😅 try uploading a clearer image and describe the setting!`;
             sendSSE('done', { reply, language });
             return res.end();
         }
 
         // ── Video create intent — full pipeline ──
         if (intentResult.intent === 'video_create') {
+            // ── Credit check (dynamic video cost — use a floor of 34 for Seedance 5s) ──
+            const creditBalance = getCreditBalance(req.user);
+            const VIDEO_COST_FLOOR = 34;
+            if (!creditBalance.unlimited && creditBalance.remaining < VIDEO_COST_FLOOR) {
+                sendSSE('done', { reply: `you need at least ${VIDEO_COST_FLOOR} credits to create a video — you have ${creditBalance.remaining} left 😬 upgrade to continue!` });
+                return res.end();
+            }
+
+            // ── History storage check ──
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount >= NexusHistory.MAX_CONVERSATIONS) {
+                sendSSE('done', { reply: `your history is full (${NexusHistory.MAX_CONVERSATIONS} conversations)! delete some old threads from the History panel first 🗂️` });
+                return res.end();
+            }
+
             let brandContextStr = '', brandName = '';
             if (brandId) {
                 try {
@@ -1071,9 +1114,20 @@ router.post('/stream', protect, async (req, res) => {
             sendSSE('intent', { intent: 'video_create' });
             const avatarUrl = req.body.avatarUrl || null;
             const result = await executeVideoCreate({ message, images, avatarUrl, brandId, user: req.user, brandContext: brandContextStr, brandName, sendSSE });
+
+            // ── Write to NexusHistory (frames + projectId) ──
+            NexusHistory.create({
+                userId, brandId, subject: autoTagSubject(message), type: 'video',
+                messages: [{ role: 'user', content: message }, { role: 'assistant', content: 'Video project created' }],
+                outputs: [
+                    ...(result.frames?.map(f => ({ type: 'image', url: f.url, prompt: f.prompt })) || []),
+                    ...(result.projectId ? [{ type: 'video', url: null, prompt: `Video Studio project #${result.projectId}` }] : []),
+                ],
+            }).catch(() => {});
+
             const reply = result.success
-                ? 'video queued! 🎬 I\'ve written the script, created storyboard frames, and sent it to our video engine — check Video Studio in ~90 seconds!'
-                : 'got the script and storyboard done! head to Video Studio to generate the final video 🎬';
+                ? `video queued! 🎬 I've written the script, created storyboard frames, and sent it to our video engine — check Video Studio in ~90 seconds!`
+                : `got the script and storyboard done! head to Video Studio to generate the final video 🎬`;
             sendSSE('done', { reply, language });
             return res.end();
         }
@@ -1331,6 +1385,27 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
         // DO NOT send TTS through SSE (200KB+ base64 breaks stream parsing)
         // Frontend calls /api/nexus/tts separately
 
+        // ── NexusHistory write-back for LLM-handled intents ──
+        try {
+            const intentType = intentToHistoryType(intentResult?.intent);
+            const histCount = await NexusHistory.countForUser(userId);
+            if (histCount < NexusHistory.MAX_CONVERSATIONS) {
+                const outputs = [];
+                if (streamImageUrl) outputs.push({ type: 'image', url: streamImageUrl, prompt: streamImagePrompt });
+                if (intentType === 'content' && streamCleanReply) outputs.push({ type: 'content', url: null, prompt: streamCleanReply.slice(0, 500) });
+                NexusHistory.create({
+                    userId, brandId,
+                    subject: autoTagSubject(message),
+                    type: intentType,
+                    messages: [
+                        { role: 'user', content: message },
+                        { role: 'assistant', content: streamCleanReply?.slice(0, 1000) || '' },
+                    ],
+                    outputs,
+                }).catch(() => {});
+            }
+        } catch { /* non-blocking */ }
+
         // Send final done event
         sendSSE('done', {
             reply: streamCleanReply,
@@ -1338,6 +1413,7 @@ ${brandContext ? `## Active Brand Context\n${brandContext}` : '(No brand selecte
             voiceReady: voiceMode, // tells frontend to call /tts
             mcotAnalysis: streamMcotAnalysis || undefined,
         });
+
 
     } catch (error) {
         console.error('Nexus stream error:', error.message);
