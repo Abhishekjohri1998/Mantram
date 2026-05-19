@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { nexus as nexusAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
+import AvatarPicker from './VideoStudio/AvatarPicker'
 
 // Detect mobile viewport
 const getIsMobile = () => typeof window !== 'undefined' && window.innerWidth < 640
@@ -27,11 +28,15 @@ export default function NexusBar() {
     // Rich media state
     const [lightboxUrl, setLightboxUrl] = useState(null)          // image lightbox URL
     const [lightboxZoom, setLightboxZoom] = useState(1)
+    const lightboxPinchRef = useRef({ dist: 0, zoom: 1 })         // touch pinch state
     const [videoStep, setVideoStep] = useState(null)              // current video pipeline step
     const [showHistory, setShowHistory] = useState(false)         // history panel open
     const [history, setHistory] = useState([])                    // NexusHistory threads
     const [historyFilter, setHistoryFilter] = useState('all')     // all/image/video/content/research
     const [copiedIdx, setCopiedIdx] = useState(null)              // content copy flash
+    // Avatar picker state
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+    const [pendingVideoMessage, setPendingVideoMessage] = useState(null) // deferred video message
 
     // Voice input state (mic → speech-to-text)
     const [recording, setRecording] = useState(false)
@@ -492,6 +497,31 @@ export default function NexusBar() {
                                     break
                                 }
 
+                                case 'content_ready': {
+                                    setMessages(prev => [...prev, {
+                                        role: 'content',
+                                        content: data.content,
+                                        platform: data.platform,
+                                    }])
+                                    break
+                                }
+
+                                case 'intent': {
+                                    pendingAction = data.action
+                                    setStreamingAction(data.action)
+                                    // ── Avatar intercept: video_create without images ──
+                                    if (data.intent === 'video_create' && pendingImageUrls.length === 0) {
+                                        // Show avatar picker prompt card
+                                        setMessages(prev => [...prev, {
+                                            role: 'avatar_prompt',
+                                            message: 'to make a video, I need a character or product image! 🎬 pick an avatar or upload an image below',
+                                        }])
+                                        setPendingVideoMessage(msg)
+                                        setShowAvatarPicker(true)
+                                    }
+                                    break
+                                }
+
                                 case 'status':
                                     setStreamingText(data.message || '🔍 Researching...')
                                     break
@@ -685,9 +715,15 @@ export default function NexusBar() {
         </div>
     )
 
-    // ContentCard — rich content output with copy + publish
-    const ContentCard = ({ content, idx }) => (
-        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 14, overflow: 'hidden', maxWidth: 300 }}>
+    // ContentCard — rich content output with platform badge + copy + publish
+    const ContentCard = ({ content, platform, idx }) => (
+        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 14, overflow: 'hidden', maxWidth: 'min(300px, 90vw)' }}>
+            {platform && (
+                <div style={{ padding: '6px 12px', borderBottom: '1px solid rgba(255,77,0,0.1)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#FF7A00' }}>article</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#FF7A00', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{platform}</span>
+                </div>
+            )}
             <div style={{ padding: '10px 12px', maxHeight: 160, overflowY: 'auto', fontSize: 12, color: 'var(--sys-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                 {content}
             </div>
@@ -697,6 +733,10 @@ export default function NexusBar() {
                     <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{copiedIdx === idx ? 'check' : 'content_copy'}</span>
                     {copiedIdx === idx ? 'Copied!' : 'Copy'}
                 </button>
+                <button onClick={() => navigate('/content-studio')}
+                    style={{ flex: 1, padding: '6px 0', fontSize: 10, color: '#FF7A00', background: 'transparent', border: 'none', borderLeft: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit_note</span> Edit Draft
+                </button>
                 <button onClick={() => navigate('/publish')}
                     style={{ flex: 1, padding: '6px 0', fontSize: 10, color: '#FF7A00', background: 'transparent', border: 'none', borderLeft: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 12 }}>send</span> Publish
@@ -705,13 +745,44 @@ export default function NexusBar() {
         </div>
     )
 
+    // AvatarPromptCard — inline prompt when video intent fires without image
+    const AvatarPromptCard = ({ message: cardMsg }) => (
+        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.2)', borderRadius: 14, padding: '12px 14px', maxWidth: 'min(290px, 90vw)' }}>
+            <p style={{ fontSize: 12, color: 'var(--sys-text)', marginBottom: 10 }}>{cardMsg}</p>
+            <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setShowAvatarPicker(true)}
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 10, background: 'linear-gradient(135deg,#ec4899,#f472b6)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>person</span> Pick Avatar
+                </button>
+                <label style={{ flex: 1, padding: '7px 0', borderRadius: 10, background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.2)', color: '#FF7A00', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>upload</span> Upload
+                    <input type="file" accept="image/*" hidden onChange={e => {
+                        if (e.target.files?.[0]) handleFileSelect(e.target.files)
+                    }} />
+                </label>
+            </div>
+        </div>
+    )
+
     // ScriptCard — displays the generated video script
     const ScriptCard = ({ content }) => (
-        <div style={{ background: 'rgba(255,77,0,0.06)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 12, padding: '10px 12px', maxWidth: 290 }}>
+        <div style={{ background: 'rgba(255,77,0,0.06)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 12, padding: '10px 12px', maxWidth: 'min(290px, 90vw)' }}>
             <p style={{ fontSize: 10, fontWeight: 700, color: '#FF7A00', marginBottom: 6 }}>📝 Video Script</p>
             <pre style={{ fontSize: 10, color: 'var(--sys-text)', whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', lineHeight: 1.5 }}>{content}</pre>
         </div>
     )
+
+    // Avatar picker callback — resumes deferred video message with avatar URL
+    const handleAvatarPicked = (avatar) => {
+        setShowAvatarPicker(false)
+        if (!avatar?.imageUrl) return
+        // Push avatar as a pending image then re-send the original video message
+        setPendingImageUrls([avatar.imageUrl])
+        if (pendingVideoMessage) {
+            setTimeout(() => sendMessage(pendingVideoMessage), 200)
+            setPendingVideoMessage(null)
+        }
+    }
 
     // Quick suggestions
     const suggestions = activeBrand ? [
@@ -953,18 +1024,50 @@ export default function NexusBar() {
                     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                         {messages.map((m, i) => (
                             <div key={i}>
+                                {/* ─ Rich cards (image / script / storyboard / video / content / avatar_prompt) ─ */}
                                 {m.role === 'image' ? (
                                     <div className="flex gap-2.5">
                                         <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
                                             <span className="material-symbols-outlined text-xs">support_agent</span>
                                         </div>
-                                        <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] max-w-[72vw]" style={{ background: 'var(--sys-surface)' }}>
-                                            <img src={m.imageUrl} alt={m.prompt} className="w-full object-cover" style={{ maxHeight: 220 }} />
-                                            <div className="px-3 py-1.5 flex items-center gap-1">
-                                                <p className="text-[11px] text-[var(--sys-text-muted)] flex-1 truncate">{m.prompt?.slice(0, 40)}…</p>
-                                                <ShareMenu idx={`img-${i}`} imageUrl={m.imageUrl} text={`Created with Mantram AI: ${m.imageUrl}`} />
-                                            </div>
+                                        <ImageResultCard imageUrl={m.imageUrl} prompt={m.prompt} subtype={m.subtype} />
+                                    </div>
+                                ) : m.role === 'script' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
                                         </div>
+                                        <ScriptCard content={m.content} />
+                                    </div>
+                                ) : m.role === 'storyboard' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 4, maxWidth: '80vw' }}>
+                                            {m.frames?.map((f, fi) => <img key={fi} src={f.url} alt="" style={{ flex: 1, height: 64, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }} onClick={() => setLightboxUrl(f.url)} />)}
+                                        </div>
+                                    </div>
+                                ) : m.role === 'video_queued' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
+                                        </div>
+                                        <VideoQueuedCard frames={m.frames} projectId={m.projectId} message={m.message} />
+                                    </div>
+                                ) : m.role === 'content' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
+                                        </div>
+                                        <ContentCard content={m.content} platform={m.platform} idx={`mob-${i}`} />
+                                    </div>
+                                ) : m.role === 'avatar_prompt' ? (
+                                    <div className="flex gap-2.5">
+                                        <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                            <span className="material-symbols-outlined text-xs">support_agent</span>
+                                        </div>
+                                        <AvatarPromptCard message={m.message} />
                                     </div>
                                 ) : (
                                     <div className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -1421,10 +1524,28 @@ export default function NexusBar() {
                 )}
             </div>
 
-            {/* ═══ LIGHTBOX OVERLAY ═══ */}
+            {/* ═══ LIGHTBOX OVERLAY (with touch pinch-zoom) ═══ */}
             {lightboxUrl && (
                 <div
                     onClick={() => setLightboxUrl(null)}
+                    onTouchStart={e => {
+                        if (e.touches.length === 2) {
+                            const dx = e.touches[0].clientX - e.touches[1].clientX
+                            const dy = e.touches[0].clientY - e.touches[1].clientY
+                            lightboxPinchRef.current.dist = Math.sqrt(dx * dx + dy * dy)
+                            lightboxPinchRef.current.zoom = lightboxZoom
+                        }
+                    }}
+                    onTouchMove={e => {
+                        if (e.touches.length === 2) {
+                            e.stopPropagation()
+                            const dx = e.touches[0].clientX - e.touches[1].clientX
+                            const dy = e.touches[0].clientY - e.touches[1].clientY
+                            const newDist = Math.sqrt(dx * dx + dy * dy)
+                            const ratio = newDist / (lightboxPinchRef.current.dist || 1)
+                            setLightboxZoom(Math.min(Math.max(lightboxPinchRef.current.zoom * ratio, 0.5), 4))
+                        }
+                    }}
                     style={{
                         position: 'fixed', inset: 0, zIndex: 99999,
                         background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column',
@@ -1450,14 +1571,15 @@ export default function NexusBar() {
                         <img src={lightboxUrl} alt="Preview"
                             style={{ transform: `scale(${lightboxZoom})`, transformOrigin: 'center', transition: 'transform 0.2s', maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12 }} />
                     </div>
-                    <p style={{ position: 'absolute', bottom: 16, color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Click outside to close</p>
+                    <p style={{ position: 'absolute', bottom: 16, color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Pinch to zoom · Click outside to close</p>
                 </div>
             )}
 
-            {/* ═══ HISTORY PANEL (slide-in from right) ═══ */}
+            {/* ═══ HISTORY PANEL (full-screen on mobile, 320px on desktop) ═══ */}
             {showHistory && (
                 <div style={{
-                    position: 'fixed', top: 0, right: 0, bottom: 0, width: 320,
+                    position: 'fixed', top: 0, right: 0, bottom: 0,
+                    width: window.innerWidth < 640 ? '100vw' : 320,
                     background: 'rgba(10,10,26,0.98)', borderLeft: '1px solid rgba(255,77,0,0.15)',
                     zIndex: 99998, display: 'flex', flexDirection: 'column',
                     backdropFilter: 'blur(24px)', boxShadow: '-8px 0 40px rgba(0,0,0,0.5)',
@@ -1528,6 +1650,14 @@ export default function NexusBar() {
                     </div>
                 </div>
             )}
+
+            {/* ═══ AVATAR PICKER MODAL ═══ */}
+            <AvatarPicker
+                isOpen={showAvatarPicker}
+                onClose={() => setShowAvatarPicker(false)}
+                onSelect={handleAvatarPicked}
+                activeBrand={activeBrand}
+            />
         </>
     )
 }

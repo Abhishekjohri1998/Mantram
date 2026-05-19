@@ -601,6 +601,90 @@ async function executeVideoCreate({ message, images, avatarUrl, brandId, user, b
 }
 
 /**
+ * ══════════════════════════════════════════════════════════
+ * CAPABILITY PILLAR 3 — Content Engine
+ * Generates platform-specific copy inline and saves draft
+ * ══════════════════════════════════════════════════════════
+ */
+async function executeContent({ message, brandId, brandContext, brandName, user, sendSSE }) {
+    // ── Detect platform from message ──────────────────────────────────────────
+    const lower = message.toLowerCase();
+    const platform =
+        lower.includes('instagram') ? 'Instagram' :
+        lower.includes('linkedin') ? 'LinkedIn' :
+        lower.includes('twitter') || lower.includes('x post') ? 'Twitter/X' :
+        lower.includes('facebook') ? 'Facebook' :
+        lower.includes('email') || lower.includes('newsletter') ? 'Email Newsletter' :
+        lower.includes('youtube') ? 'YouTube Description' :
+        lower.includes('blog') ? 'Blog Post' :
+        lower.includes('whatsapp') ? 'WhatsApp Status' :
+        lower.includes('ad copy') || lower.includes('advertisement') ? 'Ad Copy' :
+        'Social Media'; // fallback
+
+    sendSSE('step_update', { step: 'content', label: `✍️ Writing ${platform} copy…` });
+
+    const grokKey = process.env.GROK_API_KEY;
+    const brandCtxBlock = brandContext ? `\n\nBRAND CONTEXT:\n${brandContext.slice(0, 800)}` : '';
+    const systemPrompt = `You are a top-tier brand copywriter for ${brandName || 'this brand'}.${brandCtxBlock}
+Write compelling, platform-native ${platform} copy based on the user's brief.
+Rules:
+- Match the exact tone, format, and length conventions for ${platform}
+- Include relevant hashtags for social platforms
+- Use emojis strategically (not excessively)
+- Make it punchy, scroll-stopping, and on-brand
+- For Instagram: max 2200 chars, hook in first line
+- For LinkedIn: professional tone, story-driven, 300-800 chars
+- For Twitter/X: max 280 chars, punchy
+- For Email: subject line on first line, then body
+- Output ONLY the final copy — no preamble, no meta-commentary`;
+
+    try {
+        const resp = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${grokKey}` },
+            body: JSON.stringify({
+                model: 'grok-3-mini-fast',
+                stream: false,
+                max_tokens: 800,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: message },
+                ],
+            }),
+        });
+        const data = await resp.json();
+        const copy = data.choices?.[0]?.message?.content?.trim() || '';
+        if (!copy) return { success: false };
+
+        // ── Emit content_ready SSE (frontend renders ContentCard) ─────────────
+        sendSSE('content_ready', { content: copy, platform });
+
+        // ── Save draft to Content Studio (fire-and-forget) ────────────────────
+        if (brandId) {
+            try {
+                const baseUrl = process.env.API_BASE_URL || 'http://localhost:5000';
+                const internalToken = makeInternalToken(user._id.toString());
+                await fetch(`${baseUrl}/api/content/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
+                    body: JSON.stringify({
+                        brandId, platform, brief: message,
+                        tone: 'brand-aligned', type: 'nexus_generated',
+                        content: copy, draft: true,
+                    }),
+                    signal: AbortSignal.timeout(15000),
+                }).catch(() => {});
+            } catch { /* non-blocking */ }
+        }
+
+        return { success: true, copy, platform };
+    } catch (err) {
+        console.error('[Nexus Content] Failed:', err.message);
+        return { success: false };
+    }
+}
+
+/**
  * Detect if a query would benefit from live web search
  */
 function needsWebSearch(message) {
@@ -1136,15 +1220,29 @@ router.post('/stream', protect, async (req, res) => {
             sendSSE('intent', { intent: 'image_create', prompt: message });
         }
 
+        // ── Content create intent — dedicated copy engine ──
         if (intentResult.intent === 'content_create') {
             sendSSE('intent', { intent: 'content_create', prompt: message });
+            let brandContextStr = '', brandName = '';
+            if (brandId) {
+                try {
+                    const { brandContext: ctx, brand } = await agentUtils.loadBrandContext(brandId);
+                    brandContextStr = ctx || ''; brandName = brand?.name || '';
+                } catch (e) { /* silent */ }
+            }
+            const result = await executeContent({ message, brandId, brandContext: brandContextStr, brandName, user: req.user, sendSSE });
+            const reply = result.success
+                ? `here's your ${result.platform} copy! ✍️ tap Copy to use it, or hit Publish to schedule it — saved as draft in Content Studio too!`
+                : `hmm, couldn't write that copy 😅 try again with more details about what you need!`;
+            sendSSE('done', { reply, language });
+            return res.end();
         }
 
         if (intentResult.intent === 'brainstorm') {
             sendSSE('intent', { intent: 'brainstorm', prompt: message });
         }
 
-        // Creation intents — fall through to LLM streaming so Fidato handles them directly
+        // Chat + brainstorm — fall through to LLM streaming
 
         // Chat — restore history from Redis + stream the response
         const history = await getNexusHistory(userId);
