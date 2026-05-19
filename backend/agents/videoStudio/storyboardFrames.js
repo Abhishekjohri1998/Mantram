@@ -146,9 +146,11 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             fd.append('quality', 'high');
             fd.append('n', '1');
             fd.append('response_format', 'b64_json');
+            // ✅ FIX: GPT Image 2 /images/edits uses 'image' (singular) not 'image[]'
+            // Multiple images require separate 'image' entries (some proxies support array)
             refBuffers.forEach(({ buffer, mimeType }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
-                fd.append('image[]', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
+                fd.append('image', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',
@@ -191,7 +193,9 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
 async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K') {
-    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
+    // ✅ FIX: gemini-3.1-flash-image-preview is IMAGE OUTPUT ONLY — it cannot read input images.
+    // gemini-2.0-flash-exp supports both image INPUT (reference) and image OUTPUT (generation).
+    const GEMINI_MODEL = 'gemini-2.0-flash-exp';
 
     try {
         const { generateImageWithVertex } = await import('../../services/vertexImage.js');
@@ -229,10 +233,18 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         // Text prompt last (Gemini requirement)
         parts.push({ text: finalPrompt });
 
-        console.log(`[SB Poster][NanoBanana] ${GEMINI_MODEL} | inlineData parts=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${imageSize}`);
+        const hasReferenceImages = parts.filter(p => p.inlineData).length > 0;
+        // gemini-2.0-flash-exp reads reference images but doesn't support imageSize token ('1K'/'2K')
+        // When we have references, use gemini-2.0-flash-exp. When no references, use gemini-3.1 for quality.
+        const activeModel = hasReferenceImages ? 'gemini-2.0-flash-exp' : 'gemini-3.1-flash-image-preview';
+        const imageConfigObj = hasReferenceImages
+            ? { aspectRatio: ar }               // 2.0 only supports aspectRatio
+            : { aspectRatio: ar, imageSize };    // 3.1 supports imageSize too
+
+        console.log(`[SB Poster][NanoBanana] ${activeModel} | refs=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${hasReferenceImages ? 'model-default' : imageSize}`);
 
         const data = await Promise.race([
-            generateImageWithVertex(parts, GEMINI_MODEL, 0.4, { aspectRatio: ar, imageSize }),
+            generateImageWithVertex(parts, activeModel, 0.4, imageConfigObj),
             new Promise((_, reject) => setTimeout(() => reject(new Error('NanoBanana timeout')), TIMEOUT_MS)),
         ]);
 

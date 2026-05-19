@@ -95,7 +95,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('2k');
     const [directorModel, setDirectorModel] = useState('claude'); // 'claude' or 'gemini'
-    const [imageModel, setImageModel] = useState('gpt-image-2'); // 'nanobanana' or 'gemini'
+    const [imageModel, setImageModel] = useState('nanobanana-2'); // default: NanoBanana 2 (gemini-2.0-flash-exp) supports reference image input
 
     // ── Generated storyboard state ──
     const [phase, setPhase] = useState('input'); // 'input' | 'directing' | 'storyboarding' | 'review' | 'animating' | 'complete'
