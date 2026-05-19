@@ -24,6 +24,15 @@ export default function NexusBar() {
     const [streamingText, setStreamingText] = useState('')
     const [streamingAction, setStreamingAction] = useState(null)
 
+    // Rich media state
+    const [lightboxUrl, setLightboxUrl] = useState(null)          // image lightbox URL
+    const [lightboxZoom, setLightboxZoom] = useState(1)
+    const [videoStep, setVideoStep] = useState(null)              // current video pipeline step
+    const [showHistory, setShowHistory] = useState(false)         // history panel open
+    const [history, setHistory] = useState([])                    // NexusHistory threads
+    const [historyFilter, setHistoryFilter] = useState('all')     // all/image/video/content/research
+    const [copiedIdx, setCopiedIdx] = useState(null)              // content copy flash
+
     // Voice input state (mic → speech-to-text)
     const [recording, setRecording] = useState(false)
     const [transcribing, setTranscribing] = useState(false)
@@ -402,7 +411,7 @@ export default function NexusBar() {
 
                             switch (currentEvent) {
                                 case 'token': {
-                                    accumulatedText += (data.t || '')
+                                    accumulatedText += (data.t || data.token || '')
                                     const displayText = stripThink(accumulatedText)
                                     setStreamingText(displayText)
                                     break
@@ -413,10 +422,43 @@ export default function NexusBar() {
                                     setStreamingAction(data.action)
                                     break
 
+                                case 'step_update':
+                                    // Video pipeline step tracker
+                                    setVideoStep(data)
+                                    setStreamingText(data.label || '⚙️ Working...')
+                                    break
+
+                                case 'script_ready':
+                                    setMessages(prev => [...prev, {
+                                        role: 'script',
+                                        content: data.script || '',
+                                    }])
+                                    break
+
+                                case 'storyboard_ready':
+                                    if (data.frames?.length) {
+                                        setMessages(prev => [...prev, {
+                                            role: 'storyboard',
+                                            frames: data.frames,
+                                        }])
+                                    }
+                                    break
+
+                                case 'video_queued':
+                                    setVideoStep(null)
+                                    setMessages(prev => [...prev, {
+                                        role: 'video_queued',
+                                        projectId: data.projectId,
+                                        frames: data.frames,
+                                        message: data.message,
+                                    }])
+                                    break
+
                                 case 'done': {
                                     const rawFinal = data.reply || accumulatedText
                                     const finalReply = stripThink(rawFinal)
                                     setStreamingText('')
+                                    setVideoStep(null)
                                     setMessages(prev => [...prev, {
                                         role: 'assistant',
                                         content: finalReply,
@@ -433,6 +475,7 @@ export default function NexusBar() {
 
                                 case 'error':
                                     setStreamingText('')
+                                    setVideoStep(null)
                                     setMessages(prev => [...prev, {
                                         role: 'assistant',
                                         content: data.message || 'oops, try again? 😊'
@@ -440,17 +483,16 @@ export default function NexusBar() {
                                     break
 
                                 case 'image_generated': {
-                                    // Fidato generated an image inline — show preview card
                                     setMessages(prev => [...prev, {
                                         role: 'image',
                                         imageUrl: data.imageUrl,
                                         prompt: data.prompt,
+                                        subtype: data.subtype || 'generated',
                                     }])
                                     break
                                 }
 
                                 case 'status':
-                                    // Show search/research status
                                     setStreamingText(data.message || '🔍 Researching...')
                                     break
                             }
@@ -524,6 +566,152 @@ export default function NexusBar() {
             ? `Ask Fidato about ${activeBrand.name}... (⌘K)`
             : 'Ask Fidato anything... (⌘K)'
     }
+
+    // ══════════════════════════════════════════════
+    // COPY TEXT HELPER
+    // ══════════════════════════════════════════════
+    const copyText = (text, idx) => {
+        try { navigator.clipboard.writeText(text) } catch { document.execCommand('copy') }
+        setCopiedIdx(idx)
+        setTimeout(() => setCopiedIdx(null), 2000)
+    }
+
+    // ══════════════════════════════════════════════
+    // HISTORY PANEL
+    // ══════════════════════════════════════════════
+    const loadHistory = async () => {
+        try {
+            const token = localStorage.getItem('mantram_token')
+            const params = new URLSearchParams()
+            if (brandId) params.set('brandId', brandId)
+            if (historyFilter !== 'all') params.set('type', historyFilter)
+            const resp = await fetch(`${API_BASE}/nexus/history?${params}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            const data = await resp.json()
+            if (data.success) setHistory(data.threads || [])
+        } catch { /* silent */ }
+    }
+
+    useEffect(() => {
+        if (showHistory) loadHistory()
+    }, [showHistory, historyFilter, brandId])
+
+    // ══════════════════════════════════════════════
+    // RICH RESULT CARD RENDERERS
+    // ══════════════════════════════════════════════
+
+    // ImageResultCard — premium image viewer with zoom / download
+    const ImageResultCard = ({ imageUrl, prompt, subtype }) => (
+        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.2)', borderRadius: 16, overflow: 'hidden', maxWidth: 280 }}>
+            <div style={{ position: 'relative', cursor: 'zoom-in' }} onClick={() => { setLightboxUrl(imageUrl); setLightboxZoom(1) }}>
+                <img src={imageUrl} alt={prompt} style={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }} />
+                <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: '3px 6px', fontSize: 10, color: '#fff' }}>
+                    {subtype === 'photoshoot' ? '📸 AI Photoshoot' : '🎨 Generated'}
+                </div>
+            </div>
+            <div style={{ padding: '8px 10px' }}>
+                <p style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prompt?.slice(0, 50)}…</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setLightboxUrl(imageUrl)}
+                        style={{ flex: 1, padding: '4px 0', borderRadius: 8, background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.2)', color: '#FF7A00', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>zoom_in</span> Zoom
+                    </button>
+                    <a href={imageUrl} download="fidato-image.png"
+                        style={{ flex: 1, padding: '4px 0', borderRadius: 8, background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.2)', color: '#FF7A00', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, textDecoration: 'none' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>download</span> Save
+                    </a>
+                    <ShareMenu idx={`img-${imageUrl}`} imageUrl={imageUrl} text="Created with Mantram AI" />
+                </div>
+            </div>
+        </div>
+    )
+
+    // VideoProgressCard — animated step tracker
+    const VideoProgressCard = ({ step }) => {
+        const steps = [
+            { id: 'script', label: 'Writing script', icon: 'edit_note' },
+            { id: 'storyboard', label: 'Creating frames', icon: 'photo_library' },
+            { id: 'video', label: 'Generating video', icon: 'movie_creation' },
+        ]
+        const activeIdx = steps.findIndex(s => s.id === step?.step)
+        return (
+            <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.2)', borderRadius: 16, padding: '12px 14px', maxWidth: 280 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#FF7A00', marginBottom: 10 }}>🎬 Creating your video</p>
+                {steps.map((s, i) => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{
+                            width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                            background: i < activeIdx ? '#22c55e' : i === activeIdx ? '#FF4D00' : 'rgba(255,255,255,0.06)',
+                            color: i <= activeIdx ? '#fff' : 'var(--sys-text-muted)',
+                            transition: 'all 0.3s',
+                        }}>
+                            {i < activeIdx
+                                ? <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check</span>
+                                : i === activeIdx
+                                    ? <span className="material-symbols-outlined" style={{ fontSize: 12, animation: 'spin 1s linear infinite' }}>{s.icon}</span>
+                                    : <span style={{ fontSize: 10 }}>{i + 1}</span>
+                            }
+                        </div>
+                        <span style={{ fontSize: 11, color: i <= activeIdx ? 'var(--sys-text)' : 'var(--sys-text-muted)', fontWeight: i === activeIdx ? 600 : 400 }}>{s.label}</span>
+                        {i === activeIdx && <span style={{ marginLeft: 'auto', width: 16, height: 16, borderRadius: '50%', border: '2px solid #FF4D00', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />}
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
+    // VideoQueuedCard — shows script + frames + queued status
+    const VideoQueuedCard = ({ frames, projectId, message }) => (
+        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.2)', borderRadius: 16, overflow: 'hidden', maxWidth: 300 }}>
+            {frames?.length > 0 && (
+                <div style={{ display: 'flex', gap: 2, padding: '8px 8px 0' }}>
+                    {frames.slice(0, 4).map((f, i) => (
+                        <img key={i} src={f.url} alt="" style={{ flex: 1, height: 56, objectFit: 'cover', borderRadius: 8 }} />
+                    ))}
+                </div>
+            )}
+            <div style={{ padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 700 }}>✅ Video queued</span>
+                    {projectId && <span style={{ fontSize: 9, color: 'var(--sys-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 4 }}>#{projectId.toString().slice(-6)}</span>}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>{message}</p>
+                <button onClick={() => { navigate('/video-studio'); setOpen(false) }}
+                    style={{ marginTop: 8, width: '100%', padding: '5px 0', borderRadius: 8, background: 'rgba(255,77,0,0.1)', border: '1px solid rgba(255,77,0,0.2)', color: '#FF7A00', fontSize: 11, cursor: 'pointer' }}>
+                    Open Video Studio →
+                </button>
+            </div>
+        </div>
+    )
+
+    // ContentCard — rich content output with copy + publish
+    const ContentCard = ({ content, idx }) => (
+        <div style={{ background: 'var(--sys-surface)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 14, overflow: 'hidden', maxWidth: 300 }}>
+            <div style={{ padding: '10px 12px', maxHeight: 160, overflowY: 'auto', fontSize: 12, color: 'var(--sys-text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {content}
+            </div>
+            <div style={{ display: 'flex', borderTop: '1px solid var(--sys-border)' }}>
+                <button onClick={() => copyText(content, idx)}
+                    style={{ flex: 1, padding: '6px 0', fontSize: 10, color: copiedIdx === idx ? '#22c55e' : '#FF7A00', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{copiedIdx === idx ? 'check' : 'content_copy'}</span>
+                    {copiedIdx === idx ? 'Copied!' : 'Copy'}
+                </button>
+                <button onClick={() => navigate('/publish')}
+                    style={{ flex: 1, padding: '6px 0', fontSize: 10, color: '#FF7A00', background: 'transparent', border: 'none', borderLeft: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>send</span> Publish
+                </button>
+            </div>
+        </div>
+    )
+
+    // ScriptCard — displays the generated video script
+    const ScriptCard = ({ content }) => (
+        <div style={{ background: 'rgba(255,77,0,0.06)', border: '1px solid rgba(255,77,0,0.15)', borderRadius: 12, padding: '10px 12px', maxWidth: 290 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#FF7A00', marginBottom: 6 }}>📝 Video Script</p>
+            <pre style={{ fontSize: 10, color: 'var(--sys-text)', whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit', lineHeight: 1.5 }}>{content}</pre>
+        </div>
+    )
 
     // Quick suggestions
     const suggestions = activeBrand ? [
@@ -969,6 +1157,11 @@ export default function NexusBar() {
                                     title={expanded ? 'Collapse' : 'Expand'}>
                                     <span className="material-symbols-outlined text-xs">{expanded ? 'collapse_content' : 'expand_content'}</span>
                                 </button>
+                            <button onClick={() => setShowHistory(h => !h)}
+                                className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
+                                title="Conversation history">
+                                <span className="material-symbols-outlined text-xs">history</span>
+                            </button>
                             <button onClick={clearChat}
                                 className="size-7 rounded-lg bg-[var(--sys-surface)] flex items-center justify-center text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all"
                                 title="Clear chat">
@@ -985,23 +1178,36 @@ export default function NexusBar() {
                             style={{ maxHeight: expanded ? 'calc(75vh - 180px)' : 320 }}>
                             {messages.map((m, i) => (
                                 <div key={i}>
-                                    {/* ── Image card (Fidato-generated) ── */}
                                     {m.role === 'image' ? (
                                         <div className="flex gap-2.5">
                                             <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
                                                 style={{ background: 'var(--sys-primary)' }}>
                                                 <span className="material-symbols-outlined text-[10px]">support_agent</span>
                                             </div>
-                                            <div className="rounded-2xl overflow-hidden border border-[var(--sys-border)] max-w-[240px]"
-                                                style={{ background: 'var(--sys-surface)' }}>
-                                                <img src={m.imageUrl} alt={m.prompt}
-                                                    className="w-full object-cover"
-                                                    style={{ maxHeight: 200 }} />
-                                                <div className="px-2 py-1.5 flex items-center gap-1">
-                                                    <p className="text-[10px] text-[var(--sys-text-muted)] flex-1 truncate">{m.prompt?.slice(0, 35)}…</p>
-                                                    <ShareMenu idx={`img-${i}`} imageUrl={m.imageUrl} text={`Created with Mantram AI: ${m.imageUrl}`} />
-                                                </div>
+                                            <ImageResultCard imageUrl={m.imageUrl} prompt={m.prompt} subtype={m.subtype} />
+                                        </div>
+                                    ) : m.role === 'script' ? (
+                                        <div className="flex gap-2.5">
+                                            <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-white text-[10px]" style={{ background: 'var(--sys-primary)' }}>
+                                                <span className="material-symbols-outlined text-[10px]">support_agent</span>
                                             </div>
+                                            <ScriptCard content={m.content} />
+                                        </div>
+                                    ) : m.role === 'storyboard' ? (
+                                        <div className="flex gap-2.5">
+                                            <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-white text-[10px]" style={{ background: 'var(--sys-primary)' }}>
+                                                <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 4, maxWidth: 260 }}>
+                                                {m.frames?.map((f, fi) => <img key={fi} src={f.url} alt="" style={{ flex: 1, height: 56, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }} onClick={() => setLightboxUrl(f.url)} />)}
+                                            </div>
+                                        </div>
+                                    ) : m.role === 'video_queued' ? (
+                                        <div className="flex gap-2.5">
+                                            <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-white text-[10px]" style={{ background: 'var(--sys-primary)' }}>
+                                                <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                            </div>
+                                            <VideoQueuedCard frames={m.frames} projectId={m.projectId} message={m.message} />
                                         </div>
                                     ) : (
                                         /* ── Regular message (user / assistant) ── */
@@ -1052,12 +1258,18 @@ export default function NexusBar() {
                                 </div>
                             ))}
 
-                            {/* Live streaming text */}
-                            {streamingText && (
+                            {/* Live streaming text or VideoProgressCard */}
+                            {videoStep && loading ? (
                                 <div className="flex gap-2.5">
-                                    <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
-                                        style={{ background: 'var(--sys-primary)' }}>
-                                        <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                                    <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                        <span className="material-symbols-outlined text-xs">support_agent</span>
+                                    </div>
+                                    <VideoProgressCard step={videoStep} />
+                                </div>
+                            ) : streamingText ? (
+                                <div className="flex gap-2.5">
+                                    <div className="size-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style={{ background: 'var(--sys-primary)' }}>
+                                        <span className="material-symbols-outlined text-xs">support_agent</span>
                                     </div>
                                     <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-sm bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[13px] text-[var(--sys-text)] leading-relaxed"
                                         style={{ whiteSpace: 'pre-wrap' }}>
@@ -1065,12 +1277,12 @@ export default function NexusBar() {
                                         <span className="inline-block w-1.5 h-4 bg-[#FF4D00] ml-0.5 rounded-sm animate-pulse" />
                                     </div>
                                 </div>
-                            )}
+                            ) : null}
 
                             {/* Loading dots */}
-                            {loading && !streamingText && (
+                            {loading && !streamingText && !videoStep && (
                                 <div className="flex gap-2.5">
-                                    <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-[var(--sys-text)] text-[10px]"
+                                    <div className="size-6 rounded-full shrink-0 flex items-center justify-center text-white text-[10px]"
                                         style={{ background: 'var(--sys-primary)' }}>
                                         <span className="material-symbols-outlined text-[10px]">support_agent</span>
                                     </div>
@@ -1208,7 +1420,114 @@ export default function NexusBar() {
                     </button>
                 )}
             </div>
+
+            {/* ═══ LIGHTBOX OVERLAY ═══ */}
+            {lightboxUrl && (
+                <div
+                    onClick={() => setLightboxUrl(null)}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 99999,
+                        background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)',
+                    }}
+                >
+                    <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 8 }}
+                        onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setLightboxZoom(z => Math.min(z + 0.5, 4))}
+                            style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>+</button>
+                        <button onClick={() => setLightboxZoom(z => Math.max(z - 0.5, 0.5))}
+                            style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>−</button>
+                        <a href={lightboxUrl} download="fidato-image.png"
+                            style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,77,0,0.2)', border: '1px solid rgba(255,77,0,0.3)', color: '#FF7A00', fontSize: 13, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                            onClick={e => e.stopPropagation()}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span> Save
+                        </a>
+                        <button onClick={() => setLightboxUrl(null)}
+                            style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>✕</button>
+                    </div>
+                    <div style={{ overflow: 'auto', maxWidth: '96vw', maxHeight: '88vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={e => e.stopPropagation()}>
+                        <img src={lightboxUrl} alt="Preview"
+                            style={{ transform: `scale(${lightboxZoom})`, transformOrigin: 'center', transition: 'transform 0.2s', maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12 }} />
+                    </div>
+                    <p style={{ position: 'absolute', bottom: 16, color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Click outside to close</p>
+                </div>
+            )}
+
+            {/* ═══ HISTORY PANEL (slide-in from right) ═══ */}
+            {showHistory && (
+                <div style={{
+                    position: 'fixed', top: 0, right: 0, bottom: 0, width: 320,
+                    background: 'rgba(10,10,26,0.98)', borderLeft: '1px solid rgba(255,77,0,0.15)',
+                    zIndex: 99998, display: 'flex', flexDirection: 'column',
+                    backdropFilter: 'blur(24px)', boxShadow: '-8px 0 40px rgba(0,0,0,0.5)',
+                }}>
+                    {/* Header */}
+                    <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,77,0,0.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#FF7A00' }}>history</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)', flex: 1 }}>Conversation History</span>
+                        <button onClick={() => setShowHistory(false)}
+                            style={{ background: 'none', border: 'none', color: 'var(--sys-text-muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    </div>
+                    {/* Filter tabs */}
+                    <div style={{ display: 'flex', gap: 4, padding: '8px 12px', borderBottom: '1px solid rgba(255,77,0,0.08)', overflowX: 'auto' }}>
+                        {['all', 'image', 'video', 'content', 'research'].map(f => (
+                            <button key={f} onClick={() => setHistoryFilter(f)}
+                                style={{
+                                    padding: '4px 10px', borderRadius: 20, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap',
+                                    background: historyFilter === f ? 'rgba(255,77,0,0.2)' : 'rgba(255,255,255,0.04)',
+                                    border: historyFilter === f ? '1px solid rgba(255,77,0,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                                    color: historyFilter === f ? '#FF7A00' : 'var(--sys-text-muted)',
+                                    textTransform: 'capitalize',
+                                }}>
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Thread list */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+                        {history.length === 0 ? (
+                            <div style={{ textAlign: 'center', marginTop: 40, color: 'var(--sys-text-muted)', fontSize: 12 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>chat_bubble_outline</span>
+                                No conversations yet
+                            </div>
+                        ) : history.map(thread => (
+                            <div key={thread._id} style={{
+                                padding: '10px 12px', borderRadius: 12, marginBottom: 6, cursor: 'pointer',
+                                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                                transition: 'all 0.2s',
+                            }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,77,0,0.06)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#FF7A00', marginTop: 1, flexShrink: 0 }}>
+                                        {thread.type === 'image' ? 'image' : thread.type === 'video' ? 'movie' : thread.type === 'content' ? 'article' : 'chat_bubble'}
+                                    </span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 12, color: 'var(--sys-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{thread.subject}</p>
+                                        <p style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 2 }}>{new Date(thread.updatedAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <button onClick={async (e) => {
+                                        e.stopPropagation()
+                                        const token = localStorage.getItem('mantram_token')
+                                        await fetch(`${API_BASE}/nexus/history/${thread._id}`, {
+                                            method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {}
+                                        })
+                                        loadHistory()
+                                    }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: 14, padding: 2 }}
+                                        title="Delete thread">✕</button>
+                                </div>
+                                {thread.outputs?.[0]?.url && (
+                                    <img src={thread.outputs[0].url} alt="" style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 8, marginTop: 6 }} />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,77,0,0.08)', fontSize: 10, color: 'var(--sys-text-muted)', textAlign: 'center' }}>
+                        {history.length}/20 conversations used
+                    </div>
+                </div>
+            )}
         </>
     )
 }
-
