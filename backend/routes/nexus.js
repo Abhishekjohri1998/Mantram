@@ -366,7 +366,7 @@ function classifyIntent(message) {
 
     // Content creation intents — expanded to catch tweet/reel/story/tiktok variants
     if (
-        /\b(write|create|generate|draft|give\s+me|make)\s+(a\s+|me\s+a\s+|me\s+)?(post|blog|caption|article|newsletter|content|copy|script|tweet|reel|tiktok|story|status|bio|tagline|slogan|ad\s+copy|email|pitch|dm|message|announcement|thread)\b/i.test(lower) ||
+        /\b(write|create|generate|draft|give\s+me|make)\s+(a\s+|an\s+|the\s+|some\s+|me\s+a\s+|me\s+an\s+|me\s+some\s+|me\s+)?(post|blog|caption|article|newsletter|content|copy|script|tweet|reel|tiktok|story|status|bio|tagline|slogan|ad\s+copy|email|pitch|dm|message|announcement|thread)\b/i.test(lower) ||
         /\b(instagram|linkedin|twitter|x\s+post|facebook|youtube|whatsapp|pinterest|snapchat)\s+(caption|post|copy|content|bio|story|reel|thread)\b/i.test(lower) ||
         /\b(write|draft|create)\s+(content|copy)\b/i.test(lower)
     ) {
@@ -379,7 +379,7 @@ function classifyIntent(message) {
     }
 
     // Video creation intent — full pipeline
-    if (/\b(create|make|generate|produce)\s+(a\s+)?(video|promo|ad\s+film|reel|short\s+film|video\s+ad|promotional\s+video|brand\s+video|product\s+video|youtube\s+video|tiktok\s+video)\b/i.test(lower)) {
+    if (/\b(create|make|generate|produce)\s+(a\s+|an\s+|the\s+|some\s+)?(\d+\s*sec(ond)?s?\s+)?(video|promo|ad|commercial|ad\s+film|reel|short\s+film|video\s+ad|promotional\s+video|brand\s+video|product\s+video|youtube\s+video|tiktok\s+video)\b/i.test(lower)) {
         return { intent: 'video_create', studioTarget: 'video' };
     }
 
@@ -591,7 +591,7 @@ async function executeVideoCreate({ message, images, avatarUrl, brandId, user, b
             projectId,
             script,
             frames: frameUrls,
-            message: 'your video is being generated! check Video Studio in 60-90 seconds, or I'll notify you when it's ready 🎬',
+            message: "your video is being generated! check Video Studio in 60-90 seconds, or I'll notify you when it's ready 🎬",
         });
         return { success: true, projectId };
     } catch (err) {

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { nexus as nexusAPI } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import AvatarPicker from './VideoStudio/AvatarPicker'
-
+import PublishModal from './PublishModal'
 // Detect mobile viewport
 const getIsMobile = () => typeof window !== 'undefined' && window.innerWidth < 640
 
@@ -37,6 +37,7 @@ export default function NexusBar() {
     // Avatar picker state
     const [showAvatarPicker, setShowAvatarPicker] = useState(false)
     const [pendingVideoMessage, setPendingVideoMessage] = useState(null) // deferred video message
+    const [publishModalData, setPublishModalData] = useState(null) // data for publish modal
 
     // Voice input state (mic → speech-to-text)
     const [recording, setRecording] = useState(false)
@@ -733,7 +734,7 @@ export default function NexusBar() {
                     style={{ flex: 1, padding: '6px 0', fontSize: 10, color: '#FF7A00', background: 'transparent', border: 'none', borderLeft: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit_note</span> Edit Draft
                 </button>
-                <button onClick={() => navigate('/publish')}
+                <button onClick={() => setPublishModalData({ content, platform })}
                     style={{ flex: 1, padding: '6px 0', fontSize: 10, color: '#FF7A00', background: 'transparent', border: 'none', borderLeft: '1px solid var(--sys-border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 12 }}>send</span> Publish
                 </button>
@@ -1641,8 +1642,13 @@ export default function NexusBar() {
                             </div>
                         ))}
                     </div>
-                    <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,77,0,0.08)', fontSize: 10, color: 'var(--sys-text-muted)', textAlign: 'center' }}>
-                        {history.length}/20 conversations used
+                    <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,77,0,0.08)', fontSize: 10, color: 'var(--sys-text-muted)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div>{history.length}/20 conversations used</div>
+                        {history.length >= 20 && (
+                            <button onClick={() => navigate('/billing')} style={{ color: '#FF7A00', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', fontSize: 11 }}>
+                                Increase Space
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -1653,6 +1659,14 @@ export default function NexusBar() {
                 onClose={() => setShowAvatarPicker(false)}
                 onSelect={handleAvatarPicked}
                 activeBrand={activeBrand}
+            />
+
+            <PublishModal
+                isOpen={!!publishModalData}
+                onClose={() => setPublishModalData(null)}
+                defaultText={publishModalData?.content || ''}
+                defaultImage={null}
+                brandId={activeBrand?._id}
             />
         </>
     )

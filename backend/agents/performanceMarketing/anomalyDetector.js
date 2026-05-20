@@ -58,7 +58,9 @@ export async function detectAnomalies(userId, brandId) {
             // Use budget as baseline for budget-exceeded
             let baselineValue;
             if (anomalyType === 'budget-exceeded') {
-                baselineValue = campaign.budget?.daily || 0;
+                // Fix: perf.spend is total spend, so comparing it against daily budget causes false positives.
+                // We must compare total spend against total budget.
+                baselineValue = campaign.budget?.total || 0;
                 if (baselineValue === 0) continue;
             } else {
                 // Use predicted/historical values as baseline

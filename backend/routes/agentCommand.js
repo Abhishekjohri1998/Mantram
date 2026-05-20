@@ -181,7 +181,7 @@ ${brandContext}
 
 "POST" = IMAGE. When a user says "create a post", "make a poster", "women's day post", "Diwali post", "social media post", "Instagram post", "banner", "creative", "design", "visual" — they want an IMAGE, not text. Intent = "creative".
 
-"VIDEO" = VIDEO generation. When a user says "create a video", "animate", "make it move", "make a reel", "generate video", "motion", "cinematic video" — they want a VIDEO. Intent = "video".
+"VIDEO" = VIDEO generation. When a user says "create a video", "animate", "make it move", "make a reel", "generate video", "motion", "cinematic video", or specifies a duration like "15 second ad" or "30 sec reel" — they want a VIDEO. Intent = "video".
 
 "CAPTION" = TEXT. When a user says "write a caption", "write copy", "write text", "draft a message", "email copy" — they want text only. Intent = "content".
 
@@ -343,6 +343,50 @@ RESPONSE FORMAT — respond in STRICT JSON:
             } catch (imgErr) {
                 console.warn('Image generation in agent-command failed:', imgErr.message);
                 // Still return the prompt — user can use it in Creative Studio
+            }
+        }
+
+        // ===== VIDEO INTENT — Auto-queue the video generation =====
+        if (parsed.type === 'result' && parsed.intent === 'video' && parsed.data?.prompt) {
+            console.log(`🎥 Agent: Auto-queuing video generation for brand: ${brand?.name || 'none'}`);
+            try {
+                if (!brandId) {
+                    parsed.message = "I've drafted a cinematic video prompt. Select a brand to generate the video.";
+                } else {
+                    const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
+                    const jwt = (await import('jsonwebtoken')).default;
+                    const internalToken = jwt.sign(
+                        { _id: req.user?._id || 'agent', email: req.user?.email || 'agent', plan: 'pro', role: 'admin' },
+                        process.env.JWT_SECRET || 'mantram-secret',
+                        { expiresIn: '5m' }
+                    );
+
+                    const videoResp = await fetch(`${baseUrl}/api/video-studio/advanced/generate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${internalToken}`,
+                        },
+                        body: JSON.stringify({
+                            model: 'seedance-2.0',
+                            prompt: parsed.data.prompt,
+                            duration: parsed.data.duration || 5,
+                            aspectRatio: parsed.data.aspectRatio || "16:9",
+                            qualityMode: 'quality',
+                            brandId: brandId,
+                            source: 'agent_command',
+                        }),
+                    });
+
+                    if (videoResp.ok) {
+                        parsed.message = "I've drafted the scene and queued your video generation! It will take a few minutes to render. You can check its progress in the Video Studio.";
+                    } else {
+                        throw new Error(`Video API returned ${videoResp.status}`);
+                    }
+                }
+            } catch (vidErr) {
+                console.warn('Video queueing in agent-command failed:', vidErr.message);
+                parsed.message = "I've drafted the scene, but there was an error queueing the video. You can open it in the Studio to try again.";
             }
         }
 
