@@ -24,6 +24,7 @@ async function api(path, opts = {}) {
 const MODELS = {
     'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
     'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
+    'seedance-2.0-fast': { id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.05, desc: "Ultra-fast generation for testing and rapid prototyping." },
     'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
     'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5, 8, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
     'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5, 10, 20, 30, 45, 60], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
@@ -574,16 +575,16 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     // ── Compose form state ──
     const [publishUrl, setPublishUrl] = useState(null)
     const [showAdvancedOpts, setShowAdvancedOpts] = useState(false)
-    const [model, setModel] = useState('seedance-2.0')
+    const [model, setModel] = useState('seedance-2.0-fast')
     const [prompt, setPrompt] = useState('')
     const [negativePrompt, setNegativePrompt] = useState('')
     const [seed, setSeed] = useState(-1)
     const [cfgScale, setCfgScale] = useState(7)
     const [zhPrompt, setZhPrompt] = useState('')
-    const [duration, setDuration] = useState(6)
-    const [aspectRatio, setAspectRatio] = useState('16:9')
+    const [duration, setDuration] = useState(5)
+    const [aspectRatio, setAspectRatio] = useState('9:16')
     const [quality, setQuality] = useState('fast')
-    const [resolution, setResolution] = useState('1080p')
+    const [resolution, setResolution] = useState('480p')
     const [videoMode, setVideoMode] = useState('t2v')
     const [shots, setShots] = useState([{ prompt: '' }])
     const [viewVideo, setViewVideo] = useState(null) // { url, prompt, model, duration, firstImageUrl, lastImageUrl, refImages }

@@ -384,7 +384,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [aspectRatio, setAspectRatio] = useState('9:16')
     const [language, setLanguage] = useState('English')
     const [cta, setCta] = useState('Shop now')
-    const [selectedModel, setSelectedModel] = useState('seedance-2.0')
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
     const [showSettings, setShowSettings] = useState(false)
     const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
