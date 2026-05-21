@@ -31,7 +31,7 @@ export function verifyShopifyWebhook(req, res, next) {
     const rawBody = req.rawBody;
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
         console.warn(`⚠️ Shopify webhook [${topic}]: No raw buffer available`);
-        return res.status(400).json({ error: 'Raw body missing' });
+        return res.status(401).json({ error: 'HMAC verification failed (raw body missing)' });
     }
 
     // Calculate HMAC
