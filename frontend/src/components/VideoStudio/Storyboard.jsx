@@ -94,7 +94,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [format, setFormat] = useState('9:16'); // Default to 9:16 for storyboard grids
     const [duration, setDuration] = useState(5);
     const [model, setModel] = useState('seedance-2.0-fast');
-    const [resolution, setResolution] = useState('2k');
+    const [resolution, setResolution] = useState('480p');
     const [directorModel, setDirectorModel] = useState('claude'); // 'claude' or 'gemini'
     const [imageModel, setImageModel] = useState('nanobanana-2'); // default: NanoBanana 2 (gemini-2.0-flash-exp) supports reference image input
 
