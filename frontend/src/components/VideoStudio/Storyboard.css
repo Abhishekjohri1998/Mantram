@@ -278,6 +278,47 @@
     object-fit: contain;
     display: block;
     max-height: 65vh;
+    cursor: zoom-in;
+    transition: opacity 0.2s ease;
+}
+.sb-poster-img:hover {
+    opacity: 0.95;
+}
+
+.sb-poster-actions {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 5;
+}
+
+.sb-poster-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(15, 15, 15, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+}
+
+.sb-poster-action-btn:hover {
+    background: var(--sys-primary);
+    border-color: var(--sys-primary);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sb-poster-action-btn .material-symbols-outlined {
+    font-size: 20px;
 }
 
 .sb-poster-right {

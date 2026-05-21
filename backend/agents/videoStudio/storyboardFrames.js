@@ -105,27 +105,35 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
     // Collect reference buffers — prefer raw multer, fallback to S3 download
     const refBuffers = [];
+    
+    // 1. Collect Product Images
     if (rawProductBuffers.length > 0) {
-        for (const rb of rawProductBuffers.slice(0, 2)) {
+        for (const rb of rawProductBuffers) {
             if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
         }
-        if (rawAvatarBuffer?.buffer) {
-            refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
-        }
-        console.log(`[SB Poster][GPT-Image-2] Using ${refBuffers.length} raw multer buffers`);
-    } else {
-        const urlsToFetch = [
-            ...productImageUrls.filter(u => u?.startsWith('http')).slice(0, 2),
-            ...(avatarUrl?.startsWith('http') ? [avatarUrl] : []),
-        ];
+    } else if (productImageUrls.length > 0) {
+        const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
         for (const url of urlsToFetch) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(url);
                 refBuffers.push({ buffer, mimeType });
-                console.log(`[SB Poster][GPT-Image-2] Downloaded ref: ${url.substring(0, 80)}`);
+                console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
             } catch (dlErr) {
-                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download ref: ${dlErr.message}`);
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
             }
+        }
+    }
+
+    // 2. Collect Avatar Image
+    if (rawAvatarBuffer?.buffer) {
+        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
+    } else if (avatarUrl?.startsWith('http')) {
+        try {
+            const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+            refBuffers.push({ buffer, mimeType });
+            console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
+        } catch (dlErr) {
+            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
         }
     }
 
@@ -150,7 +158,7 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             // Multiple images require separate 'image' entries (some proxies support array)
             refBuffers.forEach(({ buffer, mimeType }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
-                fd.append('image', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
+                fd.append('image[]', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',
@@ -203,30 +211,36 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         // Build content parts — reference images as inlineData, text last
         const parts = [];
 
-        // Add raw product buffers as inlineData
-        for (const rb of rawProductBuffers.slice(0, 2)) {
-            if (rb?.buffer) {
-                parts.push({ inlineData: { mimeType: rb.mimeType || 'image/jpeg', data: rb.buffer.toString('base64') } });
+        // 1. Collect Product Images
+        if (rawProductBuffers.length > 0) {
+            for (const rb of rawProductBuffers) {
+                if (rb?.buffer) {
+                    parts.push({ inlineData: { mimeType: rb.mimeType || 'image/jpeg', data: rb.buffer.toString('base64') } });
+                }
             }
-        }
-        if (rawAvatarBuffer?.buffer) {
-            parts.push({ inlineData: { mimeType: rawAvatarBuffer.mimeType || 'image/jpeg', data: rawAvatarBuffer.buffer.toString('base64') } });
-        }
-
-        // Fallback to S3 URLs if no raw buffers
-        if (parts.length === 0) {
-            const urlsToFetch = [
-                ...productImageUrls.filter(u => u?.startsWith('http')).slice(0, 2),
-                ...(avatarUrl?.startsWith('http') ? [avatarUrl] : []),
-            ];
+        } else if (productImageUrls.length > 0) {
+            const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
             for (const url of urlsToFetch) {
                 try {
                     const { buffer, mimeType } = await downloadBuffer(url);
                     parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
-                    console.log(`[SB Poster][NanoBanana] Downloaded ref: ${url.substring(0, 80)}`);
+                    console.log(`[SB Poster][NanoBanana] Downloaded product ref: ${url.substring(0, 80)}`);
                 } catch (dlErr) {
-                    console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download: ${dlErr.message}`);
+                    console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download product ref: ${dlErr.message}`);
                 }
+            }
+        }
+
+        // 2. Collect Avatar Image
+        if (rawAvatarBuffer?.buffer) {
+            parts.push({ inlineData: { mimeType: rawAvatarBuffer.mimeType || 'image/jpeg', data: rawAvatarBuffer.buffer.toString('base64') } });
+        } else if (avatarUrl?.startsWith('http')) {
+            try {
+                const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+                parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
+                console.log(`[SB Poster][NanoBanana] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download avatar ref: ${dlErr.message}`);
             }
         }
 

@@ -21,7 +21,7 @@ const MAX_SHOT_DURATION = 15; // max per Seedance I2V limit
 // SYSTEM PROMPT — Director Brain for Storyboard Planning
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildStoryboardDirectorPrompt({ brandContext, duration, format, style }) {
+function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage = 'English' }) {
     // Increase shot density for modern fast-paced ad films (approx 1.5 - 2s per shot)
     const estimatedShots = Math.min(Math.ceil(duration / 1.5), MAX_SHOTS_LONG);
     const gridLayout = estimatedShots <= 9 ? '3x3' : estimatedShots <= 12 ? '3x4' : '4x4';
@@ -44,6 +44,7 @@ TOTAL DURATION: ${duration}s
 FORMAT: ${format}
 VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}
 TARGET GRID: Around ${estimatedShots} frames total (a ${gridLayout} grid) to allow for fast-paced cinematic cuts.
+DIALOGUE LANGUAGE: ${dialogueLanguage}
 
 ═══════════════════════════════════════════════════════
 PROMPT 1 RULES: imagePrompt (For the Storyboard Grid Image)
@@ -64,7 +65,14 @@ Write a highly complex and cinematic prompt instructing an AI Video Model to ani
 - Instruct the AI to interpret the grid as a storyboard and execute the fast cuts dynamically.
 - Define the cinematic motion using professional film terminology (smooth 3D tracking cameras, rack focus, kinetic whip-pans, hyper-lapse, high-energy motion blur).
 - Detail how the product should interact with the light and how the camera should move to create a ${duration}-second masterpiece.
-- Example: "Use the attached storyboard image as the exact reference. Animate this ${duration}-second ${format} sequence with award-winning commercial pacing. Preserve the exact shot order and visual continuity of the presenter and product. Execute kinetic whip-pans between cuts, smooth 3D tracking pushes, and rack focus transitions. Maintain flawless lighting and high-energy motion blur to bring the storyboard to life..."
+- MANDATORY: If there are spoken dialogues or narration in the scene, write the explicit dialogues directly inside the videoPrompt in the chosen language (${dialogueLanguage}). The dialogue must be written in the selected language's script (e.g. if dialogueLanguage is Hindi, write the dialogue in Hindi, e.g. Presenter says: "नमस्ते, यह उत्पाद...", rather than asking the character to speak without defining the dialogue).
+- Detail the image reference tags in the videoPrompt explicitly:
+  - Use \`@image1\` for the starting frame/visual layout.
+  - Use \`@image2\` to reference the storyboard poster grid.
+  - Use \`@image3\` to reference the presenter/avatar face if present.
+  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.
+  For instance, a prompt could mention: 'The presenter shown in @image3 says: "[spoken dialogue in ${dialogueLanguage}]".' or 'The camera pans across the product shown in @image1 and @image4...'
+- Example: "Use the attached storyboard image as the exact reference. Animate this ${duration}-second ${format} sequence with award-winning commercial pacing. Preserve the exact shot order and visual continuity of the presenter shown in @image3 and the product. @image1 is the visual reference for the exact starting frame. The presenter shown in @image3 says: [Insert appropriate dialogue in ${dialogueLanguage} here]. Execute kinetic whip-pans between cuts, smooth 3D tracking pushes, and rack focus transitions. Maintain flawless lighting and high-energy motion blur to bring the storyboard to life..."
 
 ═══════════════════════════════════════════════════════
 OUTPUT FORMAT — CRITICAL
@@ -83,19 +91,20 @@ The JSON must match this exact schema:
 // USER PROMPT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style }) {
+function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English' }) {
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 
 PRODUCT: ${productName || 'See product images provided'}
 KEY FEATURES: ${productFeatures || 'Extract from the product images provided and heavily highlight them visually'}
 TOTAL VIDEO DURATION: ${duration}s, FORMAT: ${format}
 VISUAL STYLE: ${style}
-AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut shots.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
+DIALOGUE LANGUAGE: ${dialogueLanguage}
+AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut shots and write their dialogues in ' + dialogueLanguage + '.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
 
 Now act as the visionary director. Deeply analyze the product and brief, and write the two master prompts as JSON. 
 Remember:
 - Make the imagePrompt dense, rich, and full of fast-cut narrative beats.
-- Make the videoPrompt cinematic, demanding high-end transitions and motion.
+- Make the videoPrompt cinematic, demanding high-end transitions, correct @image reference tags, and explicit spoken dialogues in ${dialogueLanguage}.
 - Return ONLY the JSON object, no other text.`;
 }
 
@@ -157,7 +166,8 @@ function parseStoryboardOutput(rawText, targetDuration) {
 export async function runStoryboardDirector({
     brandId, brief, productName, productFeatures,
     productImageUrls = [], avatarUrl = null,
-    style = 'hyperrealistic', duration = 30, format = '9:16', userId, directorModel = 'claude'
+    style = 'hyperrealistic', duration = 30, format = '9:16', userId, directorModel = 'claude',
+    dialogueLanguage = 'English'
 }) {
     console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, shots estimated=${Math.ceil(duration / 4)}`);
 
@@ -166,12 +176,12 @@ export async function runStoryboardDirector({
     console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars`);
 
     // 2. Build prompts
-    const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style });
-    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style });
+    const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage });
+    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage });
 
-    // 3. Build image URLs for Claude vision (product + avatar)
+    // 3. Build image URLs for Claude vision (product + avatar) — NO cap, use ALL images
     const imageUrls = [];
-    for (const url of (productImageUrls || []).filter(u => u?.startsWith('http')).slice(0, 3)) {
+    for (const url of (productImageUrls || []).filter(u => u?.startsWith('http'))) {
         imageUrls.push(url);
     }
     if (avatarUrl?.startsWith('http')) imageUrls.push(avatarUrl);
@@ -213,5 +223,99 @@ export async function runStoryboardDirector({
         defaultStyle: style,
         productImageUrls,
         avatarUrl,
+        dialogueLanguage,
     };
+}
+
+/**
+ * Recreate the video prompt based on user's updated imagePrompt and selected dialogue language.
+ */
+export async function recreateVideoPrompt({
+    imagePrompt, brief, productName, productFeatures,
+    avatarUrl, duration, format, style, dialogueLanguage = 'English',
+    brandContext = '', directorModel = 'claude'
+}) {
+    console.log(`[Storyboard Director] Recreating video prompt... duration=${duration}s, lang=${dialogueLanguage}`);
+
+    const systemPrompt = `You are a visionary, award-winning Ad Film Director and Cinematographer.
+Your job: Given a creative brief, product details, brand DNA, the generated storyboard poster description (imagePrompt), and a selected dialogue language, write a highly complex, cinematic video animation prompt (videoPrompt) for an AI Video Generator (like Seedance).
+
+This videoPrompt will animate the storyboard poster into a seamless, high-end commercial video.
+
+═══════════════════════════════════════════════════════
+BRAND DNA & CREATIVE ESSENCE
+═══════════════════════════════════════════════════════
+${brandContext || 'No brand data. Use premium cinematic style throughout.'}
+
+═══════════════════════════════════════════════════════
+AD FILM SPECIFICATIONS
+═══════════════════════════════════════════════════════
+TOTAL DURATION: ${duration}s
+FORMAT: ${format}
+VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}
+DIALOGUE LANGUAGE: ${dialogueLanguage}
+
+═══════════════════════════════════════════════════════
+VIDEO PROMPT GENERATION RULES
+═══════════════════════════════════════════════════════
+- It MUST start with: "Use the attached storyboard image as the exact reference."
+- Define the cinematic motion using professional film terminology (smooth 3D tracking cameras, rack focus, kinetic whip-pans, hyper-lapse, high-energy motion blur).
+- Preserve the exact shot order and visual continuity of the presenter and product.
+- MANDATORY: Write explicit spoken dialogues or voiceover scripts in the selected language (${dialogueLanguage}) directly inside the videoPrompt. The dialogues must be written in the actual script/language (e.g. if selected language is Hindi, write the dialogue in Hindi, e.g. Presenter says: "नमस्ते, यह हमारा नया प्रोडक्ट है...", rather than asking the character to speak without defining the dialogue).
+- Detail the image reference tags in the videoPrompt explicitly:
+  - Use \`@image1\` for the starting frame/visual layout (this is the first product image if present, else the storyboard poster).
+  - Use \`@image2\` to reference the storyboard poster grid.
+  - Use \`@image3\` to reference the presenter/avatar face if present in the scenes.
+  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.
+  For instance, a prompt could mention: 'The presenter shown in @image3 says: "[spoken dialogue in ${dialogueLanguage}]".' or 'The camera pans across the product shown in @image1 and @image4...'
+
+Return ONLY valid JSON with a single key "videoPrompt". No markdown. No explanation. No code fences.
+Example output format:
+{
+  "videoPrompt": "Use the attached storyboard image as the exact reference. Animate this sequence..."
+}
+`;
+
+    const userPrompt = `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
+PRODUCT: ${productName || 'See product images'}
+KEY FEATURES: ${productFeatures || 'Highlight product features visually'}
+STORYBOARD POSTER DESCRIPTION: "${imagePrompt}"
+DIALOGUE LANGUAGE: ${dialogueLanguage}
+AVATAR: ${avatarUrl ? 'Yes — avatar image provided.' : 'No avatar'}
+
+Generate the videoPrompt JSON now. Return ONLY JSON.`;
+
+    let rawOutput;
+    try {
+        rawOutput = await callMultimodalAgent(
+            systemPrompt,
+            userPrompt,
+            avatarUrl ? [avatarUrl] : [],
+            { temperature: 0.7, maxTokens: 4000, returnRaw: true, provider: directorModel }
+        );
+    } catch (err) {
+        throw new Error(`Failed to recreate video prompt: ${err.message}`);
+    }
+
+    let cleaned = rawOutput.trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```\s*$/i, '')
+        .trim();
+
+    try {
+        const parsed = JSON.parse(cleaned);
+        if (parsed.videoPrompt) {
+            return parsed.videoPrompt;
+        }
+    } catch (e) {
+        const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
+        if (jsonMatch) {
+            try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (parsed.videoPrompt) return parsed.videoPrompt;
+            } catch (innerE) { /* fallback */ }
+        }
+    }
+
+    return cleaned;
 }

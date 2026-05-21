@@ -172,6 +172,7 @@ const videoProjectSchema = new mongoose.Schema({
     storyboard: {
         imagePrompt: { type: String, default: '' },
         videoPrompt: { type: String, default: '' },
+        dialogueLanguage: { type: String, default: 'English' },
         imageUrl: { type: String, default: '' },
         taskId: { type: String, default: '' }, // For video animation task
         status: { type: String, enum: ['pending', 'animating', 'done', 'failed'], default: 'pending' },

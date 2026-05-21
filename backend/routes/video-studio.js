@@ -64,7 +64,7 @@ import { buildVideoHash } from '../utils/videoHash.js';
 import { checkPromptSafety } from '../utils/promptSafety.js';
 import redis from '../utils/redisClient.js';
 import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
-import { runStoryboardDirector } from '../agents/videoStudio/storyboardDirector.js';
+import { runStoryboardDirector, recreateVideoPrompt } from '../agents/videoStudio/storyboardDirector.js';
 import { generateStoryboardPoster } from '../agents/videoStudio/storyboardFrames.js';
 import { stitchVideoClips } from '../utils/videoStitcher.js';
 import { execFile } from 'child_process';
@@ -94,6 +94,27 @@ async function findCachedGeneration(hash) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * Helper to recursively sign raw URL or image objects with mixed structures
+ */
+async function signUrlOrObject(img) {
+    if (!img) return img;
+    if (typeof img === 'string') {
+        return getSignedUrlIfNeeded(img);
+    }
+    if (typeof img === 'object') {
+        if (img.url) {
+            const signedUrl = await getSignedUrlIfNeeded(img.url);
+            return { ...img, url: signedUrl };
+        }
+        if (img.imageUrl) {
+            const signedUrl = await getSignedUrlIfNeeded(img.imageUrl);
+            return { ...img, imageUrl: signedUrl };
+        }
+    }
+    return img;
+}
+
+/**
  * Recursively signs all S3 URLs in a VideoProject object or array.
  */
 async function signVideoProjectAssets(data) {
@@ -118,10 +139,10 @@ async function signVideoProjectAssets(data) {
 
     // Sign input images
     if (project.input?.images) {
-        project.input.images = await Promise.all(project.input.images.map(img => getSignedUrlIfNeeded(img)));
+        project.input.images = await Promise.all(project.input.images.map(img => signUrlOrObject(img)));
     }
     if (project.images) { // in-memory response override
-        project.images = await Promise.all(project.images.map(img => getSignedUrlIfNeeded(img)));
+        project.images = await Promise.all(project.images.map(img => signUrlOrObject(img)));
     }
 
     // Sign concepts
@@ -136,6 +157,12 @@ async function signVideoProjectAssets(data) {
         for (const shot of project.script.shots) {
             if (shot.previewUrl) shot.previewUrl = await getSignedUrlIfNeeded(shot.previewUrl);
         }
+    }
+
+    // Sign storyboard
+    if (project.storyboard) {
+        if (project.storyboard.imageUrl) project.storyboard.imageUrl = await getSignedUrlIfNeeded(project.storyboard.imageUrl);
+        if (project.storyboard.finalVideoUrl) project.storyboard.finalVideoUrl = await getSignedUrlIfNeeded(project.storyboard.finalVideoUrl);
     }
 
     return project;
@@ -6538,7 +6565,7 @@ router.get('/', protect, async (req, res) => {
         if (mode) filter.mode = mode;
 
         const skip = (Number(page) - 1) * Number(limit);
-        const selectFields = 'title status mode studioMode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl createdAt updatedAt';
+        const selectFields = 'title status mode studioMode input.videoType input.brief input.images advancedConfig routing.selectedModel routing.costPreview generation finalVideoUrl storyboard createdAt updatedAt';
 
         // Build the query — use hint to force the compound index so MongoDB avoids an in-memory sort.
         // Also set allowDiskUse via setOptions (the chained .allowDiskUse() is unreliable on some driver versions).
@@ -6725,32 +6752,14 @@ router.get('/', protect, async (req, res) => {
         // ── Sign S3 video URLs before returning ──
         // S3 bucket uses "Bucket owner enforced" (ACLs disabled), so raw S3 path-style
         // URLs are inaccessible. We must presign them. CDN URLs pass through unchanged.
-        // This is critical because downloadAndUploadVideoToS3 overwrites finalVideoUrl
-        // with an S3 URL, and the original CDN URL expires after 12-24 hours.
+        let signedProjects = projects;
         try {
-            await Promise.all(projects.map(async (p) => {
-                // Sign finalVideoUrl
-                if (p.finalVideoUrl && p.finalVideoUrl.includes('amazonaws.com')) {
-                    p.finalVideoUrl = await getSignedUrlIfNeeded(p.finalVideoUrl);
-                }
-                // Sign generation.videoUrl (may also be S3 after sync)
-                if (p.generation?.videoUrl && p.generation.videoUrl.includes('amazonaws.com')) {
-                    p.generation.videoUrl = await getSignedUrlIfNeeded(p.generation.videoUrl);
-                }
-                // Sign generation.s3VideoUrl
-                if (p.generation?.s3VideoUrl && p.generation.s3VideoUrl.includes('amazonaws.com')) {
-                    p.generation.s3VideoUrl = await getSignedUrlIfNeeded(p.generation.s3VideoUrl);
-                }
-                // Sign generation.s3ThumbnailUrl
-                if (p.generation?.s3ThumbnailUrl && p.generation.s3ThumbnailUrl.includes('amazonaws.com')) {
-                    p.generation.s3ThumbnailUrl = await getSignedUrlIfNeeded(p.generation.s3ThumbnailUrl);
-                }
-            }));
+            signedProjects = await signVideoProjectAssets(projects);
         } catch (signErr) {
             console.warn('⚠️ URL signing phase failed (non-fatal):', signErr.message);
         }
 
-        res.json({ success: true, projects, total });
+        res.json({ success: true, projects: signedProjects, total });
     } catch (error) {
         console.error('❌ GET /api/video-studio failed:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -7428,7 +7437,7 @@ const storyboardUpload = multer({ storage: multer.memoryStorage(), limits: { fil
 // Step 1: Director Brain (Claude) generates shot plan + Gemini generates frames
 // Returns full storyboard JSON with frameUrls
 router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), storyboardUpload.fields([
-    { name: 'productImages', maxCount: 4 },
+    { name: 'productImages', maxCount: 20 }, // Accept all uploaded images
     { name: 'avatarImage', maxCount: 1 },
 ]), async (req, res) => {
     try {
@@ -7439,7 +7448,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             productImageUrls: bodyProductImgUrls,
             avatarUrl: bodyAvatarUrl,
             directorModel = 'claude',
-            imageModel = 'nanobanana'
+            imageModel = 'gpt-image-2',
+            dialogueLanguage = 'English'
         } = req.body;
 
         // Map resolution string to NanoBanana imageSize token
@@ -7510,6 +7520,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             format,
             userId: req.user._id,
             directorModel,
+            dialogueLanguage,
         });
 
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
@@ -7537,7 +7548,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                     return null;
                 }
             };
-            const downloaded = await Promise.all(productImageUrls.slice(0, 2).map(downloadBuffer));
+            // Download ALL URL images to buffers — no cap
+            const downloaded = await Promise.all(productImageUrls.map(downloadBuffer));
             rawProductBuffers = downloaded.filter(Boolean);
             console.log(`[Storyboard Create] Downloaded ${rawProductBuffers.length} product image buffers from URLs`);
         }
@@ -7596,8 +7608,15 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 totalDuration: plan.totalDuration,
                 format,
                 style,
+                dialogueLanguage,
             },
         });
+
+        if (plan.imageUrl) plan.imageUrl = await getSignedUrlIfNeeded(plan.imageUrl);
+        if (plan.avatarUrl) plan.avatarUrl = await getSignedUrlIfNeeded(plan.avatarUrl);
+        if (plan.productImageUrls) {
+            plan.productImageUrls = await Promise.all(plan.productImageUrls.map(url => getSignedUrlIfNeeded(url)));
+        }
 
         res.json({
             success: true,
@@ -7614,45 +7633,79 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
 // Regenerate the main storyboard poster (after user edits prompt)
 router.post('/storyboard/regen-poster', protect, async (req, res) => {
     try {
-        const { projectId, imagePrompt, style = 'hyperrealistic', format = '9:16', imageModel = 'nanobanana' } = req.body;
+        const { projectId, imagePrompt, style = 'hyperrealistic', format = '9:16', imageModel = 'gpt-image-2', dialogueLanguage } = req.body;
 
         // ✅ FIX: Load the project's saved product images from DB so the regenerated poster
         // is grounded to the actual product — not hallucinated from scratch
         let productImageUrls = [];
         let avatarUrl = null;
+        let dialogueLanguageSelected = dialogueLanguage || 'English';
+        let brief = '';
+        let productName = '';
+        let productFeatures = '';
+        let duration = 30;
+        let brandContext = '';
+
         if (projectId) {
-            const proj = await VideoProject.findById(projectId).select('input').lean();
+            const proj = await VideoProject.findById(projectId).select('input storyboard brand').lean();
             if (proj?.input?.images?.length > 0) {
                 productImageUrls = proj.input.images.map(img => img.url).filter(Boolean);
             }
             avatarUrl = proj?.input?.avatarUrl || null;
-        }
-
-        // Download product image URLs to buffers so NanoBanana gets actual pixel data
-        let rawProductBuffers = [];
-        if (productImageUrls.length > 0) {
-            const dlBuf = async (url) => {
+            if (!dialogueLanguage) {
+                dialogueLanguageSelected = proj?.storyboard?.dialogueLanguage || 'English';
+            }
+            brief = proj?.input?.brief || '';
+            productName = proj?.input?.productName || '';
+            
+            if (proj?.brand) {
                 try {
-                    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
-                    if (!resp.ok) return null;
-                    return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: resp.headers.get('content-type') || 'image/jpeg' };
-                } catch { return null; }
-            };
-            rawProductBuffers = (await Promise.all(productImageUrls.slice(0, 2).map(dlBuf))).filter(Boolean);
+                    const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+                    const brandData = await loadBrandContext(proj.brand);
+                    brandContext = brandData?.brandContext || '';
+                } catch (brandErr) {
+                    console.warn(`[Storyboard Regen Poster] Could not load brand context: ${brandErr.message}`);
+                }
+            }
+            duration = proj?.storyboard?.totalDuration || 30;
         }
 
-        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!avatarUrl}, model=${imageModel}`);
+        const dlBuf = async (url) => {
+            try {
+                const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
+                if (!resp.ok) return null;
+                return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: resp.headers.get('content-type') || 'image/jpeg' };
+            } catch { return null; }
+        };
+
+        // Download product image URLs to buffers so NanoBanana/GPT-Image-2 gets actual pixel data
+        let rawProductBuffers = [];
+        let signedProductUrls = [];
+        if (productImageUrls.length > 0) {
+            signedProductUrls = await Promise.all(productImageUrls.map(url => getSignedUrlIfNeeded(url)));
+            rawProductBuffers = (await Promise.all(signedProductUrls.map(dlBuf))).filter(Boolean); // ALL images
+        }
+
+        // Download avatar URL to buffer to fix avatar reference loss on regeneration
+        let rawAvatarBuffer = null;
+        let signedAvatarUrl = avatarUrl;
+        if (avatarUrl) {
+            signedAvatarUrl = await getSignedUrlIfNeeded(avatarUrl);
+            rawAvatarBuffer = await dlBuf(signedAvatarUrl);
+        }
+
+        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, model=${imageModel}`);
 
         // Import frame generator
         const { generateStoryboardPoster } = await import('../agents/videoStudio/storyboardFrames.js');
 
         const posterDataUrl = await generateStoryboardPoster(
             imagePrompt, style, format,
-            productImageUrls,     // S3 URL fallback
-            avatarUrl,
+            signedProductUrls,     // signed S3 URL fallback
+            signedAvatarUrl,
             imageModel,
             rawProductBuffers,    // actual pixel data
-            null                  // no raw avatar buffer on regen
+            rawAvatarBuffer       // actual avatar pixel data
         );
 
         if (!posterDataUrl) throw new Error('Poster generation failed');
@@ -7663,17 +7716,48 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             posterUrl = await ensureS3Url(posterDataUrl, `storyboard/posters/${req.user._id}`).catch(() => posterDataUrl);
         }
 
+        // Recreate the matching videoPrompt
+        let newVideoPrompt = '';
+        if (projectId) {
+            try {
+                newVideoPrompt = await recreateVideoPrompt({
+                    imagePrompt,
+                    brief,
+                    productName,
+                    productFeatures,
+                    avatarUrl: signedAvatarUrl || avatarUrl,
+                    duration,
+                    format,
+                    style,
+                    dialogueLanguage: dialogueLanguageSelected,
+                    brandContext
+                });
+            } catch (errPrompt) {
+                console.warn(`[Storyboard Regen Poster] Recreating video prompt failed: ${errPrompt.message}`);
+            }
+        }
+
         // Update the storyboard in DB if projectId provided
         if (projectId) {
+            const updateFields = {
+                'storyboard.imageUrl': posterUrl,
+                'storyboard.imagePrompt': imagePrompt,
+                'storyboard.dialogueLanguage': dialogueLanguageSelected
+            };
+            if (newVideoPrompt) {
+                updateFields['storyboard.videoPrompt'] = newVideoPrompt;
+            }
             await VideoProject.findByIdAndUpdate(projectId, {
-                $set: { 
-                    'storyboard.imageUrl': posterUrl,
-                    'storyboard.imagePrompt': imagePrompt
-                }
+                $set: updateFields
             });
         }
 
-        res.json({ success: true, imageUrl: posterUrl });
+        const signedImageUrl = await getSignedUrlIfNeeded(posterUrl);
+        res.json({ 
+            success: true, 
+            imageUrl: signedImageUrl, 
+            videoPrompt: newVideoPrompt || undefined 
+        });
     } catch (err) {
         console.error('[Storyboard Regen Poster] Error:', err.message);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
@@ -7803,11 +7887,13 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
         if (!taskId) return res.status(400).json({ success: false, error: 'No animation task found' });
 
         if (storyboard.status === 'done' || storyboard.finalVideoUrl) {
+            const rawUrl = storyboard.finalVideoUrl || project.finalVideoUrl;
+            const signedUrl = await getSignedUrlIfNeeded(rawUrl);
             return res.json({
                 success: true,
                 projectId: project._id,
                 allDone: true,
-                finalVideoUrl: storyboard.finalVideoUrl || project.finalVideoUrl,
+                finalVideoUrl: signedUrl,
                 status: 'COMPLETED'
             });
         }
@@ -7866,7 +7952,7 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                 allDone: updatedStatus === 'done',
                 anyFailed: updatedStatus === 'failed',
                 overallProgress: updatedProgress,
-                finalVideoUrl,
+                finalVideoUrl: finalVideoUrl ? await getSignedUrlIfNeeded(finalVideoUrl) : null,
                 status: updatedStatus === 'done' ? 'COMPLETED' : updatedStatus === 'failed' ? 'FAILED' : 'IN_PROGRESS',
             });
 
@@ -7893,7 +7979,8 @@ router.get('/storyboard/history', protect, async (req, res) => {
             user: req.user._id,
             studioMode: 'storyboard',
         }).sort({ createdAt: -1 }).limit(20).lean();
-        res.json({ success: true, projects });
+        const signedProjects = await signVideoProjectAssets(projects);
+        res.json({ success: true, projects: signedProjects });
     } catch (err) {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }

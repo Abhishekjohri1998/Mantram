@@ -50,6 +50,17 @@ const IMAGE_MODELS = [
     { value: 'nanobanana-2', label: 'NanoBanana 2' }
 ];
 
+const LANGUAGES = [
+    { value: 'English', label: 'English' },
+    { value: 'Hindi', label: 'Hindi (हिंदी)' },
+    { value: 'Spanish', label: 'Spanish (Español)' },
+    { value: 'French', label: 'French (Français)' },
+    { value: 'German', label: 'German (Deutsch)' },
+    { value: 'Mandarin', label: 'Mandarin (中文)' },
+    { value: 'Japanese', label: 'Japanese (日本語)' },
+    { value: 'Arabic', label: 'Arabic (العربية)' }
+];
+
 function CfgMenu({ value, onChange, options, icon }) {
     const [open, setOpen] = useState(false); 
     const ref = useRef(null);
@@ -96,7 +107,8 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('480p');
     const [directorModel, setDirectorModel] = useState('claude'); // 'claude' or 'gemini'
-    const [imageModel, setImageModel] = useState('nanobanana-2'); // default: NanoBanana 2 (gemini-2.0-flash-exp) supports reference image input
+    const [imageModel, setImageModel] = useState('gpt-image-2'); // default: GPT Image 2
+    const [dialogueLanguage, setDialogueLanguage] = useState('English');
 
     // ── Generated storyboard state ──
     const [phase, setPhase] = useState('input'); // 'input' | 'directing' | 'storyboarding' | 'review' | 'animating' | 'complete'
@@ -109,6 +121,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [error, setError] = useState('');
     const [finalVideoUrl, setFinalVideoUrl] = useState(null);
     const [previewVideo, setPreviewVideo] = useState(null);
+    const [previewImage, setPreviewImage] = useState(null);
     const [overallProgress, setOverallProgress] = useState(0);
     const [regenLoading, setRegenLoading] = useState(false);
     
@@ -141,6 +154,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         if (project.routing?.selectedModel) setModel(project.routing.selectedModel);
         if (project.routing?.resolution) setResolution(project.routing.resolution);
         if (project.generation?.duration) setDuration(project.generation.duration);
+        if (project.storyboard?.dialogueLanguage) setDialogueLanguage(project.storyboard.dialogueLanguage);
 
         // Reset to input phase so the Scott box is visible
         setPhase('input');
@@ -151,7 +165,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
     // ── Product image upload ──
     const handleProductImages = (e) => {
-        const files = Array.from(e.target.files || []).slice(0, 4);
+        const files = Array.from(e.target.files || []);
         setProductImages(files.map(f => ({ file: f, preview: URL.createObjectURL(f) })));
     };
 
@@ -207,6 +221,25 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     };
 
 
+    // ── Download helper for storyboard image ──
+    const handleDownloadImage = async (url) => {
+        try {
+            const response = await fetch(url, { mode: 'cors' });
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `storyboard-${projectId || 'master'}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+            console.error('Failed to download image directly:', e);
+            window.open(url, '_blank');
+        }
+    };
+
     // ── Regen single poster ──
     const handleRegenPoster = useCallback(async () => {
         setRegenLoading(true);
@@ -214,11 +247,12 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             const res = await fetch(`${API}/storyboard/regen-poster`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
-                body: JSON.stringify({ projectId, imagePrompt, style: defaultStyle, format, imageModel }),
+                body: JSON.stringify({ projectId, imagePrompt, style: defaultStyle, format, imageModel, dialogueLanguage }),
             });
             const data = await res.json();
-            if (data.success && data.imageUrl) {
-                setImageUrl(data.imageUrl);
+            if (data.success) {
+                if (data.imageUrl) setImageUrl(data.imageUrl);
+                if (data.videoPrompt) setVideoPrompt(data.videoPrompt);
             }
         } catch (e) {
             console.error('Regen poster error:', e);
@@ -226,7 +260,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         } finally {
             setRegenLoading(false);
         }
-    }, [projectId, imagePrompt, defaultStyle, format, imageModel]);
+    }, [projectId, imagePrompt, defaultStyle, format, imageModel, dialogueLanguage]);
 
     // ── Generate storyboard ──
     const handleGenerate = async () => {
@@ -257,6 +291,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             }
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
+            fd.append('dialogueLanguage', dialogueLanguage);
 
             setPhase('storyboarding');
 
@@ -275,6 +310,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 setImageUrl(data.plan.imageUrl);
                 setImagePrompt(data.plan.imagePrompt);
                 setVideoPrompt(data.plan.videoPrompt);
+                if (data.plan.dialogueLanguage) setDialogueLanguage(data.plan.dialogueLanguage);
             }
             setPhase('review');
         } catch (e) {
@@ -428,27 +464,40 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                             <CfgMenu value={model} onChange={setModel} options={MODELS} icon="smart_toy" />
                             <CfgMenu value={directorModel} onChange={setDirectorModel} options={DIRECTOR_MODELS} icon="movie_filter" />
                             <CfgMenu value={imageModel} onChange={setImageModel} options={IMAGE_MODELS} icon="image" />
+                            <CfgMenu value={dialogueLanguage} onChange={setDialogueLanguage} options={LANGUAGES} icon="translate" />
 
                             <div style={{ flex: 1 }} />
                             
                             {/* Product Block */}
-                            <button className={`scott-block-btn ${productImages.length > 0 ? 'active' : ''}`} onClick={() => productInputRef.current?.click()}>
-                                {productImages.length > 0 ? (
-                                    <>
-                                        <img src={productImages[0].preview} className="scott-block-img" alt="product" />
-                                        {productImages.length > 1 && (
-                                            <span style={{ position: 'absolute', top: 4, right: 4, background: '#10b981', color: '#fff', borderRadius: '50%', width: 14, height: 14, fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                                                {productImages.length}
-                                            </span>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
-                                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>PRODUCT</span>
-                                    </>
-                                )}
-                            </button>
+                            {productImages.length === 0 ? (
+                                <button className="scott-block-btn" onClick={() => productInputRef.current?.click()}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
+                                    <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>PRODUCT</span>
+                                </button>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '3px 6px 3px 4px', maxWidth: 240, overflowX: 'auto', flexShrink: 0 }}>
+                                    {productImages.map((pi, idx) => (
+                                        <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
+                                            <img
+                                                src={pi.preview}
+                                                alt={`product-${idx + 1}`}
+                                                style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 5, display: 'block', border: '1px solid rgba(255,255,255,0.1)' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setProductImages(prev => prev.filter((_, i) => i !== idx)); }}
+                                                style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
+                                            >✕</button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => productInputRef.current?.click()}
+                                        style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 5, background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                        title="Add more images"
+                                    >+</button>
+                                </div>
+                            )}
                             <input ref={productInputRef} type="file" accept="image/*" multiple hidden onChange={handleProductImages} />
 
                             {/* Avatar Block */}
@@ -517,7 +566,33 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         <div className="sb-poster-left">
                             <div className="sb-poster-wrap">
                                 {imageUrl ? (
-                                    <img src={imageUrl} className="sb-poster-img" alt="Master Storyboard Poster" />
+                                    <>
+                                        <img 
+                                            src={imageUrl} 
+                                            className="sb-poster-img" 
+                                            alt="Master Storyboard Poster" 
+                                            onClick={() => setPreviewImage(imageUrl)}
+                                            style={{ cursor: 'zoom-in' }}
+                                        />
+                                        <div className="sb-poster-actions">
+                                            <button 
+                                                type="button" 
+                                                className="sb-poster-action-btn"
+                                                onClick={() => setPreviewImage(imageUrl)}
+                                                title="Zoom / View Full Size"
+                                            >
+                                                <span className="material-symbols-outlined">zoom_in</span>
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                className="sb-poster-action-btn"
+                                                onClick={() => handleDownloadImage(imageUrl)}
+                                                title="Download Storyboard Image"
+                                            >
+                                                <span className="material-symbols-outlined">download</span>
+                                            </button>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="sb-poster-img" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'rgba(255,255,255,0.2)', marginBottom: 16 }}>broken_image</span>
@@ -553,6 +628,14 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                     <span className="material-symbols-outlined">refresh</span>
                                     Regenerate Poster
                                 </button>
+                            </div>
+
+                            <div className="sb-prompt-group">
+                                <label className="sb-prompt-label">
+                                    <span className="material-symbols-outlined">translate</span>
+                                    Dialogue Language
+                                </label>
+                                <CfgMenu value={dialogueLanguage} onChange={setDialogueLanguage} options={LANGUAGES} icon="translate" />
                             </div>
 
                             <div className="sb-prompt-group">
@@ -671,6 +754,25 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Download
                             </a>
                             <button onClick={() => setPreviewVideo(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Image Preview Modal (Lightbox) */}
+        {previewImage && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }} onClick={() => setPreviewImage(null)}>
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%' }}>
+                        <img src={previewImage} style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 20px 80px rgba(0,0,0,0.6)', objectFit: 'contain' }} alt="Storyboard Zoom Preview" />
+                        <div style={{ position: 'absolute', top: -48, right: 0, display: 'flex', gap: 8 }}>
+                            <button onClick={() => handleDownloadImage(previewImage)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span> Download
+                            </button>
+                            <button onClick={() => setPreviewImage(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
                             </button>
                         </div>
