@@ -222,8 +222,10 @@ export async function registerShopifyWebhooks(accessToken, shopDomain, backendUr
         'orders/create',
         'orders/updated',
         'products/update',
-        'app/uninstalled'
+        'app/uninstalled',
+        'app_subscriptions/update'
     ];
+
 
     const results = [];
     for (const topic of topics) {

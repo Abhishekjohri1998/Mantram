@@ -9,8 +9,57 @@ import User from '../models/User.js';
 import { getSetting } from '../models/SystemSettings.js';
 import RetentionOffer from '../models/RetentionOffer.js';
 import Coupon from '../models/Coupon.js';
+import Integration from '../models/Integration.js';
+import {
+    createRecurringCharge,
+    createOneTimeCharge,
+    getSubscriptionDetails,
+    getOneTimePurchaseDetails
+} from '../services/shopifyBilling.js';
 
 const router = Router();
+
+// USD Pricing mapping for Shopify Billing
+const SUBSCRIPTION_USD_PRICING = {
+    creator: {
+        monthly: 19.99,
+        quarterly: 49.99,
+        yearly: 199.99,
+    },
+    professional: {
+        monthly: 49.99,
+        quarterly: 129.99,
+        yearly: 499.99,
+    }
+};
+
+const CREDIT_PACK_USD_PRICING = {
+    'festive-special': 29.99,
+    'micro': 1.99,
+    'spark': 3.99,
+    'boost': 9.99,
+    'power': 19.99,
+    'ultra': 24.99,
+    'stellar': 29.99,
+    'mega': 49.99,
+    'elite': 99.99,
+    'enterprise-pack': 179.99,
+};
+
+function getUSDPriceForPackage(slug, billingCycle, inrPrice) {
+    if (SUBSCRIPTION_USD_PRICING[slug] && SUBSCRIPTION_USD_PRICING[slug][billingCycle]) {
+        return SUBSCRIPTION_USD_PRICING[slug][billingCycle];
+    }
+    return parseFloat((inrPrice / 90).toFixed(2));
+}
+
+function getUSDPriceForCreditPack(slug, inrPrice) {
+    if (CREDIT_PACK_USD_PRICING[slug]) {
+        return CREDIT_PACK_USD_PRICING[slug];
+    }
+    return parseFloat((inrPrice / 90).toFixed(2));
+}
+
 
 let razorpay;
 function getRazorpay() {
@@ -629,6 +678,7 @@ router.get('/subscription-status', protect, async (req, res) => {
             cancelReason: sub.cancelReason,
             autoRenew: sub.autoRenew,
             retentionOfferApplied: sub.retentionOfferApplied,
+            paymentMethod: sub.paymentMethod,
         });
     } catch (error) {
         console.error('❌ Subscription Status Error:', error);
@@ -842,4 +892,357 @@ router.post('/accept-retention-offer', protect, async (req, res) => {
     }
 });
 
+// ═══════════════════════════════════════════════════
+//  SHOPIFY NATIVE BILLING API ENDPOINTS
+// ═══════════════════════════════════════════════════
+
+/**
+ * @desc    Get the current active billing provider (shopify or razorpay)
+ * @route   GET /api/payments/billing-provider
+ * @access  Private
+ */
+router.get('/billing-provider', protect, async (req, res) => {
+    try {
+        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify', status: 'connected' });
+        res.json({
+            success: true,
+            provider: integration ? 'shopify' : 'razorpay',
+            shopDomain: integration ? integration.platformData.shopDomain : null
+        });
+    } catch (error) {
+        console.error('❌ Get Billing Provider Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to detect billing provider' });
+    }
+});
+
+/**
+ * @desc    Create Shopify Recurring Charge (Subscription)
+ * @route   POST /api/payments/shopify/create-subscription
+ * @access  Private
+ */
+router.post('/shopify/create-subscription', protect, async (req, res) => {
+    try {
+        const { packageId, billingCycle = 'monthly' } = req.body;
+
+        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify', status: 'connected' }).select('+accessToken');
+        if (!integration) {
+            return res.status(400).json({ success: false, error: 'Shopify integration not connected. Please connect your store first.' });
+        }
+
+        const pkg = await SubscriptionPackage.findById(packageId);
+        if (!pkg) {
+            return res.status(404).json({ success: false, error: 'Package not found' });
+        }
+
+        const inrPrice = pkg.pricing[billingCycle] || pkg.pricing.monthly;
+        const usdPrice = getUSDPriceForPackage(pkg.slug, billingCycle, inrPrice);
+
+        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const returnUrl = `${backendUrl}/api/payments/shopify/callback?userId=${req.user._id}&packageId=${pkg._id}&billingCycle=${billingCycle}&shop=${integration.platformData.shopDomain}`;
+
+        console.log(`🛒 Creating Shopify subscription for shop ${integration.platformData.shopDomain}, price: $${usdPrice}`);
+        const result = await createRecurringCharge({
+            shopDomain: integration.platformData.shopDomain,
+            accessToken: integration.accessToken,
+            planName: `Mantram AI - ${pkg.name} Plan (${billingCycle})`,
+            price: usdPrice,
+            interval: billingCycle,
+            returnUrl
+        });
+
+        res.json({
+            success: true,
+            confirmationUrl: result.confirmationUrl,
+            chargeId: result.chargeId
+        });
+    } catch (error) {
+        console.error('❌ Shopify Create Subscription Error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Failed to initialize subscription' });
+    }
+});
+
+/**
+ * @desc    Shopify Subscription callback redirected by Shopify
+ * @route   GET /api/payments/shopify/callback
+ * @access  Public (invoked by merchant redirect after approval)
+ */
+router.get('/shopify/callback', async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    try {
+        const { charge_id, userId, packageId, billingCycle, shop } = req.query;
+
+        if (!charge_id) {
+            console.warn('⚠️ Shopify callback missing charge_id');
+            return res.redirect(`${frontendUrl}/credits?error=charge_not_approved`);
+        }
+
+        const integration = await Integration.findOne({ user: userId, platform: 'shopify', 'platformData.shopDomain': shop }).select('+accessToken');
+        if (!integration) {
+            console.warn(`⚠️ Shopify callback integration not found for user ${userId}, shop ${shop}`);
+            return res.redirect(`${frontendUrl}/credits?error=integration_not_found`);
+        }
+
+        const shopifySub = await getSubscriptionDetails(shop, integration.accessToken, charge_id);
+        if (!shopifySub || shopifySub.status !== 'ACTIVE') {
+            console.warn(`⚠️ Shopify subscription not active: ${charge_id} status is ${shopifySub?.status}`);
+            return res.redirect(`${frontendUrl}/credits?error=subscription_inactive`);
+        }
+
+        const pkg = await SubscriptionPackage.findById(packageId);
+        if (!pkg) {
+            return res.redirect(`${frontendUrl}/credits?error=package_not_found`);
+        }
+
+        // Calculate end date
+        const endDate = new Date();
+        if (billingCycle === 'yearly') endDate.setFullYear(endDate.getFullYear() + 1);
+        else endDate.setMonth(endDate.getMonth() + 1);
+
+        // Deactivate any existing active subscriptions before creating new one
+        await Subscription.updateMany(
+            { user: userId, status: 'active' },
+            { $set: { status: 'expired' } }
+        );
+
+        // Create subscription entry
+        const subData = {
+            user: userId,
+            plan: pkg.slug,
+            billingCycle,
+            credits: {
+                total: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
+                used: 0,
+            },
+            price: parseFloat(shopifySub.lineItems[0].plan.price.amount),
+            currency: 'USD',
+            startDate: new Date(),
+            endDate,
+            status: 'active',
+            paymentMethod: 'shopify',
+            transactionId: charge_id,
+        };
+
+        const subscription = await Subscription.create(subData);
+
+        // Update user
+        await User.findByIdAndUpdate(userId, {
+            plan: pkg.slug,
+            activeSubscription: subscription._id,
+            'credits.total': (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
+            'credits.used': 0,
+        });
+
+        console.log(`✅ Shopify subscription activated for ${shop} (user: ${userId}), plan: ${pkg.slug}`);
+
+        res.redirect(`${frontendUrl}/credits?shopify_billing=success&plan=${pkg.slug}`);
+    } catch (error) {
+        console.error('❌ Shopify Subscription Callback Error:', error);
+        res.redirect(`${frontendUrl}/credits?error=shopify_callback_failed&detail=${encodeURIComponent(error.message)}`);
+    }
+});
+
+/**
+ * @desc    Create Shopify One-Time Purchase for Credit Pack
+ * @route   POST /api/payments/shopify/create-topup
+ * @access  Private
+ */
+router.post('/shopify/create-topup', protect, async (req, res) => {
+    try {
+        const { packId } = req.body;
+
+        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify', status: 'connected' }).select('+accessToken');
+        if (!integration) {
+            return res.status(400).json({ success: false, error: 'Shopify integration not connected. Please connect your store first.' });
+        }
+
+        const pack = await CreditPack.findById(packId);
+        if (!pack || !pack.isActive) {
+            return res.status(400).json({ success: false, error: 'Invalid or inactive credit pack' });
+        }
+
+        const usdPrice = getUSDPriceForCreditPack(pack.slug, pack.price);
+
+        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const returnUrl = `${backendUrl}/api/payments/shopify/topup-callback?userId=${req.user._id}&packId=${pack._id}&shop=${integration.platformData.shopDomain}`;
+
+        console.log(`🛒 Creating Shopify one-time charge for shop ${integration.platformData.shopDomain}, pack: ${pack.name}, price: $${usdPrice}`);
+        const result = await createOneTimeCharge({
+            shopDomain: integration.platformData.shopDomain,
+            accessToken: integration.accessToken,
+            packName: `Mantram AI - ${pack.name} Pack`,
+            price: usdPrice,
+            returnUrl
+        });
+
+        res.json({
+            success: true,
+            confirmationUrl: result.confirmationUrl,
+            chargeId: result.chargeId
+        });
+    } catch (error) {
+        console.error('❌ Shopify Create Topup Error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Failed to initialize top-up' });
+    }
+});
+
+/**
+ * @desc    Shopify One-time purchase callback redirected by Shopify
+ * @route   GET /api/payments/shopify/topup-callback
+ * @access  Public (invoked by merchant redirect after approval)
+ */
+router.get('/shopify/topup-callback', async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    try {
+        const { charge_id, userId, packId, shop } = req.query;
+
+        if (!charge_id) {
+            console.warn('⚠️ Shopify top-up callback missing charge_id');
+            return res.redirect(`${frontendUrl}/credits?error=charge_not_approved`);
+        }
+
+        const integration = await Integration.findOne({ user: userId, platform: 'shopify', 'platformData.shopDomain': shop }).select('+accessToken');
+        if (!integration) {
+            console.warn(`⚠️ Shopify callback integration not found for user ${userId}, shop ${shop}`);
+            return res.redirect(`${frontendUrl}/credits?error=integration_not_found`);
+        }
+
+        const shopifyPurchase = await getOneTimePurchaseDetails(shop, integration.accessToken, charge_id);
+        if (!shopifyPurchase || shopifyPurchase.status !== 'ACTIVE') {
+            console.warn(`⚠️ Shopify purchase not active: ${charge_id} status is ${shopifyPurchase?.status}`);
+            return res.redirect(`${frontendUrl}/credits?error=purchase_inactive`);
+        }
+
+        const pack = await CreditPack.findById(packId);
+        if (!pack) {
+            return res.redirect(`${frontendUrl}/credits?error=pack_not_found`);
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.redirect(`${frontendUrl}/credits?error=user_not_found`);
+        }
+
+        const isFirstPurchase = !user.credits?.topUpExpiry;
+        const totalCredits = pack.credits + (pack.bonusCredits || 0);
+        const finalCredits = (isFirstPurchase && pack.isFirstPurchaseEligible) ? totalCredits * 2 : totalCredits;
+
+        const validityDays = pack.validityDays || 180;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + validityDays);
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $inc: { 'credits.topUp': finalCredits },
+                $set: { 'credits.topUpExpiry': expiry },
+            },
+            { returnDocument: 'after' }
+        );
+
+        // Update purchase statistics
+        await CreditPack.findByIdAndUpdate(packId, {
+            $inc: { purchaseCount: 1, totalRevenue: parseFloat(shopifyPurchase.price.amount) }
+        });
+
+        console.log(`💎 Shopify Top-up verified: +${finalCredits} credits for ${updatedUser.email}, expires ${expiry.toISOString()}`);
+
+        res.redirect(`${frontendUrl}/credits?shopify_topup=success&credits=${finalCredits}`);
+    } catch (error) {
+        console.error('❌ Shopify Top-up Callback Error:', error);
+        res.redirect(`${frontendUrl}/credits?error=shopify_callback_failed&detail=${encodeURIComponent(error.message)}`);
+    }
+});
+
+/**
+ * @desc    Cancel Shopify Subscription
+ * @route   POST /api/payments/shopify/cancel-subscription
+ * @access  Private
+ */
+router.post('/shopify/cancel-subscription', protect, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        const sub = await Subscription.findOne({
+            user: req.user._id,
+            status: 'active',
+            paymentMethod: 'shopify'
+        });
+
+        if (!sub) {
+            return res.status(404).json({ success: false, error: 'No active Shopify subscription found to cancel' });
+        }
+
+        const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify', status: 'connected' }).select('+accessToken');
+        if (!integration) {
+            return res.status(400).json({ success: false, error: 'Shopify integration not connected' });
+        }
+
+        // Cancel via Shopify GraphQL
+        const mutation = `
+            mutation appSubscriptionCancel($id: ID!) {
+                appSubscriptionCancel(id: $id) {
+                    appSubscription {
+                        id
+                        status
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+        `;
+
+        const cleanDomain = integration.platformData.shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const isLocal = cleanDomain.includes('localhost') || cleanDomain.includes('127.0.0.1');
+        const url = `${isLocal ? 'http' : 'https'}://${cleanDomain}/admin/api/2025-01/graphql.json`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': integration.accessToken,
+            },
+            body: JSON.stringify({
+                query: mutation,
+                variables: { id: sub.transactionId }
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Shopify cancel request failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(`Shopify cancel mutation errors: ${JSON.stringify(data.errors)}`);
+        }
+
+        const { appSubscriptionCancel } = data.data;
+        if (appSubscriptionCancel.userErrors && appSubscriptionCancel.userErrors.length > 0) {
+            throw new Error(appSubscriptionCancel.userErrors.map(e => e.message).join(', '));
+        }
+
+        // Update local DB subscription
+        sub.status = 'cancelled';
+        sub.cancelledAt = new Date();
+        sub.cancelReason = reason || '';
+        sub.gracePeriodEnd = sub.endDate || new Date();
+        sub.autoRenew = false;
+        await sub.save();
+
+        console.log(`🚫 Shopify Subscription cancelled for shop ${integration.platformData.shopDomain}`);
+
+        res.json({
+            success: true,
+            message: 'Shopify subscription cancelled. Access remains active until billing period ends.',
+            subscription: sub
+        });
+    } catch (error) {
+        console.error('❌ Shopify Cancel Subscription Error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Failed to cancel subscription' });
+    }
+});
+
 export default router;
+

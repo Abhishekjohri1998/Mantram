@@ -10,6 +10,9 @@ import Integration from '../models/Integration.js';
 import Product from '../models/Product.js';
 import ShopifyOrder from '../models/ShopifyOrder.js';
 import ShopifyCustomer from '../models/ShopifyCustomer.js';
+import Subscription from '../models/Subscription.js';
+import User from '../models/User.js';
+
 import {
     getShopifyAuthUrl,
     exchangeShopifyToken,
@@ -510,6 +513,39 @@ router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) 
         res.status(200).json({ received: true });
     } catch (error) {
         console.error('Webhook app-uninstalled error:', error);
+        res.status(200).json({ received: true });
+    }
+});
+
+router.post(['/webhooks/app-subscriptions-update', '/webhooks/app_subscriptions-update'], verifyShopifyWebhook, async (req, res) => {
+    try {
+        const payload = req.body.app_subscription || req.body;
+        const shop = req.headers['x-shopify-shop-domain'];
+        console.log(`🔔 Webhook: App subscription updated in ${shop} — status is ${payload.status}`);
+
+        if (payload.admin_graphql_api_id) {
+            const status = payload.status.toLowerCase(); // active, cancelled, declined, expired, frozen
+
+            const sub = await Subscription.findOne({ transactionId: payload.admin_graphql_api_id });
+            if (sub) {
+                if (status === 'active') {
+                    sub.status = 'active';
+                } else {
+                    sub.status = 'expired';
+                }
+                await sub.save();
+
+                if (sub.status === 'expired') {
+                    await User.findByIdAndUpdate(sub.user, {
+                        plan: 'free'
+                    });
+                }
+                console.log(`✅ Webhook: Local subscription ${sub._id} updated to ${sub.status}`);
+            }
+        }
+        res.status(200).json({ received: true });
+    } catch (error) {
+        console.error('Webhook app-subscriptions-update error:', error);
         res.status(200).json({ received: true });
     }
 });

@@ -1202,6 +1202,22 @@ export const payments = {
     getStoreVisibility: () => apiFetch('/payments/store-visibility'),
     subscriptionStatus: () => apiFetch('/payments/subscription-status'),
     getTopupPacks: () => apiFetch('/payments/topup-packs'),
+    billingProvider: () => apiFetch('/payments/billing-provider'),
+    shopifyCreateSubscription: (packageId, billingCycle = 'monthly') =>
+        apiFetch('/payments/shopify/create-subscription', {
+            method: 'POST',
+            body: JSON.stringify({ packageId, billingCycle })
+        }),
+    shopifyCreateTopup: (packId) =>
+        apiFetch('/payments/shopify/create-topup', {
+            method: 'POST',
+            body: JSON.stringify({ packId })
+        }),
+    shopifyCancelSubscription: (reason) =>
+        apiFetch('/payments/shopify/cancel-subscription', {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        }),
 };
 
 // ============ Funnel Studio API ============
