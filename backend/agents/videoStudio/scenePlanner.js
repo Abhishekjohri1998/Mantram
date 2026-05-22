@@ -166,7 +166,7 @@ export async function planScenes({
 
     const isNonEnglish = language.toLowerCase() !== 'english';
 
-    const systemPrompt = `You are a world-class ad director and cinematographer planning a ${targetDuration}-second video advertisement.
+    const systemPrompt = `You are a world-class ad director, screenwriter, and cinematographer planning a ${targetDuration}-second video advertisement.
 
 You must decompose this video into exactly ${sceneCount} SCENES. Each scene will be generated as a separate AI video clip and stitched together with crossfade transitions.
 
@@ -192,14 +192,18 @@ Every scene MUST reference these images to maintain visual consistency. Use @ima
 SCENE PLAN (you must produce exactly ${sceneCount} scenes):
 ${arcScenes.map((s, i) => `Scene ${i + 1} [${durations[i]}s] — ${s.role}: ${s.purpose} (suggested emotion: ${s.emotionSuggestion})`).join('\n')}
 
-RULES:
-1. Each scene MUST have a clear visual prompt suitable for an AI video model (describe what the camera sees)
-2. Each scene MUST have 1-3 DIALOGUE lines in format: DIALOGUE [emotion]: "text in ${language}"
-3. Scene prompts must describe TRANSITIONS: the end of each scene must visually flow into the next (e.g., "camera pushes into product close-up" → next scene starts with close-up)
-4. Maintain the same environment/setting across scenes unless the arc demands a location change
-5. Product must appear in at least ${Math.ceil(sceneCount * 0.7)} of ${sceneCount} scenes
-6. ${isNonEnglish ? `ALL dialogue MUST be in ${language} script/characters. If any line is in English, the output is REJECTED.` : 'Write natural, conversational dialogue.'}
-7. Think like a Superbowl ad director — every second must earn its place
+RULES & CREATIVE GUIDELINES:
+1. BRAND CATEGORY & EMOTIONAL ARC:
+   - Analyze the brand context, vertical, and product category. Tailor the visual language, camerawork, pacing, color palette, and mood to match the vertical (e.g. high-fashion luxury uses slow, dramatic, soft-lit, high-contrast, atmospheric studio shots with rich fabric textures; tech uses sleek, high-tech, futuristic UI overlays, dynamic movement, and clean blue/teal grading).
+   - Write creative, narrative-driven scenes that build an emotional arc (Hook, Build-up, Demonstration, Call to Action) instead of flat, literal summaries of product features.
+2. VISUAL PROMPT DEPTH & MOTION:
+   - Each visualPrompt must be a richly detailed, self-contained description (at least 100 words) describing the subject, active dynamic motion, camera angles (e.g., slow tracking shot, low-angle pan, close-up), lighting (e.g. golden hour backlight, soft diffused key light), and art direction. Avoid static poses; describe active, cinematic motion.
+3. SPATIAL CHAINING & MATCH CUTS:
+   - Design seamless visual transitions between scenes. The transitionOut of a scene must directly align with the opening framing of the next scene (e.g., a match cut on action or a camera push-in to a specific object/actor), creating a continuous and visually unified film.
+4. DIALOGUE:
+   - Write natural, emotionally resonant dialogue or voiceover (1-3 lines per scene) matching the suggested emotion, formatted as DIALOGUE [emotion]: "text in ${language}".
+   - ${isNonEnglish ? `ALL dialogue MUST be in ${language} script/characters. If any line is in English, the output is REJECTED.` : ''}
+5. Product must appear in at least ${Math.ceil(sceneCount * 0.7)} of ${sceneCount} scenes, integrated naturally into the environment.
 
 OUTPUT FORMAT (strict JSON array):
 [
@@ -207,12 +211,12 @@ OUTPUT FORMAT (strict JSON array):
     "sceneId": 1,
     "role": "HOOK",
     "duration": ${durations[0]},
-    "visualPrompt": "Detailed cinematic prompt describing what the camera sees...",
+    "visualPrompt": "Detailed cinematic prompt (100+ words) describing the action, lighting, color grading, setting, and subject, referencing @image1 and @image2...",
     "dialogue": [
       { "text": "dialogue line in ${language}", "emotion": "curious" }
     ],
     "camerawork": "Medium close-up at 50mm, slow dolly-in...",
-    "transitionOut": "Camera pushes into product close-up, creating match cut for next scene"
+    "transitionOut": "Camera pushes into close-up, matching the visual opening of next scene"
   }
 ]
 
@@ -303,11 +307,10 @@ export async function planStoryboardScenes({
 
     const isNonEnglish = language.toLowerCase() !== 'english';
 
-    const systemPrompt = `You are a world-class ad director and cinematographer. You are planning a long-form video ad of ${targetDuration} seconds based on a master storyboard.
+    const systemPrompt = `You are a world-class ad director, screenwriter, and cinematographer. You are planning a long-form video ad of ${targetDuration} seconds based on a master storyboard.
 
 The master storyboard consists of:
-1. A master storyboard poster image (grid of shots), which is reference image @image2.
-2. A master storyboard video prompt: "${videoPrompt}"
+1. A master storyboard video prompt: "${videoPrompt}"
 
 You must decompose this video into exactly ${sceneCount} sequential scenes/segments. Each segment will be generated as a separate AI video clip (around ${durations[0]}s each) and stitched together with crossfade transitions.
 
@@ -326,8 +329,10 @@ Every scene MUST reference these images to maintain visual consistency. Use @ima
 
 YOUR TASK:
 Decompose the master storyboard video prompt into exactly ${sceneCount} sequential segments.
+Analyze the brand category and vertical (e.g. luxury, tech, beauty, wellness, sports) and write visual prompts that align with that category's tone and styling, crafting an emotional and visually creative storyline.
+
 For each segment:
-1. Write a specific "visualPrompt" describing ONLY what happens in this segment of the storyboard sequence. Do NOT repeat the entire sequence. Focus on the camera movement, action, and continuity from the previous segment. The first segment starts from the product/first frame, and subsequent segments chain from the previous frame.
+1. Write a specific "visualPrompt" describing ONLY what happens in this segment of the storyboard sequence. Do NOT repeat the entire sequence. Focus on the camera movement, action, and continuity from the previous segment. Describe active dynamic motion, camera angles (e.g., slow dolly-in, tracking pan), lighting, and color grading. Subsequent segments should chain from the last frame of the previous one.
 2. Extract or write the DIALOGUE / VOICEOVER lines for this segment (in ${language}) in the format: DIALOGUE [emotion]: "text in ${language}". The dialogue lines must match the dialogues specified in the master storyboard video prompt, distributed chronologically. If no explicit dialogue is in the master storyboard for a segment, you may write relevant voiceover describing the product features or brand message.
 
 OUTPUT FORMAT (strict JSON array):
@@ -335,7 +340,7 @@ OUTPUT FORMAT (strict JSON array):
   {
     "sceneId": 1,
     "duration": ${durations[0]},
-    "visualPrompt": "Detailed cinematic prompt describing what the camera sees in this segment, referencing @image1 and @image2...",
+    "visualPrompt": "Detailed cinematic prompt (100+ words) describing the action, lighting, color grading, setting, and subject for this segment, referencing @image1 and @image2...",
     "dialogue": [
       { "text": "spoken dialogue line in ${language}", "emotion": "confident" }
     ]

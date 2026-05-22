@@ -5,8 +5,10 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import { uploadToS3 } from './s3.js';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
 const execFileAsync = promisify(execFile);
+const ffmpegPath = ffmpegInstaller.path || ffmpegInstaller.default?.path || 'ffmpeg';
 
 /**
  * Extracts the very last frame of a video and uploads it to S3.
@@ -31,7 +33,7 @@ export async function extractLastFrameToS3(videoUrl) {
 
         // Read the last 1 second of the video, continuously overwriting outPath.
         // The last frame processed will remain as the final outPath.
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-sseof', '-1', 
             '-i', videoPath,
             '-update', '1',
@@ -42,7 +44,7 @@ export async function extractLastFrameToS3(videoUrl) {
         
         // Fallback: If for some reason output wasn't created (e.g. video < 1s)
         if (!fs.existsSync(outPath)) {
-            await execFileAsync('ffmpeg', [
+            await execFileAsync(ffmpegPath, [
                 '-i', videoPath,
                 '-vframes', '1', // extract first frame as a fallback to prevent pipeline failure
                 '-q:v', '2',
@@ -94,7 +96,7 @@ export async function muxAudioOntoVideo(videoUrl, audioUrl) {
         fs.writeFileSync(audioPath, Buffer.from(await audioResp.arrayBuffer()));
 
         // Mux: replace video audio with TTS, truncate audio to video length
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y',
             '-i', videoPath,
             '-i', audioPath,
@@ -148,7 +150,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
             if (!resp.ok) {
                 console.warn(`⚠️ [ConcatAudio] Failed to download audio ${i}: ${resp.status}`);
                 // Generate silence for this scene
-                await execFileAsync('ffmpeg', [
+                await execFileAsync(ffmpegPath, [
                     '-y', '-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo`,
                     '-t', String(sceneDuration),
                     '-c:a', 'aac', '-b:a', '128k',
@@ -161,7 +163,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
 
             // Pad or trim the TTS audio to match the scene duration.
             // apad pads with silence if TTS is shorter; -t trims if TTS is longer.
-            await execFileAsync('ffmpeg', [
+            await execFileAsync(ffmpegPath, [
                 '-y',
                 '-i', audioFilePath,
                 '-af', `apad=whole_dur=${sceneDuration}`,
@@ -172,7 +174,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
             ], { timeout: 30000 });
         } else {
             // No TTS for this scene → generate silence matching scene duration
-            await execFileAsync('ffmpeg', [
+            await execFileAsync(ffmpegPath, [
                 '-y', '-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo`,
                 '-t', String(sceneDuration),
                 '-c:a', 'aac', '-b:a', '128k',
@@ -189,7 +191,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
     fs.writeFileSync(concatListPath, concatContent);
 
     const outputPath = path.join(tmpDir, 'voiceover-full.aac');
-    await execFileAsync('ffmpeg', [
+    await execFileAsync(ffmpegPath, [
         '-y', '-f', 'concat', '-safe', '0',
         '-i', concatListPath,
         '-c:a', 'aac', '-b:a', '192k',
@@ -268,7 +270,7 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
         outputPath,
     );
 
-    await execFileAsync('ffmpeg', ffmpegArgs, { timeout: 180000 });
+    await execFileAsync(ffmpegPath, ffmpegArgs, { timeout: 180000 });
     console.log(`✅ [MixAudio] Final video with audio: ${outputPath}`);
     return outputPath;
 }

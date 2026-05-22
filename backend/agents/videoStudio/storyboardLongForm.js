@@ -31,6 +31,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { allocateSceneDurations, planStoryboardScenes } from './scenePlanner.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
 import {
@@ -41,6 +42,7 @@ import {
 import { uploadToS3 } from '../../utils/s3.js';
 
 const execFileAsync = promisify(execFile);
+const ffmpegPath = ffmpegInstaller.path || ffmpegInstaller.default?.path || 'ffmpeg';
 
 // ── Segment sizing constants ─────────────────────────────────────────────────
 const OPTIMAL_SEGMENT_DURATION = 10; // seconds — keeps each Seedance task well within its 15s limit
@@ -343,11 +345,8 @@ async function _runPipeline(jobId, params) {
             // Subsequent segments: use the last frame of the previous segment
             const segmentFirstFrameUrl = i === 0 ? (params.firstFrameUrl || params.imageUrl) : lastFrameUrl;
 
-            // Build references: always include the master storyboard poster as a structural guide
+            // Build references
             const segmentRefs = [...params.referenceImages];
-            if (params.imageUrl && params.imageUrl !== segmentFirstFrameUrl) {
-                segmentRefs.unshift({ url: params.imageUrl, role: 'storyboard' });
-            }
 
             // Build per-segment prompt — enrich with position context
             const isLast   = i === segCount - 1;
@@ -454,7 +453,13 @@ async function _runPipeline(jobId, params) {
 
         // ═══ Phase 4: FFmpeg Normalize + Crossfade Stitch ════════════════════
         _setProgress(jobId, 'STITCHING', 'Normalizing and crossfading...', 0);
-        const stitchedPath = await _stitchWithCrossfade(tmpDir, segmentPaths, params.format, jobId);
+        
+        // Build valid durations for the successful segments
+        const validDurations = segmentVideoUrls
+            .map((url, idx) => url ? durations[idx] : null)
+            .filter(v => v !== null);
+
+        const stitchedPath = await _stitchWithCrossfade(tmpDir, segmentPaths, params.format, validDurations, jobId);
         _setProgress(jobId, 'STITCHING', 'Stitch complete', 100);
 
         if (job.cancelled) throw new Error('Cancelled by user');
@@ -583,7 +588,7 @@ async function _pollSegment(genResult, jobId, segIdx, totalSegs) {
 // FFmpeg: Normalize + Crossfade Stitch
 // (identical algorithm to longFormGenerator.stitchWithCrossfade)
 // ─────────────────────────────────────────────────────────────────────────────
-async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', jobId = '') {
+async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', prePlannedDurations = [], jobId = '') {
     const [w, h] = aspectRatio === '16:9' ? [1920, 1080]
         : aspectRatio === '1:1'  ? [1080, 1080]
         : [1080, 1920]; // 9:16 default
@@ -592,7 +597,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
 
     if (segmentPaths.length === 1) {
         const outPath = path.join(tmpDir, 'stitched.mp4');
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-an', '-movflags', '+faststart',
@@ -606,7 +611,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[i],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-an', '-movflags', '+faststart',
@@ -617,14 +622,15 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
 
     // Step 2: Get actual durations of each normalized clip
     const durations = [];
-    for (const np of normPaths) {
+    for (let i = 0; i < normPaths.length; i++) {
+        const np = normPaths[i];
         try {
             const { stdout } = await execFileAsync('ffprobe', [
                 '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', np,
             ], { timeout: 15000 });
-            durations.push(parseFloat(stdout.trim()) || 10);
+            durations.push(parseFloat(stdout.trim()) || prePlannedDurations[i] || 10);
         } catch {
-            durations.push(10);
+            durations.push(prePlannedDurations[i] || 10);
         }
     }
 
@@ -645,7 +651,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     }
 
     const outputPath = path.join(tmpDir, 'stitched.mp4');
-    await execFileAsync('ffmpeg', [
+    await execFileAsync(ffmpegPath, [
         '-y', ...inputs,
         '-filter_complex', filterParts.join(';'),
         '-map', '[vout]',

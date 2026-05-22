@@ -864,21 +864,28 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
             ? Math.ceil((audioTranscript.split(/\s+/).length / 150) * 60) // ~150 words/min
             : 0;
 
-        const systemPrompt = `You are a world-class film director and cinematographer with expertise in:
-- Visual storytelling and narrative structure
-- Audio-visual synchronization (matching visuals to spoken word)
-- Character consistency across multiple shots
-- Cinematic camera work, lighting, and color grading
-- Scene transitions and visual flow
+        const systemPrompt = `You are a world-class film director, screenwriter, and cinematographer with expertise in:
+- High-fidelity visual storytelling, creative screenplays, and narrative arcs.
+- Brand alignment and visual thematic aesthetics across various industries (e.g. luxury, tech, beauty, wellness, sports).
+- Audio-visual synchronization (matching visuals to spoken word/dialogue pacing).
+- Character and subject consistency across multiple consecutive shots.
+- Advanced cinematic camera work (framing, movement), artistic lighting design, and professional color grading.
+- Seamless scene transitions and spatial continuity.
 
-Your job: Given a creative brief (and optionally an audio transcript), produce a professional shot-by-shot storyboard as JSON.
+Your job: Given a creative brief (and optionally an audio transcript), analyze the brand category and produce a highly creative, emotional, and visually compelling shot-by-shot storyboard as JSON.
 
-CRITICAL RULES FOR VISUAL CONSISTENCY:
-1. Define "CHARACTER ANCHORS" — a precise physical description for each character that MUST appear VERBATIM in every scene's visualPrompt where that character appears
-2. Define a "VISUAL STYLE" — a consistent art direction string (e.g., "cinematic warm tones, shallow depth of field, golden hour lighting") that MUST appear in every scene's visualPrompt
-3. Each visualPrompt must be a self-contained, richly detailed prompt (as if it's the ONLY instruction a video generation AI will see)
-4. Include camera angle, lighting, color palette, and character positions in every visualPrompt
-5. Scenes must flow narratively — each should feel like the next shot in a continuous film
+CRITICAL RULES FOR NARRATIVE & VISUAL EXCELLENCE:
+1. BRAND CATEGORY TAILORING:
+   - Identify the brand's industry/vertical (e.g. luxury fashion, athletic performance, corporate tech, wellness, organic beauty) and tailor the tone, pacing, camerawork, color palette, and narrative structure to match this category's visual language and aspirations.
+   - Avoid flat, literal translations of the brief. Craft an emotional/thematic storyline that builds a strong narrative connection with the audience.
+2. CHARACTER ANCHORS:
+   - Define "CHARACTER ANCHORS" — a precise, detailed physical description (hair, face, clothing, build) for each character that MUST appear VERBATIM in every scene's visualPrompt where that character appears.
+3. VISUAL STYLE:
+   - Define a "VISUAL STYLE" — a consistent art direction string (e.g., "cinematic 35mm film look, warm golden hour backlighting, shallow depth of field") that MUST appear in every scene's visualPrompt.
+4. HIGH-END CINEMATOGRAPHY:
+   - Each visualPrompt must be a self-contained, richly detailed description (100+ words) specifying active, dynamic motion, framing/angle (e.g. low-angle tracking shot, slow dolly-in, close-up), lighting setups (e.g. high-contrast key lighting, soft diffused studio light), and color palette. Avoid static poses; describe active, cinematic motion.
+5. VISUAL CHAINING & CONTINUITY:
+   - Ensure the scenes flow narratively and spatially. The end of each scene should visually link to the next one (using matches, camera pans, zoom transitions, or narrative logical progression) to create a single continuous, coherent film.
 
 Output ONLY valid JSON. No markdown, no explanation, no commentary.`;
 
@@ -7835,9 +7842,6 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         const productRef = referenceImages.find(r => r.role === 'product');
         const firstFrameUrl = productRef ? productRef.url : imageUrl;
         const combinedReferences = referenceImages.filter(r => r.url !== firstFrameUrl);
-        if (firstFrameUrl !== imageUrl) {
-            combinedReferences.unshift({ url: imageUrl, role: 'storyboard' });
-        }
 
         console.log(`[Storyboard Animate] duration=${rawDuration}s | longForm=${isLongForm} | model=${model} | refs=${combinedReferences.length}`);
 

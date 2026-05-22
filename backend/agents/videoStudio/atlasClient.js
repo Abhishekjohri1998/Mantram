@@ -537,12 +537,12 @@ export async function submitAtlasCloudVideoGeneration({
     const registeredAssetUris = faceAssetUris.filter(u => u && u.startsWith('asset://'));
     const rawFallbackUrls     = faceAssetUris.filter(u => u && !u.startsWith('asset://'));
 
-    const imageCount     = registeredAssetUris.length + firstFrameAssetUris.length;
-    const effectiveCount = registeredAssetUris.length > 0 ? Math.max(imageCount, 2) : imageCount;
+    const imageCount     = registeredAssetUris.length + rawFallbackUrls.length + firstFrameAssetUris.length;
+    const effectiveCount = (registeredAssetUris.length > 0 || rawFallbackUrls.length > 0) ? Math.max(imageCount, 2) : imageCount;
     const modelName      = resolveModelName(qualityMode, effectiveCount);
     const dur            = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15);
 
-    console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | assetRefs=${registeredAssetUris.length} | firstFrame=${firstFrameAssetUris.length}`);
+    console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | assetRefs=${registeredAssetUris.length} | rawFallbacks=${rawFallbackUrls.length} | firstFrame=${firstFrameAssetUris.length}`);
     console.log(`📝 [Atlas] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
 
     const taskInput = {
