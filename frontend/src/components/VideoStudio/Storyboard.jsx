@@ -1,10 +1,26 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import './Storyboard.css';
 import AvatarPicker from './AvatarPicker';
-import { products } from '../../services/api';
+import { products, API_BASE } from '../../services/api';
 import VideoHoverActions from './VideoHoverActions';
 
-const API = '/api/video-studio';
+const API = `${API_BASE}/video-studio`;
+
+/**
+ * Safe JSON parser — returns a clean error when the backend is unreachable
+ * and the CDN/Nginx serves the SPA index.html (<!DOCTYPE html>) instead of JSON.
+ */
+async function safeJson(res) {
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+        const text = (await res.text()).substring(0, 200);
+        if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+            throw new Error('Backend unreachable — the server may be restarting. Please try again in a moment.');
+        }
+        throw new Error(`Server returned non-JSON response (${res.status})`);
+    }
+    return res.json();
+}
 
 const STYLES = [
     { id: 'hyperrealistic', label: 'Hyperrealistic', icon: 'camera', desc: 'Photorealistic DSLR commercial' },
@@ -255,7 +271,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
                 body: JSON.stringify({ projectId, imagePrompt, style: defaultStyle, format, imageModel, dialogueLanguage }),
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (data.success) {
                 if (data.imageUrl) setImageUrl(data.imageUrl);
                 if (data.videoPrompt) setVideoPrompt(data.videoPrompt);
@@ -307,7 +323,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 body: fd,
             });
 
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!data.success) throw new Error(data.error || 'Storyboard generation failed');
 
             setProjectId(data.projectId);
@@ -355,7 +371,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 }),
             });
 
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!data.success) throw new Error(data.error || 'Animation failed to start');
 
             if (data.longForm) {
@@ -383,7 +399,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 const res = await fetch(`${API}/storyboard/status/${projectId}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
                 });
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (!data.success) return;
 
                 setOverallProgress(data.overallProgress || 0);
