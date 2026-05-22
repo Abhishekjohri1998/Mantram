@@ -283,3 +283,109 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
         transitionOut: 'Smooth crossfade to next scene',
     }));
 }
+
+/**
+ * Decompose storyboard's master videoPrompt into sequential scenes
+ */
+export async function planStoryboardScenes({
+    videoPrompt,
+    imageUrl,
+    targetDuration,
+    model = 'seedance-2.0',
+    language = 'English',
+    brandContext = '',
+    productName = '',
+    productFeatures = '',
+    referenceImages = [],
+}) {
+    const sceneCount = calculateSceneCount(targetDuration, model);
+    const durations = allocateSceneDurations(targetDuration, sceneCount, model);
+
+    const isNonEnglish = language.toLowerCase() !== 'english';
+
+    const systemPrompt = `You are a world-class ad director and cinematographer. You are planning a long-form video ad of ${targetDuration} seconds based on a master storyboard.
+
+The master storyboard consists of:
+1. A master storyboard poster image (grid of shots), which is reference image @image2.
+2. A master storyboard video prompt: "${videoPrompt}"
+
+You must decompose this video into exactly ${sceneCount} sequential scenes/segments. Each segment will be generated as a separate AI video clip (around ${durations[0]}s each) and stitched together with crossfade transitions.
+
+TOTAL DURATION: ${targetDuration}s across ${sceneCount} scenes
+DIALOGUE LANGUAGE: ${language}${isNonEnglish ? ` — ALL dialogue MUST be in ${language} script/characters. NO English.` : ''}
+
+BRAND CONTEXT:
+${brandContext || 'No brand data available.'}
+
+PRODUCT:
+  Name: ${productName || 'Unknown'}
+  Features: ${productFeatures || 'Highlight product features visually'}
+
+REFERENCE IMAGES: ${referenceImages.length} images provided (product + avatar).
+Every scene MUST reference these images to maintain visual consistency. Use @image1, @image2, etc.
+
+YOUR TASK:
+Decompose the master storyboard video prompt into exactly ${sceneCount} sequential segments.
+For each segment:
+1. Write a specific "visualPrompt" describing ONLY what happens in this segment of the storyboard sequence. Do NOT repeat the entire sequence. Focus on the camera movement, action, and continuity from the previous segment. The first segment starts from the product/first frame, and subsequent segments chain from the previous frame.
+2. Extract or write the DIALOGUE / VOICEOVER lines for this segment (in ${language}) in the format: DIALOGUE [emotion]: "text in ${language}". The dialogue lines must match the dialogues specified in the master storyboard video prompt, distributed chronologically. If no explicit dialogue is in the master storyboard for a segment, you may write relevant voiceover describing the product features or brand message.
+
+OUTPUT FORMAT (strict JSON array):
+[
+  {
+    "sceneId": 1,
+    "duration": ${durations[0]},
+    "visualPrompt": "Detailed cinematic prompt describing what the camera sees in this segment, referencing @image1 and @image2...",
+    "dialogue": [
+      { "text": "spoken dialogue line in ${language}", "emotion": "confident" }
+    ]
+  }
+]
+
+Return ONLY the JSON array. No explanation, no markdown.`;
+
+    const userPrompt = `Decompose this master video prompt into ${sceneCount} segments for a ${targetDuration}s video: "${videoPrompt?.substring(0, 1000)}"`;
+
+    console.log(`[ScenePlanner] Decomposing storyboard into ${sceneCount} scenes for ${targetDuration}s video...`);
+
+    let rawOutput;
+    try {
+        rawOutput = await callAgentText(systemPrompt, userPrompt, 0.7, 8000);
+    } catch (err) {
+        console.error(`[ScenePlanner] Storyboard planning LLM call failed: ${err.message}`);
+        // Fallback: divide master prompt into segments
+        return durations.map((dur, i) => ({
+            sceneId: i + 1,
+            duration: dur,
+            visualPrompt: `Segment ${i + 1} of ${sceneCount}: Continue storyboard flow. ${videoPrompt?.substring(0, 300)}`,
+            dialogue: [],
+        }));
+    }
+
+    try {
+        let cleaned = rawOutput.trim();
+        if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        }
+        const scenes = JSON.parse(cleaned);
+
+        if (!Array.isArray(scenes) || scenes.length === 0) {
+            throw new Error('Empty scene array');
+        }
+
+        return scenes.map((scene, i) => ({
+            sceneId: scene.sceneId || i + 1,
+            duration: durations[i] || scene.duration || 10,
+            visualPrompt: scene.visualPrompt || scene.prompt || `Segment ${i+1}: Continue storyboard flow.`,
+            dialogue: Array.isArray(scene.dialogue) ? scene.dialogue : [],
+        }));
+    } catch (parseErr) {
+        console.warn(`[ScenePlanner] Storyboard JSON parse failed: ${parseErr.message}`);
+        return durations.map((dur, i) => ({
+            sceneId: i + 1,
+            duration: dur,
+            visualPrompt: `Segment ${i + 1} of ${sceneCount}: Continue storyboard flow. ${videoPrompt?.substring(0, 300)}`,
+            dialogue: [],
+        }));
+    }
+}

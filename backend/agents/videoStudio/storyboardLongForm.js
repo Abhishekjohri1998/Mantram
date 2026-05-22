@@ -31,7 +31,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
-import { allocateSceneDurations } from './scenePlanner.js';
+import { allocateSceneDurations, planStoryboardScenes } from './scenePlanner.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
 import {
     extractLastFrameToS3,
@@ -213,6 +213,76 @@ async function _runPipeline(jobId, params) {
 
         job.segmentStatuses = durations.map(() => ({ status: 'pending', progress: 0 }));
 
+        // Load project info and brand context from MongoDB
+        let brandContext = '';
+        let productName = '';
+        let productFeatures = '';
+        let dialogueLanguage = params.voiceoverLanguage || 'English';
+        let voiceoverScript = params.voiceoverScript || '';
+
+        if (params.projectId) {
+            try {
+                const mongoose = (await import('mongoose')).default;
+                const VideoProject = mongoose.model('VideoProject');
+                const Brand = mongoose.model('Brand');
+                const project = await VideoProject.findById(params.projectId).populate('brand');
+                if (project) {
+                    if (project.storyboard) {
+                        if (project.storyboard.dialogueLanguage) {
+                            dialogueLanguage = project.storyboard.dialogueLanguage;
+                        }
+                        if (project.storyboard.voiceoverScript && !voiceoverScript) {
+                            voiceoverScript = project.storyboard.voiceoverScript;
+                        }
+                    }
+                    if (project.brand) {
+                        const brand = project.brand;
+                        productName = brand.name || '';
+                        if (brand.dna) {
+                            const desc = brand.dna.brandDescription || brand.dna.companyOverview || '';
+                            const tagline = brand.dna.tagline || '';
+                            const personality = brand.dna.voice?.personality || '';
+                            const voiceDesc = brand.dna.voice?.description || '';
+                            const uniqueSellingPoints = Array.isArray(brand.dna.uniqueSellingPoints) ? brand.dna.uniqueSellingPoints.join(', ') : '';
+                            brandContext = `Brand Name: ${brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nVoice/Personality: ${personality} - ${voiceDesc}\nUSPs: ${uniqueSellingPoints}`;
+                        }
+                    }
+                    if (project.input) {
+                        productFeatures = project.input.brief || '';
+                    }
+                }
+            } catch (dbErr) {
+                console.warn(`[SB LongForm ${jobId}] Failed to load project metadata from DB: ${dbErr.message}`);
+            }
+        }
+
+        _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
+        let scenes = [];
+        try {
+            scenes = await planStoryboardScenes({
+                videoPrompt: params.videoPrompt,
+                imageUrl: params.imageUrl,
+                targetDuration: params.totalDuration,
+                model: params.model,
+                language: dialogueLanguage,
+                brandContext,
+                productName,
+                productFeatures,
+                referenceImages: params.referenceImages || [],
+            });
+            console.log(`[SB LongForm ${jobId}] 📋 Decomposed into ${scenes.length} scenes.`);
+        } catch (planErr) {
+            console.error(`[SB LongForm ${jobId}] Scene planning failed: ${planErr.message}. Using fallback.`);
+            scenes = durations.map((dur, i) => ({
+                sceneId: i + 1,
+                duration: dur,
+                visualPrompt: `Segment ${i + 1} of ${segCount}: Continue storyboard flow. ${params.videoPrompt?.substring(0, 300)}`,
+                dialogue: [],
+            }));
+        }
+
+        job.scenes = scenes;
+
         _setProgress(jobId, 'PLANNING', `${segCount} segments × ~${durations[0]}s each`, 100);
         console.log(`[SB LongForm ${jobId}] 📋 Segment plan: ${durations.map((d, i) => `#${i+1}(${d}s)`).join(' → ')}`);
 
@@ -226,17 +296,35 @@ async function _runPipeline(jobId, params) {
         let lastFrameUrl = params.firstFrameUrl || params.imageUrl;
         let completedCount = 0;
 
-        // Pre-generate TTS segments if a voiceover script is provided
-        if (params.voiceoverScript) {
+        // Pre-generate TTS segments
+        if (voiceoverScript) {
             _setProgress(jobId, 'GENERATING', 'Generating voiceover segments...', 0);
-            const scriptChunks = _splitScriptIntoSegments(params.voiceoverScript, segCount);
+            const scriptChunks = _splitScriptIntoSegments(voiceoverScript, segCount);
             for (let i = 0; i < segCount; i++) {
                 if (scriptChunks[i]) {
                     try {
-                        segmentAudioUrls[i] = await _generateTTS(scriptChunks[i], params.voiceoverLanguage, 'confident');
+                        segmentAudioUrls[i] = await _generateTTS(scriptChunks[i], dialogueLanguage, 'confident');
                         console.log(`[SB LongForm ${jobId}] 🎤 Segment ${i+1} TTS: ${segmentAudioUrls[i]?.substring(0, 60) || 'SKIP'}...`);
                     } catch (ttsErr) {
                         console.warn(`[SB LongForm ${jobId}] ⚠️ TTS segment ${i+1} failed: ${ttsErr.message}`);
+                    }
+                }
+            }
+        } else {
+            // Generate TTS from segment dialogues
+            _setProgress(jobId, 'GENERATING', 'Generating scene voiceovers...', 0);
+            for (let i = 0; i < scenes.length; i++) {
+                const scene = scenes[i];
+                const dialogueText = scene.dialogue && scene.dialogue.length > 0
+                    ? scene.dialogue.map(d => d.text).join(' ').trim()
+                    : '';
+                if (dialogueText) {
+                    try {
+                        const emotion = scene.dialogue[0]?.emotion || 'confident';
+                        segmentAudioUrls[i] = await _generateTTS(dialogueText, dialogueLanguage, emotion);
+                        console.log(`[SB LongForm ${jobId}] 🎤 Scene ${i+1} dialogue TTS: ${segmentAudioUrls[i]?.substring(0, 60)}...`);
+                    } catch (ttsErr) {
+                        console.warn(`[SB LongForm ${jobId}] ⚠️ TTS for scene ${i+1} failed: ${ttsErr.message}`);
                     }
                 }
             }
@@ -267,7 +355,8 @@ async function _runPipeline(jobId, params) {
                 : isLast   ? 'CLOSING of the film — bring the story to a cinematic conclusion.'
                 : `CONTINUATION — maintain exact visual style from previous segment. Seamlessly continue the action.`;
 
-            const segPrompt = `${params.videoPrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency.`;
+            const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
+            const segPrompt = `${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency.`;
 
             const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
 
@@ -422,11 +511,21 @@ async function _runPipeline(jobId, params) {
             try {
                 const mongoose = (await import('mongoose')).default;
                 const VideoProject = mongoose.model('VideoProject');
+
+                let fullVoiceoverScript = voiceoverScript;
+                if (!fullVoiceoverScript && scenes && scenes.length > 0) {
+                    fullVoiceoverScript = scenes
+                        .map(s => (s.dialogue || []).map(d => d.text).join(' '))
+                        .filter(Boolean)
+                        .join('\n');
+                }
+
                 await VideoProject.findByIdAndUpdate(params.projectId, {
                     'storyboard.status': 'done',
                     'storyboard.progress': 100,
                     'storyboard.finalVideoUrl': videoUrl,
                     'storyboard.longFormJobId': jobId,
+                    'storyboard.voiceoverScript': fullVoiceoverScript,
                     status: 'done',
                     finalVideoUrl: videoUrl,
                 });
