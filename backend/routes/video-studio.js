@@ -66,6 +66,7 @@ import redis from '../utils/redisClient.js';
 import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
 import { runStoryboardDirector, recreateVideoPrompt } from '../agents/videoStudio/storyboardDirector.js';
 import { generateStoryboardPoster } from '../agents/videoStudio/storyboardFrames.js';
+import { startStoryboardLongForm, getStoryboardLongFormJobStatus, estimateStoryboardLongFormCredits } from '../agents/videoStudio/storyboardLongForm.js';
 import { stitchVideoClips } from '../utils/videoStitcher.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -7768,8 +7769,28 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
 // ── POST /api/video-studio/storyboard/animate ────────────────────────────────
 // Step 3: Animate each storyboard frame via I2V (Seedance 2.0)
 // After all shots done (>15s total), auto-stitch into final film
-router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'), async (req, res) => {
+//
+// CREDIT GATE STRATEGY:
+//   ≤15s  → requireCredits('storyboardAnimate')        — applied inline
+//   >15s  → requireCredits('storyboardAnimateLongForm')  — applied inline
+// We cannot select the key at route-definition time because it depends on req.body.duration,
+// so we use a wrapper handler that calls the correct middleware first, then runs the business logic.
+router.post('/storyboard/animate', protect, async (req, res) => {
     try {
+        const rawDuration  = parseInt(req.body.duration) || 10;
+        const isLongForm   = rawDuration > 15;
+        const creditAction = isLongForm ? 'storyboardAnimateLongForm' : 'storyboardAnimate';
+
+        // Apply the correct credit middleware synchronously before any business logic.
+        // requireCredits is statically imported at the top of this file (L26).
+        // If credits are insufficient it sends a 403 and returns — we check res.headersSent.
+        await new Promise((resolve, reject) =>
+            requireCredits(creditAction)(req, res, (err) => err ? reject(err) : resolve())
+        );
+
+        // If requireCredits already sent a response (403 insufficient credits), stop here.
+        if (res.headersSent) return;
+
         const {
             projectId,
             imageUrl,
@@ -7785,7 +7806,7 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
 
         if (!imageUrl) return res.status(400).json({ success: false, error: 'No imageUrl provided' });
 
-        // Reference images: Prefer DB values, fallback to body
+        // ── Reference images (same logic as before) ──────────────────────────
         let referenceImages = [];
         let dbAvatar = null;
         let dbProductImgs = [];
@@ -7794,7 +7815,6 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
             if (project) {
                 dbProductImgs = project.input?.images?.map(img => img.url).filter(Boolean) || [];
                 dbAvatar = project.input?.avatarUrl || null;
-                // Pass both avatar and product with explicit roles so Seedance doesn't hallucinate
                 referenceImages = [
                     ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
                     ...dbProductImgs.map(url => ({ url, role: 'product' }))
@@ -7812,41 +7832,89 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
             ];
         }
 
-        // KEY FIX: Seedance reference-to-video REQUIRES an initial first frame (image_urls). 
-        // If we omit it (null), it silently falls back to T2V and drops ALL reference images.
-        // We MUST use the real product image as the First Frame to ensure the video starts with the exact product, not the hallucinated storyboard product.
         const productRef = referenceImages.find(r => r.role === 'product');
         const firstFrameUrl = productRef ? productRef.url : imageUrl;
-        
-        // We filter out the chosen first frame from references to avoid duplication,
-        // and we inject the storyboard poster as a structural reference.
         const combinedReferences = referenceImages.filter(r => r.url !== firstFrameUrl);
         if (firstFrameUrl !== imageUrl) {
             combinedReferences.unshift({ url: imageUrl, role: 'storyboard' });
         }
 
-        console.log(`[Storyboard Animate] 1 video, model=${model}, final refs=${combinedReferences.length}, firstFrameUrl starts with: ${firstFrameUrl?.substring(0, 50)}`);
+        console.log(`[Storyboard Animate] duration=${rawDuration}s | longForm=${isLongForm} | model=${model} | refs=${combinedReferences.length}`);
 
+        // ══════════════════════════════════════════════════════════════════════
+        // LONG-FORM PATH (>15s) — fire and forget, return jobId for polling
+        // ══════════════════════════════════════════════════════════════════════
+        if (isLongForm) {
+            const voiceoverScript  = req.body.voiceoverScript || '';
+            const voiceoverLanguage = req.body.dialogueLanguage || req.body.voiceoverLanguage || 'English';
+            const bgmPreset        = req.body.bgmPreset || 'cinematic';
+            const qualityMode      = model === 'seedance-2.0' ? 'quality' : 'fast';
+
+            const jobId = startStoryboardLongForm({
+                projectId: projectId || null,
+                userId: req.user._id,
+                imageUrl,
+                firstFrameUrl,
+                videoPrompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                totalDuration: rawDuration,
+                format,
+                resolution,
+                referenceImages: combinedReferences,
+                model,
+                qualityMode,
+                voiceoverScript,
+                voiceoverLanguage,
+                bgmPreset,
+            });
+
+            // Persist jobId + voiceoverScript to DB immediately
+            // voiceoverScript is persisted so it survives a server restart
+            if (projectId) {
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    $set: {
+                        'storyboard.longFormJobId': jobId,
+                        'storyboard.status': 'animating',
+                        'storyboard.totalDuration': rawDuration,
+                        'storyboard.voiceoverScript': voiceoverScript,
+                        status: 'animating',
+                    },
+                });
+            }
+
+            const estimate = estimateStoryboardLongFormCredits(rawDuration);
+            return res.json({
+                success: true,
+                projectId,
+                jobId,
+                longForm: true,
+                segments: estimate.segments,
+                creditsCharged: req.creditsDeducted || 0,
+                totalDuration: rawDuration,
+            });
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // SINGLE-SHOT PATH (≤15s) — original behavior, unchanged
+        // ══════════════════════════════════════════════════════════════════════
         let taskId = null;
         try {
             const genResult = await submitAtlasCloudVideoGeneration({
-                imageUrl: firstFrameUrl, // Start with the real product (or storyboard fallback)
-                prompt: videoPrompt || "Follow the attached storyboard exact visual flow.",
+                imageUrl: firstFrameUrl,
+                prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
                 duration: duration || 10,
                 aspectRatio: format,
                 referenceImages: combinedReferences,
                 generateAudio: true,
                 qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
                 resolution,
-                imageRole: 'mixed' // handled explicitly by reference roles in atlasClient
+                imageRole: 'mixed'
             });
             taskId = genResult.taskId;
 
-            // Update DB
             if (projectId) {
                 await VideoProject.findByIdAndUpdate(projectId, {
-                    $set: { 
-                        'storyboard.taskId': taskId, 
+                    $set: {
+                        'storyboard.taskId': taskId,
                         'storyboard.status': 'animating',
                         status: 'animating'
                     }
@@ -7861,12 +7929,13 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
             success: true,
             projectId,
             taskId,
+            longForm: false,
         });
     } catch (err) {
+        // Only send error response if headers haven't been sent yet
+        // (requireCredits may have already sent a 403)
+        if (res.headersSent) return;
         console.error('[Storyboard Animate] Critical Error:', err);
-        if (err.response) {
-            err.response.text().then(text => console.error('[Storyboard Animate] Error Response:', text)).catch(() => {});
-        }
         if (req.creditsDeducted > 0) {
             await refundCredits(req.user._id, req.creditsDeducted, 'storyboardAnimateRefund', `Storyboard animate failed: ${safeErrorMessage(err)}`, 'video');
         }
@@ -7875,54 +7944,116 @@ router.post('/storyboard/animate', protect, requireCredits('storyboardAnimate'),
 });
 
 // ── GET /api/video-studio/storyboard/status/:projectId ───────────────────────
-// Poll animation status for the single video
+// Poll animation status — handles both single-shot (taskId) and long-form (longFormJobId)
 router.get('/storyboard/status/:projectId', protect, async (req, res) => {
     try {
         const project = await VideoProject.findOne({ _id: req.params.projectId, user: req.user._id });
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
 
         const storyboard = project.storyboard || {};
-        const taskId = storyboard.taskId;
 
-        if (!taskId) return res.status(400).json({ success: false, error: 'No animation task found' });
-
+        // ── ALREADY DONE ─────────────────────────────────────────────────────
         if (storyboard.status === 'done' || storyboard.finalVideoUrl) {
             const rawUrl = storyboard.finalVideoUrl || project.finalVideoUrl;
             const signedUrl = await getSignedUrlIfNeeded(rawUrl);
             return res.json({
-                success: true,
-                projectId: project._id,
-                allDone: true,
-                finalVideoUrl: signedUrl,
-                status: 'COMPLETED'
+                success: true, projectId: project._id, allDone: true,
+                finalVideoUrl: signedUrl, status: 'COMPLETED', overallProgress: 100,
             });
         }
 
+        // ── FAILED ────────────────────────────────────────────────────────────
         if (storyboard.status === 'failed') {
             return res.json({
-                success: true,
-                projectId: project._id,
-                allDone: false,
-                anyFailed: true,
-                error: storyboard.error,
-                status: 'FAILED'
+                success: true, projectId: project._id, allDone: false,
+                anyFailed: true, error: storyboard.error, status: 'FAILED',
             });
         }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // LONG-FORM PATH — poll the in-memory job tracker
+        // ══════════════════════════════════════════════════════════════════════
+        if (storyboard.longFormJobId) {
+            const jobStatus = getStoryboardLongFormJobStatus(storyboard.longFormJobId);
+
+            if (!jobStatus) {
+                // Job not in memory — either server restarted or it completed
+                // Fall through to legacy taskId path or return IN_PROGRESS
+                if (!storyboard.taskId) {
+                    return res.json({
+                        success: true, projectId: project._id, status: 'IN_PROGRESS',
+                        overallProgress: storyboard.progress || 10,
+                        phaseLabel: 'Processing...', detail: '',
+                        isLongForm: true,
+                    });
+                }
+                // (fall through to taskId path)
+            } else if (jobStatus.status === 'COMPLETED') {
+                // Job completed — videoUrl should already be persisted by auto-persist in storyboardLongForm.js
+                const finalUrl = storyboard.finalVideoUrl || jobStatus.videoUrl;
+                const signed = finalUrl ? await getSignedUrlIfNeeded(finalUrl) : null;
+
+                if (!storyboard.finalVideoUrl && finalUrl) {
+                    // Catch-up persist in case auto-persist had a race condition
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'storyboard.status': 'done',
+                        'storyboard.finalVideoUrl': finalUrl,
+                        status: 'done', finalVideoUrl: finalUrl,
+                    });
+                }
+
+                return res.json({
+                    success: true, projectId: project._id, allDone: true,
+                    finalVideoUrl: signed, status: 'COMPLETED', overallProgress: 100,
+                    isLongForm: true,
+                });
+
+            } else if (jobStatus.status === 'FAILED') {
+                await VideoProject.findByIdAndUpdate(project._id, {
+                    'storyboard.status': 'failed',
+                    'storyboard.error': jobStatus.error || 'Long-form generation failed',
+                });
+                return res.json({
+                    success: true, projectId: project._id, allDone: false, anyFailed: true,
+                    error: jobStatus.error, status: 'FAILED', isLongForm: true,
+                });
+
+            } else {
+                // IN_PROGRESS — return rich phase info for the frontend progress bar
+                const completedSegs = (jobStatus.segmentStatuses || []).filter(s => s.status === 'completed').length;
+                const totalSegs = (jobStatus.segmentStatuses || []).length;
+
+                return res.json({
+                    success: true, projectId: project._id, allDone: false,
+                    status: 'IN_PROGRESS',
+                    overallProgress: jobStatus.progress || 10,
+                    phaseLabel: jobStatus.phaseLabel || 'Generating...',
+                    detail: jobStatus.detail || '',
+                    segments: { completed: completedSegs, total: totalSegs },
+                    isLongForm: true,
+                });
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // SINGLE-SHOT PATH — poll Atlas taskId (original behavior)
+        // ══════════════════════════════════════════════════════════════════════
+        const taskId = storyboard.taskId;
+        if (!taskId) return res.status(400).json({ success: false, error: 'No animation task found' });
 
         try {
             const result = await getUnifiedGenerationStatus('atlascloud', taskId, null, null);
-            
+
             let updatedStatus = storyboard.status;
             let updatedProgress = storyboard.progress || 10;
             let finalVideoUrl = null;
             let error = null;
 
             if (result?.status === 'COMPLETED' && result.videoUrl) {
-                // Mirror to S3
                 finalVideoUrl = await ensureS3Url(result.videoUrl, `storyboard/final/${project._id}/final-film.mp4`) || result.videoUrl;
                 updatedStatus = 'done';
                 updatedProgress = 100;
-                
+
                 await VideoProject.findByIdAndUpdate(project._id, {
                     'storyboard.status': 'done',
                     'storyboard.progress': 100,
@@ -7933,27 +8064,25 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
             } else if (result?.status === 'FAILED') {
                 updatedStatus = 'failed';
                 error = result.error || 'Generation failed';
-                
                 await VideoProject.findByIdAndUpdate(project._id, {
                     'storyboard.status': 'failed',
                     'storyboard.error': error,
                 });
             } else {
                 updatedProgress = result?.progress || storyboard.progress || 10;
-                
                 await VideoProject.findByIdAndUpdate(project._id, {
                     'storyboard.progress': updatedProgress,
                 });
             }
 
             res.json({
-                success: true,
-                projectId: project._id,
+                success: true, projectId: project._id,
                 allDone: updatedStatus === 'done',
                 anyFailed: updatedStatus === 'failed',
                 overallProgress: updatedProgress,
                 finalVideoUrl: finalVideoUrl ? await getSignedUrlIfNeeded(finalVideoUrl) : null,
                 status: updatedStatus === 'done' ? 'COMPLETED' : updatedStatus === 'failed' ? 'FAILED' : 'IN_PROGRESS',
+                isLongForm: false,
             });
 
         } catch (pollErr) {

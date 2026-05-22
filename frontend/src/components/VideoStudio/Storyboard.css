@@ -411,8 +411,8 @@
 }
 .sb-animate-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,77,0,0.4); }
 
-/* Animating bar */
-.sb-animating-bar { width: 100%; }
+/* .sb-animating-bar flex rules are defined at the bottom of this file (Long-Form Progress UI section) */
+
 .sb-overall-progress {
     display: flex; align-items: center; gap: 12px; width: 100%;
     font-size: 13px; color: var(--sys-text);
@@ -697,4 +697,65 @@
 }
 @keyframes spin {
     100% { transform: rotate(360deg); }
+}
+
+/* ── Long-Form Progress UI ── */
+.sb-animating-bar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sb-lf-progress-detail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Segment dot indicators — one dot per segment */
+.sb-lf-segments {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.sb-lf-seg-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: background 0.4s ease, transform 0.2s ease;
+    display: inline-block;
+}
+
+.sb-lf-seg-dot.done {
+    background: #22c55e;
+    border-color: #22c55e;
+}
+
+.sb-lf-seg-dot.active {
+    background: var(--sys-primary);
+    border-color: var(--sys-primary);
+    transform: scale(1.3);
+    box-shadow: 0 0 8px rgba(255, 77, 0, 0.5);
+    animation: sbPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sbPulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(255, 77, 0, 0.4); }
+    50%       { box-shadow: 0 0 14px rgba(255, 77, 0, 0.7); }
+}
+
+/* Phase detail text below dots */
+.sb-lf-detail {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+    letter-spacing: 0.3px;
+    max-width: 400px;
 }

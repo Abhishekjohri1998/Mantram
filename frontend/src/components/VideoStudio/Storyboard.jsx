@@ -20,11 +20,13 @@ const FORMATS = [
 ];
 
 const DURATIONS = [
-    { value: 5, label: '5s (Short)' },
-    { value: 10, label: '10s (Bumper)' },
-    { value: 15, label: '15s (Standard)' },
-    { value: 30, label: '30s (Hero)' },
-    { value: 60, label: '60s (Long)' }
+    { value: 5,   label: '5s (Short)' },
+    { value: 10,  label: '10s (Bumper)' },
+    { value: 15,  label: '15s (Standard)' },
+    { value: 30,  label: '30s (Hero)' },
+    { value: 60,  label: '60s (Long)' },
+    { value: 90,  label: '90s (Extended) ★' },
+    { value: 120, label: '2 min (Epic) ★' },
 ];
 
 const MODELS = [
@@ -124,6 +126,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [previewImage, setPreviewImage] = useState(null);
     const [overallProgress, setOverallProgress] = useState(0);
     const [regenLoading, setRegenLoading] = useState(false);
+    const [isLongForm, setIsLongForm] = useState(false);
+    const [phaseLabel, setPhaseLabel] = useState('');
+    const [phaseDetail, setPhaseDetail] = useState('');
+    const [segmentInfo, setSegmentInfo] = useState(null); // { completed, total }
     
     const pollRef = useRef(null);
 
@@ -324,6 +330,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         if (!projectId || !imageUrl) return;
         setPhase('animating');
         setError('');
+        setIsLongForm(false);
+        setPhaseLabel('');
+        setPhaseDetail('');
+        setSegmentInfo(null);
 
         try {
             const res = await fetch(`${API}/storyboard/animate`, {
@@ -336,12 +346,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                     duration,
                     format,
                     resolution,
-                    // ✅ FIX: productImages is always { file, preview } objects, never raw strings.
-                    // Extract the URL from .file when it's a string (scraped/S3 URL), skip File blobs.
                     productImageUrls: productImages
                         .map(pi => typeof pi.file === 'string' ? pi.file : null)
                         .filter(Boolean),
-                    // ✅ Also send avatar URL if it's a string reference
                     avatarUrl: avatarImage && typeof avatarImage.file === 'string' ? avatarImage.file : undefined,
                     model,
                     brandId: activeBrand?._id,
@@ -351,8 +358,14 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             const data = await res.json();
             if (!data.success) throw new Error(data.error || 'Animation failed to start');
 
-            // Start polling
-            startPolling();
+            if (data.longForm) {
+                setIsLongForm(true);
+                setPhaseLabel('Planning segments...');
+                setPhaseDetail(`${data.segments || Math.ceil(duration / 10)} segments will be generated`);
+            }
+
+            // Start polling — long-form uses 10s interval, single-shot uses 4s
+            startPolling(!!data.longForm);
         } catch (e) {
             setError(e.message);
             setPhase('review');
@@ -360,8 +373,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     };
 
     // ── Polling for animation status ──
-    const startPolling = useCallback(() => {
+    const startPolling = useCallback((longForm = false) => {
         if (pollRef.current) clearInterval(pollRef.current);
+        // Long-form jobs can take hours — poll less aggressively to avoid backend hammering
+        const intervalMs = longForm ? 10000 : 4000;
         pollRef.current = setInterval(async () => {
             if (!projectId) return;
             try {
@@ -372,6 +387,14 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 if (!data.success) return;
 
                 setOverallProgress(data.overallProgress || 0);
+
+                // Rich progress for long-form
+                if (data.isLongForm) {
+                    setIsLongForm(true);
+                    if (data.phaseLabel) setPhaseLabel(data.phaseLabel);
+                    if (data.detail)     setPhaseDetail(data.detail);
+                    if (data.segments)   setSegmentInfo(data.segments);
+                }
 
                 if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
 
@@ -387,7 +410,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             } catch (e) {
                 console.warn('Poll error:', e.message);
             }
-        }, 4000);
+        }, intervalMs);
     }, [projectId, onVideoComplete]);
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -664,11 +687,13 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 </button>
                                 <div className="sb-action-right">
                                     <span className="sb-credits-hint">
-                                        ~15 credits · 1 I2V shot
+                                        {duration > 15
+                                            ? `~${Math.ceil(duration / 10) * 15} credits · ${Math.ceil(duration / 10)} segments`
+                                            : '~15 credits · 1 I2V shot'}
                                     </span>
                                     <button className="sb-animate-btn" onClick={handleAnimate}>
                                         <span className="material-symbols-outlined">play_circle</span>
-                                        Animate Full Film
+                                        {duration > 15 ? 'Generate Long Film' : 'Animate Full Film'}
                                     </button>
                                 </div>
                             </>
@@ -677,12 +702,28 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         {phase === 'animating' && (
                             <div className="sb-animating-bar">
                                 <div className="sb-overall-progress">
-                                    <span>Animating film...</span>
+                                    <span>{phaseLabel || 'Animating film...'}</span>
                                     <div className="sb-progress-track">
                                         <div className="sb-progress-fill-overall" style={{ width: `${overallProgress}%` }} />
                                     </div>
                                     <span>{overallProgress}%</span>
                                 </div>
+                                {isLongForm && (
+                                    <div className="sb-lf-progress-detail">
+                                        {segmentInfo && segmentInfo.total > 0 && (
+                                            <div className="sb-lf-segments">
+                                                {Array.from({ length: segmentInfo.total }, (_, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className={`sb-lf-seg-dot ${i < segmentInfo.completed ? 'done' : i === segmentInfo.completed ? 'active' : ''}`}
+                                                        title={`Segment ${i + 1}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                        {phaseDetail && <span className="sb-lf-detail">{phaseDetail}</span>}
+                                    </div>
+                                )}
                             </div>
                         )}
 

@@ -208,6 +208,9 @@ const videoProjectSchema = new mongoose.Schema({
         format: { type: String, default: '9:16' },
         style: { type: String, enum: ['hyperrealistic', '3d', '2d'], default: 'hyperrealistic' },
         finalVideoUrl: { type: String, default: '' },     // Stitched final film
+        longFormJobId: { type: String, default: '' },     // Background job ID for long-form (>15s) generation
+        voiceoverScript: { type: String, default: '' },   // Full VO script passed to long-form TTS pipeline
+        totalDuration: { type: Number, default: 0 },       // Requested total duration (seconds)
     },
 
     // ── Analytics counters ──

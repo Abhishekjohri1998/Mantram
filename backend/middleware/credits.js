@@ -53,6 +53,7 @@ const ACTION_LABELS = {
     viralityPredict: 'Virality Prediction (3-Model AI Pipeline)',
     storyboardCreate: 'Storyboard Director + Frames (AI Ad Film)',
     storyboardAnimate: 'Storyboard Animation (I2V per shot)',
+    storyboardAnimateLongForm: 'Storyboard Long-Form Animation (multi-segment I2V + FFmpeg stitch)',
 };
 
 // Provider credit multipliers — Claude is premium (higher API cost to us)
@@ -127,6 +128,9 @@ const DEFAULT_CREDIT_COSTS = {
     viralityPredict: 3,            // Virality Predictor: Gemini vision + Grok research + Claude synthesis
     storyboardCreate: 8,           // Storyboard Director (Claude) + Gemini frame gen for all shots
     storyboardAnimate: 'dynamic',  // DYNAMIC — Seedance 2.0 I2V per shot
+    // Long-form (>15s) storyboard: per-segment dynamic charge.
+    // 30s → 3 segs (~45cr) | 60s → 6 segs (~90cr) | 90s → 9 segs (~135cr) | 120s → 12 segs (~180cr)
+    storyboardAnimateLongForm: 'dynamic',
 };
 
 // Cache for credit costs (refresh every 5 minutes)
@@ -193,25 +197,51 @@ export const requireCredits = (actionOrCost = 1) => {
                 const rawCost = costs[actionOrCost];
 
                 // Dynamic video credits — calculated per request
-                // Applies to: videoGenerate, ugcProGenerate, qAdsGenerate
-                const DYNAMIC_VIDEO_ACTIONS = ['videoGenerate', 'ugcProGenerate', 'qAdsGenerate'];
+                // Applies to: videoGenerate, ugcProGenerate, qAdsGenerate, storyboardAnimate, storyboardAnimateLongForm
+                const DYNAMIC_VIDEO_ACTIONS = ['videoGenerate', 'ugcProGenerate', 'qAdsGenerate', 'storyboardAnimate', 'storyboardAnimateLongForm'];
                 if (rawCost === 'dynamic' && DYNAMIC_VIDEO_ACTIONS.includes(actionOrCost)) {
-                    // UGC Pro and Q-Ads always use seedance-2.0 via Atlas Cloud
-                    const defaultModel = (actionOrCost === 'ugcProGenerate' || actionOrCost === 'qAdsGenerate')
-                        ? 'seedance-2.0' : 'kling-3.0';
-                    const defaultDuration = (actionOrCost === 'qAdsGenerate') ? 8 : 5;
-                    const { model = defaultModel, duration = defaultDuration,
-                        resolution = '720p', qualityMode = 'fast' } = req.body;
-                    // Parse duration from settings for UGC Pro / Q-Ads
-                    let parsedDuration = parseInt(duration) || defaultDuration;
-                    if (req.body.settings) {
-                        const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
-                        if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
+
+                    // ── Long-Form Storyboard: per-segment dynamic pricing ──
+                    if (actionOrCost === 'storyboardAnimateLongForm') {
+                        const totalDuration = parseInt(req.body.duration || req.body.totalDuration) || 30;
+                        const OPTIMAL_SEG  = 10; // seconds per segment
+                        const segCount     = Math.ceil(totalDuration / OPTIMAL_SEG);
+                        const segModel     = req.body.model || 'seedance-2.0-fast';
+                        const segResolution = req.body.resolution || '720p';
+                        const segQuality   = segModel.includes('quality') || segModel === 'seedance-2.0' ? 'quality' : 'fast';
+                        const segEstimate  = estimateCost(segModel, Math.min(OPTIMAL_SEG, totalDuration), segResolution, segQuality);
+                        const perSeg       = Math.max(Math.ceil(segEstimate.usd * 70), 5);
+                        cost = perSeg * segCount;
+                        console.log(`🎬 Dynamic storyboard long-form credits: ${totalDuration}s → ${segCount} segs × ${perSeg}cr = ${cost} credits`);
+
+                    // ── Single-shot Storyboard Animate ──
+                    } else if (actionOrCost === 'storyboardAnimate') {
+                        const dur          = parseInt(req.body.duration) || 10;
+                        const sbModel      = req.body.model || 'seedance-2.0-fast';
+                        const sbResolution = req.body.resolution || '720p';
+                        const sbQuality    = sbModel === 'seedance-2.0' ? 'quality' : 'fast';
+                        const sbEstimate   = estimateCost(sbModel, Math.min(dur, 15), sbResolution, sbQuality);
+                        cost = Math.max(Math.ceil(sbEstimate.usd * 70), 5);
+                        console.log(`🎬 Dynamic storyboard animate credits: ${dur}s ${sbModel} → $${sbEstimate.usd} → ${cost} credits`);
+
+                    } else {
+                        // UGC Pro and Q-Ads always use seedance-2.0 via Atlas Cloud
+                        const defaultModel = (actionOrCost === 'ugcProGenerate' || actionOrCost === 'qAdsGenerate')
+                            ? 'seedance-2.0' : 'kling-3.0';
+                        const defaultDuration = (actionOrCost === 'qAdsGenerate') ? 8 : 5;
+                        const { model = defaultModel, duration = defaultDuration,
+                            resolution = '720p', qualityMode = 'fast' } = req.body;
+                        // Parse duration from settings for UGC Pro / Q-Ads
+                        let parsedDuration = parseInt(duration) || defaultDuration;
+                        if (req.body.settings) {
+                            const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
+                            if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
+                        }
+                        const estimate = estimateCost(model || defaultModel, parsedDuration, resolution, qualityMode);
+                        // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
+                        cost = Math.max(Math.ceil(estimate.usd * 70), 5);
+                        console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${model || defaultModel} ${parsedDuration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                     }
-                    const estimate = estimateCost(model || defaultModel, parsedDuration, resolution, qualityMode);
-                    // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
-                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${model || defaultModel} ${parsedDuration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
                 }
@@ -282,7 +312,7 @@ export const requireCredits = (actionOrCost = 1) => {
             const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video', avatarGenerate: 'creative', viralityPredict: 'virality', storyboardCreate: 'video', storyboardAnimate: 'video' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video', avatarGenerate: 'creative', viralityPredict: 'virality', storyboardCreate: 'video', storyboardAnimate: 'video', storyboardAnimateLongForm: 'video' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
 
