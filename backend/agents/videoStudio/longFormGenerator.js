@@ -16,6 +16,7 @@ import { planScenes } from './scenePlanner.js';
 import { submitVideoGeneration, estimateCost, submitLipSync, pollLipSyncResult } from './falClient.js';
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
+import ffmpegPath from 'ffmpeg-static';
 import {
     extractLastFrameToS3,
     muxAudioOntoVideo,
@@ -546,7 +547,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     if (segmentPaths.length === 1) {
         // Single segment — just normalize
         const outPath = path.join(tmpDir, 'final.mp4');
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
@@ -562,7 +563,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[i],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
@@ -609,7 +610,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     const outputPath = path.join(tmpDir, 'final.mp4');
 
     try {
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', filterComplex,
             '-map', '[vout]',
@@ -620,7 +621,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     } catch (xfadeErr) {
         console.warn(`[LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
         const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', concatFilter,
             '-map', '[vout]',
@@ -688,15 +689,16 @@ async function generateSceneTTS(text, language, emotion = 'neutral') {
             const audioUrl = await _geminiTTS(text, language, emotion);
             if (audioUrl) {
                 console.log(`🎤 [SceneTTS] ✅ Gemini TTS success: ${audioUrl.substring(0, 60)}...`);
+                return audioUrl;
             }
-            return audioUrl;
-        } else {
-            const audioUrl = await _openaiTTS(text, emotion, language, langCode);
-            if (audioUrl) {
-                console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
-            }
-            return audioUrl;
+            console.warn(`⚠️ [SceneTTS] Gemini TTS returned null, falling back to OpenAI...`);
         }
+        
+        const audioUrl = await _openaiTTS(text, emotion, language, langCode);
+        if (audioUrl) {
+            console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
+        }
+        return audioUrl;
     } catch (err) {
         console.error(`❌ [SceneTTS] TTS FAILED (${isRegional ? 'Gemini' : 'OpenAI'}): ${err.message}`);
         if (isRegional) {

@@ -4,6 +4,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { credits as creditsAPI, payments as paymentsAPI, rewards as rewardsAPI } from '../services/api'
 import { useRazorpay } from '../hooks/useRazorpay'
+import { useShopify } from '../context/ShopifyContext'
 
 
 const ACTION_ICONS = {
@@ -93,8 +94,12 @@ export default function CreditsPage() {
     const [showCheckout, setShowCheckout] = useState(false)
     const [checkoutItem, setCheckoutItem] = useState(null) // { type: 'topup' | 'subscription', ...item }
     const { loadRazorpay } = useRazorpay()
-    const [billingProvider, setBillingProvider] = useState('razorpay')
+    const [billingProvider, setBillingProvider] = useState(null)
     const [shopDomain, setShopDomain] = useState(null)
+
+    const shopifyContext = useShopify() || {};
+    const { isEmbedded } = shopifyContext;
+    const activeBillingProvider = isEmbedded ? 'shopify' : billingProvider;
 
 
 
@@ -138,7 +143,7 @@ export default function CreditsPage() {
     }
 
     const getDisplayPrice = (item, type, cycle = billingCycle) => {
-        if (billingProvider === 'shopify') {
+        if (activeBillingProvider === 'shopify') {
             if (type === 'subscription') {
                 const usdPrices = {
                     creator: { monthly: 19.99, quarterly: 49.99, yearly: 199.99 },
@@ -269,7 +274,7 @@ export default function CreditsPage() {
     }
 
     const confirmUpgrade = async (pkg) => {
-        if (billingProvider === 'shopify') {
+        if (activeBillingProvider === 'shopify') {
             try {
                 const data = await paymentsAPI.shopifyCreateSubscription(pkg._id, billingCycle)
                 if (data.success && data.confirmationUrl) {
@@ -354,7 +359,7 @@ export default function CreditsPage() {
     }
 
     const confirmTopup = async (pack) => {
-        if (billingProvider === 'shopify') {
+        if (activeBillingProvider === 'shopify') {
             try {
                 const data = await paymentsAPI.shopifyCreateTopup(pack.id || pack._id)
                 if (data.success && data.confirmationUrl) {
@@ -695,10 +700,10 @@ export default function CreditsPage() {
                                                 {pack.promoOriginalPrice > 0 && (
                                                     <p className="text-xs text-[var(--sys-text-muted)] line-through mb-1">
                                                         {(() => {
-                                                            const originalPriceObj = billingProvider === 'shopify' 
+                                                            const originalPriceObj = activeBillingProvider === 'shopify' 
                                                                 ? { amount: parseFloat((pack.promoOriginalPrice / 90).toFixed(2)), symbol: '$' } 
                                                                 : { amount: pack.promoOriginalPrice, symbol: '₹' };
-                                                            return `${originalPriceObj.symbol}${originalPriceObj.amount.toLocaleString(undefined, { minimumFractionDigits: billingProvider === 'shopify' ? 2 : 0 })}`;
+                                                            return `${originalPriceObj.symbol}${originalPriceObj.amount.toLocaleString(undefined, { minimumFractionDigits: activeBillingProvider === 'shopify' ? 2 : 0 })}`;
                                                         })()}
                                                     </p>
                                                 )}
@@ -967,7 +972,7 @@ export default function CreditsPage() {
                             </div>
 
                             {/* Coupon Section (Plans) */}
-                            {billingProvider !== 'shopify' && (
+                            {activeBillingProvider !== 'shopify' && (
                                 <div className="glass-panel p-6 rounded-2xl border border-[var(--sys-border)] flex flex-wrap items-center justify-between gap-4">
                                     <div className="flex items-center gap-3">
                                         <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
@@ -1396,7 +1401,7 @@ export default function CreditsPage() {
                                     </div>
 
                                     {/* Coupon Section */}
-                                    {billingProvider !== 'shopify' && (
+                                    {activeBillingProvider !== 'shopify' && (
                                         <div className="space-y-3">
                                             <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider px-1">Promo Code</h4>
                                             {appliedCoupon ? (
@@ -1477,7 +1482,7 @@ export default function CreditsPage() {
                         </button>
                         
                         <p className="text-[10px] text-[var(--sys-text-muted)] text-center">
-                            By proceeding, you agree to our Terms of Service. Payments are processed securely via {billingProvider === 'shopify' ? 'Shopify Billing' : 'Razorpay'}.
+                            By proceeding, you agree to our Terms of Service. Payments are processed securely via {activeBillingProvider === 'shopify' ? 'Shopify Billing' : 'Razorpay'}.
                         </p>
                     </div>
                 </div>

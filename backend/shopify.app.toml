@@ -9,9 +9,9 @@ embedded = true
 api_version = "2025-01"
 
   [webhooks.privacy_compliance]
-  customer_deletion_url = "https://mantram.ai/api/shopify/webhooks/customers-redact"
-  customer_data_request_url = "https://mantram.ai/api/shopify/webhooks/customers-data-request"
-  shop_deletion_url = "https://mantram.ai/api/shopify/webhooks/shop-redact"
+  customer_deletion_url = "https://api.mantram.ai/api/shopify/webhooks/customers-redact"
+  customer_data_request_url = "https://api.mantram.ai/api/shopify/webhooks/customers-data-request"
+  shop_deletion_url = "https://api.mantram.ai/api/shopify/webhooks/shop-redact"
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_customers,read_orders,read_products"

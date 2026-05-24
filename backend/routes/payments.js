@@ -903,6 +903,14 @@ router.post('/accept-retention-offer', protect, async (req, res) => {
  */
 router.get('/billing-provider', protect, async (req, res) => {
     try {
+        if (req.shopifyAuth) {
+            return res.json({
+                success: true,
+                provider: 'shopify',
+                shopDomain: req.shopifyShop
+            });
+        }
+
         const integration = await Integration.findOne({ user: req.user._id, platform: 'shopify', status: 'connected' });
         res.json({
             success: true,
