@@ -781,8 +781,26 @@ export async function submitGeminiFlashVideoGeneration({
         }
     } catch { /* normal string */ }
 
+    let safePromptText = (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '');
+    
+    // 🛡️ UNIVERSAL @IMAGE TAG SANITIZER FOR GEMINI FLASH
+    // Gemini Flash only supports 1 image. Strip any @image2, @image3 phantom tags to prevent Atlas Internal Errors.
+    const totalImageCount = (imageUrl || (referenceImages && referenceImages.length > 0)) ? 1 : 0;
+    if (totalImageCount > 0) {
+        safePromptText = safePromptText.replace(/@image(\d+)/gi, (match, p1) => {
+            const idx = parseInt(p1, 10);
+            if (idx > totalImageCount) {
+                console.warn(`🛡️ [Gemini Flash] Stripping phantom ${match} from prompt`);
+                return '';
+            }
+            return match;
+        });
+    } else {
+        safePromptText = safePromptText.replace(/@image\d+/gi, '');
+    }
+
     const finalPrompt = truncatePrompt(
-        (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim(),
+        safePromptText.replace(/\s{2,}/g, ' ').trim(),
         4000
     );
 
