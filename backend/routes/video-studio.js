@@ -8078,12 +8078,62 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                     finalVideoUrl,
                 });
             } else if (result?.status === 'FAILED') {
-                updatedStatus = 'failed';
-                error = result.error || 'Generation failed';
-                await VideoProject.findByIdAndUpdate(project._id, {
-                    'storyboard.status': 'failed',
-                    'storyboard.error': error,
-                });
+                // 🛡️ SAFE MODE PIVOT: If Gemini Flash fails (e.g. Internal Error), auto-retry with Seedance 2.0 Fast
+                if (result.isGeminiFlash && !storyboard.geminiRetried) {
+                    console.log(`⚠️ [Storyboard] Gemini Flash failed. Auto-retrying with seedance-2.0-fast for project ${project._id}...`);
+                    try {
+                        const { submitAtlasCloudVideoGeneration } = await import('../agents/videoStudio/falClient.js');
+                        
+                        // Reconstruct references
+                        const dbProductImgs = project.input?.images?.map(img => img.url).filter(Boolean) || [];
+                        const dbAvatar = project.input?.avatarUrl || null;
+                        const referenceImages = [
+                            ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
+                            ...dbProductImgs.map(url => ({ url, role: 'product' }))
+                        ];
+                        const productRef = referenceImages.find(r => r.role === 'product');
+                        const firstFrameUrl = productRef ? productRef.url : storyboard.imageUrl;
+                        const combinedReferences = referenceImages.filter(r => r.url !== firstFrameUrl);
+
+                        const genResult = await submitAtlasCloudVideoGeneration({
+                            imageUrl: firstFrameUrl,
+                            prompt: storyboard.videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                            duration: storyboard.totalDuration || 10,
+                            aspectRatio: storyboard.format || '9:16',
+                            referenceImages: combinedReferences,
+                            generateAudio: true,
+                            qualityMode: 'fast', // fallback to seedance fast
+                            resolution: '720p',
+                            imageRole: 'mixed'
+                        });
+
+                        // Update task ID and mark retried
+                        await VideoProject.findByIdAndUpdate(project._id, {
+                            'storyboard.taskId': genResult.taskId,
+                            'storyboard.geminiRetried': true,
+                            'storyboard.status': 'animating',
+                        });
+
+                        updatedStatus = 'animating';
+                        updatedProgress = 10;
+                    } catch (retryErr) {
+                        console.error(`[Storyboard] Fallback retry failed:`, retryErr.message);
+                        updatedStatus = 'failed';
+                        error = result.error || 'Generation failed and fallback failed.';
+                        await VideoProject.findByIdAndUpdate(project._id, {
+                            'storyboard.status': 'failed',
+                            'storyboard.error': error,
+                        });
+                    }
+                } else {
+                    updatedStatus = 'failed';
+                    error = result.error || 'Generation failed';
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'storyboard.status': 'failed',
+                        'storyboard.error': error,
+                    });
+                }
+
             } else {
                 updatedProgress = result?.progress || storyboard.progress || 10;
                 await VideoProject.findByIdAndUpdate(project._id, {
