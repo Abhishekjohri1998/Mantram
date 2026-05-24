@@ -53,7 +53,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration } from '../agents/videoStudio/atlasClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration, submitGeminiFlashVideoGeneration } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
@@ -7902,17 +7902,29 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         // ══════════════════════════════════════════════════════════════════════
         let taskId = null;
         try {
-            const genResult = await submitAtlasCloudVideoGeneration({
-                imageUrl: firstFrameUrl,
-                prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
-                duration: duration || 10,
-                aspectRatio: format,
-                referenceImages: combinedReferences,
-                generateAudio: true,
-                qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
-                resolution,
-                imageRole: 'mixed'
-            });
+            let genResult;
+            if (model === 'gemini-flash') {
+                genResult = await submitGeminiFlashVideoGeneration({
+                    imageUrl: firstFrameUrl,
+                    prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                    duration: duration || 10,
+                    aspectRatio: format,
+                    resolution,
+                    referenceImages: combinedReferences,
+                });
+            } else {
+                genResult = await submitAtlasCloudVideoGeneration({
+                    imageUrl: firstFrameUrl,
+                    prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                    duration: duration || 10,
+                    aspectRatio: format,
+                    referenceImages: combinedReferences,
+                    generateAudio: true,
+                    qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
+                    resolution,
+                    imageRole: 'mixed'
+                });
+            }
             taskId = genResult.taskId;
 
             if (projectId) {

@@ -48,7 +48,8 @@ const DURATIONS = [
 const MODELS = [
     { value: 'seedance-2.0-fast', label: 'Seedance Fast' },
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
-    { value: 'kling-3.0', label: 'Kling 3.0' }
+    { value: 'kling-3.0', label: 'Kling 3.0' },
+    { value: 'gemini-flash', label: 'Gemini Flash Video' }
 ];
 
 const RESOLUTIONS = [

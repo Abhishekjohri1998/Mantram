@@ -56,6 +56,7 @@ const VIDEO_MODELS_UGC = [
     { value: 'kling-3.0',        label: 'Kling 3.0',     icon: 'videocam' },
     { value: 'kling-3.0-o',      label: 'Kling Omni ✨',  icon: 'auto_awesome' },
     { value: 'veo-3.1-fast',     label: 'Veo 3.1 Fast',  icon: 'movie' },
+    { value: 'gemini-flash',     label: 'Gemini Flash Video', icon: 'flash_on' },
 ]
 const LANGUAGES = [
     { id: 'English',    label: 'English' },

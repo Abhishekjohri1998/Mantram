@@ -4,7 +4,7 @@
 
 import config from '../../config/env.js';
 import { submitKieVideoGeneration, getKieGenerationStatus } from './kieClient.js';
-import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration, getAtlasCloudGenerationStatus, submitGeminiFlashVideoGeneration } from './atlasClient.js';
 import { submitMuApiVideoGeneration, getMuApiGenerationStatus } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoStatus } from './laozhangClient.js';
@@ -28,7 +28,7 @@ const MODEL_ENDPOINTS = {
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'grok-imagine': true,
-    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
+    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'gemini-flash': true,
 };
 
 export function getModelsInfo() {
@@ -50,6 +50,7 @@ export const COST_PER_SECOND = {
     'sora-2': { fast: 0.10, quality: 0.15 },
     // HappyHorse — also Atlas Cloud. Adjusted from $0.06 to reflect actual billing.
     'happyhorse-1.0': { fast: 0.12, quality: 0.18 },
+    'gemini-flash': { fast: 0.12, quality: 0.12 },
 };
 
 const DURATION_LIMITS = {
@@ -64,6 +65,7 @@ const DURATION_LIMITS = {
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
     'happyhorse-1.0': { min: 3, max: 15 },
+    'gemini-flash': { min: 4, max: 10 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -163,6 +165,16 @@ export const MODEL_CAPABILITIES = {
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.0'], recommended: false,
         maxPromptLength: 200000,
+    },
+    'gemini-flash': {
+        id: 'gemini-flash', name: 'Gemini Flash Video', icon: '⚡', provider: 'atlascloud',
+        description: 'Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration',
+        bestFor: 'High-speed cinematic actions, visual storytelling, text/image-to-video',
+        duration: { min: 4, max: 10, native: 6, step: 2 },
+        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 1, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
+        maxPromptLength: 4000,
     },
 };
 
@@ -563,6 +575,32 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         } catch (err) {
             console.error(`❌ [HappyHorse 1.0] Atlas Cloud submission failed: ${err.message}`);
             throw new Error(`HappyHorse 1.0 generation failed: ${err.message}`);
+        }
+    }
+
+    // Gemini Flash Video — routes directly to Atlas Cloud
+    if (model === 'gemini-flash') {
+        console.log(`⚡ [Gemini Flash Video] Routing to Atlas Cloud...`);
+        try {
+            const result = await submitGeminiFlashVideoGeneration({
+                prompt: safePrompt,
+                imageUrl: s3ImageUrl,
+                duration,
+                aspectRatio: aspectRatio || '16:9',
+                resolution: resolution || '720p',
+                referenceImages: s3ReferenceImages.filter(Boolean),
+            });
+            return {
+                requestId: result.taskId,
+                endpoint: 'atlascloud-gemini-flash',
+                statusUrl: null,
+                resultUrl: null,
+                provider: 'atlascloud',
+                _atlasCloudPayload: result._payload,
+            };
+        } catch (err) {
+            console.error(`❌ [Gemini Flash] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`Gemini Flash Video generation failed: ${err.message}`);
         }
     }
 

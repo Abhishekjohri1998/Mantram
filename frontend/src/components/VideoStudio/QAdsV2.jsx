@@ -25,6 +25,7 @@ const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
     {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
     {value:'happyhorse-1.0',label:'HappyHorse 1.0',msIcon:'pets'},
+    {value:'gemini-flash',label:'Gemini Flash Video',msIcon:'flash_on'},
     {value:'grok-imagine',label:'Grok Imagine',msIcon:'smart_toy'},
     {value:'kling-3.0',label:'Kling 3.0',msIcon:'videocam'},
     {value:'kling-3.0-o',label:'Kling Omni',msIcon:'auto_awesome'},

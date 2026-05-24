@@ -22,6 +22,7 @@ const OPTIMAL_SEGMENT_DURATION = {
     'happyhorse-1.0': 10,
     'hunyuan': 8,
     'sora-2': 10,
+    'gemini-flash': 6,
 };
 
 const MAX_SEGMENT_DURATION = {
@@ -35,6 +36,7 @@ const MAX_SEGMENT_DURATION = {
     'happyhorse-1.0': 15,
     'hunyuan': 10,
     'sora-2': 15,
+    'gemini-flash': 10,
 };
 
 /**

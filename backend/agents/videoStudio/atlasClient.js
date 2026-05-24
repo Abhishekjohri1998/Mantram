@@ -285,88 +285,104 @@ async function prepFaceReferencesAsAssets(imageUrls) {
 async function submitAtlasCloudPayload(payload) {
     const MAX_ATTEMPTS = 3;
     const atlasModel   = payload.task_type || payload.model || 'atlascloud/workflow/seedance-2.0-fast/text-to-video';
-    const isR2V = atlasModel.includes('reference-to-video');
-    const isI2V = atlasModel.includes('image-to-video');
-    const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
-
-    // HappyHorse uses uppercase resolution ('720P', '1080P') per Atlas Cloud docs
-    const isHappyHorse = atlasModel.includes('happyhorse');
-    const rawRes = payload.input?.resolution || '720p';
-    const normalizedRes = isHappyHorse ? rawRes.toUpperCase() : rawRes.toLowerCase();
-
-    // Sanitize prompt — context-aware (fashion vocabulary preserved) + length enforcement
-    const rawPrompt = payload.input?.prompt || '';
-    const imageCountInPayload = (payload.input?.image_urls?.length || 0) + (payload.input?.reference_images?.length || 0);
-    const { prompt: sanitizedPromptFromSanitizer, warnings: sanitizerWarnings } = sanitizePromptForProvider(rawPrompt, 'atlascloud', imageCountInPayload);
-    if (sanitizerWarnings.length > 0) {
-        console.warn(`⚠️ [Atlas Sanitizer] ${sanitizerWarnings.join(' | ')}`);
-    }
-    // Also strip explicit words (safety layer on top of fashion sanitizer)
-    const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
-    const sanitizedPrompt = sanitizedPromptFromSanitizer.replace(BANNED_PATTERNS, 'move');
-
-    const atlasPayload = {
-        model:           atlasModel,
-        prompt:          sanitizedPrompt,
-        duration:        payload.input?.duration || 5,
-        resolution:      normalizedRes,
-        ratio:           rawRatio,
-        generate_audio:  payload.input?.generate_audio !== false,
-        watermark:       false,
-        return_last_frame: false,
-    };
-
-    if (payload.input?.audio_url) {
-        console.log(`🔊 [Atlas] Uploading audio track to Atlas CDN...`);
-        const cdnAudio = await uploadMediaToAtlasCDN(payload.input.audio_url);
-        atlasPayload.audio_url = cdnAudio;
-        atlasPayload.audio = cdnAudio;
-        atlasPayload.ref_audio = cdnAudio;
-    }
     
-    if (payload.input?.video_url) {
-        atlasPayload.video_url = payload.input.video_url;
-    }
-
-    const rawImageUrls  = payload.input?.image_urls       || [];
-    const rawRefImages  = payload.input?.reference_images || [];
-    const isInfiniteTalk = atlasModel.includes('infinitetalk');
-
-    if (isR2V) {
-        // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
-        const allRefs = [...rawRefImages, ...rawImageUrls];
-        if (allRefs.length > 0) {
-            // Filter: asset:// URIs stay as-is, raw URLs get uploaded to CDN for fallback
-            const processedRefs = await Promise.all(allRefs.map(async url => {
-                if (url.startsWith('asset://')) return url; // ✅ already an Atlas asset
-                // Last resort: upload to Atlas CDN (not face-registered, but better than raw S3/HTTP)
-                return await uploadMediaToAtlasCDN(url);
-            }));
-            const validRefs = processedRefs.filter(Boolean).slice(0, 9);
-            if (atlasModel.includes('happyhorse')) {
-                atlasPayload.images = validRefs;
-                console.log(`✅ [Atlas R2V] images (HappyHorse): ${validRefs.length} — ${validRefs.join(', ')}`);
-            } else {
-                atlasPayload.reference_images = validRefs;
-                console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
-            }
+    let atlasPayload;
+    if (payload.model === 'gemini-flash') {
+        atlasPayload = {
+            model: payload.input.model,
+            prompt: payload.input.prompt,
+            duration: payload.input.duration,
+            aspect_ratio: payload.input.aspect_ratio,
+            resolution: payload.input.resolution,
+            seed: payload.input.seed || -1
+        };
+        if (payload.input.images) {
+            atlasPayload.images = payload.input.images;
         }
-    } else if (isI2V || isInfiniteTalk) {
-        const allImages = [...rawImageUrls, ...rawRefImages];
-        if (allImages.length > 0) {
-            console.log(`📸 [Atlas I2V/InfiniteTalk] Uploading first frame to Atlas CDN...`);
-            const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
-            if (uploaded) {
-                atlasPayload.image = uploaded; // Both I2V and InfiniteTalk use 'image'
-                if (isInfiniteTalk) {
-                    atlasPayload.image_url = uploaded; // Just in case it expects image_url
+    } else {
+        const isR2V = atlasModel.includes('reference-to-video');
+        const isI2V = atlasModel.includes('image-to-video');
+        const rawRatio   = payload.input?.aspect_ratio || payload.input?.ratio || '9:16';
+
+        // HappyHorse uses uppercase resolution ('720P', '1080P') per Atlas Cloud docs
+        const isHappyHorse = atlasModel.includes('happyhorse');
+        const rawRes = payload.input?.resolution || '720p';
+        const normalizedRes = isHappyHorse ? rawRes.toUpperCase() : rawRes.toLowerCase();
+
+        // Sanitize prompt — context-aware (fashion vocabulary preserved) + length enforcement
+        const rawPrompt = payload.input?.prompt || '';
+        const imageCountInPayload = (payload.input?.image_urls?.length || 0) + (payload.input?.reference_images?.length || 0);
+        const { prompt: sanitizedPromptFromSanitizer, warnings: sanitizerWarnings } = sanitizePromptForProvider(rawPrompt, 'atlascloud', imageCountInPayload);
+        if (sanitizerWarnings.length > 0) {
+            console.warn(`⚠️ [Atlas Sanitizer] ${sanitizerWarnings.join(' | ')}`);
+        }
+        // Also strip explicit words (safety layer on top of fashion sanitizer)
+        const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
+        const sanitizedPrompt = sanitizedPromptFromSanitizer.replace(BANNED_PATTERNS, 'move');
+
+        atlasPayload = {
+            model:           atlasModel,
+            prompt:          sanitizedPrompt,
+            duration:        payload.input?.duration || 5,
+            resolution:      normalizedRes,
+            ratio:           rawRatio,
+            generate_audio:  payload.input?.generate_audio !== false,
+            watermark:       false,
+            return_last_frame: false,
+        };
+
+        if (payload.input?.audio_url) {
+            console.log(`🔊 [Atlas] Uploading audio track to Atlas CDN...`);
+            const cdnAudio = await uploadMediaToAtlasCDN(payload.input.audio_url);
+            atlasPayload.audio_url = cdnAudio;
+            atlasPayload.audio = cdnAudio;
+            atlasPayload.ref_audio = cdnAudio;
+        }
+        
+        if (payload.input?.video_url) {
+            atlasPayload.video_url = payload.input.video_url;
+        }
+
+        const rawImageUrls  = payload.input?.image_urls       || [];
+        const rawRefImages  = payload.input?.reference_images || [];
+        const isInfiniteTalk = atlasModel.includes('infinitetalk');
+
+        if (isR2V) {
+            // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
+            const allRefs = [...rawRefImages, ...rawImageUrls];
+            if (allRefs.length > 0) {
+                // Filter: asset:// URIs stay as-is, raw URLs get uploaded to CDN for fallback
+                const processedRefs = await Promise.all(allRefs.map(async url => {
+                    if (url.startsWith('asset://')) return url; // ✅ already an Atlas asset
+                    // Last resort: upload to Atlas CDN (not face-registered, but better than raw S3/HTTP)
+                    return await uploadMediaToAtlasCDN(url);
+                }));
+                const validRefs = processedRefs.filter(Boolean).slice(0, 9);
+                if (atlasModel.includes('happyhorse')) {
+                    atlasPayload.images = validRefs;
+                    console.log(`✅ [Atlas R2V] images (HappyHorse): ${validRefs.length} — ${validRefs.join(', ')}`);
+                } else {
+                    atlasPayload.reference_images = validRefs;
+                    console.log(`✅ [Atlas R2V] reference_images: ${validRefs.length} — ${validRefs.map(u => u.startsWith('asset://') ? u : u.substring(0, 40)+'...').join(', ')}`);
+                }
+            }
+        } else if (isI2V || isInfiniteTalk) {
+            const allImages = [...rawImageUrls, ...rawRefImages];
+            if (allImages.length > 0) {
+                console.log(`📸 [Atlas I2V/InfiniteTalk] Uploading first frame to Atlas CDN...`);
+                const uploaded = await uploadMediaToAtlasCDN(allImages[0]);
+                if (uploaded) {
+                    atlasPayload.image = uploaded; // Both I2V and InfiniteTalk use 'image'
+                    if (isInfiniteTalk) {
+                        atlasPayload.image_url = uploaded; // Just in case it expects image_url
+                    }
                 }
             }
         }
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        console.log(`🎬 [Atlas] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | refs=${atlasPayload.reference_images?.length || 0} | image=${atlasPayload.image ? 'yes' : 'no'}`);
+        console.log(`🎬 [Atlas] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | refs=${atlasPayload.reference_images?.length || 0} | image=${(atlasPayload.image || atlasPayload.images?.length) ? 'yes' : 'no'}`);
         console.log(`📝 [Atlas] Prompt (first 100): ${atlasPayload.prompt.substring(0, 100)}...`);
 
         try {
@@ -745,12 +761,105 @@ export async function submitInfiniteTalkVideoGeneration({
     return { taskId, provider: 'atlascloud', model: 'infinitetalk', _payload: payload, type: 'generation' };
 }
 
+// ── Public: Gemini Flash Video Generation (T2V / I2V) ─────────────────────────
+
+export async function submitGeminiFlashVideoGeneration({
+    prompt, imageUrl, duration, aspectRatio, resolution = '720p',
+    referenceImages = [],
+}) {
+    console.log(`⚡ [Gemini Flash Video] submitGeminiFlashVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
+
+    // Extract ZH prompt if bilingual
+    let finalPromptText = prompt;
+    try {
+        if (typeof prompt === 'string' && prompt.trim().startsWith('[') && prompt.trim().endsWith(']')) {
+            const parsed = JSON.parse(prompt);
+            if (Array.isArray(parsed) && parsed.some(p => p.lang === 'zh')) {
+                finalPromptText = parsed.find(p => p.lang === 'zh')?.prompt || prompt;
+                console.log(`🈯 [Gemini Flash] Extracted ZH prompt (${finalPromptText.length} chars)`);
+            }
+        }
+    } catch { /* normal string */ }
+
+    const finalPrompt = truncatePrompt(
+        (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim(),
+        4000
+    );
+
+    // Prepare images: pick the primary first frame or first reference image
+    let targetImage = null;
+    if (imageUrl) {
+        targetImage = imageUrl;
+    } else if (referenceImages && referenceImages.length > 0) {
+        targetImage = referenceImages[0];
+    }
+
+    let cdnImageUrl = null;
+    if (targetImage) {
+        const s3Url = await ensureS3Url(targetImage, 'video-studio/gemini-flash');
+        if (s3Url) {
+            cdnImageUrl = await uploadMediaToAtlasCDN(s3Url);
+        }
+    }
+
+    const hasImage = !!cdnImageUrl;
+    const modelName = hasImage 
+        ? 'google/gemini-omni-flash/image-to-video-developer' 
+        : 'google/gemini-omni-flash/text-to-video-developer';
+
+    // Round duration to closest of [4, 6, 8, 10]
+    const allowedDurations = [4, 6, 8, 10];
+    const targetDur = parseInt(duration, 10) || 6;
+    const finalDur = allowedDurations.reduce((prev, curr) => 
+        Math.abs(curr - targetDur) < Math.abs(prev - targetDur) ? curr : prev
+    );
+
+    // Normalize aspect ratio to 16:9 or 9:16
+    let finalRatio = '16:9';
+    if (aspectRatio === '9:16') {
+        finalRatio = '9:16';
+    }
+
+    // Normalize resolution to 720p, 1080p, 4k
+    let finalRes = '720p';
+    if (resolution === '1080p') {
+        finalRes = '1080p';
+    } else if (resolution === '4k') {
+        finalRes = '4k';
+    }
+
+    console.log(`🎯 [Gemini Flash] model=${modelName} | dur=${finalDur}s | ratio=${finalRatio} | res=${finalRes} | hasImage=${hasImage}`);
+
+    const taskInput = {
+        model: modelName,
+        prompt: finalPrompt,
+        duration: finalDur,
+        aspect_ratio: finalRatio,
+        resolution: finalRes,
+        seed: -1
+    };
+
+    if (hasImage) {
+        taskInput.images = [cdnImageUrl];
+    }
+
+    const payload = { model: 'gemini-flash', task_type: modelName, input: taskInput };
+    const taskId = await submitAtlasCloudPayload(payload);
+    return { taskId, provider: 'atlascloud', model: 'gemini-flash', _payload: payload, type: 'generation' };
+}
+
 // ── Public: Resubmit ─────────────────────────────────────────────────────────
 
 export async function resubmitAtlasCloudTask(storedPayload) {
     console.log(`🔄 [Atlas] Auto-retry resubmit...`);
     const taskId = await submitAtlasCloudPayload(storedPayload);
-    return { taskId, provider: 'atlascloud', model: storedPayload?.task_type?.includes('happyhorse') ? 'happyhorse-1.0' : 'seedance-2.0' };
+    let model = 'seedance-2.0';
+    if (storedPayload?.model === 'gemini-flash') {
+        model = 'gemini-flash';
+    } else if (storedPayload?.task_type?.includes('happyhorse')) {
+        model = 'happyhorse-1.0';
+    }
+    return { taskId, provider: 'atlascloud', model };
 }
 
 // ── Public: Watermark Removal ─────────────────────────────────────────────────
@@ -788,7 +897,7 @@ export async function getAtlasCloudGenerationStatus(taskId) {
     const taskStatus = (result.data.status || '').toLowerCase();
     console.log(`📊 [Atlas] Task ${taskId} status: ${taskStatus}`);
 
-    if (taskStatus === 'completed' || taskStatus === 'success') {
+    if (taskStatus === 'completed' || taskStatus === 'success' || taskStatus === 'succeeded') {
         const outputs  = result.data.outputs || [];
         let videoUrl = outputs[0] || result.data.video_url || '';
         if (typeof videoUrl === 'object' && videoUrl !== null) {
@@ -805,8 +914,9 @@ export async function getAtlasCloudGenerationStatus(taskId) {
             errorMsg = 'Generation blocked by safety filters. Retrying in Safe Mode...';
             safetyTriggered = true;
         }
-        console.warn(`⚠️ [Atlas] Task ${taskId} failed: ${errorMsg}`);
-        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: safetyTriggered, safetyTriggered };
+        const isGeminiFlash = !!(result.data?.model && result.data.model.includes('gemini-omni-flash'));
+        console.warn(`⚠️ [Atlas] Task ${taskId} failed: ${errorMsg} | isGeminiFlash=${isGeminiFlash}`);
+        return { status: 'FAILED', progress: 0, error: errorMsg, retryable: safetyTriggered || isGeminiFlash, safetyTriggered };
     }
 
     if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') {

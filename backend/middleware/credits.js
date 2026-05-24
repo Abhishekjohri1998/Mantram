@@ -204,9 +204,9 @@ export const requireCredits = (actionOrCost = 1) => {
                     // ── Long-Form Storyboard: per-segment dynamic pricing ──
                     if (actionOrCost === 'storyboardAnimateLongForm') {
                         const totalDuration = parseInt(req.body.duration || req.body.totalDuration) || 30;
-                        const OPTIMAL_SEG  = 10; // seconds per segment
-                        const segCount     = Math.ceil(totalDuration / OPTIMAL_SEG);
                         const segModel     = req.body.model || 'seedance-2.0-fast';
+                        const OPTIMAL_SEG  = segModel === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(segModel) ? 8 : 10);
+                        const segCount     = Math.ceil(totalDuration / OPTIMAL_SEG);
                         const segResolution = req.body.resolution || '720p';
                         const segQuality   = segModel.includes('quality') || segModel === 'seedance-2.0' ? 'quality' : 'fast';
                         const segEstimate  = estimateCost(segModel, Math.min(OPTIMAL_SEG, totalDuration), segResolution, segQuality);

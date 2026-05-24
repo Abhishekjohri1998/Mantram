@@ -628,6 +628,7 @@ export async function pollGenerationStatus(state) {
                         }
                     }
 
+
                     const retryResult = await resubmitAtlasCloudTask(retryPayload);
                     return {
                         ...state,

@@ -608,16 +608,29 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     const filterComplex = filterParts.join(';');
     const outputPath = path.join(tmpDir, 'final.mp4');
 
-    await execFileAsync('ffmpeg', [
-        '-y', ...inputs,
-        '-filter_complex', filterComplex,
-        '-map', '[vout]',
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-        '-movflags', '+faststart',
-        outputPath,
-    ], { timeout: 300000 }); // 5 min timeout for stitching
+    try {
+        await execFileAsync('ffmpeg', [
+            '-y', ...inputs,
+            '-filter_complex', filterComplex,
+            '-map', '[vout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-movflags', '+faststart',
+            outputPath,
+        ], { timeout: 300000 }); // 5 min timeout for stitching
+    } catch (xfadeErr) {
+        console.warn(`[LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+        await execFileAsync('ffmpeg', [
+            '-y', ...inputs,
+            '-filter_complex', concatFilter,
+            '-map', '[vout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-movflags', '+faststart',
+            outputPath,
+        ], { timeout: 300000 });
+    }
 
-    console.log(`[LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments with crossfade → ${outputPath}`);
+    console.log(`[LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
     return outputPath;
 }
 

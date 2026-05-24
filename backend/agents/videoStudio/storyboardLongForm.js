@@ -33,7 +33,7 @@ import { promisify } from 'util';
 import fetch from 'node-fetch';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { allocateSceneDurations, planStoryboardScenes } from './scenePlanner.js';
-import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus, submitGeminiFlashVideoGeneration } from './atlasClient.js';
 import {
     extractLastFrameToS3,
     concatSceneAudios,
@@ -360,18 +360,30 @@ async function _runPipeline(jobId, params) {
             const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
 
             try {
-                const genResult = await submitAtlasCloudVideoGeneration({
-                    prompt: segPrompt,
-                    imageUrl: segmentFirstFrameUrl,
-                    duration: durations[i],
-                    aspectRatio: params.format,
-                    generateAudio: !segmentAudioUrls[i],  // Native audio only when no TTS
-                    referenceImages: segmentRefs.slice(0, 6),
-                    qualityMode,
-                    resolution: params.resolution,
-                    imageRole: 'mixed',
-                    refAudio: segmentAudioUrls[i] || null,  // Seedance native lip-sync
-                });
+                let genResult;
+                if (params.model === 'gemini-flash') {
+                    genResult = await submitGeminiFlashVideoGeneration({
+                        prompt: segPrompt,
+                        imageUrl: segmentFirstFrameUrl,
+                        duration: durations[i],
+                        aspectRatio: params.format,
+                        resolution: params.resolution,
+                        referenceImages: segmentRefs.slice(0, 6),
+                    });
+                } else {
+                    genResult = await submitAtlasCloudVideoGeneration({
+                        prompt: segPrompt,
+                        imageUrl: segmentFirstFrameUrl,
+                        duration: durations[i],
+                        aspectRatio: params.format,
+                        generateAudio: !segmentAudioUrls[i],  // Native audio only when no TTS
+                        referenceImages: segmentRefs.slice(0, 6),
+                        qualityMode,
+                        resolution: params.resolution,
+                        imageRole: 'mixed',
+                        refAudio: segmentAudioUrls[i] || null,  // Seedance native lip-sync
+                    });
+                }
 
                 // Poll until complete
                 const videoUrl = await _pollSegment(genResult, jobId, i, segCount);
@@ -403,17 +415,29 @@ async function _runPipeline(jobId, params) {
                 // One retry — without refAudio to maximize success
                 try {
                     console.log(`[SB LongForm ${jobId}] 🔄 Retrying segment ${i+1} (no TTS)...`);
-                    const retryResult = await submitAtlasCloudVideoGeneration({
-                        prompt: segPrompt,
-                        imageUrl: segmentFirstFrameUrl,
-                        duration: durations[i],
-                        aspectRatio: params.format,
-                        generateAudio: true,
-                        referenceImages: segmentRefs.slice(0, 6),
-                        qualityMode,
-                        resolution: params.resolution,
-                        imageRole: 'mixed',
-                    });
+                    let retryResult;
+                    if (params.model === 'gemini-flash') {
+                        retryResult = await submitGeminiFlashVideoGeneration({
+                            prompt: segPrompt,
+                            imageUrl: segmentFirstFrameUrl,
+                            duration: durations[i],
+                            aspectRatio: params.format,
+                            resolution: params.resolution,
+                            referenceImages: segmentRefs.slice(0, 6),
+                        });
+                    } else {
+                        retryResult = await submitAtlasCloudVideoGeneration({
+                            prompt: segPrompt,
+                            imageUrl: segmentFirstFrameUrl,
+                            duration: durations[i],
+                            aspectRatio: params.format,
+                            generateAudio: true,
+                            referenceImages: segmentRefs.slice(0, 6),
+                            qualityMode,
+                            resolution: params.resolution,
+                            imageRole: 'mixed',
+                        });
+                    }
                     const retryUrl = await _pollSegment(retryResult, jobId, i, segCount);
                     segmentVideoUrls[i] = retryUrl;
                     job.segmentStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
@@ -651,13 +675,25 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     }
 
     const outputPath = path.join(tmpDir, 'stitched.mp4');
-    await execFileAsync(ffmpegPath, [
-        '-y', ...inputs,
-        '-filter_complex', filterParts.join(';'),
-        '-map', '[vout]',
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
-        outputPath,
-    ], { timeout: 300000 });
+    try {
+        await execFileAsync(ffmpegPath, [
+            '-y', ...inputs,
+            '-filter_complex', filterParts.join(';'),
+            '-map', '[vout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            outputPath,
+        ], { timeout: 300000 });
+    } catch (xfadeErr) {
+        console.warn(`[SB LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+        await execFileAsync(ffmpegPath, [
+            '-y', ...inputs,
+            '-filter_complex', concatFilter,
+            '-map', '[vout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            outputPath,
+        ], { timeout: 300000 });
+    }
 
     console.log(`[SB LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
     return outputPath;

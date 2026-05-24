@@ -30,6 +30,7 @@ const MODEL_INFO = {
     'hunyuan': { name: 'Hunyuan', icon: '🎨', tier: 'Draft' },
     'grok-imagine': { name: 'Grok', icon: '🤖', tier: 'Fast' },
     'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: '🐴', tier: 'Pro' },
+    'gemini-flash': { name: 'Gemini Flash Video', icon: '⚡', tier: 'Pro' },
 }
 
 export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgradeRequired }) {
@@ -805,6 +806,7 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
                             <option value="seedance-2.0" className="bg-[var(--sys-surface)]">🎥 Seedance 2.0</option>
                             <option value="hunyuan" className="bg-[var(--sys-surface)]">🎨 Hunyuan (Draft)</option>
                             <option value="grok-imagine" className="bg-[var(--sys-surface)]">🤖 Grok (Fast)</option>
+                            <option value="gemini-flash" className="bg-[var(--sys-surface)]">⚡ Gemini Flash</option>
                         </select>
                         <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none" style={{ fontSize: '12px' }}>expand_more</span>
                     </div>

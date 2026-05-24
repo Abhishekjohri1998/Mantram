@@ -11,6 +11,7 @@
 
 import fetch from 'node-fetch';
 import FormData from 'form-data';
+import fs from 'fs';
 import config from '../../config/env.js';
 
 // ── Style prompt prefixes ─────────────────────────────────────────────────────
@@ -80,7 +81,26 @@ export async function generateStoryboardPoster(
     }
 
     // Normalise model choice
-    const useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
+    let useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
+
+    // Verify GCP credentials for NanoBanana
+    if (useNanoBanana) {
+        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        let credsExist = false;
+        try {
+            if (credsVar && fs.existsSync(credsVar)) {
+                credsExist = true;
+            }
+        } catch (e) {
+            console.warn(`[SB Poster] Credentials check failed: ${e.message}`);
+        }
+        
+        if (!credsExist) {
+            console.warn(`[SB Poster] ⚠️ GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Falling back to gpt-image-2.`);
+            useNanoBanana = false;
+        }
+    }
+
     const effectiveModel = useNanoBanana ? 'nanobanana' : 'gpt-image-2';
 
     console.log(`\n[SB Poster] ══ GENERATING STORYBOARD POSTER ══`);
@@ -92,10 +112,16 @@ export async function generateStoryboardPoster(
     const TIMEOUT_MS = 240000;
 
     if (useNanoBanana) {
-        return await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize);
-    } else {
-        return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS);
+        try {
+            const result = await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize);
+            if (result) return result;
+            console.warn(`[SB Poster] NanoBanana returned null/empty. Falling back to gpt-image-2...`);
+        } catch (bananaErr) {
+            console.error(`[SB Poster] ❌ NanoBanana execution failed: ${bananaErr.message}. Falling back to gpt-image-2...`);
+        }
     }
+    
+    return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS);
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────
