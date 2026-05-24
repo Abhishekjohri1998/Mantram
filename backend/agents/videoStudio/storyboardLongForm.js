@@ -683,9 +683,8 @@ async function _generateTTS(text, language = 'English', emotion = 'confident') {
     const langCode = LANG_TO_CODE[language] || 'en-IN';
     const isRegional = SARVAM_LANG_CODES.has(langCode);
 
-    if (isRegional) {
+    if (isRegional && process.env.GEMINI_API_KEY) {
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) return null;
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -697,13 +696,17 @@ async function _generateTTS(text, language = 'English', emotion = 'confident') {
                 },
             }),
         });
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
-        if (!part?.inlineData?.data) return null;
-        const buf = Buffer.from(part.inlineData.data, 'base64');
-        const ext = part.inlineData.mimeType.includes('mp3') ? 'mp3' : 'wav';
-        return await uploadToS3(buf, `storyboard/longform/tts/${Date.now()}.${ext}`, part.inlineData.mimeType);
+        if (resp.ok) {
+            const data = await resp.json();
+            const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
+            if (part?.inlineData?.data) {
+                const buf = Buffer.from(part.inlineData.data, 'base64');
+                const ext = part.inlineData.mimeType.includes('mp3') ? 'mp3' : 'wav';
+                return await uploadToS3(buf, `storyboard/longform/tts/${Date.now()}.${ext}`, part.inlineData.mimeType);
+            }
+        } else {
+            console.warn(`[SB LongForm] ⚠️ Gemini TTS failed with status ${resp.status}, falling back to OpenAI...`);
+        }
     }
 
     // Global — OpenAI TTS

@@ -676,15 +676,16 @@ async function generateSceneTTS(text, language, emotion = 'neutral') {
             const audioUrl = await _geminiTTS(text, language, emotion);
             if (audioUrl) {
                 console.log(`🎤 [SceneTTS] ✅ Gemini TTS success: ${audioUrl.substring(0, 60)}...`);
+                return audioUrl;
             }
-            return audioUrl;
-        } else {
-            const audioUrl = await _openaiTTS(text, emotion, language, langCode);
-            if (audioUrl) {
-                console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
-            }
-            return audioUrl;
+            console.warn(`⚠️ [SceneTTS] Gemini TTS returned null, falling back to OpenAI...`);
         }
+        
+        const audioUrl = await _openaiTTS(text, emotion, language, langCode);
+        if (audioUrl) {
+            console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
+        }
+        return audioUrl;
     } catch (err) {
         console.error(`❌ [SceneTTS] TTS FAILED (${isRegional ? 'Gemini' : 'OpenAI'}): ${err.message}`);
         if (isRegional) {
