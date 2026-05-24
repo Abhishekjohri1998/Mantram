@@ -18,15 +18,15 @@ import { uploadToS3 } from './s3.js';
 
 const execFileAsync = promisify(execFile);
 
-// Get ffmpeg binary path from @ffmpeg-installer
+// Get ffmpeg binary path from ffmpeg-static
 let FFMPEG_PATH;
 try {
-    const { path: ffmpegPath } = await import('@ffmpeg-installer/ffmpeg');
-    FFMPEG_PATH = ffmpegPath;
+    const module = await import('ffmpeg-static');
+    FFMPEG_PATH = module.default || module;
     console.log(`[VideoStitcher] ffmpeg binary: ${FFMPEG_PATH}`);
 } catch (e) {
     FFMPEG_PATH = 'ffmpeg'; // fallback to system ffmpeg
-    console.warn('[VideoStitcher] @ffmpeg-installer not found, using system ffmpeg');
+    console.warn('[VideoStitcher] ffmpeg-static not found, using system ffmpeg');
 }
 
 const STITCH_TIMEOUT_MS = 120_000; // 2 minutes max for stitching

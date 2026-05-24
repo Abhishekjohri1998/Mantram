@@ -5,10 +5,9 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import { uploadToS3 } from './s3.js';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
 
 const execFileAsync = promisify(execFile);
-const ffmpegPath = ffmpegInstaller.path || ffmpegInstaller.default?.path || 'ffmpeg';
 
 /**
  * Extracts the very last frame of a video and uploads it to S3.

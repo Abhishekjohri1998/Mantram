@@ -31,7 +31,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
 import { allocateSceneDurations, planStoryboardScenes } from './scenePlanner.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
 import {
@@ -42,7 +42,6 @@ import {
 import { uploadToS3 } from '../../utils/s3.js';
 
 const execFileAsync = promisify(execFile);
-const ffmpegPath = ffmpegInstaller.path || ffmpegInstaller.default?.path || 'ffmpeg';
 
 // ── Segment sizing constants ─────────────────────────────────────────────────
 const OPTIMAL_SEGMENT_DURATION = 10; // seconds — keeps each Seedance task well within its 15s limit
