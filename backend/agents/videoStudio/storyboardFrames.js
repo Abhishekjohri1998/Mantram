@@ -65,6 +65,8 @@ export async function generateStoryboardPoster(
     rawProductBuffers = [],
     rawAvatarBuffer = null,
     imageSize = '2K',  // ✅ NanoBanana resolution: '1K' | '2K' | '4K'
+    logoUrl = null,
+    rawLogoBuffer = null,
 ) {
     const stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
     const ar = format || '16:9';
@@ -72,12 +74,14 @@ export async function generateStoryboardPoster(
     
     const hasProductRefs = rawProductBuffers.length > 0 || productImageUrls.length > 0;
     const hasAvatarRef = !!rawAvatarBuffer || !!avatarUrl;
+    const hasLogoRef = !!rawLogoBuffer || !!logoUrl;
     
-    if (hasProductRefs || hasAvatarRef) {
+    if (hasProductRefs || hasAvatarRef || hasLogoRef) {
         finalPrompt += `\n\nCRITICAL INSTRUCTION: You have been provided with reference images. You MUST use them exactly as they appear.`;
         if (hasProductRefs) finalPrompt += ` The product in the storyboard MUST perfectly match the attached product reference image (exact shape, color, branding).`;
         if (hasAvatarRef) finalPrompt += ` The presenter in the storyboard MUST perfectly match the attached face/avatar reference image.`;
-        finalPrompt += ` Do NOT hallucinate new products or generic faces.`;
+        if (hasLogoRef) finalPrompt += ` The brand logo in the storyboard MUST perfectly match the attached logo reference image.`;
+        finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos.`;
     }
 
     // Normalise model choice
@@ -106,14 +110,14 @@ export async function generateStoryboardPoster(
     console.log(`\n[SB Poster] ══ GENERATING STORYBOARD POSTER ══`);
     console.log(`  selected model: ${imageModel} → routing to: ${effectiveModel}`);
     console.log(`  format=${ar}, style=${style}`);
-    console.log(`  raw buffers: product=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}`);
+    console.log(`  raw buffers: product=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, logo=${!!rawLogoBuffer}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
     const TIMEOUT_MS = 240000;
 
     if (useNanoBanana) {
         try {
-            const result = await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize);
+            const result = await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer);
             if (result) return result;
             console.warn(`[SB Poster] NanoBanana returned null/empty. Falling back to gpt-image-2...`);
         } catch (bananaErr) {
@@ -121,11 +125,11 @@ export async function generateStoryboardPoster(
         }
     }
     
-    return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS);
+    return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl, rawLogoBuffer);
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────
-async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS) {
+async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl = null, rawLogoBuffer = null) {
     const size = AR_TO_SIZE[ar] || '1792x1024';
     const modelId = 'gpt-image-2';
 
@@ -160,6 +164,19 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
         } catch (dlErr) {
             console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+        }
+    }
+
+    // 3. Collect Logo Image
+    if (rawLogoBuffer?.buffer) {
+        refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
+    } else if (logoUrl?.startsWith('http')) {
+        try {
+            const { buffer, mimeType } = await downloadBuffer(logoUrl);
+            refBuffers.push({ buffer, mimeType });
+            console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
+        } catch (dlErr) {
+            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
         }
     }
 
@@ -226,7 +243,7 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 }
 
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
-async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K') {
+async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K', logoUrl = null, rawLogoBuffer = null) {
     // ✅ FIX: gemini-3.1-flash-image-preview is IMAGE OUTPUT ONLY — it cannot read input images.
     // gemini-2.0-flash-exp supports both image INPUT (reference) and image OUTPUT (generation).
     const GEMINI_MODEL = 'gemini-2.0-flash-exp';
@@ -267,6 +284,19 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
                 console.log(`[SB Poster][NanoBanana] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
             } catch (dlErr) {
                 console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+            }
+        }
+
+        // 3. Collect Logo Image
+        if (rawLogoBuffer?.buffer) {
+            parts.push({ inlineData: { mimeType: rawLogoBuffer.mimeType || 'image/jpeg', data: rawLogoBuffer.buffer.toString('base64') } });
+        } else if (logoUrl?.startsWith('http')) {
+            try {
+                const { buffer, mimeType } = await downloadBuffer(logoUrl);
+                parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
+                console.log(`[SB Poster][NanoBanana] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download logo ref: ${dlErr.message}`);
             }
         }
 

@@ -21,10 +21,15 @@ const MAX_SHOT_DURATION = 15; // max per Seedance I2V limit
 // SYSTEM PROMPT — Director Brain for Storyboard Planning
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage = 'English' }) {
-    // Increase shot density for modern fast-paced ad films (approx 1.5 - 2s per shot)
-    const estimatedShots = Math.min(Math.ceil(duration / 1.5), MAX_SHOTS_LONG);
-    const gridLayout = estimatedShots <= 9 ? '3x3' : estimatedShots <= 12 ? '3x4' : '4x4';
+function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '' }) {
+    let logoTagInstruction = '';
+    let logoPromptInstruction = '';
+    if (logoUrl) {
+        logoTagInstruction = `
+- <<<image_logo>>> = brand logo (extract from image: exact shapes, typography, and colors of the logo described as: "${logoDescription || 'brand logo'}").`;
+        logoPromptInstruction = `
+- Brand logo: Since a brand logo reference image is provided, you MUST refer to the brand logo using the tag "the brand logo (<<<image_logo>>>)" whenever it appears in the Canvas, footer, or panels. This ensures the image model uses the actual logo design and does not hallucinate it.`;
+    }
 
     return `You are a visionary, award-winning Ad Film Director and Cinematographer. Your expertise lies in crafting visually breathtaking, high-energy, and deeply emotional commercial video campaigns with dynamic pacing and avant-garde camera work.
 
@@ -43,19 +48,41 @@ AD FILM SPECIFICATIONS
 TOTAL DURATION: ${duration}s
 FORMAT: ${format}
 VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}
-TARGET GRID: Around ${estimatedShots} frames total (a ${gridLayout} grid) to allow for fast-paced cinematic cuts.
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 
 ═══════════════════════════════════════════════════════
 PROMPT 1 RULES: imagePrompt (For the Storyboard Grid Image)
 ═══════════════════════════════════════════════════════
-Write an incredibly detailed and imaginative prompt to generate ONE single image containing a dense grid of frames.
-- AVOID basic grids. DEMAND a highly complex editorial layout.
-- INJECT extreme creativity: use dynamic camera angles (low-angle hero shots, sweeping aerials, macro close-ups, Dutch angles, kinetic tracking).
-- SPECIFY professional lighting (volumetric god rays, chiaroscuro, neon rim lights, softbox diffusion).
-- Detail the EXACT sequence of fast cuts, props, character actions, and product hero moments.
-- CRITICAL: The prompt MUST start with "Reference image attached — reproduce the exact product/garment shown with its precise colors, silhouette, and details in every frame." This ensures the image model uses the actual product reference and does NOT hallucinate a generic or different product.
-- Example: "Reference image attached — reproduce the exact product/garment shown with its precise colors, silhouette, and details in every frame. Create a breathtaking high-end ${format} luxury pitch deck storyboard in a ${gridLayout} grid (${estimatedShots} frames). Pixar 3D style. The layout must resemble an elite agency presentation. Structured fast-cut flow: 1. Extreme macro close-up of condensation on the product -> 2. Kinetic whip-pan revealing the presenter in volumetric lighting -> 3. Low-angle tracking shot -> 4. Sweeping aerial... Each frame must have typography underneath describing the camera motion."
+Write an incredibly detailed and imaginative prompt to generate ONE single image containing a dense grid of multiple distinct storyboard panels.
+- GRID SIZE & PACING: Determine the optimal number of frames (shots) and the grid layout (e.g. 2x2, 2x3, 3x3, 3x4, 4x4) dynamically based on the story pacing and structure. The total duration is ${duration}s, so each panel should represent a logical segment (e.g. 2 to 6 seconds per shot) summing up to exactly ${duration}s. Do NOT hardcode the layout; let it fit the story.
+- STRUCTURE: You MUST format the generated imagePrompt using this exact structure (do not skip any sections):
+
+Create a premium [Grid Layout, e.g. 3x3] cinematic storyboard poster for a [Product/Brand Name] advertisement.
+
+Canvas:
+[Describe layout: format e.g. Square 1:1 or Portrait 9:16, clean grid layout. Each panel has a dark frame, small scene number in top-left, short title text, brief action copy, and a sound bar at the bottom with music and SFX cues. Optionally add a footer area with a tagline and logo.]
+
+Style:
+[Describe visual style, lighting, grading, mood, weather, photography quality, premium feel based on the requested visual style.]
+
+Main subject:
+[Describe the product/garment (reproducing its exact colors and details) and any characters/avatars shown. Avoid hallucinating product details.]
+${logoPromptInstruction}
+
+Storyboard panels:
+Panel 1: [TITLE]
+[Describe visual action, camera angle and movement, matching continuous cinematic flow]
+Music: [Describe music/mood cue]
+SFX: [Describe sound effects cues]
+
+Panel 2: ...
+[Continue for all panels in the grid]
+
+Design details:
+[Describe formatting details: white uppercase typography for scene titles, body text, black translucent bars for music and SFX, waveforms, clean spacing.]
+
+Negative prompt:
+[Detailed negative prompt to prevent cartoonish styles, low quality, distorted layout, smiling models, etc.]
 
 ═══════════════════════════════════════════════════════
 PROMPT 2 RULES: videoPrompt (For the Video Animation)
@@ -65,23 +92,19 @@ Write a highly complex and cinematic prompt instructing an AI Video Model to ani
 - Instruct the AI to interpret the grid as a storyboard and execute the fast cuts dynamically.
 - Define the cinematic motion using professional film terminology (smooth 3D tracking cameras, rack focus, kinetic whip-pans, hyper-lapse, high-energy motion blur).
 - Detail how the product should interact with the light and how the camera should move to create a ${duration}-second masterpiece.
-- MANDATORY: If there are spoken dialogues or narration in the scene, write the explicit dialogues directly inside the videoPrompt in the chosen language (${dialogueLanguage}). The dialogue must be written in the selected language's script (e.g. if dialogueLanguage is Hindi, write the dialogue in Hindi, e.g. Presenter says: "नमस्ते, यह उत्पाद...", rather than asking the character to speak without defining the dialogue).
+- MANDATORY: If there are spoken dialogues or narration in the scene, write the explicit dialogues directly inside the videoPrompt in the chosen language (${dialogueLanguage}). The dialogue must be written in the selected language's script.
 - Detail the image reference tags in the videoPrompt explicitly:
   - Use \`@image1\` for the starting frame/visual layout.
   - Use \`@image2\` to reference the storyboard poster grid.
   - Use \`@image3\` to reference the presenter/avatar face if present.
-  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.
-  For instance, a prompt could mention: 'The presenter shown in @image3 says: "[spoken dialogue in ${dialogueLanguage}]".' or 'The camera pans across the product shown in @image1 and @image4...'
-- Example: "Use the attached storyboard image as the exact reference. Animate this ${duration}-second ${format} sequence with award-winning commercial pacing. Preserve the exact shot order and visual continuity of the presenter shown in @image3 and the product. @image1 is the visual reference for the exact starting frame. The presenter shown in @image3 says: [Insert appropriate dialogue in ${dialogueLanguage} here]. Execute kinetic whip-pans between cuts, smooth 3D tracking pushes, and rack focus transitions. Maintain flawless lighting and high-energy motion blur to bring the storyboard to life..."
+  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.${logoUrl ? '\n  - Use `<<<image_logo>>>` to reference the brand logo image.' : ''}
 
-═══════════════════════════════════════════════════════
 OUTPUT FORMAT — CRITICAL
-═══════════════════════════════════════════════════════
 Return ONLY valid JSON. No markdown. No explanation. No code fences.
 The JSON must match this exact schema:
 
 {
-  "imagePrompt": "Reference image attached — reproduce the exact product/garment shown...",
+  "imagePrompt": "Create a premium...",
   "videoPrompt": "Use the attached storyboard image as the exact reference..."
 }
 `;
@@ -91,7 +114,8 @@ The JSON must match this exact schema:
 // USER PROMPT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English' }) {
+function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '' }) {
+    const logoDetails = logoUrl ? `\nBRAND LOGO DETAILS: description="${logoDescription}"` : '';
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 
 PRODUCT: ${productName || 'See product images provided'}
@@ -100,13 +124,15 @@ TOTAL VIDEO DURATION: ${duration}s, FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut shots and write their dialogues in ' + dialogueLanguage + '.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
+BRAND NAME: ${brandName}${logoDetails}
 
 Now act as the visionary director. Deeply analyze the product and brief, and write the two master prompts as JSON. 
 Remember:
-- Make the imagePrompt dense, rich, and full of fast-cut narrative beats.
+- Make the imagePrompt dense, rich, and formatted with Canvas, Style, Main subject, Storyboard panels, Design details, and Negative prompt sections.
 - Make the videoPrompt cinematic, demanding high-end transitions, correct @image reference tags, and explicit spoken dialogues in ${dialogueLanguage}.
 - Return ONLY the JSON object, no other text.`;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OUTPUT PARSER + VALIDATOR
@@ -172,12 +198,16 @@ export async function runStoryboardDirector({
     console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, shots estimated=${Math.ceil(duration / 4)}`);
 
     // 1. Load brand DNA
-    const { brandContext } = await loadBrandContext(brandId);
+    const { brand, brandContext } = await loadBrandContext(brandId);
     console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars`);
+    
+    const logoUrl = brand?.dna?.logo?.url || null;
+    const logoDescription = brand?.dna?.logo?.metadata?.visionDescription || '';
+    const brandName = brand?.name || 'the brand';
 
     // 2. Build prompts
-    const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage });
-    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage });
+    const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
+    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
 
     // 3. Build image URLs for Claude vision (product + avatar) — NO cap, use ALL images
     const imageUrls = [];
@@ -224,6 +254,7 @@ export async function runStoryboardDirector({
         productImageUrls,
         avatarUrl,
         dialogueLanguage,
+        logoUrl,
     };
 }
 

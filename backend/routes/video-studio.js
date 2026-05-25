@@ -7564,6 +7564,27 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
 
         console.log(`[Storyboard Create] Passing ${rawProductBuffers.length} raw buffers + avatar=${!!rawAvatarBuffer} directly to poster generator`);
 
+        // Download logo URL to buffer
+        let rawLogoBuffer = null;
+        const logoUrl = plan.logoUrl || null;
+        if (logoUrl) {
+            console.log(`[Storyboard Create] Downloading logo ref: ${logoUrl.substring(0, 80)}`);
+            try {
+                const resp = await fetch(logoUrl, { 
+                    headers: { 'User-Agent': 'Mozilla/5.0' }, 
+                    signal: AbortSignal.timeout(15000) 
+                });
+                if (resp.ok) {
+                    rawLogoBuffer = {
+                        buffer: Buffer.from(await resp.arrayBuffer()),
+                        mimeType: resp.headers.get('content-type') || 'image/jpeg'
+                    };
+                }
+            } catch (e) {
+                console.warn(`[Storyboard Create] Failed to download logo buffer: ${e.message}`);
+            }
+        }
+
         const posterDataUrl = await generateStoryboardPoster(
             plan.imagePrompt,
             style,
@@ -7573,7 +7594,9 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             imageModel,
             rawProductBuffers,  // raw buffers — contains actual pixel data
             rawAvatarBuffer,
-            imageSizeForModel   // ✅ Pass resolved imageSize (e.g. '2K') to NanoBanana
+            imageSizeForModel,  // ✅ Pass resolved imageSize (e.g. '2K') to NanoBanana
+            logoUrl,
+            rawLogoBuffer
         );
 
 
@@ -7653,6 +7676,7 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         let productFeatures = '';
         let duration = 30;
         let brandContext = '';
+        let logoUrl = null;
 
         if (projectId) {
             const proj = await VideoProject.findById(projectId).select('input storyboard brand').lean();
@@ -7671,6 +7695,7 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
                     const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
                     const brandData = await loadBrandContext(proj.brand);
                     brandContext = brandData?.brandContext || '';
+                    logoUrl = brandData?.brand?.dna?.logo?.url || null;
                 } catch (brandErr) {
                     console.warn(`[Storyboard Regen Poster] Could not load brand context: ${brandErr.message}`);
                 }
@@ -7702,7 +7727,15 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             rawAvatarBuffer = await dlBuf(signedAvatarUrl);
         }
 
-        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, model=${imageModel}`);
+        // Download logo URL to buffer
+        let rawLogoBuffer = null;
+        let signedLogoUrl = logoUrl;
+        if (logoUrl) {
+            signedLogoUrl = await getSignedUrlIfNeeded(logoUrl);
+            rawLogoBuffer = await dlBuf(signedLogoUrl);
+        }
+
+        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, logo=${!!rawLogoBuffer}, model=${imageModel}`);
 
         // Import frame generator
         const { generateStoryboardPoster } = await import('../agents/videoStudio/storyboardFrames.js');
@@ -7713,7 +7746,10 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             signedAvatarUrl,
             imageModel,
             rawProductBuffers,    // actual pixel data
-            rawAvatarBuffer       // actual avatar pixel data
+            rawAvatarBuffer,       // actual avatar pixel data
+            '2K',
+            signedLogoUrl,
+            rawLogoBuffer
         );
 
         if (!posterDataUrl) throw new Error('Poster generation failed');
