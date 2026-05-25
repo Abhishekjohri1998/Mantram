@@ -198,7 +198,6 @@ export async function getLaozhangVideoStatus(requestId) {
 const IMAGE_MODEL_TIMEOUTS = {
     'gpt-image-2':    180_000,   // OpenAI: ~60-120s typical, allow 180s
     'gpt-image-1':    120_000,
-    'dall-e-3':       120_000,
     default:           90_000,   // Gemini Flash / NanoBanana 2
 };
 

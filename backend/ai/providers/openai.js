@@ -88,7 +88,7 @@ export class OpenAIProvider extends BaseProvider {
     }
 
     /**
-     * Generate image — supports both dall-e-3 and gpt-image-2
+     * Generate image — supports both gpt-image-2 and gpt-image-1
      *
      * gpt-image-2:
      *  - Endpoint: POST /images/generations
@@ -99,10 +99,13 @@ export class OpenAIProvider extends BaseProvider {
      * For thumbnails (16:9) → 1536x1024, quality: hd
      */
     async generateImage({ prompt, size = '1024x1024', model, quality, aspectRatio, imageParts, image_url }) {
-        let modelId = model || this.config.defaultImageModel || 'dall-e-3';
+        let modelId = model || this.config.defaultImageModel || 'gpt-image-2';
         if (modelId === 'nanobanana') modelId = 'gpt-image-2'; // NanoBanana is an alias for gpt-image-2
+        if (modelId === 'dall-e-3') {
+            throw new Error('DALL-E 3 is a deprecated model and cannot be used.');
+        }
 
-        const isGptImage2 = modelId === 'gpt-image-2';
+        const isGptImageModel = modelId === 'gpt-image-2' || modelId === 'gpt-image-1';
 
         // Aspect ratio → size mapping
         const sizeMap = {
@@ -123,30 +126,27 @@ export class OpenAIProvider extends BaseProvider {
             model: modelId,
             prompt,
             n: 1,
-            size: isGptImage2 ? finalSize : (finalSize === 'auto' ? '1024x1024' : finalSize),
+            size: isGptImageModel ? finalSize : (finalSize === 'auto' ? '1024x1024' : finalSize),
         };
 
         if (image_url) {
             body.image_url = image_url;
-            console.log(`   ℹ️ gpt-image-2: Injecting S3 URL natively into API payload -> ${image_url.substring(0,60)}...`);
+            console.log(`   ℹ️ ${modelId}: Injecting S3 URL natively into API payload -> ${image_url.substring(0,60)}...`);
         }
 
-        if (isGptImage2) {
+        if (isGptImageModel) {
             body.quality = quality || 'high';
-            // Reference images for gpt-image-2 — must go through LaoZhang /images/edits
+            // Reference images for gpt-image models — must go through LaoZhang /images/edits
             if (imageParts?.length) {
                 if (!this.lzApiKey) {
-                    console.warn('   ⚠️  gpt-image-2 ref images require LAOZHANG_API_KEY (no fallback). Ignoring refs.');
+                    console.warn(`   ⚠️  ${modelId} ref images require LAOZHANG_API_KEY (no fallback). Ignoring refs.`);
                 } else {
-                    console.log(`   ℹ️  gpt-image-2: ${imageParts.length} reference image(s) — routing to LaoZhang /images/edits`);
-                    return this.generateImageEdit({ prompt, imageParts, size: finalSize });
+                    console.log(`   ℹ️  ${modelId}: ${imageParts.length} reference image(s) — routing to LaoZhang /images/edits`);
+                    return this.generateImageEdit({ prompt, imageParts, size: finalSize, model: modelId });
                 }
             }
         } else {
-            // dall-e-3
-            body.quality = quality || 'hd';
-            const dalleSizes = ['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792'];
-            body.size = dalleSizes.includes(finalSize) ? finalSize : '1792x1024'; // dalle-3 doesn't have 1536x1024
+            body.quality = quality || 'high';
         }
 
         const response = await fetch(`${this.baseUrl}/images/generations`, {
@@ -182,11 +182,11 @@ export class OpenAIProvider extends BaseProvider {
     }
 
     /**
-     * Generate image with edits — gpt-image-2 specific
+     * Generate image with edits — gpt-image specific
      * Allows reference images for style/character grounding
      * Uses multipart/form-data (not JSON) per API spec
      */
-    async generateImageEdit({ prompt, imageParts = [], size = '1536x1024' }) {
+    async generateImageEdit({ prompt, imageParts = [], size = '1536x1024', model = 'gpt-image-2' }) {
         const allowedSizes = ['1024x1024', '1024x1536', '1536x1024'];
         const finalSize = allowedSizes.includes(size) ? size : '1536x1024';
 
@@ -194,7 +194,7 @@ export class OpenAIProvider extends BaseProvider {
         const { FormData, Blob } = await import('node:buffer').then(() => globalThis);
 
         const formData = new FormData();
-        formData.append('model', 'gpt-image-2');
+        formData.append('model', model);
         formData.append('prompt', prompt);
         formData.append('size', finalSize);
         formData.append('quality', 'high');
@@ -211,7 +211,7 @@ export class OpenAIProvider extends BaseProvider {
             }
         }
 
-        // ── Always use LaoZhang proxy for /images/edits (native OpenAI doesn't support gpt-image-2 edits) ──
+        // ── Always use LaoZhang proxy for /images/edits (native OpenAI doesn't support gpt-image edits) ──
         const editApiKey = this.lzApiKey || this.apiKey;
         const editBaseUrl = this.lzApiKey ? this.lzBaseUrl : this.baseUrl;
         if (!editApiKey) throw new Error('No API key for image edit — set LAOZHANG_API_KEY or OPENAI_API_KEY');
@@ -234,7 +234,7 @@ export class OpenAIProvider extends BaseProvider {
         return {
             imageUrl: item.b64_json ? `data:image/png;base64,${item.b64_json}` : item.url,
             b64: item.b64_json || null,
-            model: 'gpt-image-2',
+            model: model,
             provider: 'openai',
         };
     }

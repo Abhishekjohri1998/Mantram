@@ -1401,7 +1401,7 @@ async function grokImageGenerate(promptText, aspectRatio = '1:1') {
 export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quality = 'medium', modelId = 'gpt-image-2', outputFormat = 'webp', background = 'opaque', refImageUrls = [], customSize = null) {
     // ── Choose API endpoint ──
     // Auto-prefer LaoZhang for gpt-image-1/2 when key is available.
-    // Direct OpenAI remaps these to dall-e-3 which drops ref images and is slower.
+    // Direct OpenAI does not remap modelId now.
     const isGptImageModel = modelId === 'gpt-image-1' || modelId === 'gpt-image-2';
     const lzKeyAvailable = !!process.env.LAOZHANG_API_KEY;
     const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (isGptImageModel && lzKeyAvailable);
@@ -1414,18 +1414,17 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
 
     if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
 
-    // ── Map aspect ratio → nearest supported OpenAI image size ──
-    // DALL-E 3 natively supports: 1024x1024, 1024x1792 (9:16), 1792x1024 (16:9)
+    // ── Map aspect ratio → nearest supported image size ──
     // We map portrait and landscape ratios to their native equivalents to prevent text cropping downstream.
     const sizeMap = {
         '1:1':  '1024x1024',
         '4:5':  '1024x1024',   // 0.8 — closest to square
         '5:4':  '1792x1024',   // 1.25 — landscape
         '2:3':  '1024x1792',   // 0.67 — portrait
-        '9:16': '1024x1792',   // native DALL-E 3 portrait
+        '9:16': '1024x1792',   // native portrait
         '3:4':  '1024x1792',   // 0.75 — portrait
-        '3:2':  '1792x1024',   // native DALL-E 3 landscape
-        '16:9': '1792x1024',   // native DALL-E 3 landscape
+        '3:2':  '1792x1024',   // native landscape
+        '16:9': '1792x1024',   // native landscape
         '4:3':  '1792x1024',   // 1.33 — landscape
         '21:9': '1792x1024',   // ultra-wide → use landscape
         '2:1':  '1792x1024',   // wide
@@ -1500,66 +1499,42 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
     let mappedModelId = modelId;
-    if (!useLaoZhang) {
-        if (modelId === 'gpt-image-2' || modelId === 'gpt-image-1') {
-            mappedModelId = 'dall-e-3'; // Force dall-e-3 since dall-e-2 is gone
-        }
+    if (mappedModelId === 'dall-e-3') {
+        throw new Error('DALL-E 3 is a deprecated model and cannot be used.');
     }
 
     let finalImageSize = imageSize;
     let customDimensions = null;
 
-    if (!useLaoZhang) {
-        if (mappedModelId === 'dall-e-3') {
-            if (finalImageSize !== '1024x1024' && finalImageSize !== '1024x1792' && finalImageSize !== '1792x1024') {
-                const [wStr, hStr] = aspectRatio.split(':');
-                const w = parseFloat(wStr) || 1, h = parseFloat(hStr) || 1;
-                if (w > h) finalImageSize = '1792x1024';
-                else if (w < h) finalImageSize = '1024x1792';
-                else finalImageSize = '1024x1024';
-            }
-        } else if (mappedModelId === 'dall-e-2') {
-            finalImageSize = '1024x1024';
+    // ── GPT Image 2 / GPT Image 1 is fully flexible ──
+    // Rules: max 3:1 ratio, multiples of 16, pixels between 655k and 8.29M
+    if (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1') {
+        let ratio = 1;
+        if (customSize && customSize.width && customSize.height) {
+            ratio = parseFloat(customSize.width) / parseFloat(customSize.height);
+        } else {
+            const [wStr, hStr] = (aspectRatio || '1:1').split(':');
+            let wRatio = parseFloat(wStr) || 1;
+            let hRatio = parseFloat(hStr) || 1;
+            ratio = wRatio / hRatio;
         }
-    } else {
-        // ── GPT Image 2 (via LaoZhang) is fully flexible ──
-        // Rules: max 3:1 ratio, multiples of 16, pixels between 655k and 8.29M
-        if (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1') {
-            let ratio = 1;
-            if (customSize && customSize.width && customSize.height) {
-                ratio = parseFloat(customSize.width) / parseFloat(customSize.height);
-            } else {
-                const [wStr, hStr] = (aspectRatio || '1:1').split(':');
-                let wRatio = parseFloat(wStr) || 1;
-                let hRatio = parseFloat(hStr) || 1;
-                ratio = wRatio / hRatio;
-            }
-            const targetPixels = 1500000; // ~1.5 Megapixels
-            
-            let h = Math.sqrt(targetPixels / ratio);
-            let w = h * ratio;
-            
-            // Snap to multiples of 16
-            w = Math.round(w / 16) * 16;
-            h = Math.round(h / 16) * 16;
-            
-            // Enforce max edge 3840
-            if (w > 3840) { w = 3840; h = Math.round((w / ratio) / 16) * 16; }
-            if (h > 3840) { h = 3840; w = Math.round((h * ratio) / 16) * 16; }
-            
-            customDimensions = { width: w, height: h };
-        }
+        const targetPixels = 1500000; // ~1.5 Megapixels
+        
+        let h = Math.sqrt(targetPixels / ratio);
+        let w = h * ratio;
+        
+        // Snap to multiples of 16
+        w = Math.round(w / 16) * 16;
+        h = Math.round(h / 16) * 16;
+        
+        // Enforce max edge 3840
+        if (w > 3840) { w = 3840; h = Math.round((w / ratio) / 16) * 16; }
+        if (h > 3840) { h = 3840; w = Math.round((h * ratio) / 16) * 16; }
+        
+        customDimensions = { width: w, height: h };
     }
 
-    // ── Map quality values for DALL-E 3 compatibility ──
-    // gpt-image-1/2 uses: 'low' | 'medium' | 'high'
-    // dall-e-3 uses: 'standard' | 'hd'
-    // When we remap to dall-e-3, we must also remap the quality parameter.
     let finalQuality = quality;
-    if (mappedModelId === 'dall-e-3' || mappedModelId === 'dall-e-2') {
-        if (quality === 'high') finalQuality = 'hd';
-        else if (quality === 'medium' || quality === 'low') finalQuality = 'standard';
-    }
 
     console.log(`\n══════ OPENAI IMAGE ${useEditsEndpoint ? 'EDIT' : 'GENERATION'} (${modelId} -> ${mappedModelId}) ══════`);
     console.log(`🎨 Model: ${mappedModelId} | Quality: ${finalQuality} | Size: ${finalImageSize} | Format: ${finalFormat}`);
