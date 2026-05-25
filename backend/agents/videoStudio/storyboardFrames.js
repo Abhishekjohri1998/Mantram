@@ -84,27 +84,7 @@ export async function generateStoryboardPoster(
         finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos.`;
     }
 
-    // Normalise model choice
     let useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
-
-    // Verify GCP credentials for NanoBanana
-    if (useNanoBanana) {
-        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        let credsExist = false;
-        try {
-            if (credsVar && fs.existsSync(credsVar)) {
-                credsExist = true;
-            }
-        } catch (e) {
-            console.warn(`[SB Poster] Credentials check failed: ${e.message}`);
-        }
-        
-        if (!credsExist) {
-            console.warn(`[SB Poster] ⚠️ GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Falling back to gpt-image-2.`);
-            useNanoBanana = false;
-        }
-    }
-
     const effectiveModel = useNanoBanana ? 'nanobanana' : 'gpt-image-2';
 
     console.log(`\n[SB Poster] ══ GENERATING STORYBOARD POSTER ══`);
