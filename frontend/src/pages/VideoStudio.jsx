@@ -1224,9 +1224,9 @@ export default function VideoStudio() {
 
                 {/* ── Video Player Modal ── */}
                 {playingVideo && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setPlayingVideo(null)}>
+                    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md " onClick={() => setPlayingVideo(null)}>
                         <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                            <video src={playingVideo} controls autoPlay className="w-full rounded-2xl shadow-none" />
+                            <video src={playingVideo} controls autoPlay className="max-w-full max-h-[85vh] mx-auto rounded-2xl shadow-none object-contain bg-black" />
                             <div className="absolute -top-12 right-0 flex items-center gap-2">
                                 <button onClick={() => handleDownloadVideo(playingVideo, 'video')}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer backdrop-blur">
