@@ -255,8 +255,8 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
 async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K', logoUrl = null, rawLogoBuffer = null) {
     // ✅ FIX: gemini-3.1-flash-image-preview is IMAGE OUTPUT ONLY — it cannot read input images.
-    // gemini-2.0-flash-exp supports both image INPUT (reference) and image OUTPUT (generation).
-    const GEMINI_MODEL = 'gemini-2.0-flash-exp';
+    // gemini-3.1-flash-image-preview supports both image INPUT (reference) and image OUTPUT (generation).
+    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 
     try {
         const { generateImageWithVertex } = await import('../../services/vertexImage.js');
@@ -313,12 +313,15 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         // Text prompt last (Gemini requirement)
         parts.push({ text: finalPrompt });
 
-        // Use gemini-3.1-flash-image-preview for all cases as it supports both image reference inputs (multimodal)
-        // and high-quality image generation output.
-        const activeModel = 'gemini-3.1-flash-image-preview';
-        const imageConfigObj = { aspectRatio: ar, imageSize };
+        const hasReferenceImages = parts.filter(p => p.inlineData).length > 0;
+        // gemini-3.1-flash-image-preview reads reference images but doesn't support imageSize token ('1K'/'2K')
+        // When we have references, use gemini-3.1-flash-image-preview. When no references, use imagen-3.0-generate-002 for quality.
+        const activeModel = hasReferenceImages ? 'gemini-3.1-flash-image-preview' : 'imagen-3.0-generate-002';
+        const imageConfigObj = hasReferenceImages
+            ? { aspectRatio: ar }               // 2.0 only supports aspectRatio
+            : { aspectRatio: ar, imageSize };    // imagen-3 supports imageSize too
 
-        console.log(`[SB Poster][NanoBanana] ${activeModel} | refs=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${imageSize}`);
+        console.log(`[SB Poster][NanoBanana] ${activeModel} | refs=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${hasReferenceImages ? 'model-default' : imageSize}`);
 
         const data = await Promise.race([
             generateImageWithVertex(parts, activeModel, 0.4, imageConfigObj),

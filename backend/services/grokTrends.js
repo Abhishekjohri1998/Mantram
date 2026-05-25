@@ -58,8 +58,15 @@ async function grokCall(systemPrompt, userPrompt, options = {}) {
             }),
         });
 
-        const data = await resp.json();
-        
+        let data;
+        const respText = await resp.text();
+        try {
+            data = JSON.parse(respText);
+        } catch (e) {
+            console.warn(`Grok API returned non-JSON [${resp.status}]: ${respText.substring(0, 100)}`);
+            return null;
+        }
+
         if (!resp.ok) {
             const msg = data.error?.message || data.error || resp.statusText;
             const lowerMsg = String(msg).toLowerCase();
