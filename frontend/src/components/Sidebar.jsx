@@ -31,9 +31,18 @@ const bottomItems = [
     { icon: 'settings', label: 'Settings', to: '/settings' },
 ]
 
-function filterNavByAccess(items, studioAccess, isSuperAdmin) {
+function filterNavByAccess(items, studioAccess, isSuperAdmin, userPlan = 'free') {
+    const isFreePlan = userPlan.toLowerCase() === 'free';
+    const premiumStudios = ['conversationStudio', 'adStudio', 'skillsHub'];
+
     return items.filter(item => {
         if (item.superAdminOnly && !isSuperAdmin) return false
+        
+        // Hide premium studios for free plan users
+        if (isFreePlan && item.studioKey && premiumStudios.includes(item.studioKey)) {
+            return false;
+        }
+
         if (isSuperAdmin) return true
         if (!studioAccess) return true
         if (!item.studioKey) return true
@@ -100,7 +109,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                         <span className="material-symbols-outlined text-[18px]">close</span>
                     </button>
                 </div>
-                {filterNavByAccess(navItems, user?.studioAccess, isSuperAdmin).map((item) => (
+                {filterNavByAccess(navItems, user?.studioAccess, isSuperAdmin, user?.plan || 'free').map((item) => (
                     <NavLink
                         key={item.label}
                         to={item.to}
