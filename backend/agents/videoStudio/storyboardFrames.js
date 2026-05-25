@@ -143,57 +143,53 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
     const size = AR_TO_SIZE[ar] || '1792x1024';
     const modelId = 'gpt-image-2';
 
-    // DALL-E 3 (gpt-image-2) does not support image-to-image reference edits.
-    // Forcing /images/edits on the proxy falls back to slow, low-quality DALL-E 2 edits.
-    // Instead, we always use standard generations (text-to-image) to keep DALL-E 3 quality and speed.
-    const useEditsEndpoint = false;
     const refBuffers = [];
     
-    if (useEditsEndpoint) {
-        // 1. Collect Product Images
-        if (rawProductBuffers.length > 0) {
-            for (const rb of rawProductBuffers) {
-                if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
-            }
-        } else if (productImageUrls.length > 0) {
-            const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
-            for (const url of urlsToFetch) {
-                try {
-                    const { buffer, mimeType } = await downloadBuffer(url);
-                    refBuffers.push({ buffer, mimeType });
-                    console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
-                } catch (dlErr) {
-                    console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
-                }
-            }
+    // 1. Collect Product Images
+    if (rawProductBuffers.length > 0) {
+        for (const rb of rawProductBuffers) {
+            if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
         }
-
-        // 2. Collect Avatar Image
-        if (rawAvatarBuffer?.buffer) {
-            refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
-        } else if (avatarUrl?.startsWith('http')) {
+    } else if (productImageUrls.length > 0) {
+        const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
+        for (const url of urlsToFetch) {
             try {
-                const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+                const { buffer, mimeType } = await downloadBuffer(url);
                 refBuffers.push({ buffer, mimeType });
-                console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
+                console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
             } catch (dlErr) {
-                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
-            }
-        }
-
-        // 3. Collect Logo Image
-        if (rawLogoBuffer?.buffer) {
-            refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
-        } else if (logoUrl?.startsWith('http')) {
-            try {
-                const { buffer, mimeType } = await downloadBuffer(logoUrl);
-                refBuffers.push({ buffer, mimeType });
-                console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
-            } catch (dlErr) {
-                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
             }
         }
     }
+
+    // 2. Collect Avatar Image
+    if (rawAvatarBuffer?.buffer) {
+        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
+    } else if (avatarUrl?.startsWith('http')) {
+        try {
+            const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+            refBuffers.push({ buffer, mimeType });
+            console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
+        } catch (dlErr) {
+            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+        }
+    }
+
+    // 3. Collect Logo Image
+    if (rawLogoBuffer?.buffer) {
+        refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
+    } else if (logoUrl?.startsWith('http')) {
+        try {
+            const { buffer, mimeType } = await downloadBuffer(logoUrl);
+            refBuffers.push({ buffer, mimeType });
+            console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
+        } catch (dlErr) {
+            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
+        }
+    }
+
+    const useEditsEndpoint = refBuffers.length > 0;
 
     const apiKey = config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY;
     const baseUrl = config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
@@ -211,11 +207,11 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             fd.append('quality', 'high');
             fd.append('n', '1');
             fd.append('response_format', 'b64_json');
-            // ✅ FIX: GPT Image 2 /images/edits uses 'image' (singular) not 'image[]'
-            // Multiple images require separate 'image' entries (some proxies support array)
+            
+            // LaoZhang proxy supports multiple 'image[]' parameters for character/style/logo injection
             refBuffers.forEach(({ buffer, mimeType }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
-                fd.append('image', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
+                fd.append('image[]', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',

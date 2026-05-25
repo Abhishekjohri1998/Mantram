@@ -1489,7 +1489,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         console.log(`📦 ${refBuffers.length} base64 reference images ready (no HTTP URLs)`);
     }
 
-    let useEditsEndpoint = refBuffers.length > 0 && modelId !== 'gpt-image-2' && modelId !== 'gpt-image-1';
+    let useEditsEndpoint = refBuffers.length > 0;
 
     if (!useLaoZhang && useEditsEndpoint) {
         console.log(`⚠️ Direct OpenAI no longer supports /images/edits (dall-e-2 is dead). Ignoring ref images.`);
