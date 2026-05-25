@@ -60,6 +60,7 @@
 /* ── Messages area ── */
 .bs-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1.5rem 1.25rem 1rem;
   display: flex;
@@ -1810,6 +1811,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1928,6 +1930,7 @@
 /* ── Right Main Panel ── */
 .bs-layout-main {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
