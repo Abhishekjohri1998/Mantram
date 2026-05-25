@@ -127,7 +127,7 @@ async function deepSearch(query) {
                     return_citations: true,
                     search_recency_filter: 'month', // last 30 days only
                 }),
-                signal: AbortSignal.timeout(25000),
+                signal: AbortSignal.timeout(45000),
             });
             const data = await resp.json();
             const text = data.choices?.[0]?.message?.content || '';
