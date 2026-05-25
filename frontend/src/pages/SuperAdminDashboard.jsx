@@ -4644,7 +4644,6 @@ const ADMIN_MODELS = [
     { key: 'gpt-image-2',  label: 'GPT-4o Image',  sub: 'Highest fidelity',  color: '#10b981' },
     { key: 'nanobanana-2', label: 'NanoBanana 2',   sub: 'Gemini • Creative', color: '#6366f1' },
     { key: 'gpt-image-1',  label: 'GPT Image 1',    sub: 'Fast generation',   color: '#3b82f6' },
-    { key: 'dall-e-3',     label: 'DALL·E 3',       sub: 'Artistic quality',  color: '#8b5cf6' },
     { key: 'flux-pro',     label: 'Flux Pro',        sub: 'Detail-rich',       color: '#f59e0b' },
 ]
 const RATIOS = [

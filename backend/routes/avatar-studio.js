@@ -55,14 +55,6 @@ export const AVATAR_MODELS = {
         defaultSize: '9:16',         // passed as aspectRatio hint in prompt
         responseFormat: 'base64',
     },
-    'dall-e-3': {
-        label: 'DALL·E 3',
-        badge: 'Creative',
-        apiModel: 'dall-e-3',
-        provider: 'lz',
-        defaultSize: '1024x1792',
-        responseFormat: 'url',
-    },
     'flux-pro': {
         label: 'Flux Pro',
         badge: 'Detailed',
