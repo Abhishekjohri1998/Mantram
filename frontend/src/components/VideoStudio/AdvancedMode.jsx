@@ -1084,7 +1084,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         <button className="vm-viewer-close" onClick={() => setViewVideo(null)}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span> Back
                         </button>
-                        <video src={viewVideo.url} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} loop style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', objectFit: 'contain', background: '#000' }} />
+                        <video src={viewVideo.url} controls autoPlay playsInline muted={false} ref={el => { if(el){ el.muted = false; el.volume = 1; const p = el.play(); if(p!==undefined) p.catch(()=>{}); } }} loop style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', objectFit: 'contain', background: '#000' }} />
                         <div className="vm-viewer-actions">
                             <button className="vm-viewer-btn accent" onClick={() => {
                                 setModel(viewVideo.model || 'seedance-2.0')

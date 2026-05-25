@@ -1226,7 +1226,7 @@ export default function VideoStudio() {
                 {playingVideo && (
                     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md " onClick={() => setPlayingVideo(null)}>
                         <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                            <video src={playingVideo} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} className="max-w-full max-h-[85vh] mx-auto rounded-2xl shadow-none object-contain bg-black" />
+                            <video src={playingVideo} controls autoPlay playsInline muted={false} ref={el => { if(el){ el.muted = false; el.volume = 1; const p = el.play(); if(p!==undefined) p.catch(()=>{}); } }} className="max-w-full max-h-[85vh] mx-auto rounded-2xl shadow-none object-contain bg-black" />
                             <div className="absolute -top-12 right-0 flex items-center gap-2">
                                 <button onClick={() => handleDownloadVideo(playingVideo, 'video')}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer backdrop-blur">
