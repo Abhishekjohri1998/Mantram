@@ -235,14 +235,32 @@ ${(() => {
     const needsDialogue = preset.register && (preset.register.toLowerCase().includes('dialogue') || preset.register.toLowerCase().includes('conversational') || preset.register.toLowerCase().includes('talks to') || preset.register.toLowerCase().includes('peer-to-peer') || preset.register.toLowerCase().includes('instructional') || (preset.group === 'creator' && !preset.register.toLowerCase().includes('no dialogue')));
     const lang = settings?.language || 'English';
     const isNonEnglish = lang.toLowerCase() !== 'english';
+    const isHindi = lang.toLowerCase() === 'hindi';
+    
     // Force dialogue for non-English languages even if preset doesn't require it,
     // because regional language voiceover needs spoken text to synthesize.
     if (needsDialogue || isNonEnglish) {
+        let langSpecificRules = '';
+        if (isHindi) {
+            langSpecificRules = `DIALOGUE LANGUAGE: Hindi (Hinglish/Colloquial mixed style)
+⚠️ CRITICAL LANGUAGE STYLE INSTRUCTIONS:
+- Do NOT write in bookish, formal, or highly Sanskritized Hindi (e.g. avoid words like "उत्पाद" (utpaad), "त्वचा" (tvacha), "मूल्य" (moolya), "क्रय" (kray), "आदेश" (aadesh)). No one speaks like this in daily life or in modern video ads.
+- Write dialogue in COLLOQUIAL HINGLISH/CONVERSATIONAL HINDI written in Devanagari script.
+- Mix common English words naturally using Devanagari script for nouns and verbs (e.g. use "प्रोडक्ट" for product, "स्किन" for skin, "ऑर्डर" for order, "डिस्काउंट" for discount, "ट्राई" for try, "ग्लो" for glow, "अमेजिंग" for amazing, "गैस" or "फ्रेंड्स" for guys/friends).
+- Formatting: DIALOGUE [emotion]: "[exact words in Devanagari Hinglish script]"
+- Example: 
+  ❌ WRONG (Bookish): DIALOGUE [excited]: "क्या आप अपनी शुष्क त्वचा से परेशान हैं? यह उत्कृष्ट उत्पाद अभी खरीदें।"
+  ✅ CORRECT (Conversational): DIALOGUE [excited]: "हे गाइस! क्या आप भी अपनी ड्राई स्किन से परेशान हैं? तो इस अमेजिंग प्रोडक्ट को अभी ट्राई करो।"`;
+        } else {
+            langSpecificRules = `DIALOGUE LANGUAGE: ${lang}
+- Write dialogue DIRECTLY in ${lang} using ${lang} script/characters.
+- Important: Write in COLLOQUIAL, CONVERSATIONAL regional style as a native speaker would naturally speak in daily life. Avoid overly formal or bookish vocabulary. If common English words are normally used in daily speech for your language (like "product", "skin", "delivery"), write them phonetically in the ${lang} script.
+- Formatting: DIALOGUE [emotion]: "[exact words in ${lang} script]"`;
+        }
+
         return `DIALOGUE REQUIREMENT — ${isNonEnglish ? 'MANDATORY (regional language selected)' : 'this preset demands spoken words on camera'}:
 Every shot with the avatar on screen MUST include a DIALOGUE line.
-DIALOGUE LANGUAGE: ${lang} — ALL dialogue lines MUST be written DIRECTLY in ${lang} using ${lang} script/characters. NOT English. NOT translated from English. Write as a native ${lang} speaker would naturally speak.
-${isNonEnglish ? `⚠️ CRITICAL: If ANY dialogue line is in English instead of ${lang}, the ENTIRE output is REJECTED. You MUST write in ${lang} only.` : ''}
-Format: DIALOGUE [emotion]: "[exact words the presenter says in ${lang}]"
+${langSpecificRules}
 
 EMOTION TAGS (pick one per line — think like a director giving actor notes):
 - [excited] — product reveal, wow moment, unboxing surprise
@@ -255,7 +273,7 @@ EMOTION TAGS (pick one per line — think like a director giving actor notes):
 - [confident] — strong recommendation, social proof
 
 Write at least 4-6 distinct DIALOGUE lines across different shots. Emotions MUST arc — never repeat the same emotion twice in a row.
-${isNonEnglish ? `Example (${lang}): DIALOGUE [excited]: "[write this in ${lang} script]"` : 'Example: DIALOGUE [curious]: "Has anyone else been struggling with this?"'}
+${isHindi ? 'Example (Hindi): DIALOGUE [excited]: "हे गाइस! क्या आप भी अपनी ड्राई स्किन से परेशान हैं? तो इस अमेजिंग प्रोडक्ट को अभी ट्राई करो।"' : `Example (${lang}): DIALOGUE [excited]: "[write this in ${lang} script]"`}
 `;
     } else {
         return 'NO DIALOGUE — this preset is silent/cinematic. Do not include spoken words.\n';
@@ -474,19 +492,33 @@ export async function runQAdsAgent({
     const systemPrompt = buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format, settings });
     const userPrompt = buildUserPrompt({ userBrief, productData, hasAvatar, settings });
 
-    console.log(`[Q-Ads Agent] Calling Claude — ${imageUrls.length} images, ${duration}s, ${format}`);
+    // Resolve best provider for text/dialogue generation
+    const langLower = (settings?.language || '').toLowerCase().trim();
+    let promptProvider = settings?.promptProvider || settings?.provider;
 
-    // ── 6. Claude call (with images via vision) ───────────────────────────────
+    if (!promptProvider) {
+        if (langLower === 'hindi' || langLower === 'hinglish') {
+            // Grok/xAI is highly recommended for colloquial Hinglish due to real-time Twitter/conversational data,
+            // followed by OpenAI (GPT-4o) which is also very creative.
+            promptProvider = 'xai'; // ModelRouter falls back to openai or gemini if xai is unconfigured
+        } else {
+            promptProvider = 'gemini'; // default
+        }
+    }
+
+    console.log(`[Q-Ads Agent] Calling LLM (${promptProvider}) — ${imageUrls.length} images, ${duration}s, ${format}`);
+
+    // ── 6. LLM call (with images via vision) ───────────────────────────────
     let rawOutput;
     try {
         rawOutput = await callMultimodalAgent(
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.75, maxTokens: 5000, returnRaw: true }
+            { temperature: 0.75, maxTokens: 5000, returnRaw: true, provider: promptProvider }
         );
     } catch (llmErr) {
-        console.error(`[Q-Ads Agent] Claude call failed: ${llmErr.message}`);
+        console.error(`[Q-Ads Agent] LLM call failed: ${llmErr.message}`);
         throw new Error(`Q-Ads generation failed: ${llmErr.message}`);
     }
 
@@ -509,7 +541,7 @@ export async function runQAdsAgent({
                 retrySystem,
                 userPrompt,
                 imageUrls,
-                { temperature: 0.65, maxTokens: 5000, returnRaw: true }
+                { temperature: 0.65, maxTokens: 5000, returnRaw: true, provider: promptProvider }
             );
             variants = parseVariants(rawOutput);
             const retryIssues = validateVariants(variants);
