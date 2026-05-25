@@ -202,6 +202,19 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
     return outputPath;
 }
 
+async function getVideoDuration(videoPath) {
+    try {
+        await execFileAsync(ffmpegPath, ['-i', videoPath]);
+    } catch (err) {
+        // FFmpeg exits with an error code when run with just -i, but logs metadata to stderr
+        const match = err.message.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2,3})/);
+        if (match) {
+            return (parseInt(match[1], 10) * 3600) + (parseInt(match[2], 10) * 60) + parseFloat(match[3]);
+        }
+    }
+    return null;
+}
+
 /**
  * Mix a voiceover audio track with background music and mux onto a video.
  * Voiceover is at full volume; BGM is ducked to ~15% when VO is present.
@@ -238,6 +251,9 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
         }
     }
 
+    // Get exact video duration to avoid buggy -shortest flag with looped streams
+    const videoDuration = await getVideoDuration(videoPath);
+    
     const ffmpegArgs = ['-y', '-i', videoPath];
 
     if (voiceoverPath && bgmPath) {
@@ -246,7 +262,7 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
         ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath); // Loop BGM to fill video length
         ffmpegArgs.push(
             '-filter_complex',
-            '[1:a]volume=1.5[vo];[2:a]volume=0.12[bgm];[vo][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]'
+            '[1:a]volume=1.5[vo];[2:a]volume=0.12[bgm];[vo][bgm]amix=inputs=2:duration=longest:dropout_transition=2[aout]'
         );
         ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
     } else if (voiceoverPath) {
@@ -263,8 +279,16 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
 
     ffmpegArgs.push(
         '-c:v', 'copy',
-        '-c:a', 'aac', '-b:a', '192k',
-        '-shortest',
+        '-c:a', 'aac', '-b:a', '192k'
+    );
+    
+    if (videoDuration) {
+        ffmpegArgs.push('-t', String(videoDuration));
+    } else {
+        ffmpegArgs.push('-shortest'); // Fallback if duration extraction failed
+    }
+    
+    ffmpegArgs.push(
         '-movflags', '+faststart',
         outputPath,
     );
