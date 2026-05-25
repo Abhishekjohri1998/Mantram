@@ -13,7 +13,7 @@ import { runArtDirector } from './artDirectorAgent.js';
 import { v4 as uuidv4 } from 'uuid';
 
 
-const GPT_IMAGE_MODEL = 'gemini-2.0-flash-exp';
+const GPT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 // Identity asset definitions

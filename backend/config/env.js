@@ -33,7 +33,7 @@ export default {
         defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-3-flash-preview',
         defaultOpenAIModel: process.env.DEFAULT_OPENAI_MODEL || 'gpt-4o-mini',
         defaultAnthropicModel: process.env.DEFAULT_ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.0-flash-exp',
+        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-3.1-flash-image-preview',
         providers: {
             gemini: {
                 apiKey: process.env.GEMINI_API_KEY,

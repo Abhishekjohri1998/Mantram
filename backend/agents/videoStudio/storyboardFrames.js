@@ -3,7 +3,7 @@
  *
  * Routes image generation based on user-selected model:
  *   - gpt-image-2  → LaoZhang proxy (/images/edits with ref images, or /images/generations)
- *   - nanobanana   → Gemini Vertex AI (gemini-2.0-flash-exp)
+ *   - nanobanana   → Gemini Vertex AI (gemini-3.1-flash-image-preview)
  *
  * Raw multer buffers are preferred for GPT Image 2 (no S3 roundtrip).
  * NanoBanana uses inline base64 parts for Vertex AI.
@@ -248,9 +248,9 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
 async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K', logoUrl = null, rawLogoBuffer = null) {
-    // ✅ FIX: gemini-2.0-flash-exp is IMAGE OUTPUT ONLY — it cannot read input images.
-    // gemini-2.0-flash-exp supports both image INPUT (reference) and image OUTPUT (generation).
-    const GEMINI_MODEL = 'gemini-2.0-flash-exp';
+    // ✅ FIX: gemini-3.1-flash-image-preview is IMAGE OUTPUT ONLY — it cannot read input images.
+    // gemini-3.1-flash-image-preview supports both image INPUT (reference) and image OUTPUT (generation).
+    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 
     try {
         const { generateImageWithVertex } = await import('../../services/vertexImage.js');
@@ -308,9 +308,9 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         parts.push({ text: finalPrompt });
 
         const hasReferenceImages = parts.filter(p => p.inlineData).length > 0;
-        // gemini-2.0-flash-exp reads reference images but doesn't support imageSize token ('1K'/'2K')
-        // When we have references, use gemini-2.0-flash-exp. When no references, use imagen-3.0-generate-002 for quality.
-        const activeModel = hasReferenceImages ? 'gemini-2.0-flash-exp' : 'imagen-3.0-generate-002';
+        // gemini-3.1-flash-image-preview reads reference images but doesn't support imageSize token ('1K'/'2K')
+        // When we have references, use gemini-3.1-flash-image-preview. When no references, use imagen-3.0-generate-002 for quality.
+        const activeModel = hasReferenceImages ? 'gemini-3.1-flash-image-preview' : 'imagen-3.0-generate-002';
         const imageConfigObj = hasReferenceImages
             ? { aspectRatio: ar }               // 2.0 only supports aspectRatio
             : { aspectRatio: ar, imageSize };    // imagen-3 supports imageSize too

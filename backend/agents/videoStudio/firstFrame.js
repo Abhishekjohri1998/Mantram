@@ -1,7 +1,7 @@
 /**
  * First Frame Generator — Generates a reference image for video consistency
  * 
- * Uses Gemini's NanoBanana 2 (gemini-2.0-flash-exp) to create
+ * Uses Gemini's NanoBanana 2 (gemini-3.1-flash-image-preview) to create
  * product-consistent images based on shot descriptions + user reference images.
  * 
  * KEY DESIGN DECISIONS:
@@ -12,7 +12,7 @@
  * 4. Flux Pro fallback passes reference as image_prompt for basic style guidance
  */
 
-const GEMINI_MODELS = ['gemini-2.0-flash-exp'];
+const GEMINI_MODELS = ['gemini-3.1-flash-image-preview'];
 import { ensureS3Url } from '../../utils/s3.js';
 import { falGenerateImage } from '../youtubeStudio/nodes.js';
 import sharp from 'sharp';

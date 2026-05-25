@@ -279,7 +279,7 @@ async function scrapeProductUrl(url) {
 }
 
 // ── Image Generation for A+ / A++ Modules ──────────────────────────────────────
-async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = [], designContext = null, imageModel = 'gemini-2.0-flash-exp') {
+async function generateModuleImage(prompt, moduleSpec, productImages = [], brandColors = [], designContext = null, imageModel = 'gemini-3.1-flash-image-preview') {
     // Q&A and text-only modules skip image gen
     if (!moduleSpec.width || !moduleSpec.height) return null;
 
@@ -309,10 +309,10 @@ async function generateModuleImage(prompt, moduleSpec, productImages = [], brand
     try {
         const imagePromise = refImages.length > 0
             ? laozhangMultimodalImageGenerate(fullPrompt, refImages.slice(0, 2), {
-                model: imageModel || 'gemini-2.0-flash-exp', size
+                model: imageModel || 'gemini-3.1-flash-image-preview', size
             })
             : laozhangImageGenerate(fullPrompt, {
-                model: imageModel || 'gemini-2.0-flash-exp', size
+                model: imageModel || 'gemini-3.1-flash-image-preview', size
             });
 
         const result = await Promise.race([
@@ -480,7 +480,7 @@ export async function generateAplusListing({
     listingTier = 'standard',   // 'standard' | 'premium'
     designContext = null,        // PDI locked design directive from frontend
     productDNA = null,
-    imageModel = 'gemini-2.0-flash-exp', // User-selected image model
+    imageModel = 'gemini-3.1-flash-image-preview', // User-selected image model
 }) {
     const isPremium = listingTier === 'premium';
     console.log(`A+ Builder: Starting ${isPremium ? 'Premium A++' : 'Standard A+'} generation pipeline...`);

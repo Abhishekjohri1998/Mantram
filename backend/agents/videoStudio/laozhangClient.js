@@ -206,7 +206,7 @@ function getImageTimeout(model) {
     return IMAGE_MODEL_TIMEOUTS[model] || IMAGE_MODEL_TIMEOUTS.default;
 }
 
-export async function laozhangImageGenerate(prompt, { model = 'gemini-2.0-flash-exp', size = '1024x1024' } = {}) {
+export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
     const timeoutMs = getImageTimeout(model);
     console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
@@ -249,7 +249,7 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-2.0-flash-
 // MULTIMODAL IMAGE GENERATION — via /v1/chat/completions
 // ══════════════════════════════════════════════════════════════════════════════
 
-export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-2.0-flash-exp', size = '1024x1024' } = {}) {
+export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const apiKey = getApiKey();
     const timeoutMs = getImageTimeout(model);
     if (!imageUrls || imageUrls.length === 0) return laozhangImageGenerate(prompt, { model, size });

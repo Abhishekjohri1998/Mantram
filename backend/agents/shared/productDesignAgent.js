@@ -372,7 +372,7 @@ function buildFallbackProductDNA(productData, brief) {
  * @param {object} customMoodDirs    - AI-generated moods from generateProductMoodDirections (or FALLBACK)
  * @returns {{ moods: MoodImage[], moodDirections: object }}
  */
-export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null, imageModel = 'gemini-2.0-flash-exp') {
+export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null, imageModel = 'gemini-3.1-flash-image-preview') {
     const moodDirections = customMoodDirs || FALLBACK_MOOD_DIRECTIONS;
     console.log(`PDI: Generating ${Object.keys(moodDirections).length} product-world mood boards...`);
 
@@ -498,12 +498,12 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
             let result;
             if (hasRefImages && laozhangMultimodalImageGenerate) {
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
-                    model: imageModel || 'gemini-2.0-flash-exp',
+                    model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             } else {
                 result = await laozhangImageGenerate(prompt, {
-                    model: imageModel || 'gemini-2.0-flash-exp',
+                    model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             }
@@ -670,7 +670,7 @@ export function injectDesignContext(basePrompt, designContext) {
  * @param {string} brandContext       — brand DNA string
  * @returns {{ postImageUrl, backgroundUrl, copy, palette }}
  */
-export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '', imageModel = 'gemini-2.0-flash-exp') {
+export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '', imageModel = 'gemini-3.1-flash-image-preview') {
     console.log(`🎯 QuickPost: type=${postType} | ratio=${aspectRatio} | product="${productData?.title || 'unknown'}"`);
 
     const productTitle = productData?.title || productDNA?.productCategory || 'Product';
@@ -874,12 +874,12 @@ IMPORTANT: Do NOT recolor, stylize, cartoon-ize, or distort the product. It must
         let result;
         if (refImages.length > 0) {
             result = await laozhangMultimodalImageGenerate(designPrompt, refImages, {
-                model: imageModel || 'gemini-2.0-flash-exp',
+                model: imageModel || 'gemini-3.1-flash-image-preview',
                 size: imageSize,
             });
         } else {
             result = await laozhangImageGenerate(designPrompt, {
-                model: imageModel || 'gemini-2.0-flash-exp',
+                model: imageModel || 'gemini-3.1-flash-image-preview',
                 size: imageSize,
             });
         }
