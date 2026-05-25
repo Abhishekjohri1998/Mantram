@@ -32,6 +32,15 @@ const AR_TO_SIZE = {
     '3:4':   '1024x1536',
 };
 
+function sanitizeMimeType(mimeType) {
+    if (!mimeType) return 'image/jpeg';
+    const clean = mimeType.split(';')[0].trim().toLowerCase();
+    if (['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'image/bmp'].includes(clean)) {
+        return clean;
+    }
+    return 'image/jpeg';
+}
+
 // ── Download a URL to a Buffer ────────────────────────────────────────────────
 async function downloadBuffer(url) {
     const resp = await fetch(url, {
@@ -39,7 +48,8 @@ async function downloadBuffer(url) {
         signal: AbortSignal.timeout(15000),
     });
     if (!resp.ok) throw new Error(`Download failed: ${resp.status} — ${url}`);
-    return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: resp.headers.get('content-type') || 'image/jpeg' };
+    const rawMime = resp.headers.get('content-type') || 'image/jpeg';
+    return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: sanitizeMimeType(rawMime) };
 }
 
 /**
@@ -262,7 +272,7 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         if (rawProductBuffers.length > 0) {
             for (const rb of rawProductBuffers) {
                 if (rb?.buffer) {
-                    parts.push({ inlineData: { mimeType: rb.mimeType || 'image/jpeg', data: rb.buffer.toString('base64') } });
+                    parts.push({ inlineData: { mimeType: sanitizeMimeType(rb.mimeType), data: rb.buffer.toString('base64') } });
                 }
             }
         } else if (productImageUrls.length > 0) {
@@ -280,7 +290,7 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
 
         // 2. Collect Avatar Image
         if (rawAvatarBuffer?.buffer) {
-            parts.push({ inlineData: { mimeType: rawAvatarBuffer.mimeType || 'image/jpeg', data: rawAvatarBuffer.buffer.toString('base64') } });
+            parts.push({ inlineData: { mimeType: sanitizeMimeType(rawAvatarBuffer.mimeType), data: rawAvatarBuffer.buffer.toString('base64') } });
         } else if (avatarUrl?.startsWith('http')) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(avatarUrl);
@@ -293,7 +303,7 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
 
         // 3. Collect Logo Image
         if (rawLogoBuffer?.buffer) {
-            parts.push({ inlineData: { mimeType: rawLogoBuffer.mimeType || 'image/jpeg', data: rawLogoBuffer.buffer.toString('base64') } });
+            parts.push({ inlineData: { mimeType: sanitizeMimeType(rawLogoBuffer.mimeType), data: rawLogoBuffer.buffer.toString('base64') } });
         } else if (logoUrl?.startsWith('http')) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(logoUrl);
