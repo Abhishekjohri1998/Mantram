@@ -84,9 +84,7 @@ export async function generateStoryboardPoster(
         finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos.`;
     }
 
-    // Normalise model choice
     let useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
-
     // Verify GCP credentials for NanoBanana
     if (useNanoBanana) {
         const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -207,7 +205,7 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             // Multiple images require separate 'image' entries (some proxies support array)
             refBuffers.forEach(({ buffer, mimeType }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
-                fd.append('image[]', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
+                fd.append('image', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',

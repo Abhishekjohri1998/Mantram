@@ -95,6 +95,14 @@ const STRATEGY_MODES_LIST = [
 
 // ── Strategy Mode Result Renderer ─────────────────────────────────────────────
 function StrategyModeResult({ data, onClose, navigate }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
   if (!data) return null
   const priorityColor = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
   const studioIcons = { creative: 'auto_fix_high', content: 'edit_note', video: 'movie', brainstorm: 'psychology' }
@@ -105,7 +113,7 @@ function StrategyModeResult({ data, onClose, navigate }) {
   }
 
   return (
-    <div className="sm-result">
+    <div className="sm-result" ref={containerRef}>
       <div className="sm-result-hdr">
         <div className="sm-result-title">{data.modeLabel} — {data.brand}</div>
         <button className="sm-close-btn" onClick={onClose}><span className="material-symbols-outlined">close</span></button>

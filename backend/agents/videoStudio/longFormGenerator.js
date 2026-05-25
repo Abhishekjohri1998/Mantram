@@ -517,7 +517,9 @@ async function pollUntilComplete(genResult, jobId, sceneIdx, totalScenes) {
                 return status.videoUrl;
             }
             if (status.status === 'FAILED') {
-                throw new Error(status.error || `Scene generation failed (${provider})`);
+                const err = new Error(status.error || `Scene generation failed (${provider})`);
+                err.isTerminal = true;
+                throw err;
             }
 
             // Update scene progress
@@ -529,6 +531,7 @@ async function pollUntilComplete(genResult, jobId, sceneIdx, totalScenes) {
             }
         } catch (pollErr) {
             if (pollErr.message === 'Cancelled') throw pollErr;
+            if (pollErr.isTerminal) throw pollErr;
             console.warn(`[LongForm ${jobId}] Poll error for scene ${sceneIdx + 1}: ${pollErr.message}`);
         }
     }
