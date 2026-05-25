@@ -4,6 +4,25 @@ import AvatarPicker from './AvatarPicker';
 import { products, API_BASE } from '../../services/api';
 import VideoHoverActions from './VideoHoverActions';
 
+// --- Internal Component to prevent massive re-renders on keystroke ---
+const DebouncedInput = ({ value, onChange, placeholder, className, disabled, style }) => {
+    const [local, setLocal] = useState(value || '');
+    useEffect(() => { setLocal(value || '') }, [value]);
+    return (
+        <input 
+            type="text" 
+            className={className}
+            style={style}
+            placeholder={placeholder}
+            value={local}
+            onChange={e => setLocal(e.target.value)}
+            onBlur={() => { if (local !== value) onChange(local) }}
+            onKeyDown={e => { if (e.key === 'Enter' && local !== value) onChange(local) }}
+            disabled={disabled}
+        />
+    )
+}
+
 const API = `${API_BASE}/video-studio`;
 
 /**
@@ -482,12 +501,11 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         {/* Row 1: Brief input */}
                         <div className="scott-input-wrapper" style={{ width: '100%' }}>
                             <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', marginRight: 10, fontSize: 18 }}>edit</span>
-                            <input
-                                type="text"
+                            <DebouncedInput
                                 className="scott-input"
                                 placeholder="Describe your ad film... e.g. 'Create a 30s emotional ad for our protein powder targeting young fitness enthusiasts...'"
                                 value={brief}
-                                onChange={e => setBrief(e.target.value)}
+                                onChange={setBrief}
                                 disabled={isLoading}
                             />
                         </div>
@@ -565,14 +583,13 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         {/* URL input row for product */}
                         <div style={{ display: 'flex', width: '100%', gap: '8px', alignItems: 'center', padding: '4px 8px 0', borderTop: '1px dashed rgba(255,255,255,0.05)', marginTop: 4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>link</span>
-                            <input 
-                                type="text" 
+                            <DebouncedInput 
                                 className="scott-input" 
                                 style={{ padding: '4px 0', fontSize: 12, flex: 1 }}
                                 placeholder="Paste product URL (optional)..." 
                                 value={productUrlInput}
-                                onChange={(e) => setProductUrlInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleProductUrlAdd()}
+                                onChange={setProductUrlInput}
+                                disabled={isScrapingUrl}
                             />
                             {productUrlInput && (
                                 <button className="sb-url-add-btn" onClick={handleProductUrlAdd} disabled={isScrapingUrl}>

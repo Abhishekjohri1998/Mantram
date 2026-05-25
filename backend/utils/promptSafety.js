@@ -24,13 +24,12 @@ export async function checkPromptSafety(prompt) {
     try {
         const router = getRouter();
         const result = await router.generateText({
-            model: 'gemini-flash',
-            system: SAFETY_SYSTEM,
-            prompt: `Classify this video prompt:\n\n"${prompt.substring(0, 500)}"`,
+            model: 'gemini-1.5-flash',
+            systemPrompt: SAFETY_SYSTEM,
+            userPrompt: `Classify this video prompt:\n\n"${prompt.substring(0, 500)}"`,
             temperature: 0,
             maxTokens: 60,
-            timeoutMs: 5000,         // hard 5s timeout — never block generation
-        });
+        }, { provider: 'gemini' });
         const parsed = JSON.parse(result?.text?.match(/\{[\s\S]*\}/)?.[0] || '{}');
         return { safe: parsed.safe !== false, reason: parsed.reason || '' };
     } catch (err) {

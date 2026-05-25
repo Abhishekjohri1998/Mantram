@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react'
 import AvatarPicker from './AvatarPicker'
 import PublishModal from '../PublishModal'
 import VideoHoverActions from './VideoHoverActions'
@@ -20,7 +20,7 @@ import ViralityMiniPanel from '../ViralityMiniPanel'
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'},{value:20,label:'20s',msIcon:'timer'},{value:30,label:'30s',msIcon:'movie'},{value:45,label:'45s',msIcon:'movie'},{value:60,label:'60s',msIcon:'movie'},{value:90,label:'90s',msIcon:'movie'},{value:120,label:'120s',msIcon:'movie'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
-const RES = [{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
+const RES = [{value:'480p',label:'480p',msIcon:'sd'},{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
 const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
     {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
@@ -33,6 +33,25 @@ const VIDEO_MODELS = [
     {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
     {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
 ]
+
+// --- Internal Component to prevent massive re-renders on keystroke ---
+const DebouncedInput = ({ value, onChange, placeholder, className, disabled }) => {
+    const [local, setLocal] = useState(value || '');
+    useEffect(() => { setLocal(value || '') }, [value]);
+    return (
+        <input 
+            type="text" 
+            className={className}
+            placeholder={placeholder}
+            value={local}
+            onChange={e => setLocal(e.target.value)}
+            onBlur={() => { if (local !== value) onChange(local) }}
+            onKeyDown={e => { if (e.key === 'Enter' && local !== value) onChange(local) }}
+            disabled={disabled}
+        />
+    )
+}
+
 const LANGUAGES = [
     {value:'English',label:'English',msIcon:'translate'},
     {value:'Hindi',label:'Hindi',msIcon:'translate'},
@@ -518,7 +537,7 @@ function CfgMenu({ value, onChange, options, icon }) {
             <span>{sel?.label || value}</span>
         </button>
         {open && <div className="qv2-cmenu" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, zIndex: 9999, minWidth: 100, maxHeight: 300, overflowY: 'auto' }}>
-            {options.map(o => <button key={o.value || o} type="button" className="qv2-copt" style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', borderRadius: 6 }} onClick={() => { onChange(o.value || o); setOpen(false) }}>
+            {options.map(o => <button key={o.value || o} type="button" className="qv2-copt" style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', borderRadius: 6 }} onClick={() => { startTransition(() => { onChange(o.value || o) }); setOpen(false) }}>
                 {o.label || o}
             </button>)}
         </div>}
@@ -1151,7 +1170,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                 {job.status === 'done' && job.videoUrl ? (
                                     <div>
                                         <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                                            <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
+                                            <video src={job.videoUrl} controls loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
                                             <VideoHoverActions videoUrl={job.videoUrl} onPreview={setPreviewVideo} project={job} />
                                         </div>
                                         {job.voiceoverStatus === 'processing' && (
@@ -1210,12 +1229,11 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 {/* Row 1: Brief input */}
                 <div className="scott-input-wrapper" style={{ width: '100%' }}>
                     <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', marginRight: 10, fontSize: 18 }}>edit</span>
-                    <input
-                        type="text"
+                    <DebouncedInput
                         className="scott-input"
                         placeholder="Describe the ad — what should happen, who stars in it, the mood..."
                         value={userBrief}
-                        onChange={e => setUserBrief(e.target.value)}
+                        onChange={setUserBrief}
                         disabled={isGeneratingPrompts}
                     />
                     {(productImgs.length > 0 || avatarUrl) && (

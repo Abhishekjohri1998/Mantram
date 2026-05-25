@@ -1201,7 +1201,7 @@ router.post('/canvas-voiceover', protect, async (req, res) => {
 
         const promptText = `Please speak the following text fluently in ${language || 'regional language'} with an expressive tone:\n\n${cleanText.substring(0, 2000)}`;
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + geminiKey, {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + geminiKey, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1238,7 +1238,7 @@ router.post('/canvas-voiceover', protect, async (req, res) => {
             audioUrl,
             duration: Math.ceil(cleanText.split(/\s+/).length / 2.5), // rough estimate: 2.5 words/sec
             format: ext,
-            provider: 'gemini-3.1-flash-tts',
+            provider: 'gemini-2.0-flash-exp',
         });
     } catch (err) {
         console.error('Canvas voiceover error:', err.message);

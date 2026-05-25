@@ -290,16 +290,14 @@ async function submitAtlasCloudPayload(payload) {
     if (payload.model === 'gemini-flash') {
         atlasPayload = {
             model: payload.input.model,
-            input: {
-                prompt: payload.input.prompt,
-                duration: payload.input.duration,
-                aspect_ratio: payload.input.aspect_ratio,
-                resolution: payload.input.resolution,
-                seed: payload.input.seed || -1
-            }
+            prompt: payload.input.prompt,
+            duration: payload.input.duration,
+            aspect_ratio: payload.input.aspect_ratio,
+            resolution: payload.input.resolution,
+            seed: payload.input.seed || -1
         };
         if (payload.input.images) {
-            atlasPayload.input.images = payload.input.images;
+            atlasPayload.images = payload.input.images;
         }
     } else {
         const isR2V = atlasModel.includes('reference-to-video');
@@ -385,7 +383,7 @@ async function submitAtlasCloudPayload(payload) {
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         console.log(`🎬 [Atlas] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | refs=${atlasPayload.reference_images?.length || 0} | image=${(atlasPayload.image || atlasPayload.images?.length) ? 'yes' : 'no'}`);
-        console.log(`📝 [Atlas] Prompt (first 100): ${atlasPayload.prompt.substring(0, 100)}...`);
+        console.log(`📝 [Atlas] Prompt (first 100): ${(atlasPayload.prompt || '').substring(0, 100)}...`);
 
         try {
             const response = await fetch(`${ATLAS_INFERENCE_BASE}/model/generateVideo`, {
@@ -783,8 +781,26 @@ export async function submitGeminiFlashVideoGeneration({
         }
     } catch { /* normal string */ }
 
+    let safePromptText = (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '');
+    
+    // 🛡️ UNIVERSAL @IMAGE TAG SANITIZER FOR GEMINI FLASH
+    // Gemini Flash only supports 1 image. Strip any @image2, @image3 phantom tags to prevent Atlas Internal Errors.
+    const totalImageCount = (imageUrl || (referenceImages && referenceImages.length > 0)) ? 1 : 0;
+    if (totalImageCount > 0) {
+        safePromptText = safePromptText.replace(/@image(\d+)/gi, (match, p1) => {
+            const idx = parseInt(p1, 10);
+            if (idx > totalImageCount) {
+                console.warn(`🛡️ [Gemini Flash] Stripping phantom ${match} from prompt`);
+                return '';
+            }
+            return match;
+        });
+    } else {
+        safePromptText = safePromptText.replace(/@image\d+/gi, '');
+    }
+
     const finalPrompt = truncatePrompt(
-        (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim(),
+        safePromptText.replace(/\s{2,}/g, ' ').trim(),
         4000
     );
 

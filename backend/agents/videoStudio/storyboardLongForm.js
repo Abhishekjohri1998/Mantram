@@ -721,7 +721,7 @@ async function _generateTTS(text, language = 'English', emotion = 'confident') {
 
     if (isRegional && process.env.GEMINI_API_KEY) {
         const apiKey = process.env.GEMINI_API_KEY;
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=${apiKey}`, {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

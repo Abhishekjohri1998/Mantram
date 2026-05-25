@@ -512,7 +512,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 if (enhanced?.enhancedPrompt) {
                     finalPrompt = enhanced.enhancedPrompt;
                     // Cache for 24 hours
-                    await redis.set(promptCacheKey, finalPrompt, { ex: 86400 }).catch(() => {});
+                    await redis.setex(promptCacheKey, 86400, finalPrompt);
                     console.log(`✅ [ADVANCED] Enhanced prompt (${finalPrompt.split(' ').length} words): "${finalPrompt.substring(0, 100)}..."`);
                 } else {
                     console.warn('⚠️ [ADVANCED] Enhancement returned empty — using raw prompt');
@@ -1350,7 +1350,7 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
                     if (geminiKey) {
                         const promptText = `Please speak the following text fluently in regional language with an expressive tone:\n\n${storyboard.voiceoverScript.substring(0, 2000)}`;
                         
-                        const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + geminiKey, {
+                        const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + geminiKey, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4112,7 +4112,7 @@ async function generateGeminiTTSInternal(text, language, langCode, emotion = 'ne
 
     const promptText = `Please speak the following text fluently in ${language} with a ${emotion} tone:\n\n${text.substring(0, 2000)}`;
 
-    const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts:generateContent?key=' + apiKey, {
+    const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
