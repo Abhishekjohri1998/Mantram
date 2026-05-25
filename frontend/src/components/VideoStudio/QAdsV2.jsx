@@ -1441,7 +1441,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
         {previewVideo && (
             <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
                 <div style={{ position: 'relative', maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
-                    <video src={previewVideo} controls autoPlay ref={el => { if(el){ el.muted=false; el.volume=1; } }} style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', objectFit: 'contain', background: '#000' }} />
+                    <video src={previewVideo} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', objectFit: 'contain', background: '#000' }} />
                     <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
                         <a href={previewVideo} download="q-ads-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
