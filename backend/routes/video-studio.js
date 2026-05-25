@@ -7302,17 +7302,17 @@ router.post('/long-form/generate', protect, async (req, res) => {
         // Credit check
         const costEst = estimateLongFormCost(model || 'seedance-2.0', dur, settings?.resolution || '1080p', settings?.quality || 'fast');
         const user = req.user;
-        if (user.credits < costEst.totalCredits) {
+        if (user.creditsRemaining < costEst.totalCredits) {
             return res.status(402).json({
                 success: false,
-                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${user.credits}.`,
+                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${user.creditsRemaining}.`,
                 required: costEst.totalCredits,
-                available: user.credits,
+                available: user.creditsRemaining,
             });
         }
 
         // Deduct credits upfront
-        user.credits -= costEst.totalCredits;
+        user.credits.used += costEst.totalCredits;
         await user.save();
 
         // Load brand context
