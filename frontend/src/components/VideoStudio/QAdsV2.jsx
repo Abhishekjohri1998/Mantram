@@ -1170,7 +1170,7 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                                 {job.status === 'done' && job.videoUrl ? (
                                     <div>
                                         <div className="has-vha" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                                            <video src={job.videoUrl} controls autoPlay loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
+                                            <video src={job.videoUrl} controls loop playsInline style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 180, display: 'block' }} />
                                             <VideoHoverActions videoUrl={job.videoUrl} onPreview={setPreviewVideo} project={job} />
                                         </div>
                                         {job.voiceoverStatus === 'processing' && (
