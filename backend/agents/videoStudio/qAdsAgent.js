@@ -492,19 +492,33 @@ export async function runQAdsAgent({
     const systemPrompt = buildSystemPrompt({ brandContext, preset, trendingContext, competitorContext, duration, format, settings });
     const userPrompt = buildUserPrompt({ userBrief, productData, hasAvatar, settings });
 
-    console.log(`[Q-Ads Agent] Calling Claude — ${imageUrls.length} images, ${duration}s, ${format}`);
+    // Resolve best provider for text/dialogue generation
+    const langLower = (settings?.language || '').toLowerCase().trim();
+    let promptProvider = settings?.promptProvider || settings?.provider;
 
-    // ── 6. Claude call (with images via vision) ───────────────────────────────
+    if (!promptProvider) {
+        if (langLower === 'hindi' || langLower === 'hinglish') {
+            // Grok/xAI is highly recommended for colloquial Hinglish due to real-time Twitter/conversational data,
+            // followed by OpenAI (GPT-4o) which is also very creative.
+            promptProvider = 'xai'; // ModelRouter falls back to openai or gemini if xai is unconfigured
+        } else {
+            promptProvider = 'gemini'; // default
+        }
+    }
+
+    console.log(`[Q-Ads Agent] Calling LLM (${promptProvider}) — ${imageUrls.length} images, ${duration}s, ${format}`);
+
+    // ── 6. LLM call (with images via vision) ───────────────────────────────
     let rawOutput;
     try {
         rawOutput = await callMultimodalAgent(
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.75, maxTokens: 5000, returnRaw: true }
+            { temperature: 0.75, maxTokens: 5000, returnRaw: true, provider: promptProvider }
         );
     } catch (llmErr) {
-        console.error(`[Q-Ads Agent] Claude call failed: ${llmErr.message}`);
+        console.error(`[Q-Ads Agent] LLM call failed: ${llmErr.message}`);
         throw new Error(`Q-Ads generation failed: ${llmErr.message}`);
     }
 
@@ -527,7 +541,7 @@ export async function runQAdsAgent({
                 retrySystem,
                 userPrompt,
                 imageUrls,
-                { temperature: 0.65, maxTokens: 5000, returnRaw: true }
+                { temperature: 0.65, maxTokens: 5000, returnRaw: true, provider: promptProvider }
             );
             variants = parseVariants(rawOutput);
             const retryIssues = validateVariants(variants);
