@@ -33,6 +33,25 @@ const VIDEO_MODELS = [
     {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
     {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
 ]
+
+// --- Internal Component to prevent massive re-renders on keystroke ---
+const DebouncedInput = ({ value, onChange, placeholder, className, disabled }) => {
+    const [local, setLocal] = useState(value || '');
+    useEffect(() => { setLocal(value || '') }, [value]);
+    return (
+        <input 
+            type="text" 
+            className={className}
+            placeholder={placeholder}
+            value={local}
+            onChange={e => setLocal(e.target.value)}
+            onBlur={() => { if (local !== value) onChange(local) }}
+            onKeyDown={e => { if (e.key === 'Enter' && local !== value) onChange(local) }}
+            disabled={disabled}
+        />
+    )
+}
+
 const LANGUAGES = [
     {value:'English',label:'English',msIcon:'translate'},
     {value:'Hindi',label:'Hindi',msIcon:'translate'},
@@ -1210,12 +1229,11 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
                 {/* Row 1: Brief input */}
                 <div className="scott-input-wrapper" style={{ width: '100%' }}>
                     <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', marginRight: 10, fontSize: 18 }}>edit</span>
-                    <input
-                        type="text"
+                    <DebouncedInput
                         className="scott-input"
                         placeholder="Describe the ad — what should happen, who stars in it, the mood..."
                         value={userBrief}
-                        onChange={e => setUserBrief(e.target.value)}
+                        onChange={setUserBrief}
                         disabled={isGeneratingPrompts}
                     />
                     {(productImgs.length > 0 || avatarUrl) && (

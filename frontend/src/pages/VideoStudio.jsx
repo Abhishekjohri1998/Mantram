@@ -91,7 +91,7 @@ const LazyVideoThumbnail = ({ src, poster }) => {
     }, [isHovered])
 
     return (
-        <div ref={ref} className="w-full h-full bg-[var(--sys-surface)] relative overflow-hidden"
+        <div ref={ref} className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
             onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
 
             {/* Layer 1: Poster image (fades out on hover) */}
@@ -107,8 +107,7 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                 <video ref={videoRef} src={src}
                     className="w-full h-full object-cover block"
                     muted loop playsInline
-                    preload="auto"
-                    onLoadedData={e => { e.target.currentTime = 1 }}
+                    preload={hasPoster ? "none" : "metadata"}
                     onError={e => { e.target.style.display = 'none' }}
                 />
             )}
@@ -136,6 +135,7 @@ export default function VideoStudio() {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
     // ── State ──
+    const [isPending, startTransition] = React.useTransition()
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
@@ -898,7 +898,7 @@ export default function VideoStudio() {
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => setStudioMode(tab.id)}
+                            <button key={tab.id} onClick={() => startTransition(() => setStudioMode(tab.id))}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
