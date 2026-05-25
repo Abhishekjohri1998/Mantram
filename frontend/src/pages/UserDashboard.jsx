@@ -69,7 +69,7 @@ function StatusBadge({ status }) {
 
 // ── Skeleton pulse ──
 function Skel({ className }) {
-  return <div className={`rounded-lg bg-white/[0.04] animate-pulse ${className}`}/>
+  return <div className={`rounded-lg bg-[var(--sys-surface)] animate-pulse ${className}`}/>
 }
 
 // ── Bento card wrapper ──
@@ -77,7 +77,7 @@ function Card({ children, className = '', onClick, glow }) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm relative overflow-hidden transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-[#ff4d00]/25 hover:bg-[rgba(255,77,0,0.02)]' : ''} ${className}`}
+      className={`rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] backdrop-blur-sm relative overflow-hidden transition-all duration-300 ${onClick ? 'cursor-pointer hover:border-[#ff4d00]/25 hover:bg-[rgba(255,77,0,0.02)]' : ''} ${className}`}
       style={glow ? { boxShadow: '0 0 40px rgba(255,77,0,0.07)' } : {}}
     >
       {children}
@@ -91,7 +91,7 @@ function Label({ icon, children, action, onAction }) {
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
         {icon && <span className="material-symbols-outlined text-[#ff4d00] text-lg">{icon}</span>}
-        <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-white/50">{children}</h3>
+        <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-[var(--sys-text-muted)]">{children}</h3>
       </div>
       {action && <button onClick={onAction} className="text-[10px] font-bold text-[#ff4d00] hover:opacity-80 transition-opacity cursor-pointer">{action}</button>}
     </div>
@@ -272,18 +272,18 @@ export default function UserDashboard() {
         </div>
       )}
       <div className="mb-6">
-        <SmartCommandBox variant="dashboard" className="w-full bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 text-white placeholder-white/30 focus:border-[#ff4d00]/40 shadow-inner" />
+        <SmartCommandBox variant="dashboard" className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 text-[var(--sys-text)] placeholder-[var(--sys-text-muted)] focus:border-[#ff4d00]/40 shadow-inner" />
       </div>
             <div className="max-w-7xl mx-auto space-y-5 pb-16">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</p>
-            <h1 className="text-3xl font-['Space_Grotesk'] font-bold text-white tracking-tight">{greeting}<span className="animate-pulse">|</span></h1>
+            <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-widest mb-1">{new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</p>
+            <h1 className="text-3xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] tracking-tight">{greeting}<span className="animate-pulse">|</span></h1>
           </div>
           {streak > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ff4d00]/10 border border-[#ff4d00]/20">
               <span className="text-xl">🔥</span>
-              <div><p className="text-lg font-black text-[#ff4d00] leading-none">{streak}</p><p className="text-[9px] text-white/40 uppercase tracking-widest">Day Streak</p></div>
+              <div><p className="text-lg font-black text-[#ff4d00] leading-none">{streak}</p><p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-widest">Day Streak</p></div>
             </div>
           )}
         </div>
@@ -295,53 +295,53 @@ export default function UserDashboard() {
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {healthMetrics.map((m,i)=>(
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                     <Ring score={health[m.key]||0} color={m.color} size={44} stroke={4}/>
                     <div>
-                      <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">{m.label}</p>
-                      <p className="text-xl font-['Space_Grotesk'] font-bold text-white leading-tight">{Math.round(health[m.key]||0)}<span className="text-xs text-white/30">/100</span></p>
+                      <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{m.label}</p>
+                      <p className="text-xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] leading-tight">{Math.round(health[m.key]||0)}<span className="text-xs text-[var(--sys-text-muted)]">/100</span></p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
             {d2c?.connected ? (
-              <div className="mt-4 pt-4 border-t border-white/[0.05] grid grid-cols-3 gap-2">
+              <div className="mt-4 pt-4 border-t border-[var(--sys-border)] grid grid-cols-3 gap-2">
                 {[['Revenue','₹'+String((d2c.weeklyRevenue||0).toLocaleString()),'#34d399'],['Orders',String(d2c.weeklyOrders||0),'#8ff5ff'],['Velocity','High','#a78bfa']].map(([l,v,c])=>(
-                  <div key={l} className="text-center"><p className="text-[10px] text-white/30 uppercase tracking-wider">{l}</p><p className="text-sm font-bold" style={{color:c}}>{v}</p></div>
+                  <div key={l} className="text-center"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase tracking-wider">{l}</p><p className="text-sm font-bold" style={{color:c}}>{v}</p></div>
                 ))}
               </div>
             ) : (
-              <button onClick={()=>navigate('/d2c-analytics')} className="mt-4 w-full py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/40 hover:text-white/70 transition-colors font-bold cursor-pointer">Connect Shopify →</button>
+              <button onClick={()=>navigate('/d2c-analytics')} className="mt-4 w-full py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors font-bold cursor-pointer">Connect Shopify →</button>
             )}
           </Card>
           <Card className="col-span-12 lg:col-span-4 p-5">
             <Label icon="calendar_today" action="View Calendar" onAction={()=>navigate('/brand-calendar')}>Today&apos;s Queue</Label>
             {(todaySchedule.today.length + todaySchedule.tomorrow.length) === 0 ? (
               <div className="text-center py-8">
-                <span className="material-symbols-outlined text-4xl text-white/10 block mb-3">event_busy</span>
-                <p className="text-xs text-white/30 mb-4">Nothing scheduled today</p>
+                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] block mb-3">event_busy</span>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-4">Nothing scheduled today</p>
                 <button onClick={()=>navigate('/social-media-studio')} className="px-4 py-2 rounded-xl bg-[#ff4d00]/10 border border-[#ff4d00]/20 text-[#ff4d00] text-xs font-bold hover:bg-[#ff4d00]/20 cursor-pointer">+ Schedule a Post</button>
               </div>
             ) : (
               <div className="space-y-2">
-                {todaySchedule.today.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-white/30">Today</p>}
+                {todaySchedule.today.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)]">Today</p>}
                 {todaySchedule.today.slice(0,4).map(e=>(
-                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-[#ff4d00]/20 cursor-pointer transition-all group">
+                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[#ff4d00]/20 cursor-pointer transition-all group">
                     <PlatformIcon platform={(e.platform||'').toLowerCase()}/>
-                    <p className="text-xs text-white/60 truncate flex-1 group-hover:text-white">{(e.caption||'Post').slice(0,32)}</p>
+                    <p className="text-xs text-[var(--sys-text-muted)] truncate flex-1 group-hover:text-[var(--sys-text)]">{(e.caption||'Post').slice(0,32)}</p>
                     <div className="flex items-center gap-1 shrink-0">
-                      {e.scheduledFor && <span className="text-[10px] text-white/30">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+                      {e.scheduledFor && <span className="text-[10px] text-[var(--sys-text-muted)]">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
                       <StatusBadge status={e.status}/>
                     </div>
                   </div>
                 ))}
-                {todaySchedule.tomorrow.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-white/20 mt-2">Tomorrow</p>}
+                {todaySchedule.tomorrow.length > 0 && <p className="text-[9px] uppercase tracking-[0.2em] font-black text-[var(--sys-text-muted)] mt-2">Tomorrow</p>}
                 {todaySchedule.tomorrow.slice(0,2).map(e=>(
-                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] cursor-pointer opacity-60 hover:opacity-90 transition-all">
+                  <div key={e._id} onClick={()=>navigate('/brand-calendar')} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] cursor-pointer opacity-60 hover:opacity-90 transition-all">
                     <PlatformIcon platform={(e.platform||'').toLowerCase()}/>
-                    <p className="text-xs text-white/50 truncate flex-1">{(e.caption||'Post').slice(0,32)}</p>
-                    {e.scheduledFor && <span className="text-[10px] text-white/25">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+                    <p className="text-xs text-[var(--sys-text-muted)] truncate flex-1">{(e.caption||'Post').slice(0,32)}</p>
+                    {e.scheduledFor && <span className="text-[10px] text-[var(--sys-text-muted)]">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
                   </div>
                 ))}
               </div>
@@ -354,16 +354,16 @@ export default function UserDashboard() {
             ) : (perfData||funnelData||blendedRoas) ? (
               <div className="space-y-2">
                 {[['Total Spend','₹'+String((perfData?.stats?.totalSpend||0).toLocaleString()),'#ff4d00'],['Blended ROAS',String(blendedRoas?.mer||perfData?.stats?.avgRoas||'—')+'x','#8ff5ff'],['Funnel CVR',String(funnelData?.analytics?.overview?.conversionRate||0)+'%','#34d399'],['Live Campaigns',String(perfData?.stats?.activeCampaigns||0),'#a78bfa']].map(([l,v,c])=>(
-                  <div key={l} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider">{l}</p>
+                  <div key={l} className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                    <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{l}</p>
                     <p className="text-lg font-['Space_Grotesk'] font-bold" style={{color:c}}>{v}</p>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-8">
-                <span className="material-symbols-outlined text-4xl text-white/10 block mb-3">campaign</span>
-                <p className="text-xs text-white/30 mb-4">No ad campaigns yet</p>
+                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] block mb-3">campaign</span>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-4">No ad campaigns yet</p>
                 <button onClick={()=>navigate('/performance-marketing')} className="px-4 py-2 rounded-xl bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] text-xs font-bold hover:bg-[#f43f5e]/20 cursor-pointer">Connect Ads →</button>
               </div>
             )}
@@ -375,20 +375,20 @@ export default function UserDashboard() {
             {(loadingTrends && trends.length===0) ? (
               <div className="space-y-2">{[0,1,2,3,4].map(i=><Skel key={i} className="h-14"/>)}</div>
             ) : (trends.length>0?trends:grokTrends).slice(0,5).map((t,i)=>(
-              <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-rose-500/15 transition-all group">
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black shrink-0 mt-0.5 ${(t.urgency==='high'||t.urgency==='now')?'bg-rose-500/15 text-rose-400':t.urgency==='today'?'bg-amber-500/15 text-amber-400':'bg-white/5 text-white/30'}`}>
+              <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-2 hover:border-rose-500/15 transition-all group">
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black shrink-0 mt-0.5 ${(t.urgency==='high'||t.urgency==='now')?'bg-rose-500/15 text-rose-400':t.urgency==='today'?'bg-amber-500/15 text-amber-400':'bg-[var(--sys-border)] text-[var(--sys-text-muted)]'}`}>
                   {(t.urgency==='high'||t.urgency==='now')?'NOW':t.urgency==='today'?'TODAY':'WEEK'}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white/80 truncate">{t.title||t.topic}</p>
+                  <p className="text-xs font-bold text-[var(--sys-text-muted)] truncate">{t.title||t.topic}</p>
                   {(t.contentIdea||t.angle||t.marketingAngle) && <p className="text-[10px] text-emerald-400 truncate">💡 {t.contentIdea||t.angle||t.marketingAngle}</p>}
                 </div>
                 <button onClick={()=>navigate('/content-studio?trend='+encodeURIComponent(t.title||t.topic))} className="shrink-0 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg bg-rose-500/10 text-rose-400 text-[10px] font-bold cursor-pointer transition-opacity">Create</button>
               </div>
             ))}
             {(grokSeo?.risingKeywords||[]).length > 0 && (
-              <div className="mt-3 pt-3 border-t border-white/[0.05]">
-                <p className="text-[9px] uppercase tracking-wider text-white/30 mb-2 font-bold">Rising Keywords</p>
+              <div className="mt-3 pt-3 border-t border-[var(--sys-border)]">
+                <p className="text-[9px] uppercase tracking-wider text-[var(--sys-text-muted)] mb-2 font-bold">Rising Keywords</p>
                 <div className="flex flex-wrap gap-1.5">
                   {grokSeo.risingKeywords.slice(0,4).map((k,i)=>(
                     <span key={i} className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/15">{k.keyword}</span>
@@ -402,11 +402,11 @@ export default function UserDashboard() {
             {loadingIntel ? (
               <div className="space-y-2">{[0,1,2,3].map(i=><Skel key={i} className="h-16"/>)}</div>
             ) : businessNews.length > 0 ? businessNews.slice(0,4).map((n,i)=>(
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-emerald-500/15 transition-all">
+              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-2 hover:border-emerald-500/15 transition-all">
                 <span className="text-xl shrink-0">{n.emoji||'📰'}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start gap-2 mb-1">
-                    <p className="text-xs font-bold text-white/80 leading-tight flex-1">{n.headline}</p>
+                    <p className="text-xs font-bold text-[var(--sys-text-muted)] leading-tight flex-1">{n.headline}</p>
                     <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${n.category==='funding'?'bg-green-500/10 text-green-400':n.category==='competitor'?'bg-rose-500/10 text-rose-400':'bg-cyan-500/10 text-cyan-400'}`}>{n.category}</span>
                   </div>
                   {n.relevance && <p className="text-[10px] text-emerald-400">💡 {n.relevance}</p>}
@@ -414,8 +414,8 @@ export default function UserDashboard() {
               </div>
             )) : (
               <div className="text-center py-6">
-                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">newspaper</span>
-                <p className="text-xs text-white/30 mb-3">No news loaded</p>
+                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] block mb-2">newspaper</span>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-3">No news loaded</p>
                 <button onClick={()=>loadIntel()} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 cursor-pointer transition-colors">Fetch Latest News</button>
               </div>
             )}
@@ -425,26 +425,26 @@ export default function UserDashboard() {
             {loadingIntel ? (
               <div className="space-y-2">{[0,1,2].map(i=><Skel key={i} className="h-16"/>)}</div>
             ) : grokContent.slice(0,3).map((s,i)=>(
-              <div key={i} onClick={()=>navigate('/content-studio?prompt='+encodeURIComponent(s.hook||s.title))} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-cyan-500/20 cursor-pointer transition-all group">
+              <div key={i} onClick={()=>navigate('/content-studio?prompt='+encodeURIComponent(s.hook||s.title))} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-2 hover:border-cyan-500/20 cursor-pointer transition-all group">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${s.platform==='instagram'?'bg-pink-500/10 text-pink-400':s.platform==='twitter'?'bg-sky-500/10 text-sky-400':s.platform==='linkedin'?'bg-blue-500/10 text-blue-400':'bg-white/5 text-white/30'}`}>{s.platform||'Content'}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${s.platform==='instagram'?'bg-pink-500/10 text-pink-400':s.platform==='twitter'?'bg-sky-500/10 text-sky-400':s.platform==='linkedin'?'bg-blue-500/10 text-blue-400':'bg-[var(--sys-border)] text-[var(--sys-text-muted)]'}`}>{s.platform||'Content'}</span>
                   {s.viralPotential==='high' && <span className="text-[9px] text-orange-400 font-bold ml-auto">🔥 Viral</span>}
                 </div>
-                <p className="text-xs font-bold text-white/70 group-hover:text-cyan-400 transition-colors line-clamp-1">{s.title}</p>
-                <p className="text-[10px] text-white/30 line-clamp-1 mt-0.5">{s.hook}</p>
+                <p className="text-xs font-bold text-[var(--sys-text-muted)] group-hover:text-cyan-400 transition-colors line-clamp-1">{s.title}</p>
+                <p className="text-[10px] text-[var(--sys-text-muted)] line-clamp-1 mt-0.5">{s.hook}</p>
               </div>
             ))}
             {grokContent.length === 0 && upcoming.length === 0 && !loadingIntel && (
               <div className="text-center py-6">
-                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">lightbulb</span>
-                <p className="text-xs text-white/30 mb-3">No opportunities detected yet</p>
+                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] block mb-2">lightbulb</span>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-3">No opportunities detected yet</p>
                 <button onClick={()=>loadIntel()} className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 cursor-pointer transition-colors">Scan for Opportunities</button>
               </div>
             )}
             {upcoming.slice(0,3).map((e,i)=>(
-              <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name))} className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-violet-500/20 cursor-pointer mb-2 transition-all group">
+              <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name))} className="w-full flex items-center gap-2 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-violet-500/20 cursor-pointer mb-2 transition-all group">
                 <span className="text-lg">{e.emoji}</span>
-                <span className="text-xs text-white/60 flex-1 text-left">{e.name}</span>
+                <span className="text-xs text-[var(--sys-text-muted)] flex-1 text-left">{e.name}</span>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil<=3?'bg-rose-500/15 text-rose-400':e.daysUntil<=7?'bg-amber-500/15 text-amber-400':'bg-violet-500/10 text-violet-400'}`}>{e.daysUntil===0?'TODAY':e.daysUntil===1?'TMR':String(e.daysUntil)+'d'}</span>
               </button>
             ))}
@@ -458,10 +458,10 @@ export default function UserDashboard() {
                 const c = EVENT_COLORS[e.type]||EVENT_COLORS.global
                 return (
                   <button key={i} onClick={()=>navigate('/content-studio?occasion='+encodeURIComponent(e.name)+'&tone='+(e.tone||''))}
-                    className="shrink-0 w-32 rounded-xl p-3 text-left bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.06] flex flex-col gap-2 transition-all cursor-pointer"
+                    className="shrink-0 w-32 rounded-xl p-3 text-left bg-[var(--sys-surface)] hover:bg-[var(--sys-border)] border border-[var(--sys-border)] flex flex-col gap-2 transition-all cursor-pointer"
                     style={{borderColor:c.border+'20'}}>
                     <div className="flex items-center justify-between"><span className="text-xl">{e.emoji}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${e.daysUntil<=3?'bg-rose-500/15 text-rose-400':e.daysUntil<=7?'bg-amber-500/15 text-amber-400':'bg-violet-500/10 text-violet-400'}`}>{e.daysUntil===0?'TODAY':e.daysUntil===1?'TMR':String(e.daysUntil)+'d'}</span></div>
-                    <p className="text-[11px] font-bold text-white/70 leading-tight line-clamp-2">{e.name}</p>
+                    <p className="text-[11px] font-bold text-[var(--sys-text-muted)] leading-tight line-clamp-2">{e.name}</p>
                   </button>
                 )
               })}
@@ -476,26 +476,26 @@ export default function UserDashboard() {
                 const p = socialPlatforms[pl]||{connected:false}
                 const meta = PL[pl]||{icon:'share',color:'#888',bg:'rgba(136,136,136,0.1)'}
                 return (
-                  <div key={pl} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:border-white/[0.10] transition-all">
+                  <div key={pl} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all">
                     <span className="inline-flex items-center justify-center rounded-lg w-9 h-9 shrink-0" style={{background:meta.bg}}>
                       <span className="material-symbols-outlined text-lg" style={{color:meta.color}}>{meta.icon}</span>
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-white/70 capitalize">{pl}</p>
-                      <p className="text-[10px] text-white/30">{p.connected?(p.accountName||'Connected'):'Not connected'}</p>
+                      <p className="text-xs font-bold text-[var(--sys-text-muted)] capitalize">{pl}</p>
+                      <p className="text-[10px] text-[var(--sys-text-muted)]">{p.connected?(p.accountName||'Connected'):'Not connected'}</p>
                     </div>
                     {p.connected ? (
                       <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/><span className="text-[10px] text-emerald-400 font-bold">Live</span></div>
                     ) : (
-                      <button onClick={()=>navigate('/integrations')} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/[0.05] text-white/40 hover:text-white hover:bg-white/[0.08] border border-white/[0.07] cursor-pointer">Connect</button>
+                      <button onClick={()=>navigate('/integrations')} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-border)] border border-[var(--sys-border)] cursor-pointer">Connect</button>
                     )}
                   </div>
                 )
               })}
             </div>
             {scheduledPosts.totalUpcoming > 0 && (
-              <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between">
-                <span className="text-xs text-white/30">Upcoming posts queued</span>
+              <div className="mt-3 pt-3 border-t border-[var(--sys-border)] flex items-center justify-between">
+                <span className="text-xs text-[var(--sys-text-muted)]">Upcoming posts queued</span>
                 <span className="text-sm font-black text-[#ff4d00]">{scheduledPosts.totalUpcoming}</span>
               </div>
             )}
@@ -504,10 +504,10 @@ export default function UserDashboard() {
             <Label icon="apps">Studio Launcher</Label>
             <div className="grid grid-cols-4 gap-2">
               {studios.map((s,i)=>(
-                <button key={i} onClick={()=>navigate(s.path)} className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all cursor-pointer ${i===hotStudioIdx?'bg-[#ff4d00]/10 border-[#ff4d00]/25':'bg-white/[0.03] border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.10]'}`}>
+                <button key={i} onClick={()=>navigate(s.path)} className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all cursor-pointer ${i===hotStudioIdx?'bg-[#ff4d00]/10 border-[#ff4d00]/25':'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:bg-[var(--sys-border)] hover:border-[var(--sys-border)]'}`}>
                   <span className="material-symbols-outlined text-xl" style={{color:i===hotStudioIdx?'#ff4d00':s.color}}>{s.icon}</span>
-                  <p className="text-[9px] font-bold text-white/50 leading-tight text-center">{s.label}</p>
-                  {s.count > 0 && <span className="text-[8px] font-black px-1 py-0.5 rounded-full bg-white/[0.07] text-white/30">{s.count}</span>}
+                  <p className="text-[9px] font-bold text-[var(--sys-text-muted)] leading-tight text-center">{s.label}</p>
+                  {s.count > 0 && <span className="text-[8px] font-black px-1 py-0.5 rounded-full bg-[var(--sys-border)] text-[var(--sys-text-muted)]">{s.count}</span>}
                 </button>
               ))}
             </div>
@@ -516,18 +516,18 @@ export default function UserDashboard() {
             <Label icon="radar" action="New +" onAction={()=>navigate('/seo-studio?tab=intel')}>Intel Missions</Label>
             {intelMissions.length === 0 ? (
               <div className="text-center py-6">
-                <span className="material-symbols-outlined text-3xl text-white/10 block mb-2">satellite_alt</span>
-                <p className="text-xs text-white/30 mb-3">No active missions</p>
+                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] block mb-2">satellite_alt</span>
+                <p className="text-xs text-[var(--sys-text-muted)] mb-3">No active missions</p>
                 <button onClick={()=>navigate('/seo-studio?tab=intel')} className="px-3 py-1.5 rounded-xl bg-[#06b6d4]/10 border border-[#06b6d4]/20 text-[#06b6d4] text-xs font-bold hover:bg-[#06b6d4]/20 cursor-pointer">Launch Mission</button>
               </div>
             ) : intelMissions.map((m,i)=>(
-              <div key={i} onClick={()=>openIntelReport(m)} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] mb-2 hover:border-[#06b6d4]/20 cursor-pointer transition-all group">
-                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${m.status==='active'?'bg-emerald-400 animate-pulse':'bg-white/20'}`}/>
+              <div key={i} onClick={()=>openIntelReport(m)} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] mb-2 hover:border-[#06b6d4]/20 cursor-pointer transition-all group">
+                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${m.status==='active'?'bg-emerald-400 animate-pulse':'bg-[var(--sys-border)]'}`}/>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white/70 group-hover:text-[#06b6d4] transition-colors truncate">{m.title}</p>
-                  <p className="text-[10px] text-white/30">{m.target?.name} · {m.type}</p>
+                  <p className="text-xs font-bold text-[var(--sys-text-muted)] group-hover:text-[#06b6d4] transition-colors truncate">{m.title}</p>
+                  <p className="text-[10px] text-[var(--sys-text-muted)]">{m.target?.name} · {m.type}</p>
                 </div>
-                <span className="material-symbols-outlined text-xs text-white/20 group-hover:text-[#06b6d4] transition-colors">chevron_right</span>
+                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] group-hover:text-[#06b6d4] transition-colors">chevron_right</span>
               </div>
             ))}
           </Card>
