@@ -60,8 +60,20 @@ export async function generateImageWithVertex(
     const client = await auth.getClient();
     const accessToken = (await client.getAccessToken()).token;
 
+    // ── Model Mapping (Handle non-existent 3.1 model) ──
+    let mappedModelId = modelId;
+    if (modelId === 'gemini-3.1-flash-image-preview') {
+        const hasReferenceImages = parts.some(p => p.inlineData);
+        mappedModelId = hasReferenceImages ? 'gemini-2.0-flash-exp' : 'imagen-3.0-generate-002';
+    }
+
+    // gemini-2.0-flash-exp does not support imageSize token
+    if (mappedModelId === 'gemini-2.0-flash-exp' && generationConfig.imageConfig?.imageSize) {
+        delete generationConfig.imageConfig.imageSize;
+    }
+
     // ── Direct REST call to Vertex AI ──
-    const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`;
+    const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${mappedModelId}:generateContent`;
 
     const resp = await fetch(url, {
         method: 'POST',
