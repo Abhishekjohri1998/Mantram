@@ -100,15 +100,12 @@ export async function generateStoryboardPoster(
         }
         
         if (!credsExist) {
-            console.warn(`[SB Poster] ⚠️ GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Falling back to gpt-image-2.`);
-            useNanoBanana = false;
+            throw new Error(`GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Cannot generate image with NanoBanana (Gemini Vertex AI).`);
         }
     }
 
-    const effectiveModel = useNanoBanana ? 'nanobanana' : 'gpt-image-2';
-
     console.log(`\n[SB Poster] ══ GENERATING STORYBOARD POSTER ══`);
-    console.log(`  selected model: ${imageModel} → routing to: ${effectiveModel}`);
+    console.log(`  selected model: ${imageModel}`);
     console.log(`  format=${ar}, style=${style}`);
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, logo=${!!rawLogoBuffer}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
@@ -119,13 +116,18 @@ export async function generateStoryboardPoster(
         try {
             const result = await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer);
             if (result) return result;
-            console.warn(`[SB Poster] NanoBanana returned null/empty. Falling back to gpt-image-2...`);
+            throw new Error(`NanoBanana returned null or empty result.`);
         } catch (bananaErr) {
-            console.error(`[SB Poster] ❌ NanoBanana execution failed: ${bananaErr.message}. Falling back to gpt-image-2...`);
+            console.error(`[SB Poster] ❌ NanoBanana execution failed: ${bananaErr.message}`);
+            throw new Error(`NanoBanana image generation failed: ${bananaErr.message}`);
         }
     }
     
-    return await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl, rawLogoBuffer);
+    const result = await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl, rawLogoBuffer);
+    if (!result) {
+        throw new Error(`GPT Image 2 generation failed.`);
+    }
+    return result;
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────
@@ -133,56 +135,60 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
     const size = AR_TO_SIZE[ar] || '1792x1024';
     const modelId = 'gpt-image-2';
 
-    // Collect reference buffers — prefer raw multer, fallback to S3 download
+    // DALL-E 3 (gpt-image-2) does not support image-to-image reference edits.
+    // Forcing /images/edits on the proxy falls back to slow, low-quality DALL-E 2 edits.
+    // Instead, we always use standard generations (text-to-image) to keep DALL-E 3 quality and speed.
+    const useEditsEndpoint = false;
     const refBuffers = [];
     
-    // 1. Collect Product Images
-    if (rawProductBuffers.length > 0) {
-        for (const rb of rawProductBuffers) {
-            if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
-        }
-    } else if (productImageUrls.length > 0) {
-        const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
-        for (const url of urlsToFetch) {
-            try {
-                const { buffer, mimeType } = await downloadBuffer(url);
-                refBuffers.push({ buffer, mimeType });
-                console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
-            } catch (dlErr) {
-                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
+    if (useEditsEndpoint) {
+        // 1. Collect Product Images
+        if (rawProductBuffers.length > 0) {
+            for (const rb of rawProductBuffers) {
+                if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
+            }
+        } else if (productImageUrls.length > 0) {
+            const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
+            for (const url of urlsToFetch) {
+                try {
+                    const { buffer, mimeType } = await downloadBuffer(url);
+                    refBuffers.push({ buffer, mimeType });
+                    console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
+                } catch (dlErr) {
+                    console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
+                }
             }
         }
-    }
 
-    // 2. Collect Avatar Image
-    if (rawAvatarBuffer?.buffer) {
-        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
-    } else if (avatarUrl?.startsWith('http')) {
-        try {
-            const { buffer, mimeType } = await downloadBuffer(avatarUrl);
-            refBuffers.push({ buffer, mimeType });
-            console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
-        } catch (dlErr) {
-            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+        // 2. Collect Avatar Image
+        if (rawAvatarBuffer?.buffer) {
+            refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
+        } else if (avatarUrl?.startsWith('http')) {
+            try {
+                const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+                refBuffers.push({ buffer, mimeType });
+                console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+            }
         }
-    }
 
-    // 3. Collect Logo Image
-    if (rawLogoBuffer?.buffer) {
-        refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
-    } else if (logoUrl?.startsWith('http')) {
-        try {
-            const { buffer, mimeType } = await downloadBuffer(logoUrl);
-            refBuffers.push({ buffer, mimeType });
-            console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
-        } catch (dlErr) {
-            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
+        // 3. Collect Logo Image
+        if (rawLogoBuffer?.buffer) {
+            refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
+        } else if (logoUrl?.startsWith('http')) {
+            try {
+                const { buffer, mimeType } = await downloadBuffer(logoUrl);
+                refBuffers.push({ buffer, mimeType });
+                console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
+            }
         }
     }
 
     const apiKey = config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY;
     const baseUrl = config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
-    const useEditsEndpoint = refBuffers.length > 0;
     const endpoint = useEditsEndpoint ? `${baseUrl}/images/edits` : `${baseUrl}/images/generations`;
 
     console.log(`[SB Poster][GPT-Image-2] ${endpoint} | refs=${refBuffers.length} | size=${size}`);
@@ -303,15 +309,12 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
         // Text prompt last (Gemini requirement)
         parts.push({ text: finalPrompt });
 
-        const hasReferenceImages = parts.filter(p => p.inlineData).length > 0;
-        // gemini-2.0-flash-exp reads reference images but doesn't support imageSize token ('1K'/'2K')
-        // When we have references, use gemini-2.0-flash-exp. When no references, use gemini-3.1 for quality.
-        const activeModel = hasReferenceImages ? 'gemini-2.0-flash-exp' : 'gemini-3.1-flash-image-preview';
-        const imageConfigObj = hasReferenceImages
-            ? { aspectRatio: ar }               // 2.0 only supports aspectRatio
-            : { aspectRatio: ar, imageSize };    // 3.1 supports imageSize too
+        // Use gemini-3.1-flash-image-preview for all cases as it supports both image reference inputs (multimodal)
+        // and high-quality image generation output.
+        const activeModel = 'gemini-3.1-flash-image-preview';
+        const imageConfigObj = { aspectRatio: ar, imageSize };
 
-        console.log(`[SB Poster][NanoBanana] ${activeModel} | refs=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${hasReferenceImages ? 'model-default' : imageSize}`);
+        console.log(`[SB Poster][NanoBanana] ${activeModel} | refs=${parts.filter(p => p.inlineData).length} | ar=${ar} | size=${imageSize}`);
 
         const data = await Promise.race([
             generateImageWithVertex(parts, activeModel, 0.4, imageConfigObj),
