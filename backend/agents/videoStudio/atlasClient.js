@@ -290,14 +290,16 @@ async function submitAtlasCloudPayload(payload) {
     if (payload.model === 'gemini-flash') {
         atlasPayload = {
             model: payload.input.model,
-            prompt: payload.input.prompt,
-            duration: payload.input.duration,
-            aspect_ratio: payload.input.aspect_ratio,
-            resolution: payload.input.resolution,
-            seed: payload.input.seed || -1
+            input: {
+                prompt: payload.input.prompt,
+                duration: payload.input.duration,
+                aspect_ratio: payload.input.aspect_ratio,
+                resolution: payload.input.resolution,
+                seed: payload.input.seed || -1
+            }
         };
         if (payload.input.images) {
-            atlasPayload.images = payload.input.images;
+            atlasPayload.input.images = payload.input.images;
         }
     } else {
         const isR2V = atlasModel.includes('reference-to-video');
