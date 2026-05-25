@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
@@ -135,7 +135,7 @@ export default function VideoStudio() {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
     // ── State ──
-    const [isPending, startTransition] = React.useTransition()
+    const [isPending, startTransition] = useTransition()
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
