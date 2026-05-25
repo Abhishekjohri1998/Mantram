@@ -255,7 +255,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             }
         } catch (e) {
             console.error('Failed to scrape URL:', e);
-            alert("Failed to scrape URL. The website might be blocking bots. Please upload the image manually.");
+            alert(e.message || "Failed to scrape URL. The website might be blocking bots. Please upload the image manually.");
         } finally {
             setIsScrapingUrl(false);
             setProductUrlInput('');
@@ -583,12 +583,13 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         {/* URL input row for product */}
                         <div style={{ display: 'flex', width: '100%', gap: '8px', alignItems: 'center', padding: '4px 8px 0', borderTop: '1px dashed rgba(255,255,255,0.05)', marginTop: 4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>link</span>
-                            <DebouncedInput 
+                            <input 
+                                type="text"
                                 className="scott-input" 
                                 style={{ padding: '4px 0', fontSize: 12, flex: 1 }}
                                 placeholder="Paste product URL (optional)..." 
                                 value={productUrlInput}
-                                onChange={setProductUrlInput}
+                                onChange={e => setProductUrlInput(e.target.value)}
                                 disabled={isScrapingUrl}
                             />
                             {productUrlInput && (
