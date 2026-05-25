@@ -290,16 +290,14 @@ async function submitAtlasCloudPayload(payload) {
     if (payload.model === 'gemini-flash') {
         atlasPayload = {
             model: payload.input.model,
-            input: {
-                prompt: payload.input.prompt,
-                duration: payload.input.duration,
-                aspect_ratio: payload.input.aspect_ratio,
-                resolution: payload.input.resolution,
-                seed: payload.input.seed || -1
-            }
+            prompt: payload.input.prompt,
+            duration: payload.input.duration,
+            aspect_ratio: payload.input.aspect_ratio,
+            resolution: payload.input.resolution,
+            seed: payload.input.seed || -1
         };
         if (payload.input.images) {
-            atlasPayload.input.images = payload.input.images;
+            atlasPayload.images = payload.input.images;
         }
     } else {
         const isR2V = atlasModel.includes('reference-to-video');
@@ -385,7 +383,7 @@ async function submitAtlasCloudPayload(payload) {
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         console.log(`🎬 [Atlas] Submit attempt ${attempt}/${MAX_ATTEMPTS}: model=${atlasPayload.model} | refs=${atlasPayload.reference_images?.length || 0} | image=${(atlasPayload.image || atlasPayload.images?.length) ? 'yes' : 'no'}`);
-        console.log(`📝 [Atlas] Prompt (first 100): ${atlasPayload.prompt.substring(0, 100)}...`);
+        console.log(`📝 [Atlas] Prompt (first 100): ${(atlasPayload.prompt || '').substring(0, 100)}...`);
 
         try {
             const response = await fetch(`${ATLAS_INFERENCE_BASE}/model/generateVideo`, {
