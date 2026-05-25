@@ -512,7 +512,7 @@ router.post('/advanced/generate', protect, requireCredits('videoGenerate'), asyn
                 if (enhanced?.enhancedPrompt) {
                     finalPrompt = enhanced.enhancedPrompt;
                     // Cache for 24 hours
-                    await redis.set(promptCacheKey, finalPrompt, { ex: 86400 }).catch(() => {});
+                    await redis.setex(promptCacheKey, 86400, finalPrompt);
                     console.log(`✅ [ADVANCED] Enhanced prompt (${finalPrompt.split(' ').length} words): "${finalPrompt.substring(0, 100)}..."`);
                 } else {
                     console.warn('⚠️ [ADVANCED] Enhancement returned empty — using raw prompt');
