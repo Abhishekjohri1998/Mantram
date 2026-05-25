@@ -180,6 +180,38 @@ async function signProductAssets(product) {
     return p;
 }
 
+async function scrapeWithPuppeteer(siteUrl) {
+    let browser;
+    try {
+        const puppeteer = await import('puppeteer');
+        console.log(`[scrape-url] 🌐 Launching Puppeteer fallback for: ${siteUrl}`);
+        browser = await puppeteer.default.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+        });
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1280, height: 800 });
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        // Go to page
+        await page.goto(siteUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+        
+        // Wait a short time for images/lazy loading
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const html = await page.content();
+        await page.close();
+        await browser.close();
+        return html;
+    } catch (err) {
+        console.error('[scrape-url] ❌ Puppeteer fallback failed:', err);
+        if (browser) {
+            await browser.close().catch(() => {});
+        }
+        throw err;
+    }
+}
+
 // POST /api/products/scrape-url — Light scrape for a single product URL without DB persistence
 router.post('/scrape-url', protect, async (req, res) => {
     try {
@@ -194,53 +226,40 @@ router.post('/scrape-url', protect, async (req, res) => {
         }
 
         const fetch = (await import('node-fetch')).default;
-        const response = await fetch(siteUrl, {
-            headers: { 
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            timeout: 10000
-        });
-        const html = await response.text();
-        const $ = cheerio.load(html);
+        
+        let html = '';
+        let fetchedSuccessfully = false;
 
-        const title = $('meta[property="og:title"]').attr('content') || $('title').text() || 'Product';
-        const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
-        let imageUrl = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || '';
-        let allImages = [];
-
-        // ── SHOPIFY: Use /products/{handle}.json for the real gallery images ──
-        // og:image on Shopify stores is unreliable — it often returns an unrelated/generic
-        // product image (e.g., the first product in the catalog, not the one being viewed).
-        // The Shopify JSON API always returns the correct variant images for the specific product.
+        // Try standard fetch first
         try {
-            const parsed = new URL(siteUrl);
-            const pathParts = parsed.pathname.split('/');
-            const productsIdx = pathParts.indexOf('products');
-            if (productsIdx !== -1 && pathParts[productsIdx + 1]) {
-                const handle = pathParts[productsIdx + 1].split('?')[0];
-                const shopifyJsonUrl = `${parsed.origin}/products/${handle}.json`;
-                console.log(`[scrape-url] Trying Shopify product API: ${shopifyJsonUrl}`);
-                const shopifyResp = await fetch(shopifyJsonUrl, {
-                    headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-                    timeout: 8000,
-                });
-                if (shopifyResp.ok) {
-                    const shopifyData = await shopifyResp.json();
-                    if (shopifyData?.product?.images?.length > 0) {
-                        allImages = shopifyData.product.images.map(img => img.src);
-                        imageUrl = allImages[0]; // Use first real product image, not og:image
-                        console.log(`[scrape-url] ✅ Shopify API: ${allImages.length} real product images for "${shopifyData.product.title}"`);
-                    }
-                }
+            console.log(`[scrape-url] Fetching with node-fetch: ${siteUrl}`);
+            const response = await fetch(siteUrl, {
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+                timeout: 10000
+            });
+            if (response.ok) {
+                html = await response.text();
+                fetchedSuccessfully = true;
+            } else {
+                console.log(`[scrape-url] node-fetch returned non-ok status: ${response.status}`);
             }
-        } catch (shopifyErr) {
-            console.log(`[scrape-url] Shopify API skipped (${shopifyErr.message}), using og:image`);
+        } catch (fetchErr) {
+            console.warn(`[scrape-url] node-fetch failed: ${fetchErr.message}`);
         }
 
-        // ── FALLBACK: Extract gallery images from HTML ──
-        if (allImages.length === 0) {
+        // Helper to parse HTML and extract product details
+        const extractDetails = (rawHtml) => {
+            const $ = cheerio.load(rawHtml);
+            const title = $('meta[property="og:title"]').attr('content') || $('title').text() || 'Product';
+            const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+            let imageUrl = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || '';
+            let allImages = [];
+
+            // ── FALLBACK: Extract gallery images from HTML ──
             $('img[src*="cdn.shopify"], .product__media img, .product-image img, .product-gallery img').each((_, el) => {
                 const src = $(el).attr('src') || $(el).attr('data-src') || '';
                 if (src && src.includes('cdn.shopify') && !src.includes('icon') && !src.includes('logo')) {
@@ -252,17 +271,98 @@ router.post('/scrape-url', protect, async (req, res) => {
                 }
             });
             if (allImages.length > 0) imageUrl = allImages[0];
+
+            // ── FINAL FALLBACK: og:image or first img tag ──
+            if (!imageUrl) {
+                const firstImg = $('img').first().attr('src');
+                if (firstImg) {
+                    imageUrl = firstImg.startsWith('http') ? firstImg : new URL(firstImg, siteUrl).toString();
+                }
+            }
+
+            if (allImages.length === 0 && imageUrl) allImages = [imageUrl];
+
+            return { title, description, imageUrl, allImages };
+        };
+
+        // Try Shopify JSON details API first if it's a Shopify store product URL
+        let allImages = [];
+        let imageUrl = '';
+        let title = 'Product';
+        let description = '';
+
+        const tryShopifyApi = async () => {
+            try {
+                const parsed = new URL(siteUrl);
+                const pathParts = parsed.pathname.split('/');
+                const productsIdx = pathParts.indexOf('products');
+                if (productsIdx !== -1 && pathParts[productsIdx + 1]) {
+                    const handle = pathParts[productsIdx + 1].split('?')[0];
+                    const shopifyJsonUrl = `${parsed.origin}/products/${handle}.json`;
+                    console.log(`[scrape-url] Trying Shopify product API: ${shopifyJsonUrl}`);
+                    const shopifyResp = await fetch(shopifyJsonUrl, {
+                        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+                        timeout: 8000,
+                    });
+                    if (shopifyResp.ok) {
+                        const shopifyData = await shopifyResp.json();
+                        if (shopifyData?.product) {
+                            title = shopifyData.product.title || title;
+                            description = shopifyData.product.body_html || description;
+                            if (shopifyData.product.images?.length > 0) {
+                                allImages = shopifyData.product.images.map(img => img.src);
+                                imageUrl = allImages[0];
+                                console.log(`[scrape-url] ✅ Shopify API: ${allImages.length} real product images for "${shopifyData.product.title}"`);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            } catch (shopifyErr) {
+                console.log(`[scrape-url] Shopify API skipped (${shopifyErr.message})`);
+            }
+            return false;
+        };
+
+        let shopifySuccess = false;
+        if (fetchedSuccessfully) {
+            shopifySuccess = await tryShopifyApi();
         }
 
-        // ── FINAL FALLBACK: og:image or first img tag ──
-        if (!imageUrl) {
-            const firstImg = $('img').first().attr('src');
-            if (firstImg) {
-                imageUrl = firstImg.startsWith('http') ? firstImg : new URL(firstImg, siteUrl).toString();
+        // If Shopify JSON API didn't extract images, parse the fetched HTML
+        if (!shopifySuccess && fetchedSuccessfully && html) {
+            const details = extractDetails(html);
+            title = details.title || title;
+            description = details.description || description;
+            imageUrl = details.imageUrl || imageUrl;
+            allImages = details.allImages || allImages;
+        }
+
+        // If fetch failed OR we retrieved no images (possibly bot-blocked or blank page response), fallback to Puppeteer
+        if (!fetchedSuccessfully || (!imageUrl && allImages.length === 0)) {
+            try {
+                console.log(`[scrape-url] No images found or fetch failed (success=${fetchedSuccessfully}, images=${allImages.length}). Falling back to Puppeteer...`);
+                html = await scrapeWithPuppeteer(siteUrl);
+                fetchedSuccessfully = true;
+                
+                shopifySuccess = await tryShopifyApi();
+                if (!shopifySuccess && html) {
+                    const details = extractDetails(html);
+                    title = details.title || title;
+                    description = details.description || description;
+                    imageUrl = details.imageUrl || imageUrl;
+                    allImages = details.allImages || allImages;
+                }
+            } catch (puppErr) {
+                console.error(`[scrape-url] Puppeteer fallback failed: ${puppErr.message}`);
+                throw new Error('Failed to scrape URL. The website might be blocking bots. Please upload the image manually.');
             }
         }
 
-        if (allImages.length === 0 && imageUrl) allImages = [imageUrl];
+        // If even after Puppeteer we have no images, return a descriptive error
+        if (!imageUrl && allImages.length === 0) {
+            throw new Error('Could not extract any product images from this URL. Please upload the image manually.');
+        }
 
         const { ensureS3Url } = await import('../utils/s3.js');
 
@@ -287,7 +387,7 @@ router.post('/scrape-url', protect, async (req, res) => {
                 title,
                 description,
                 image: finalImageUrl,
-                images: finalAllImages,  // ✅ All real product gallery images for AI grounding
+                images: finalAllImages,
                 url: siteUrl
             }
         });
