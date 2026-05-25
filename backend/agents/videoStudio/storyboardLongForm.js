@@ -593,7 +593,9 @@ async function _pollSegment(genResult, jobId, segIdx, totalSegs) {
                 return status.videoUrl;
             }
             if (status.status === 'FAILED') {
-                throw new Error(status.error || `Segment ${segIdx+1} generation failed`);
+                const err = new Error(status.error || `Segment ${segIdx+1} generation failed`);
+                err.isTerminal = true;
+                throw err;
             }
 
             if (job) {
@@ -601,6 +603,7 @@ async function _pollSegment(genResult, jobId, segIdx, totalSegs) {
             }
         } catch (pollErr) {
             if (pollErr.message === 'Cancelled by user') throw pollErr;
+            if (pollErr.isTerminal) throw pollErr;
             console.warn(`[SB LongForm ${jobId}] Poll error (seg ${segIdx+1}): ${pollErr.message}`);
         }
     }
