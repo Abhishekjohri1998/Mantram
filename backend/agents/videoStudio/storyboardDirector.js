@@ -114,9 +114,27 @@ The JSON must match this exact schema:
 // USER PROMPT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '' }) {
+function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '', productImageUrls = [] }) {
     const logoDetails = logoUrl ? `\nBRAND LOGO DETAILS: description="${logoDescription}"` : '';
+
+    // Build image references mapping list to avoid confusion between product model vs presenter/avatar
+    const imageMappingLines = [];
+    let imgIdx = 1;
+    if (productImageUrls && productImageUrls.length > 0) {
+        productImageUrls.forEach((url, i) => {
+            imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is a **PRODUCT** reference image featuring the product: "${productName || 'product'}". (This maps to \`@image1\` or \`@image4\`, \`@image5\`, etc. in the videoPrompt).`);
+        });
+    }
+    if (avatarUrl) {
+        imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is the **AVATAR/PRESENTER** reference image featuring the presenter's face/body. (This maps to \`@image3\` in the videoPrompt).`);
+    }
+
+    const imageMappingText = imageMappingLines.length > 0
+        ? `\nIMAGE REFERENCES AND MAPPING:\n${imageMappingLines.join('\n')}\n\nCRITICAL CONTEXT DISAMBIGUATION:\n- Even if a product reference image (Images 1..${productImageUrls.length}) contains a model wearing, holding, or interacting with the product, treat that image strictly as the PRODUCT reference (representing the watch, garment, or item itself). Do NOT confuse the model in the product image with the main presenter.\n- The main presenter's face and identity must be strictly modeled after the AVATAR reference image (the last attached image, which maps to \`@image3\`). Keep these distinct: the product is the item being showcased, and the avatar/presenter is the character speaking the dialogue and interacting with it.`
+        : '';
+
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
+${imageMappingText}
 
 PRODUCT: ${productName || 'See product images provided'}
 KEY FEATURES: ${productFeatures || 'Extract from the product images provided and heavily highlight them visually'}
@@ -207,7 +225,7 @@ export async function runStoryboardDirector({
 
     // 2. Build prompts
     const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
-    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
+    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription, productImageUrls });
 
     // 3. Build image URLs for Claude vision (product + avatar) — NO cap, use ALL images
     const imageUrls = [];
