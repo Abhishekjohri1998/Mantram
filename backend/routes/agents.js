@@ -1209,7 +1209,14 @@ Each caption should be complete, polished, and ready to copy-paste. Do not inclu
                     }
                 );
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    console.warn(`JSON parse error for model ${modelId}:`, parseError.message);
+                    lastError = `Invalid JSON response: ${parseError.message}`;
+                    continue;
+                }
 
                 if (data.error) {
                     console.warn(`Image analysis model ${modelId} failed:`, data.error.message);
@@ -1252,7 +1259,14 @@ Each caption should be complete, polished, and ready to copy-paste. Do not inclu
                         temperature: 0.4,
                     }),
                 });
-                const gptData = await gptResp.json();
+                let gptData;
+                try {
+                    gptData = await gptResp.json();
+                } catch (parseError) {
+                    console.warn('GPT JSON parse error:', parseError.message);
+                    lastError = `Invalid JSON response: ${parseError.message}`;
+                    continue;
+                }
                 if (gptData.error) {
                     lastError = gptData.error.message;
                 } else {
