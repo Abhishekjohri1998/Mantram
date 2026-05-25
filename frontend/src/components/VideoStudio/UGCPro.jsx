@@ -238,7 +238,7 @@ function Dropdown({ value, onChange, options, label }) {
 function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
     return (
         <div className="ugc-video-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="has-vha" style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            <div className="has-vha" style={{ position: 'relative', flex: 1, minHeight: 0, cursor: 'pointer' }} onClick={() => onPreview?.(videoUrl)}>
                 <video src={videoUrl} muted loop playsInline
                     onMouseEnter={e => e.target.play()}
                     onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }}

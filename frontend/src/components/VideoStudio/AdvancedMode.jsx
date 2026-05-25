@@ -1199,7 +1199,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     }
                     
                     return (
-                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative', flex: '0 0 auto', height: '340px', width: 'auto' }}>
+                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative', flex: '0 0 auto', height: '340px', width: 'auto', cursor: 'pointer' }} onClick={() => setViewVideo({ url: videoSrc, prompt: p.promptText })}>
                             <PosterThumbnail
                                 src={videoSrc}
                                 poster={posterUrl}

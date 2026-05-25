@@ -632,12 +632,12 @@ function SaveTemplateForm({ project, onClose, api: apiFn }) {
 function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     const vRef = useRef(null)
     const videoUrl = project.generation?.videoUrl || project.finalVideoUrl
-    return <div className="qv2-bi has-vha" style={{ position: 'relative' }}>
+    return <div className="qv2-bi has-vha" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onPreview?.(videoUrl)}>
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
         <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} project={project} />
         <div className="qv2-bi-ov">
             {isAdmin && (
-                <button className="qv2-bi-btn template-btn" onClick={() => onSaveTemplate(project)}>
+                <button className="qv2-bi-btn template-btn" onClick={(e) => { e.stopPropagation(); onSaveTemplate(project); }}>
                     <span className="material-symbols-outlined" style={{fontSize: 14}}>bookmark_add</span>
                     Template
                 </button>
