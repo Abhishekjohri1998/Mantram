@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react'
 import AvatarPicker from './AvatarPicker'
 import PublishModal from '../PublishModal'
 import VideoHoverActions from './VideoHoverActions'
@@ -537,7 +537,7 @@ function CfgMenu({ value, onChange, options, icon }) {
             <span>{sel?.label || value}</span>
         </button>
         {open && <div className="qv2-cmenu" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, zIndex: 9999, minWidth: 100, maxHeight: 300, overflowY: 'auto' }}>
-            {options.map(o => <button key={o.value || o} type="button" className="qv2-copt" style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', borderRadius: 6 }} onClick={() => { onChange(o.value || o); setOpen(false) }}>
+            {options.map(o => <button key={o.value || o} type="button" className="qv2-copt" style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', borderRadius: 6 }} onClick={() => { startTransition(() => { onChange(o.value || o) }); setOpen(false) }}>
                 {o.label || o}
             </button>)}
         </div>}
