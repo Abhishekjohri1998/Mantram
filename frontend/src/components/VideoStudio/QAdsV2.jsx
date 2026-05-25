@@ -20,7 +20,7 @@ import ViralityMiniPanel from '../ViralityMiniPanel'
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'},{value:20,label:'20s',msIcon:'timer'},{value:30,label:'30s',msIcon:'movie'},{value:45,label:'45s',msIcon:'movie'},{value:60,label:'60s',msIcon:'movie'},{value:90,label:'90s',msIcon:'movie'},{value:120,label:'120s',msIcon:'movie'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
-const RES = [{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
+const RES = [{value:'480p',label:'480p',msIcon:'sd'},{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
 const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
     {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
