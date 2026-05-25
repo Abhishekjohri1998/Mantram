@@ -95,8 +95,8 @@ const LazyVideoThumbnail = ({ src, poster }) => {
             onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
 
             {/* Layer 1: Poster image (fades out on hover) */}
-            {isVisible && hasPoster && (
-                <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" alt=""
+            {hasPoster && (
+                <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" fetchpriority="high" alt=""
                     style={{ opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', pointerEvents: 'none' }} />
             )}
 
@@ -1241,6 +1241,7 @@ export default function VideoStudio() {
                     </div>
                 )}
 
+                <div style={{ minHeight: '80vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
                     <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
@@ -1282,6 +1283,7 @@ export default function VideoStudio() {
                         user={user}
                     />
                 )}
+                </div>
 
                 {/* ── OLD STORYBOARD PIPELINE (archived below — do not render) ── */}
                 {false && studioMode === 'storyboard-old' && (<>
