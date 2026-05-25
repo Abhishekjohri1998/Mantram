@@ -238,7 +238,7 @@ function Dropdown({ value, onChange, options, label }) {
 function UGCVideoCard({ v, videoUrl, onPreview, onSaveTemplate, isAdmin }) {
     return (
         <div className="ugc-video-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="has-vha" style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            <div className="has-vha" style={{ position: 'relative', flex: 1, minHeight: 0, cursor: 'pointer' }} onClick={() => onPreview?.(videoUrl)}>
                 <video src={videoUrl} muted loop playsInline
                     onMouseEnter={e => e.target.play()}
                     onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }}
@@ -825,9 +825,9 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
 
             {/* ── Video Preview Modal ── */}
             {previewVideo && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
                     <div style={{ position: 'relative', maxWidth: 420, width: '90%' }} onClick={e => e.stopPropagation()}>
-                        <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                        <video src={previewVideo} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', objectFit: 'contain', background: '#000' }} />
                         <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
                             <a href={previewVideo} download="ugc-pro-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download

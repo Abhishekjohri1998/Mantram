@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
+import { useState, useEffect, useRef, useCallback, useTransition, lazy, Suspense } from 'react'
 import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
@@ -7,14 +7,14 @@ import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import GlobalLoader from '../components/GlobalLoader'
 import { creatives as creativesAPI, monthlyStrategy as monthlyStrategyAPI } from '../services/api'
-import AdvancedMode from '../components/VideoStudio/AdvancedMode'
-import UGCCreator from '../components/VideoStudio/UGCCreator'
-import UGCPro from '../components/VideoStudio/UGCPro'
-import QAds from '../components/VideoStudio/QAds'
-import QAdsV2 from '../components/VideoStudio/QAdsV2'
-import VideoAgent from '../components/VideoStudio/VideoAgent'
-import MotionGraphics from '../components/VideoStudio/MotionGraphics'
-import Storyboard from '../components/VideoStudio/Storyboard'
+const AdvancedMode = lazy(() => import('../components/VideoStudio/AdvancedMode'))
+const UGCCreator = lazy(() => import('../components/VideoStudio/UGCCreator'))
+const UGCPro = lazy(() => import('../components/VideoStudio/UGCPro'))
+const QAds = lazy(() => import('../components/VideoStudio/QAds'))
+const QAdsV2 = lazy(() => import('../components/VideoStudio/QAdsV2'))
+const VideoAgent = lazy(() => import('../components/VideoStudio/VideoAgent'))
+const MotionGraphics = lazy(() => import('../components/VideoStudio/MotionGraphics'))
+const Storyboard = lazy(() => import('../components/VideoStudio/Storyboard'))
 import VideoUpgradeModal from '../components/VideoUpgradeModal'
 import SaveAsTemplateButton from '../components/Templates/SaveAsTemplateButton'
 import TemplateSuggestionRow from '../components/Templates/TemplateSuggestionRow'
@@ -1224,9 +1224,9 @@ export default function VideoStudio() {
 
                 {/* ── Video Player Modal ── */}
                 {playingVideo && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sys-surface)] " onClick={() => setPlayingVideo(null)}>
+                    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md " onClick={() => setPlayingVideo(null)}>
                         <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                            <video src={playingVideo} controls autoPlay className="w-full rounded-2xl shadow-none" />
+                            <video src={playingVideo} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} className="max-w-full max-h-[85vh] mx-auto rounded-2xl shadow-none object-contain bg-black" />
                             <div className="absolute -top-12 right-0 flex items-center gap-2">
                                 <button onClick={() => handleDownloadVideo(playingVideo, 'video')}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer backdrop-blur">
@@ -1241,7 +1241,12 @@ export default function VideoStudio() {
                     </div>
                 )}
 
-                <div style={{ minHeight: '80vh', width: '100%', position: 'relative' }}>
+                <Suspense fallback={
+                    <div className="w-full min-h-[100vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                        <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                    </div>
+                }>
+                <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
                 {studioMode === 'advanced' && (
                     <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
@@ -1284,6 +1289,7 @@ export default function VideoStudio() {
                     />
                 )}
                 </div>
+                </Suspense>
 
                 {/* ── OLD STORYBOARD PIPELINE (archived below — do not render) ── */}
                 {false && studioMode === 'storyboard-old' && (<>

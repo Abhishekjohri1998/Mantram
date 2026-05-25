@@ -1079,12 +1079,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
 
             {/* ── Video Viewer Modal ── */}
             {viewVideo && (
-                <div className="vm-viewer-modal" onClick={() => setViewVideo(null)}>
-                    <div className="vm-viewer-inner" onClick={e => e.stopPropagation()}>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setViewVideo(null)}>
+                    <div style={{ position: 'relative', maxWidth: 420, width: '90%' }} onClick={e => e.stopPropagation()}>
                         <button className="vm-viewer-close" onClick={() => setViewVideo(null)}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span> Back
                         </button>
-                        <video src={viewVideo.url} controls autoPlay loop style={{ width: '100%', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)' }} />
+                        <video src={viewVideo.url} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} loop style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', objectFit: 'contain', background: '#000' }} />
                         <div className="vm-viewer-actions">
                             <button className="vm-viewer-btn accent" onClick={() => {
                                 setModel(viewVideo.model || 'seedance-2.0')
@@ -1199,7 +1199,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     }
                     
                     return (
-                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative', flex: '0 0 auto', height: '340px', width: 'auto' }}>
+                        <div key={p._id || i} className="vm-bg-item has-vha" style={{ position: 'relative', flex: '0 0 auto', height: '340px', width: 'auto', cursor: 'pointer' }} onClick={() => setViewVideo({ url: videoSrc, prompt: p.promptText })}>
                             <PosterThumbnail
                                 src={videoSrc}
                                 poster={posterUrl}

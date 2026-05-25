@@ -576,7 +576,7 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                                                     <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-white text-[#0c0f1a] scale-110' : 'border border-[var(--sys-border)] group-hover:border-[var(--sys-border)]'}`}>
                                                         {isSelected && <span className="material-symbols-outlined text-[14px] font-bold">check</span>}
                                                     </div>
-                                                    {acc.avatar ? <img src={acc.avatar} className="w-9 h-9 rounded-full flex-shrink-0 ring-2 border-[var(--sys-border)]" alt="" /> : <div className="w-9 h-9 rounded-full bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0 text-lg">{meta.icon || '📱'}</div>}
+                                                    {acc.avatar ? <img src={acc.avatar} referrerPolicy="no-referrer" onError={(e) => e.target.style.display = 'none'} className="w-9 h-9 rounded-full flex-shrink-0 ring-2 border-[var(--sys-border)]" alt="" /> : <div className="w-9 h-9 rounded-full bg-[var(--sys-surface)] flex items-center justify-center flex-shrink-0 text-lg">{meta.icon || '📱'}</div>}
                                                     <div className="truncate pr-2">
                                                         <p className="text-sm font-bold text-[var(--sys-text)] truncate">{acc.accountName}</p>
                                                         <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-medium">{meta.label || acc.platform}</p>

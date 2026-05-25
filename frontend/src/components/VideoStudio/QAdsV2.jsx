@@ -632,12 +632,12 @@ function SaveTemplateForm({ project, onClose, api: apiFn }) {
 function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     const vRef = useRef(null)
     const videoUrl = project.generation?.videoUrl || project.finalVideoUrl
-    return <div className="qv2-bi has-vha" style={{ position: 'relative' }}>
+    return <div className="qv2-bi has-vha" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => onPreview?.(videoUrl)}>
         <video ref={vRef} src={videoUrl} muted autoPlay loop playsInline />
         <VideoHoverActions videoUrl={videoUrl} onPreview={onPreview} project={project} />
         <div className="qv2-bi-ov">
             {isAdmin && (
-                <button className="qv2-bi-btn template-btn" onClick={() => onSaveTemplate(project)}>
+                <button className="qv2-bi-btn template-btn" onClick={(e) => { e.stopPropagation(); onSaveTemplate(project); }}>
                     <span className="material-symbols-outlined" style={{fontSize: 14}}>bookmark_add</span>
                     Template
                 </button>
@@ -1439,9 +1439,9 @@ export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, in
 
         {/* ── Video Preview Modal ── */}
         {previewVideo && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setPreviewVideo(null)}>
                 <div style={{ position: 'relative', maxWidth: 720, width: '90%' }} onClick={e => e.stopPropagation()}>
-                    <video src={previewVideo} controls autoPlay style={{ width: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                    <video src={previewVideo} controls autoPlay playsInline muted={false} onLoadedData={(e) => { e.target.muted = false; e.target.volume = 1; e.target.play().catch(() => {}); }} style={{ maxWidth: '100%', maxHeight: '85vh', margin: '0 auto', display: 'block', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.5)', objectFit: 'contain', background: '#000' }} />
                     <div style={{ position: 'absolute', top: -44, right: 0, display: 'flex', gap: 8 }}>
                         <a href={previewVideo} download="q-ads-video.mp4" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span> Download
