@@ -278,12 +278,12 @@ export class GeminiProvider extends BaseProvider {
 
     /**
      * Generate image using modern Gemini models (Flash/Pro) or older Imagen models.
-     * Supports gemini-3.1-flash-image-preview, imagen-3, etc.
+     * Supports gemini-2.0-flash-exp, imagen-3, etc.
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [], size = "1K", temperature = 0.4 }) {
         const startTime = Date.now();
         const imageKey = this.imageApiKey;
-        const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
+        const modelId = model || this.config.defaultImageModel || 'gemini-2.0-flash-exp';
 
         console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
         console.log(`📐 Aspect Ratio: ${aspectRatio}`);

@@ -72,7 +72,7 @@ export const PROVIDER_PRICING = {
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
             // ── Gemini Image Models ──
-            'gemini-3.1-flash-image-preview': {
+            'gemini-2.0-flash-exp': {
                 name: 'Gemini Image Gen', type: 'image',
                 flatCostUSD: 0.04, unit: 'USD/image',
                 pricingUrl: 'https://ai.google.dev/pricing',

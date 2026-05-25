@@ -487,7 +487,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
  * auto-generated still. Instead, we use character visual descriptions from the
  * analysis to generate characters de-novo in the show's visual style.
  *
- * Models: PRIMARY = gemini-3.1-flash-image-preview via @google/genai SDK
+ * Models: PRIMARY = gemini-2.0-flash-exp via @google/genai SDK
  *         FALLBACK = fal-ai/flux-pro/v1.1
  */
 export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [], extractedFrames = [] }) {

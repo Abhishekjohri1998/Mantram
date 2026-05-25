@@ -2,7 +2,7 @@
  * Pulse Deck — Interactive Web Presentation Builder
  *
  * Intelligence: Claude Sonnet 4.6 — strategic creative director
- * Images:       NanoBanana 2 (gemini-3.1-flash-image-preview) — every visual slide
+ * Images:       NanoBanana 2 (gemini-2.0-flash-exp) — every visual slide
  * Output:       Reveal.js HTML5 presentation hosted on S3
  */
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +13,7 @@ import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import { injectDesignContext } from '../shared/productDesignAgent.js';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
-const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const DEFAULT_IMAGE_MODEL = 'gemini-2.0-flash-exp';
 
 // ── Claude Creative Director System Prompt ─────────────────────────
 const DECK_SYSTEM = (brandContext, urlBlock) => `You are a world-class strategic creative director at a top-tier agency.

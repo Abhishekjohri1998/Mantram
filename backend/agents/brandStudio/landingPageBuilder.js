@@ -176,7 +176,7 @@ function buildBrandImagePrompt(basePrompt, type, brandContext, tokens, designCon
 }
 
 async function generatePageImages(plan, brandContext, referenceImage, tokens, designContext, imageModel) {
-    const model = imageModel || 'gemini-3.1-flash-image-preview';
+    const model = imageModel || 'gemini-2.0-flash-exp';
     const tasks = [];
     for (const s of (plan.sections || [])) {
         if (!s.imagePrompt) continue;
