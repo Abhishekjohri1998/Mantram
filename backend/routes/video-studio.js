@@ -5687,16 +5687,42 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
         const qualityMode = routing.mode || 'fast';
 
         // Collect product/reference images for consistency across all shots
+        const rawRefImages = [];
+
+        // 1. Prioritize avatar/character image
+        const avatarUrl = project.input?.avatarUrl || null;
+        if (avatarUrl && avatarUrl.startsWith('http') && !avatarUrl.includes('localhost')) {
+            rawRefImages.push(avatarUrl);
+        }
+
+        // 2. Fetch brand and include logo
+        let logoUrl = null;
+        if (project.brand) {
+            const brand = await Brand.findById(project.brand).lean();
+            logoUrl = brand?.dna?.logo?.url || null;
+            if (logoUrl && logoUrl.startsWith('http') && !logoUrl.includes('localhost')) {
+                rawRefImages.push(logoUrl);
+            }
+        }
+
+        // 3. Include user product images
         const userRefUrls = (project.input?.images || [])
             .map(img => img.url)
             .filter(url => url && url.startsWith('http') && !url.includes('localhost'));
-        const brandRefUrls = (project.references?.brandImages || [])
-            .map(img => img.url)
-            .filter(url => url && url.startsWith('http'));
+        rawRefImages.push(...userRefUrls);
+
+        // 4. Include other user uploaded and brand references
         const userUploadedUrls = (project.references?.userUploaded || [])
             .map(img => img.url)
-            .filter(url => url && url.startsWith('http'));
-        const allRefImages = [...userRefUrls, ...userUploadedUrls, ...brandRefUrls];
+            .filter(url => url && url.startsWith('http') && !url.includes('localhost'));
+        rawRefImages.push(...userUploadedUrls);
+
+        const brandRefUrls = (project.references?.brandImages || [])
+            .map(img => img.url)
+            .filter(url => url && url.startsWith('http') && !url.includes('localhost'));
+        rawRefImages.push(...brandRefUrls);
+
+        const allRefImages = [...new Set(rawRefImages)];
 
         // ── SHOT-BY-SHOT PIPELINE ──
         if (shots.length > 1) {
@@ -5819,6 +5845,7 @@ router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (re
             routing: updatedProject.routing,
             inputImages: updatedProject.input?.images || [],
             references: updatedProject.references,
+            avatarUrl: updatedProject.input?.avatarUrl || null,
         }).catch(e => console.error('Background runStep generating failed:', e));
 
         res.json({

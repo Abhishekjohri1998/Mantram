@@ -459,15 +459,6 @@ export async function videoGeneratorNode(state) {
         prompt = `${prompt}\n\nDETAILED SHOT BREAKDOWN:\n${shotDescriptions}`;
     }
 
-    // Use first reference image if available (for image-to-video models)
-    // IMPORTANT: Skip base64 data URIs AND localhost URLs — external APIs can't access them
-    let imageUrl = null;
-    const candidates = [
-        ...(state.inputImages || []).map(img => img.url),
-        ...(state.references?.userUploaded || []).map(img => img.url),
-        ...(state.references?.brandImages || []).map(img => img.url),
-    ].filter(Boolean);
-
     // Helper: check if a URL is accessible by external APIs
     // Note: base64 is now allowed here because clients use ensureS3Url to upload to S3 before submission
     const isExternallyAccessible = (url) => {
@@ -477,23 +468,46 @@ export async function videoGeneratorNode(state) {
         return url.startsWith('http');
     };
 
-    for (const url of candidates) {
-        if (isExternallyAccessible(url)) {
-            imageUrl = url;
-            break;
+    // Load logo url if brand is present
+    let logoUrl = null;
+    if (state.brandId) {
+        try {
+            const { brand } = await agentUtils.loadBrandContext(state.brandId);
+            logoUrl = brand?.dna?.logo?.url || null;
+        } catch (e) {
+            console.warn(`[videoGeneratorNode] Failed to load brand for logoUrl: ${e.message}`);
         }
     }
-    if (!imageUrl && candidates.length > 0) {
-        console.warn('⚠️ All input images are base64 or localhost URLs — external video APIs can\'t access them. Skipping image input.');
-    } else if (imageUrl) {
-        console.log(`📸 Using image for video gen: ${imageUrl.substring(0, 80)}...`);
+
+    const rawCandidates = [];
+
+    // 1. Prioritize avatar image
+    if (state.avatarUrl && isExternallyAccessible(state.avatarUrl)) {
+        rawCandidates.push(state.avatarUrl);
     }
 
-    // Collect all reference images for consistency
-    const referenceImages = [
-        ...(state.inputImages || []).map(img => img.url),
-        ...(state.references?.userUploaded || []).map(img => img.url),
-    ].filter(u => u && isExternallyAccessible(u));
+    // 2. Prioritize logo image
+    if (logoUrl && isExternallyAccessible(logoUrl)) {
+        rawCandidates.push(logoUrl);
+    }
+
+    // 3. User product images and references
+    const userRefImages = (state.inputImages || []).map(img => img.url).filter(isExternallyAccessible);
+    rawCandidates.push(...userRefImages);
+
+    const userUploaded = (state.references?.userUploaded || []).map(img => img.url).filter(isExternallyAccessible);
+    rawCandidates.push(...userUploaded);
+
+    const brandImages = (state.references?.brandImages || []).map(img => img.url).filter(isExternallyAccessible);
+    rawCandidates.push(...brandImages);
+
+    const referenceImages = [...new Set(rawCandidates)].slice(0, 3);
+
+    let imageUrl = null;
+    if (referenceImages.length > 0) {
+        imageUrl = referenceImages[0];
+        console.log(`📸 Using image for video gen: ${imageUrl.substring(0, 80)}...`);
+    }
 
     const { requestId, endpoint, statusUrl, resultUrl, provider, _atlasCloudPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
