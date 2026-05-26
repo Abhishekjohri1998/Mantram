@@ -17,6 +17,7 @@ import { submitVideoGeneration, estimateCost, submitLipSync, pollLipSyncResult }
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
 import ffmpegPath from 'ffmpeg-static';
+import {
     extractLastFrameToS3,
 } from '../../utils/ffmpegUtils.js';
 
