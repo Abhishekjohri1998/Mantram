@@ -17,59 +17,21 @@ import { submitVideoGeneration, estimateCost, submitLipSync, pollLipSyncResult }
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
 import ffmpegPath from 'ffmpeg-static';
-import {
     extractLastFrameToS3,
-    muxAudioOntoVideo,
-    concatSceneAudios,
-    mixAudioAndMux,
 } from '../../utils/ffmpegUtils.js';
 
 const execFileAsync = promisify(execFile);
 
-// ── TTS Engine (Sarvam for Indian languages, OpenAI for global) ──────────────
-const LANG_TO_CODE = {
-    'Hindi': 'hi-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN', 'Bengali': 'bn-IN',
-    'Marathi': 'mr-IN', 'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN',
-    'Punjabi': 'pa-IN', 'English': 'en-IN', 'Arabic': 'ar-SA', 'Urdu': 'ur-PK',
-    'French': 'fr-FR', 'Spanish': 'es-ES', 'Portuguese': 'pt-BR', 'Japanese': 'ja-JP',
-    'Korean': 'ko-KR', 'Chinese': 'zh-CN', 'German': 'de-DE', 'Italian': 'it-IT',
-    'Turkish': 'tr-TR', 'Thai': 'th-TH',
-};
-const SARVAM_SUPPORTED = new Set(['hi-IN', 'ta-IN', 'te-IN', 'bn-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'en-IN']);
-const SARVAM_VOICES = {
-    'hi-IN': 'anushka', 'ta-IN': 'meera', 'te-IN': 'meera', 'bn-IN': 'meera',
-    'mr-IN': 'meera', 'gu-IN': 'meera', 'kn-IN': 'meera', 'ml-IN': 'meera',
-    'pa-IN': 'meera', 'en-IN': 'anushka',
-};
-const OPENAI_VOICES = {
-    'ar-SA': 'coral', 'ur-PK': 'coral', 'fr-FR': 'sage', 'es-ES': 'nova',
-    'pt-BR': 'nova', 'ja-JP': 'shimmer', 'ko-KR': 'shimmer', 'zh-CN': 'alloy',
-    'de-DE': 'onyx', 'it-IT': 'sage', 'tr-TR': 'echo', 'th-TH': 'nova', 'en-IN': 'nova',
-};
+// ── TTS Engine (removed) ──────────────
 
-// Models that support refAudio for native lip-sync
-// HappyHorse 1.0 supports audio_url via Atlas Cloud for audio-driven generation
-const MODELS_WITH_REF_AUDIO = new Set(['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0']);
-
-// ── Background Music Presets ─────────────────────────────────────────────────
-// Royalty-free ambient music URLs (stored in S3 or public CDN)
-// Volume is ducked to -18dB when voiceover is present, -8dB during silent scenes
-const BGM_PRESETS = {
-    upbeat:     { name: 'Upbeat Corporate',   volumeWithVO: 0.08, volumeNoVO: 0.20 },
-    cinematic:  { name: 'Cinematic Ambient',   volumeWithVO: 0.06, volumeNoVO: 0.18 },
-    emotional:  { name: 'Emotional Piano',     volumeWithVO: 0.07, volumeNoVO: 0.20 },
-    energetic:  { name: 'Energetic Pop',       volumeWithVO: 0.10, volumeNoVO: 0.25 },
-    minimal:    { name: 'Minimal Electronic',  volumeWithVO: 0.05, volumeNoVO: 0.15 },
-};
+// ── Background Music Presets (removed) ─────────────────────────────────────────────────
 
 // ── Progress Phases ──────────────────────────────────────────────────────────
 const PHASES = {
     PLANNING:     { label: 'Planning scenes...', range: [0, 5] },
     GENERATING:   { label: 'Generating scenes', range: [5, 75] },
     DOWNLOADING:  { label: 'Downloading segments...', range: [75, 80] },
-    STITCHING:    { label: 'Stitching video...', range: [80, 88] },
-    TTS:          { label: 'Generating voiceover...', range: [88, 93] },
-    MUXING:       { label: 'Final mixing...', range: [93, 100] },
+    STITCHING:    { label: 'Stitching video...', range: [80, 100] },
 };
 
 // ── In-memory job tracker ────────────────────────────────────────────────────
@@ -201,25 +163,12 @@ async function runPipeline(jobId, params) {
         job.sceneStatuses = scenes.map(() => ({ status: 'pending', progress: 0 }));
         updateProgress(jobId, 'PLANNING', `${scenes.length} scenes planned`, 100);
 
-        // ── Sarvam API key pre-validation for regional languages ──
-        const langCode = LANG_TO_CODE[params.language] || 'en-IN';
-        const needsSarvam = SARVAM_SUPPORTED.has(langCode);
-        if (needsSarvam && !process.env.SARVAM_API_KEY) {
-            console.error(`[LongForm ${jobId}] ❌ SARVAM_API_KEY not set but language '${params.language}' (${langCode}) requires Sarvam TTS. Voiceovers will be SKIPPED.`);
-        } else if (needsSarvam) {
-            console.log(`[LongForm ${jobId}] ✅ Sarvam TTS validated for '${params.language}' (${langCode})`);
-        } else {
-            console.log(`[LongForm ${jobId}] 🌐 Using OpenAI TTS for '${params.language}' (${langCode})`);
-        }
-
         if (job.cancelled) throw new Error('Cancelled by user');
 
         // ═══ Phase 2: Sequential Video Generation with Per-Scene TTS ═══
         const sceneVideos = new Array(scenes.length).fill(null);
-        const sceneAudioUrls = new Array(scenes.length).fill(null); // Per-scene TTS URLs
         let completedScenes = 0;
         let lastFrameUrl = null;
-        const supportsRefAudio = MODELS_WITH_REF_AUDIO.has(params.model);
 
         for (let i = 0; i < scenes.length; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
@@ -232,22 +181,6 @@ async function runPipeline(jobId, params) {
                 (completedScenes / scenes.length) * 100);
 
             try {
-                // ── Step 2a: Generate per-scene TTS audio ──
-                let sceneTtsUrl = null;
-                if (scene.dialogue && scene.dialogue.length > 0) {
-                    try {
-                        const dialogueText = scene.dialogue.map(d => d.text || d).join('. ');
-                        const emotion = scene.dialogue[0]?.emotion || 'neutral';
-                        sceneTtsUrl = await generateSceneTTS(dialogueText, params.language, emotion);
-                        if (sceneTtsUrl) {
-                            console.log(`[LongForm ${jobId}] 🎤 Scene ${i + 1} TTS ready: ${sceneTtsUrl.substring(0, 60)}...`);
-                        }
-                    } catch (ttsErr) {
-                        console.warn(`[LongForm ${jobId}] ⚠️ Scene ${i + 1} TTS failed: ${ttsErr.message}`);
-                    }
-                }
-                sceneAudioUrls[i] = sceneTtsUrl;
-
                 // ── Step 2b: Build scene prompt ──
                 let scenePrompt = scene.visualPrompt || scene.prompt || params.prompt;
                 if (scene.camerawork) scenePrompt += `\n${scene.camerawork}`;
@@ -263,11 +196,10 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: !sceneTtsUrl, // Disable native audio when TTS provided
+                        generateAudio: true, // Native audio only
                         referenceImages: params.referenceImages.slice(0, 9),
                         qualityMode: params.settings?.quality || 'fast',
                         imageRole: params.imageRole,
-                        refAudio: supportsRefAudio ? sceneTtsUrl : null,
                     });
                 } else {
                     genResult = await submitVideoGeneration({
@@ -276,35 +208,13 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: !sceneTtsUrl,
+                        generateAudio: true, // Native audio only
                         referenceImages: params.referenceImages.slice(0, 9),
-                        refAudio: supportsRefAudio ? sceneTtsUrl : null,
                     });
                 }
 
                 // Poll until complete
                 let videoUrl = await pollUntilComplete(genResult, jobId, i, scenes.length);
-
-                // ── Step 2d: Lip-sync for models WITHOUT refAudio ──
-                // Use fal.ai Sync Lipsync to make the character's lips move with TTS
-                if (sceneTtsUrl && !supportsRefAudio) {
-                    try {
-                        console.log(`[LongForm ${jobId}] 👄 Lip-syncing scene ${i + 1} (model lacks refAudio)...`);
-                        const lipSyncJob = await submitLipSync(videoUrl, sceneTtsUrl);
-                        const lipSyncedUrl = await pollLipSyncResult(lipSyncJob, 180000);
-                        videoUrl = lipSyncedUrl;
-                        console.log(`[LongForm ${jobId}] ✅ Scene ${i + 1} lip-synced successfully`);
-                    } catch (lipErr) {
-                        console.warn(`[LongForm ${jobId}] ⚠️ Lip-sync failed for scene ${i + 1}: ${lipErr.message}`);
-                        // Fallback: just mux audio onto video (voiceover without lip movement)
-                        try {
-                            console.log(`[LongForm ${jobId}] 🔊 Falling back to audio mux for scene ${i + 1}...`);
-                            videoUrl = await muxAudioOntoVideo(videoUrl, sceneTtsUrl);
-                        } catch (muxErr) {
-                            console.warn(`[LongForm ${jobId}] ⚠️ Audio mux also failed: ${muxErr.message}`);
-                        }
-                    }
-                }
 
                 sceneVideos[i] = videoUrl;
                 job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl };
@@ -360,11 +270,6 @@ async function runPipeline(jobId, params) {
 
                     let retryUrl = await pollUntilComplete(retryResult, jobId, i, scenes.length);
 
-                    // Post-mux TTS on retry if available
-                    if (sceneAudioUrls[i] && !supportsRefAudio) {
-                        try { retryUrl = await muxAudioOntoVideo(retryUrl, sceneAudioUrls[i]); } catch {}
-                    }
-
                     sceneVideos[i] = retryUrl;
                     job.sceneStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
                     completedScenes++;
@@ -409,38 +314,14 @@ async function runPipeline(jobId, params) {
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 5: Audio Pipeline — Concat per-scene TTS + BGM Mix ═══
-        updateProgress(jobId, 'TTS', 'Building voiceover track...', 0);
+        // ═══ Phase 5: Final Upload ═══
+        updateProgress(jobId, 'STITCHING', 'Uploading to S3...', 50);
 
-        // Build per-scene audio data with matching durations
-        const sceneAudioData = scenes.map((scene, i) => ({
-            audioUrl: sceneAudioUrls[i],
-            sceneDuration: scene.duration,
-        }));
-
-        const voiceoverPath = await concatSceneAudios(sceneAudioData, tmpDir);
-        updateProgress(jobId, 'TTS', voiceoverPath ? 'Voiceover ready' : 'No voiceover', 100);
-
-        // BGM URLs — using Pixabay download links (direct CDN)
-        const BGM_URLS = {
-            upbeat: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-            cinematic: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_0319dd632e.mp3',
-            emotional: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_27ab966bc7.mp3',
-            energetic: 'https://cdn.pixabay.com/download/audio/2023/04/27/audio_f5353ee5c0.mp3',
-            minimal: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_0710609b5a.mp3',
-        };
-        const bgmUrl = params.bgmPreset ? BGM_URLS[params.bgmPreset] : null;
-
-        // ═══ Phase 6: Final Mux (Video + Voiceover + BGM) → Upload ═══
-        updateProgress(jobId, 'MUXING', 'Mixing audio and uploading...', 0);
-        const finalMuxedPath = await mixAudioAndMux(finalVideoPath, voiceoverPath, bgmUrl, tmpDir);
-        updateProgress(jobId, 'MUXING', 'Uploading...', 50);
-
-        const finalBuffer = fs.readFileSync(finalMuxedPath);
+        const finalBuffer = fs.readFileSync(finalVideoPath);
         const s3Key = `video-studio/longform/${jobId}/final-${Date.now()}.mp4`;
         const videoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
 
-        updateProgress(jobId, 'MUXING', 'Complete!', 100);
+        updateProgress(jobId, 'STITCHING', 'Complete!', 100);
         job.status = 'COMPLETED';
         job.progress = 100;
         job.videoUrl = videoUrl;
@@ -554,7 +435,6 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-an', // Strip audio — voiceover is built from per-scene TTS and muxed in Phase 6
             '-movflags', '+faststart',
             outPath,
         ], { timeout: 120000 });
@@ -570,7 +450,6 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
             '-y', '-i', segmentPaths[i],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-an',
             '-movflags', '+faststart',
             normPath,
         ], { timeout: 120000 });
@@ -623,7 +502,7 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
         ], { timeout: 300000 }); // 5 min timeout for stitching
     } catch (xfadeErr) {
         console.warn(`[LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
-        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout]`;
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', concatFilter,
@@ -638,140 +517,3 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     return outputPath;
 }
 
-// ── Per-Scene TTS Engine ─────────────────────────────────────────────────────
-// Generates voiceover audio for a single scene's dialogue.
-// Sarvam Bulbul v2 for Indian languages, OpenAI gpt-4o-mini-tts for global.
-
-const EMOTION_INSTRUCTIONS = {
-    excited:    'Speak with genuine excitement and high energy. Fast-paced and infectious.',
-    warm:       'Speak warmly and conversationally, like talking to a close friend.',
-    urgent:     'Speak with urgency and conviction. Direct, persuasive, slightly faster pace.',
-    calm:       'Speak calmly and authoritatively. Measured pace, confident tone.',
-    playful:    'Speak playfully with a smile in your voice. Light, teasing energy.',
-    dramatic:   'Speak dramatically with emotional weight. Slow, deliberate pauses.',
-    curious:    'Speak with genuine curiosity and wonder. Rising intonation on key phrases.',
-    confident:  'Speak with strong confidence and authority. Steady, unwavering.',
-    mysterious: 'Speak in a low, intriguing tone. Slight whisper quality on key phrases.',
-    empathetic: 'Speak with deep empathy and understanding. Soft, caring.',
-    neutral:    'Speak naturally and clearly with an engaging, professional tone.',
-};
-
-const SARVAM_EMOTION_MAP = {
-    excited:   { pitch: 2, pace: 1.2, loudness: 1.8 },
-    warm:      { pitch: 0, pace: 0.9, loudness: 1.3 },
-    urgent:    { pitch: 1, pace: 1.3, loudness: 1.8 },
-    calm:      { pitch: -1, pace: 0.85, loudness: 1.2 },
-    playful:   { pitch: 2, pace: 1.1, loudness: 1.5 },
-    dramatic:  { pitch: -2, pace: 0.75, loudness: 1.6 },
-    curious:   { pitch: 1, pace: 1.0, loudness: 1.4 },
-    confident: { pitch: 0, pace: 0.95, loudness: 1.7 },
-    neutral:   { pitch: 0, pace: 1.0, loudness: 1.5 },
-};
-
-/**
- * Generate TTS audio for a single scene's dialogue.
- * @param {string} text - The dialogue text to speak
- * @param {string} language - Language name (e.g. 'Hindi', 'English', 'French')
- * @param {string} emotion - Emotion tag (e.g. 'excited', 'calm', 'urgent')
- * @returns {Promise<string|null>} - S3 URL of the audio file, or null
- */
-async function generateSceneTTS(text, language, emotion = 'neutral') {
-    if (!text || text.length < 5) {
-        console.log(`🎤 [SceneTTS] Skipping — text too short (${text?.length || 0} chars)`);
-        return null;
-    }
-
-    const langCode = LANG_TO_CODE[language] || 'en-IN';
-    const isRegional = SARVAM_SUPPORTED.has(langCode);
-
-    console.log(`🎤 [SceneTTS] Generating TTS: lang=${language} (${langCode}), provider=${isRegional ? 'Gemini' : 'OpenAI'}, emotion=${emotion}, text="${text.substring(0, 60)}..."`);
-
-    try {
-        if (isRegional) {
-            // ── Gemini 3.1 Flash TTS for regional Indian languages ──
-            const audioUrl = await _geminiTTS(text, language, emotion);
-            if (audioUrl) {
-                console.log(`🎤 [SceneTTS] ✅ Gemini TTS success: ${audioUrl.substring(0, 60)}...`);
-                return audioUrl;
-            }
-            console.warn(`⚠️ [SceneTTS] Gemini TTS returned null, falling back to OpenAI...`);
-        }
-        
-        const audioUrl = await _openaiTTS(text, emotion, language, langCode);
-        if (audioUrl) {
-            console.log(`🎤 [SceneTTS] ✅ OpenAI TTS success: ${audioUrl.substring(0, 60)}...`);
-        }
-        return audioUrl;
-    } catch (err) {
-        console.error(`❌ [SceneTTS] TTS FAILED (${isRegional ? 'Gemini' : 'OpenAI'}): ${err.message}`);
-        if (isRegional) {
-            console.error(`❌ [SceneTTS] Gemini TTS failed for ${language} (${langCode}). No fallback to OpenAI for regional languages. Scene will have NO voiceover.`);
-        }
-        return null;
-    }
-}
-
-async function _geminiTTS(text, language, emotion) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) { console.warn('🎤 [SceneTTS] GEMINI_API_KEY not set'); return null; }
-
-    const promptText = `Please speak the following text fluently in ${language} with a ${emotion} tone:\n\n${text.substring(0, 2000)}`;
-
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
-                }
-            }
-        }),
-    });
-
-    if (!resp.ok) {
-        const errText = await resp.text().catch(() => '');
-        throw new Error(`Gemini TTS ${resp.status}: ${errText.substring(0, 100)}`);
-    }
-
-    const data = await resp.json();
-    const audioPart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
-
-    if (!audioPart?.inlineData?.data) {
-        throw new Error('No audio generated by Gemini');
-    }
-
-    const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
-    const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
-    const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
-    const s3Key = `video-studio/longform/tts/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-    return await uploadToS3(buffer, s3Key, mimeType);
-}
-
-async function _openaiTTS(text, emotion, language, langCode) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) { console.warn('🎤 [SceneTTS] OPENAI_API_KEY not set'); return null; }
-
-    const instruction = EMOTION_INSTRUCTIONS[emotion] || EMOTION_INSTRUCTIONS.neutral;
-    const voice = OPENAI_VOICES[langCode] || 'nova';
-    const langNote = language !== 'English' ? ` Speak fluently in ${language} with an authentic native accent.` : '';
-
-    const resp = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: 'gpt-4o-mini-tts',
-            voice,
-            input: text.substring(0, 4000),
-            instructions: `${instruction}${langNote} This is a voiceover for a cinematic video advertisement.`,
-            response_format: 'mp3',
-        }),
-    });
-
-    if (!resp.ok) throw new Error(`OpenAI TTS ${resp.status}`);
-    const buffer = Buffer.from(await resp.arrayBuffer());
-    const s3Key = `video-studio/longform/tts/${Date.now()}-${Math.random().toString(36).substring(7)}.mp3`;
-    return await uploadToS3(buffer, s3Key, 'audio/mpeg');
-}

@@ -36,8 +36,6 @@ import { allocateSceneDurations, planStoryboardScenes } from './scenePlanner.js'
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus, submitGeminiFlashVideoGeneration } from './atlasClient.js';
 import {
     extractLastFrameToS3,
-    concatSceneAudios,
-    mixAudioAndMux,
 } from '../../utils/ffmpegUtils.js';
 import { uploadToS3 } from '../../utils/s3.js';
 
@@ -46,23 +44,14 @@ const execFileAsync = promisify(execFile);
 // ── Segment sizing constants ─────────────────────────────────────────────────
 const OPTIMAL_SEGMENT_DURATION = 10; // seconds — keeps each Seedance task well within its 15s limit
 
-// ── BGM presets (same as longFormGenerator) ───────────────────────────────────
-const BGM_URLS = {
-    upbeat:    'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-    cinematic: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_0319dd632e.mp3',
-    emotional: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_27ab966bc7.mp3',
-    energetic: 'https://cdn.pixabay.com/download/audio/2023/04/27/audio_f5353ee5c0.mp3',
-    minimal:   'https://cdn.pixabay.com/download/audio/2022/03/15/audio_0710609b5a.mp3',
-};
+// ── BGM presets (removed) ───────────────────────────────────
 
 // ── Progress phases ───────────────────────────────────────────────────────────
 const PHASES = {
     PLANNING:    { label: 'Planning segments...',        range: [0,   5] },
     GENERATING:  { label: 'Generating video segments',   range: [5,  75] },
     DOWNLOADING: { label: 'Downloading segments...',     range: [75, 80] },
-    STITCHING:   { label: 'Stitching video...',          range: [80, 87] },
-    TTS:         { label: 'Mixing voiceover...',         range: [87, 93] },
-    MUXING:      { label: 'Final audio mix...',          range: [93, 100] },
+    STITCHING:   { label: 'Stitching video...',          range: [80, 100] },
 };
 
 // ── In-memory job tracker (shared with longFormGenerator via same pattern) ────
@@ -291,45 +280,10 @@ async function _runPipeline(jobId, params) {
 
         // ═══ Phase 2: Sequential I2V Generation ══════════════════════════════
         const segmentVideoUrls = new Array(segCount).fill(null);
-        const segmentAudioUrls = new Array(segCount).fill(null);
         // BUG FIX: initialize to a real URL so segments 2+ never receive null imageUrl
         // even if segment 1 fails and lastFrameUrl was never set.
         let lastFrameUrl = params.firstFrameUrl || params.imageUrl;
         let completedCount = 0;
-
-        // Pre-generate TTS segments
-        if (voiceoverScript) {
-            _setProgress(jobId, 'GENERATING', 'Generating voiceover segments...', 0);
-            const scriptChunks = _splitScriptIntoSegments(voiceoverScript, segCount);
-            for (let i = 0; i < segCount; i++) {
-                if (scriptChunks[i]) {
-                    try {
-                        segmentAudioUrls[i] = await _generateTTS(scriptChunks[i], dialogueLanguage, 'confident');
-                        console.log(`[SB LongForm ${jobId}] 🎤 Segment ${i+1} TTS: ${segmentAudioUrls[i]?.substring(0, 60) || 'SKIP'}...`);
-                    } catch (ttsErr) {
-                        console.warn(`[SB LongForm ${jobId}] ⚠️ TTS segment ${i+1} failed: ${ttsErr.message}`);
-                    }
-                }
-            }
-        } else {
-            // Generate TTS from segment dialogues
-            _setProgress(jobId, 'GENERATING', 'Generating scene voiceovers...', 0);
-            for (let i = 0; i < scenes.length; i++) {
-                const scene = scenes[i];
-                const dialogueText = scene.dialogue && scene.dialogue.length > 0
-                    ? scene.dialogue.map(d => d.text).join(' ').trim()
-                    : '';
-                if (dialogueText) {
-                    try {
-                        const emotion = scene.dialogue[0]?.emotion || 'confident';
-                        segmentAudioUrls[i] = await _generateTTS(dialogueText, dialogueLanguage, emotion);
-                        console.log(`[SB LongForm ${jobId}] 🎤 Scene ${i+1} dialogue TTS: ${segmentAudioUrls[i]?.substring(0, 60)}...`);
-                    } catch (ttsErr) {
-                        console.warn(`[SB LongForm ${jobId}] ⚠️ TTS for scene ${i+1} failed: ${ttsErr.message}`);
-                    }
-                }
-            }
-        }
 
         for (let i = 0; i < segCount; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
@@ -375,12 +329,11 @@ async function _runPipeline(jobId, params) {
                         imageUrl: segmentFirstFrameUrl,
                         duration: durations[i],
                         aspectRatio: params.format,
-                        generateAudio: !segmentAudioUrls[i],  // Native audio only when no TTS
+                        generateAudio: true,  // Native audio only
                         referenceImages: segmentRefs.slice(0, 6),
                         qualityMode,
                         resolution: params.resolution,
                         imageRole: 'mixed',
-                        refAudio: segmentAudioUrls[i] || null,  // Seedance native lip-sync
                     });
                 }
 
@@ -483,50 +436,17 @@ async function _runPipeline(jobId, params) {
             .filter(v => v !== null);
 
         const stitchedPath = await _stitchWithCrossfade(tmpDir, segmentPaths, params.format, validDurations, jobId);
-        _setProgress(jobId, 'STITCHING', 'Stitch complete', 100);
+        _setProgress(jobId, 'STITCHING', 'Stitch complete', 50);
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
-        // ═══ Phase 5: Build Voiceover Track (if available) ═══════════════════
-        _setProgress(jobId, 'TTS', 'Building voiceover track...', 0);
+        _setProgress(jobId, 'STITCHING', 'Uploading to S3...', 75);
 
-        // BUG FIX: track original segment index alongside URL so that
-        // segmentAudioUrls[originalIdx] is correctly matched even when
-        // some segments were skipped (null in segmentVideoUrls).
-        const validEntries = segmentVideoUrls
-            .map((url, idx) => url ? { url, idx } : null)
-            .filter(Boolean);
-
-        let voiceoverPath = null;
-        const hasAnyTTS = segmentAudioUrls.some(Boolean);
-        if (hasAnyTTS) {
-            const sceneAudioData = validEntries.map(({ idx }) => ({
-                audioUrl: segmentAudioUrls[idx] || null,
-                sceneDuration: durations[idx] || OPTIMAL_SEGMENT_DURATION,
-            }));
-            try {
-                voiceoverPath = await concatSceneAudios(sceneAudioData, tmpDir);
-                console.log(`[SB LongForm ${jobId}] 🎙️ Voiceover track ready: ${voiceoverPath}`);
-            } catch (voErr) {
-                console.warn(`[SB LongForm ${jobId}] ⚠️ Voiceover concat failed: ${voErr.message}`);
-            }
-        }
-
-        _setProgress(jobId, 'TTS', voiceoverPath ? 'Voiceover ready' : 'No voiceover', 100);
-
-        // ═══ Phase 6: Final Mix (Video + VO + BGM) + Upload ══════════════════
-        _setProgress(jobId, 'MUXING', 'Mixing audio and uploading...', 0);
-
-        const bgmUrl = params.bgmPreset ? (BGM_URLS[params.bgmPreset] || BGM_URLS.cinematic) : null;
-        const finalMixedPath = await mixAudioAndMux(stitchedPath, voiceoverPath, bgmUrl, tmpDir);
-
-        _setProgress(jobId, 'MUXING', 'Uploading to S3...', 50);
-
-        const finalBuffer = fs.readFileSync(finalMixedPath);
+        const finalBuffer = fs.readFileSync(stitchedPath);
         const s3Key = `storyboard/longform/${params.projectId || jobId}/final-${Date.now()}.mp4`;
         const videoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
 
-        _setProgress(jobId, 'MUXING', 'Complete!', 100);
+        _setProgress(jobId, 'STITCHING', 'Complete!', 100);
         job.status = 'COMPLETED';
         job.progress = 100;
         job.videoUrl = videoUrl;
@@ -626,7 +546,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-an', '-movflags', '+faststart',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
             outPath,
         ], { timeout: 120000 });
         return outPath;
@@ -640,7 +560,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[i],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-an', '-movflags', '+faststart',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
             normPath,
         ], { timeout: 120000 });
         normPaths.push(normPath);
@@ -687,7 +607,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         ], { timeout: 300000 });
     } catch (xfadeErr) {
         console.warn(`[SB LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
-        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout]`;
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', concatFilter,
@@ -699,89 +619,4 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
 
     console.log(`[SB LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
     return outputPath;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TTS helper — generates audio for a single text chunk
-// Prefers Gemini TTS for Indian languages, OpenAI for global
-// ─────────────────────────────────────────────────────────────────────────────
-const SARVAM_LANG_CODES = new Set(['hi-IN', 'ta-IN', 'te-IN', 'bn-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'en-IN']);
-const LANG_TO_CODE = {
-    'Hindi': 'hi-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN', 'Bengali': 'bn-IN',
-    'Marathi': 'mr-IN', 'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN',
-    'Punjabi': 'pa-IN', 'English': 'en-IN', 'Arabic': 'ar-SA', 'French': 'fr-FR',
-    'Spanish': 'es-ES', 'Japanese': 'ja-JP', 'Mandarin': 'zh-CN', 'German': 'de-DE',
-};
-const OPENAI_VOICES = {
-    'ar-SA': 'coral', 'fr-FR': 'sage', 'es-ES': 'nova', 'ja-JP': 'shimmer',
-    'zh-CN': 'alloy', 'de-DE': 'onyx',
-};
-
-async function _generateTTS(text, language = 'English', emotion = 'confident') {
-    if (!text || text.length < 5) return null;
-    const langCode = LANG_TO_CODE[language] || 'en-IN';
-    const isRegional = SARVAM_LANG_CODES.has(langCode);
-
-    if (isRegional && process.env.GEMINI_API_KEY) {
-        const apiKey = process.env.GEMINI_API_KEY;
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `Speak fluently in ${language} with a ${emotion} tone:\n\n${text.substring(0, 2000)}` }] }],
-                generationConfig: {
-                    responseModalities: ['AUDIO'],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } },
-                },
-            }),
-        });
-        if (resp.ok) {
-            const data = await resp.json();
-            const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
-            if (part?.inlineData?.data) {
-                const buf = Buffer.from(part.inlineData.data, 'base64');
-                const ext = part.inlineData.mimeType.includes('mp3') ? 'mp3' : 'wav';
-                return await uploadToS3(buf, `storyboard/longform/tts/${Date.now()}.${ext}`, part.inlineData.mimeType);
-            }
-        } else {
-            console.warn(`[SB LongForm] ⚠️ Gemini TTS failed with status ${resp.status}, falling back to OpenAI...`);
-        }
-    }
-
-    // Global — OpenAI TTS
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return null;
-    const voice = OPENAI_VOICES[langCode] || 'nova';
-    const resp = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: 'gpt-4o-mini-tts', voice, input: text.substring(0, 4000),
-            instructions: `Speak with a ${emotion}, cinematic advertising voiceover tone.${language !== 'English' ? ` Speak in ${language}.` : ''}`,
-            response_format: 'mp3',
-        }),
-    });
-    if (!resp.ok) return null;
-    const buf = Buffer.from(await resp.arrayBuffer());
-    return await uploadToS3(buf, `storyboard/longform/tts/${Date.now()}.mp3`, 'audio/mpeg');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Split a voiceover script into N roughly equal chunks for per-segment TTS
-// ─────────────────────────────────────────────────────────────────────────────
-function _splitScriptIntoSegments(script, segCount) {
-    if (!script || segCount <= 1) return [script];
-    // Split at sentence boundaries first
-    const sentences = script.split(/(?<=[.!?])\s+/);
-    if (sentences.length <= segCount) {
-        // Fewer sentences than segments — assign one per segment, rest empty
-        const chunks = Array(segCount).fill('');
-        sentences.forEach((s, i) => { if (i < segCount) chunks[i] = s; });
-        return chunks;
-    }
-    // Distribute sentences across segments
-    const chunkSize = Math.ceil(sentences.length / segCount);
-    return Array.from({ length: segCount }, (_, i) =>
-        sentences.slice(i * chunkSize, (i + 1) * chunkSize).join(' ').trim(),
-    );
 }
