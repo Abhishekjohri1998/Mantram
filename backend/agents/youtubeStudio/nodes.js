@@ -167,40 +167,38 @@ export async function analysisNode({ video, brandContext }) {
             .replace(/```(?:json)?\s*\n?/gi, '')
             .trim();
 
+        let analysisText = cleaned;
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
+            analysisText = jsonMatch[0];
             try {
                 analysis = JSON.parse(jsonMatch[0]);
             } catch (parseErr) {
-                // Robust fallback for malformed JSON
                 console.warn(`⚠️ [analysisNode] JSON parse failed, attempting extraction: ${parseErr.message}`);
-                const fixedJson = jsonMatch[0]
-                    .replace(/,\s*([\]}])/g, '$1') // remove trailing commas
-                    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":'); // quote keys
-                try {
-                    analysis = JSON.parse(fixedJson);
-                } catch (e2) {
-                    // Field extraction as last resort
-                    analysis = {};
-                    const stringPairs = jsonMatch[0].matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
-                    for (const [, key, val] of stringPairs) {
-                        if (!analysis[key]) analysis[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            }
+        }
+
+        if (!analysis) {
+            if (!jsonMatch) console.warn(`⚠️ [analysisNode] No JSON braces in response, attempting raw extraction. Raw text: ${cleaned.substring(0, 300)}`);
+            // Field extraction as last resort (works on raw text or jsonMatch)
+            analysis = {};
+            const stringPairs = analysisText.matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
+            for (const [, key, val] of stringPairs) {
+                if (!analysis[key]) analysis[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            }
+            const arrayPairs = analysisText.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
+            for (const [, key, val] of arrayPairs) {
+                if (!analysis[key]) {
+                    if (val.includes('{') && val.includes('}')) {
+                        analysis[key] = [];
+                    } else {
+                        analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
                     }
-                    const arrayPairs = jsonMatch[0].matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
-                    for (const [, key, val] of arrayPairs) {
-                        if (!analysis[key]) {
-                            if (val.includes('{') && val.includes('}')) {
-                                analysis[key] = [];
-                            } else {
-                                analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
-                            }
-                        }
-                    }
-                    if (Object.keys(analysis).length === 0) throw parseErr;
                 }
             }
-        } else {
-            throw new Error('No JSON in Gemini response');
+            if (Object.keys(analysis).length === 0) {
+                throw new Error(`No JSON fields extracted from Gemini response. Raw: ${cleaned.substring(0, 300)}`);
+            }
         }
     } catch (err) {
         clearTimeout(analysisTimeout);
