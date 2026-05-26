@@ -169,7 +169,32 @@ export async function analysisNode({ video, brandContext }) {
 
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            analysis = JSON.parse(jsonMatch[0]);
+            try {
+                analysis = JSON.parse(jsonMatch[0]);
+            } catch (parseErr) {
+                // Robust fallback for malformed JSON
+                console.warn(`⚠️ [analysisNode] JSON parse failed, attempting extraction: ${parseErr.message}`);
+                const fixedJson = jsonMatch[0]
+                    .replace(/,\s*([\]}])/g, '$1') // remove trailing commas
+                    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":'); // quote keys
+                try {
+                    analysis = JSON.parse(fixedJson);
+                } catch (e2) {
+                    // Field extraction as last resort
+                    analysis = {};
+                    const stringPairs = jsonMatch[0].matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
+                    for (const [, key, val] of stringPairs) {
+                        if (!analysis[key]) analysis[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    }
+                    const arrayPairs = jsonMatch[0].matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
+                    for (const [, key, val] of arrayPairs) {
+                        if (!analysis[key]) {
+                            analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                        }
+                    }
+                    if (Object.keys(analysis).length === 0) throw parseErr;
+                }
+            }
         } else {
             throw new Error('No JSON in Gemini response');
         }
