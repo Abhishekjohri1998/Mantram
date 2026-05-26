@@ -189,7 +189,11 @@ export async function analysisNode({ video, brandContext }) {
                     const arrayPairs = jsonMatch[0].matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
                     for (const [, key, val] of arrayPairs) {
                         if (!analysis[key]) {
-                            analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                            if (val.includes('{') && val.includes('}')) {
+                                analysis[key] = [];
+                            } else {
+                                analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                            }
                         }
                     }
                     if (Object.keys(analysis).length === 0) throw parseErr;
