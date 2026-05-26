@@ -878,7 +878,7 @@ Return ONLY a JSON object, no markdown:
                 prompt:      genPrompt, // use original text-only prompt
                 model:       'gpt-image-2',
                 aspectRatio: '16:9',
-                quality:     'hd',
+                quality:     'high',
             }, { provider: 'openai' });
 
             const rawUrl   = typeof fallbackResult === 'string' ? fallbackResult : fallbackResult.imageUrl;
