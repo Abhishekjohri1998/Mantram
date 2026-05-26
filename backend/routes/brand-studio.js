@@ -6,7 +6,7 @@ import { generateEmail } from '../agents/brandStudio/emailBuilder.js';
 import { generateLandingPage, publishToShopify, generateEmbedCode } from '../agents/brandStudio/landingPageBuilder.js';
 import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
-import { callAgentText } from '../agents/shared/agentUtils.js';
+import { callAgentText, callAgent } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
 import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext, generateQuickPost } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
@@ -160,7 +160,7 @@ router.post('/fetch-url', protect, async (req, res) => {
 // Free (no credit cost) — this is context building, not content generation
 router.post('/product-intelligence', protect, async (req, res) => {
     try {
-        const { productImages = [], productData = {}, brief = '', brandId } = req.body;
+        const { productImages = [], productData = {}, brief = '', brandId, productUrl = '' } = req.body;
 
         if (!productImages.length && !productData?.title && !brief) {
             return res.status(400).json({ success: false, error: 'Provide productImages, productData, or brief' });
@@ -168,6 +168,9 @@ router.post('/product-intelligence', protect, async (req, res) => {
 
         console.log(`🎨 PDI: Running product intelligence for "${productData?.title || 'untitled'}" — ${productImages.length} images`);
         const productDNA = await analyzeProductDesign(productImages, productData, brief);
+
+        // Store the original product URL in DNA for downstream use
+        if (productUrl) productDNA.sourceUrl = productUrl;
 
         // Diagnostic log — shows exactly what was classified
         console.log(`✅ PDI Complete: category="${productDNA.productCategory}" | colors=${productDNA.dominantColors?.length || 0} | mood=${productDNA.defaultMoodDirection} | fallback=${productDNA.isFallback || false}`);
@@ -608,126 +611,549 @@ router.delete('/history/:id', protect, async (req, res) => {
     }
 });
 
-// ── POST /api/brand-studio/aplus/analyze-product ─────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ── POST /api/brand-studio/aplus/analyze-product ─────────────────────────────
 // Step 1: Analyze a product URL and return structured product data
+// Enhanced: multi-platform scrapers + AI fallback + blocking S3 mirroring
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── User-Agent Configs ─────────────────────────────────────────────────────
+const DESKTOP_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const MOBILE_UA  = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
+const FETCH_HEADERS = (ua = DESKTOP_UA) => ({
+    'User-Agent': ua,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+});
+
+// ── Helper: filter out garbage images ──────────────────────────────────────
+function isProductImage(src) {
+    if (!src || !src.startsWith('http')) return false;
+    if (src.length < 10) return false;
+    // Skip common non-product images
+    if (/icon|logo|spinner|loader|arrow|badge|star|rating|payment|trust|sprite|pixel|spacer|captcha/i.test(src)) return false;
+    if (/\.svg$/i.test(src)) return false;
+    if (/data:image/i.test(src)) return false;
+    return true;
+}
+
+// ── Amazon Scraper ─────────────────────────────────────────────────────────
+function scrapeAmazon($, html) {
+    // Image source 1: data-a-dynamic-image — extract all resolutions, pick highest
+    const dynamicImages = [];
+    $('img[data-a-dynamic-image]').each((_, el) => {
+        try {
+            const parsed = JSON.parse($(el).attr('data-a-dynamic-image') || '{}');
+            Object.entries(parsed).forEach(([imgUrl, dims]) => {
+                dynamicImages.push({ url: imgUrl, area: (dims[0] || 0) * (dims[1] || 0) });
+            });
+        } catch (_) {}
+    });
+    const sortedDynamic = dynamicImages
+        .sort((a, b) => b.area - a.area)
+        .map(i => i.url)
+        .filter((u, i, arr) => arr.indexOf(u) === i);
+
+    // Image source 2: colorImages JS variable (Amazon embeds full gallery JSON in script)
+    const colorImagesUrls = [];
+    try {
+        const colorMatch = html.match(/'colorImages'\s*:\s*\{\s*'initial'\s*:\s*(\[[\s\S]*?\])\s*\}/m)
+            || html.match(/"colorImages"\s*:\s*\{\s*"initial"\s*:\s*(\[[\s\S]*?\])\s*\}/m);
+        if (colorMatch) {
+            const imgArr = JSON.parse(colorMatch[1]);
+            for (const item of imgArr) {
+                const hiRes = item.hiRes || item.large || item.main?.['1500'] || '';
+                if (hiRes && hiRes.startsWith('http')) colorImagesUrls.push(hiRes);
+            }
+            console.log(`   📸 Amazon colorImages: ${colorImagesUrls.length} hi-res images found`);
+        }
+    } catch (_) {}
+
+    // Image source 3: alt image thumbnails → upscale to full-size
+    const altImgUrls = $('#altImages img, #imageBlock img')
+        .map((_, el) => {
+            const src = $(el).attr('src') || '';
+            return src.replace(/\._[A-Z0-9_,]+_\./g, '._SL1500_.');
+        }).get()
+        .filter(u => u && u.startsWith('http') && !u.includes('transparent') && !u.includes('grey-pixel'));
+
+    // Image source 4: og:image fallback
+    const ogImage = $('meta[property="og:image"]').attr('content');
+
+    const allImages = [...new Set([...colorImagesUrls, ...sortedDynamic, ...altImgUrls, ...(ogImage ? [ogImage] : [])])]
+        .filter(isProductImage)
+        .slice(0, 8);
+
+    return {
+        title: $('#productTitle').text().trim() || $('h1').first().text().trim(),
+        brand: $('#bylineInfo').text().trim().replace(/^Brand:|^Visit the |Store$/g, '').trim() || '',
+        rating: $('#acrPopover').attr('title') || '',
+        reviewCount: $('#acrCustomerReviewText').text().trim(),
+        price: $('.a-price .a-offscreen').first().text().trim(),
+        bulletPoints: $('#feature-bullets li span.a-list-item')
+            .map((_, el) => $(el).text().trim())
+            .get()
+            .filter(t => t.length > 5 && !t.includes('Make sure'))
+            .slice(0, 10),
+        description: $('#productDescription p').text().trim().substring(0, 1000),
+        category: $('#wayfinding-breadcrumbs_feature_div').text().replace(/\s+/g, ' ').trim().substring(0, 200),
+        images: allImages,
+        platform: 'amazon',
+    };
+}
+
+// ── Flipkart Scraper ──────────────────────────────────────────────────────
+function scrapeFlipkart($, html) {
+    // Flipkart stores product data in JSON embedded in script tags
+    let jsonLdProduct = null;
+    $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+            const data = JSON.parse($(el).html());
+            if (data['@type'] === 'Product' || data?.['@graph']?.find(g => g['@type'] === 'Product')) {
+                jsonLdProduct = data['@type'] === 'Product' ? data : data['@graph'].find(g => g['@type'] === 'Product');
+            }
+        } catch (_) {}
+    });
+
+    // Images: Flipkart uses _128.jpg suffix thumbnails — upscale to _832.jpg
+    const imgUrls = [];
+    $('img').each((_, el) => {
+        let src = $(el).attr('src') || $(el).attr('data-src') || '';
+        if (src.includes('rukminim') || src.includes('img1a.flixcart') || src.includes('img.fkcdn')) {
+            src = src.replace(/\/(\d+)\/(\d+)\//g, '/832/832/');
+            src = src.replace(/_\d+\./, '_832.');
+            if (isProductImage(src) && !imgUrls.includes(src)) imgUrls.push(src);
+        }
+    });
+
+    const ogImage = $('meta[property="og:image"]').attr('content');
+    if (ogImage && !imgUrls.includes(ogImage)) imgUrls.unshift(ogImage);
+
+    // Extract JSON-LD images
+    if (jsonLdProduct?.image) {
+        const ldImages = [].concat(jsonLdProduct.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean);
+        for (const u of ldImages) { if (!imgUrls.includes(u)) imgUrls.push(u); }
+    }
+
+    // Title: Flipkart uses dynamic class names; try JSON-LD first, then h1, then og:title
+    const title = jsonLdProduct?.name
+        || $('h1 span').first().text().trim()
+        || $('h1').first().text().trim()
+        || $('meta[property="og:title"]').attr('content') || '';
+
+    // Price
+    const price = jsonLdProduct?.offers?.price
+        || $('div[class*="_30jeq3"]').first().text().trim()
+        || $('div[class*="CEmiEU"]').first().text().trim()
+        || $('[class*="price"]').first().text().trim();
+
+    // Features / bullet points
+    const bullets = [];
+    $('li[class*="_21Ahn-"], li[class*="column"], div[class*="_2418kt"] li, table[class*="_14cfVK"] tr').each((_, el) => {
+        const txt = $(el).text().trim().replace(/\s+/g, ' ');
+        if (txt.length > 8 && txt.length < 300 && bullets.length < 12) bullets.push(txt);
+    });
+
+    // Description
+    const description = jsonLdProduct?.description
+        || $('meta[name="description"]').attr('content')
+        || $('div[class*="_1mXcCf"]').text().trim()
+        || '';
+
+    // Category from breadcrumbs
+    const category = $('div[class*="_1MR4o5"] a, div[class*="_2whKao"] a').map((_, el) => $(el).text().trim()).get().join(' > ');
+
+    console.log(`   📦 Flipkart scraper: "${title}" — ${imgUrls.length} images`);
+
+    return {
+        title,
+        brand: jsonLdProduct?.brand?.name || '',
+        rating: jsonLdProduct?.aggregateRating?.ratingValue || '',
+        reviewCount: jsonLdProduct?.aggregateRating?.reviewCount || '',
+        price: typeof price === 'number' ? `₹${price}` : (price || ''),
+        bulletPoints: bullets,
+        description: (description || '').substring(0, 1000),
+        category,
+        images: imgUrls.filter(isProductImage).slice(0, 8),
+        platform: 'flipkart',
+    };
+}
+
+// ── Myntra Scraper ────────────────────────────────────────────────────────
+function scrapeMyntra($, html) {
+    // Myntra embeds product data in window.__myx = { pdpData: ... }
+    let pdpData = null;
+    try {
+        const pdpMatch = html.match(/window\.__myx\s*=\s*(\{[\s\S]*?\});\s*<\/script>/m)
+            || html.match(/"pdpData"\s*:\s*(\{[\s\S]*?\})\s*[,}]/m);
+        if (pdpMatch) {
+            const parsed = JSON.parse(pdpMatch[1]);
+            pdpData = parsed.pdpData || parsed;
+        }
+    } catch (_) {}
+
+    // Fallback: JSON-LD
+    let jsonLdProduct = null;
+    $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+            const data = JSON.parse($(el).html());
+            if (data['@type'] === 'Product') jsonLdProduct = data;
+        } catch (_) {}
+    });
+
+    const product = pdpData?.product || pdpData || {};
+
+    // Images: Myntra uses h_($height), w_($width) in URLs
+    const imgUrls = [];
+    if (product.media?.albums?.default?.images) {
+        for (const img of product.media.albums.default.images) {
+            let src = img.imageURL || img.secureSrc || '';
+            src = src.replace(/h_\d+,w_\d+/g, 'h_1080,w_1080');
+            if (isProductImage(src)) imgUrls.push(src);
+        }
+    }
+    // Fallback images from page
+    if (!imgUrls.length) {
+        $('img[class*="image-grid"], img[class*="pdp-image"]').each((_, el) => {
+            let src = $(el).attr('src') || '';
+            src = src.replace(/h_\d+,w_\d+/g, 'h_1080,w_1080');
+            if (isProductImage(src) && !imgUrls.includes(src)) imgUrls.push(src);
+        });
+    }
+    const ogImage = $('meta[property="og:image"]').attr('content');
+    if (ogImage && !imgUrls.includes(ogImage)) imgUrls.unshift(ogImage);
+    if (jsonLdProduct?.image) {
+        const ldImgs = [].concat(jsonLdProduct.image).filter(Boolean);
+        for (const u of ldImgs) { if (!imgUrls.includes(u)) imgUrls.push(u); }
+    }
+
+    const title = product.name || jsonLdProduct?.name || $('h1').first().text().trim() || $('meta[property="og:title"]').attr('content') || '';
+    const price = product.price?.discounted || product.mrp || jsonLdProduct?.offers?.price || $('[class*="price"]').first().text().trim();
+
+    const bullets = [];
+    // Myntra product descriptors
+    if (product.descriptors) {
+        for (const desc of product.descriptors) {
+            if (desc.description && bullets.length < 8) bullets.push(desc.description);
+        }
+    }
+    if (!bullets.length) {
+        $('div[class*="index-tableContainer"] tr, div[class*="pdp-productDescriptors"] li').each((_, el) => {
+            const txt = $(el).text().trim().replace(/\s+/g, ' ');
+            if (txt.length > 5 && txt.length < 300 && bullets.length < 8) bullets.push(txt);
+        });
+    }
+
+    console.log(`   👗 Myntra scraper: "${title}" — ${imgUrls.length} images`);
+
+    return {
+        title,
+        brand: product.brand?.name || jsonLdProduct?.brand?.name || '',
+        rating: product.ratings?.averageRating || '',
+        reviewCount: product.ratings?.totalCount || '',
+        price: typeof price === 'number' ? `₹${price}` : (price || ''),
+        bulletPoints: bullets,
+        description: (product.description || jsonLdProduct?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
+        category: product.masterCategory?.typeName || '',
+        images: imgUrls.filter(isProductImage).slice(0, 8),
+        platform: 'myntra',
+    };
+}
+
+// ── Nykaa Scraper ─────────────────────────────────────────────────────────
+function scrapeNykaa($, html) {
+    // Nykaa uses __PRELOADED_STATE__ or window.__INITIAL_STATE__
+    let productState = null;
+    try {
+        const stateMatch = html.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});\s*<\/script>/m)
+            || html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});\s*<\/script>/m);
+        if (stateMatch) productState = JSON.parse(stateMatch[1]);
+    } catch (_) {}
+
+    // JSON-LD fallback
+    let jsonLdProduct = null;
+    $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+            const data = JSON.parse($(el).html());
+            if (data['@type'] === 'Product') jsonLdProduct = data;
+        } catch (_) {}
+    });
+
+    // Try to find product in preloaded state
+    const pp = productState?.productPage?.product || productState?.product || {};
+
+    const imgUrls = [];
+    if (pp.imageUrls?.length) {
+        for (const u of pp.imageUrls) if (isProductImage(u)) imgUrls.push(u);
+    }
+    const ogImage = $('meta[property="og:image"]').attr('content');
+    if (ogImage && !imgUrls.includes(ogImage)) imgUrls.unshift(ogImage);
+    if (jsonLdProduct?.image) {
+        const ldImgs = [].concat(jsonLdProduct.image).filter(Boolean);
+        for (const u of ldImgs) { if (!imgUrls.includes(u)) imgUrls.push(u); }
+    }
+    // Fallback: all nykaa CDN images
+    if (!imgUrls.length) {
+        $('img[src*="nykaa"]').each((_, el) => {
+            const src = $(el).attr('src') || '';
+            if (isProductImage(src) && !imgUrls.includes(src)) imgUrls.push(src);
+        });
+    }
+
+    const title = pp.name || jsonLdProduct?.name || $('h1').first().text().trim() || '';
+    const price = pp.offerPrice || pp.mrp || jsonLdProduct?.offers?.price || '';
+
+    const bullets = [];
+    if (pp.description) bullets.push(pp.description);
+    $('div[class*="product-description"] li, div[class*="product-keyFeature"] div').each((_, el) => {
+        const txt = $(el).text().trim().replace(/\s+/g, ' ');
+        if (txt.length > 5 && txt.length < 300 && bullets.length < 8) bullets.push(txt);
+    });
+
+    console.log(`   💄 Nykaa scraper: "${title}" — ${imgUrls.length} images`);
+
+    return {
+        title,
+        brand: pp.brandName || jsonLdProduct?.brand?.name || '',
+        rating: pp.rating || '',
+        reviewCount: pp.reviewCount || '',
+        price: typeof price === 'number' ? `₹${price}` : (price || ''),
+        bulletPoints: bullets,
+        description: (pp.description || jsonLdProduct?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
+        category: pp.categoryName || '',
+        images: imgUrls.filter(isProductImage).slice(0, 8),
+        platform: 'nykaa',
+    };
+}
+
+// ── Generic / Shopify Scraper ─────────────────────────────────────────────
+function scrapeGeneric($, url) {
+    const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
+        try { return JSON.parse($(el).html()); } catch (_) { return null; }
+    }).get().filter(Boolean).find(d => d?.['@type'] === 'Product');
+
+    const jsonLdImages = jsonLd?.image ? [].concat(jsonLd.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean) : [];
+    const ogImages = $('meta[property="og:image"]').map((_, el) => $(el).attr('content')).get().filter(Boolean);
+    const shopifyImages = $('img[src*="cdn.shopify"]').map((_, el) => {
+        return ($(el).attr('src') || '').replace(/_\d+x(\d+)?\./, '_2048x2048.');
+    }).get().filter(Boolean);
+
+    return {
+        title: jsonLd?.name || $('h1').first().text().trim(),
+        brand: jsonLd?.brand?.name || '',
+        price: jsonLd?.offers?.[0]?.price || jsonLd?.offers?.price || $('[class*="price"]').first().text().trim(),
+        description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
+        bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 300).slice(0, 8),
+        images: [...new Set([...jsonLdImages, ...ogImages, ...shopifyImages])].filter(isProductImage).slice(0, 8),
+        category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
+        platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web',
+    };
+}
+
+// ── AI-Powered Universal Fallback Scraper ─────────────────────────────────
+// Uses Gemini to analyze the URL and extract product data when HTML fails
+async function aiProductScraper(url, partialProduct = {}) {
+    console.log(`   🤖 AI Fallback Scraper: Analyzing ${url} via Gemini...`);
+    try {
+        const result = await callAgent(
+            `You are an expert product analyst. The user will give you a product URL.
+Your task: analyze the URL and extract structured product information.
+You MUST return ONLY valid JSON. No markdown fences, no explanation.
+
+IMPORTANT: Focus on extracting the EXACT product shown at this URL. Do NOT fabricate data.
+If you cannot determine a field, use an empty string.`,
+            `Product URL: ${url}
+
+Partial data already scraped (may be incomplete or empty):
+Title: "${partialProduct.title || ''}"
+Brand: "${partialProduct.brand || ''}"
+Price: "${partialProduct.price || ''}"
+Images found: ${partialProduct.images?.length || 0}
+
+Analyze this product URL and extract:
+{
+  "title": "Exact product name as shown on the page",
+  "brand": "Brand name",
+  "price": "Price with currency symbol",
+  "description": "Product description (max 500 chars)",
+  "bulletPoints": ["key feature 1", "key feature 2", ...up to 6],
+  "category": "Product category (e.g. 'Wireless Earbuds', 'Face Moisturiser')",
+  "images": ["direct image URL 1", "direct image URL 2", ...up to 6 — these MUST be real URLs, not guesses]
+}
+
+CRITICAL: Only include image URLs you are CERTAIN exist. If unsure, return an empty images array.
+For Amazon products, image URLs follow: https://m.media-amazon.com/images/I/<id>._SL1500_.jpg
+For Flipkart, they follow: https://rukminim2.flixcart.com/image/<size>/<path>`,
+            0.2, 1500,
+            { provider: 'gemini', model: 'gemini-2.5-flash', timeoutMs: 25000 }
+        );
+
+        if (result?.title) {
+            console.log(`   ✅ AI Scraper: "${result.title}" — ${result.images?.length || 0} images extracted`);
+            return {
+                ...result,
+                images: (result.images || []).filter(isProductImage).slice(0, 8),
+                platform: partialProduct.platform || 'ai_extracted',
+                aiExtracted: true,
+            };
+        }
+    } catch (err) {
+        console.warn(`   ⚠️ AI Scraper failed: ${err.message}`);
+    }
+    return null;
+}
+
+// ── Determine if scrape result is valid ────────────────────────────────────
+function isScrapeValid(product) {
+    if (!product) return false;
+    // Must have a title that doesn't look like an error page
+    if (!product.title || product.title.length < 3) return false;
+    if (/oops|something went wrong|access denied|captcha|page not found|robot|verify|blocked/i.test(product.title)) return false;
+    return true;
+}
+
+// ── Main Route ────────────────────────────────────────────────────────────
 router.post('/aplus/analyze-product', protect, async (req, res) => {
     try {
         const { url } = req.body;
         if (!url) return res.status(400).json({ success: false, error: 'url required' });
 
-        console.log(`\ud83d\udd0d A+ Scraper: Fetching ${url}`);
+        console.log(`🔍 Product Scraper: Fetching ${url}`);
 
-        const fetchRes = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            timeout: 20000
-        });
-        const html = await fetchRes.text();
-        const $ = cheerio.load(html);
+        // ── Step 1: Detect platform and fetch HTML ────────────────────────────
+        let html = '';
+        let $;
+        let product = null;
 
-        let product = {};
+        const platform = url.includes('amazon.') ? 'amazon'
+            : url.includes('flipkart.com') ? 'flipkart'
+            : url.includes('myntra.com') ? 'myntra'
+            : (url.includes('nykaa.com') || url.includes('nykaaman.com') || url.includes('nykaafashion.com')) ? 'nykaa'
+            : 'generic';
 
-        if (url.includes('amazon.')) {
-            // Image source 1: data-a-dynamic-image — extract all resolutions, pick highest
-            const dynamicImages = [];
-            $('img[data-a-dynamic-image]').each((_, el) => {
-                try {
-                    const parsed = JSON.parse($(el).attr('data-a-dynamic-image') || '{}');
-                    Object.entries(parsed).forEach(([imgUrl, dims]) => {
-                        dynamicImages.push({ url: imgUrl, area: (dims[0] || 0) * (dims[1] || 0) });
-                    });
-                } catch (_) {}
-            });
-            const sortedDynamic = dynamicImages
-                .sort((a, b) => b.area - a.area)
-                .map(i => i.url)
-                .filter((u, i, arr) => arr.indexOf(u) === i);
+        console.log(`   🏷️  Platform detected: ${platform}`);
 
-            // Image source 2: alt image thumbnails → upscale to full-size
-            const altImgUrls = $('#altImages img, #imageBlock img')
-                .map((_, el) => {
-                    const src = $(el).attr('src') || '';
-                    return src.replace(/\._[A-Z0-9_,]+_\./g, '._SL1500_.');
-                }).get()
-                .filter(u => u && u.startsWith('http') && !u.includes('transparent') && !u.includes('grey-pixel'));
-
-            // Image source 3: og:image fallback
-            const ogImage = $('meta[property="og:image"]').attr('content');
-
-            const allImages = [...new Set([...sortedDynamic, ...altImgUrls, ...(ogImage ? [ogImage] : [])])]
-                .filter(u => u && u.startsWith('http'))
-                .slice(0, 8);
-
-            product = {
-                title: $('#productTitle').text().trim() || $('h1').first().text().trim(),
-                brand: $('#bylineInfo').text().trim().replace(/^Brand:|^Visit the |Store$/g, '').trim() || '',
-                rating: $('#acrPopover').attr('title') || '',
-                reviewCount: $('#acrCustomerReviewText').text().trim(),
-                price: $('.a-price .a-offscreen').first().text().trim(),
-                bulletPoints: $('#feature-bullets li span.a-list-item')
-                    .map((_, el) => $(el).text().trim())
-                    .get()
-                    .filter(t => t.length > 5 && !t.includes('Make sure'))
-                    .slice(0, 10),
-                description: $('#productDescription p').text().trim().substring(0, 1000),
-                category: $('#wayfinding-breadcrumbs_feature_div').text().replace(/\s+/g, ' ').trim().substring(0, 200),
-                images: allImages,
-                platform: 'amazon'
-            };
-
-        } else {
-            // Generic / Shopify scraper
-            const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
-                try { return JSON.parse($(el).html()); } catch (_) { return null; }
-            }).get().filter(Boolean).find(d => d?.['@type'] === 'Product');
-
-            const jsonLdImages = jsonLd?.image ? [].concat(jsonLd.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean) : [];
-            const ogImages = $('meta[property="og:image"]').map((_, el) => $(el).attr('content')).get().filter(Boolean);
-            const shopifyImages = $('img[src*="cdn.shopify"]').map((_, el) => {
-                return ($(el).attr('src') || '').replace(/_\d+x(\d+)?\./, '_2048x2048.');
-            }).get().filter(Boolean);
-
-            product = {
-                title: jsonLd?.name || $('h1').first().text().trim(),
-                brand: jsonLd?.brand?.name || '',
-                price: jsonLd?.offers?.[0]?.price || $('[class*="price"]').first().text().trim(),
-                description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
-                bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 300).slice(0, 8),
-                images: [...new Set([...jsonLdImages, ...ogImages, ...shopifyImages])].slice(0, 8),
-                category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
-                platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web'
-            };
+        // Fetch with desktop UA first
+        try {
+            const fetchRes = await fetch(url, { headers: FETCH_HEADERS(DESKTOP_UA), redirect: 'follow', timeout: 20000 });
+            html = await fetchRes.text();
+            $ = cheerio.load(html);
+        } catch (fetchErr) {
+            console.warn(`   ⚠️ Desktop fetch failed: ${fetchErr.message}`);
         }
 
-        console.log(`\u2705 Scraped: "${product.title}" \u2014 ${product.images?.length || 0} images, ${product.bulletPoints?.length || 0} bullets`);
+        // ── Step 2: Run platform-specific scraper ─────────────────────────────
+        if (html && $) {
+            switch (platform) {
+                case 'amazon':   product = scrapeAmazon($, html); break;
+                case 'flipkart': product = scrapeFlipkart($, html); break;
+                case 'myntra':   product = scrapeMyntra($, html); break;
+                case 'nykaa':    product = scrapeNykaa($, html); break;
+                default:         product = scrapeGeneric($, url); break;
+            }
+        }
+
+        // ── Step 3: Retry with mobile UA if scrape looks empty ─────────────────
+        if (!isScrapeValid(product) || (product && (!product.images?.length || !product.title))) {
+            console.log(`   🔄 Retrying with mobile User-Agent...`);
+            try {
+                const mobileRes = await fetch(url, { headers: FETCH_HEADERS(MOBILE_UA), redirect: 'follow', timeout: 20000 });
+                const mobileHtml = await mobileRes.text();
+                const $m = cheerio.load(mobileHtml);
+
+                let mobileProduct;
+                switch (platform) {
+                    case 'amazon':   mobileProduct = scrapeAmazon($m, mobileHtml); break;
+                    case 'flipkart': mobileProduct = scrapeFlipkart($m, mobileHtml); break;
+                    case 'myntra':   mobileProduct = scrapeMyntra($m, mobileHtml); break;
+                    case 'nykaa':    mobileProduct = scrapeNykaa($m, mobileHtml); break;
+                    default:         mobileProduct = scrapeGeneric($m, url); break;
+                }
+
+                // Use mobile result if it's better
+                if (isScrapeValid(mobileProduct)) {
+                    const mobileImages = mobileProduct.images?.length || 0;
+                    const desktopImages = product?.images?.length || 0;
+                    if (mobileImages > desktopImages || !isScrapeValid(product)) {
+                        product = mobileProduct;
+                        console.log(`   ✅ Mobile scrape succeeded: "${product.title}" — ${product.images?.length || 0} images`);
+                    }
+                }
+            } catch (mobileErr) {
+                console.warn(`   ⚠️ Mobile fetch also failed: ${mobileErr.message}`);
+            }
+        }
+
+        // ── Step 4: AI Fallback — Gemini web-grounded analysis ────────────────
+        if (!isScrapeValid(product) || (product && !product.images?.length)) {
+            console.log(`   🤖 HTML scrape insufficient (title="${product?.title || ''}", images=${product?.images?.length || 0}) — invoking AI fallback...`);
+            const aiResult = await aiProductScraper(url, product || {});
+            if (aiResult && isScrapeValid(aiResult)) {
+                // Merge: AI result fills gaps, HTML result keeps what it found
+                if (product && isScrapeValid(product)) {
+                    // Prefer HTML title if valid, AI images if more
+                    product.title = product.title || aiResult.title;
+                    product.brand = product.brand || aiResult.brand;
+                    product.price = product.price || aiResult.price;
+                    product.description = product.description || aiResult.description;
+                    if (!product.bulletPoints?.length) product.bulletPoints = aiResult.bulletPoints || [];
+                    if (!product.images?.length) product.images = aiResult.images || [];
+                    if (!product.category) product.category = aiResult.category || '';
+                    product.aiEnriched = true;
+                } else {
+                    product = aiResult;
+                }
+                console.log(`   ✅ AI fallback merged: "${product.title}" — ${product.images?.length || 0} images`);
+            }
+        }
+
+        // Final fallback: if still nothing, return what we have
+        if (!product) {
+            product = { title: '', brand: '', images: [], bulletPoints: [], description: '', platform: 'failed' };
+        }
+
+        console.log(`✅ Scraped: "${product.title}" — ${product.images?.length || 0} images, ${product.bulletPoints?.length || 0} bullets [${product.platform}${product.aiExtracted ? ' +AI' : ''}${product.aiEnriched ? ' +AI-enriched' : ''}]`);
         if (product.images?.length) {
             console.log(`   First images: ${product.images.slice(0, 2).map(u => u.substring(0, 70)).join(' | ')}`);
         } else {
-            console.warn(`   \u26a0\ufe0f  No images found \u2014 PDI will run text-only. URL may require login or bot protection.`);
+            console.warn(`   ⚠️  No images found — PDI will run text-only. URL may require login or bot protection.`);
         }
 
-        // ── Mirror top 4 product images to S3 for permanent storage (non-blocking) ──
+        // ── Step 5: Mirror top 4 product images to S3 (BLOCKING) ──────────────
         // Scraped URLs (Amazon CDN, etc.) can expire — S3 copies persist forever
-        // Fire-and-forget: response is sent immediately; S3 copies happen in background
+        // BLOCKING: wait for persisted images so PDI always gets permanent URLs
         if (product.images?.length > 0) {
             const userId = req.user._id;
-            Promise.all(product.images.slice(0, 4).map(async (imgUrl, i) => {
-                try {
-                    const s3Key = `product-library/${userId}/${Date.now()}-${i}-product.jpg`;
-                    return await mirrorUrlToS3(imgUrl, s3Key) || imgUrl;
-                } catch (e) { return imgUrl; }
-            })).then(persistedImages => {
+            try {
+                const persistedImages = await Promise.all(
+                    product.images.slice(0, 4).map(async (imgUrl, i) => {
+                        try {
+                            const s3Key = `product-library/${userId}/${Date.now()}-${i}-product.jpg`;
+                            return await mirrorUrlToS3(imgUrl, s3Key) || imgUrl;
+                        } catch (e) { return imgUrl; }
+                    })
+                );
                 product.persistedImages = persistedImages;
-                console.log(`📦 Mirrored ${persistedImages.filter(u => u.includes('amazonaws')).length}/${persistedImages.length} images to S3`);
-            }).catch(e => console.warn('⚠️ S3 mirroring failed (non-critical):', e.message));
+                const s3Count = persistedImages.filter(u => u.includes('amazonaws')).length;
+                console.log(`📦 Mirrored ${s3Count}/${persistedImages.length} images to S3`);
+                // Replace original images with persisted S3 URLs where available
+                product.images = product.images.map((origUrl, i) => {
+                    if (i < persistedImages.length && persistedImages[i].includes('amazonaws')) {
+                        return persistedImages[i];
+                    }
+                    return origUrl;
+                });
+            } catch (e) {
+                console.warn('⚠️ S3 mirroring failed (non-critical):', e.message);
+            }
         }
 
         res.json({ success: true, product });
     } catch (err) {
-        console.error('\u274c A+ analyze-product:', err.message);
+        console.error('❌ A+ analyze-product:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
