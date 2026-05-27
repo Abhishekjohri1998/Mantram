@@ -1293,121 +1293,11 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (
             }
         }
 
-        // ── Generate voiceover if requested ──
+        // ── Voiceover generation (removed) ──
         let voiceoverUrl = null;
-        if (session.voiceover?.enabled && storyboard.voiceoverScript) {
-            try {
-                const voProvider = session.voiceover.provider || 'minimax';
-                console.log(`   🎙️ Generating voiceover: ${voProvider}`);
 
-                if (voProvider === 'minimax' || voProvider === 'elevenlabs') {
-                    const falKey = process.env.FAL_API_KEY;
-                    if (falKey) {
-                        let ttsApiUrl, ttsPayload;
-                        if (voProvider === 'elevenlabs') {
-                            ttsApiUrl = 'https://fal.run/fal-ai/elevenlabs/tts/eleven-v3';
-                            ttsPayload = {
-                                text: storyboard.voiceoverScript,
-                                voice: session.voiceover.voiceId || 'Rachel'
-                            };
-                        } else {
-                            ttsApiUrl = 'https://fal.run/fal-ai/minimax/speech-02-hd';
-                            ttsPayload = {
-                                text: storyboard.voiceoverScript,
-                                voice_setting: { voice_id: session.voiceover.voiceId || 'Deep_Voice_Man', speed: session.voiceover.speed || 1.0 }
-                            };
-                        }
-                        // Use synchronous fal.run endpoint with timeout to guarantee completion
-                        const ttsResp = await fetch(ttsApiUrl, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify(ttsPayload),
-                            signal: AbortSignal.timeout(120000), // 120s for long scripts
-                        });
-                        if (ttsResp.ok) {
-                            const ttsData = await ttsResp.json();
-                            const rawAudioUrl = ttsData.audio?.url || ttsData.audio_url || ttsData.audio_file?.url || ttsData.url;
-                            if (rawAudioUrl) {
-                                // Mirror to S3 immediately so URL stays valid for compile
-                                try {
-                                    const audioResp = await fetch(rawAudioUrl, { signal: AbortSignal.timeout(20000) });
-                                    const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
-                                    const s3Key = `agent-vo/${req.user._id}/${Date.now()}.mp3`;
-                                    voiceoverUrl = await uploadToS3(audioBuffer, s3Key, 'audio/mpeg');
-                                    console.log(`   ✅ Voiceover mirrored to S3: ${voiceoverUrl.substring(0, 60)}`);
-                                } catch (mirrorErr) {
-                                    console.warn(`   ⚠️ S3 mirror failed, using raw URL:`, mirrorErr.message);
-                                    voiceoverUrl = rawAudioUrl;
-                                }
-                            }
-                        } else {
-                            console.warn(`   ⚠️ ${voProvider} generation failed:`, await ttsResp.text());
-                        }
-                    }
-                } else if (voProvider === 'sarvam') {
-                    // Replaced Sarvam with Gemini 3.1 Flash TTS for regional languages
-                    const geminiKey = process.env.GEMINI_API_KEY;
-                    if (geminiKey) {
-                        const promptText = `Please speak the following text fluently in regional language with an expressive tone:\n\n${storyboard.voiceoverScript.substring(0, 2000)}`;
-                        
-                        const ttsResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: promptText }] }],
-                                generationConfig: {
-                                    responseModalities: ['AUDIO'],
-                                    speechConfig: {
-                                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } }
-                                    }
-                                }
-                            }),
-                        });
-                        if (ttsResp.ok) {
-                            const ttsData = await ttsResp.json();
-                            const audioPart = ttsData.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.mimeType?.startsWith('audio/'));
-                            if (audioPart?.inlineData?.data) {
-                                const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
-                                const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
-                                const ext = mimeType.includes('mp3') ? 'mp3' : 'wav';
-                                const s3Key = `agent-vo/${req.user._id}/${Date.now()}.${ext}`;
-                                voiceoverUrl = await uploadToS3(buffer, s3Key, mimeType);
-                            }
-                        } else {
-                            console.warn(`   ⚠️ Gemini TTS generation failed:`, await ttsResp.text());
-                        }
-                    }
-                }
-            } catch (voErr) {
-                console.error('   ⚠️ Voiceover generation failed:', voErr.message);
-            }
-        }
-
-        // ── Generate AI background music if requested ──
+        // ── AI background music generation (removed) ──
         let musicUrl = null;
-        if (session.music?.enabled) {
-            try {
-                const falKey = process.env.FAL_API_KEY;
-                if (falKey) {
-                    const musicMood = storyboard.suggestedMusicMood || session.music.mood || 'corporate';
-                    const musicDuration = Math.min(storyboard.totalDuration || 30, 60);
-                    const musicPrompt = `${musicMood} background music for a ${storyboard.title || 'brand'} video. Professional, modern, suitable for advertising. No vocals. Duration: ${musicDuration} seconds.`;
-
-                    const musicResp = await fetch('https://queue.fal.run/fal-ai/stable-audio', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Key ' + falKey, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: musicPrompt, seconds_total: musicDuration, steps: 100 }),
-                    });
-                    if (musicResp.ok) {
-                        const musicData = await musicResp.json();
-                        if (musicData.request_id) musicUrl = 'fal-pending:' + musicData.request_id;
-                        else if (musicData.audio_file?.url) musicUrl = musicData.audio_file.url;
-                    }
-                }
-            } catch (musicErr) {
-                console.error('   ⚠️ AI music gen failed:', musicErr.message);
-            }
-        }
 
         // Update session
         await AgentSession.findOneAndUpdate({ sessionId }, { status: 'generating', sceneProjects });
@@ -1488,27 +1378,7 @@ router.post('/compile', protect, async (req, res) => {
                 clipPaths.push(clipPath);
             }
 
-            // Step 2: Download voiceover if provided
-            let voiceoverPath = null;
-            if (voiceover?.audioUrl) {
-                console.log(`   🎙️ Downloading voiceover...`);
-                voiceoverPath = path.join(tmpDir, 'voiceover.wav');
-                const voResp = await fetch(voiceover.audioUrl, { signal: AbortSignal.timeout(30000) });
-                if (voResp.ok) {
-                    fs.writeFileSync(voiceoverPath, Buffer.from(await voResp.arrayBuffer()));
-                }
-            }
-
-            // Step 3: Download music if provided
-            let musicPath = null;
-            if (music?.audioUrl && !music.audioUrl.startsWith('blob:')) {
-                console.log(`   🎵 Downloading music track...`);
-                musicPath = path.join(tmpDir, 'music.mp3');
-                const musicResp = await fetch(music.audioUrl, { signal: AbortSignal.timeout(30000) });
-                if (musicResp.ok) {
-                    fs.writeFileSync(musicPath, Buffer.from(await musicResp.arrayBuffer()));
-                }
-            }
+            // Step 2: Audio logic removed (no longer mixing music or TTS here)
 
             // Step 4: Try FFmpeg compilation
             let outputPath = path.join(tmpDir, 'compiled.mp4');
@@ -1525,43 +1395,9 @@ router.post('/compile', protect, async (req, res) => {
                 const concatContent = clipPaths.map(p => `file '${p}'`).join('\n');
                 fs.writeFileSync(concatFile, concatContent);
 
-                // Build ffmpeg command
-                let ffmpegCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatFile}"`;
+                // Build ffmpeg command for simple concat
+                let ffmpegCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatFile}" -c copy`;
 
-                // Add voiceover as audio overlay
-                if (voiceoverPath && fs.existsSync(voiceoverPath)) {
-                    ffmpegCmd += ` -i "${voiceoverPath}"`;
-                }
-
-                // Add music as audio overlay
-                if (musicPath && fs.existsSync(musicPath)) {
-                    ffmpegCmd += ` -i "${musicPath}"`;
-                }
-
-                // Build filter complex for audio mixing
-                const audioInputs = [];
-                let inputIdx = 1; // 0 is video concat
-                if (voiceoverPath && fs.existsSync(voiceoverPath)) {
-                    audioInputs.push({ idx: inputIdx++, volume: 1.0, label: 'vo' });
-                }
-                if (musicPath && fs.existsSync(musicPath)) {
-                    audioInputs.push({ idx: inputIdx++, volume: music?.volume || 0.3, label: 'music' });
-                }
-
-                if (audioInputs.length > 0) {
-                    let filterComplex = '';
-                    const mixInputs = ['[0:a]']; // original video audio
-
-                    audioInputs.forEach(a => {
-                        filterComplex += `[${a.idx}:a]volume=${a.volume}[${a.label}];`;
-                        mixInputs.push(`[${a.label}]`);
-                    });
-
-                    filterComplex += `${mixInputs.join('')}amix=inputs=${mixInputs.length}:duration=longest[aout]`;
-                    ffmpegCmd += ` -filter_complex "${filterComplex}" -map 0:v -map "[aout]"`;
-                } else {
-                    ffmpegCmd += ` -c copy`;
-                }
 
                 ffmpegCmd += ` -movflags +faststart "${outputPath}"`;
 
@@ -1588,8 +1424,7 @@ router.post('/compile', protect, async (req, res) => {
                         clipUrls.push(url);
                     }
 
-                    // Upload voiceover separately if present
-                    let voiceoverUrl = voiceover?.audioUrl || null;
+                    let voiceoverUrl = null;
 
                     // Clean up
                     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -7302,12 +7137,20 @@ router.post('/long-form/generate', protect, async (req, res) => {
         // Credit check
         const costEst = estimateLongFormCost(model || 'seedance-2.0', dur, settings?.resolution || '1080p', settings?.quality || 'fast');
         const user = req.user;
-        if (user.creditsRemaining < costEst.totalCredits) {
+        // Credit check — creditsRemaining is a Mongoose virtual; if user was fetched
+        // with .lean() it won't exist. Compute inline as a defensive fallback.
+        const remaining = user.creditsRemaining ?? (() => {
+            if (user.role === 'superadmin' || user.plan === 'enterprise') return Infinity;
+            const c = user.credits || {};
+            const topUp = (c.topUp > 0 && c.topUpExpiry && new Date(c.topUpExpiry) > new Date()) ? c.topUp : 0;
+            return Math.max(0, ((c.total || 0) + (c.bonus || 0) + topUp) - (c.used || 0));
+        })();
+        if (remaining < costEst.totalCredits) {
             return res.status(402).json({
                 success: false,
-                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${user.creditsRemaining}.`,
+                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${remaining}.`,
                 required: costEst.totalCredits,
-                available: user.creditsRemaining,
+                available: remaining,
             });
         }
 

@@ -550,7 +550,7 @@ router.post('/:id/use', protect, async (req, res) => {
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': reqAuthHeader || '',
-                            'X-Skip-Credits': 'true'
+                            'X-Internal-Secret': process.env.INTERNAL_JOB_SECRET || ''
                         },
                         body: JSON.stringify({ jobId, prompt: promptData.finalPrompt, visionInputs: promptData.visionInputs, settings: promptData.settings })
                     });
@@ -561,7 +561,7 @@ router.post('/:id/use', protect, async (req, res) => {
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': reqAuthHeader || '',
-                            'X-Skip-Credits': 'true'
+                            'X-Internal-Secret': process.env.INTERNAL_JOB_SECRET || ''
                         },
                         body: JSON.stringify({ jobId, prompt: promptData.finalPrompt, topic: promptData.finalPrompt })
                     });

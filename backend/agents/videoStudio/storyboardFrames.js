@@ -88,9 +88,10 @@ export async function generateStoryboardPoster(
     
     if (hasProductRefs || hasAvatarRef || hasLogoRef) {
         finalPrompt += `\n\nCRITICAL INSTRUCTION: You have been provided with reference images. You MUST use them exactly as they appear.`;
-        if (hasProductRefs) finalPrompt += ` The product in the storyboard MUST perfectly match the attached product reference image (exact shape, color, branding).`;
-        if (hasAvatarRef) finalPrompt += ` The presenter in the storyboard MUST perfectly match the attached face/avatar reference image.`;
-        if (hasLogoRef) finalPrompt += ` The brand logo in the storyboard MUST perfectly match the attached logo reference image.`;
+        finalPrompt += ` IMPORTANT: Do NOT confuse the human character with the product! Keep them entirely separate.`;
+        if (hasProductRefs) finalPrompt += ` The PRODUCT to feature in the scene MUST perfectly match the attached product reference (exact shape, color, branding).`;
+        if (hasAvatarRef) finalPrompt += ` The HUMAN CHARACTER/PRESENTER in the scene MUST perfectly match the attached human face/avatar reference. Do NOT mix product features onto the human face.`;
+        if (hasLogoRef) finalPrompt += ` The brand logo MUST perfectly match the attached logo reference.`;
         finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos.`;
     }
 
@@ -148,14 +149,14 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
     // 1. Collect Product Images
     if (rawProductBuffers.length > 0) {
         for (const rb of rawProductBuffers) {
-            if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg' });
+            if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: 'product' });
         }
     } else if (productImageUrls.length > 0) {
         const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
         for (const url of urlsToFetch) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(url);
-                refBuffers.push({ buffer, mimeType });
+                refBuffers.push({ buffer, mimeType, label: 'product' });
                 console.log(`[SB Poster][GPT-Image-2] Downloaded product ref: ${url.substring(0, 80)}`);
             } catch (dlErr) {
                 console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download product ref: ${dlErr.message}`);
@@ -165,11 +166,11 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
     // 2. Collect Avatar Image
     if (rawAvatarBuffer?.buffer) {
-        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg' });
+        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg', label: 'character' });
     } else if (avatarUrl?.startsWith('http')) {
         try {
             const { buffer, mimeType } = await downloadBuffer(avatarUrl);
-            refBuffers.push({ buffer, mimeType });
+            refBuffers.push({ buffer, mimeType, label: 'character' });
             console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
         } catch (dlErr) {
             console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
@@ -178,11 +179,11 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
     // 3. Collect Logo Image
     if (rawLogoBuffer?.buffer) {
-        refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg' });
+        refBuffers.push({ buffer: rawLogoBuffer.buffer, mimeType: rawLogoBuffer.mimeType || 'image/jpeg', label: 'logo' });
     } else if (logoUrl?.startsWith('http')) {
         try {
             const { buffer, mimeType } = await downloadBuffer(logoUrl);
-            refBuffers.push({ buffer, mimeType });
+            refBuffers.push({ buffer, mimeType, label: 'logo' });
             console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
         } catch (dlErr) {
             console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
@@ -209,9 +210,10 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             fd.append('response_format', 'b64_json');
             
             // LaoZhang proxy supports multiple 'image[]' parameters for character/style/logo injection
-            refBuffers.forEach(({ buffer, mimeType }, idx) => {
+            refBuffers.forEach(({ buffer, mimeType, label }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
-                fd.append('image[]', buffer, { filename: `ref_${idx}.${ext}`, contentType: mimeType });
+                const fName = label ? `${label}_${idx}.${ext}` : `ref_${idx}.${ext}`;
+                fd.append('image[]', buffer, { filename: fName, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',
@@ -266,16 +268,20 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
 
         // 1. Collect Product Images
         if (rawProductBuffers.length > 0) {
+            let addedLabel = false;
             for (const rb of rawProductBuffers) {
                 if (rb?.buffer) {
+                    if (!addedLabel) { parts.push({ text: "PRODUCT REFERENCE IMAGE (Feature this exact item):" }); addedLabel = true; }
                     parts.push({ inlineData: { mimeType: sanitizeMimeType(rb.mimeType), data: rb.buffer.toString('base64') } });
                 }
             }
         } else if (productImageUrls.length > 0) {
             const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
+            let addedLabel = false;
             for (const url of urlsToFetch) {
                 try {
                     const { buffer, mimeType } = await downloadBuffer(url);
+                    if (!addedLabel) { parts.push({ text: "PRODUCT REFERENCE IMAGE (Feature this exact item):" }); addedLabel = true; }
                     parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
                     console.log(`[SB Poster][NanoBanana] Downloaded product ref: ${url.substring(0, 80)}`);
                 } catch (dlErr) {
@@ -286,10 +292,12 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
 
         // 2. Collect Avatar Image
         if (rawAvatarBuffer?.buffer) {
+            parts.push({ text: "CHARACTER REFERENCE IMAGE (The human presenter must look exactly like this):" });
             parts.push({ inlineData: { mimeType: sanitizeMimeType(rawAvatarBuffer.mimeType), data: rawAvatarBuffer.buffer.toString('base64') } });
         } else if (avatarUrl?.startsWith('http')) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(avatarUrl);
+                parts.push({ text: "CHARACTER REFERENCE IMAGE (The human presenter must look exactly like this):" });
                 parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
                 console.log(`[SB Poster][NanoBanana] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
             } catch (dlErr) {
@@ -299,10 +307,12 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
 
         // 3. Collect Logo Image
         if (rawLogoBuffer?.buffer) {
+            parts.push({ text: "LOGO REFERENCE IMAGE:" });
             parts.push({ inlineData: { mimeType: sanitizeMimeType(rawLogoBuffer.mimeType), data: rawLogoBuffer.buffer.toString('base64') } });
         } else if (logoUrl?.startsWith('http')) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(logoUrl);
+                parts.push({ text: "LOGO REFERENCE IMAGE:" });
                 parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
                 console.log(`[SB Poster][NanoBanana] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
             } catch (dlErr) {

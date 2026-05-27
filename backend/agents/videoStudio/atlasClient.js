@@ -41,7 +41,9 @@ function truncatePrompt(prompt, maxLen = ATLASCLOUD_MAX_PROMPT_LENGTH) {
 }
 
 function getAtlasApiKey() {
-    return process.env.ATLASCLOUD_API_KEY || 'apikey-5213047d313643cc806219208e183def';
+    const key = process.env.ATLASCLOUD_API_KEY;
+    if (!key) throw new Error('ATLASCLOUD_API_KEY environment variable is not set. Cannot call Atlas Cloud API.');
+    return key;
 }
 
 function authHeaders() {

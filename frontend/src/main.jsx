@@ -3,6 +3,28 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// ── Theme bootstrap (must run BEFORE first paint) ─────────────────────────────
+// The theme class used to be applied only from <Sidebar/> after login, which
+// meant the auth screen + initial paint always rendered in dark mode regardless
+// of the user’s preference. Apply it here, synchronously, so light mode works
+// across the whole app and there’s no dark-mode flash.
+;(() => {
+  try {
+    const stored = localStorage.getItem('mantram-theme') || 'auto'
+    const isLight = stored === 'light'
+      || (stored === 'auto' && window.matchMedia?.('(prefers-color-scheme: light)').matches)
+    document.documentElement.classList.toggle('theme-light', isLight)
+    if (stored === 'auto' && window.matchMedia) {
+      const mql = window.matchMedia('(prefers-color-scheme: light)')
+      mql.addEventListener?.('change', e => {
+        if ((localStorage.getItem('mantram-theme') || 'auto') === 'auto') {
+          document.documentElement.classList.toggle('theme-light', e.matches)
+        }
+      })
+    }
+  } catch { /* localStorage / matchMedia may be blocked */ }
+})()
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

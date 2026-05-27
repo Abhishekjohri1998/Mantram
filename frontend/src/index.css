@@ -5,12 +5,20 @@
     /* MANTRAM GLOBAL UI TOKENS — DARK THEME (DEFAULT) */
     --sys-bg: #09090b;
     --sys-surface: #18181b;
-    --sys-border: rgba(255, 255, 255, 0.02);
-    /* Extremely faint, virtually borderless like Runway */
+    /* Nested surface — sits inside a Card, needs to differ from --sys-surface */
+    --sys-surface-2: #232327;
+    --sys-border: rgba(255, 255, 255, 0.08);
+    --sys-border-strong: rgba(255, 255, 255, 0.16);
+    /* Subtle but visible card separation in dark mode */
     --sys-primary: #FF4D00;
     --sys-primary-dim: rgba(255, 77, 0, 0.15);
     --sys-text: rgba(255, 255, 255, 0.92);
     --sys-text-muted: rgba(255, 255, 255, 0.45);
+    /* Reusable elevation. Empty in dark (we rely on borders); subtle in light. */
+    --sys-shadow-sm: 0 0 0 0 transparent;
+    --sys-shadow-md: 0 0 0 0 transparent;
+    /* Ring track baseline (component-level fallback) */
+    --sys-ring-track: rgba(255, 255, 255, 0.08);
 
     /* Font bindings */
     --font-display: 'Instrument Serif', serif;
@@ -20,13 +28,27 @@
 
   .theme-light {
     /* MANTRAM GLOBAL UI TOKENS — LIGHT THEME */
-    --sys-bg: #f4f4f5;
+    /* Cooler page background so white surfaces clearly pop */
+    --sys-bg: #e6e9f0;
     --sys-surface: #ffffff;
-    --sys-border: rgba(0, 0, 0, 0.12);
+    /* Nested surface in light mode — a clear zinc tint, not the same as bg */
+    --sys-surface-2: #eef1f6;
+    --sys-border: rgba(15, 23, 42, 0.16);
+    --sys-border-strong: rgba(15, 23, 42, 0.30);
     --sys-primary: #FF4D00;
     --sys-primary-dim: rgba(255, 77, 0, 0.12);
-    --sys-text: #18181b;
-    --sys-text-muted: #71717a;
+    --sys-text: #0f172a;
+    --sys-text-muted: #475569;
+    /* Real, visible elevation — 3-layer shadow gives soft falloff + crisp lift */
+    --sys-shadow-sm:
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 4px 8px rgba(15, 23, 42, 0.06),
+      0 12px 24px rgba(15, 23, 42, 0.10);
+    --sys-shadow-md:
+      0 2px 4px rgba(15, 23, 42, 0.08),
+      0 8px 16px rgba(15, 23, 42, 0.10),
+      0 20px 40px rgba(15, 23, 42, 0.14);
+    --sys-ring-track: rgba(15, 23, 42, 0.18);
   }
 }
 

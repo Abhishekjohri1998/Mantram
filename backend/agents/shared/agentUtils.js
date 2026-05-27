@@ -164,7 +164,11 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
                 const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
                 for (const [, key, val] of arrayPairs) {
                     if (!obj[key]) {
-                        obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                        if (val.includes('{') && val.includes('}')) {
+                            obj[key] = []; // Fallback to empty array to prevent flattening object keys into strings
+                        } else {
+                            obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                        }
                     }
                 }
                 if (Object.keys(obj).length > 0) return obj;
@@ -546,7 +550,11 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
                     const arrayPairs = fieldExtract.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
                     for (const [, key, val] of arrayPairs) {
                         if (!obj[key]) {
-                            obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                            if (val.includes('{') && val.includes('}')) {
+                                obj[key] = []; // Fallback to empty array to prevent flattening object keys into strings
+                            } else {
+                                obj[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                            }
                         }
                     }
                     if (Object.keys(obj).length > 0) return obj;

@@ -3108,7 +3108,26 @@ Use all available brand data and research intel to build the most specific, acti
     parsed.generatedAt = new Date().toISOString();
     parsed.researchUsed = mcpCalls.length > 0;
 
-    emit({ type: 'done', data: parsed });
+    let sessionId = null;
+    const userId = req.user?._id;
+    if (userId && brandId) {
+      try {
+        const session = new BrainstormSession({
+          user: userId,
+          brand: brandId,
+          title: `Strategy: ${modeConfig.label}`,
+          intent: 'strategy-mode',
+          sessionState: { lastStrategy: parsed },
+          messages: [{ role: 'fidato', content: `Generated ${modeConfig.label} strategy.`, strategyPayload: parsed, timestamp: new Date() }]
+        });
+        await session.save();
+        sessionId = session._id.toString();
+      } catch (e) {
+        console.error('[strategy-stream] Failed to save session:', e.message);
+      }
+    }
+
+    emit({ type: 'done', data: parsed, sessionId });
 
   } catch (error) {
     console.error('[strategy-stream] error:', error);
@@ -3307,7 +3326,26 @@ Use all available brand data and research intel to build the most specific, acti
     parsed.generatedAt = new Date().toISOString();
     parsed.researchUsed = mcpCalls.length > 0;
 
-    res.json({ success: true, data: parsed });
+    let sessionId = null;
+    const userId = req.user?._id;
+    if (userId && brandId) {
+      try {
+        const session = new BrainstormSession({
+          user: userId,
+          brand: brandId,
+          title: `Strategy: ${modeConfig.label}`,
+          intent: 'strategy-mode',
+          sessionState: { lastStrategy: parsed },
+          messages: [{ role: 'fidato', content: `Generated ${modeConfig.label} strategy.`, strategyPayload: parsed, timestamp: new Date() }]
+        });
+        await session.save();
+        sessionId = session._id.toString();
+      } catch (e) {
+        console.error('[strategy-mode] Failed to save session:', e.message);
+      }
+    }
+
+    res.json({ success: true, data: parsed, sessionId });
   } catch (error) {
     console.error('strategy-mode error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });

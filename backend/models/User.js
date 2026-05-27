@@ -41,6 +41,7 @@ const userSchema = new mongoose.Schema({
         creativeStudio: { type: Boolean },
         seoStudio: { type: Boolean },
         brainstormStudio: { type: Boolean },
+        researchStudio: { type: Boolean },
         videoStudio: { type: Boolean },
         socialMediaStudio: { type: Boolean },
         conversationStudio: { type: Boolean },

@@ -168,6 +168,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [segmentInfo, setSegmentInfo] = useState(null); // { completed, total }
     
     const pollRef = useRef(null);
+    const projectIdRef = useRef(null);
 
     const productInputRef = useRef();
     const avatarInputRef = useRef();
@@ -208,7 +209,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     // ── Product image upload ──
     const handleProductImages = (e) => {
         const files = Array.from(e.target.files || []);
-        setProductImages(files.map(f => ({ file: f, preview: URL.createObjectURL(f) })));
+        setProductImages(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
     };
 
     const handleAvatarImage = (e) => {
@@ -347,6 +348,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             if (!data.success) throw new Error(data.error || 'Storyboard generation failed');
 
             setProjectId(data.projectId);
+            projectIdRef.current = data.projectId;
             setPlan(data.plan);
             if (data.plan) {
                 setImageUrl(data.plan.imageUrl);
@@ -422,9 +424,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         // Long-form jobs can take hours — poll less aggressively to avoid backend hammering
         const intervalMs = longForm ? 10000 : 4000;
         pollRef.current = setInterval(async () => {
-            if (!projectId) return;
+            if (!projectIdRef.current) return;
             try {
-                const res = await fetch(`${API}/storyboard/status/${projectId}`, {
+                const res = await fetch(`${API}/storyboard/status/${projectIdRef.current}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
                 });
                 const data = await safeJson(res);
@@ -551,7 +553,12 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                             />
                                             <button
                                                 type="button"
-                                                onClick={(e) => { e.stopPropagation(); setProductImages(prev => prev.filter((_, i) => i !== idx)); }}
+                                                onClick={(e) => {
+                                                e.stopPropagation();
+                                                const removed = productImages[idx];
+                                                if (removed?.preview?.startsWith('blob:')) URL.revokeObjectURL(removed.preview);
+                                                setProductImages(prev => prev.filter((_, i) => i !== idx));
+                                            }}
                                                 style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
                                             >✕</button>
                                         </div>

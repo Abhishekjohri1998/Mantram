@@ -167,11 +167,38 @@ export async function analysisNode({ video, brandContext }) {
             .replace(/```(?:json)?\s*\n?/gi, '')
             .trim();
 
+        let analysisText = cleaned;
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-            analysis = JSON.parse(jsonMatch[0]);
-        } else {
-            throw new Error('No JSON in Gemini response');
+            analysisText = jsonMatch[0];
+            try {
+                analysis = JSON.parse(jsonMatch[0]);
+            } catch (parseErr) {
+                console.warn(`⚠️ [analysisNode] JSON parse failed, attempting extraction: ${parseErr.message}`);
+            }
+        }
+
+        if (!analysis) {
+            if (!jsonMatch) console.warn(`⚠️ [analysisNode] No JSON braces in response, attempting raw extraction. Raw text: ${cleaned.substring(0, 300)}`);
+            // Field extraction as last resort (works on raw text or jsonMatch)
+            analysis = {};
+            const stringPairs = analysisText.matchAll(/"(\w+)"\s*:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}\n])/g);
+            for (const [, key, val] of stringPairs) {
+                if (!analysis[key]) analysis[key] = val.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            }
+            const arrayPairs = analysisText.matchAll(/"(\w+)"\s*:\s*\[([\s\S]*?)\]/g);
+            for (const [, key, val] of arrayPairs) {
+                if (!analysis[key]) {
+                    if (val.includes('{') && val.includes('}')) {
+                        analysis[key] = [];
+                    } else {
+                        analysis[key] = val.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+                    }
+                }
+            }
+            if (Object.keys(analysis).length === 0) {
+                throw new Error(`No JSON fields extracted from Gemini response. Raw: ${cleaned.substring(0, 300)}`);
+            }
         }
     } catch (err) {
         clearTimeout(analysisTimeout);
@@ -849,7 +876,7 @@ Return ONLY a JSON object, no markdown:
                 prompt:      genPrompt, // use original text-only prompt
                 model:       'gpt-image-2',
                 aspectRatio: '16:9',
-                quality:     'hd',
+                quality:     'high',
             }, { provider: 'openai' });
 
             const rawUrl   = typeof fallbackResult === 'string' ? fallbackResult : fallbackResult.imageUrl;

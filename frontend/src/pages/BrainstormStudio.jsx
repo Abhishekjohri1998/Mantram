@@ -1180,6 +1180,10 @@ export default function BrainstormStudio() {
             } else if (event.type === 'done') {
               setSmResult(event.data)
               setSmStreamPhase('')
+              if (event.sessionId) {
+                setActiveSessionId(event.sessionId)
+                fetchSessionsList()
+              }
             } else if (event.type === 'error') {
               throw new Error(event.message || 'Strategy generation failed')
             }
@@ -1199,6 +1203,10 @@ export default function BrainstormStudio() {
         })
         if (res?.success && res?.data) {
           setSmResult(res.data)
+          if (res.sessionId) {
+            setActiveSessionId(res.sessionId)
+            fetchSessionsList()
+          }
         } else {
           setSmError(res?.error || 'Strategy generation failed. Please try again.')
         }
@@ -1216,6 +1224,13 @@ export default function BrainstormStudio() {
   const [activeSessionId, setActiveSessionId] = useState(null)
   const [sessionList, setSessionList] = useState([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const fetchSessionsList = useCallback(() => {
+    if (!activeBrand?._id) return
+    bsAPI.sessions(activeBrand._id).then(r => {
+      if (r.success) setSessionList(r.sessions || [])
+    }).catch(() => {})
+  }, [activeBrand?._id])
 
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -1268,11 +1283,8 @@ export default function BrainstormStudio() {
 
   // Load session list on mount and when brand changes
   useEffect(() => {
-    if (!activeBrand?._id) return
-    bsAPI.sessions(activeBrand._id).then(r => {
-      if (r.success) setSessionList(r.sessions || [])
-    }).catch(() => {})
-  }, [activeBrand?._id])
+    fetchSessionsList()
+  }, [fetchSessionsList])
 
   // Phase sync — now includes deep dive and calendar stages
   useEffect(() => {
@@ -1292,6 +1304,19 @@ export default function BrainstormStudio() {
       const s = r.session
       setActiveSessionId(s._id)
       setSessionState(s.sessionState || {})
+      
+      // Handle strategy-mode session
+      if (s.intent === 'strategy-mode' && s.sessionState?.lastStrategy) {
+         setSmResult(s.sessionState.lastStrategy)
+         const modeObj = STRATEGY_MODES_LIST.find(m => m.id === s.sessionState.lastStrategy.mode)
+         if (modeObj) setSmActiveMode(modeObj)
+         setMessages([])
+         setSidebarOpen(false)
+         return
+      } else {
+         setSmResult(null)
+      }
+
       // Reconstruct messages from stored conversation
       const msgs = s.messages.map((m, i) => ({
         id: `loaded-${i}`,
@@ -1523,6 +1548,7 @@ export default function BrainstormStudio() {
     setSessionState({ intent: null, collectedAnswers: {}, ideasGenerated: false, screenplayGenerated: false, lastIdeas: null, lastScreenplay: null })
     setPhase('explore')
     setActiveSessionId(null)
+    setSmResult(null)
     const greeting = brandName
       ? `Fresh start! What should we brainstorm for ${brandName} today? `
       : `Fresh start! What are we building today? `

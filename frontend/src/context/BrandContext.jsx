@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { brands as brandsAPI } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
 import { useBrandSession } from '../hooks/useBrandSession.js';
@@ -10,6 +10,7 @@ const STORAGE_KEY = 'mantram_active_brand';
 export function BrandProvider({ children }) {
     const { isAuthenticated, user, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [brands, setBrands] = useState([]);
     const [activeBrand, setActiveBrandState] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -149,7 +150,7 @@ export function BrandProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, setActiveBrand, restoreSession, navigate, refreshUser]);
 
     useEffect(() => { fetchBrands(); }, [fetchBrands]);
 
@@ -183,11 +184,11 @@ export function BrandProvider({ children }) {
     // Auto-save current page every time the route changes
     useEffect(() => {
         if (!activeBrand?._id || !initializedRef.current) return;
-        const currentPath = window.location.pathname;
+        const currentPath = location.pathname;
         // Don't save auth / onboarding pages
         if (currentPath.startsWith('/auth') || currentPath.startsWith('/onboarding')) return;
         saveSession(activeBrand._id, { lastActivePage: currentPath });
-    }, [activeBrand?._id, window.location.pathname]);
+    }, [activeBrand?._id, location.pathname, saveSession]);
 
     const addBrand = useCallback((brand) => {
         setBrands(prev => [brand, ...prev]);

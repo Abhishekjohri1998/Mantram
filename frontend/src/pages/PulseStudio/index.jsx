@@ -2056,8 +2056,7 @@ function APlusTool({ brandId, onContextReady, externalContext, forceTier, imageM
         try {
             const data = await apiFetch('/brand-studio/product-intelligence', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                // Pass all images (up to 8) for two-stage diversity classification
-                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brief, brandId })
+                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brief, brandId, productUrl })
             })
             if (data.success && data.productDNA) {
                 setProductDNA(data.productDNA)
@@ -3324,7 +3323,7 @@ function ProductDiscoverySection({ brandId, onContextReady }) {
         try {
             const data = await apiFetch('/brand-studio/product-intelligence', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brandId })
+                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brandId, productUrl })
             })
             if (data.success && data.productDNA) {
                 setProductDNA(data.productDNA)

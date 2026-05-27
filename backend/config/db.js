@@ -3,6 +3,7 @@ import config from './env.js';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3000; // 3 seconds
+let reconnectHandlerRegistered = false;
 
 const connectDB = async (attempt = 1) => {
     try {
@@ -20,15 +21,20 @@ const connectDB = async (attempt = 1) => {
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 
         // Auto-reconnect on disconnect (unless shutting down)
-        mongoose.connection.on('disconnected', () => {
-            if (mongoose.connection.isShuttingDown) return;
-            console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
-            setTimeout(() => connectDB(), RETRY_DELAY);
-        });
+        // Guard: register only once to prevent exponential handler accumulation
+        if (!reconnectHandlerRegistered) {
+            mongoose.connection.on('disconnected', () => {
+                if (mongoose.connection.isShuttingDown) return;
+                console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
+                setTimeout(() => connectDB(), RETRY_DELAY);
+            });
 
-        mongoose.connection.on('error', (err) => {
-            console.error('❌ MongoDB connection error:', err.message);
-        });
+            mongoose.connection.on('error', (err) => {
+                console.error('❌ MongoDB connection error:', err.message);
+            });
+
+            reconnectHandlerRegistered = true;
+        }
 
         return conn;
     } catch (error) {
