@@ -1,5 +1,6 @@
 async function testAtlas() {
-  const apiKey = 'apikey-5213047d313643cc806219208e183def';
+  const apiKey = process.env.ATLASCLOUD_API_KEY;
+  if (!apiKey) { console.error('ATLASCLOUD_API_KEY not set'); process.exit(1); }
   
   const payload = {
       "model": "google/gemini-omni-flash/text-to-video-developer", 

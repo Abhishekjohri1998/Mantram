@@ -7137,12 +7137,20 @@ router.post('/long-form/generate', protect, async (req, res) => {
         // Credit check
         const costEst = estimateLongFormCost(model || 'seedance-2.0', dur, settings?.resolution || '1080p', settings?.quality || 'fast');
         const user = req.user;
-        if (user.creditsRemaining < costEst.totalCredits) {
+        // Credit check — creditsRemaining is a Mongoose virtual; if user was fetched
+        // with .lean() it won't exist. Compute inline as a defensive fallback.
+        const remaining = user.creditsRemaining ?? (() => {
+            if (user.role === 'superadmin' || user.plan === 'enterprise') return Infinity;
+            const c = user.credits || {};
+            const topUp = (c.topUp > 0 && c.topUpExpiry && new Date(c.topUpExpiry) > new Date()) ? c.topUp : 0;
+            return Math.max(0, ((c.total || 0) + (c.bonus || 0) + topUp) - (c.used || 0));
+        })();
+        if (remaining < costEst.totalCredits) {
             return res.status(402).json({
                 success: false,
-                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${user.creditsRemaining}.`,
+                error: `Insufficient credits. Need ${costEst.totalCredits}, have ${remaining}.`,
                 required: costEst.totalCredits,
-                available: user.creditsRemaining,
+                available: remaining,
             });
         }
 

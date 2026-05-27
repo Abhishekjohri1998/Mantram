@@ -181,7 +181,9 @@ export const requireCredits = (actionOrCost = 1) => {
             // ── Background Job Bypass ──
             // When runCreativeJobAsync calls /generate internally, credits are
             // already deducted at POST /jobs time. Skip re-deduction.
-            if (req.headers['x-skip-credits'] === 'true' && req.headers['x-job-id']) {
+            // SECURITY: Requires a server-only secret to prevent client-side forgery.
+            const internalJobSecret = process.env.INTERNAL_JOB_SECRET;
+            if (internalJobSecret && req.headers['x-internal-secret'] === internalJobSecret && req.headers['x-job-id']) {
                 console.log(`⚡ [CREDITS] Skipping deduction for internal job call ${req.headers['x-job-id']}`);
                 req.creditsDeducted = 0; // Signal to handler: already deducted
                 return next();
@@ -257,9 +259,10 @@ export const requireCredits = (actionOrCost = 1) => {
             }
             req.providerMultiplier = providerMultiplier;
 
-            // Bypass credit checks for Superadmins and Enterprise early
-            const isSuperAdmin = user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise';
-            if (isSuperAdmin) {
+            // Bypass credit checks for Superadmins and Enterprise plans
+            // NOTE: 'admin' role is intentionally excluded — admins follow normal credit rules.
+            const isCreditExempt = user.role === 'superadmin' || user.plan === 'enterprise';
+            if (isCreditExempt) {
                 console.log(`🛡️ [CREDITS] ${user.email} (Role: ${user.role}, Plan: ${user.plan}) is bypassing credits for "${actionName}" (Cost: ${cost})`);
                 CreditUsage.create({
                     user: new mongoose.Types.ObjectId(user._id),

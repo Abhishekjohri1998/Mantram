@@ -168,7 +168,7 @@ export function requireStudioAccess(studioKey) {
 
             const portalVisibility = await getPortalVisibility();
             const key = STUDIO_MAP[studioKey] || studioKey;
-            const hasAccess = canAccessStudio(portalVisibility, req.user, key);
+            const hasAccess = await canAccessStudio(portalVisibility, req.user, key);
 
             if (!hasAccess) {
                 const status = portalVisibility[key] || 'public';
@@ -186,7 +186,7 @@ export function requireStudioAccess(studioKey) {
             next();
         } catch (error) {
             console.error('Studio access check error:', error);
-            next(); // fail open
+            return res.status(500).json({ success: false, error: 'Studio access check failed. Please try again.' });
         }
     };
 }
