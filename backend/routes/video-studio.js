@@ -7650,9 +7650,10 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             title: `Storyboard — ${productName || brief?.substring(0, 40) || 'Ad Film'}`,
             input: {
                 brief,
-                productName,
+                productName: productName || '',
+                productFeatures: productFeatures || '',
+                avatarUrl: avatarUrl || '',
                 images: productImageUrls.map(url => ({ url, source: 'upload' })),
-                avatarUrl,
             },
             storyboard: {
                 imagePrompt: plan.imagePrompt,
@@ -7787,47 +7788,26 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             posterUrl = await ensureS3Url(posterDataUrl, `storyboard/posters/${req.user._id}`).catch(() => posterDataUrl);
         }
 
-        // Recreate the matching videoPrompt
-        let newVideoPrompt = '';
-        if (projectId) {
-            try {
-                newVideoPrompt = await recreateVideoPrompt({
-                    imagePrompt,
-                    brief,
-                    productName,
-                    productFeatures,
-                    avatarUrl: signedAvatarUrl || avatarUrl,
-                    duration,
-                    format,
-                    style,
-                    dialogueLanguage: dialogueLanguageSelected,
-                    brandContext
-                });
-            } catch (errPrompt) {
-                console.warn(`[Storyboard Regen Poster] Recreating video prompt failed: ${errPrompt.message}`);
-            }
-        }
+        // Video prompt is NOT recreated here — it will be generated fresh at animate-time
+        // by generateAnimateVideoPrompt() with correct @imageN tags.
 
         // Update the storyboard in DB if projectId provided
         if (projectId) {
-            const updateFields = {
-                'storyboard.imageUrl': posterUrl,
-                'storyboard.imagePrompt': imagePrompt,
-                'storyboard.dialogueLanguage': dialogueLanguageSelected
-            };
-            if (newVideoPrompt) {
-                updateFields['storyboard.videoPrompt'] = newVideoPrompt;
-            }
             await VideoProject.findByIdAndUpdate(projectId, {
-                $set: updateFields
+                $set: {
+                    'storyboard.imageUrl': posterUrl,
+                    'storyboard.imagePrompt': imagePrompt,
+                    'storyboard.dialogueLanguage': dialogueLanguageSelected,
+                    'storyboard.videoPrompt': '',  // clear stale video prompt — regenerated fresh at animate-time
+                }
             });
         }
 
         const signedImageUrl = await getSignedUrlIfNeeded(posterUrl);
         res.json({ 
             success: true, 
-            imageUrl: signedImageUrl, 
-            videoPrompt: newVideoPrompt || undefined 
+            imageUrl: signedImageUrl,
+            // videoPrompt not returned — it is generated fresh at animate-time
         });
     } catch (err) {
         console.error('[Storyboard Regen Poster] Error:', err.message);
@@ -7835,6 +7815,121 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
     }
 });
 
+
+// ── generateAnimateVideoPrompt ────────────────────────────────────────────────
+// Generates a video prompt AFTER storyboard approval, with correct @imageN tags
+// mapping each reference image to its exact role in the video generation call.
+//
+// Reference image order passed to the video model:
+//   Position 1 (imageUrl / I2V first frame): product image 1
+//   Position 2 (ref[0]): storyboard poster  → @image2 (style reference)
+//   Position 3 (ref[1]): product image 2+   → @image3 (extra product ref)
+//   Position 4 (ref[2]): avatar/face        → @image4 (presenter)
+//   Position 5 (ref[3]): logo               → @image5 (brand logo)
+//
+// The exact slot indices match what AtlasCloud/Seedance see when we pass
+// imageUrl as the first frame + referenceImages as additional inputs.
+//
+async function generateAnimateVideoPrompt({
+    brief,
+    productName,
+    productFeatures,
+    storyboardPosterUrl,   // approved storyboard poster
+    productImageUrls = [], // product images from DB
+    avatarUrl = null,
+    logoUrl = null,
+    duration,
+    format,
+    style,
+    dialogueLanguage = 'English',
+    brandContext = '',
+    existingVideoPrompt = '',
+    firstFrameIsAvatar = false, // true when avatar is used as first frame (no product images)
+}) {
+    // Build the precise @imageN tag mapping so Claude can write them correctly.
+    // The video model sees: firstFrame then referenceImages in order.
+    // @image1 = the I2V first frame (product image OR avatar if no product images).
+    // @image2 = storyboard poster (always in slot 2 of combinedReferences).
+    const tagMap = [];
+
+    if (firstFrameIsAvatar) {
+        // No product images — avatar/presenter is the opening frame
+        tagMap.push(`@image1 = Avatar / Presenter image (first frame / I2V anchor) — the presenter's face and body. The video OPENS with this person in frame.`);
+    } else {
+        // Product image is the opening frame (standard case)
+        tagMap.push(`@image1 = Product image (first frame / I2V anchor) — "${productName || 'the product'}". This is the opening visual frame of the video.`);
+    }
+    tagMap.push(`@image2 = Storyboard poster (visual style reference) — Use this as the overall style guide for colour grading, mood, layout, and composition. Do NOT animate it as-is; extract the visual style from it.`);
+
+    let nextTag = 3;
+    // Additional product images (product[1], product[2]...)
+    for (let i = 1; i < productImageUrls.length; i++) {
+        tagMap.push(`@image${nextTag++} = Additional product reference image ${i + 1} — "${productName || 'product'}" from another angle.`);
+    }
+    // Avatar: only add as a reference if it's NOT already used as the first frame
+    // When firstFrameIsAvatar=true, avatar is @image1 (the I2V start), not a ref slot
+    if (avatarUrl && !firstFrameIsAvatar) {
+        tagMap.push(`@image${nextTag++} = Avatar / Presenter reference — the human presenter's exact face and identity. Use this for all shots featuring the presenter speaking or interacting with the product.`);
+    }
+    // Logo
+    if (logoUrl) {
+        tagMap.push(`@image${nextTag++} = Brand logo reference — show this exact logo on screen during the closing shot or overlay.`);
+    }
+
+    const systemPrompt = `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
+
+Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will animate an approved storyboard into a high-end commercial video.
+
+CRITICAL PROMPT RULES:
+1. MUST start with: "Use the attached storyboard image (@image2) as the visual style reference."
+2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame — do NOT open with the storyboard poster.
+3. Use @imageN tags to reference each attached image precisely. The mapping is:
+${tagMap.map(t => `   ${t}`).join('\n')}
+4. Use professional cinematography terms: rack focus, kinetic whip-pans, 3D tracking cameras, slow-motion, hyper-lapse, dolly zoom, etc.
+5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt (e.g. for Hindi: "नमस्ते, यह हमारा नया प्रोडक्ट है...").
+6. Specify exact shot durations that sum to ${duration}s total.
+7. Describe product interaction shots: how the product moves, catches light, is handled by the presenter.
+8. End with a cinematic brand CTA / closing shot.
+9. The prompt should be 300-600 words, extremely specific, and directly executable.
+10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.`;
+
+    const userPrompt = `APPROVED STORYBOARD STYLE (from poster):
+The storyboard poster (@image2) defines the visual world — use it only for style grounding.
+
+CREATIVE BRIEF: "${brief || 'Create a high-energy, cinematic ad film.'}"
+PRODUCT: ${productName || 'See @image1'}
+KEY FEATURES: ${productFeatures || 'Highlight from product images'}
+VIDEO DURATION: ${duration}s | FORMAT: ${format} | STYLE: ${style}
+DIALOGUE LANGUAGE: ${dialogueLanguage}
+AVATAR PRESENT: ${avatarUrl ? `YES — presenter's face is in @image${nextTag - (logoUrl ? 2 : 1)}` : 'NO'}
+BRAND LOGO: ${logoUrl ? `YES — logo appears in @image${nextTag - 1}` : 'NO'}
+
+${existingVideoPrompt ? `REFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 800)}"\n` : ''}
+
+Write the final video prompt now. Ensure every @imageN tag matches the mapping above exactly.`;
+
+    const { callMultimodalAgent } = await import('../agents/shared/agentUtils.js');
+    const rawPrompt = await callMultimodalAgent(
+        systemPrompt,
+        userPrompt,
+        [], // No vision needed — we describe images through tag mapping
+        { temperature: 0.72, maxTokens: 2000, returnRaw: true, provider: 'claude' }
+    );
+
+    // Clean up any accidental JSON or markdown wrapper
+    let cleaned = (rawPrompt || '').trim()
+        .replace(/^```(?:json)?[\s\S]*?```$/m, '')
+        .replace(/^\{[\s\S]*?"videoPrompt"\s*:\s*"/, '')
+        .replace(/"\s*\}$/, '')
+        .replace(/^"+|"+$/g, '')
+        .trim();
+
+    if (!cleaned || cleaned.length < 50) {
+        throw new Error('Video prompt generation returned empty result');
+    }
+
+    return cleaned;
+}
 
 // ── POST /api/video-studio/storyboard/animate ────────────────────────────────
 // Step 3: Animate each storyboard frame via I2V (Seedance 2.0)
@@ -7851,82 +7946,170 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         const isLongForm   = rawDuration > 15;
         const creditAction = isLongForm ? 'storyboardAnimateLongForm' : 'storyboardAnimate';
 
-        // Apply the correct credit middleware synchronously before any business logic.
-        // requireCredits is statically imported at the top of this file (L26).
-        // If credits are insufficient it sends a 403 and returns — we check res.headersSent.
         await new Promise((resolve, reject) =>
             requireCredits(creditAction)(req, res, (err) => err ? reject(err) : resolve())
         );
-
-        // If requireCredits already sent a response (403 insufficient credits), stop here.
         if (res.headersSent) return;
 
         const {
             projectId,
-            imageUrl,
-            videoPrompt,
+            imageUrl,           // ← storyboard poster URL (approved by user)
+            videoPrompt: clientVideoPrompt,
             duration,
             format = '9:16',
             resolution = '480p',
             productImageUrls = [],
             avatarUrl,
             model = 'seedance-2.0-fast',
-            brandId,
         } = req.body;
 
         if (!imageUrl) return res.status(400).json({ success: false, error: 'No imageUrl provided' });
 
-        // ── Reference images (same logic as before) ──────────────────────────
-        let referenceImages = [];
-        let dbAvatar = null;
+        // ── Load full context from DB ─────────────────────────────────────────
         let dbProductImgs = [];
+        let dbAvatar = null;
+        let dbBrief = '';
+        let dbProductName = '';
+        let dbProductFeatures = '';
+        let dbFormat = format;
+        let dbStyle = 'hyperrealistic';
+        let dbDialogueLanguage = 'English';
+        let dbBrandContext = '';
+        let dbLogoUrl = null;
+
         if (projectId) {
-            const project = await VideoProject.findById(projectId);
+            const project = await VideoProject.findById(projectId)
+                .populate('brand', 'name dna')
+                .lean();
             if (project) {
-                dbProductImgs = project.input?.images?.map(img => img.url).filter(Boolean) || [];
-                dbAvatar = project.input?.avatarUrl || null;
-                referenceImages = [
-                    ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
-                    ...dbProductImgs.map(url => ({ url, role: 'product' }))
-                ];
-                console.log(`[Storyboard Animate] Loaded refs from DB: ${referenceImages.length} (mixed roles)`);
+                dbProductImgs = (project.input?.images || []).map(img => img.url).filter(Boolean);
+                dbAvatar      = project.input?.avatarUrl || null;
+                dbBrief       = project.input?.brief || '';
+                dbProductName = project.input?.productName || '';
+                dbProductFeatures = project.input?.productFeatures || '';
+                dbFormat      = project.storyboard?.format || format;
+                dbStyle       = project.storyboard?.style || 'hyperrealistic';
+                dbDialogueLanguage = project.storyboard?.dialogueLanguage || 'English';
+
+                if (project.brand?.dna) {
+                    const dna = project.brand.dna;
+                    dbLogoUrl = dna.logo?.url || null;
+                    const desc = dna.brandDescription || dna.companyOverview || '';
+                    const tagline = dna.tagline || '';
+                    const personality = dna.voice?.personality || '';
+                    const voiceDesc = dna.voice?.description || '';
+                    const usps = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
+                    dbBrandContext = `Brand: ${project.brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nPersonality: ${personality} - ${voiceDesc}\nUSPs: ${usps}`;
+                }
+                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs, avatar=${!!dbAvatar}, logo=${!!dbLogoUrl}`);
             }
         }
 
-        if (referenceImages.length === 0) {
-            const parsedProductImgs = typeof productImageUrls === 'string' ? JSON.parse(productImageUrls) : (productImageUrls || []);
-            const prodUrls = parsedProductImgs.filter(u => u?.startsWith('http')).slice(0, 2);
-            referenceImages = [
-                ...(avatarUrl ? [{ url: avatarUrl, role: 'face' }] : []),
-                ...prodUrls.map(url => ({ url, role: 'product' }))
-            ];
+        // Fallback to body params
+        if (dbProductImgs.length === 0 && productImageUrls) {
+            const parsed = typeof productImageUrls === 'string' ? JSON.parse(productImageUrls) : (productImageUrls || []);
+            dbProductImgs = parsed.filter(u => u?.startsWith('http'));
         }
+        if (!dbAvatar && avatarUrl) dbAvatar = avatarUrl;
 
-        const productRef = referenceImages.find(r => r.role === 'product');
-        const firstFrameUrl = productRef ? productRef.url : imageUrl;
-        const combinedReferences = referenceImages.filter(r => r.url !== firstFrameUrl);
+        // ── Reference image routing ────────────────────────────────────────────
+        //
+        // NEW DESIGN:
+        //   @image1  = product image 1      → I2V first frame (opening shot)
+        //   @image2  = storyboard poster    → visual style reference (colour grade, mood, composition)
+        //   @image3+ = extra product images → additional product angles
+        //   @imageN  = avatar               → presenter identity
+        //   @imageN+1= brand logo           → closing shot overlay
+        //
+        // The storyboard poster is NEVER used as a video first frame.
+        // It is a style reference — it defines what the video should LOOK LIKE, not what it starts with.
 
-        console.log(`[Storyboard Animate] duration=${rawDuration}s | longForm=${isLongForm} | model=${model} | refs=${combinedReferences.length}`);
+        const firstFrameUrl = dbProductImgs[0] || dbAvatar || null;
+
+        // Determine if first frame is a product or avatar (affects @image1 tag description)
+        const firstFrameIsProduct = !!dbProductImgs[0];
+        const firstFrameIsAvatar = !dbProductImgs[0] && !!dbAvatar;
+
+        // Build combinedReferences for the video model.
+        // Rules:
+        //   - Storyboard poster goes in as style_reference (@image2)
+        //   - Extra product images beyond product[0] go in (product[0] IS the first frame)
+        //   - Avatar goes in as face ref ONLY if it's not already used as the first frame
+        //   - Logo goes in if present
+        const combinedReferences = [
+            { url: imageUrl, role: 'style_reference' },                                   // @image2: storyboard poster style guide
+            ...dbProductImgs.slice(1).map(url => ({ url, role: 'product' })),            // @image3+: extra product angles
+            // Avatar: include as face ref ONLY when product[0] was used as firstFrame
+            // If avatar was used as firstFrame (no product images), skip it from refs to avoid sending twice
+            ...(dbAvatar && firstFrameIsProduct ? [{ url: dbAvatar, role: 'face' }] : []),
+            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),                    // logo
+        ];
+
+        // For long-form segments, pass refs WITHOUT the poster
+        // (storyboardLongForm.js adds the poster per-segment from params.imageUrl)
+        const longFormRefs = [
+            ...dbProductImgs.slice(1).map(url => ({ url, role: 'product' })),
+            ...(dbAvatar && firstFrameIsProduct ? [{ url: dbAvatar, role: 'face' }] : []),
+            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
+        ];
+
+        console.log(`[Storyboard Animate] ── Reference Routing ──`);
+        console.log(`  firstFrameUrl (I2V): ${firstFrameUrl ? firstFrameUrl.substring(0, 80) : 'null (T2V)'}`);
+        console.log(`  poster (style ref): ${imageUrl?.substring(0, 80)}`);
+        console.log(`  refs: ${combinedReferences.length} | duration=${rawDuration}s | model=${model}`);
+
+        // ── Generate fresh video prompt at animate-time ───────────────────────
+        // Generated HERE, after storyboard approval, so every @imageN tag correctly
+        // matches the actual image attached to the video generation API call.
+        let finalVideoPrompt = clientVideoPrompt || '';
+        try {
+            console.log(`[Storyboard Animate] Generating fresh video prompt...`);
+            finalVideoPrompt = await generateAnimateVideoPrompt({
+                brief: dbBrief,
+                productName: dbProductName,
+                productFeatures: dbProductFeatures,
+                storyboardPosterUrl: imageUrl,
+                productImageUrls: dbProductImgs,
+                avatarUrl: dbAvatar,
+                logoUrl: dbLogoUrl,
+                duration: rawDuration,
+                format: dbFormat,
+                style: dbStyle,
+                dialogueLanguage: dbDialogueLanguage,
+                brandContext: dbBrandContext,
+                existingVideoPrompt: clientVideoPrompt || '',
+                firstFrameIsAvatar,  // tells prompt generator what @image1 actually is
+            });
+            console.log(`[Storyboard Animate] Video prompt (first 120): ${finalVideoPrompt.substring(0, 120)}...`);
+            if (projectId) {
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    $set: { 'storyboard.videoPrompt': finalVideoPrompt }
+                });
+            }
+        } catch (promptErr) {
+            console.warn(`[Storyboard Animate] Prompt gen failed, using fallback: ${promptErr.message}`);
+            finalVideoPrompt = clientVideoPrompt || 'Use the attached storyboard image (@image2) as the visual style reference. Open with the product shown in @image1. Animate with cinematic camera movements. Maintain exact product appearance throughout. Build to a compelling brand close.';
+        }
 
         // ══════════════════════════════════════════════════════════════════════
         // LONG-FORM PATH (>15s) — fire and forget, return jobId for polling
         // ══════════════════════════════════════════════════════════════════════
         if (isLongForm) {
-            const voiceoverScript  = req.body.voiceoverScript || '';
-            const voiceoverLanguage = req.body.dialogueLanguage || req.body.voiceoverLanguage || 'English';
-            const bgmPreset        = req.body.bgmPreset || 'cinematic';
-            const qualityMode      = model === 'seedance-2.0' ? 'quality' : 'fast';
+            const voiceoverScript   = req.body.voiceoverScript || '';
+            const voiceoverLanguage = req.body.dialogueLanguage || req.body.voiceoverLanguage || dbDialogueLanguage;
+            const bgmPreset         = req.body.bgmPreset || 'cinematic';
+            const qualityMode       = model === 'seedance-2.0' ? 'quality' : 'fast';
 
             const jobId = startStoryboardLongForm({
                 projectId: projectId || null,
                 userId: req.user._id,
-                imageUrl,
-                firstFrameUrl,
-                videoPrompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                imageUrl,           // storyboard poster → style ref injected per-segment in storyboardLongForm.js
+                firstFrameUrl,      // product/avatar → segment 1 opening frame
+                videoPrompt: finalVideoPrompt,
                 totalDuration: rawDuration,
-                format,
+                format: dbFormat,
                 resolution,
-                referenceImages: combinedReferences,
+                referenceImages: longFormRefs,  // poster NOT included here — added per-segment in storyboardLongForm.js
                 model,
                 qualityMode,
                 voiceoverScript,
@@ -7934,8 +8117,6 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 bgmPreset,
             });
 
-            // Persist jobId + voiceoverScript to DB immediately
-            // voiceoverScript is persisted so it survives a server restart
             if (projectId) {
                 await VideoProject.findByIdAndUpdate(projectId, {
                     $set: {
@@ -7957,45 +8138,45 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 segments: estimate.segments,
                 creditsCharged: req.creditsDeducted || 0,
                 totalDuration: rawDuration,
+                videoPrompt: finalVideoPrompt,  // show to user so they can see what was generated
             });
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        // SINGLE-SHOT PATH (≤15s) — original behavior, unchanged
+        // SINGLE-SHOT PATH (≤15s)
         // ══════════════════════════════════════════════════════════════════════
         let taskId = null;
         try {
             let genResult;
             if (model === 'gemini-flash') {
                 genResult = await submitGeminiFlashVideoGeneration({
-                    imageUrl: firstFrameUrl,
-                    prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                    imageUrl: firstFrameUrl || imageUrl, // product first; poster only if nothing else
+                    prompt: finalVideoPrompt,
                     duration: duration || 10,
-                    aspectRatio: format,
+                    aspectRatio: dbFormat,
                     resolution,
                     referenceImages: combinedReferences,
                 });
             } else {
                 genResult = await submitAtlasCloudVideoGeneration({
-                    imageUrl: firstFrameUrl,
-                    prompt: videoPrompt || 'Follow the attached storyboard exact visual flow.',
+                    imageUrl: firstFrameUrl || imageUrl, // product first; poster only if nothing else
+                    prompt: finalVideoPrompt,
                     duration: duration || 10,
-                    aspectRatio: format,
+                    aspectRatio: dbFormat,
                     referenceImages: combinedReferences,
                     generateAudio: true,
                     qualityMode: model === 'seedance-2.0' ? 'quality' : 'fast',
                     resolution,
-                    imageRole: 'mixed'
+                    imageRole: 'mixed',
                 });
             }
             taskId = genResult.taskId;
-
             if (projectId) {
                 await VideoProject.findByIdAndUpdate(projectId, {
                     $set: {
                         'storyboard.taskId': taskId,
                         'storyboard.status': 'animating',
-                        status: 'animating'
+                        status: 'animating',
                     }
                 });
             }
@@ -8004,15 +8185,9 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             return res.status(500).json({ success: false, error: err.message });
         }
 
-        res.json({
-            success: true,
-            projectId,
-            taskId,
-            longForm: false,
-        });
+        res.json({ success: true, projectId, taskId, longForm: false, videoPrompt: finalVideoPrompt });
+
     } catch (err) {
-        // Only send error response if headers haven't been sent yet
-        // (requireCredits may have already sent a 403)
         if (res.headersSent) return;
         console.error('[Storyboard Animate] Critical Error:', err);
         if (req.creditsDeducted > 0) {
@@ -8021,6 +8196,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     }
 });
+
 
 // ── GET /api/video-studio/storyboard/status/:projectId ───────────────────────
 // Poll animation status — handles both single-shot (taskId) and long-form (longFormJobId)

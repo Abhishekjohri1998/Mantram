@@ -518,34 +518,44 @@ export async function submitAtlasCloudVideoGeneration({
 
     const tagOffset = firstFrameAssetUris.length;
 
-    if (faceAssetUris.length > 0) {
-        let injectedPrompt = cleanedPrompt;
+    // Build ordered tag legend (in image number order, lowest first)
+    // Then prepend as a compact block BEFORE the main cinematic prompt.
+    // This ensures: (a) tags are in correct numeric order, (b) the main prompt
+    // from Claude is not buried at the end by repeated prepends.
+    if (faceAssetUris.length > 0 || firstFrameAssetUris.length > 0) {
+        const tagLines = [];
+
+        // @image1 = first frame (always, when present)
+        if (firstFrameAssetUris.length > 0) {
+            tagLines.push(`@image1 = opening first frame anchor (I2V). Start the video from this exact visual.`);
+        }
+
+        // @image2, @image3, ... = reference images in registration order
         faceAssetUris.forEach((assetUri, index) => {
             const role = referenceMeta[index]?.role || imageRole;
             const tag = `@image${index + 1 + tagOffset}`;
-            
-            let anchorText;
-            if (role === 'storyboard') {
-                anchorText = `${tag} — visual reference for the exact storyboard layout, camera angles, and shot sequence. Follow this structural guide perfectly.`;
+
+            let desc;
+            if (role === 'storyboard' || role === 'style_reference') {
+                desc = `${tag} = storyboard style guide — extract colour grading, mood, lighting & shot composition. Do NOT animate the grid itself.`;
             } else if (role === 'face') {
-                anchorText = `${tag} — visual reference for the presenter in this video. Maintain consistent appearance throughout every frame.`;
+                desc = `${tag} = presenter/avatar — maintain exact face & identity in every shot.`;
             } else if (role === 'fashion-model') {
-                anchorText = `${tag} — visual reference for the outfit. Maintain the exact garment style, fabric texture, color, and fit throughout every frame. The clothing is the subject of this video.`;
+                desc = `${tag} = outfit reference — maintain exact garment style, texture, colour, fit.`;
             } else if (role === 'character') {
-                anchorText = `${tag} — visual reference for the animated character. Maintain exact consistency in every frame.`;
+                desc = `${tag} = animated character — maintain exact look in every frame.`;
+            } else if (role === 'logo') {
+                desc = `${tag} = brand logo — show in closing shot / overlay without distortion.`;
             } else {
-                anchorText = `${tag} — visual reference for the product. Maintain exact shape, color, and surface detail throughout every frame.`;
+                desc = `${tag} = product reference — maintain exact shape, colour & surface detail.`;
             }
-            injectedPrompt = `${anchorText} ${injectedPrompt}`;
-            console.log(`[Atlas] Injected role '${role}' for ${tag}`);
+            tagLines.push(desc);
+            console.log(`[Atlas] Tag legend entry: ${desc.substring(0, 80)}`);
         });
-        cleanedPrompt = injectedPrompt;
-    } 
-    
-    if (firstFrameAssetUris.length > 0) {
-        if (!cleanedPrompt.toLowerCase().includes('@image1')) {
-            cleanedPrompt += ` @image1 is the visual reference for the exact starting frame of this scene.`;
-        }
+
+        // Compact preamble + main cinematic prompt
+        const preamble = `IMAGE REFERENCES: ${tagLines.join(' | ')} ||`;
+        cleanedPrompt = `${preamble} ${cleanedPrompt}`;
     }
 
     let finalPrompt = truncatePrompt(cleanedPrompt.replace(/<img>[^<]*<\/img>/g, '').replace(/\s{2,}/g, ' ').trim());

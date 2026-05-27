@@ -33,9 +33,9 @@ function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, 
 
     return `You are a visionary, award-winning Ad Film Director and Cinematographer. Your expertise lies in crafting visually breathtaking, high-energy, and deeply emotional commercial video campaigns with dynamic pacing and avant-garde camera work.
 
-Your job: Given a product, brand DNA, avatar, and creative brief, write exactly TWO master prompts. 
-1. An \`imagePrompt\` for an AI Image Generator (like Midjourney or Gemini) to create a single high-resolution "storyboard poster" (a dense grid of frames).
-2. A \`videoPrompt\` for an AI Video Generator (like Seedance) that will take your generated storyboard image as an exact reference and animate it into a seamless, high-end commercial video.
+Your job: Given a product, brand DNA, avatar, and creative brief, write ONE master prompt for the storyboard poster image generator.
+
+The video animation prompt will be written separately after storyboard approval — you do NOT need to generate it here.
 
 ═══════════════════════════════════════════════════════
 BRAND DNA & CREATIVE ESSENCE
@@ -51,7 +51,7 @@ VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 
 ═══════════════════════════════════════════════════════
-PROMPT 1 RULES: imagePrompt (For the Storyboard Grid Image)
+PROMPT RULES: imagePrompt (For the Storyboard Grid Image)
 ═══════════════════════════════════════════════════════
 Write an incredibly detailed and imaginative prompt to generate ONE single image containing a dense grid of multiple distinct storyboard panels.
 - GRID SIZE & PACING: Determine the optimal number of frames (shots) and the grid layout (e.g. 2x2, 2x3, 3x3, 3x4, 4x4) dynamically based on the story pacing and structure. The total duration is ${duration}s, so each panel should represent a logical segment (e.g. 2 to 6 seconds per shot) summing up to exactly ${duration}s. Do NOT hardcode the layout; let it fit the story.
@@ -84,28 +84,12 @@ Design details:
 Negative prompt:
 [Detailed negative prompt to prevent cartoonish styles, low quality, distorted layout, smiling models, etc.]
 
-═══════════════════════════════════════════════════════
-PROMPT 2 RULES: videoPrompt (For the Video Animation)
-═══════════════════════════════════════════════════════
-Write a highly complex and cinematic prompt instructing an AI Video Model to animate the sequence.
-- It MUST start with: "Use the attached storyboard image as the exact reference."
-- Instruct the AI to interpret the grid as a storyboard and execute the fast cuts dynamically.
-- Define the cinematic motion using professional film terminology (smooth 3D tracking cameras, rack focus, kinetic whip-pans, hyper-lapse, high-energy motion blur).
-- Detail how the product should interact with the light and how the camera should move to create a ${duration}-second masterpiece.
-- MANDATORY: If there are spoken dialogues or narration in the scene, write the explicit dialogues directly inside the videoPrompt in the chosen language (${dialogueLanguage}). The dialogue must be written in the selected language's script.
-- Detail the image reference tags in the videoPrompt explicitly:
-  - Use \`@image1\` for the starting frame/visual layout.
-  - Use \`@image2\` to reference the storyboard poster grid.
-  - Use \`@image3\` to reference the presenter/avatar face if present.
-  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.${logoUrl ? '\n  - Use `<<<image_logo>>>` to reference the brand logo image.' : ''}
-
 OUTPUT FORMAT — CRITICAL
 Return ONLY valid JSON. No markdown. No explanation. No code fences.
 The JSON must match this exact schema:
 
 {
-  "imagePrompt": "Create a premium...",
-  "videoPrompt": "Use the attached storyboard image as the exact reference..."
+  "imagePrompt": "Create a premium..."
 }
 `;
 }
@@ -117,20 +101,19 @@ The JSON must match this exact schema:
 function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '', productImageUrls = [] }) {
     const logoDetails = logoUrl ? `\nBRAND LOGO DETAILS: description="${logoDescription}"` : '';
 
-    // Build image references mapping list to avoid confusion between product model vs presenter/avatar
     const imageMappingLines = [];
     let imgIdx = 1;
     if (productImageUrls && productImageUrls.length > 0) {
         productImageUrls.forEach((url, i) => {
-            imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is a **PRODUCT** reference image featuring the product: "${productName || 'product'}". (This maps to \`@image1\` or \`@image4\`, \`@image5\`, etc. in the videoPrompt).`);
+            imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is a **PRODUCT** reference image featuring the product: "${productName || 'product'}". Use this as visual reference for the product in the storyboard panels.`);
         });
     }
     if (avatarUrl) {
-        imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is the **AVATAR/PRESENTER** reference image featuring the presenter's face/body. (This maps to \`@image3\` in the videoPrompt).`);
+        imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is the **AVATAR/PRESENTER** reference image featuring the presenter's face/body. Use this as visual reference for the human presenter in the storyboard panels.`);
     }
 
     const imageMappingText = imageMappingLines.length > 0
-        ? `\nIMAGE REFERENCES AND MAPPING:\n${imageMappingLines.join('\n')}\n\nCRITICAL CONTEXT DISAMBIGUATION:\n- Even if a product reference image (Images 1..${productImageUrls.length}) contains a model wearing, holding, or interacting with the product, treat that image strictly as the PRODUCT reference (representing the watch, garment, or item itself). Do NOT confuse the model in the product image with the main presenter.\n- The main presenter's face and identity must be strictly modeled after the AVATAR reference image (the last attached image, which maps to \`@image3\`). Keep these distinct: the product is the item being showcased, and the avatar/presenter is the character speaking the dialogue and interacting with it.`
+        ? `\nIMAGE REFERENCES:\n${imageMappingLines.join('\n')}\n\nCRITICAL CONTEXT DISAMBIGUATION:\n- Even if a product reference image contains a model wearing, holding, or interacting with the product, treat that image strictly as the PRODUCT reference (representing the item itself). Do NOT confuse the model in the product image with the main presenter.\n- The main presenter's face and identity must be strictly modeled after the AVATAR reference image (the last attached image). Keep these distinct.`
         : '';
 
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
@@ -141,14 +124,13 @@ KEY FEATURES: ${productFeatures || 'Extract from the product images provided and
 TOTAL VIDEO DURATION: ${duration}s, FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
-AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut shots and write their dialogues in ' + dialogueLanguage + '.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
+AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut storyboard panels.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
 BRAND NAME: ${brandName}${logoDetails}
 
-Now act as the visionary director. Deeply analyze the product and brief, and write the two master prompts as JSON. 
+Now act as the visionary director. Deeply analyze the product and brief, and write the imagePrompt as JSON.
 Remember:
 - Make the imagePrompt dense, rich, and formatted with Canvas, Style, Main subject, Storyboard panels, Design details, and Negative prompt sections.
-- Make the videoPrompt cinematic, demanding high-end transitions, correct @image reference tags, and explicit spoken dialogues in ${dialogueLanguage}.
-- Return ONLY the JSON object, no other text.`;
+- Return ONLY the JSON object with the imagePrompt field, no other text.`;
 }
 
 
@@ -176,13 +158,13 @@ function parseStoryboardOutput(rawText, targetDuration) {
         }
     }
 
-    if (!plan.imagePrompt || !plan.videoPrompt) {
-        throw new Error('Storyboard JSON missing imagePrompt or videoPrompt fields');
+    if (!plan.imagePrompt) {
+        throw new Error('Storyboard JSON missing imagePrompt field');
     }
 
     return {
         imagePrompt: plan.imagePrompt,
-        videoPrompt: plan.videoPrompt,
+        videoPrompt: '',  // Video prompt generated fresh at animate-time — not at creation time
         duration: targetDuration
     };
 }

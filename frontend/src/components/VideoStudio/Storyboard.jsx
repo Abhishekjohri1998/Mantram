@@ -153,7 +153,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [plan, setPlan] = useState(null);       // full storyboard plan from API
     const [imageUrl, setImageUrl] = useState('');
     const [imagePrompt, setImagePrompt] = useState('');
-    const [videoPrompt, setVideoPrompt] = useState('');
+    const [generatedVideoPrompt, setGeneratedVideoPrompt] = useState(''); // set after animate starts
     
     const [projectId, setProjectId] = useState(null);
     const [error, setError] = useState('');
@@ -294,7 +294,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             const data = await safeJson(res);
             if (data.success) {
                 if (data.imageUrl) setImageUrl(data.imageUrl);
-                if (data.videoPrompt) setVideoPrompt(data.videoPrompt);
+                // videoPrompt is generated fresh at animate-time; not needed here
             }
         } catch (e) {
             console.error('Regen poster error:', e);
@@ -351,7 +351,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             if (data.plan) {
                 setImageUrl(data.plan.imageUrl);
                 setImagePrompt(data.plan.imagePrompt);
-                setVideoPrompt(data.plan.videoPrompt);
+                // videoPrompt is NOT stored at creation time — generated fresh at animate-time
                 if (data.plan.dialogueLanguage) setDialogueLanguage(data.plan.dialogueLanguage);
             }
             setPhase('review');
@@ -367,9 +367,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         setPhase('animating');
         setError('');
         setIsLongForm(false);
-        setPhaseLabel('');
-        setPhaseDetail('');
+        setPhaseLabel('Writing video prompt...');
+        setPhaseDetail('Claude is composing the cinematic animation prompt');
         setSegmentInfo(null);
+        setGeneratedVideoPrompt('');
 
         try {
             const res = await fetch(`${API}/storyboard/animate`, {
@@ -378,7 +379,8 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 body: JSON.stringify({
                     projectId,
                     imageUrl,
-                    videoPrompt,
+                    // videoPrompt intentionally NOT sent — backend generates it fresh at animate-time
+                    // with correct @imageN tags mapped to the actual reference images being sent.
                     duration,
                     format,
                     resolution,
@@ -394,10 +396,16 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             const data = await safeJson(res);
             if (!data.success) throw new Error(data.error || 'Animation failed to start');
 
+            // Show the generated video prompt so user knows what was created
+            if (data.videoPrompt) setGeneratedVideoPrompt(data.videoPrompt);
+
             if (data.longForm) {
                 setIsLongForm(true);
                 setPhaseLabel('Planning segments...');
                 setPhaseDetail(`${data.segments || Math.ceil(duration / 10)} segments will be generated`);
+            } else {
+                setPhaseLabel('Animating film...');
+                setPhaseDetail('');
             }
 
             // Start polling — long-form uses 10s interval, single-shot uses 4s
@@ -688,27 +696,18 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 </button>
                             </div>
 
+                            {/* Dialogue Language selector */}
                             <div className="sb-prompt-group">
                                 <label className="sb-prompt-label">
                                     <span className="material-symbols-outlined">translate</span>
                                     Dialogue Language
                                 </label>
                                 <CfgMenu value={dialogueLanguage} onChange={setDialogueLanguage} options={LANGUAGES} icon="translate" />
+                                <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
+                                    Video prompt with dialogues in this language is auto-generated when you click Animate.
+                                </p>
                             </div>
 
-                            <div className="sb-prompt-group">
-                                <label className="sb-prompt-label">
-                                    <span className="material-symbols-outlined">movie</span>
-                                    Seedance Video Prompt
-                                </label>
-                                <textarea
-                                    className="sb-prompt-textarea"
-                                    rows={5}
-                                    value={videoPrompt}
-                                    onChange={e => setVideoPrompt(e.target.value)}
-                                    placeholder="Prompt for animating the poster into a cohesive long-duration film..."
-                                />
-                            </div>
                         </div>
                     </div>
 
@@ -743,6 +742,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                     </div>
                                     <span>{overallProgress}%</span>
                                 </div>
+                                {phaseDetail && !isLongForm && (
+                                    <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{phaseDetail}</p>
+                                )}
                                 {isLongForm && (
                                     <div className="sb-lf-progress-detail">
                                         {segmentInfo && segmentInfo.total > 0 && (
@@ -757,6 +759,18 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                             </div>
                                         )}
                                         {phaseDetail && <span className="sb-lf-detail">{phaseDetail}</span>}
+                                    </div>
+                                )}
+                                {/* Show the generated video prompt so user can see what Claude wrote */}
+                                {generatedVideoPrompt && (
+                                    <div style={{ marginTop: 12, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}>
+                                        <p style={{ margin: '0 0 6px', fontSize: 10, color: 'rgba(255,200,50,0.7)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 4 }}>auto_awesome</span>
+                                            Generated Video Prompt
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, maxHeight: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {generatedVideoPrompt.substring(0, 400)}{generatedVideoPrompt.length > 400 ? '...' : ''}
+                                        </p>
                                     </div>
                                 )}
                             </div>
@@ -776,7 +790,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                         </a>
                                     )}
                                     <button className="sb-btn-ghost" onClick={() => {
-                                        setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setVideoPrompt('');
+                                        setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setGeneratedVideoPrompt('');
                                         setProjectId(null); setFinalVideoUrl(null);
                                     }}>
                                         <span className="material-symbols-outlined">add</span>

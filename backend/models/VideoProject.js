@@ -53,6 +53,9 @@ const videoProjectSchema = new mongoose.Schema({
     // ── Step 1: Input ──
     input: {
         brief: { type: String, default: '' },
+        productName: { type: String, default: '' },
+        productFeatures: { type: String, default: '' },
+        avatarUrl: { type: String, default: '' },
         inputType: { type: String, enum: ['text', 'image', 'both'], default: 'text' },
         images: [{
             url: { type: String },

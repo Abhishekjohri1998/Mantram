@@ -292,9 +292,12 @@ async function _runPipeline(jobId, params) {
         // ═══ Phase 2: Sequential I2V Generation ══════════════════════════════
         const segmentVideoUrls = new Array(segCount).fill(null);
         const segmentAudioUrls = new Array(segCount).fill(null);
-        // BUG FIX: initialize to a real URL so segments 2+ never receive null imageUrl
-        // even if segment 1 fails and lastFrameUrl was never set.
-        let lastFrameUrl = params.firstFrameUrl || params.imageUrl;
+        // Initialize lastFrameUrl for segment chaining.
+        // Segment 1 uses params.firstFrameUrl (product/avatar image) as its opening frame.
+        // If firstFrameUrl is null (no product image), segment 1 runs as text-to-video.
+        // Subsequent segments chain from the last frame of the previous segment.
+        // NOTE: params.imageUrl is the STORYBOARD POSTER — it's a style reference, never a first frame.
+        let lastFrameUrl = params.firstFrameUrl || null;
         let completedCount = 0;
 
         // Pre-generate TTS segments
@@ -340,12 +343,16 @@ async function _runPipeline(jobId, params) {
                 (completedCount / segCount) * 100,
             );
 
-            // First segment: use the true product first-frame anchor
-            // Subsequent segments: use the last frame of the previous segment
-            const segmentFirstFrameUrl = i === 0 ? (params.firstFrameUrl || params.imageUrl) : lastFrameUrl;
+            // First segment: use product/avatar image as the opening frame anchor.
+            // If no product/avatar image → text-to-video (imageUrl=null is fine for Atlas).
+            // Subsequent segments: use last frame of previous segment for continuity.
+            // NEVER use the storyboard poster as a first frame — it's a style reference only.
+            const segmentFirstFrameUrl = i === 0 ? (params.firstFrameUrl || null) : lastFrameUrl;
 
-            // Build references
-            const segmentRefs = [...params.referenceImages];
+            // Build references: always inject storyboard poster as style guide for EVERY segment.
+            // This keeps colour grading, composition and overall visual style consistent.
+            const posterStyleRef = params.imageUrl ? [{ url: params.imageUrl, role: 'style_reference' }] : [];
+            const segmentRefs = [...posterStyleRef, ...params.referenceImages];
 
             // Build per-segment prompt — enrich with position context
             const isLast   = i === segCount - 1;
@@ -402,8 +409,10 @@ async function _runPipeline(jobId, params) {
                         lastFrameUrl = await extractLastFrameToS3(videoUrl);
                         console.log(`[SB LongForm ${jobId}] 🖼️ Last frame seg ${i+1}: ${lastFrameUrl?.substring(0, 70)}`);
                     } catch (frameErr) {
-                        console.warn(`[SB LongForm ${jobId}] ⚠️ Last frame extraction failed: ${frameErr.message} — next segment will use storyboard image`);
-                        lastFrameUrl = params.imageUrl; // fallback to master poster
+                        console.warn(`[SB LongForm ${jobId}] ⚠️ Last frame extraction failed: ${frameErr.message} — next segment will use firstFrameUrl fallback`);
+                        // Fallback: use product/avatar first-frame rather than the poster
+                        // (poster is a style reference, not suitable as a video start-frame)
+                        lastFrameUrl = params.firstFrameUrl || null;
                     }
                 }
 
@@ -444,7 +453,7 @@ async function _runPipeline(jobId, params) {
 
                     if (i < segCount - 1) {
                         try { lastFrameUrl = await extractLastFrameToS3(retryUrl); }
-                        catch { lastFrameUrl = params.imageUrl; }
+                        catch { lastFrameUrl = params.firstFrameUrl || null; }
                     }
                 } catch (retryErr) {
                     // If even the retry fails, skip this segment and continue
