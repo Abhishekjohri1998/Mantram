@@ -14,13 +14,16 @@
  *   - motion-graphics/video-{ts}.mp4  → no user ID (assign to primary user)
  *   - compiled-video/...              → check for user ID in path
  * 
- * Run: node scripts/restoreAllVideos.js
+ * Run: node scripts/restoreAllVideos.js [--dry-run]
  */
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 
 dotenv.config();
+
+const DRY_RUN = process.argv.includes('--dry-run');
+if (DRY_RUN) console.log('🔍 DRY RUN MODE — no database writes will be made\n');
 
 const s3 = new S3Client({
     region: process.env.AWS_REGION || 'ap-south-1',
@@ -39,6 +42,8 @@ const ALL_PREFIXES = [
     'video-studio/',
     'storyboard/final/',
     'storyboard/longform/',
+    'storyboard/posters/',
+    'storyboard/products/',
     'qads/',
     'ugc-pro/',
     'motion-graphics/',
@@ -46,6 +51,7 @@ const ALL_PREFIXES = [
     'ugc-enhance/',
     'ugc-previews/',
     'canvas-voiceover/',
+    'voiceover-preview/',
 ];
 
 async function listS3Videos(prefix) {
@@ -149,11 +155,13 @@ async function restore() {
     console.log(`\n🔑 Primary user (for unattributed videos): ${userMap[primaryUserId]?.email} (${primaryUserId})`);
 
     // Get existing projects to avoid duplicates
-    const existing = await db.collection('videoprojects').find({}).project({ finalVideoUrl: 1, 'generation.s3VideoUrl': 1 }).toArray();
+    const existing = await db.collection('videoprojects').find({}).project({ finalVideoUrl: 1, 'generation.s3VideoUrl': 1, 'generation.videoUrl': 1, 'storyboard.finalVideoUrl': 1 }).toArray();
     const existingUrls = new Set();
     existing.forEach(p => {
         if (p.finalVideoUrl) existingUrls.add(p.finalVideoUrl);
         if (p.generation?.s3VideoUrl) existingUrls.add(p.generation.s3VideoUrl);
+        if (p.generation?.videoUrl) existingUrls.add(p.generation.videoUrl);
+        if (p.storyboard?.finalVideoUrl) existingUrls.add(p.storyboard.finalVideoUrl);
     });
 
     console.log(`\n${'═'.repeat(65)}`);
@@ -261,8 +269,13 @@ async function restore() {
             };
 
             try {
-                await db.collection('videoprojects').insertOne(doc);
-                totalRestored++;
+                if (DRY_RUN) {
+                    console.log(`   [DRY] Would restore: ${title} (${studioMode}) → ${key}`);
+                    totalRestored++;
+                } else {
+                    await db.collection('videoprojects').insertOne(doc);
+                    totalRestored++;
+                }
                 existingUrls.add(s3Url); // prevent dups in this run
             } catch (err) {
                 if (err.code === 11000) {
