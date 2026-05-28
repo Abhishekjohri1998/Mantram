@@ -138,6 +138,63 @@ export async function apiFetch(endpoint, options = {}) {
     return data;
 }
 
+// ══════════════════════════════════════════════════════════════
+// SWR (Stale-While-Revalidate) Cache
+// Returns cached data instantly, revalidates in the background.
+// Only applies to GET requests to specified endpoints.
+// ══════════════════════════════════════════════════════════════
+const _swrCache = new Map();
+const SWR_TTL = 60_000; // 1 minute freshness window
+
+/**
+ * Cached fetch with stale-while-revalidate semantics.
+ * - If fresh data exists (< TTL), return it immediately.
+ * - If stale data exists (>= TTL), return it AND revalidate in background.
+ * - If no cache, fetch normally and cache the result.
+ * @param {string} endpoint - API endpoint (GET only)
+ * @param {Object} [options] - Same as apiFetch options
+ * @returns {Promise<any>}
+ */
+export async function cachedFetch(endpoint, options = {}) {
+    const key = endpoint;
+    const cached = _swrCache.get(key);
+    const now = Date.now();
+
+    if (cached) {
+        if (now - cached.ts < SWR_TTL) {
+            // Fresh — return immediately
+            return cached.data;
+        }
+        // Stale — return cached data, revalidate in background
+        apiFetch(endpoint, options)
+            .then(data => _swrCache.set(key, { data, ts: Date.now() }))
+            .catch(() => {}); // Silently fail background revalidation
+        return cached.data;
+    }
+
+    // No cache — fetch and store
+    const data = await apiFetch(endpoint, options);
+    _swrCache.set(key, { data, ts: now });
+    return data;
+}
+
+/**
+ * Invalidate a specific cache entry (call after mutations)
+ * @param {string} endpoint - The endpoint to invalidate
+ */
+export function invalidateCache(endpoint) {
+    if (endpoint) {
+        _swrCache.delete(endpoint);
+    }
+}
+
+/**
+ * Clear entire SWR cache (call on logout)
+ */
+export function clearCache() {
+    _swrCache.clear();
+}
+
 // ============ Auth API ============
 export const auth = {
     register: (data) => apiFetch('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
@@ -153,7 +210,11 @@ export const auth = {
 
 // ============ Brands API ============
 export const brands = {
-    list: (params = {}) => apiFetch(`/brands?${new URLSearchParams(params)}`),
+    list: (params = {}) => {
+        const qs = new URLSearchParams(params).toString();
+        const endpoint = qs ? `/brands?${qs}` : '/brands';
+        return cachedFetch(endpoint);
+    },
     get: (id) => apiFetch(`/brands/${id}`),
     create: (data) => apiFetch('/brands', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => apiFetch(`/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -1475,4 +1536,11 @@ export const notificationsAPI = {
     read: (id) => apiFetch(`/notifications/${id}/read`, { method: 'POST' }),
     readAll: () => apiFetch('/notifications/read-all', { method: 'POST' }),
     delete: (id) => apiFetch(`/notifications/${id}`, { method: 'DELETE' }),
+};
+
+// ── Activity Log (Team Accountability) ──────────────────────────────────────
+export const activityLog = {
+    mine: (params = {}) => apiFetch(`/activity?${new URLSearchParams(params)}`),
+    forBrand: (brandId, params = {}) => apiFetch(`/activity/brand/${brandId}?${new URLSearchParams(params)}`),
+    brandStats: (brandId) => cachedFetch(`/activity/brand/${brandId}/stats`),
 };

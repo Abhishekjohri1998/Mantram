@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { brands as brandsAPI } from '../services/api.js';
+import { brands as brandsAPI, invalidateCache } from '../services/api.js';
 import { useAuth } from './AuthContext.jsx';
 import { useBrandSession } from '../hooks/useBrandSession.js';
 
@@ -197,6 +197,7 @@ export function BrandProvider({ children }) {
 
     const updateBrand = async (id, updates) => {
         const data = await brandsAPI.update(id, updates);
+        invalidateCache('/brands'); // Bust list cache after mutation
         setBrands(prev => prev.map(b => b._id === id ? data.brand : b));
         if (activeBrand?._id === id) setActiveBrand(data.brand);
         return data.brand;
@@ -211,6 +212,7 @@ export function BrandProvider({ children }) {
 
     const deleteBrand = async (id) => {
         await brandsAPI.delete(id);
+        invalidateCache('/brands'); // Bust list cache after deletion
         setBrands(prev => {
             const remaining = prev.filter(b => b._id !== id);
             if (activeBrand?._id === id) {

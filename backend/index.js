@@ -80,6 +80,8 @@ import superadminTemplatesRoutes from './routes/superadmin-templates.js';
 import superadminImagesRoutes from './routes/superadmin-images.js';
 import commentRepliesRoutes from './routes/comment-replies.js';
 import viralityPredictorRoutes from './routes/virality-predictor.js';
+import activityLogRoutes from './routes/activity-log.js';
+import exportRoutes from './routes/export.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 
 const HARDCODED_ORIGINS = [
@@ -458,6 +460,8 @@ app.use('/api/superadmin/templates', superadminTemplatesRoutes);
 app.use('/api/superadmin/images', superadminImagesRoutes);
 app.use('/api/comment-replies', commentRepliesRoutes);
 app.use('/api/virality', viralityPredictorRoutes);
+app.use('/api/activity', activityLogRoutes);
+app.use('/api/export', exportRoutes);
 
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──

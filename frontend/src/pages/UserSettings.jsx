@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { auth as authAPI, payments as paymentsAPI, team as teamAPI } from '../services/api'
+import { auth as authAPI, payments as paymentsAPI, team as teamAPI, apiFetch, API_BASE } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useCredits } from '../context/CreditContext'
 
@@ -14,6 +14,7 @@ const SECTIONS = [
     { key: 'credits', label: 'Credit Usage', icon: 'toll' },
     { key: 'preferences', label: 'Preferences', icon: 'tune' },
     { key: 'team', label: 'Team', icon: 'group' },
+    { key: 'data', label: 'Data & Privacy', icon: 'download' },
 ]
 
 export default function UserSettings() {
@@ -53,6 +54,10 @@ export default function UserSettings() {
     const [prefs, setPrefs] = useState({})
     const [prefsSaving, setPrefsSaving] = useState(false)
     const [prefsMsg, setPrefsMsg] = useState(null)
+
+    // Data Export
+    const [exporting, setExporting] = useState(false)
+    const [exportMsg, setExportMsg] = useState(null)
 
     // Team
     const [teamInfo, setTeamInfo] = useState(null)
@@ -730,6 +735,73 @@ export default function UserSettings() {
                 </div>
                 <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] transition-all">chevron_right</span>
             </button>
+        </div>
+    </div>
+)}
+
+{/* ═══════════════ DATA & PRIVACY ═══════════════ */}
+{section === 'data' && (
+    <div className="space-y-6">
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-8">
+            <h3 className="text-xl font-bold text-[var(--sys-text)] flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-2xl text-primary">download</span>
+                Data Export
+            </h3>
+            <p className="text-sm text-[var(--sys-text-muted)] mb-6">Download a copy of all your data including profile, brands, Brand DNA, credit history, and activity logs. Compliant with GDPR data portability requirements.</p>
+
+            <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-6 mb-6">
+                <h4 className="text-sm font-bold text-[var(--sys-text)] mb-3">What's included in the export:</h4>
+                <div className="grid grid-cols-2 gap-2">
+                    {[
+                        { icon: 'person', label: 'Profile & account info' },
+                        { icon: 'business', label: 'All brand data & DNA' },
+                        { icon: 'palette', label: 'Custom templates & categories' },
+                        { icon: 'toll', label: 'Credit usage history' },
+                        { icon: 'history', label: 'Activity log (180 days)' },
+                        { icon: 'tune', label: 'Preferences & settings' },
+                    ].map(item => (
+                        <div key={item.label} className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
+                            <span className="material-symbols-outlined text-base text-primary">{item.icon}</span>
+                            {item.label}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <button
+                onClick={async () => {
+                    setExporting(true); setExportMsg(null);
+                    try {
+                        const data = await apiFetch('/export/user');
+                        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `mantram-export-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        setExportMsg({ type: 'success', text: 'Data exported successfully!' });
+                    } catch (e) { setExportMsg({ type: 'error', text: e.message || 'Export failed' }); }
+                    finally { setExporting(false); }
+                }}
+                disabled={exporting}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-none hover:bg-primary-light disabled:opacity-40 transition-all cursor-pointer"
+            >
+                <span className="material-symbols-outlined text-lg">{exporting ? 'hourglass_empty' : 'download'}</span>
+                {exporting ? 'Exporting...' : 'Download My Data'}
+            </button>
+            <MsgBox msg={exportMsg} />
+        </div>
+
+        <div className="glass-panel rounded-2xl border border-[var(--sys-border)] p-6">
+            <h4 className="text-base font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-lg text-[var(--sys-text-muted)]">shield</span>
+                Privacy Policy
+            </h4>
+            <p className="text-sm text-[var(--sys-text-muted)]">
+                Your data is stored securely on encrypted MongoDB Atlas servers. We never sell your data to third parties.
+                Activity logs are automatically deleted after 180 days. For data deletion requests, contact us at <a href="mailto:privacy@mantram.ai" className="text-primary hover:underline">privacy@mantram.ai</a>.
+            </p>
         </div>
     </div>
 )}

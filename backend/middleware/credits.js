@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
+import ActivityLog from '../models/ActivityLog.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 
 // Human-readable labels for actions
@@ -335,6 +336,19 @@ export const requireCredits = (actionOrCost = 1) => {
                     providerMultiplier: providerMultiplier > 1 ? providerMultiplier : undefined,
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
+
+            // Activity Log — fire-and-forget entry for team dashboards
+            ActivityLog.log({
+                user: user._id,
+                userName: user.name || user.email,
+                brand: req.body?.brandId || req.params?.brandId || undefined,
+                brandName: req.body?.brandName || '',
+                action: `${studio}.generated`,
+                studio,
+                details: `${ACTION_LABELS[actionName] || actionName} (${cost} credits)`,
+                creditCost: cost,
+                metadata: { provider: requestedProvider || undefined },
+            });
 
             // Store reference for downstream token usage logging
             req.creditAction = actionName;

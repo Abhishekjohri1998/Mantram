@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth as authAPI, setToken, clearToken, getToken } from '../services/api.js';
+import { auth as authAPI, setToken, clearToken, getToken, clearCache } from '../services/api.js';
 
 const AuthContext = createContext(null);
 
@@ -53,6 +53,7 @@ export function AuthProvider({ children }) {
 
     const logout = () => {
         clearToken();
+        clearCache(); // Purge SWR cache to prevent stale data leaking between sessions
         setUser(null);
     };
 
