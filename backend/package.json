@@ -6,7 +6,7 @@
     "scripts": {
         "start": "node index.js",
         "dev": "node --watch index.js",
-        "test": "node --experimental-vm-modules __tests__/test-ai.js"
+        "test": "node --experimental-vm-modules --test __tests__/unit.test.js"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1004.0",
