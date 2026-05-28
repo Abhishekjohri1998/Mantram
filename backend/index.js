@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import config from './config/env.js';
 import mongoose from 'mongoose';
-
+import { stripHtml } from './utils/sanitize.js';
 // Route imports
 import authRoutes from './routes/auth.js';
 import integrationsRoutes from './routes/integrations.js';
@@ -129,8 +129,10 @@ const isOriginAllowed = (origin) => {
     if (envOrigins.includes(cleanOrigin)) return true;
     
     // Domain-based allowance (mantram.ai and its subdomains)
-    if (cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1')) return true;
+    if (cleanOrigin.endsWith('mantram.ai')) return true;
     if (/\.mantram\.ai$/.test(cleanOrigin)) return true;
+    // Only allow localhost in development
+    if (process.env.NODE_ENV !== 'production' && (cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1'))) return true;
     
     return false;
 };
@@ -377,6 +379,23 @@ app.use((req, res, next) => {
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
 });
 
+// Global input sanitization — strip HTML tags from all string fields
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        const sanitize = (obj) => {
+            for (const [key, value] of Object.entries(obj)) {
+                if (typeof value === 'string') {
+                    obj[key] = stripHtml(value);
+                } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !Buffer.isBuffer(value)) {
+                    sanitize(value);
+                }
+            }
+        };
+        sanitize(req.body);
+    }
+    next();
+});
+
 // Request logging in dev
 if (config.nodeEnv === 'development') {
     app.use((req, res, next) => {
@@ -432,7 +451,6 @@ app.use('/api/fidato', fidatoRoutes);
 app.use('/api/nexus', nexusRoutes);
 app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/social', socialRoutes);
 
 app.use('/api/skills', skillsRoutes);
 app.use('/api/mcp-tools', mcpToolsRoutes);
@@ -463,6 +481,14 @@ app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
 app.use('/api/export', exportRoutes);
 
+// Catch-all 404 logger — suppress for known bot scans
+app.use((req, res) => {
+    // Catch-all 404 logger — suppress for known bot scans and POST / noise
+    if (!req.isBotScan && !(req.method === 'POST' && req.path === '/')) {
+        console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    }
+    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
+});
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
 // Exposes platform intelligence tools to all studio agents via mcpBridge
@@ -539,13 +565,6 @@ process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
 });
 
-// Catch-all 404 logger — suppress for known bot scans
-app.use((req, res) => {
-    // Catch-all 404 logger — suppress for known bot scans and POST / noise
-    if (!req.isBotScan && !(req.method === 'POST' && req.path === '/')) {
-        console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
-    }
-    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
-});
+// Catch-all 404 logger removed from here and placed before the error handler
 
 export default app;

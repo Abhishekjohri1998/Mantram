@@ -165,8 +165,8 @@ router.post('/validate-coupon', protect, async (req, res) => {
         }
 
         // Plan restriction
-        if (coupon.applicablePlans?.length > 0 && planSlug && !coupon.applicablePlans.includes(planSlug)) {
-            return res.status(400).json({ success: false, error: `This coupon is not valid for the ${planSlug} plan` });
+        if (coupon.applicablePlans?.length > 0 && !coupon.applicablePlans.includes(planSlug || 'credit_pack')) {
+            return res.status(400).json({ success: false, error: `This coupon is not valid for the ${planSlug || 'credit pack'} plan` });
         }
 
         // Min purchase amount
@@ -579,6 +579,11 @@ router.post('/verify-topup', protect, async (req, res) => {
         const order = await getRazorpay().orders.fetch(razorpay_order_id);
         if (order.notes?.type !== 'credit_topup') {
             return res.status(400).json({ success: false, error: 'Not a top-up order' });
+        }
+
+        // Verify the paying user matches the order creator
+        if (order.notes?.userId && order.notes.userId !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, error: 'Payment user mismatch' });
         }
 
         const credits = parseInt(order.notes.credits);
@@ -996,6 +1001,13 @@ router.get('/shopify/callback', async (req, res) => {
             return res.redirect(`${frontendUrl}/credits?error=subscription_inactive`);
         }
 
+        // Idempotency guard — prevent duplicate subscriptions from callback replays
+        const existingSub = await Subscription.findOne({ transactionId: charge_id });
+        if (existingSub) {
+            console.log(`🔐 [Idempotency] Shopify callback replay — sub ${existingSub._id} already exists for charge ${charge_id}`);
+            return res.redirect(`${frontendUrl}/credits?shopify_billing=success&plan=${existingSub.plan}`);
+        }
+
         const pkg = await SubscriptionPackage.findById(packageId);
         if (!pkg) {
             return res.redirect(`${frontendUrl}/credits?error=package_not_found`);
@@ -1120,6 +1132,16 @@ router.get('/shopify/topup-callback', async (req, res) => {
             return res.redirect(`${frontendUrl}/credits?error=purchase_inactive`);
         }
 
+        // Idempotency guard — prevent duplicate credit additions from callback replays
+        const CreditUsage = (await import('../models/CreditUsage.js')).default;
+        const alreadyProcessed = await CreditUsage.findOne({ 
+            'metadata.shopifyChargeId': charge_id, action: 'shopify_topup' 
+        });
+        if (alreadyProcessed) {
+            console.log(`🔐 [Idempotency] Shopify top-up callback replay — charge ${charge_id} already processed`);
+            return res.redirect(`${frontendUrl}/credits?shopify_topup=success&credits=${alreadyProcessed.cost}`);
+        }
+
         const pack = await CreditPack.findById(packId);
         if (!pack) {
             return res.redirect(`${frontendUrl}/credits?error=pack_not_found`);
@@ -1151,6 +1173,13 @@ router.get('/shopify/topup-callback', async (req, res) => {
         await CreditPack.findByIdAndUpdate(packId, {
             $inc: { purchaseCount: 1, totalRevenue: parseFloat(shopifyPurchase.price.amount) }
         });
+
+        // Record for idempotency tracking
+        await CreditUsage.create({
+            user: userId, action: 'shopify_topup', cost: finalCredits,
+            description: `Shopify Top-Up: ${pack.name}`,
+            metadata: { shopifyChargeId: charge_id, packSlug: pack.slug },
+        }).catch(() => {});
 
         console.log(`💎 Shopify Top-up verified: +${finalCredits} credits for ${updatedUser.email}, expires ${expiry.toISOString()}`);
 

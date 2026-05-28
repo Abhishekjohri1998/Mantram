@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import crypto from 'crypto';
-import { protect } from '../middleware/auth.js';
+import { protect, authorize } from '../middleware/auth.js';
 import Integration from '../models/Integration.js';
 import Product from '../models/Product.js';
 import ShopifyOrder from '../models/ShopifyOrder.js';
@@ -31,6 +31,18 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
+
+const processedWebhookIds = new Set();
+const WEBHOOK_DEDUP_TTL = 5 * 60 * 1000; // 5 minutes
+
+function isWebhookDuplicate(req) {
+    const webhookId = req.get('X-Shopify-Webhook-Id');
+    if (!webhookId) return false;
+    if (processedWebhookIds.has(webhookId)) return true;
+    processedWebhookIds.add(webhookId);
+    setTimeout(() => processedWebhookIds.delete(webhookId), WEBHOOK_DEDUP_TTL);
+    return false;
+}
 
 // ── Standard Shopify Install Endpoint ──────────────────────────────────────
 // GET /api/shopify/auth?shop=my-store.myshopify.com
@@ -443,7 +455,7 @@ router.get('/products', protect, async (req, res) => {
 // GET /api/shopify/products/:id — Single product
 router.get('/products/:id', protect, async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findOne({ _id: req.params.id, user: req.user._id });
         if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
         const signedProduct = await signProductAssets(product);
         res.json({ success: true, product: signedProduct });
@@ -537,6 +549,7 @@ router.post('/webhooks/compliance', verifyShopifyWebhook, async (req, res) => {
 // ============================================================================
 
 router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) => {
+    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -557,6 +570,7 @@ router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) =>
 });
 
 router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) => {
+    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -577,6 +591,7 @@ router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) =
 });
 
 router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) => {
+    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const product = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -597,6 +612,7 @@ router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) 
 });
 
 router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) => {
+    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const shop = req.headers['x-shopify-shop-domain'];
         console.log(`🗑️ Webhook: App uninstalled from ${shop}`);
@@ -612,6 +628,7 @@ router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) 
 });
 
 router.post(['/webhooks/app-subscriptions-update', '/webhooks/app_subscriptions-update'], verifyShopifyWebhook, async (req, res) => {
+    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const payload = req.body.app_subscription || req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -653,7 +670,7 @@ router.get('/webhooks/check', (req, res) => {
 });
 
 // C3 FIX: Both debug endpoints are now protected — require auth + only available in non-production
-router.get('/debug-config', protect, (req, res) => {
+router.get('/debug-config', protect, authorize('superadmin'), (req, res) => {
     if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ error: 'Not available in production' });
     }
@@ -670,7 +687,7 @@ router.get('/debug-config', protect, (req, res) => {
     });
 });
 
-router.post('/debug/hmac-simulator', protect, async (req, res) => {
+router.post('/debug/hmac-simulator', protect, authorize('superadmin'), async (req, res) => {
     if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ error: 'Not available in production' });
     }

@@ -286,23 +286,40 @@ export const requireCredits = (actionOrCost = 1) => {
             // Include topUp credits if not expired
             const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
                 ? user.credits.topUp : 0;
-            const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) + topUp - (user.credits?.used || 0);
 
-            if (remaining < cost) {
-                console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${remaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
+            // Atomic deduction with balance precondition
+            const updatedUser = await User.findOneAndUpdate(
+                {
+                    _id: user._id,
+                    $expr: {
+                        $gte: [
+                            { $subtract: [
+                                { $add: [{ $ifNull: ['$credits.total', 0] }, { $ifNull: ['$credits.bonus', 0] }, topUp > 0 ? topUp : 0] },
+                                { $ifNull: ['$credits.used', 0] }
+                            ] },
+                            cost
+                        ]
+                    }
+                },
+                { $inc: { 'credits.used': cost } },
+                { returnDocument: 'after' }
+            );
+
+            if (!updatedUser) {
+                const freshUser = await User.findById(user._id);
+                const freshTopUp = (freshUser?.credits?.topUp > 0 && freshUser?.credits?.topUpExpiry && new Date(freshUser.credits.topUpExpiry) > new Date()) ? freshUser.credits.topUp : 0;
+                const freshRemaining = (freshUser?.credits?.total || 0) + (freshUser?.credits?.bonus || 0) + freshTopUp - (freshUser?.credits?.used || 0);
+                console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${freshRemaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
                 return res.status(403).json({
                     success: false,
                     error: 'Insufficient credits',
                     creditsRequired: cost,
-                    creditsRemaining: Math.max(0, remaining),
+                    creditsRemaining: Math.max(0, freshRemaining),
                     upgradeRequired: true,
                 });
             }
 
-            // Deduct credits immediately
-            const updateOps = [
-                User.findByIdAndUpdate(user._id, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
-            ];
+            const updateOps = [Promise.resolve(updatedUser)];
 
             // If user has an active subscription, sync deduction there too
             if (user.activeSubscription) {

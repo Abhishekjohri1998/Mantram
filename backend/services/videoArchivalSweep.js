@@ -188,8 +188,7 @@ export async function markAbandonedDrafts() {
     try {
         const abandoned = await VideoProject.updateMany(
             {
-                isDraft: true,
-                status: { $in: ['failed', 'advanced-generating'] },
+                status: { $in: ['failed', 'advanced-generating', 'generating'] },
                 createdAt: { $lt: cutoff },
                 abandonedAt: { $exists: false },
             },

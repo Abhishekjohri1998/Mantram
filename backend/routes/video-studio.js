@@ -324,8 +324,8 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
     try {
         const { projectId, prompt, duration, qualityMode } = req.body;
 
-        if (!projectId) {
-            return res.status(400).json({ success: false, error: 'Project ID is required' });
+        if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+            return res.status(400).json({ success: false, error: 'Valid Project ID is required' });
         }
 
         // Load original project
@@ -2545,9 +2545,16 @@ router.post('/ugc/register-webhook', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/video-studio/ugc/webhook-callback — HeyGen webhook callback (no auth)
+// POST /api/video-studio/ugc/webhook-callback — HeyGen webhook callback
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/ugc/webhook-callback', async (req, res) => {
+    // Verify HeyGen webhook authenticity
+    const webhookToken = req.headers['x-heygen-signature'] || req.headers.authorization?.replace('Bearer ', '');
+    if (webhookToken !== process.env.HEYGEN_WEBHOOK_SECRET && process.env.HEYGEN_WEBHOOK_SECRET) {
+        console.warn('⚠️ UGC webhook callback rejected — invalid signature');
+        return res.status(401).json({ error: 'Unauthorized webhook callback' });
+    }
+
     try {
         const { event_type, event_data } = req.body;
         const videoId = event_data?.video_id;

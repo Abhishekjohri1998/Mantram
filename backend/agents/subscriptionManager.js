@@ -17,6 +17,18 @@ export async function processRenewals() {
     const now = new Date();
 
     try {
+        // --- NEW: Expire subscriptions past their endDate ---
+        const expiredSubs = await Subscription.find({
+            status: 'active',
+            endDate: { $lt: now }
+        });
+        for (const sub of expiredSubs) {
+            sub.status = 'expired';
+            await sub.save();
+            await User.findByIdAndUpdate(sub.user, { plan: 'free' });
+            console.log(`📉 Subscription ${sub._id} expired — user ${sub.user} downgraded to free`);
+        }
+
         // Find active subscriptions that have passed their renewal date
         const subscriptions = await Subscription.find({
             status: 'active',
