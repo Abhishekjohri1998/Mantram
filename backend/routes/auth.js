@@ -9,6 +9,7 @@ import { protect, generateToken } from '../middleware/auth.js';
 import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { sendVerificationEmail, sendQueueRegistrationEmails } from '../utils/email.js';
+import { normalizeEmail } from '../utils/normalizeEmail.js';
 
 const router = Router();
 
@@ -92,7 +93,11 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
         }
 
-        const exists = await User.findOne({ email });
+        // Normalize email to prevent duplicates via Gmail dots/plus tricks
+        // e.g. a.b.c@gmail.com = abc@gmail.com, user+tag@gmail.com = user@gmail.com
+        const normalizedEmail = normalizeEmail(email);
+
+        const exists = await User.findOne({ email: normalizedEmail });
         if (exists) {
             return res.status(400).json({ success: false, error: 'Email already registered' });
         }
@@ -110,7 +115,7 @@ router.post('/register', async (req, res) => {
 
         const user = await User.create({
             name,
-            email,
+            email: normalizedEmail,
             password,
             company,
             userId,
@@ -201,8 +206,11 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Provide email and password' });
         }
 
+        // Normalize email for lookup (handles Gmail dots, plus addressing)
+        const normalizedEmail = normalizeEmail(email);
+
         // Select verification fields to check status
-        const user = await User.findOne({ email }).select('+password +verificationToken +verificationExpires');
+        const user = await User.findOne({ email: normalizedEmail }).select('+password +verificationToken +verificationExpires');
 
         if (!user) {
             return res.status(401).json({ 
@@ -303,7 +311,7 @@ router.post('/resend-verification', async (req, res) => {
         const { email } = req.body;
         if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: normalizeEmail(email) });
         if (!user) {
             // Success response for security (prevents account discovery)
             return res.json({ success: true, message: 'If an account exists, a new verification link has been sent.' });
@@ -340,7 +348,7 @@ router.post('/forgot-password', async (req, res) => {
         // Always return success to prevent account enumeration
         const successMsg = 'If an account with that email exists, a password reset link has been sent.';
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({ email: normalizeEmail(email) });
         if (!user) {
             return res.json({ success: true, message: successMsg });
         }
@@ -704,14 +712,15 @@ router.get('/google/callback', async (req, res) => {
             return res.send(closeAuthPopupScript('Could not retrieve email from Google.'));
         }
 
-        // 3. Find or Create User
-        let user = await User.findOne({ email: profileData.email });
+        // 3. Find or Create User (normalize email to catch Gmail dot/plus duplicates)
+        const normalizedGoogleEmail = normalizeEmail(profileData.email);
+        let user = await User.findOne({ email: normalizedGoogleEmail });
 
         if (!user) {
             const userId = await User.generateUserId();
             user = await User.create({
                 name: profileData.name || 'Google User',
-                email: profileData.email,
+                email: normalizedGoogleEmail,
                 avatar: profileData.picture,
                 userId,
                 isGoogleUser: true,
@@ -752,7 +761,7 @@ router.get('/google/callback', async (req, res) => {
         }
 
         if (!userId && profileData.email) {
-            const fallbackUser = await User.findOne({ email: profileData.email });
+            const fallbackUser = await User.findOne({ email: normalizedGoogleEmail });
             if (fallbackUser) {
                 user = fallbackUser;
                 userId = user._id || user.id;

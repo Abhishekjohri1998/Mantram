@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { normalizeEmail } from '../utils/normalizeEmail.js';
 
 // ── Creative User ID Generator ──
 const USER_ID_ADJECTIVES = [
@@ -143,6 +144,14 @@ userSchema.virtual('creditsRemaining').get(function () {
 });
 
 userSchema.set('toJSON', { virtuals: true });
+
+// Normalize email before save (safety net — catches all code paths)
+userSchema.pre('save', function (next) {
+    if (this.isModified('email') && this.email) {
+        this.email = normalizeEmail(this.email);
+    }
+    next();
+});
 
 // Hash password before save
 userSchema.pre('save', async function () {
