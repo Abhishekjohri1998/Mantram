@@ -32,6 +32,100 @@ import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
 
+// ── Standard Shopify Install Endpoint ──────────────────────────────────────
+// GET /api/shopify/auth?shop=my-store.myshopify.com
+// This is the entry point Shopify calls when a merchant clicks "Install" from
+// the App Store or Admin. It auto-creates User + Brand + Integration and
+// redirects to Shopify OAuth consent screen — no manual login needed.
+router.get('/auth', async (req, res) => {
+    try {
+        const { shop } = req.query;
+        if (!shop) return res.status(400).send('Missing shop parameter');
+
+        // Validate shop domain format
+        const SHOPIFY_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
+        if (!SHOPIFY_DOMAIN_REGEX.test(shop)) {
+            return res.status(400).send('Invalid shop domain');
+        }
+
+        const clientId = config.shopify.apiKey;
+        if (!clientId) return res.status(500).send('Shopify app not configured');
+
+        const backendUrl = config.backendUrl || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        const redirectUri = `${backendUrl}/api/shopify/callback`;
+
+        // Auto-provision: find or create user + brand + integration for this shop
+        let integration = await Integration.findOne({
+            'platformData.shopDomain': shop,
+            platform: 'shopify',
+        });
+
+        let userId;
+        if (integration) {
+            userId = integration.user;
+        } else {
+            // Create user + brand + integration
+            const shopName = shop.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const generatedUserId = await User.generateUserId();
+
+            const user = await User.create({
+                name: shopName,
+                email: `${shop.replace(/\./g, '-')}@shopify-install.mantram.ai`,
+                password: crypto.randomBytes(24).toString('hex'),
+                userId: generatedUserId,
+                isVerified: true,
+                approvalStatus: 'approved',
+                company: shopName,
+            });
+
+            const Brand = (await import('../models/Brand.js')).default;
+            const brand = await Brand.create({
+                user: user._id,
+                name: shopName,
+                website: `https://${shop}`,
+                onboardingMethod: 'shopify',
+                status: 'active',
+                dna: { brandDescription: `Brand auto-created from Shopify install (${shop})` },
+            });
+
+            integration = await Integration.create({
+                user: user._id,
+                brand: brand._id,
+                platform: 'shopify',
+                status: 'pending',
+                platformData: { shopDomain: shop, shopName },
+                displayName: shopName,
+                profileUrl: `https://${shop}`,
+            });
+
+            userId = user._id;
+            console.log(`🛍️ Shopify install: auto-provisioned User=${user.email}, Brand=${brand.name}`);
+        }
+
+        // Generate nonce for CSRF protection
+        const nonce = crypto.randomBytes(16).toString('hex');
+        const statePayload = Buffer.from(JSON.stringify({
+            userId: String(userId),
+            brandId: integration.brand ? String(integration.brand) : '',
+            nonce
+        })).toString('base64');
+
+        // Store nonce in integration metadata
+        await Integration.findByIdAndUpdate(integration._id, {
+            status: 'pending',
+            'metadata.oauthNonce': nonce,
+        });
+
+        const authUrl = getShopifyAuthUrl(shop, clientId, redirectUri) + `&state=${statePayload}`;
+        console.log(`🔗 Shopify install OAuth redirect for ${shop}`);
+        res.redirect(authUrl);
+
+    } catch (error) {
+        console.error('Shopify install auth error:', error);
+        res.status(500).send('Failed to start Shopify installation. Please try again.');
+    }
+});
+
 // GET /api/shopify/status — Check connection status (brand-aware)
 router.get('/status', protect, async (req, res) => {
     try {
@@ -67,7 +161,8 @@ router.post('/connect', protect, async (req, res) => {
         const clientId = config.shopify.apiKey;
         if (!clientId) return res.status(500).json({ success: false, error: 'Shopify app not configured. Add SHOPIFY_API_KEY to .env' });
 
-        const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+        // Hardcode production redirect URI to match shopify.app.toml
+        const backendUrl = config.backendUrl || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
         const redirectUri = `${backendUrl}/api/shopify/callback`;
 
         // C1 FIX: Generate a cryptographic nonce and store it server-side to prevent CSRF
@@ -162,7 +257,7 @@ router.post('/connect-token', protect, async (req, res) => {
 
 // GET /api/shopify/callback — Shopify OAuth Callback
 router.get('/callback', async (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl) || 'http://localhost:5173';
     try {
         const { code, shop, state } = req.query;
         if (!code || !shop) return res.redirect(`${frontendUrl}/integrations?error=missing_params`);
@@ -192,11 +287,10 @@ router.get('/callback', async (req, res) => {
             } catch { /* state decode failed — proceed without nonce (legacy flow) */ }
         }
 
-        // Find the pending integration and verify nonce matches
-        const query = { platform: 'shopify', 'platformData.shopDomain': shop };
+        // Find the pending integration — try with brand first, then without
+        let query = { platform: 'shopify', 'platformData.shopDomain': shop };
         if (userId) query.user = userId;
-        if (brandId) query.brand = brandId;
-        else query.brand = { $exists: false };
+        // Don't filter by brand — the install endpoint may have set one
 
         const pendingIntegration = await Integration.findOne({ ...query, status: 'pending' }).select('+metadata');
         if (pendingIntegration && receivedNonce && pendingIntegration.metadata?.oauthNonce) {
@@ -227,7 +321,7 @@ router.get('/callback', async (req, res) => {
                 await integration.save();
                 console.log(`✅ Shopify connected: ${shopInfo.name} (${shop})`);
 
-                const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`;
+                const backendUrl = config.backendUrl || `http://localhost:${process.env.PORT || 3001}`;
                 syncStoreData(tokenData.access_token, shop, userId, integration.brand, { Product, ShopifyOrder, ShopifyCustomer })
                     .then(res => console.log(`📦 Initial sync complete for ${shop}:`, res))
                     .catch(err => console.error(`❌ Initial sync failed for ${shop}:`, err));

@@ -19,4 +19,7 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://api.mantram.ai/api/shopify/callback" ]
+redirect_urls = [
+  "https://api.mantram.ai/api/shopify/callback",
+  "https://api.mantram.ai/api/shopify/auth"
+]

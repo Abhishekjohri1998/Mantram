@@ -121,10 +121,12 @@ const userSchema = new mongoose.Schema({
     resetPasswordExpires: { type: Date, select: false },
 
     // Registration Queue & Approval
+    // NOTE: Default is 'approved' — users can access the platform after email verification.
+    // SuperAdmin can still reject users manually if needed.
     approvalStatus: { 
         type: String, 
         enum: ['pending', 'approved', 'rejected'], 
-        default: 'pending' 
+        default: 'approved' 
     },
     queueNumber: { type: Number },
 

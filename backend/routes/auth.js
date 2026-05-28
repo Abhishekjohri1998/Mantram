@@ -117,7 +117,7 @@ router.post('/register', async (req, res) => {
             verificationToken,
             verificationExpires,
             isVerified: false,
-            approvalStatus: 'pending',
+            approvalStatus: 'approved',
             queueNumber,
             milestones: {
                 addedBrand: !!(company || initialWebsite)
@@ -226,19 +226,12 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // 2. Approval Check
-        if (user.approvalStatus !== 'approved' && user.role !== 'superadmin') {
-            if (user.approvalStatus === 'rejected') {
-                return res.status(403).json({
-                    success: false,
-                    error: 'Your registration request was not approved. Please contact support if you believe this is an error.'
-                });
-            }
-            // pending or undefined
+        // NOTE: Approval gate removed — users can access after email verification only.
+        // SuperAdmin can still manually reject users via the admin dashboard if needed.
+        if (user.approvalStatus === 'rejected' && user.role !== 'superadmin') {
             return res.status(403).json({
                 success: false,
-                error: 'Your account is pending approval. You will be notified once approved.',
-                needsApproval: true,
+                error: 'Your account has been suspended. Please contact support if you believe this is an error.'
             });
         }
 
@@ -724,7 +717,7 @@ router.get('/google/callback', async (req, res) => {
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
                 password: Math.random().toString(36).slice(-12),
-                approvalStatus: 'pending'
+                approvalStatus: 'approved'
             });
             // --- NEW: Assign Free Subscription for Google Signup ---
             await assignDefaultSubscription(user);
@@ -739,15 +732,13 @@ router.get('/google/callback', async (req, res) => {
             }
         }
 
-        // Check approval before proceeding
-        if (user.approvalStatus !== 'approved' && user.role !== 'superadmin') {
-            const errorMsg = user.approvalStatus === 'rejected' 
-                ? 'Your registration request was not approved.' 
-                : 'Your account is pending approval. You will be notified once approved.';
-            
+        // NOTE: Approval gate removed — Google OAuth users get immediate access.
+        // SuperAdmin can still reject users manually if needed.
+        if (user.approvalStatus === 'rejected' && user.role !== 'superadmin') {
+            const errorMsg = 'Your account has been suspended. Please contact support.';
             if (flow === 'redirect') {
                 const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
-                return res.redirect(`${frontendUrl}/auth?needsApproval=true&error=${encodeURIComponent(errorMsg)}`);
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
             }
             return res.send(closeAuthPopupScript(errorMsg, '', null, true));
         }

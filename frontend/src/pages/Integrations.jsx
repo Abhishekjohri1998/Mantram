@@ -135,7 +135,8 @@ export default function Integrations() {
     const [platformStatus, setPlatformStatus] = useState({})
     const [shopifyDomain, setShopifyDomain] = useState(shopifyShop || '')
     const [shopifyToken, setShopifyToken] = useState('')
-    const [shopifyMode, setShopifyMode] = useState(isEmbedded ? 'oauth' : 'token')
+    const [shopifyMode, setShopifyMode] = useState('oauth') // Default to OAuth — Shopify reviewers expect standard OAuth
+    const [shopifyError, setShopifyError] = useState('')
     const [products, setProducts] = useState([])
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
@@ -358,21 +359,22 @@ export default function Integrations() {
 
     // ── Shopify Actions ──
     const connectShopify = async () => {
-        if (!shopifyDomain) return alert('Enter your Shopify store domain')
+        setShopifyError('')
+        if (!shopifyDomain) { setShopifyError('Enter your Shopify store domain (e.g. my-store.myshopify.com)'); return }
         if (shopifyMode === 'token') {
-            if (!shopifyToken) return alert('Paste your Admin API Access Token')
+            if (!shopifyToken) { setShopifyError('Paste your Admin API Access Token'); return }
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connectToken(shopifyDomain, shopifyToken, brandId)
-                alert(` Connected to ${data.shopName}!`); setShopifyToken(''); loadAllStatuses()
-            } catch (err) { alert(`Connection failed: ${err.message}`) }
+                setShopifyError(''); setShopifyToken(''); loadAllStatuses()
+            } catch (err) { setShopifyError(err.message || 'Connection failed. Check your access token and try again.') }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         } else {
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connect(shopifyDomain, brandId)
                 if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
-            } catch (err) { alert(`Shopify connection failed: ${err.message}`) }
+            } catch (err) { setShopifyError(err.message || 'OAuth connection failed. Please try again.') }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         }
     }
@@ -618,13 +620,17 @@ export default function Integrations() {
                                                 placeholder="my-store.myshopify.com"
                                                 className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
                                             {shopifyMode === 'oauth' && (
-                                                <div className="p-3.5 rounded-xl bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] flex gap-3">
-                                                    <span className="material-symbols-outlined text-primary text-xl">warning</span>
-                                                    <div className="text-xs border-[var(--sys-border)] leading-relaxed">
-                                                        <p className="font-bold text-primary mb-1">Shopify Review Pending</p>
-                                                        Shopify blocks standard OAuth for new apps until review is complete.
-                                                        Use <strong>Access Token</strong> mode instead to connect immediately.
+                                                <div className="p-3.5 rounded-xl bg-[#96BF48]/5 border border-[#96BF48]/20 flex gap-3">
+                                                    <span className="material-symbols-outlined text-[#96BF48] text-xl">info</span>
+                                                    <div className="text-xs leading-relaxed text-[var(--sys-text-muted)]">
+                                                        Click <strong>Connect via OAuth</strong> to authorize Mantram AI. You'll be redirected to Shopify to approve permissions.
                                                     </div>
+                                                </div>
+                                            )}
+                                            {shopifyError && (
+                                                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3">
+                                                    <span className="material-symbols-outlined text-red-400 text-xl">error</span>
+                                                    <div className="text-xs leading-relaxed text-red-300">{shopifyError}</div>
                                                 </div>
                                             )}
                                             {shopifyMode === 'token' && (

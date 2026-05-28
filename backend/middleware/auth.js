@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import Integration from '../models/Integration.js';
+import Brand from '../models/Brand.js';
 import config from '../config/env.js';
 import { performMonthlyReset } from '../utils/credits.js';
 
@@ -43,24 +45,72 @@ export const protect = async (req, res, next) => {
         });
 
         const shopDomain = decoded.dest.replace(/^https?:\/\//, '');
-        const integration = await Integration.findOne({
+        
+        // Look for ANY existing integration (connected or pending) for this shop
+        let integration = await Integration.findOne({
             'platformData.shopDomain': shopDomain,
             platform: 'shopify',
-            status: 'connected'
+            status: { $in: ['connected', 'pending'] }
         });
 
         if (integration) {
             const user = await User.findById(integration.user);
-            req.user = await performMonthlyReset(user);
-            req.activeBrand = integration.brand;
-            req.shopifyShop = shopDomain;
-            req.shopifyAuth = true;
-            return next();
-        } else {
-            // Valid Shopify token but no integration/user found — cannot proceed
-            console.warn(`⚠️ [AUTH] Valid Shopify token for ${shopDomain} but no integration found`);
-            return res.status(401).json({ success: false, error: 'Shopify store not connected. Please install the app first.' });
+            if (user) {
+                req.user = await performMonthlyReset(user);
+                req.activeBrand = integration.brand;
+                req.shopifyShop = shopDomain;
+                req.shopifyAuth = true;
+                return next();
+            }
         }
+        
+        // ── AUTO-PROVISION: First-time Shopify install ──
+        // Valid Shopify token but no integration/user found — create everything automatically.
+        // This is critical for Shopify App Review: the reviewer installs the app and expects
+        // it to work immediately without manual registration/approval.
+        console.log(`🛍️ [AUTH] Auto-provisioning user for new Shopify install: ${shopDomain}`);
+        
+        const shopName = shopDomain.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const userId = await User.generateUserId();
+        
+        const newUser = await User.create({
+            name: shopName,
+            email: `${shopDomain.replace(/\./g, '-')}@shopify-install.mantram.ai`,
+            password: crypto.randomBytes(24).toString('hex'),
+            userId,
+            isVerified: true,
+            approvalStatus: 'approved',
+            company: shopName,
+        });
+
+        // Create a default brand for the shop
+        const brand = await Brand.create({
+            user: newUser._id,
+            name: shopName,
+            website: `https://${shopDomain}`,
+            onboardingMethod: 'shopify',
+            status: 'active',
+            dna: { brandDescription: `Brand auto-created from Shopify install (${shopDomain})` },
+        });
+
+        // Create the pending integration (will become 'connected' after OAuth callback)
+        integration = await Integration.create({
+            user: newUser._id,
+            brand: brand._id,
+            platform: 'shopify',
+            status: 'pending',
+            platformData: { shopDomain, shopName },
+            displayName: shopName,
+            profileUrl: `https://${shopDomain}`,
+        });
+
+        console.log(`✅ [AUTH] Auto-provisioned: User=${newUser.email}, Brand=${brand.name}, Integration=${integration._id}`);
+
+        req.user = newUser;
+        req.activeBrand = brand._id;
+        req.shopifyShop = shopDomain;
+        req.shopifyAuth = true;
+        return next();
     } catch (shopifyErr) {
         if (shopifyErr.message !== 'jwt malformed' && shopifyErr.message !== 'invalid signature') {
             console.error(`❌ [AUTH] Token verification failed (Standard & Shopify): ${shopifyErr.message}`);

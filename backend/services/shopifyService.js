@@ -9,14 +9,15 @@ import { shopifyApi, ApiVersion, Session } from '@shopify/shopify-api';
 import config from '../config/env.js';
 
 // Initialize the official Shopify API client
+const backendHost = (config.backendUrl || 'https://api.mantram.ai').replace(/^https?:\/\//, '');
 export const shopify = shopifyApi({
     apiKey: config.shopify.apiKey || process.env.SHOPIFY_API_KEY || 'dummy',
     apiSecretKey: config.shopify.apiSecret || process.env.SHOPIFY_API_SECRET || 'dummy',
     scopes: (config.shopify.scope || 'read_products,read_orders,read_customers,read_inventory').split(','),
-    hostName: (process.env.BACKEND_URL || 'localhost:3001').replace(/^https?:\/\//, ''),
-    hostScheme: (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith('https')) ? 'https' : 'http',
+    hostName: backendHost,
+    hostScheme: (config.backendUrl && config.backendUrl.startsWith('https')) ? 'https' : 'http',
     apiVersion: ApiVersion.January25,
-    isEmbeddedApp: false, // Set to true if rendering within Shopify Admin iframe
+    isEmbeddedApp: true, // Shopify App Review expects embedded mode (matching shopify.app.toml)
 });
 
 /**
