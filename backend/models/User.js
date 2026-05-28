@@ -146,11 +146,10 @@ userSchema.virtual('creditsRemaining').get(function () {
 userSchema.set('toJSON', { virtuals: true });
 
 // Normalize email before save (safety net — catches all code paths)
-userSchema.pre('save', function (next) {
+userSchema.pre('save', function () {
     if (this.isModified('email') && this.email) {
         this.email = normalizeEmail(this.email);
     }
-    next();
 });
 
 // Hash password before save
