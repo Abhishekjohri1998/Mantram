@@ -40,12 +40,22 @@ backend/shopify.app.toml.local
 waitlist.xlsx
 pitch_deck_research.json
 
-# Scripts & Scratch
+# Scripts & Scratch (dev-only files)
 /scripts/fix_*.py
 /scripts/fix_*.js
 /scripts/patch_*.js
 /scripts/scratch.js
 scratch.js
+scratch/
+scratch_*.js
+scratch.diff
+
+# Test files (root-level one-offs)
+test_*.js
+test-*.js
+full-qa-*.js
+fix_*.js
+*.js.tmp
 
 # Data
 *.json

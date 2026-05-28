@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import User from '../models/User.js';
 import Brand from '../models/Brand.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
@@ -10,8 +11,37 @@ import config from '../config/env.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { sendVerificationEmail, sendQueueRegistrationEmails } from '../utils/email.js';
 import { normalizeEmail } from '../utils/normalizeEmail.js';
+import { sanitizeBody } from '../utils/sanitize.js';
 
 const router = Router();
+
+// ── Rate Limiters ────────────────────────────────────────────
+// Login: 5 attempts per 15 minutes per IP (prevents brute-force)
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { success: false, error: 'Too many login attempts. Please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Registration: 3 per hour per IP (prevents spam accounts)
+const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    message: { success: false, error: 'Too many registrations from this IP. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Email operations: 3 per 15 minutes per IP (forgot-password, resend-verification)
+const emailLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    message: { success: false, error: 'Too many requests. Please wait before trying again.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 // Spam Protection: Domain Blacklist for common "burner" providers
 const BLACKLISTED_DOMAINS = [
@@ -69,7 +99,7 @@ async function assignDefaultSubscription(user) {
 }
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, sanitizeBody(['name', 'company']), async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         // POST /api/auth/register
@@ -198,7 +228,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         const { email, password } = req.body;
@@ -306,7 +336,7 @@ router.get('/verify-email', async (req, res) => {
 });
 
 // POST /api/auth/resend-verification
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', emailLimiter, async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
@@ -339,7 +369,7 @@ router.post('/resend-verification', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 
 // POST /api/auth/forgot-password — Send password reset email
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', emailLimiter, async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         const { email } = req.body;
@@ -409,7 +439,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password — Reset password with token
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', emailLimiter, async (req, res) => {
     if (!requireDB(req, res)) return;
     try {
         const { token, password } = req.body;
@@ -505,7 +535,7 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // PUT /api/auth/profile
-router.put('/profile', protect, async (req, res) => {
+router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, res) => {
     const { name, company, avatar, preferences } = req.body;
     const user = await User.findByIdAndUpdate(
         req.user._id,

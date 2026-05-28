@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import config from './config/env.js';
 import mongoose from 'mongoose';
@@ -89,6 +91,27 @@ const HARDCODED_ORIGINS = [
 ];
 
 const app = express();
+
+// ── SECURITY HEADERS (Helmet) ─────────────────────────────────
+// Sets X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options,
+// X-XSS-Protection, and other security headers automatically.
+app.use(helmet({
+    contentSecurityPolicy: false,          // CSP conflicts with inline styles (Tailwind)
+    crossOriginEmbedderPolicy: false,      // Required for Shopify embedded app mode
+    crossOriginResourcePolicy: false,      // Allow cross-origin images from S3/CDN
+}));
+
+// ── GLOBAL API RATE LIMITER ───────────────────────────────────
+// 100 requests per minute per IP — catch-all safety net
+const globalApiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.path === '/api/health' || req.path === '/health',
+    message: { success: false, error: 'Too many requests. Please slow down and try again in a minute.' },
+});
+app.use('/api/', globalApiLimiter);
 
 // ── CORS CONFIGURATION ────────────────────────────────────────
 const isOriginAllowed = (origin) => {

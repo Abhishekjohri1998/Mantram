@@ -7,6 +7,7 @@ import { ShopifyProvider } from './context/ShopifyContext'
 import { UIProvider } from './context/UIContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlanGatedRoute from './components/PlanGatedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 import { BackgroundJobsContext, useBackgroundJobs } from './hooks/useBackgroundJobs'
 
 // ── Global overlays — lazy-loaded (not needed for first paint) ──
@@ -121,6 +122,7 @@ function App() {
           <BrandProvider>
             <CreditProvider>
               <UIProvider>
+                <ErrorBoundary>
                 <Suspense fallback={<LoadingSpinner />}>
                   <Routes>
                     {/* Public routes */}
@@ -192,6 +194,7 @@ function App() {
                     <Route path="*" element={<Navigate to="/templates" replace />} />
                   </Routes>
                 </Suspense>
+                </ErrorBoundary>
 
                 {/* Global Background Jobs Panel + Fidato — mounted across all routes */}
                 <AppInner />

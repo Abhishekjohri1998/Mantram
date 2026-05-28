@@ -10,6 +10,7 @@ import multer from 'multer';
 import crypto from 'crypto';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { sanitizeBody } from '../utils/sanitize.js';
 import { mirrorBrandAssets } from '../services/assetMirror.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import redis from '../utils/redisClient.js';
@@ -155,7 +156,7 @@ router.get('/:id', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // POST /api/brands — create new brand
 // ═══════════════════════════════════════════════════════════════
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, sanitizeBody(['name']), async (req, res) => {
     try {
         const { name, website } = req.body;
         const userId = req.user._id;
@@ -210,7 +211,7 @@ router.post('/', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/brands/:id — update brand (general fields)
 // ═══════════════════════════════════════════════════════════════
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, sanitizeBody(['name']), async (req, res) => {
     try {
         // Mirror assets if DNA is updated
         if (req.body.dna) {
