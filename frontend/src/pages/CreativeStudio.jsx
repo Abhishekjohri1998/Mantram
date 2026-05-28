@@ -9797,11 +9797,11 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
 
             {/* ═══ ZOOM LIGHTBOX (for generated result — global, all tabs) ═══ */}
             {zoomImage && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-start pl-[5vw] md:pl-[10vw] animate-fade-in"
+                <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in"
                     onClick={() => setZoomImage(null)}>
                     <div className="absolute inset-0 bg-black/60 " />
-                    <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <img loading="lazy" decoding="async" src={zoomImage} alt="Zoomed" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain relative z-10" />
+                    <div className="relative flex items-center justify-center" style={{ maxWidth: '85vw', maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+                        <img loading="lazy" decoding="async" src={zoomImage} alt="Zoomed" className="rounded-2xl shadow-2xl object-contain relative z-10" style={{ maxWidth: '85vw', maxHeight: '75vh' }} />
                         
                         {/* Bottom Actions Dock */}
                         <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] shadow-2xl z-20 animate-in slide-in-from-bottom-4 duration-300">
