@@ -556,23 +556,49 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:a', 'aac', '-b:a', '192k',
+            '-movflags', '+faststart',
             outPath,
         ], { timeout: 120000 });
         return outPath;
     }
 
-    // Step 1: Normalize all segments to the same resolution/fps
-    console.log(`[SB LongForm ${jobId}] Normalizing ${segmentPaths.length} segments → ${w}x${h}@24fps`);
+    // Step 1: Normalize all segments to the same resolution/fps — PRESERVE AUDIO
+    // Add a silent audio track if a segment has no audio, so concat doesn't fail
+    console.log(`[SB LongForm ${jobId}] Normalizing ${segmentPaths.length} segments → ${w}x${h}@24fps (with audio)`);
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
+        // Use -f lavfi to generate silence as a fallback audio input.
+        // Map 0:a? (optional audio from source), fall back to generated silence.
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[i],
+            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
+            '-map', '0:v:0',
+            '-map', '0:a:0?',  // Use source audio if it exists
+            '-shortest',
+            '-movflags', '+faststart',
             normPath,
-        ], { timeout: 120000 });
+        ], { timeout: 120000 }).catch(async () => {
+            // If source had no audio stream, -map 0:a:0? might still fail on some ffmpeg versions.
+            // Retry with generated silence.
+            console.warn(`[SB LongForm ${jobId}] Segment ${i+1} has no audio — adding silent track`);
+            await execFileAsync(ffmpegPath, [
+                '-y', '-i', segmentPaths[i],
+                '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo:d=${prePlannedDurations[i] || 10}`,
+                '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
+                '-map', '0:v:0', '-map', '1:a:0',
+                '-shortest',
+                '-movflags', '+faststart',
+                normPath,
+            ], { timeout: 120000 });
+        });
         normPaths.push(normPath);
     }
 
@@ -590,39 +616,60 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         }
     }
 
-    // Step 3: Build xfade filter chain
-    console.log(`[SB LongForm ${jobId}] Building crossfade filter (${CROSSFADE_DURATION}s transitions)...`);
+    // Step 3: Build xfade filter chain (VIDEO) + audio concat (AUDIO)
+    console.log(`[SB LongForm ${jobId}] Building crossfade filter (${CROSSFADE_DURATION}s transitions) with audio...`);
     const inputs = normPaths.flatMap(p => ['-i', p]);
-    const filterParts = [];
+
+    // VIDEO: xfade chain
+    const videoFilterParts = [];
     let lastLabel = '[0:v]';
     let accOffset = 0;
 
     for (let i = 1; i < normPaths.length; i++) {
         accOffset += durations[i - 1] - CROSSFADE_DURATION;
         const outLabel = i === normPaths.length - 1 ? '[vout]' : `[v${i}]`;
-        filterParts.push(
+        videoFilterParts.push(
             `${lastLabel}[${i}:v]xfade=transition=fade:duration=${CROSSFADE_DURATION}:offset=${accOffset.toFixed(2)}${outLabel}`,
         );
         lastLabel = outLabel;
     }
 
+    // AUDIO: acrossfade chain for smooth audio transitions
+    const audioFilterParts = [];
+    let lastAudioLabel = '[0:a]';
+
+    for (let i = 1; i < normPaths.length; i++) {
+        const outLabel = i === normPaths.length - 1 ? '[aout]' : `[a${i}]`;
+        audioFilterParts.push(
+            `${lastAudioLabel}[${i}:a]acrossfade=d=${CROSSFADE_DURATION}:c1=tri:c2=tri${outLabel}`,
+        );
+        lastAudioLabel = outLabel;
+    }
+
+    const fullFilter = [...videoFilterParts, ...audioFilterParts].join(';');
+
     const outputPath = path.join(tmpDir, 'stitched.mp4');
     try {
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
-            '-filter_complex', filterParts.join(';'),
-            '-map', '[vout]',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            '-filter_complex', fullFilter,
+            '-map', '[vout]', '-map', '[aout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:a', 'aac', '-b:a', '192k',
+            '-movflags', '+faststart',
             outputPath,
         ], { timeout: 300000 });
     } catch (xfadeErr) {
-        console.warn(`[SB LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
-        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout]`;
+        console.warn(`[SB LongForm ${jobId}] xfade/acrossfade failed: ${xfadeErr.message}. Falling back to simple concat...`);
+        // Fallback: simple concat with both video and audio
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout][aout]`;
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', concatFilter,
-            '-map', '[vout]',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-movflags', '+faststart',
+            '-map', '[vout]', '-map', '[aout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:a', 'aac', '-b:a', '192k',
+            '-movflags', '+faststart',
             outputPath,
         ], { timeout: 300000 });
     }
