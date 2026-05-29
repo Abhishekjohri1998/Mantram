@@ -77,6 +77,25 @@ const LazyVideoThumbnail = ({ src, poster }) => {
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
+    useEffect(() => {
+        if (hasPoster || !videoRef.current) return;
+        
+        // If cached, onLoadedData might not fire. Poll readyState briefly.
+        let attempts = 0;
+        const checkReady = () => {
+            if (!videoRef.current) return;
+            if (videoRef.current.readyState >= 1) {
+                // If it's ready, force the frame and stop polling
+                videoRef.current.currentTime = 1;
+            } else if (attempts < 20) {
+                // Not ready yet, check again in 50ms (up to 1 second)
+                attempts++;
+                setTimeout(checkReady, 50);
+            }
+        };
+        checkReady();
+    }, [hasPoster])
+
     return (
         <div className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
             onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
@@ -96,6 +115,8 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                     muted loop playsInline
                     preload={hasPoster ? "none" : "metadata"}
                     onError={e => { e.target.style.display = 'none' }}
+                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
+                    onLoadedMetadata={e => { if (!hasPoster) e.target.currentTime = 1 }}
                 />
             )}
         </div>
