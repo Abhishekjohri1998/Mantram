@@ -29,7 +29,8 @@ export function CreditProvider({ children }) {
 
     useEffect(() => {
         if (user) refresh()
-        const interval = setInterval(() => { if (user) refresh() }, 60 * 1000)
+        // PERF-018: Pause polling when tab is in background to save API calls
+        const interval = setInterval(() => { if (user && document.visibilityState === 'visible') refresh() }, 60 * 1000)
         return () => clearInterval(interval)
     }, [user])
 

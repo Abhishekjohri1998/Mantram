@@ -34,6 +34,19 @@ const router = Router();
 // ── Daily insight cache (1 per brand per day) ──
 const insightCache = new Map();
 
+// ── PERF-023: Response cache for dashboard endpoints (5 min TTL) ──
+const dashResponseCache = new Map();
+const DASH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+function getDashCache(key) {
+    const entry = dashResponseCache.get(key);
+    if (entry && Date.now() - entry.ts < DASH_CACHE_TTL) return entry.data;
+    if (entry) dashResponseCache.delete(key);
+    return null;
+}
+function setDashCache(key, data) {
+    dashResponseCache.set(key, { data, ts: Date.now() });
+}
+
 // ── Purge stale cache entries (older than today) ──
 function purgeOldCacheEntries() {
     const today = new Date().toISOString().split('T')[0];
@@ -317,12 +330,13 @@ Respond in JSON:
 }
 
 // ── Streak calculation (consecutive days of activity) ──
+// PERF-028: Uses .select() to only return createdAt field instead of full documents
 async function computeStreak(userId) {
     try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const [contentDates, creativeDates] = await Promise.all([
-            Content.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }, { createdAt: 1 }).lean(),
-            Creative.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }, { createdAt: 1 }).lean(),
+            Content.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }).select('createdAt').lean(),
+            Creative.find({ user: userId, createdAt: { $gte: thirtyDaysAgo } }).select('createdAt').lean(),
         ]);
 
         const allDates = [...contentDates, ...creativeDates].map(d => {
@@ -537,10 +551,17 @@ All percentage arrays must sum to 100. Make data realistic for the industry.`,
 // ── ═══════════════════════════════════════════════════════════════════════════
 
 // ── 1. Hero Data (Fast: Streak, Health, Activity, Daily Insight)
+// PERF-023: Cached for 5 minutes per user+brand
 router.get('/hero', protect, async (req, res) => {
     try {
         const { brandId } = req.query;
         const userId = req.user._id;
+        const cacheKey = `hero:${userId}:${brandId || 'all'}`;
+
+        // Check cache first
+        const cached = getDashCache(cacheKey);
+        if (cached) return res.json(cached);
+
         let brand = brandId ? await Brand.findById(brandId).lean() : null;
 
         const [dailyInsight, activity, streak] = await Promise.allSettled([
@@ -552,13 +573,16 @@ router.get('/hero', protect, async (req, res) => {
         const activityData = activity.status === 'fulfilled' ? activity.value : { content: { thisWeek: 0, total: 0 }, creatives: { thisWeek: 0, total: 0 } };
         const healthScores = computeBrandHealth(brand, activityData);
 
-        res.json({
+        const response = {
             success: true,
             dailyInsight: dailyInsight.status === 'fulfilled' ? dailyInsight.value : null,
             healthScores,
             activity: activityData,
             streak: streak.status === 'fulfilled' ? streak.value : 0,
-        });
+        };
+
+        setDashCache(cacheKey, response);
+        res.json(response);
 
     } catch (error) {
         console.error('Dash Hero error:', error);

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import config from './config/env.js';
@@ -115,6 +116,10 @@ const globalApiLimiter = rateLimit({
 });
 app.use('/api/', globalApiLimiter);
 
+// ── RESPONSE COMPRESSION (PERF-008) ──────────────────────────
+// gzip/deflate all responses > 1KB — saves 60-80% bandwidth on JSON payloads.
+app.use(compression({ threshold: 1024 }));
+
 // ── CORS CONFIGURATION ────────────────────────────────────────
 const isOriginAllowed = (origin) => {
     if (!origin) return true;
@@ -188,7 +193,9 @@ app.set('trust proxy', 1);
 
 // ── TOP-LEVEL DIAGNOSTICS & LOGGING ───────────────────────────
 // Bot scanner patterns — expanded to silence vulnerability scanners
+// PERF-014: Pre-compiled regexes to avoid per-request RegExp construction
 const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log'];
+const BOT_EXT_REGEX = new RegExp(`(${BOT_SCAN_EXTENSIONS.map(e => e.replace('.', '\\.')).join('|')})$`, 'i');
 const BOT_SCAN_PATHS = [
     'wp-admin', 'wp-content', 'vendor', 'phpunit', '.env', '.git', '.ssh', '.ssl', '.well-known',
     'boaform', 'shell', 'cgi-bin', 'autodiscover', 'sdk/weblanguage',
@@ -199,23 +206,23 @@ const BOT_SCAN_PATHS = [
     // e.g. 'config' falsely blocked /api/yt-studio-settings/channel-configs → 444.
     // Use BOT_SCAN_SEGMENT_WORDS below for whole-segment matching instead.
 ];
-
-// These words must appear as a FULL path segment (e.g. /config/ or /debug/)
-// NOT as a substring (so /channel-configs/ is NOT blocked, but /config/ IS).
-const BOT_SCAN_SEGMENT_WORDS = ['config', 'debug', 'scripts', 'phpinfo'];
+const BOT_SCAN_SEGMENT_REGEXES = ['config', 'debug', 'scripts', 'phpinfo'].map(w => new RegExp('(^|/)' + w + '(/|$)'));
+const BOT_SUFFIX_REGEX = /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.~]*$/i;
+const BOT_TILDE_REGEX = /~$/;
+const BOT_DOUBLE_SLASH_REGEX = /\/\/(index|test|db)\.\w+/;
 
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
     const origin = req.headers.origin || '';
 
-    // Detect bot scans: matches known scanner patterns
+    // Detect bot scans: matches known scanner patterns (pre-compiled regexes for perf)
     const isBotScan = (
-        BOT_SCAN_EXTENSIONS.some(ext => path.endsWith(ext)) ||
+        BOT_EXT_REGEX.test(path) ||
         BOT_SCAN_PATHS.some(p => path.includes(p)) ||
-        BOT_SCAN_SEGMENT_WORDS.some(w => new RegExp('(^|/)' + w + '(/|$)').test(path)) ||
-        /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.\~]*$/i.test(path) ||
-        /~$/.test(path) ||
-        /\/\/(index|test|db)\.\w+/.test(path)
+        BOT_SCAN_SEGMENT_REGEXES.some(r => r.test(path)) ||
+        BOT_SUFFIX_REGEX.test(path) ||
+        BOT_TILDE_REGEX.test(path) ||
+        BOT_DOUBLE_SLASH_REGEX.test(path)
     );
 
     if (isBotScan) {
@@ -380,8 +387,10 @@ app.use((req, res, next) => {
 });
 
 // Global input sanitization — strip HTML tags from all string fields
+// PERF-013: Skip sanitization for webhook/upload paths that handle raw/binary data
+const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/'];
 app.use((req, res, next) => {
-    if (req.body && typeof req.body === 'object') {
+    if (req.body && typeof req.body === 'object' && !SKIP_SANITIZE_PREFIXES.some(p => req.path.startsWith(p))) {
         const sanitize = (obj) => {
             for (const [key, value] of Object.entries(obj)) {
                 if (typeof value === 'string') {

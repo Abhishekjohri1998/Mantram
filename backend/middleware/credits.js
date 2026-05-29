@@ -19,6 +19,7 @@ import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings
 import CreditUsage from '../models/CreditUsage.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
+import { invalidateUserCache } from './auth.js';
 
 // Human-readable labels for actions
 const ACTION_LABELS = {
@@ -373,6 +374,9 @@ export const requireCredits = (actionOrCost = 1) => {
 
             // Attach info for downstream use
             req.creditsDeducted = cost;
+
+            // PERF-001: Invalidate cached user so the next request gets fresh credit data
+            invalidateUserCache(user._id);
 
             next();
         } catch (error) {

@@ -279,15 +279,32 @@ export const getObjectStream = async (urlOrKey) => {
     }
 };
 
-
 /**
  * Helper to sign a URL only if it looks like an S3 URL from our bucket.
  * Useful for processing lists of mixed URLs.
+ * PERF-027: Caches presigned URLs for 6 hours (they expire in 7 days)
+ * to avoid redundant S3 presigning calls on hot paths.
  */
+const presignedCache = new Map();
+const PRESIGN_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+// Auto-evict stale entries every 30 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of presignedCache) {
+        if (now - entry.ts > PRESIGN_CACHE_TTL) presignedCache.delete(key);
+    }
+}, 30 * 60 * 1000).unref();
+
 export const getSignedUrlIfNeeded = async (url) => {
     if (!url || typeof url !== 'string') return url;
     if (url.includes('amazonaws.com') && url.includes(config.aws.bucket)) {
-        return await getSignedUrlForPath(url);
+        // Check cache first
+        const cached = presignedCache.get(url);
+        if (cached && Date.now() - cached.ts < PRESIGN_CACHE_TTL) return cached.signed;
+        const signed = await getSignedUrlForPath(url);
+        presignedCache.set(url, { signed, ts: Date.now() });
+        return signed;
     }
     return url;
 };
