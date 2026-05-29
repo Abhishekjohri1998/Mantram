@@ -213,7 +213,6 @@ const videoProjectSchema = new mongoose.Schema({
         finalVideoUrl: { type: String, default: '' },     // Stitched final film
         longFormJobId: { type: String, default: '' },     // Background job ID for long-form (>15s) generation
         voiceoverScript: { type: String, default: '' },   // Full VO script passed to long-form TTS pipeline
-        totalDuration: { type: Number, default: 0 },       // Requested total duration (seconds)
 
         // ── Structured 4-section storyboard plan (new professional format) ──
         // Contains: colorPalette, materialNotes, environmentFingerprint, cuts[],

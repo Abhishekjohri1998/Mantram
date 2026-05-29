@@ -25,7 +25,6 @@
  */
 
 import { loadBrandContext, callMultimodalAgent } from '../shared/agentUtils.js';
-import { ANTISLOP_BANNED_WORDS, AGEBLIND_BANNED_WORDS } from './qAdsPresets.js';
 
 const MIN_SHOT_DURATION = 2;  // seconds per cut
 const MAX_SHOT_DURATION = 15; // Seedance I2V max per segment
