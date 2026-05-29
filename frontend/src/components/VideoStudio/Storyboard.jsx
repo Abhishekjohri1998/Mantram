@@ -151,6 +151,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     // ── Generated storyboard state ──
     const [phase, setPhase] = useState('input'); // 'input' | 'directing' | 'storyboarding' | 'review' | 'animating' | 'complete'
     const [plan, setPlan] = useState(null);       // full storyboard plan from API
+    const [structuredPlan, setStructuredPlan] = useState(null); // 4-section structured plan
     const [imageUrl, setImageUrl] = useState('');
     const [imagePrompt, setImagePrompt] = useState('');
     const [generatedVideoPrompt, setGeneratedVideoPrompt] = useState(''); // set after animate starts
@@ -190,6 +191,12 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             setProductImages(project.input.images.map(img => ({ file: img.url, preview: img.url })));
         } else if (project.storyboard?.imageUrl) {
             setProductImages([{ file: project.storyboard.imageUrl, preview: project.storyboard.imageUrl }]);
+        }
+
+        if (project.input?.avatarUrl) {
+            setAvatarImage({ file: project.input.avatarUrl, preview: project.input.avatarUrl });
+        } else {
+            setAvatarImage(null);
         }
 
         // 3. Config (format, model, etc)
@@ -355,6 +362,20 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 setImagePrompt(data.plan.imagePrompt);
                 // videoPrompt is NOT stored at creation time — generated fresh at animate-time
                 if (data.plan.dialogueLanguage) setDialogueLanguage(data.plan.dialogueLanguage);
+                // Store the 4-section structured plan for display + animate-time use
+                if (data.plan.cuts?.length || data.plan.colorPalette?.length) {
+                    setStructuredPlan({
+                        colorPalette:           data.plan.colorPalette || [],
+                        paletteNames:           data.plan.paletteNames || [],
+                        materialNotes:          data.plan.materialNotes || '',
+                        environmentFingerprint: data.plan.environmentFingerprint || '',
+                        cuts:                   data.plan.cuts || [],
+                        moodKeywords:           data.plan.moodKeywords || [],
+                        cinematographyRules:    data.plan.cinematographyRules || '',
+                        emotionalArc:           data.plan.emotionalArc || '',
+                        narrativeArc:           data.plan.narrativeArc || '',
+                    });
+                }
             }
             setPhase('review');
         } catch (e) {
@@ -715,8 +736,95 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 </p>
                             </div>
 
-                        </div>
-                    </div>
+                             {/* ── 4-Section Structured Storyboard Plan ── */}
+                             {structuredPlan && (
+                                 <div style={{ marginTop: 4 }}>
+
+                                     {/* Section 1 — Color Palette + Materials */}
+                                     {(structuredPlan.colorPalette?.length > 0 || structuredPlan.materialNotes) && (
+                                         <div style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8 }}>
+                                             <p style={{ margin: '0 0 7px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§1 — Color Palette + Materials</p>
+                                             {structuredPlan.colorPalette?.length > 0 && (
+                                                 <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                                                     {structuredPlan.colorPalette.map((hex, i) => (
+                                                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                                             <div style={{ width: 14, height: 14, borderRadius: '50%', background: hex, border: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 }} title={hex} />
+                                                             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{structuredPlan.paletteNames?.[i] || hex}</span>
+                                                         </div>
+                                                     ))}
+                                                 </div>
+                                             )}
+                                             {structuredPlan.materialNotes && (
+                                                 <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{structuredPlan.materialNotes}</p>
+                                             )}
+                                         </div>
+                                     )}
+
+                                     {/* Section 2 — Environment */}
+                                     {structuredPlan.environmentFingerprint && (
+                                         <div style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8 }}>
+                                             <p style={{ margin: '0 0 4px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§2 — Environment (constant across all cuts)</p>
+                                             <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, fontStyle: 'italic' }}>"{structuredPlan.environmentFingerprint}"</p>
+                                         </div>
+                                     )}
+
+                                     {/* Section 3 — Cut Plan */}
+                                     {structuredPlan.cuts?.length > 0 && (
+                                         <div style={{ marginBottom: 10 }}>
+                                             <p style={{ margin: '0 0 6px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§3 — Cut Plan ({structuredPlan.cuts.length} cuts · {duration}s)</p>
+                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                                 {(() => {
+                                                     let elapsed = 0;
+                                                     const moveColors = { STEADICAM: '#6ee7b7', 'DOLLY-IN': '#93c5fd', 'DOLLY-OUT': '#93c5fd', 'RACK-FOCUS': '#fca5a5', ARC: '#c4b5fd', 'PULL-OUT': '#fdba74', CRANE: '#f9a8d4', HANDHELD: '#fde68a', STATIC: '#e2e8f0', 'WHIP-PAN': '#f87171', 'PUSH-IN': '#93c5fd' };
+                                                     return structuredPlan.cuts.map((cut, i) => {
+                                                         const start = elapsed;
+                                                         const end = elapsed + cut.duration;
+                                                         elapsed = end;
+                                                         const moveColor = moveColors[cut.move] || 'rgba(255,255,255,0.5)';
+                                                         return (
+                                                             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, padding: '6px 9px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6 }}>
+                                                                 <div style={{ width: 18, height: 18, borderRadius: 3, background: 'rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginTop: 1 }}>{cut.id}</div>
+                                                                 <div style={{ flex: 1, minWidth: 0 }}>
+                                                                     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 3, alignItems: 'center' }}>
+                                                                         <span style={{ fontSize: 9, color: 'rgba(255,200,50,0.75)', background: 'rgba(255,200,50,0.08)', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>{cut.lens}</span>
+                                                                         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)', padding: '1px 5px', borderRadius: 3 }}>{cut.shot}</span>
+                                                                         <span style={{ fontSize: 9, color: moveColor, background: `${moveColor}18`, padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>{cut.move}</span>
+                                                                         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>{start}s–{end}s</span>
+                                                                     </div>
+                                                                     <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cut.scene}</p>
+                                                                 </div>
+                                                             </div>
+                                                         );
+                                                     });
+                                                 })()}
+                                             </div>
+                                         </div>
+                                     )}
+
+                                     {/* Section 4 — Mood + Arc */}
+                                     {(structuredPlan.moodKeywords?.length > 0 || structuredPlan.emotionalArc || structuredPlan.cinematographyRules) && (
+                                         <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8 }}>
+                                             <p style={{ margin: '0 0 6px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§4 — Lighting / Mood / Style</p>
+                                             {structuredPlan.moodKeywords?.length > 0 && (
+                                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                                                     {structuredPlan.moodKeywords.map((kw, i) => (
+                                                         <span key={i} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: 'rgba(139,92,246,0.12)', color: 'rgba(196,181,253,0.8)', border: '1px solid rgba(139,92,246,0.18)', fontWeight: 500 }}>{kw}</span>
+                                                     ))}
+                                                 </div>
+                                             )}
+                                             {structuredPlan.emotionalArc && (
+                                                 <p style={{ margin: '0 0 4px', fontSize: 10, color: 'rgba(255,200,50,0.6)', fontStyle: 'italic' }}>Arc: {structuredPlan.emotionalArc}</p>
+                                             )}
+                                             {structuredPlan.cinematographyRules && (
+                                                 <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.32)', lineHeight: 1.5 }}>{structuredPlan.cinematographyRules}</p>
+                                             )}
+                                         </div>
+                                     )}
+                                 </div>
+                             )}
+
+                         </div>
+                     </div>
 
                     {/* Action bar */}
                     <div className="sb-action-bar">
@@ -797,7 +905,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                         </a>
                                     )}
                                     <button className="sb-btn-ghost" onClick={() => {
-                                        setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setGeneratedVideoPrompt('');
+                                        setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setGeneratedVideoPrompt(''); setStructuredPlan(null);
                                         setProjectId(null); setFinalVideoUrl(null);
                                     }}>
                                         <span className="material-symbols-outlined">add</span>

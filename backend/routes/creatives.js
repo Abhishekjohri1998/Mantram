@@ -1599,7 +1599,9 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
         console.log(`📏 Prompt condensed for OpenAI API: ${promptText.length} → ${finalPrompt.length} chars`);
     }
 
-
+    if (useEditsEndpoint && (mappedModelId === 'gpt-image-1' || mappedModelId === 'gpt-image-2')) {
+        finalPrompt += `\n\nCRITICAL PRODUCT FIDELITY RULE: You have been provided with reference images. Do NOT change, simplify, stylize, or modify the product's design, shapes, logos, labels, packaging, or branding from the reference image(s). The product design, physical attributes, color values, and shades must look EXACTLY as original. The brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.`;
+    }
 
     if (useEditsEndpoint) {
         // ── MULTIPART/FORM-DATA path: /images/edits ──

@@ -210,7 +210,7 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     const timeoutMs = getImageTimeout(model);
     console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
 
-    // LaoZhang's OpenAI-compatible /generations endpoint silently drops non-square sizes that DALL-E wouldn't accept.
+    // LaoZhang's OpenAI-compatible /generations endpoint silently drops non-square sizes that standard OpenAI image models wouldn't accept.
     // To ensure NanoBanana 2 (Gemini-3.1) respects custom boundaries like 1080x1350 or 100x900, we must force it in prompt.
     const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
     const finalPrompt = prompt + arInstruction;
