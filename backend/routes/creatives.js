@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import express from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
@@ -23,7 +23,9 @@ import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits as requireCredits, refundCredits } from '../middleware/credits.js';
 import { aiGenerationLimiter } from '../middleware/rateLimiter.js';
+import { generationLimiter } from '../utils/concurrencyLimiter.js';
 import { requireStudio } from '../middleware/studioAccess.js';
+import { creativeQueue } from '../utils/creativeQueue.js';
 // orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
 import { getSetting } from '../models/SystemSettings.js';
@@ -111,76 +113,20 @@ async function createCreativeJob(req, res) {
         // Return immediately to frontend
         res.json({ success: true, jobId, message: 'Generation queued. Processing will begin shortly.' });
 
-        // ── DIRECT BACKGROUND EXECUTION ──────────────────────────────────────
-        // We previously used Bull+Redis (Upstash) here, but Upstash is a serverless
-        // REST-based Redis that does NOT support persistent TCP connections required
-        // by Bull's BRPOP/SUBSCRIBE model. Jobs were enqueued but NEVER processed.
-        //
-        // Fix: run the generation directly in Node.js background via setImmediate.
-        // This is non-blocking (response is already sent above), reliable, and doesn't
-        // require Redis. It handles up to ~10 concurrent generations comfortably.
-        // ─────────────────────────────────────────────────────────────────────
-        setImmediate(async () => {
-            registerJob(jobId);
-            const JOB_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-            const timeout = setTimeout(async () => {
-                console.warn(`⏰ [Job] Background generation timed out after 10m: ${jobId}`);
-                await GenerationJob.findOneAndUpdate(
-                    { jobId, status: 'processing' },
-                    { status: 'failed', errorMessage: 'Generation timed out (10m)', completedAt: new Date() }
-                ).catch(() => {});
-                
-                if (req.creditsDeducted > 0) {
-                    refundCredits(req.user._id, req.creditsDeducted, 'creative',
-                        `Refund: Timeout refund for Job ${jobId}`, 'creative'
-                    ).catch(e => console.error(`❌ [Job] Timeout refund failed for ${jobId}:`, e.message));
-                }
-                unregisterJob(jobId);
-            }, JOB_TIMEOUT);
-
-            try {
-                console.log(`🚀 [Job] Starting direct background generation: ${jobId}`);
-
-                // Mark as processing
-                await GenerationJob.findOneAndUpdate(
-                    { jobId },
-                    { status: 'processing', startedAt: new Date() }
-                );
-
-                // Get user model
-                const User = mongoose.model('User');
-                const user = req.user; // Already authenticated — use req.user directly
-
-                const data = await internalGenerateCreative({
-                    body: { brandId: sanitizedBrandId, type, prompt, options, jobId },
-                    user,
-                    creditsDeducted: req.creditsDeducted || 0,
-                    jobId,
-                });
-
-                if (data?.success) {
-                    console.log(`✅ [Job] ${jobId} completed — Creative: ${data.creative?._id}`);
-                } else {
-                    throw new Error(data?.error || 'Pipeline returned no creative');
-                }
-            } catch (err) {
-                console.error(`❌ [Job] Background generation failed (${jobId}):`, err.message);
-                await GenerationJob.findOneAndUpdate(
-                    { jobId, status: 'processing' },
-                    { status: 'failed', completedAt: new Date(), errorMessage: err.message }
-                ).catch(() => { });
-
-                // Refund credits on failure
-                if (req.creditsDeducted > 0) {
-                    refundCredits(req.user._id, req.creditsDeducted, 'creative',
-                        `Refund: Background Job ${jobId} Failed — ${err.message}`, 'creative'
-                    ).catch(e => console.error(`❌ [Job] Refund failed for ${jobId}:`, e.message));
-                }
-            } finally {
-                clearTimeout(timeout);
-                unregisterJob(jobId);
+        // ── QUEUE EXECUTION ──────────────────────────────────────
+        // Push generation payload to Redis-backed Bull queue.
+        creativeQueue.add({
+            jobId,
+            userId: req.user._id,
+            payload: {
+                brandId: sanitizedBrandId,
+                type,
+                prompt,
+                options,
+                creditsDeducted: req.creditsDeducted || 0
             }
         });
+
 
     } catch (error) {
         console.error('❌ [Job] createCreativeJob top-level error:', error);
@@ -1010,13 +956,9 @@ router.get('/jobs', protect, async (req, res) => {
 // ── GET /api/creatives/jobs/:jobId — Poll a specific job ──────────────────────
 router.get('/jobs/:jobId', protect, async (req, res) => {
     try {
-        const job = await GenerationJob.findOne(
-            { jobId: req.params.jobId, user: req.user._id },
-            {
-                jobId: 1, status: 1, type: 1, prompt: 1, format: 1, imageUrl: 1, errorMessage: 1,
-                creativeId: 1, result: 1, warnings: 1, createdAt: 1, startedAt: 1, completedAt: 1, steps: 1
-            }
-        ).lean();
+        const job = await GenerationJob.findOne({ jobId: req.params.jobId, user: req.user._id })
+            .select('jobId status type prompt format imageUrl errorMessage creativeId result warnings createdAt startedAt completedAt steps')
+            .lean();
         if (!job) return res.status(404).json({ success: false, error: 'Job not found' });
 
         // Sign S3 URLs before returning to frontend (do each URL once)
@@ -1032,6 +974,61 @@ router.get('/jobs/:jobId', protect, async (req, res) => {
         console.error('❌ [API] GET /jobs/:id error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
+});
+
+// ── GET /api/creatives/jobs/:jobId/stream — Server-Sent Events (SSE) ─────────
+router.get('/jobs/:jobId/stream', protect, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    // Important for flush immediately
+    res.flushHeaders();
+
+    const jobId = req.params.jobId;
+    const userId = req.user._id;
+
+    // Send initial ping to establish connection
+    res.write(': ping\n\n');
+
+    let isClosed = false;
+
+    // Clean up on disconnect
+    req.on('close', () => {
+        isClosed = true;
+    });
+
+    const pollInterval = setInterval(async () => {
+        if (isClosed) {
+            clearInterval(pollInterval);
+            return;
+        }
+        try {
+            const job = await GenerationJob.findOne({ jobId, user: userId })
+                .select('jobId status type progress errorMessage creativeId result warnings completedAt steps')
+                .lean();
+
+            if (!job) {
+                res.write(`data: ${JSON.stringify({ error: 'Job not found' })}\n\n`);
+                clearInterval(pollInterval);
+                res.end();
+                return;
+            }
+
+            if (job.result?.creative) {
+                job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+                job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+            }
+
+            res.write(`data: ${JSON.stringify(job)}\n\n`);
+
+            if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+                clearInterval(pollInterval);
+                res.end();
+            }
+        } catch (err) {
+            console.error(`❌ [SSE] Error polling job ${jobId}:`, err.message);
+        }
+    }, 2000); // 2-second heartbeat
 });
 
 // ── DELETE /api/creatives/jobs/:jobId — Cancel a pending/processing job ───────
@@ -2291,11 +2288,22 @@ router.post('/suggest-copy', protect, async (req, res) => {
 // Returns the fully engineered 100-180 word image prompt + art direction notes.
 // This differentiates Mantram from competitors who do basic text expansion.
 // ══════════════════════════════════════════════════════════════════════════════
+
+const promptCache = new Map(); // hash → { enhanced, ts }
+const PROMPT_CACHE_TTL = 3600_000; // 1 hour
 router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (req, res) => {
     try {
         const { brandId, prompt, style, format, referenceDescriptions, aspectRatio, imageModel } = req.body;
         if (!prompt) return res.status(400).json({ success: false, error: 'Prompt is required' });
         if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID is required for enhancement' });
+        if (!brandId) return res.status(400).json({ success: false, error: 'Brand ID is required for enhancement' });
+
+        const hash = createHash('md5').update(prompt + brandId + (style || '') + (format || '') + (imageModel || '')).digest('hex');
+        const cached = promptCache.get(hash);
+        if (cached && Date.now() - cached.ts < PROMPT_CACHE_TTL) {
+            console.log(`✨ [EnhancePrompt] Cache hit for brief: "${prompt.substring(0, 60)}..."`);
+            return res.json({ success: true, enhancedPrompt: cached.enhanced, cached: true, agenticEnhanced: true });
+        }
 
         console.log(`✨ [EnhancePrompt] Running full agentic pipeline for brief: "${prompt.substring(0, 60)}..." → format: ${format}, model: ${imageModel || 'nanobanana-2'}`);
 
@@ -2339,7 +2347,7 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         console.log(`✨ [EnhancePrompt] Done in ${pipelineResult.pipelineTimeMs}ms — enhanced from ${prompt.length} to ${cleanPrompt.length} chars`);
         console.log(`✨ [EnhancePrompt] Design trend: ${pipelineResult.artDirection?.designTrend || pipelineResult.engineeredPrompt?.engineeringNotes?.substring(0, 60) || 'N/A'}`);
 
-        res.json({
+        const responsePayload = {
             success: true,
             enhancedPrompt: cleanPrompt,
             agenticEnhanced: true,
@@ -2349,7 +2357,11 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
             productMatched: pipelineResult.matchedProduct?.title || null,
             engineeringNotes: pipelineResult.engineeredPrompt?.engineeringNotes || null,
             pipelineTimeMs: pipelineResult.pipelineTimeMs,
-        });
+        };
+
+        promptCache.set(hash, { enhanced: cleanPrompt, ts: Date.now() });
+
+        res.json(responsePayload);
     } catch (error) {
         console.error('✨ [EnhancePrompt] Error:', error);
         // Graceful degradation — if the full pipeline fails, return original prompt

@@ -10,6 +10,7 @@ import { ensureS3Url } from '../../utils/s3.js';
 import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoStatus } from './laozhangClient.js';
 import { getSetting } from '../../models/SystemSettings.js';
 import { getActiveProvider } from '../../ai/providerRouting.js';
+import { fetchOptions } from '../../utils/network.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -622,12 +623,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         payload.images = s3ReferenceImages;
     }
 
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
+    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, fetchOptions({
         method: 'POST',
         headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(35000)
-    });
+    }));
     if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
     return { requestId: data.request_id, endpoint, statusUrl: data.status_url, resultUrl: data.response_url, provider: 'fal' };
@@ -636,7 +637,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
     const safePrompt = truncatePrompt(prompt, 'veo-3.1'); // Extend is usually Veo
-    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt: safePrompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
+    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, fetchOptions({ method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt: safePrompt, duration: String(duration), generate_audio: true, auto_fix: true }) }));
     if (!response.ok) throw new Error('fal.ai extend failed');
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
@@ -676,7 +677,7 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     const apiKey = getApiKey();
     if (!statusUrl) statusUrl = `${FAL_BASE_URL}/fal-ai/kling-video/requests/${requestId}/status`;
     if (!resultUrl) resultUrl = statusUrl.replace('/status', '');
-    const response = await fetch(statusUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
+    const response = await fetch(statusUrl, fetchOptions({ headers: { 'Authorization': `Key ${apiKey}` } }));
     if (!response.ok) return { status: 'IN_PROGRESS', progress: 30 };
     const data = await response.json();
     if (data.status === 'COMPLETED') return await fetchFalResult(apiKey, resultUrl);
@@ -684,7 +685,7 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 }
 
 async function fetchFalResult(apiKey, resultUrl) {
-    const res = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
+    const res = await fetch(resultUrl, fetchOptions({ headers: { 'Authorization': `Key ${apiKey}` } }));
     const data = await res.json();
     const videoUrl = data.video?.url || data.output?.url || data.video_url || data.url || data.images?.[0]?.url || data.data?.[0]?.url || '';
     if (!videoUrl) {
@@ -724,12 +725,12 @@ export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5
     }
 
     console.log(`🎬 [Grok] Submitting to /v1/videos/generations (duration=${payload.duration}s, ratio=${payload.aspect_ratio}, res=${payload.resolution})...`);
-    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
+    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, fetchOptions({
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(60000),
-    });
+    }));
     if (!response.ok) {
         const errText = await response.text();
         throw new Error(`xAI video generation failed (${response.status}): ${errText.substring(0, 300)}`);
@@ -747,10 +748,10 @@ export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5
 export async function getGrokGenerationStatus(requestId) {
     const apiKey = getGrokApiKey();
     try {
-        const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, {
+        const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, fetchOptions({
             headers: { 'Authorization': `Bearer ${apiKey}` },
             signal: AbortSignal.timeout(15000),
-        });
+        }));
         if (!response.ok) {
             console.warn(`⚠️ [Grok] Poll failed: ${response.status}`);
             return { status: 'IN_PROGRESS', progress: 30, provider: 'grok' };
@@ -786,12 +787,12 @@ export async function extendGrokVideo({ videoUrl, prompt, duration = 6 }) {
         video: { url: videoUrl },
     };
     console.log(`🎬 [Grok] Extending video (duration=${payload.duration}s)...`);
-    const response = await fetch(`${GROK_BASE_URL}/videos/extensions`, {
+    const response = await fetch(`${GROK_BASE_URL}/videos/extensions`, fetchOptions({
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(60000),
-    });
+    }));
     if (!response.ok) {
         const errText = await response.text();
         throw new Error(`xAI video extend failed (${response.status}): ${errText.substring(0, 300)}`);

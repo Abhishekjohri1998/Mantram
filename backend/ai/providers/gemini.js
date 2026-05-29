@@ -87,7 +87,7 @@ export class GeminiProvider extends BaseProvider {
         }
 
         const startTime = Date.now();
-        const response = await fetch(url, {
+        const response = await fetch(url, fetchOptions({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -135,7 +135,7 @@ export class GeminiProvider extends BaseProvider {
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
-        const response = await fetch(url, {
+        const response = await fetch(url, fetchOptions({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -222,7 +222,7 @@ export class GeminiProvider extends BaseProvider {
         const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
         const url = `${this.baseUrl}/models/${modelId}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
 
-        const response = await fetch(url, {
+        const response = await fetch(url, fetchOptions({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -392,7 +392,7 @@ export class GeminiProvider extends BaseProvider {
             // Legacy Imagen models use predict endpoint
             else {
                 const url = `${this.baseUrl}/models/${modelId}:predict?key=${imageKey}`;
-                const response = await fetch(url, {
+                const response = await fetch(url, fetchOptions({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

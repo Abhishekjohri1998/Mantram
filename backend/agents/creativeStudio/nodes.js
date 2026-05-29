@@ -1444,14 +1444,6 @@ export async function runCreativePipeline(params) {
                 // Skip if already cached
                 if (getCachedImageBuffer(url)) return;
                 try {
-                    // ⚡ HEAD-check before full download — skip dead URLs instantly
-                    try {
-                        const headResp = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(3000) });
-                        if (headResp && !headResp.ok) {
-                            console.warn(`⚡ Pre-cache: Skipping dead ref URL (${headResp.status}): ${url.substring(0, 60)}`);
-                            return;
-                        }
-                    } catch (_) { /* HEAD failed — try download */ }
                     // Pre-sign private S3 URLs before downloading
                     let fetchUrl = url;
                     const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
@@ -1464,7 +1456,7 @@ export async function runCreativePipeline(params) {
                     }
                     const resp = await fetch(fetchUrl, {
                         headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' },
-                        signal: AbortSignal.timeout(8000), // ⚡ 8s (was 12s)
+                        signal: AbortSignal.timeout(5000), // ⚡ 5s (was 8s)
                     });
                     if (resp && resp.ok) {
                         const rawBuf = await resp.arrayBuffer();

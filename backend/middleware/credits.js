@@ -21,6 +21,31 @@ import ActivityLog from '../models/ActivityLog.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 import { invalidateUserCache } from './auth.js';
 
+import { invalidateUserCache } from './auth.js';
+
+// ── Batch Accumulator Pattern for Logs ──
+const creditUsageQueue = [];
+const activityLogQueue = [];
+
+setInterval(async () => {
+    if (creditUsageQueue.length > 0) {
+        const batch = creditUsageQueue.splice(0, 100);
+        try {
+            await CreditUsage.insertMany(batch);
+        } catch (err) {
+            console.warn('Batch CreditUsage log failed:', err.message);
+        }
+    }
+    if (activityLogQueue.length > 0) {
+        const batch = activityLogQueue.splice(0, 100);
+        try {
+            await ActivityLog.insertMany(batch);
+        } catch (err) {
+            console.warn('Batch ActivityLog failed:', err.message);
+        }
+    }
+}, 5000);
+
 // Human-readable labels for actions
 const ACTION_LABELS = {
     content: 'Content Generation', contentRefine: 'Content Refine/Regen',
@@ -338,7 +363,7 @@ export const requireCredits = (actionOrCost = 1) => {
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
 
-            CreditUsage.create({
+            creditUsageQueue.push({
                 user: user._id,
                 action: actionName || 'unknown',
                 cost,
@@ -353,10 +378,10 @@ export const requireCredits = (actionOrCost = 1) => {
                     provider: requestedProvider || undefined,
                     providerMultiplier: providerMultiplier > 1 ? providerMultiplier : undefined,
                 },
-            }).catch(err => console.warn('Credit usage log failed:', err.message));
+            });
 
             // Activity Log — fire-and-forget entry for team dashboards
-            ActivityLog.log({
+            activityLogQueue.push({
                 user: user._id,
                 userName: user.name || user.email,
                 brand: req.body?.brandId || req.params?.brandId || undefined,
@@ -424,7 +449,7 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
         const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
         const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
 
-        CreditUsage.create({
+        creditUsageQueue.push({
             user: userId,
             action: typeof actionOrCost === 'string' ? actionOrCost : 'manual_deduction',
             cost,
@@ -432,7 +457,7 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             description: ACTION_LABELS[actionOrCost] || actionOrCost || 'AI Operation',
             studio: (typeof actionOrCost === 'string' && actionOrCost.startsWith('seo')) ? 'seo' : 'unknown',
             metadata: { brandId },
-        }).catch(err => console.warn('Manual credit usage log failed:', err.message));
+        });
 
         console.log(`💰 Manually deducted ${cost} credits from user ${userId} for ${actionOrCost}`);
         return updated;

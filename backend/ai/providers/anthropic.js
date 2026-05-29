@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { fetchOptions } from '../../utils/network.js';
 
 /**
  * Anthropic Claude Provider
@@ -15,7 +16,7 @@ export class AnthropicProvider extends BaseProvider {
         const modelId = model || this.config.defaultModel || 'claude-sonnet-4-6';
 
         const startTime = Date.now();
-        const response = await fetch(`${this.baseUrl}/messages`, {
+        const response = await fetch(`${this.baseUrl}/messages`, fetchOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -29,7 +30,7 @@ export class AnthropicProvider extends BaseProvider {
                 messages: [{ role: 'user', content: userPrompt }],
                 temperature,
             }),
-        });
+        }));
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             const errMsg = data.error?.message || response.statusText;
@@ -84,7 +85,7 @@ export class AnthropicProvider extends BaseProvider {
             if (messages.length > 5) {
                 messages = [messages[0], ...messages.slice(-4)];
             }
-            const response = await fetch(`${this.baseUrl}/messages`, {
+            const response = await fetch(`${this.baseUrl}/messages`, fetchOptions({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -99,7 +100,7 @@ export class AnthropicProvider extends BaseProvider {
                     tools,
                     temperature,
                 }),
-            });
+            }));
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));

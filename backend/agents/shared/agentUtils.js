@@ -30,7 +30,7 @@ export const agentUtils = {
 //   L2: Redis (30min TTL) — survives restarts, shared across PM2 workers
 // Both are invalidated instantly on any brand update via redis.del() + clearBrandMemCache() in brands.js
 const BRAND_CACHE_TTL = 1800; // 30 minutes (Redis L2)
-const BRAND_MEM_CACHE_TTL = 60_000; // 60 seconds (in-process L1)
+const BRAND_MEM_CACHE_TTL = 300_000; // 5 minutes (in-process L1)
 const _brandMemCache = new Map(); // Map<cacheKey, { data, expiry }>
 
 /**
