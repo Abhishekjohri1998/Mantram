@@ -361,7 +361,8 @@ const LazyVideoThumbnail = PosterThumbnail
 export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false, canCreateVideo = true, onUpgradeRequired }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
-    const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
+    const isAdvanced = p => p.mode === 'advanced' || !p.studioMode || p.studioMode === 'long-form'
+    const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p) && isAdvanced(p)
     
     const [gridVideos, setGridVideos] = useState(() => {
         return projects.filter(isCompleted)
