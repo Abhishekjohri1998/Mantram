@@ -345,7 +345,7 @@ const PosterThumbnail = ({ src, poster }) => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {isVisible && hasPoster ? (
+            {hasPoster ? (
                 <>
                     <img src={posterUrl} loading="lazy" alt=""
                         style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block',
@@ -357,17 +357,15 @@ const PosterThumbnail = ({ src, poster }) => {
                     )}
                 </>
             ) : (
-                isVisible && src && (
+                (isVisible || isHovered) && src ? (
                     <video ref={videoRef} src={src}
                         style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
                         muted loop playsInline preload="metadata"
                         onLoadedData={e => { e.target.currentTime = 1 }}
                     />
+                ) : (
+                    <div style={{ position: 'relative', width: '340px', height: '100%', background: 'rgba(255,255,255,0.02)' }} />
                 )
-            )}
-
-            {!isVisible && (
-                <div style={{ position: 'relative', width: '340px', height: '100%', background: 'rgba(255,255,255,0.02)' }} />
             )}
         </div>
     )
