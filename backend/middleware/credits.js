@@ -21,7 +21,6 @@ import ActivityLog from '../models/ActivityLog.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 import { invalidateUserCache } from './auth.js';
 
-import { invalidateUserCache } from './auth.js';
 
 // ── Batch Accumulator Pattern for Logs ──
 const creditUsageQueue = [];
