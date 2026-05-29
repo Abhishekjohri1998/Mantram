@@ -1,41 +1,119 @@
 /**
  * Storyboard Director — Claude-powered Ad Film Storyboard Generator
  *
- * Takes product + avatar + brief → writes a numbered shot plan (like a real film storyboard)
- * Each shot has: label, duration, frame image prompt, I2V video prompt, dialogue, camera, emotion
+ * Takes product + avatar + brief → writes a 4-section structured storyboard plan:
  *
- * Outputs structured JSON that the frontend renders as a storyboard grid.
- * Each shot's framePrompt is fed to Gemini image gen.
- * Each shot's videoPrompt is fed to Seedance 2.0 I2V.
+ *   Section 1 — Character + Product DNA
+ *     colorPalette, paletteNames, materialNotes
+ *
+ *   Section 2 — Environment / Set Design
+ *     environmentFingerprint (single set description locked across the whole video)
+ *
+ *   Section 3 — Cut Plan
+ *     cuts[] — each cut has: id, lens, duration, move, shot, scene, framePrompt
+ *     totalDuration (sum of all cut durations)
+ *
+ *   Section 4 — Lighting / Mood / Style
+ *     moodKeywords, cinematographyRules, emotionalArc
+ *
+ * Additionally outputs:
+ *   imagePrompt — a rich grid-poster prompt built from the cuts (for GPT-Image-2 / NanoBanana)
+ *   narrativeArc, hookStrategy — story-level metadata
+ *
+ * The structuredPlan is stored in MongoDB and used at animate-time to build
+ * a precise, timed video prompt — not inferred from a grid image thumbnail.
  */
 
 import { loadBrandContext, callMultimodalAgent } from '../shared/agentUtils.js';
 import { ANTISLOP_BANNED_WORDS, AGEBLIND_BANNED_WORDS } from './qAdsPresets.js';
 
-const MAX_SHOTS_DEFAULT = 12;
-const MAX_SHOTS_LONG = 20;
-const MIN_SHOT_DURATION = 3; // seconds
-const MAX_SHOT_DURATION = 15; // max per Seedance I2V limit
+const MIN_SHOT_DURATION = 2;  // seconds per cut
+const MAX_SHOT_DURATION = 15; // Seedance I2V max per segment
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM PROMPT — Director Brain for Storyboard Planning
+// SYSTEM PROMPT — Professional 4-Section Storyboard Director
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '' }) {
-    let logoTagInstruction = '';
-    let logoPromptInstruction = '';
-    if (logoUrl) {
-        logoTagInstruction = `
-- <<<image_logo>>> = brand logo (extract from image: exact shapes, typography, and colors of the logo described as: "${logoDescription || 'brand logo'}").`;
-        logoPromptInstruction = `
-- Brand logo: Since a brand logo reference image is provided, you MUST refer to the brand logo using the tag "the brand logo (<<<image_logo>>>)" whenever it appears in the Canvas, footer, or panels. This ensures the image model uses the actual logo design and does not hallucinate it.`;
-    }
+    const logoTagInstruction = logoUrl
+        ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
+        : '';
+    const logoPromptInstruction = logoUrl
+        ? `\n- Brand logo: Whenever the logo appears in the grid panels or footer, reference it as "the brand logo (<<<image_logo>>>)".`
+        : '';
 
-    return `You are a visionary, award-winning Ad Film Director and Cinematographer. Your expertise lies in crafting visually breathtaking, high-energy, and deeply emotional commercial video campaigns with dynamic pacing and avant-garde camera work.
+    return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
 
-Your job: Given a product, brand DNA, avatar, and creative brief, write ONE master prompt for the storyboard poster image generator.
+The storyboard package has 4 sections, exactly like a real agency pre-production document:
 
-The video animation prompt will be written separately after storyboard approval — you do NOT need to generate it here.
+═══════════════════════════════════════════════════════
+SECTION 1 — CHARACTER + PRODUCT DNA
+═══════════════════════════════════════════════════════
+Define the visual identity that must stay consistent across every frame:
+- colorPalette: 3 exact hex colors that define the entire visual world
+- paletteNames: human-readable names for each color
+- materialNotes: the physical materials present in the scene (e.g. "polished marble, walnut wood, brushed brass, ceramic glaze, steam condensation")
+${logoTagInstruction}
+
+═══════════════════════════════════════════════════════
+SECTION 2 — ENVIRONMENT / SET DESIGN
+═══════════════════════════════════════════════════════
+Define ONE environment (set) that all cuts take place in:
+- environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
+This environment NEVER changes across cuts. The camera moves through it.
+
+═══════════════════════════════════════════════════════
+SECTION 3 — CUT PLAN (THE STORYBOARD)
+═══════════════════════════════════════════════════════
+Write the exact shot list for ONE continuous video of ${duration} seconds.
+Cuts are camera angles / shot changes within the video — NOT separate videos.
+Each cut must have:
+- id: sequential number starting at 1
+- lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime")
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${MAX_SHOT_DURATION}s)
+- move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
+- shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
+- scene: one crisp sentence describing what happens in this cut (who, what action, emotional note)
+- framePrompt: a detailed image generation prompt for this panel in the storyboard grid (describe the exact composition, lighting, subject position, product placement, mood — as if describing a still photograph)
+
+RULES FOR CUTS:
+- Durations must SUM exactly to ${duration}s
+- Follow a natural cinematic arc (wide → narrow → detail → emotion → resolve)
+- Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion)
+- The product must be visually featured in at least one INSERT/MACRO cut
+- If an avatar/presenter is provided, feature them in at least one CLOSE-UP
+
+═══════════════════════════════════════════════════════
+SECTION 4 — LIGHTING / MOOD / STYLE
+═══════════════════════════════════════════════════════
+- moodKeywords: 5-7 single words defining the emotional feel (e.g. "inviting", "premium", "intimate")
+- cinematographyRules: 2-4 sentences defining the visual rules for the ENTIRE video (depth of field, lens character, colour grading, movement rhythm)
+- emotionalArc: the narrative journey described as an arrow chain (e.g. "establish → approach → detail → emotion → resolve")
+
+═══════════════════════════════════════════════════════
+ADDITIONAL OUTPUTS
+═══════════════════════════════════════════════════════
+- narrativeArc: one sentence summarising the story
+- hookStrategy: one sentence describing the opening hook strategy
+- imagePrompt: a rich, detailed prompt to generate a SINGLE GRID IMAGE containing all the storyboard panels visually. This is what the image model (GPT-Image-2 / Gemini) will render. Build it from your cuts[] so every panel is described precisely. Format it as:
+
+"Create a premium [NxM] cinematic storyboard poster for a ${brandName} advertisement.
+
+Canvas: [format: ${format}, clean grid layout, each panel has a dark frame, small cut number in top-left, short title, brief action copy, sound bar at bottom with music/SFX cues. Include a footer with tagline and logo area.]
+
+Style: [${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}, ${duration}s total, cinematic lighting grading, premium feel]
+
+Main subject: [product and/or presenter — exact colours/details from reference images]
+${logoPromptInstruction}
+
+Panels:
+Cut 1: [lens | shot | move | scene — using your cuts[0] framePrompt]
+Cut 2: [lens | shot | move | scene — using your cuts[1] framePrompt]
+... (all cuts)
+
+Design details: [white uppercase typography, dark translucent bars for music/SFX, waveforms, clean spacing]
+
+Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]"
 
 ═══════════════════════════════════════════════════════
 BRAND DNA & CREATIVE ESSENCE
@@ -50,48 +128,33 @@ FORMAT: ${format}
 VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 
-═══════════════════════════════════════════════════════
-PROMPT RULES: imagePrompt (For the Storyboard Grid Image)
-═══════════════════════════════════════════════════════
-Write an incredibly detailed and imaginative prompt to generate ONE single image containing a dense grid of multiple distinct storyboard panels.
-- GRID SIZE & PACING: Determine the optimal number of frames (shots) and the grid layout (e.g. 2x2, 2x3, 3x3, 3x4, 4x4) dynamically based on the story pacing and structure. The total duration is ${duration}s, so each panel should represent a logical segment (e.g. 2 to 6 seconds per shot) summing up to exactly ${duration}s. Do NOT hardcode the layout; let it fit the story.
-- STRUCTURE: You MUST format the generated imagePrompt using this exact structure (do not skip any sections):
-
-Create a premium [Grid Layout, e.g. 3x3] cinematic storyboard poster for a [Product/Brand Name] advertisement.
-
-Canvas:
-[Describe layout: format e.g. Square 1:1 or Portrait 9:16, clean grid layout. Each panel has a dark frame, small scene number in top-left, short title text, brief action copy, and a sound bar at the bottom with music and SFX cues. Optionally add a footer area with a tagline and logo.]
-
-Style:
-[Describe visual style, lighting, grading, mood, weather, photography quality, premium feel based on the requested visual style.]
-
-Main subject:
-[Describe the product/garment (reproducing its exact colors and details) and any characters/avatars shown. Avoid hallucinating product details.]
-${logoPromptInstruction}
-
-Storyboard panels:
-Panel 1: [TITLE]
-[Describe visual action, camera angle and movement, matching continuous cinematic flow]
-Music: [Describe music/mood cue]
-SFX: [Describe sound effects cues]
-
-Panel 2: ...
-[Continue for all panels in the grid]
-
-Design details:
-[Describe formatting details: white uppercase typography for scene titles, body text, black translucent bars for music and SFX, waveforms, clean spacing.]
-
-Negative prompt:
-[Detailed negative prompt to prevent cartoonish styles, low quality, distorted layout, smiling models, etc.]
-
-OUTPUT FORMAT — CRITICAL
+OUTPUT FORMAT — CRITICAL:
 Return ONLY valid JSON. No markdown. No explanation. No code fences.
 The JSON must match this exact schema:
 
 {
+  "colorPalette": ["#hex1", "#hex2", "#hex3"],
+  "paletteNames": ["Name1", "Name2", "Name3"],
+  "materialNotes": "string",
+  "environmentFingerprint": "string",
+  "cuts": [
+    {
+      "id": 1,
+      "lens": "string",
+      "duration": 4,
+      "move": "STEADICAM",
+      "shot": "WIDE",
+      "scene": "string",
+      "framePrompt": "string"
+    }
+  ],
+  "moodKeywords": ["word1", "word2"],
+  "cinematographyRules": "string",
+  "emotionalArc": "establish → approach → detail → emotion → resolve",
+  "narrativeArc": "string",
+  "hookStrategy": "string",
   "imagePrompt": "Create a premium..."
-}
-`;
+}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,34 +166,39 @@ function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, durat
 
     const imageMappingLines = [];
     let imgIdx = 1;
-    if (productImageUrls && productImageUrls.length > 0) {
+    if (productImageUrls?.length > 0) {
         productImageUrls.forEach((url, i) => {
-            imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is a **PRODUCT** reference image featuring the product: "${productName || 'product'}". Use this as visual reference for the product in the storyboard panels.`);
+            imageMappingLines.push(`  - Attached Image ${imgIdx++}: PRODUCT reference — "${productName || 'product'}". Use this for exact product appearance (shape, color, branding, materials) in all framePrompts and in the imagePrompt grid panels.`);
         });
     }
     if (avatarUrl) {
-        imageMappingLines.push(`  - Attached Image ${imgIdx++} in your visual input is the **AVATAR/PRESENTER** reference image featuring the presenter's face/body. Use this as visual reference for the human presenter in the storyboard panels.`);
+        imageMappingLines.push(`  - Attached Image ${imgIdx++}: AVATAR/PRESENTER — the presenter's exact face and body. Use this for all cuts that feature a human presenter. Do NOT confuse with the product.`);
     }
 
     const imageMappingText = imageMappingLines.length > 0
-        ? `\nIMAGE REFERENCES:\n${imageMappingLines.join('\n')}\n\nCRITICAL CONTEXT DISAMBIGUATION:\n- Even if a product reference image contains a model wearing, holding, or interacting with the product, treat that image strictly as the PRODUCT reference (representing the item itself). Do NOT confuse the model in the product image with the main presenter.\n- The main presenter's face and identity must be strictly modeled after the AVATAR reference image (the last attached image). Keep these distinct.`
+        ? `\nIMAGE REFERENCES:\n${imageMappingLines.join('\n')}\n\nCRITICAL: Even if a product reference image contains a model, treat it STRICTLY as the PRODUCT reference. The presenter must match the AVATAR reference only.`
         : '';
 
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 ${imageMappingText}
 
 PRODUCT: ${productName || 'See product images provided'}
-KEY FEATURES: ${productFeatures || 'Extract from the product images provided and heavily highlight them visually'}
-TOTAL VIDEO DURATION: ${duration}s, FORMAT: ${format}
+KEY FEATURES: ${productFeatures || 'Extract from the product images and highlight visually'}
+TOTAL VIDEO DURATION: ${duration}s (cuts must sum EXACTLY to this)
+FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
-AVATAR: ${avatarUrl ? 'Yes — avatar image provided. Incorporate this specific presenter dynamically across multiple fast-cut storyboard panels.' : 'No avatar — product-only ad with high-end CGI/VFX feel'}
+AVATAR/PRESENTER: ${avatarUrl ? 'YES — avatar image provided. Feature this specific presenter in relevant cuts.' : 'NO — product-only ad, no presenter'}
 BRAND NAME: ${brandName}${logoDetails}
 
-Now act as the visionary director. Deeply analyze the product and brief, and write the imagePrompt as JSON.
+Now act as the professional storyboard director. Deeply analyse the product, brief, and reference images.
+Write the complete 4-section structured storyboard JSON.
 Remember:
-- Make the imagePrompt dense, rich, and formatted with Canvas, Style, Main subject, Storyboard panels, Design details, and Negative prompt sections.
-- Return ONLY the JSON object with the imagePrompt field, no other text.`;
+- cuts[] durations must SUM EXACTLY to ${duration}s
+- environmentFingerprint defines ONE single set — never changes
+- Each cut's framePrompt must be a detailed still-image description grounded in the actual product/avatar references
+- imagePrompt must be built from your cuts[] array — it is the grid poster prompt
+- Return ONLY the JSON object, no other text`;
 }
 
 
@@ -149,7 +217,6 @@ function parseStoryboardOutput(rawText, targetDuration) {
     try {
         plan = JSON.parse(cleaned);
     } catch (e) {
-        // Try to extract JSON from within the text
         const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
         if (jsonMatch) {
             plan = JSON.parse(jsonMatch[0]);
@@ -162,11 +229,51 @@ function parseStoryboardOutput(rawText, targetDuration) {
         throw new Error('Storyboard JSON missing imagePrompt field');
     }
 
-    return {
-        imagePrompt: plan.imagePrompt,
-        videoPrompt: '',  // Video prompt generated fresh at animate-time — not at creation time
-        duration: targetDuration
-    };
+    // Validate and fix cuts[] if present
+    if (Array.isArray(plan.cuts) && plan.cuts.length > 0) {
+        // Ensure all cuts have required fields with fallbacks
+        plan.cuts = plan.cuts.map((cut, i) => ({
+            id: cut.id || i + 1,
+            lens: cut.lens || '50mm',
+            duration: Math.max(MIN_SHOT_DURATION, parseInt(cut.duration) || 4),
+            move: cut.move || 'STEADICAM',
+            shot: cut.shot || 'MEDIUM',
+            scene: cut.scene || `Cut ${i + 1}`,
+            framePrompt: cut.framePrompt || cut.scene || '',
+        }));
+
+        // Compute actual total from cuts
+        const cutsTotal = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
+        plan.totalDuration = cutsTotal;
+
+        // If there's a duration mismatch, scale the last cut to fix it
+        if (cutsTotal !== targetDuration && plan.cuts.length > 0) {
+            const diff = targetDuration - cutsTotal;
+            plan.cuts[plan.cuts.length - 1].duration = Math.max(
+                MIN_SHOT_DURATION,
+                plan.cuts[plan.cuts.length - 1].duration + diff
+            );
+            plan.totalDuration = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
+        }
+    } else {
+        // No structured cuts — create minimal fallback
+        plan.cuts = [];
+        plan.totalDuration = targetDuration;
+    }
+
+    // Ensure all section fields have fallbacks
+    plan.colorPalette = Array.isArray(plan.colorPalette) ? plan.colorPalette.slice(0, 3) : [];
+    plan.paletteNames = Array.isArray(plan.paletteNames) ? plan.paletteNames.slice(0, 3) : [];
+    plan.materialNotes = plan.materialNotes || '';
+    plan.environmentFingerprint = plan.environmentFingerprint || '';
+    plan.moodKeywords = Array.isArray(plan.moodKeywords) ? plan.moodKeywords : [];
+    plan.cinematographyRules = plan.cinematographyRules || '';
+    plan.emotionalArc = plan.emotionalArc || '';
+    plan.narrativeArc = plan.narrativeArc || '';
+    plan.hookStrategy = plan.hookStrategy || '';
+    plan.videoPrompt = '';  // Generated fresh at animate-time
+
+    return plan;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,7 +281,7 @@ function parseStoryboardOutput(rawText, targetDuration) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Run the Storyboard Director — generates a complete shot plan
+ * Run the Storyboard Director — generates a complete 4-section structured storyboard plan
  *
  * @param {object} params
  * @param {string} params.brandId
@@ -187,7 +294,9 @@ function parseStoryboardOutput(rawText, targetDuration) {
  * @param {number} params.duration              — total video duration in seconds
  * @param {string} params.format                — '9:16' | '16:9' | '1:1'
  * @param {string} params.userId
- * @returns {object} storyboard plan JSON
+ * @param {string} params.directorModel         — 'claude' | 'gemini'
+ * @param {string} params.dialogueLanguage      — dialogue language
+ * @returns {object} full storyboard plan JSON with structuredPlan fields
  */
 export async function runStoryboardDirector({
     brandId, brief, productName, productFeatures,
@@ -195,12 +304,12 @@ export async function runStoryboardDirector({
     style = 'hyperrealistic', duration = 30, format = '9:16', userId, directorModel = 'claude',
     dialogueLanguage = 'English'
 }) {
-    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, shots estimated=${Math.ceil(duration / 4)}`);
+    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}`);
 
     // 1. Load brand DNA
     const { brand, brandContext } = await loadBrandContext(brandId);
     console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars`);
-    
+
     const logoUrl = brand?.dna?.logo?.url || null;
     const logoDescription = brand?.dna?.logo?.metadata?.visionDescription || '';
     const brandName = brand?.name || 'the brand';
@@ -209,14 +318,14 @@ export async function runStoryboardDirector({
     const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
     const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription, productImageUrls });
 
-    // 3. Build image URLs for Claude vision (product + avatar) — NO cap, use ALL images
+    // 3. Build image URLs for Claude vision — ALL product images + avatar
     const imageUrls = [];
     for (const url of (productImageUrls || []).filter(u => u?.startsWith('http'))) {
         imageUrls.push(url);
     }
     if (avatarUrl?.startsWith('http')) imageUrls.push(avatarUrl);
 
-    console.log(`[Storyboard Director] Calling Claude with ${imageUrls.length} vision images...`);
+    console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images...`);
 
     // 4. Call Agent (multimodal)
     let rawOutput;
@@ -225,10 +334,10 @@ export async function runStoryboardDirector({
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: 6000, returnRaw: true, provider: directorModel }
+            { temperature: 0.7, maxTokens: 8000, returnRaw: true, provider: directorModel }
         );
     } catch (err) {
-        throw new Error(`Storyboard Director (Claude) failed: ${err.message}`);
+        throw new Error(`Storyboard Director (${directorModel}) failed: ${err.message}`);
     }
 
     // 5. Parse + validate
@@ -236,14 +345,16 @@ export async function runStoryboardDirector({
     try {
         plan = parseStoryboardOutput(rawOutput, duration);
     } catch (parseErr) {
-        console.error(`[Storyboard Director] Parse failed, retrying with stricter prompt...`);
-        // Retry once with a stronger instruction
+        console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
-        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.5, maxTokens: 6000, returnRaw: true, provider: directorModel });
+        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel });
         plan = parseStoryboardOutput(rawOutput, duration);
     }
 
-    console.log(`[Storyboard Director] Complete — duration: ${plan.duration}s`);
+    console.log(`[Storyboard Director] ✅ Complete — ${plan.cuts.length} cuts, ${plan.totalDuration}s total`);
+    console.log(`[Storyboard Director]   Arc: ${plan.emotionalArc}`);
+    console.log(`[Storyboard Director]   Colors: ${plan.colorPalette.join(', ')}`);
+    console.log(`[Storyboard Director]   Mood: ${plan.moodKeywords.join(', ')}`);
 
     return {
         ...plan,
@@ -260,6 +371,7 @@ export async function runStoryboardDirector({
 
 /**
  * Recreate the video prompt based on user's updated imagePrompt and selected dialogue language.
+ * (Legacy — kept for backwards compat with regen-poster flow)
  */
 export async function recreateVideoPrompt({
     imagePrompt, brief, productName, productFeatures,
@@ -273,39 +385,19 @@ Your job: Given a creative brief, product details, brand DNA, the generated stor
 
 This videoPrompt will animate the storyboard poster into a seamless, high-end commercial video.
 
-═══════════════════════════════════════════════════════
-BRAND DNA & CREATIVE ESSENCE
-═══════════════════════════════════════════════════════
+BRAND DNA & CREATIVE ESSENCE:
 ${brandContext || 'No brand data. Use premium cinematic style throughout.'}
 
-═══════════════════════════════════════════════════════
-AD FILM SPECIFICATIONS
-═══════════════════════════════════════════════════════
-TOTAL DURATION: ${duration}s
-FORMAT: ${format}
-VISUAL STYLE: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}
-DIALOGUE LANGUAGE: ${dialogueLanguage}
+AD FILM SPECIFICATIONS:
+TOTAL DURATION: ${duration}s | FORMAT: ${format} | VISUAL STYLE: ${style} | DIALOGUE LANGUAGE: ${dialogueLanguage}
 
-═══════════════════════════════════════════════════════
-VIDEO PROMPT GENERATION RULES
-═══════════════════════════════════════════════════════
-- It MUST start with: "Use the attached storyboard image as the exact reference."
-- Define the cinematic motion using professional film terminology (smooth 3D tracking cameras, rack focus, kinetic whip-pans, hyper-lapse, high-energy motion blur).
-- Preserve the exact shot order and visual continuity of the presenter and product.
-- MANDATORY: Write explicit spoken dialogues or voiceover scripts in the selected language (${dialogueLanguage}) directly inside the videoPrompt. The dialogues must be written in the actual script/language (e.g. if selected language is Hindi, write the dialogue in Hindi, e.g. Presenter says: "नमस्ते, यह हमारा नया प्रोडक्ट है...", rather than asking the character to speak without defining the dialogue).
-- Detail the image reference tags in the videoPrompt explicitly:
-  - Use \`@image1\` for the starting frame/visual layout (this is the first product image if present, else the storyboard poster).
-  - Use \`@image2\` to reference the storyboard poster grid.
-  - Use \`@image3\` to reference the presenter/avatar face if present in the scenes.
-  - Use \`@image4\`, \`@image5\` etc. to reference additional product images if any.
-  For instance, a prompt could mention: 'The presenter shown in @image3 says: "[spoken dialogue in ${dialogueLanguage}]".' or 'The camera pans across the product shown in @image1 and @image4...'
-
-Return ONLY valid JSON with a single key "videoPrompt". No markdown. No explanation. No code fences.
-Example output format:
-{
-  "videoPrompt": "Use the attached storyboard image as the exact reference. Animate this sequence..."
-}
-`;
+VIDEO PROMPT RULES:
+- Start with: "Use the attached storyboard image (@image2) as the visual style reference."
+- Define cinematic motion using professional film terminology.
+- MANDATORY: Write explicit spoken dialogues/voiceover in ${dialogueLanguage} inside the prompt.
+- Use @image1, @image2, @image3 tags to reference attached images.
+- Specify exact shot durations that sum to ${duration}s.
+- Return ONLY valid JSON: { "videoPrompt": "..." }`;
 
     const userPrompt = `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 PRODUCT: ${productName || 'See product images'}
@@ -335,9 +427,7 @@ Generate the videoPrompt JSON now. Return ONLY JSON.`;
 
     try {
         const parsed = JSON.parse(cleaned);
-        if (parsed.videoPrompt) {
-            return parsed.videoPrompt;
-        }
+        if (parsed.videoPrompt) return parsed.videoPrompt;
     } catch (e) {
         const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
         if (jsonMatch) {

@@ -7511,6 +7511,19 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 format,
                 style,
                 dialogueLanguage,
+                // ── 4-section structured plan (new) ──
+                structuredPlan: {
+                    colorPalette:           plan.colorPalette || [],
+                    paletteNames:           plan.paletteNames || [],
+                    materialNotes:          plan.materialNotes || '',
+                    environmentFingerprint: plan.environmentFingerprint || '',
+                    cuts:                   plan.cuts || [],
+                    moodKeywords:           plan.moodKeywords || [],
+                    cinematographyRules:    plan.cinematographyRules || '',
+                    emotionalArc:           plan.emotionalArc || '',
+                    hookStrategy:           plan.hookStrategy || '',
+                    narrativeArc:           plan.narrativeArc || '',
+                },
             },
         });
 
@@ -7688,6 +7701,7 @@ async function generateAnimateVideoPrompt({
     brandContext = '',
     existingVideoPrompt = '',
     firstFrameIsAvatar = false, // true when avatar is used as first frame (no product images)
+    structuredPlan = null,     // 4-section storyboard plan from DB (new)
 }) {
     // Build the precise @imageN tag mapping so Claude can write them correctly.
     // The video model sees: firstFrame then referenceImages in order.
@@ -7696,27 +7710,78 @@ async function generateAnimateVideoPrompt({
     const tagMap = [];
 
     if (firstFrameIsAvatar) {
-        // No product images — avatar/presenter is the opening frame
         tagMap.push(`@image1 = Avatar / Presenter image (first frame / I2V anchor) — the presenter's face and body. The video OPENS with this person in frame.`);
     } else {
-        // Product image is the opening frame (standard case)
         tagMap.push(`@image1 = Product image (first frame / I2V anchor) — "${productName || 'the product'}". This is the opening visual frame of the video.`);
     }
-    tagMap.push(`@image2 = Storyboard poster (visual style reference) — Use this as the overall style guide for colour grading, mood, layout, and composition. Do NOT animate it as-is; extract the visual style from it.`);
+    tagMap.push(`@image2 = Storyboard poster (visual style reference) — Use this as the overall style guide for colour grading, mood, layout, and composition.`);
 
     let nextTag = 3;
-    // Additional product images (product[1], product[2]...)
     for (let i = 1; i < productImageUrls.length; i++) {
         tagMap.push(`@image${nextTag++} = Additional product reference image ${i + 1} — "${productName || 'product'}" from another angle.`);
     }
-    // Avatar: only add as a reference if it's NOT already used as the first frame
-    // When firstFrameIsAvatar=true, avatar is @image1 (the I2V start), not a ref slot
     if (avatarUrl && !firstFrameIsAvatar) {
-        tagMap.push(`@image${nextTag++} = Avatar / Presenter reference — the human presenter's exact face and identity. Use this for all shots featuring the presenter speaking or interacting with the product.`);
+        tagMap.push(`@image${nextTag++} = Avatar / Presenter reference — the human presenter's exact face and identity.`);
     }
-    // Logo
     if (logoUrl) {
-        tagMap.push(`@image${nextTag++} = Brand logo reference — show this exact logo on screen during the closing shot or overlay.`);
+        tagMap.push(`@image${nextTag++} = Brand logo reference — show this exact logo during the closing shot or overlay.`);
+    }
+
+    // ── Build a rich structured context block from the 4-section plan ──────────
+    // When structuredPlan is available, Claude gets the full cinematic blueprint:
+    // materials, environment, timed cut list, emotional arc, lighting rules.
+    // This produces a far more precise video prompt than a generic brief.
+    let structuredContext = '';
+    if (structuredPlan && Array.isArray(structuredPlan.cuts) && structuredPlan.cuts.length > 0) {
+        console.log(`[generateAnimateVideoPrompt] Using structured plan — ${structuredPlan.cuts.length} cuts`);
+
+        // Build timed cut list (accumulate start time per cut)
+        let elapsed = 0;
+        const cutLines = structuredPlan.cuts.map(cut => {
+            const start = elapsed;
+            const end = elapsed + cut.duration;
+            elapsed = end;
+            return `  Cut ${cut.id} [${start}s–${end}s]: ${cut.lens} | ${cut.shot} | ${cut.move} — ${cut.scene}`;
+        }).join('\n');
+
+        const colorStr = structuredPlan.colorPalette?.length
+            ? structuredPlan.colorPalette.map((hex, i) => `${hex} (${structuredPlan.paletteNames?.[i] || ''})`).join(', ')
+            : '';
+
+        structuredContext = `
+═══════════════════════════════════════════════════════
+STRUCTURED STORYBOARD PLAN (4-SECTION BRIEF)
+═══════════════════════════════════════════════════════
+
+── SECTION 1: CHARACTER + PRODUCT DNA ──
+Color Palette: ${colorStr || 'See storyboard poster'}
+Materials in scene: ${structuredPlan.materialNotes || 'See storyboard poster'}
+
+── SECTION 2: ENVIRONMENT (constant across ALL cuts) ──
+Set: ${structuredPlan.environmentFingerprint || 'See storyboard poster'}
+IMPORTANT: The background / environment NEVER changes between cuts.
+
+── SECTION 3: CUT PLAN (timed shot list for ONE continuous video) ──
+Total: ${duration}s across ${structuredPlan.cuts.length} cuts
+${cutLines}
+
+── SECTION 4: LIGHTING / MOOD / STYLE ──
+Mood: ${structuredPlan.moodKeywords?.join(', ') || ''}
+Cinematography rules: ${structuredPlan.cinematographyRules || ''}
+Emotional arc: ${structuredPlan.emotionalArc || ''}
+Narrative: ${structuredPlan.narrativeArc || ''}
+═══════════════════════════════════════════════════════
+
+YOUR PRIMARY TASK: Translate the cut plan above into precise Seedance video generation instructions.
+For EACH cut, specify:
+  - Exact timing [Xs–Ys]
+  - Camera movement (${structuredPlan.cuts.map(c => c.move).join(' → ')})
+  - Lens character and depth of field behaviour
+  - What the subject does / how the product moves / emotional beat
+  - Any spoken dialogue or VO in ${dialogueLanguage}
+The environment (${structuredPlan.environmentFingerprint}) must remain visually consistent throughout.`;
+    } else {
+        console.log(`[generateAnimateVideoPrompt] No structuredPlan — using generic prompt`);
     }
 
     const systemPrompt = `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
@@ -7725,19 +7790,19 @@ Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will ani
 
 CRITICAL PROMPT RULES:
 1. MUST start with: "Use the attached storyboard image (@image2) as the visual style reference."
-2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame — do NOT open with the storyboard poster.
-3. Use @imageN tags to reference each attached image precisely. The mapping is:
+2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
+3. Use @imageN tags precisely. The mapping is:
 ${tagMap.map(t => `   ${t}`).join('\n')}
-4. Use professional cinematography terms: rack focus, kinetic whip-pans, 3D tracking cameras, slow-motion, hyper-lapse, dolly zoom, etc.
-5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt (e.g. for Hindi: "नमस्ते, यह हमारा नया प्रोडक्ट है...").
-6. Specify exact shot durations that sum to ${duration}s total.
-7. Describe product interaction shots: how the product moves, catches light, is handled by the presenter.
+4. Use professional cinematography terms: rack focus, dolly zoom, kinetic whip-pans, 3D tracking cameras, slow-motion.
+5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
+6. Specify EXACT shot durations that sum to ${duration}s total — follow the cut plan if provided.
+7. Describe product interaction: how the product moves, catches light, is handled.
 8. End with a cinematic brand CTA / closing shot.
-9. The prompt should be 300-600 words, extremely specific, and directly executable.
+9. 300–600 words. Extremely specific. Directly executable by Seedance.
 10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.`;
 
-    const userPrompt = `APPROVED STORYBOARD STYLE (from poster):
-The storyboard poster (@image2) defines the visual world — use it only for style grounding.
+    const userPrompt = `APPROVED STORYBOARD STYLE (from @image2 poster):
+Use @image2 for style grounding only — not as a literal first frame.
 
 CREATIVE BRIEF: "${brief || 'Create a high-energy, cinematic ad film.'}"
 PRODUCT: ${productName || 'See @image1'}
@@ -7746,20 +7811,18 @@ VIDEO DURATION: ${duration}s | FORMAT: ${format} | STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR PRESENT: ${avatarUrl ? `YES — presenter's face is in @image${nextTag - (logoUrl ? 2 : 1)}` : 'NO'}
 BRAND LOGO: ${logoUrl ? `YES — logo appears in @image${nextTag - 1}` : 'NO'}
-
-${existingVideoPrompt ? `REFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 800)}"\n` : ''}
-
-Write the final video prompt now. Ensure every @imageN tag matches the mapping above exactly.`;
+${structuredContext}
+${existingVideoPrompt ? `\nREFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 600)}"\n` : ''}
+Write the final video prompt now. Follow the cut plan timings exactly. Ensure every @imageN tag matches the mapping above.`;
 
     const { callMultimodalAgent } = await import('../agents/shared/agentUtils.js');
     const rawPrompt = await callMultimodalAgent(
         systemPrompt,
         userPrompt,
-        [], // No vision needed — we describe images through tag mapping
-        { temperature: 0.72, maxTokens: 2000, returnRaw: true, provider: 'claude' }
+        [],
+        { temperature: 0.72, maxTokens: 2500, returnRaw: true, provider: 'claude' }
     );
 
-    // Clean up any accidental JSON or markdown wrapper
     let cleaned = (rawPrompt || '').trim()
         .replace(/^```(?:json)?[\s\S]*?```$/m, '')
         .replace(/^\{[\s\S]*?"videoPrompt"\s*:\s*"/, '')
@@ -7819,6 +7882,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbDialogueLanguage = 'English';
         let dbBrandContext = '';
         let dbLogoUrl = null;
+        let dbStructuredPlan = null;
 
         if (projectId) {
             const project = await VideoProject.findById(projectId)
@@ -7833,6 +7897,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dbFormat      = project.storyboard?.format || format;
                 dbStyle       = project.storyboard?.style || 'hyperrealistic';
                 dbDialogueLanguage = project.storyboard?.dialogueLanguage || 'English';
+                dbStructuredPlan  = project.storyboard?.structuredPlan || null;
 
                 if (project.brand?.dna) {
                     const dna = project.brand.dna;
@@ -7921,7 +7986,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dialogueLanguage: dbDialogueLanguage,
                 brandContext: dbBrandContext,
                 existingVideoPrompt: clientVideoPrompt || '',
-                firstFrameIsAvatar,  // tells prompt generator what @image1 actually is
+                firstFrameIsAvatar,
+                structuredPlan: dbStructuredPlan,  // 4-section plan for rich timed prompt
             });
             console.log(`[Storyboard Animate] Video prompt (first 120): ${finalVideoPrompt.substring(0, 120)}...`);
             if (projectId) {
