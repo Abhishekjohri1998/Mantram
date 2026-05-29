@@ -7161,9 +7161,38 @@ router.post('/long-form/generate', protect, async (req, res) => {
             });
         }
 
-        // Deduct credits upfront
-        user.credits.used += costEst.totalCredits;
-        await user.save();
+        // Deduct credits upfront atomically (REL-014)
+        const updatedUser = await User.findOneAndUpdate(
+            {
+                _id: user._id,
+                $expr: {
+                    $gte: [
+                        { $add: [
+                            { $ifNull: ['$credits.total', 0] },
+                            { $ifNull: ['$credits.bonus', 0] },
+                            { $cond: [
+                                { $and: [
+                                    { $gt: ['$credits.topUp', 0] },
+                                    { $gt: ['$credits.topUpExpiry', new Date()] }
+                                ]},
+                                '$credits.topUp',
+                                0
+                            ]}
+                        ] },
+                        costEst.totalCredits
+                    ]
+                }
+            },
+            { $inc: { 'credits.used': costEst.totalCredits } },
+            { returnDocument: 'after' }
+        );
+
+        if (!updatedUser) {
+             return res.status(402).json({
+                success: false,
+                error: 'Insufficient credits (concurrent deduction occurred).',
+            });
+        }
 
         // Load brand context
         let brandContext = '';

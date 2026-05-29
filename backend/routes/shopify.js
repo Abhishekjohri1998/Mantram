@@ -32,16 +32,25 @@ import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
 
-const processedWebhookIds = new Set();
-const WEBHOOK_DEDUP_TTL = 5 * 60 * 1000; // 5 minutes
+import WebhookEvent from '../models/WebhookEvent.js';
 
-function isWebhookDuplicate(req) {
+async function isWebhookDuplicate(req) {
     const webhookId = req.get('X-Shopify-Webhook-Id');
+    const topic = req.get('X-Shopify-Topic');
+    const shop = req.get('X-Shopify-Shop-Domain');
     if (!webhookId) return false;
-    if (processedWebhookIds.has(webhookId)) return true;
-    processedWebhookIds.add(webhookId);
-    setTimeout(() => processedWebhookIds.delete(webhookId), WEBHOOK_DEDUP_TTL);
-    return false;
+
+    try {
+        await WebhookEvent.create({ webhookId, topic, shop });
+        return false; // successfully created, not a duplicate
+    } catch (error) {
+        if (error.code === 11000) {
+            console.log(`[Shopify Webhook] Deduplicated event ${webhookId}`);
+            return true; // duplicate key error
+        }
+        console.error('[Shopify Webhook] Dedup check error:', error);
+        return false; // on DB error, proceed anyway
+    }
 }
 
 // ── Standard Shopify Install Endpoint ──────────────────────────────────────
@@ -549,7 +558,7 @@ router.post('/webhooks/compliance', verifyShopifyWebhook, async (req, res) => {
 // ============================================================================
 
 router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) => {
-    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
+    if (await isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -570,7 +579,7 @@ router.post('/webhooks/orders-create', verifyShopifyWebhook, async (req, res) =>
 });
 
 router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) => {
-    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
+    if (await isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const order = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -591,7 +600,7 @@ router.post('/webhooks/orders-updated', verifyShopifyWebhook, async (req, res) =
 });
 
 router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) => {
-    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
+    if (await isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const product = req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -612,7 +621,7 @@ router.post('/webhooks/products-update', verifyShopifyWebhook, async (req, res) 
 });
 
 router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) => {
-    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
+    if (await isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const shop = req.headers['x-shopify-shop-domain'];
         console.log(`🗑️ Webhook: App uninstalled from ${shop}`);
@@ -628,7 +637,7 @@ router.post('/webhooks/app-uninstalled', verifyShopifyWebhook, async (req, res) 
 });
 
 router.post(['/webhooks/app-subscriptions-update', '/webhooks/app_subscriptions-update'], verifyShopifyWebhook, async (req, res) => {
-    if (isWebhookDuplicate(req)) return res.status(200).json({ received: true });
+    if (await isWebhookDuplicate(req)) return res.status(200).json({ received: true });
     try {
         const payload = req.body.app_subscription || req.body;
         const shop = req.headers['x-shopify-shop-domain'];
@@ -639,8 +648,12 @@ router.post(['/webhooks/app-subscriptions-update', '/webhooks/app_subscriptions-
 
             const sub = await Subscription.findOne({ transactionId: payload.admin_graphql_api_id });
             if (sub) {
+                // REL-013: Handle 'frozen' properly so user doesn't get instantly downgraded on payment retry
                 if (status === 'active') {
                     sub.status = 'active';
+                } else if (status === 'frozen') {
+                    sub.status = 'past_due'; // Shopify puts it in 'frozen' while retrying payment
+                    console.log(`❄️ Webhook: Subscription ${sub._id} frozen (payment failing)`);
                 } else {
                     sub.status = 'expired';
                 }
@@ -648,7 +661,8 @@ router.post(['/webhooks/app-subscriptions-update', '/webhooks/app_subscriptions-
 
                 if (sub.status === 'expired') {
                     await User.findByIdAndUpdate(sub.user, {
-                        plan: 'free'
+                        plan: 'free',
+                        activeSubscription: null // Unlink subscription from user
                     });
                 }
                 console.log(`✅ Webhook: Local subscription ${sub._id} updated to ${sub.status}`);

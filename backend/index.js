@@ -96,7 +96,16 @@ const HARDCODED_ORIGINS = [
     'http://localhost:3000',
 ];
 
+import crypto from 'crypto';
+
 const app = express();
+
+// ── REQUEST ID MIDDLEWARE ─────────────────────────────────────
+app.use((req, res, next) => {
+    req.id = crypto.randomUUID();
+    res.setHeader('X-Request-Id', req.id);
+    next();
+});
 
 // ── SECURITY HEADERS (Helmet) ─────────────────────────────────
 // Sets X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options,
@@ -246,11 +255,42 @@ app.use((req, res, next) => {
 
 // Alias for health checks
 // ── HEALTH & LOG HYGIENE ──────────────────────────────────────
-app.get(['/health', '/api/health'], (req, res) => {
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    res.json({ 
-        status: dbStatus === 'connected' ? 'ok' : 'error', 
-        database: dbStatus,
+app.get(['/health', '/api/health'], async (req, res) => {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbState === 1 ? 'connected' : 'disconnected';
+    
+    // REL-008: Deep health check endpoint
+    const memoryUsage = process.memoryUsage();
+    
+    // Check if Mongo is actually responsive
+    let dbPing = false;
+    if (dbState === 1) {
+        try {
+            await mongoose.connection.db.admin().ping();
+            dbPing = true;
+        } catch (e) {
+            dbPing = false;
+        }
+    }
+
+    const isOk = dbStatus === 'connected' && dbPing;
+
+    res.status(isOk ? 200 : 503).json({ 
+        status: isOk ? 'ok' : 'error', 
+        database: {
+            state: dbStatus,
+            pingOk: dbPing,
+        },
+        memory: {
+            rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+            heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+        },
+        worker: {
+            instanceId: process.env.NODE_APP_INSTANCE || '0',
+            pid: process.pid,
+            uptime: Math.round(process.uptime())
+        },
         port: config.port,
         timestamp: new Date().toISOString()
     });
@@ -514,7 +554,15 @@ console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err.stack);
+    // REL-017: Enhanced error handler with structured context
+    console.error(`❌ Server Error [req_id: ${req.id || 'unknown'}]:`, {
+        message: err.message,
+        stack: err.stack,
+        url: req.originalUrl,
+        method: req.method,
+        userId: req.user ? req.user._id : 'unauthenticated',
+        body: req.method !== 'GET' ? req.body : undefined
+    });
     
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
@@ -524,10 +572,10 @@ app.use((err, req, res, next) => {
         res.setHeader('Vary', 'Origin');
     }
 
-    
     const response = {
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',
+        requestId: req.id, // Expose request ID to client for debugging
     };
 
     // If it's a categorized AI provider error, pass metadata to frontend
@@ -548,11 +596,27 @@ server.timeout = 60000000;
 // ══════════════════════════════════════════════════════════════
 // GRACEFUL SHUTDOWN
 // ══════════════════════════════════════════════════════════════
+import { getInFlightJobs, hasInFlightJobs } from './utils/jobRegistry.js';
+
 const gracefulShutdown = (signal) => {
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+    
     server.close(async () => {
-        console.log('HTTP server closed.');
+        console.log('HTTP server closed. No longer accepting new connections.');
+        
         try {
+            // REL-009 & REL-015: Wait for in-flight jobs to finish before closing DB
+            let drainChecks = 0;
+            while (hasInFlightJobs() && drainChecks < 15) { // wait up to 30 seconds (15 * 2s)
+                console.log(`⏳ Waiting for ${getInFlightJobs().length} in-flight jobs to complete...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                drainChecks++;
+            }
+            
+            if (hasInFlightJobs()) {
+                console.warn(`⚠️ Forcing shutdown with ${getInFlightJobs().length} jobs still running.`);
+            }
+
             if (mongoose.connection) mongoose.connection.isShuttingDown = true;
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');

@@ -14,6 +14,7 @@ async function getSharp() {
 }
 
 import GenerationJob from '../models/GenerationJob.js';
+import { registerJob, unregisterJob } from '../utils/jobRegistry.js';
 import { Router } from 'express';
 import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
@@ -119,6 +120,7 @@ async function createCreativeJob(req, res) {
         // require Redis. It handles up to ~10 concurrent generations comfortably.
         // ─────────────────────────────────────────────────────────────────────
         setImmediate(async () => {
+            registerJob(jobId);
             const JOB_TIMEOUT = 10 * 60 * 1000; // 10 minutes
             const timeout = setTimeout(async () => {
                 console.warn(`⏰ [Job] Background generation timed out after 10m: ${jobId}`);
@@ -132,6 +134,7 @@ async function createCreativeJob(req, res) {
                         `Refund: Timeout refund for Job ${jobId}`, 'creative'
                     ).catch(e => console.error(`❌ [Job] Timeout refund failed for ${jobId}:`, e.message));
                 }
+                unregisterJob(jobId);
             }, JOB_TIMEOUT);
 
             try {
@@ -174,6 +177,7 @@ async function createCreativeJob(req, res) {
                 }
             } finally {
                 clearTimeout(timeout);
+                unregisterJob(jobId);
             }
         });
 
