@@ -898,7 +898,7 @@ export default function VideoStudio() {
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => startTransition(() => setStudioMode(tab.id))}
+                            <button key={tab.id} onClick={() => { startTransition(() => setStudioMode(tab.id)); fetchHistory(50) }}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
