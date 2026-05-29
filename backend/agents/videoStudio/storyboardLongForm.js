@@ -311,9 +311,14 @@ async function _runPipeline(jobId, params) {
 
             // Build per-segment prompt — enrich with position context
             const isLast   = i === segCount - 1;
-            const positionHint = i === 0  ? 'OPENING of the film — establish the visual world clearly.'
-                : isLast   ? 'CLOSING of the film — bring the story to a cinematic conclusion.'
-                : `CONTINUATION — maintain exact visual style from previous segment. Seamlessly continue the action.`;
+            // IMPORTANT: Only the FINAL segment should close with the brand logo/CTA.
+            // Do NOT add brand opening or closing hooks to intermediate segments —
+            // that causes the logo to appear at the start/end of every video cut.
+            const positionHint = i === 0
+                ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately. The scene should open strong and cinematic.'
+                : isLast
+                ? 'This is the FINAL segment — build to the story\'s emotional peak, then end with a single, unified brand closing shot in the last few seconds ONLY (product beauty shot + brand name). The brand logo/CTA must appear exactly ONCE at the very end of this segment, not before.'
+                : `This is a CONTINUATION segment — maintain exact visual style from the previous segment. Seamlessly continue the action. DO NOT include any brand opening, brand logo, or closing CTA — those belong only in the final segment.`;
 
             const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
             const segPrompt = `${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency.`;
