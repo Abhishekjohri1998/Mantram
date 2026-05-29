@@ -123,6 +123,7 @@ export default function VideoStudio() {
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
+    const [visitedTabs, setVisitedTabs] = useState(new Set(['advanced'])) // Track visited tabs for CSS persistence
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
@@ -882,7 +883,7 @@ export default function VideoStudio() {
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => { startTransition(() => setStudioMode(tab.id)); fetchHistory(50) }}
+                            <button key={tab.id} onClick={() => { startTransition(() => setStudioMode(tab.id)); setVisitedTabs(prev => { const next = new Set(prev); next.add(tab.id); return next }); fetchHistory(50) }}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
@@ -1232,45 +1233,59 @@ export default function VideoStudio() {
                 }>
                 <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
-                {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('advanced') && (
+                    <div style={{ display: studioMode === 'advanced' ? 'contents' : 'none' }}>
+                        <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
-                {studioMode === 'ugc' && (
-                    <UGCCreator activeBrand={activeBrand} />
+                {visitedTabs.has('ugc') && (
+                    <div style={{ display: studioMode === 'ugc' ? 'contents' : 'none' }}>
+                        <UGCCreator activeBrand={activeBrand} />
+                    </div>
                 )}
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
-                {studioMode === 'ugc-pro' && (
-                    <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                {visitedTabs.has('ugc-pro') && (
+                    <div style={{ display: studioMode === 'ugc-pro' ? 'contents' : 'none' }}>
+                        <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                    </div>
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
-                {studioMode === 'q-ads' && (
-                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                {visitedTabs.has('q-ads') && (
+                    <div style={{ display: studioMode === 'q-ads' ? 'contents' : 'none' }}>
+                        <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                    </div>
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
-                {studioMode === 'agent' && (
-                    <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('agent') && (
+                    <div style={{ display: studioMode === 'agent' ? 'contents' : 'none' }}>
+                        <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── MOTION GRAPHICS MODE ── */}
-                {studioMode === 'motion-graphics' && (
-                    <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('motion-graphics') && (
+                    <div style={{ display: studioMode === 'motion-graphics' ? 'contents' : 'none' }}>
+                        <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── STORYBOARD MODE — New AI Ad Film Director ── */}
-                {studioMode === 'storyboard' && (
-                    <Storyboard
-                        activeBrand={activeBrand}
-                        projects={projects}
-                        onVideoComplete={() => fetchHistory(50)}
-                        canCreateVideo={canCreateVideo}
-                        onUpgradeRequired={() => setShowUpgradeModal(true)}
-                        user={user}
-                    />
+                {visitedTabs.has('storyboard') && (
+                    <div style={{ display: studioMode === 'storyboard' ? 'contents' : 'none' }}>
+                        <Storyboard
+                            activeBrand={activeBrand}
+                            projects={projects}
+                            onVideoComplete={() => fetchHistory(50)}
+                            canCreateVideo={canCreateVideo}
+                            onUpgradeRequired={() => setShowUpgradeModal(true)}
+                            user={user}
+                        />
+                    </div>
                 )}
                 </div>
                 </Suspense>
