@@ -142,6 +142,10 @@ async function signVideoProjectAssets(data) {
     if (project.input?.images) {
         project.input.images = await Promise.all(project.input.images.map(img => signUrlOrObject(img)));
     }
+    // ✅ CRITICAL FIX: Sign the avatarUrl if present so the frontend can load/render it on project reuse
+    if (project.input?.avatarUrl) {
+        project.input.avatarUrl = await getSignedUrlIfNeeded(project.input.avatarUrl);
+    }
     if (project.images) { // in-memory response override
         project.images = await Promise.all(project.images.map(img => signUrlOrObject(img)));
     }
@@ -7404,7 +7408,30 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
         // Pass raw file buffers directly (bypasses S3 re-download which can silently fail)
         let rawProductBuffers = (req.files?.productImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
-        const rawAvatarBuffer = req.files?.avatarImage?.[0] ? { buffer: req.files.avatarImage[0].buffer, mimeType: req.files.avatarImage[0].mimetype } : null;
+        let rawAvatarBuffer = req.files?.avatarImage?.[0] ? { buffer: req.files.avatarImage[0].buffer, mimeType: req.files.avatarImage[0].mimetype } : null;
+
+        // Eagerly download avatar image URL to buffer if no file was uploaded
+        if (!rawAvatarBuffer && avatarUrl) {
+            console.log(`[Storyboard Create] rawAvatarBuffer empty — downloading avatar URL to buffer...`);
+            try {
+                const signedAvatarUrl = await getSignedUrlIfNeeded(avatarUrl);
+                const resp = await fetch(signedAvatarUrl, { 
+                    headers: { 'User-Agent': 'Mozilla/5.0' }, 
+                    signal: AbortSignal.timeout(15000) 
+                });
+                if (resp.ok) {
+                    rawAvatarBuffer = {
+                        buffer: Buffer.from(await resp.arrayBuffer()),
+                        mimeType: resp.headers.get('content-type') || 'image/jpeg'
+                    };
+                    console.log(`[Storyboard Create] Successfully downloaded avatar to buffer`);
+                } else {
+                    console.warn(`[Storyboard Create] Failed to download avatar buffer: HTTP ${resp.status}`);
+                }
+            } catch (e) {
+                console.warn(`[Storyboard Create] Failed to download avatar buffer: ${e.message}`);
+            }
+        }
 
         // ✅ KEY FIX: When product images arrive as URLs (scraped via URL, not file-uploaded),
         // rawProductBuffers will be empty and NanoBanana will hallucinate because it never
@@ -7413,7 +7440,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             console.log(`[Storyboard Create] rawProductBuffers empty — downloading ${Math.min(productImageUrls.length, 2)} URL images to buffers...`);
             const downloadBuffer = async (url) => {
                 try {
-                    const resp = await fetch(url, { 
+                    const signedUrl = await getSignedUrlIfNeeded(url);
+                    const resp = await fetch(signedUrl, { 
                         headers: { 'User-Agent': 'Mozilla/5.0' }, 
                         signal: AbortSignal.timeout(15000) 
                     });
@@ -7440,7 +7468,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         if (logoUrl) {
             console.log(`[Storyboard Create] Downloading logo ref: ${logoUrl.substring(0, 80)}`);
             try {
-                const resp = await fetch(logoUrl, { 
+                const signedLogoUrl = await getSignedUrlIfNeeded(logoUrl);
+                const resp = await fetch(signedLogoUrl, { 
                     headers: { 'User-Agent': 'Mozilla/5.0' }, 
                     signal: AbortSignal.timeout(15000) 
                 });
@@ -7717,10 +7746,10 @@ async function generateAnimateVideoPrompt({
     tagMap.push(`@image2 = Storyboard poster (visual style reference) — Use this as the overall style guide for colour grading, mood, layout, and composition.`);
 
     let nextTag = 3;
-    for (let i = 1; i < productImageUrls.length; i++) {
-        tagMap.push(`@image${nextTag++} = Additional product reference image ${i + 1} — "${productName || 'product'}" from another angle.`);
+    for (let i = 0; i < productImageUrls.length; i++) {
+        tagMap.push(`@image${nextTag++} = Product reference image ${i + 1} — "${productName || 'product'}" appearance reference.`);
     }
-    if (avatarUrl && !firstFrameIsAvatar) {
+    if (avatarUrl) {
         tagMap.push(`@image${nextTag++} = Avatar / Presenter reference — the human presenter's exact face and identity.`);
     }
     if (logoUrl) {
@@ -7799,7 +7828,8 @@ ${tagMap.map(t => `   ${t}`).join('\n')}
 7. Describe product interaction: how the product moves, catches light, is handled.
 8. End with a cinematic brand CTA / closing shot.
 9. 300–600 words. Extremely specific. Directly executable by Seedance.
-10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.`;
+10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
+11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`;
 
     const userPrompt = `APPROVED STORYBOARD STYLE (from @image2 poster):
 Use @image2 for style grounding only — not as a literal first frame.
@@ -7815,11 +7845,23 @@ ${structuredContext}
 ${existingVideoPrompt ? `\nREFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 600)}"\n` : ''}
 Write the final video prompt now. Follow the cut plan timings exactly. Ensure every @imageN tag matches the mapping above.`;
 
+    const visionImages = [];
+    if (storyboardPosterUrl?.startsWith('http')) visionImages.push(storyboardPosterUrl);
+    for (const url of (productImageUrls || []).filter(u => u?.startsWith('http'))) {
+        if (!visionImages.includes(url)) visionImages.push(url);
+    }
+    if (avatarUrl?.startsWith('http') && !visionImages.includes(avatarUrl)) {
+        visionImages.push(avatarUrl);
+    }
+    if (logoUrl?.startsWith('http') && !visionImages.includes(logoUrl)) {
+        visionImages.push(logoUrl);
+    }
+
     const { callMultimodalAgent } = await import('../agents/shared/agentUtils.js');
     const rawPrompt = await callMultimodalAgent(
         systemPrompt,
         userPrompt,
-        [],
+        visionImages,
         { temperature: 0.72, maxTokens: 2500, returnRaw: true, provider: 'claude' }
     );
 
@@ -7859,7 +7901,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
 
         const {
             projectId,
-            imageUrl,           // ← storyboard poster URL (approved by user)
+            imageUrl: _imageUrlFromClient,  // ← storyboard poster URL (approved by user)
             videoPrompt: clientVideoPrompt,
             duration,
             format = '9:16',
@@ -7868,6 +7910,9 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             avatarUrl,
             model = 'seedance-2.0-fast',
         } = req.body;
+
+        // Mutable — may be re-signed or overridden by DB copy below
+        let imageUrl = _imageUrlFromClient;
 
         if (!imageUrl) return res.status(400).json({ success: false, error: 'No imageUrl provided' });
 
@@ -7889,8 +7934,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 .populate('brand', 'name dna')
                 .lean();
             if (project) {
-                dbProductImgs = (project.input?.images || []).map(img => img.url).filter(Boolean);
-                dbAvatar      = project.input?.avatarUrl || null;
+                const rawProductImgs = (project.input?.images || []).map(img => img.url).filter(Boolean);
+                const rawAvatar      = project.input?.avatarUrl || null;
                 dbBrief       = project.input?.brief || '';
                 dbProductName = project.input?.productName || '';
                 dbProductFeatures = project.input?.productFeatures || '';
@@ -7898,6 +7943,25 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dbStyle       = project.storyboard?.style || 'hyperrealistic';
                 dbDialogueLanguage = project.storyboard?.dialogueLanguage || 'English';
                 dbStructuredPlan  = project.storyboard?.structuredPlan || null;
+
+                // ✅ FIX: S3 bucket has ACLs disabled — raw S3 URLs stored in DB are NOT publicly
+                // accessible. Sign all product image URLs and the avatar URL before passing them
+                // to Atlas Cloud, which must be able to fetch them over HTTPS.
+                dbProductImgs = await Promise.all(rawProductImgs.map(url => getSignedUrlIfNeeded(url)));
+                dbAvatar      = rawAvatar ? await getSignedUrlIfNeeded(rawAvatar) : null;
+
+                // ✅ FIX: Always refresh the poster URL with a new signed URL so Atlas can always fetch it.
+                // The client-sent imageUrl may be an expired signed URL from a stale session.
+                const rawDbPosterUrl = project.storyboard?.imageUrl || null;
+                const posterSource = rawDbPosterUrl || imageUrl; // prefer DB copy (raw S3 URL)
+                if (posterSource) {
+                    try {
+                        imageUrl = await getSignedUrlIfNeeded(posterSource);
+                        console.log(`[Storyboard Animate] Poster URL re-signed from ${rawDbPosterUrl ? 'DB' : 'client'}: ${imageUrl.substring(0, 80)}...`);
+                    } catch (signErr) {
+                        console.warn(`[Storyboard Animate] Could not re-sign poster URL: ${signErr.message}`);
+                    }
+                }
 
                 if (project.brand?.dna) {
                     const dna = project.brand.dna;
@@ -7908,8 +7972,10 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                     const voiceDesc = dna.voice?.description || '';
                     const usps = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
                     dbBrandContext = `Brand: ${project.brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nPersonality: ${personality} - ${voiceDesc}\nUSPs: ${usps}`;
+                    // Sign logo URL
+                    if (dbLogoUrl) dbLogoUrl = await getSignedUrlIfNeeded(dbLogoUrl);
                 }
-                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs, avatar=${!!dbAvatar}, logo=${!!dbLogoUrl}`);
+                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs (signed), avatar=${!!dbAvatar} (signed), logo=${!!dbLogoUrl}`);
             }
         }
 
@@ -7938,26 +8004,18 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         const firstFrameIsProduct = !!dbProductImgs[0];
         const firstFrameIsAvatar = !dbProductImgs[0] && !!dbAvatar;
 
-        // Build combinedReferences for the video model.
-        // Rules:
-        //   - Storyboard poster goes in as style_reference (@image2)
-        //   - Extra product images beyond product[0] go in (product[0] IS the first frame)
-        //   - Avatar goes in as face ref ONLY if it's not already used as the first frame
-        //   - Logo goes in if present
         const combinedReferences = [
             { url: imageUrl, role: 'style_reference' },                                   // @image2: storyboard poster style guide
-            ...dbProductImgs.slice(1).map(url => ({ url, role: 'product' })),            // @image3+: extra product angles
-            // Avatar: include as face ref ONLY when product[0] was used as firstFrame
-            // If avatar was used as firstFrame (no product images), skip it from refs to avoid sending twice
-            ...(dbAvatar && firstFrameIsProduct ? [{ url: dbAvatar, role: 'face' }] : []),
-            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),                    // logo
+            ...dbProductImgs.map(url => ({ url, role: 'product' })),                      // @image3+: product references
+            ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),                       // avatar face reference
+            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),                     // logo
         ];
 
         // For long-form segments, pass refs WITHOUT the poster
         // (storyboardLongForm.js adds the poster per-segment from params.imageUrl)
         const longFormRefs = [
-            ...dbProductImgs.slice(1).map(url => ({ url, role: 'product' })),
-            ...(dbAvatar && firstFrameIsProduct ? [{ url: dbAvatar, role: 'face' }] : []),
+            ...dbProductImgs.map(url => ({ url, role: 'product' })),
+            ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
 

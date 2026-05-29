@@ -190,12 +190,17 @@ export class OpenAIProvider extends BaseProvider {
         const allowedSizes = ['1024x1024', '1024x1536', '1536x1024'];
         const finalSize = allowedSizes.includes(size) ? size : '1536x1024';
 
+        let finalPrompt = prompt;
+        if (model === 'gpt-image-1' || model === 'gpt-image-2') {
+            finalPrompt += `\n\nCRITICAL PRODUCT FIDELITY RULE: You have been provided with reference images. Do NOT change, simplify, stylize, or modify the product's design, shapes, logos, labels, packaging, or branding from the reference image(s). The product design, physical attributes, color values, and shades must look EXACTLY as original. The brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.`;
+        }
+
         // Build FormData for multipart request
         const { FormData, Blob } = await import('node:buffer').then(() => globalThis);
 
         const formData = new FormData();
         formData.append('model', model);
-        formData.append('prompt', prompt);
+        formData.append('prompt', finalPrompt);
         formData.append('size', finalSize);
         formData.append('quality', 'high');
         formData.append('n', '1');

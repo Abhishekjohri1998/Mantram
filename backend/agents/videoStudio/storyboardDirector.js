@@ -81,6 +81,7 @@ RULES FOR CUTS:
 - Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion)
 - The product must be visually featured in at least one INSERT/MACRO cut
 - If an avatar/presenter is provided, feature them in at least one CLOSE-UP
+- Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
 
 ═══════════════════════════════════════════════════════
 SECTION 4 — LIGHTING / MOOD / STYLE
@@ -94,25 +95,36 @@ ADDITIONAL OUTPUTS
 ═══════════════════════════════════════════════════════
 - narrativeArc: one sentence summarising the story
 - hookStrategy: one sentence describing the opening hook strategy
-- imagePrompt: a rich, detailed prompt to generate a SINGLE GRID IMAGE containing all the storyboard panels visually. This is what the image model (GPT-Image-2 / Gemini) will render. Build it from your cuts[] so every panel is described precisely. Format it as:
+- imagePrompt: a rich, detailed prompt to generate a SINGLE CONSOLIDATED INFOGRAPHIC storyboard pitch deck sheet image. Build it from your cuts[] so the storyboard row is described precisely. It MUST follow this exact structure:
 
-"Create a premium [NxM] cinematic storyboard poster for a ${brandName} advertisement.
+"Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout for a ${brandName} advertisement.
 
-Canvas: [format: ${format}, clean grid layout, each panel has a dark frame, small cut number in top-left, short title, brief action copy, sound bar at bottom with music/SFX cues. Include a footer with tagline and logo area.]
+Beige/creme background canvas.
+Top Meta Header: Display 'Cut Count: ${duration > 15 ? '5+' : '5'}', 'Color Palette: [hex colors/names]', 'Environment Fingerprint: [environment description]' in clean black typography.
 
-Style: [${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'}, ${duration}s total, cinematic lighting grading, premium feel]
+Section 1 (CHARACTER & HERO PRODUCT REFERENCE):
+- CHARACTER REFERENCE: 6 panels showing the presenter/model (using avatar reference) from angles (front, side, back, face close-up, side close-up, wardrobe detail).
+- HERO PRODUCT REFERENCE: 5 panels showing the product (using product image reference) from angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
+- Bottom row: Color palette circular swatches and text material notes.
 
-Main subject: [product and/or presenter — exact colours/details from reference images]
-${logoPromptInstruction}
+Section 2 (ENVIRONMENT / SET DESIGN):
+- Left side: A large 16:9 set design render of the environment ([environment description]).
+- Right side: A top-down floor plan schematic diagram showing furniture layout and camera paths/arrows labeled with cut numbers (e.g. Cut 1, Cut 2).
 
-Panels:
-Cut 1: [lens | shot | move | scene — using your cuts[0] framePrompt]
-Cut 2: [lens | shot | move | scene — using your cuts[1] framePrompt]
-... (all cuts)
+Section 3 (STORYBOARD):
+- A clean horizontal row of 5 storyboard panels showing:
+  - Panel 1 (Cut 1): Describe Panel 1 in detail using the specific lens, shot type, camera move, and action description from your Cut 1 plan.
+  - Panel 2 (Cut 2): Describe Panel 2 in detail using the details from your Cut 2 plan.
+  - Panel 3 (Cut 3): Describe Panel 3 in detail using the details from your Cut 3 plan.
+  - Panel 4 (Cut 4): Describe Panel 4 in detail using the details from your Cut 4 plan.
+  - Panel 5 (Cut 5): Describe Panel 5 in detail using the details from your Cut 5 plan.
+- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type — short action description'.
 
-Design details: [white uppercase typography, dark translucent bars for music/SFX, waveforms, clean spacing]
+Section 4 (LIGHTING / MOOD / STYLE NOTES):
+- 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
+- On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
 
-Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]"
+Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${duration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors."
 
 ═══════════════════════════════════════════════════════
 BRAND DNA & CREATIVE ESSENCE
@@ -167,7 +179,7 @@ function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, durat
     let imgIdx = 1;
     if (productImageUrls?.length > 0) {
         productImageUrls.forEach((url, i) => {
-            imageMappingLines.push(`  - Attached Image ${imgIdx++}: PRODUCT reference — "${productName || 'product'}". Use this for exact product appearance (shape, color, branding, materials) in all framePrompts and in the imagePrompt grid panels.`);
+            imageMappingLines.push(`  - Attached Image ${imgIdx++}: PRODUCT reference — "${productName || 'product'}". Use this for exact product appearance (shape, color, branding, materials) in all framePrompts and in the imagePrompt grid panels. Do NOT recolor or color-shift the product itself to match the brand colors.`);
         });
     }
     if (avatarUrl) {

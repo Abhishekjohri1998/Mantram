@@ -310,13 +310,13 @@ RESPONSE FORMAT — respond in STRICT JSON:
             cleanPrompt += '\n\nThe output must be ONLY the design itself, edge-to-edge, filling the entire canvas. Do NOT add color swatches, color circles, color labels, palette panels, title cards, dimension text, mockup frames, or any elements outside the design.';
 
             // ===== SOCIAL MEDIA SIZE MAPPING =====
-            // DALL-E 3 only supports: 1024x1024 (1:1), 1024x1792 (9:16), 1792x1024 (16:9)
+            // Standard image models perform best on standard aspect ratios: 1024x1024 (1:1), 1024x1792 (9:16), 1792x1024 (16:9)
             // Map all social media ratios to these three
             const ratio = (parsed.data.aspectRatio || '1:1').toLowerCase().replace(/\s+/g, '');
             let imageSize;
             switch (ratio) {
                 case '9:16':  // Instagram/Facebook Story, Reels, TikTok
-                case '4:5':   // Instagram post (portrait) — closest DALL-E match
+                case '4:5':   // Instagram post (portrait) — closest standard match
                     imageSize = '1024x1792';
                     break;
                 case '16:9':  // YouTube thumbnail, LinkedIn cover, Twitter/X header

@@ -351,7 +351,10 @@ async function submitAtlasCloudPayload(payload) {
 
         if (isR2V) {
             // reference_images: prefer asset:// URIs (already resolved upstream), fall back to raw URLs
-            const allRefs = [...rawRefImages, ...rawImageUrls];
+            // ✅ CRITICAL FIX: To match the prompt's @image1 and @image2 tag expectations, 
+            // the first frame (rawImageUrls) must be at index 0 (start of array), 
+            // and the reference images (rawRefImages) must follow.
+            const allRefs = [...rawImageUrls, ...rawRefImages];
             if (allRefs.length > 0) {
                 // Filter: asset:// URIs stay as-is, raw URLs get uploaded to CDN for fallback
                 const processedRefs = await Promise.all(allRefs.map(async url => {

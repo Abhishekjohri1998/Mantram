@@ -193,6 +193,12 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             setProductImages([{ file: project.storyboard.imageUrl, preview: project.storyboard.imageUrl }]);
         }
 
+        if (project.input?.avatarUrl) {
+            setAvatarImage({ file: project.input.avatarUrl, preview: project.input.avatarUrl });
+        } else {
+            setAvatarImage(null);
+        }
+
         // 3. Config (format, model, etc)
         if (project.storyboard?.format) setFormat(project.storyboard.format);
         if (project.routing?.selectedModel) setModel(project.routing.selectedModel);

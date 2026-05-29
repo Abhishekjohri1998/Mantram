@@ -16,12 +16,28 @@ import config from '../../config/env.js';
 
 // ── Style prompt prefixes ─────────────────────────────────────────────────────
 const STYLE_PREFIXES = {
-    hyperrealistic: 'Create a professional production storyboard pitch deck in a cohesive multi-frame grid layout (e.g. 3x4 or 4x4 frames). Cinematic, ultra-detailed photorealistic photography, professional 3-point lighting.',
-    '3d': 'Create a professional production storyboard pitch deck in a cohesive multi-frame grid layout (e.g. 3x4 or 4x4 frames). 3D animated commercial style, Pixar and Unreal Engine 5 rendering, ray-traced cinematic lighting.',
-    '2d': 'Create a professional production storyboard pitch deck in a cohesive multi-frame grid layout (e.g. 3x4 or 4x4 frames). 2D animated commercial style, clean flat vector illustration, bold black outlines, vibrant colors.',
+    hyperrealistic: 'Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout. Cinematic, ultra-detailed photorealistic photography, professional lighting, clean design, beige/creme background canvas.',
+    '3d': 'Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout. 3D animated commercial style, Pixar and Unreal Engine 5 rendering, ray-traced cinematic lighting, clean design, beige/creme background canvas.',
+    '2d': 'Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout. 2D animated commercial style, clean flat vector illustration, bold black outlines, vibrant colors, clean design, beige/creme background canvas.',
 };
 
-const STYLE_SUFFIX = `CRITICAL REQUIREMENT: This MUST be a single image containing a dense grid of multiple distinct storyboard frames. Below EACH individual frame, include clear typography with a frame number and a short caption describing the action or camera angle (e.g. "1. WIDE SHOT", "2. CLOSE UP"). It should look exactly like a real advertising agency presentation deck or film production storyboard template.`;
+const STYLE_SUFFIX = `CRITICAL CANVAS LAYOUT REQUIREMENT: This MUST be a single, large consolidated infographic image structured into 4 distinct horizontal sections:
+1. TOP META HEADER: Displaying 'Cut Count: X', 'Color Palette: ...', 'Environment Fingerprint: ...' in clean black typography.
+2. SECTION 1 (CHARACTER & HERO PRODUCT REFERENCE):
+   - 'CHARACTER REFERENCE' showing 6 small panels of the presenter/model from different angles (front, side, back, face close-up, side close-up, wardrobe detail).
+   - 'HERO PRODUCT REFERENCE' showing 5 small panels of the product from different angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
+   - Bottom row: Color palette circular swatches and text material notes.
+3. SECTION 2 (ENVIRONMENT / SET DESIGN):
+   - A large 16:9 set design render of the environment on the left.
+   - A clean top-down floor plan schematic diagram on the right, showing counter/furniture layout and camera paths/arrows labeled with cut numbers (e.g. Cut 1, Cut 2).
+4. SECTION 3 (STORYBOARD CUTS):
+   - A clean horizontal row of 5 main storyboard panels (Cut 1, Cut 2, Cut 3, Cut 4, Cut 5).
+   - Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type — short action description'.
+5. SECTION 4 (LIGHTING / MOOD / STYLE NOTES):
+   - 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
+   - On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
+
+This must look exactly like a real professional advertising agency presentation deck or director's pre-production storyboard template. All panels, text labels, schemas, and diagrams must be crisp, clean, and perfectly organized on a single cohesive canvas page.`;
 
 // ── Aspect ratio → GPT Image 2 size ──────────────────────────────────────────
 const AR_TO_SIZE = {
@@ -43,7 +59,14 @@ function sanitizeMimeType(mimeType) {
 
 // ── Download a URL to a Buffer ────────────────────────────────────────────────
 async function downloadBuffer(url) {
-    const resp = await fetch(url, {
+    let targetUrl = url;
+    try {
+        const { getSignedUrlIfNeeded } = await import('../../utils/s3.js');
+        targetUrl = await getSignedUrlIfNeeded(url);
+    } catch (e) {
+        console.warn(`[storyboardFrames] Could not sign S3 URL inside downloadBuffer: ${e.message}`);
+    }
+    const resp = await fetch(targetUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Mantram AI Backend)' },
         signal: AbortSignal.timeout(15000),
     });
@@ -89,10 +112,16 @@ export async function generateStoryboardPoster(
     if (hasProductRefs || hasAvatarRef || hasLogoRef) {
         finalPrompt += `\n\nCRITICAL INSTRUCTION: You have been provided with reference images. You MUST use them exactly as they appear.`;
         finalPrompt += ` IMPORTANT: Do NOT confuse the human character with the product! Keep them entirely separate.`;
-        if (hasProductRefs) finalPrompt += ` The PRODUCT to feature in the scene MUST perfectly match the attached product reference (exact shape, color, branding).`;
-        if (hasAvatarRef) finalPrompt += ` The HUMAN CHARACTER/PRESENTER in the scene MUST perfectly match the attached human face/avatar reference. Do NOT mix product features onto the human face.`;
-        if (hasLogoRef) finalPrompt += ` The brand logo MUST perfectly match the attached logo reference.`;
-        finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos.`;
+        if (hasProductRefs) {
+            finalPrompt += ` The PRODUCT to feature in the scene MUST perfectly match the attached product reference (its exact shape, design details, color shades, labels, and branding). Do NOT change the product's colors, materials, or structure. The product must look exactly as in the original reference. The brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.`;
+        }
+        if (hasAvatarRef) {
+            finalPrompt += ` The HUMAN CHARACTER/PRESENTER in the scene MUST perfectly match the attached human face/avatar reference. Do NOT mix product features onto the human face, and keep facial features, skin tone, hair, and look completely original.`;
+        }
+        if (hasLogoRef) {
+            finalPrompt += ` The brand logo MUST perfectly match the attached logo reference (colors, font, and shape must be identical).`;
+        }
+        finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos. Do NOT stylize, modify, or simplify any of the reference details. Keep all shapes and colors completely true to the references.`;
     }
 
     let useNanoBanana = imageModel === 'nanobanana' || imageModel === 'nanobanana-2' || imageModel === 'nanobanana-pro';
@@ -146,14 +175,13 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 
     const refBuffers = [];
     
-    // 1. Collect Product Images
+    // 1. Collect Product Images (Only the first one to avoid slot/reference confusion in LaoZhang edits)
     if (rawProductBuffers.length > 0) {
-        for (const rb of rawProductBuffers) {
-            if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: 'product' });
-        }
+        const rb = rawProductBuffers[0];
+        if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: 'product' });
     } else if (productImageUrls.length > 0) {
-        const urlsToFetch = productImageUrls.filter(u => u?.startsWith('http'));
-        for (const url of urlsToFetch) {
+        const url = productImageUrls.find(u => u?.startsWith('http'));
+        if (url) {
             try {
                 const { buffer, mimeType } = await downloadBuffer(url);
                 refBuffers.push({ buffer, mimeType, label: 'product' });
