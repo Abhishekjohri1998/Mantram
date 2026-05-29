@@ -195,11 +195,17 @@ router.get('/', protect, async (req, res) => {
             year:  y,
         }).lean();
 
+        // Deduplicate strategy entries that have become SocialPosts
+        const socialPostCalendarItemIds = new Set(
+            socialPosts.filter(p => p.calendarItemId).map(p => p.calendarItemId.toString())
+        );
+
         // Flatten strategy items and filter to this month
         const strategyEntries = [];
         for (const strategy of strategies) {
             for (const item of strategy.calendar || []) {
                 if (!item.date) continue;
+                if (socialPostCalendarItemIds.has(item._id.toString())) continue;
                 const itemDate = new Date(item.date + 'T00:00:00');
                 if (itemDate >= rangeStart && itemDate <= rangeEnd) {
                     strategyEntries.push(normalizeStrategyItem(item, strategy));
@@ -290,6 +296,11 @@ router.get('/today', protect, async (req, res) => {
             .limit(10)
             .lean();
 
+        // Deduplicate strategy items that have become SocialPosts
+        const socialPostCalendarItemIds = new Set(
+            posts.filter(p => p.calendarItemId).map(p => p.calendarItemId.toString())
+        );
+
         // Also pull strategy items for today + tomorrow if brand specified
         let strategyItems = [];
         if (brand && brand !== 'all') {
@@ -304,7 +315,9 @@ router.get('/today', protect, async (req, res) => {
             for (const strategy of strategies) {
                 for (const item of strategy.calendar || []) {
                     if (item.date === todayStr || item.date === tomorrowStr) {
-                        strategyItems.push(normalizeStrategyItem(item, strategy));
+                        if (!socialPostCalendarItemIds.has(item._id.toString())) {
+                            strategyItems.push(normalizeStrategyItem(item, strategy));
+                        }
                     }
                 }
             }

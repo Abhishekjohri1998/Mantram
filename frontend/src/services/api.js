@@ -63,8 +63,8 @@ export async function apiFetch(endpoint, options = {}) {
         ...options.headers,
     };
 
-    // Configurable timeout — default 1 hour (3,600,000ms), heavy operations can pass longer
-    const { timeout: timeoutMs = 3600000, signal: externalSignal, ...fetchOptions } = options;
+    // PERF-029: Default 30s timeout — long operations (AI gen) pass custom longer timeouts
+    const { timeout: timeoutMs = 30000, signal: externalSignal, ...fetchOptions } = options;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     // If caller provides an external signal (for stop buttons), wire it up

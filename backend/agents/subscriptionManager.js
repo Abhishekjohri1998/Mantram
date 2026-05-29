@@ -17,6 +17,18 @@ export async function processRenewals() {
     const now = new Date();
 
     try {
+        // --- NEW: Expire subscriptions past their endDate ---
+        const expiredSubs = await Subscription.find({
+            status: 'active',
+            endDate: { $lt: now }
+        });
+        for (const sub of expiredSubs) {
+            sub.status = 'expired';
+            await sub.save();
+            await User.findByIdAndUpdate(sub.user, { plan: 'free' });
+            console.log(`📉 Subscription ${sub._id} expired — user ${sub.user} downgraded to free`);
+        }
+
         // Find active subscriptions that have passed their renewal date
         const subscriptions = await Subscription.find({
             status: 'active',
@@ -144,7 +156,14 @@ async function assignFreePlan(user) {
  * Starts the Subscription Manager background agent
  */
 export function startSubscriptionManager() {
-    console.log('💎 [SubscriptionManager] Agent started');
+    // Only run on the primary PM2 worker
+    const instanceId = process.env.NODE_APP_INSTANCE || '0';
+    if (instanceId !== '0') {
+        console.log(`💎 [SubscriptionManager] Skipped on worker ${instanceId} (runs on primary only)`);
+        return;
+    }
+
+    console.log('💎 [SubscriptionManager] Agent started (primary worker)');
     
     // Initial run after 1 minute (give DB time to settle)
     setTimeout(processRenewals, 60000);

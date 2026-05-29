@@ -6,6 +6,33 @@ import Brand from '../models/Brand.js';
 import config from '../config/env.js';
 import { performMonthlyReset } from '../utils/credits.js';
 
+// ── PERF-001: Per-process user cache (LRU with TTL) ──
+// Eliminates User.findById() on every API call — saves 15-40ms per request.
+const userCache = new Map();
+const USER_CACHE_TTL = 60_000; // 60 seconds
+const USER_CACHE_MAX = 500;
+
+function getCachedUser(userId) {
+    const entry = userCache.get(userId);
+    if (entry && Date.now() - entry.ts < USER_CACHE_TTL) return entry.user;
+    if (entry) userCache.delete(userId); // expired
+    return null;
+}
+
+function setCachedUser(user) {
+    // Simple LRU eviction — drop oldest if over max
+    if (userCache.size >= USER_CACHE_MAX) {
+        const oldest = userCache.keys().next().value;
+        userCache.delete(oldest);
+    }
+    userCache.set(user._id.toString(), { user, ts: Date.now() });
+}
+
+/** Invalidate the user cache entry (call after credit deduction, profile update, etc.) */
+export function invalidateUserCache(userId) {
+    if (userId) userCache.delete(userId.toString());
+}
+
 // Protect routes — verify JWT (supports Shopify Session Tokens as fallback)
 export const protect = async (req, res, next) => {
     let token;
@@ -23,11 +50,30 @@ export const protect = async (req, res, next) => {
     // 1. Try standard JWT verification
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
-        const user = await User.findById(decoded.id);
+
+        // PERF-001: Check in-memory cache before hitting DB
+        const cached = getCachedUser(decoded.id);
+        if (cached) {
+            req.user = cached;
+            return next();
+        }
+
+        const user = await User.findById(decoded.id).populate('activeSubscription');
 
         if (user) {
+            // REL-020: Inline subscription expiry check
+            if (user.activeSubscription && user.activeSubscription.endDate && new Date(user.activeSubscription.endDate) < new Date()) {
+                console.log(`[Auth] Inline expiring subscription ${user.activeSubscription._id} for user ${user._id}`);
+                const Subscription = mongoose.model('Subscription');
+                await Subscription.findByIdAndUpdate(user.activeSubscription._id, { status: 'expired' });
+                user.plan = 'free';
+                user.activeSubscription = null;
+                await user.save();
+            }
+
             // Lazy credit sync/reset
             req.user = await performMonthlyReset(user);
+            setCachedUser(req.user);
             return next();
         }
     } catch (jwtErr) {

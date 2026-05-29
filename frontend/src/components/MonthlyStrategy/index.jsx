@@ -136,6 +136,7 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
   const canInlineImage = INLINE_IMAGE_TYPES.has(item.contentType)
   const canCarousel    = CAROUSEL_TYPES.has(item.contentType)
   const canBlog        = BLOG_TYPES.has(item.contentType)
+  const isVideo        = item.targetStudio === 'video' || item.contentType === 'reel' || item.contentType === 'video'
 
   // Load brand's recent creatives for the library picker
   useEffect(() => {
@@ -736,7 +737,8 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
         onClose={() => setSchedOpen(false)}
         prefill={{
           caption:        brief.captionDraft || '',
-          imageUrl:       generatedImageUrl || item.generatedAsset?.url || '',
+          imageUrl:       (!isVideo && (generatedImageUrl || item.generatedAsset?.url)) || '',
+          videoUrl:       (isVideo && (generatedImageUrl || item.generatedAsset?.url)) || '',
           platform:       item.platform || '',
           scheduledAt:    item.date ? new Date(item.date + 'T09:00:00').toISOString() : null,
           sourceType:     'strategy',

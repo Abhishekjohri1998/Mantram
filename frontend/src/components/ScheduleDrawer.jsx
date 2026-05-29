@@ -37,6 +37,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
     const [selAccts,   setSelAccts]   = useState([])
     const [caption,    setCaption]    = useState('')
     const [imageUrl,   setImageUrl]   = useState('')
+    const [videoUrl,   setVideoUrl]   = useState('')
     const [schedAt,    setSchedAt]    = useState(toLocalDatetimeValue(null))
     const [loading,    setLoading]    = useState(false)
     const [error,      setError]      = useState('')
@@ -53,6 +54,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
         if (!open) { setSuccess(false); setError(''); return }
         setCaption(prefill.caption || '')
         setImageUrl(prefill.imageUrl || '')
+        setVideoUrl(prefill.videoUrl || '')
         setSchedAt(toLocalDatetimeValue(prefill.scheduledAt || null))
         // Pre-select accounts that match the prefilled platform
         if (prefill.platform && accounts.length) {
@@ -63,7 +65,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
         }
         setError('')
         setSuccess(false)
-    }, [open, prefill.caption, prefill.imageUrl, prefill.platform, prefill.scheduledAt, accounts.length]) // eslint-disable-line
+    }, [open, prefill.caption, prefill.imageUrl, prefill.videoUrl, prefill.platform, prefill.scheduledAt, accounts.length]) // eslint-disable-line
 
     // Trap keyboard close
     useEffect(() => {
@@ -103,6 +105,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
                 accountIds:  selAccts,
                 text:        caption,
                 imageUrl:    imageUrl || undefined,
+                videoUrl:    videoUrl || undefined,
                 scheduledFor,
                 brandId:     activeBrand?._id,
                 sourceType:  prefill.sourceType  || 'manual',
@@ -261,15 +264,22 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
                         <p className="text-[10px] text-[var(--sys-text-muted)] text-right mt-1">{caption.length} chars</p>
                     </div>
 
-                    {/* Image preview */}
-                    {imageUrl && (
+                    {/* Image/Video preview */}
+                    {videoUrl ? (
+                        <div>
+                            <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Media Preview</label>
+                            <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] bg-black flex justify-center items-center">
+                                <video src={videoUrl} controls autoPlay muted loop className="w-full max-h-52 object-contain" />
+                            </div>
+                        </div>
+                    ) : imageUrl ? (
                         <div>
                             <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Media Preview</label>
                             <div className="rounded-xl overflow-hidden border border-[var(--sys-border)]">
                                 <img src={imageUrl} alt="Scheduled media" className="w-full max-h-52 object-cover" onError={e => e.target.style.display = 'none'} />
                             </div>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Source tag */}
                     {prefill.sourceTitle && (

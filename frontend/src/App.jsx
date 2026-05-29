@@ -112,6 +112,14 @@ function AppInner() {
 }
 
 import RouteTracker from './components/RouteTracker'
+import { useAuth } from './context/AuthContext'
+
+// PERF-020: Only mount global overlays (Fidato, NexusBar, BackgroundJobs) for authenticated users
+function AuthenticatedAppInner() {
+  const { user } = useAuth()
+  if (!user) return null
+  return <AppInner />
+}
 
 function App() {
   return (
@@ -196,8 +204,8 @@ function App() {
                 </Suspense>
                 </ErrorBoundary>
 
-                {/* Global Background Jobs Panel + Fidato — mounted across all routes */}
-                <AppInner />
+                {/* PERF-020: Global overlays only mounted for authenticated users */}
+                <AuthenticatedAppInner />
               </UIProvider>
             </CreditProvider>
           </BrandProvider>

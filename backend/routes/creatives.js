@@ -14,6 +14,7 @@ async function getSharp() {
 }
 
 import GenerationJob from '../models/GenerationJob.js';
+import { registerJob, unregisterJob } from '../utils/jobRegistry.js';
 import { Router } from 'express';
 import Creative from '../models/Creative.js';
 import Feedback from '../models/Feedback.js';
@@ -21,6 +22,7 @@ import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits as requireCredits, refundCredits } from '../middleware/credits.js';
+import { aiGenerationLimiter } from '../middleware/rateLimiter.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 // orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
@@ -119,6 +121,23 @@ async function createCreativeJob(req, res) {
         // require Redis. It handles up to ~10 concurrent generations comfortably.
         // ─────────────────────────────────────────────────────────────────────
         setImmediate(async () => {
+            registerJob(jobId);
+            const JOB_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+            const timeout = setTimeout(async () => {
+                console.warn(`⏰ [Job] Background generation timed out after 10m: ${jobId}`);
+                await GenerationJob.findOneAndUpdate(
+                    { jobId, status: 'processing' },
+                    { status: 'failed', errorMessage: 'Generation timed out (10m)', completedAt: new Date() }
+                ).catch(() => {});
+                
+                if (req.creditsDeducted > 0) {
+                    refundCredits(req.user._id, req.creditsDeducted, 'creative',
+                        `Refund: Timeout refund for Job ${jobId}`, 'creative'
+                    ).catch(e => console.error(`❌ [Job] Timeout refund failed for ${jobId}:`, e.message));
+                }
+                unregisterJob(jobId);
+            }, JOB_TIMEOUT);
+
             try {
                 console.log(`🚀 [Job] Starting direct background generation: ${jobId}`);
 
@@ -147,7 +166,7 @@ async function createCreativeJob(req, res) {
             } catch (err) {
                 console.error(`❌ [Job] Background generation failed (${jobId}):`, err.message);
                 await GenerationJob.findOneAndUpdate(
-                    { jobId },
+                    { jobId, status: 'processing' },
                     { status: 'failed', completedAt: new Date(), errorMessage: err.message }
                 ).catch(() => { });
 
@@ -157,6 +176,9 @@ async function createCreativeJob(req, res) {
                         `Refund: Background Job ${jobId} Failed — ${err.message}`, 'creative'
                     ).catch(e => console.error(`❌ [Job] Refund failed for ${jobId}:`, e.message));
                 }
+            } finally {
+                clearTimeout(timeout);
+                unregisterJob(jobId);
             }
         });
 
@@ -2474,7 +2496,7 @@ No markdown, no explanation.`;
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/generate — Optimized Agentic Image Generation
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), aiGenerationLimiter, async (req, res) => {
     try {
         const jobId = req.body.jobId || req.headers['x-job-id'];
         const result = await internalGenerateCreative({
@@ -2776,7 +2798,7 @@ router.post('/upload-to-bank', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 const FAL_QUEUE_URL = 'https://queue.fal.run';
 
-router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireCredits('creative'), aiGenerationLimiter, async (req, res) => {
     try {
         const { personImage, garmentImage, brandId, mode = 'preview' } = req.body;
         if (!personImage || !garmentImage) {

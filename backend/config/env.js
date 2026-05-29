@@ -183,4 +183,21 @@ export default {
         model: process.env.UGC_PRO_MODEL || 'seedance-v2.0-i2v',
         quality: process.env.UGC_PRO_QUALITY || 'high',
     },
+
+    // Atlas Cloud — Seedance 2.0 & HappyHorse 1.0 Video Generation
+    atlascloud: {
+        apiKey: process.env.ATLASCLOUD_API_KEY || '',
+    },
 };
+
+const REQUIRED_PRODUCTION = ['MONGODB_URI', 'JWT_SECRET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_S3_BUCKET'];
+const REQUIRED_IF_PAYMENTS = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'];
+
+export function validateConfig() {
+    if (process.env.NODE_ENV !== 'production') return;
+    const missing = REQUIRED_PRODUCTION.filter(k => !process.env[k]);
+    if (missing.length) {
+        console.error(`❌ FATAL: Missing required env vars: ${missing.join(', ')}`);
+        process.exit(1);
+    }
+}

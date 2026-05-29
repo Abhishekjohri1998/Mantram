@@ -21,6 +21,7 @@ const creditUsageSchema = new mongoose.Schema({
         estimatedCost: { type: Number, default: 0 }, // USD cents
     },
     createdAt: { type: Date, default: Date.now },
+    paymentId: { type: String, sparse: true, unique: true }, // REL-011: Idempotency for topups
 });
 
 // TTL index: auto-delete after 90 days

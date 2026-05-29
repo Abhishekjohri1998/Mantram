@@ -76,9 +76,14 @@
   <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
   <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
 
-  <!-- Critical Font — Geist (body text) -->
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap"
-    rel="stylesheet" />
+  <!-- Critical Font — Geist (body text) — PERF-010: async preload to unblock rendering -->
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet" />
+  </noscript>
 
   <!-- Non-critical Fonts — deferred -->
   <link rel="preload" as="style"
@@ -90,10 +95,15 @@
       rel="stylesheet" />
   </noscript>
 
-  <!-- Material Symbols — Synchronous with display=block to prevent FOUT (icon text flashing) -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
-    rel="stylesheet" />
+  <!-- Material Symbols — PERF-002: changed from display=block to async preload + display=swap -->
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+      rel="stylesheet" />
+  </noscript>
 
   <!-- External Scripts -->
   <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>

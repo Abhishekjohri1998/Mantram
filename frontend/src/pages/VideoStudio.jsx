@@ -66,55 +66,39 @@ const VIDEO_TYPES = [
 
 // ── Smart Thumbnail: poster-first when available, video-frame fallback when not ──
 const LazyVideoThumbnail = ({ src, poster }) => {
-    const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
-    const ref = useRef()
     const videoRef = useRef()
 
     const posterUrl = poster || ''
     const hasPoster = !!posterUrl
 
     useEffect(() => {
-        const observer = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting) {
-                setIsVisible(true)
-                observer.disconnect()
-            }
-        }, { rootMargin: '200px' })
-        if (ref.current) observer.observe(ref.current)
-        return () => observer.disconnect()
-    }, [])
-
-    useEffect(() => {
         if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
+    const videoUrl = src ? (src.includes('#') ? src : `${src}#t=1.0`) : ''
+
     return (
-        <div ref={ref} className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
-            onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-
-            {/* Layer 1: Poster image (fades out on hover) */}
-            {hasPoster && (
-                <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" fetchpriority="high" alt=""
-                    style={{ opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', pointerEvents: 'none' }} />
-            )}
-
-            {/* Layer 2: Video element
-                 - If poster exists: only mount on hover (saves bandwidth)
-                 - If NO poster: always mount with preload=metadata to grab a visual frame */}
-            {isVisible && src && (hasPoster ? isHovered : true) && (
-                <video ref={videoRef} src={src}
+        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {hasPoster ? (
+                <>
+                    <img src={posterUrl} loading="lazy" alt=""
+                        style={{ height: '100%', width: '100%', objectFit: 'cover', display: 'block',
+                            opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'relative', zIndex: 2 }} />
+                    {isHovered && (
+                        <video ref={videoRef} src={videoUrl} className="w-full h-full object-cover block" muted loop playsInline preload="none" />
+                    )}
+                </>
+            ) : (
+                <video ref={videoRef} src={videoUrl}
                     className="w-full h-full object-cover block"
                     muted loop playsInline
-                    preload={hasPoster ? "none" : "metadata"}
-                    onError={e => { e.target.style.display = 'none' }}
+                    preload="metadata"
                 />
-            )}
-
-            {/* Layer 3: Loading skeleton (before intersection observer fires) */}
-            {!isVisible && (
-                <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
             )}
         </div>
     )
@@ -139,6 +123,7 @@ export default function VideoStudio() {
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
     const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
+    const [visitedTabs, setVisitedTabs] = useState(new Set(['advanced'])) // Track visited tabs for CSS persistence
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
@@ -898,7 +883,7 @@ export default function VideoStudio() {
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
                         ].map(tab => (
-                            <button key={tab.id} onClick={() => startTransition(() => setStudioMode(tab.id))}
+                            <button key={tab.id} onClick={() => { startTransition(() => setStudioMode(tab.id)); setVisitedTabs(prev => { const next = new Set(prev); next.add(tab.id); return next }); fetchHistory(50) }}
                                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-300 cursor-pointer ${studioMode === tab.id ? 'studio-nav-pill text-[var(--sys-text)] font-bold' : 'studio-nav-tab-inactive'}`}>
                                 <span className={`material-symbols-outlined ${studioMode === tab.id ? 'text-lg' : 'text-base opacity-70'}`}>{tab.icon}</span>
                                 <span>{tab.label}</span>
@@ -1248,45 +1233,59 @@ export default function VideoStudio() {
                 }>
                 <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
-                {studioMode === 'advanced' && (
-                    <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('advanced') && (
+                    <div style={{ display: studioMode === 'advanced' ? 'contents' : 'none' }}>
+                        <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
-                {studioMode === 'ugc' && (
-                    <UGCCreator activeBrand={activeBrand} />
+                {visitedTabs.has('ugc') && (
+                    <div style={{ display: studioMode === 'ugc' ? 'contents' : 'none' }}>
+                        <UGCCreator activeBrand={activeBrand} />
+                    </div>
                 )}
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
-                {studioMode === 'ugc-pro' && (
-                    <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                {visitedTabs.has('ugc-pro') && (
+                    <div style={{ display: studioMode === 'ugc-pro' ? 'contents' : 'none' }}>
+                        <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                    </div>
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
-                {studioMode === 'q-ads' && (
-                    <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                {visitedTabs.has('q-ads') && (
+                    <div style={{ display: studioMode === 'q-ads' ? 'contents' : 'none' }}>
+                        <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                    </div>
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
-                {studioMode === 'agent' && (
-                    <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('agent') && (
+                    <div style={{ display: studioMode === 'agent' ? 'contents' : 'none' }}>
+                        <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── MOTION GRAPHICS MODE ── */}
-                {studioMode === 'motion-graphics' && (
-                    <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                {visitedTabs.has('motion-graphics') && (
+                    <div style={{ display: studioMode === 'motion-graphics' ? 'contents' : 'none' }}>
+                        <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                    </div>
                 )}
 
                 {/* ── STORYBOARD MODE — New AI Ad Film Director ── */}
-                {studioMode === 'storyboard' && (
-                    <Storyboard
-                        activeBrand={activeBrand}
-                        projects={projects}
-                        onVideoComplete={() => fetchHistory(50)}
-                        canCreateVideo={canCreateVideo}
-                        onUpgradeRequired={() => setShowUpgradeModal(true)}
-                        user={user}
-                    />
+                {visitedTabs.has('storyboard') && (
+                    <div style={{ display: studioMode === 'storyboard' ? 'contents' : 'none' }}>
+                        <Storyboard
+                            activeBrand={activeBrand}
+                            projects={projects}
+                            onVideoComplete={() => fetchHistory(50)}
+                            canCreateVideo={canCreateVideo}
+                            onUpgradeRequired={() => setShowUpgradeModal(true)}
+                            user={user}
+                        />
+                    </div>
                 )}
                 </div>
                 </Suspense>

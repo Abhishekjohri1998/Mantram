@@ -24,6 +24,7 @@ import Avatar from '../models/Avatar.js';
 import Brand from '../models/Brand.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
+import { aiGenerationLimiter } from '../middleware/rateLimiter.js';
 import { runStep, advanceWithApproval, getPipelineInfo } from '../agents/videoStudio/engine.js';
 import {
     brainstormNode,
@@ -328,8 +329,8 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
     try {
         const { projectId, prompt, duration, qualityMode } = req.body;
 
-        if (!projectId) {
-            return res.status(400).json({ success: false, error: 'Project ID is required' });
+        if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+            return res.status(400).json({ success: false, error: 'Valid Project ID is required' });
         }
 
         // Load original project
@@ -424,7 +425,7 @@ router.post('/extend-video', protect, requireCredits('videoGenerate'), async (re
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/advanced/generate — Direct generation (Advanced Mode)
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/advanced/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post('/advanced/generate', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const {
             prompt, model, duration, resolution, aspectRatio,
@@ -1186,7 +1187,7 @@ router.post('/agent/first-frames', protect, async (req, res) => {
 // POST /api/video-studio/agent/generate — Generate actual videos after approval
 // User approves first frames → we create VideoProjects and start generation
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/agent/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post('/agent/generate', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const { sessionId, selectedModel } = req.body;
         if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId is required' });
@@ -2549,9 +2550,16 @@ router.post('/ugc/register-webhook', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/video-studio/ugc/webhook-callback — HeyGen webhook callback (no auth)
+// POST /api/video-studio/ugc/webhook-callback — HeyGen webhook callback
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/ugc/webhook-callback', async (req, res) => {
+    // Verify HeyGen webhook authenticity
+    const webhookToken = req.headers['x-heygen-signature'] || req.headers.authorization?.replace('Bearer ', '');
+    if (webhookToken !== process.env.HEYGEN_WEBHOOK_SECRET && process.env.HEYGEN_WEBHOOK_SECRET) {
+        console.warn('⚠️ UGC webhook callback rejected — invalid signature');
+        return res.status(401).json({ error: 'Unauthorized webhook callback' });
+    }
+
     try {
         const { event_type, event_data } = req.body;
         const videoId = event_data?.video_id;
@@ -2600,7 +2608,7 @@ router.post('/ugc/webhook-callback', async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/ugc/generate-agent — Video Agent mode (AI product placement)
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/ugc/generate-agent', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post('/ugc/generate-agent', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const { prompt, avatarId, durationSec, orientation, fileAssetIds, brandId, title } = req.body;
 
@@ -2692,7 +2700,7 @@ router.post('/ugc/generate-script', protect, requireCredits('promptEnhance'), as
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/ugc/generate — Generate UGC video via HeyGen
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/ugc/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post('/ugc/generate', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const {
             script, avatarId, voiceId, photoUrl, audioUrl,
@@ -3333,7 +3341,7 @@ router.post('/ugc-pro/generate-avatar', protect, ugcUpload.single('avatarImage')
 
 
 // Full UGC video generation — builds prompt via nodes, submits to MuAPI
-router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), async (req, res) => {
+router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const {
             brandId, productData, settings,
@@ -5497,7 +5505,7 @@ router.post('/:id/regenerate-shot-image', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/video-studio/:id/generate — Confirm cost → trigger fal.ai
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/:id/generate', protect, requireCredits('videoGenerate'), async (req, res) => {
+router.post('/:id/generate', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
     try {
         const { resolution, model, mode, aspectRatio } = req.body; // Optional overrides
         const project = await VideoProject.findOne({ _id: req.params.id, user: req.user._id });
@@ -7158,9 +7166,38 @@ router.post('/long-form/generate', protect, async (req, res) => {
             });
         }
 
-        // Deduct credits upfront
-        user.credits.used += costEst.totalCredits;
-        await user.save();
+        // Deduct credits upfront atomically (REL-014)
+        const updatedUser = await User.findOneAndUpdate(
+            {
+                _id: user._id,
+                $expr: {
+                    $gte: [
+                        { $add: [
+                            { $ifNull: ['$credits.total', 0] },
+                            { $ifNull: ['$credits.bonus', 0] },
+                            { $cond: [
+                                { $and: [
+                                    { $gt: ['$credits.topUp', 0] },
+                                    { $gt: ['$credits.topUpExpiry', new Date()] }
+                                ]},
+                                '$credits.topUp',
+                                0
+                            ]}
+                        ] },
+                        costEst.totalCredits
+                    ]
+                }
+            },
+            { $inc: { 'credits.used': costEst.totalCredits } },
+            { returnDocument: 'after' }
+        );
+
+        if (!updatedUser) {
+             return res.status(402).json({
+                success: false,
+                error: 'Insufficient credits (concurrent deduction occurred).',
+            });
+        }
 
         // Load brand context
         let brandContext = '';

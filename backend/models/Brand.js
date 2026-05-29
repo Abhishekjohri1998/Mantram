@@ -283,5 +283,7 @@ const brandSchema = new mongoose.Schema({
 // Index for fast lookups
 brandSchema.index({ user: 1, status: 1 });
 brandSchema.index({ 'sharedWith': 1 });
+// PERF-015: Compound index for sorted brand listing (covers the common query pattern)
+brandSchema.index({ user: 1, status: 1, updatedAt: -1 });
 
 export default mongoose.model('Brand', brandSchema);

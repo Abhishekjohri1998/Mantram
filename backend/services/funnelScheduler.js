@@ -117,6 +117,12 @@ async function runFunnelSchedulerTick() {
  * Runs every 10 minutes for nurture + automation
  */
 export function startFunnelScheduler() {
+    const instanceId = process.env.NODE_APP_INSTANCE || '0';
+    if (instanceId !== '0') {
+        console.log(`🌱 [FunnelScheduler] Skipped on worker ${instanceId} (runs on primary only)`);
+        return;
+    }
+
     // Run immediately on start
     setTimeout(() => {
         runFunnelSchedulerTick().catch(err => console.warn('[FunnelScheduler] Initial tick failed:', err.message));
@@ -128,7 +134,7 @@ export function startFunnelScheduler() {
         runFunnelSchedulerTick().catch(err => console.warn('[FunnelScheduler] Tick failed:', err.message));
     }, INTERVAL_MS);
 
-    console.log('🌱 Funnel Scheduler active (every 10 minutes)');
+    console.log('🌱 Funnel Scheduler active (primary worker) (every 10 minutes)');
 }
 
 export default { startFunnelScheduler };

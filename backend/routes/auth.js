@@ -503,46 +503,55 @@ router.put('/change-password', protect, async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
-    let user = await User.findById(req.user._id).lean();
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    try {
+        let user = await User.findById(req.user._id).lean();
+        if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    // Auto-generate userId for existing users who don't have one
-    if (!user.userId) {
-        const generatedId = await User.generateUserId();
-        await User.findByIdAndUpdate(req.user._id, { userId: generatedId });
-        user.userId = generatedId;
+        // Auto-generate userId for existing users who don't have one
+        if (!user.userId) {
+            const generatedId = await User.generateUserId();
+            await User.findByIdAndUpdate(req.user._id, { userId: generatedId });
+            user.userId = generatedId;
+        }
+
+        const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
+        
+        // Accurate brand count (Owned + Shared)
+        const userId = user._id || user.id;
+        const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
+        const brandCount = ownedCount + sharedCount;
+
+        res.json({ 
+            success: true, 
+            user: { 
+                ...user, 
+                completedWalkthroughs: user.completedWalkthroughs || [],
+                planDetails, 
+                brandCount,
+                isTeamMember: ownedCount === 0 && sharedCount > 0 
+            } 
+        });
+    } catch (error) {
+        console.error('❌ /me Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
-
-    const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
-    
-    // Accurate brand count (Owned + Shared)
-    const userId = user._id || user.id;
-    const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
-    const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
-    const brandCount = ownedCount + sharedCount;
-
-    res.json({ 
-        success: true, 
-        user: { 
-            ...user, 
-            completedWalkthroughs: user.completedWalkthroughs || [],
-            planDetails, 
-            brandCount,
-            isTeamMember: ownedCount === 0 && sharedCount > 0 
-        } 
-    });
-
 });
 
 // PUT /api/auth/profile
 router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, res) => {
-    const { name, company, avatar, preferences } = req.body;
-    const user = await User.findByIdAndUpdate(
-        req.user._id,
-        { name, company, avatar, preferences },
-        { returnDocument: 'after', runValidators: true }
-    );
-    res.json({ success: true, user });
+    try {
+        const { name, company, avatar, preferences } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { name, company, avatar, preferences },
+            { returnDocument: 'after', runValidators: true }
+        );
+        res.json({ success: true, user });
+    } catch (error) {
+        console.error('❌ Profile Update Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
 });
 
 /**
@@ -755,7 +764,7 @@ router.get('/google/callback', async (req, res) => {
                 userId,
                 isGoogleUser: true,
                 isVerified: true, // Google users are pre-verified
-                password: Math.random().toString(36).slice(-12),
+                password: crypto.randomBytes(24).toString('hex'),
                 approvalStatus: 'approved'
             });
             // --- NEW: Assign Free Subscription for Google Signup ---
@@ -861,7 +870,7 @@ ${error
         window.opener.postMessage({
             type: 'GOOGLE_AUTH_SUCCESS',
             ${error ? `error: ${JSON.stringify(error)}, needsApproval: ${needsApproval}` : `token: '${token}', user: ${JSON.stringify(user)}`}
-        }, '*');
+        }, '${Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl}');
     }
     ${!error ? 'setTimeout(() => window.close(), 1000);' : ''}
 </script>

@@ -86,6 +86,8 @@ export function BrandProvider({ children }) {
                     console.error('Failed to save pending brand:', saveErr);
                 }
                 localStorage.removeItem('mantram_pending_brand');
+                // PERF-017: Bust cache so the list() call below fetches fresh data
+                invalidateCache('/brands');
             }
 
             const data = await brandsAPI.list();

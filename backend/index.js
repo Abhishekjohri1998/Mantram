@@ -1,11 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
-import config from './config/env.js';
+import config, { validateConfig } from './config/env.js';
 import mongoose from 'mongoose';
 
+// Run boot-time config validation before anything else
+validateConfig();
+import { stripHtml } from './utils/sanitize.js';
 // Route imports
 import authRoutes from './routes/auth.js';
 import integrationsRoutes from './routes/integrations.js';
@@ -92,7 +96,16 @@ const HARDCODED_ORIGINS = [
     'http://localhost:3000',
 ];
 
+import crypto from 'crypto';
+
 const app = express();
+
+// ── REQUEST ID MIDDLEWARE ─────────────────────────────────────
+app.use((req, res, next) => {
+    req.id = crypto.randomUUID();
+    res.setHeader('X-Request-Id', req.id);
+    next();
+});
 
 // ── SECURITY HEADERS (Helmet) ─────────────────────────────────
 // Sets X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options,
@@ -115,6 +128,10 @@ const globalApiLimiter = rateLimit({
 });
 app.use('/api/', globalApiLimiter);
 
+// ── RESPONSE COMPRESSION (PERF-008) ──────────────────────────
+// gzip/deflate all responses > 1KB — saves 60-80% bandwidth on JSON payloads.
+app.use(compression({ threshold: 1024 }));
+
 // ── CORS CONFIGURATION ────────────────────────────────────────
 const isOriginAllowed = (origin) => {
     if (!origin) return true;
@@ -129,8 +146,10 @@ const isOriginAllowed = (origin) => {
     if (envOrigins.includes(cleanOrigin)) return true;
     
     // Domain-based allowance (mantram.ai and its subdomains)
-    if (cleanOrigin.endsWith('mantram.ai') || cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1')) return true;
+    if (cleanOrigin.endsWith('mantram.ai')) return true;
     if (/\.mantram\.ai$/.test(cleanOrigin)) return true;
+    // Only allow localhost in development
+    if (process.env.NODE_ENV !== 'production' && (cleanOrigin.includes('localhost') || cleanOrigin.includes('127.0.0.1'))) return true;
     
     return false;
 };
@@ -186,7 +205,9 @@ app.set('trust proxy', 1);
 
 // ── TOP-LEVEL DIAGNOSTICS & LOGGING ───────────────────────────
 // Bot scanner patterns — expanded to silence vulnerability scanners
+// PERF-014: Pre-compiled regexes to avoid per-request RegExp construction
 const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log'];
+const BOT_EXT_REGEX = new RegExp(`(${BOT_SCAN_EXTENSIONS.map(e => e.replace('.', '\\.')).join('|')})$`, 'i');
 const BOT_SCAN_PATHS = [
     'wp-admin', 'wp-content', 'vendor', 'phpunit', '.env', '.git', '.ssh', '.ssl', '.well-known',
     'boaform', 'shell', 'cgi-bin', 'autodiscover', 'sdk/weblanguage',
@@ -197,23 +218,23 @@ const BOT_SCAN_PATHS = [
     // e.g. 'config' falsely blocked /api/yt-studio-settings/channel-configs → 444.
     // Use BOT_SCAN_SEGMENT_WORDS below for whole-segment matching instead.
 ];
-
-// These words must appear as a FULL path segment (e.g. /config/ or /debug/)
-// NOT as a substring (so /channel-configs/ is NOT blocked, but /config/ IS).
-const BOT_SCAN_SEGMENT_WORDS = ['config', 'debug', 'scripts', 'phpinfo'];
+const BOT_SCAN_SEGMENT_REGEXES = ['config', 'debug', 'scripts', 'phpinfo'].map(w => new RegExp('(^|/)' + w + '(/|$)'));
+const BOT_SUFFIX_REGEX = /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.~]*$/i;
+const BOT_TILDE_REGEX = /~$/;
+const BOT_DOUBLE_SLASH_REGEX = /\/\/(index|test|db)\.\w+/;
 
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
     const origin = req.headers.origin || '';
 
-    // Detect bot scans: matches known scanner patterns
+    // Detect bot scans: matches known scanner patterns (pre-compiled regexes for perf)
     const isBotScan = (
-        BOT_SCAN_EXTENSIONS.some(ext => path.endsWith(ext)) ||
+        BOT_EXT_REGEX.test(path) ||
         BOT_SCAN_PATHS.some(p => path.includes(p)) ||
-        BOT_SCAN_SEGMENT_WORDS.some(w => new RegExp('(^|/)' + w + '(/|$)').test(path)) ||
-        /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.\~]*$/i.test(path) ||
-        /~$/.test(path) ||
-        /\/\/(index|test|db)\.\w+/.test(path)
+        BOT_SCAN_SEGMENT_REGEXES.some(r => r.test(path)) ||
+        BOT_SUFFIX_REGEX.test(path) ||
+        BOT_TILDE_REGEX.test(path) ||
+        BOT_DOUBLE_SLASH_REGEX.test(path)
     );
 
     if (isBotScan) {
@@ -234,11 +255,42 @@ app.use((req, res, next) => {
 
 // Alias for health checks
 // ── HEALTH & LOG HYGIENE ──────────────────────────────────────
-app.get(['/health', '/api/health'], (req, res) => {
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    res.json({ 
-        status: dbStatus === 'connected' ? 'ok' : 'error', 
-        database: dbStatus,
+app.get(['/health', '/api/health'], async (req, res) => {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbState === 1 ? 'connected' : 'disconnected';
+    
+    // REL-008: Deep health check endpoint
+    const memoryUsage = process.memoryUsage();
+    
+    // Check if Mongo is actually responsive
+    let dbPing = false;
+    if (dbState === 1) {
+        try {
+            await mongoose.connection.db.admin().ping();
+            dbPing = true;
+        } catch (e) {
+            dbPing = false;
+        }
+    }
+
+    const isOk = dbStatus === 'connected' && dbPing;
+
+    res.status(isOk ? 200 : 503).json({ 
+        status: isOk ? 'ok' : 'error', 
+        database: {
+            state: dbStatus,
+            pingOk: dbPing,
+        },
+        memory: {
+            rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+            heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+        },
+        worker: {
+            instanceId: process.env.NODE_APP_INSTANCE || '0',
+            pid: process.pid,
+            uptime: Math.round(process.uptime())
+        },
         port: config.port,
         timestamp: new Date().toISOString()
     });
@@ -329,6 +381,16 @@ connectDB().then(() => {
         startSubscriptionManager();
     }).catch(err => console.error('❌ Failed to load subscriptionManager.js:', err));
 
+    // Start stuck job sweeper (every 5 mins)
+    import('./services/stuckJobSweeper.js').then(({ startStuckJobSweeper }) => {
+        startStuckJobSweeper();
+    }).catch(err => console.error('❌ Failed to load stuckJobSweeper.js:', err));
+
+    // Start S3 orphaned assets cleanup sweep (daily)
+    import('./services/s3CleanupSweep.js').then(({ startS3CleanupSweep }) => {
+        startS3CleanupSweep();
+    }).catch(err => console.error('❌ Failed to load s3CleanupSweep.js:', err));
+
     // Start video archival sweep (catches videos missed by inline S3 upload — configurable via VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS)
     import('./services/videoArchivalSweep.js').then(({ startVideoArchivalSweep }) => {
         startVideoArchivalSweep();
@@ -375,6 +437,25 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (isRawBodyRoute(req.originalUrl)) return next();
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
+});
+
+// Global input sanitization — strip HTML tags from all string fields
+// PERF-013: Skip sanitization for webhook/upload paths that handle raw/binary data
+const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/'];
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object' && !SKIP_SANITIZE_PREFIXES.some(p => req.path.startsWith(p))) {
+        const sanitize = (obj) => {
+            for (const [key, value] of Object.entries(obj)) {
+                if (typeof value === 'string') {
+                    obj[key] = stripHtml(value);
+                } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !Buffer.isBuffer(value)) {
+                    sanitize(value);
+                }
+            }
+        };
+        sanitize(req.body);
+    }
+    next();
 });
 
 // Request logging in dev
@@ -432,7 +513,6 @@ app.use('/api/fidato', fidatoRoutes);
 app.use('/api/nexus', nexusRoutes);
 app.use('/api/intel', intelMissionRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/social', socialRoutes);
 
 app.use('/api/skills', skillsRoutes);
 app.use('/api/mcp-tools', mcpToolsRoutes);
@@ -463,6 +543,14 @@ app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
 app.use('/api/export', exportRoutes);
 
+// Catch-all 404 logger — suppress for known bot scans
+app.use((req, res) => {
+    // Catch-all 404 logger — suppress for known bot scans and POST / noise
+    if (!req.isBotScan && !(req.method === 'POST' && req.path === '/')) {
+        console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    }
+    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
+});
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
 // Exposes platform intelligence tools to all studio agents via mcpBridge
@@ -471,7 +559,15 @@ console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err.stack);
+    // REL-017: Enhanced error handler with structured context
+    console.error(`❌ Server Error [req_id: ${req.id || 'unknown'}]:`, {
+        message: err.message,
+        stack: err.stack,
+        url: req.originalUrl,
+        method: req.method,
+        userId: req.user ? req.user._id : 'unauthenticated',
+        body: req.method !== 'GET' ? req.body : undefined
+    });
     
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
@@ -481,10 +577,10 @@ app.use((err, req, res, next) => {
         res.setHeader('Vary', 'Origin');
     }
 
-    
     const response = {
         success: false,
         error: config.nodeEnv === 'development' ? err.message : 'Server Error',
+        requestId: req.id, // Expose request ID to client for debugging
     };
 
     // If it's a categorized AI provider error, pass metadata to frontend
@@ -505,11 +601,27 @@ server.timeout = 60000000;
 // ══════════════════════════════════════════════════════════════
 // GRACEFUL SHUTDOWN
 // ══════════════════════════════════════════════════════════════
+import { getInFlightJobs, hasInFlightJobs } from './utils/jobRegistry.js';
+
 const gracefulShutdown = (signal) => {
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+    
     server.close(async () => {
-        console.log('HTTP server closed.');
+        console.log('HTTP server closed. No longer accepting new connections.');
+        
         try {
+            // REL-009 & REL-015: Wait for in-flight jobs to finish before closing DB
+            let drainChecks = 0;
+            while (hasInFlightJobs() && drainChecks < 15) { // wait up to 30 seconds (15 * 2s)
+                console.log(`⏳ Waiting for ${getInFlightJobs().length} in-flight jobs to complete...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                drainChecks++;
+            }
+            
+            if (hasInFlightJobs()) {
+                console.warn(`⚠️ Forcing shutdown with ${getInFlightJobs().length} jobs still running.`);
+            }
+
             if (mongoose.connection) mongoose.connection.isShuttingDown = true;
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
@@ -537,15 +649,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
+    // Allow time for the log to flush, then exit. PM2 will restart.
+    setTimeout(() => process.exit(1), 1000);
 });
 
-// Catch-all 404 logger — suppress for known bot scans
-app.use((req, res) => {
-    // Catch-all 404 logger — suppress for known bot scans and POST / noise
-    if (!req.isBotScan && !(req.method === 'POST' && req.path === '/')) {
-        console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
-    }
-    res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
-});
+// Catch-all 404 logger removed from here and placed before the error handler
 
 export default app;

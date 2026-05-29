@@ -158,10 +158,16 @@ async function runSweep() {
  * Default interval: 2 hours (configurable via VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS).
  */
 export function startVideoArchivalSweep() {
+    const instanceId = process.env.NODE_APP_INSTANCE || '0';
+    if (instanceId !== '0') {
+        console.log(`📦 [VideoArchival] Skipped on worker ${instanceId} (runs on primary only)`);
+        return;
+    }
+
     const intervalMs = parseInt(process.env.VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS, 10) || (2 * 60 * 60 * 1000); // 2 hours default
     const intervalMin = Math.round(intervalMs / 60000);
 
-    console.log(`📦 Video Archival Sweep active — runs every ${intervalMin} minutes`);
+    console.log(`📦 Video Archival Sweep active (primary worker) — runs every ${intervalMin} minutes`);
 
     // Run initial sweep after a short delay (let server finish booting)
     setTimeout(() => {
@@ -188,8 +194,7 @@ export async function markAbandonedDrafts() {
     try {
         const abandoned = await VideoProject.updateMany(
             {
-                isDraft: true,
-                status: { $in: ['failed', 'advanced-generating'] },
+                status: { $in: ['failed', 'advanced-generating', 'generating'] },
                 createdAt: { $lt: cutoff },
                 abandonedAt: { $exists: false },
             },

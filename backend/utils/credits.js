@@ -67,8 +67,15 @@ export const syncUserCredits = async (userId) => {
  * Perform a monthly reset for a user if their reset date has passed.
  */
 export const performMonthlyReset = async (user) => {
+    // Skip reset check if last checked within 1 hour
+    if (user.credits?.lastResetCheck && (Date.now() - new Date(user.credits.lastResetCheck).getTime()) < 3600000) {
+        return user;
+    }
+
     const now = new Date();
     if (!user.credits?.resetDate || user.credits.resetDate > now) {
+        // Throttle the check to once per hour
+        User.findByIdAndUpdate(user._id, { 'credits.lastResetCheck': now }).catch(() => {});
         return user;
     }
 
@@ -82,7 +89,8 @@ export const performMonthlyReset = async (user) => {
     const updatedUser = await User.findByIdAndUpdate(user._id, {
         $set: { 
             'credits.used': 0,
-            'credits.resetDate': nextReset
+            'credits.resetDate': nextReset,
+            'credits.lastResetCheck': now
         }
     }, { returnDocument: 'after' });
 

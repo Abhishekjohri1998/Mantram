@@ -316,58 +316,40 @@ function ConfigDropdown({ value, onChange, options, label }) {
 // Videos WITH poster: show image instantly, load video only on hover (saves bandwidth)
 // Videos WITHOUT poster: load video with preload=metadata to grab frame 1
 const PosterThumbnail = ({ src, poster }) => {
-    const ref = useRef()
     const videoRef = useRef()
-    const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
     const posterUrl = poster || ''
     const hasPoster = !!posterUrl
 
     useEffect(() => {
-        const observer = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting) {
-                setIsVisible(true)
-                observer.disconnect()
-            }
-        }, { rootMargin: '200px' })
-        if (ref.current) observer.observe(ref.current)
-        return () => observer.disconnect()
-    }, [])
-
-    useEffect(() => {
         if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
+    const videoUrl = src ? (src.includes('#') ? src : `${src}#t=1.0`) : ''
+
     return (
-        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {isVisible && hasPoster ? (
+            {hasPoster ? (
                 <>
                     <img src={posterUrl} loading="lazy" alt=""
                         style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block',
                             opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'relative', zIndex: 2 }} />
                     {isHovered && (
-                        <video ref={videoRef} src={src}
+                        <video ref={videoRef} src={videoUrl}
                             style={{ height: '100%', width: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: 0 }}
                             muted loop playsInline preload="auto" />
                     )}
                 </>
             ) : (
-                isVisible && src && (
-                    <video ref={videoRef} src={src}
-                        style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
-                        muted loop playsInline preload="metadata"
-                        onLoadedData={e => { e.target.currentTime = 1 }}
-                    />
-                )
-            )}
-
-            {!isVisible && (
-                <div style={{ position: 'relative', width: '340px', height: '100%', background: 'rgba(255,255,255,0.02)' }} />
+                <video ref={videoRef} src={videoUrl}
+                    style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
+                    muted loop playsInline preload="metadata"
+                />
             )}
         </div>
     )
