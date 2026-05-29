@@ -42,7 +42,11 @@ function truncatePrompt(prompt, maxLen = ATLASCLOUD_MAX_PROMPT_LENGTH) {
 
 function getAtlasApiKey() {
     const key = process.env.ATLASCLOUD_API_KEY;
-    if (!key) throw new Error('ATLASCLOUD_API_KEY environment variable is not set. Cannot call Atlas Cloud API.');
+    if (!key) {
+        const err = new Error('ATLASCLOUD_API_KEY environment variable is not set. Add it to your .env file on the server.');
+        err.isConfigError = true; // Flag to skip retries — this won't self-heal
+        throw err;
+    }
     return key;
 }
 
@@ -200,6 +204,7 @@ async function uploadMediaToAtlasCDN(imageUrl) {
         console.log(`✅ [Atlas CDN] Upload successful: ${finalUrl.substring(0, 80)}`);
         return finalUrl;
     } catch (e) {
+        if (e.isConfigError) throw e; // Don't swallow missing API key — let it bubble up once
         console.error(`⚠️ [Atlas CDN] Upload failed: ${e.message}`);
         return imageUrl;
     }
@@ -414,7 +419,8 @@ async function submitAtlasCloudPayload(payload) {
             console.log(`✅ [Atlas] Task queued: id=${taskId} | model=${atlasModel}`);
             return taskId;
         } catch (e) {
-            if (e.message.startsWith('ATLAS_INSUFFICIENT_CREDITS')) { throw e; }
+            // Non-retryable errors — these will never self-heal
+            if (e.message.startsWith('ATLAS_INSUFFICIENT_CREDITS') || e.isConfigError) { throw e; }
             console.warn(`⚠️ [Atlas] Submit attempt ${attempt} failed: ${e.message}`);
             if (attempt < MAX_ATTEMPTS) {
                 console.log(`🔄 Retrying in 3s...`);
