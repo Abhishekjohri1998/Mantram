@@ -66,24 +66,11 @@ const VIDEO_TYPES = [
 
 // ── Smart Thumbnail: poster-first when available, video-frame fallback when not ──
 const LazyVideoThumbnail = ({ src, poster }) => {
-    const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
-    const ref = useRef()
     const videoRef = useRef()
 
     const posterUrl = poster || ''
     const hasPoster = !!posterUrl
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting) {
-                setIsVisible(true)
-                observer.disconnect()
-            }
-        }, { rootMargin: '200px' })
-        if (ref.current) observer.observe(ref.current)
-        return () => observer.disconnect()
-    }, [])
 
     useEffect(() => {
         if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
@@ -91,7 +78,7 @@ const LazyVideoThumbnail = ({ src, poster }) => {
     }, [isHovered])
 
     return (
-        <div ref={ref} className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
+        <div className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
             onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
 
             {/* Layer 1: Poster image (fades out on hover) */}
@@ -103,18 +90,13 @@ const LazyVideoThumbnail = ({ src, poster }) => {
             {/* Layer 2: Video element
                  - If poster exists: only mount on hover (saves bandwidth)
                  - If NO poster: always mount with preload=metadata to grab a visual frame */}
-            {isVisible && src && (hasPoster ? isHovered : true) && (
+            {src && (hasPoster ? isHovered : true) && (
                 <video ref={videoRef} src={src}
                     className="w-full h-full object-cover block"
                     muted loop playsInline
                     preload={hasPoster ? "none" : "metadata"}
                     onError={e => { e.target.style.display = 'none' }}
                 />
-            )}
-
-            {/* Layer 3: Loading skeleton (before intersection observer fires) */}
-            {!isVisible && (
-                <div className="absolute inset-0 bg-[#ffffff05] animate-pulse" />
             )}
         </div>
     )

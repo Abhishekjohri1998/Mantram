@@ -316,24 +316,11 @@ function ConfigDropdown({ value, onChange, options, label }) {
 // Videos WITH poster: show image instantly, load video only on hover (saves bandwidth)
 // Videos WITHOUT poster: load video with preload=metadata to grab frame 1
 const PosterThumbnail = ({ src, poster }) => {
-    const ref = useRef()
     const videoRef = useRef()
-    const [isVisible, setIsVisible] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
     const posterUrl = poster || ''
     const hasPoster = !!posterUrl
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting) {
-                setIsVisible(true)
-                observer.disconnect()
-            }
-        }, { rootMargin: '200px' })
-        if (ref.current) observer.observe(ref.current)
-        return () => observer.disconnect()
-    }, [])
 
     useEffect(() => {
         if (isHovered && videoRef.current) videoRef.current.play().catch(() => {})
@@ -341,7 +328,7 @@ const PosterThumbnail = ({ src, poster }) => {
     }, [isHovered])
 
     return (
-        <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -357,15 +344,11 @@ const PosterThumbnail = ({ src, poster }) => {
                     )}
                 </>
             ) : (
-                (isVisible || isHovered) && src ? (
-                    <video ref={videoRef} src={src}
-                        style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
-                        muted loop playsInline preload="metadata"
-                        onLoadedData={e => { e.target.currentTime = 1 }}
-                    />
-                ) : (
-                    <div style={{ position: 'relative', width: '340px', height: '100%', background: 'rgba(255,255,255,0.02)' }} />
-                )
+                <video ref={videoRef} src={src}
+                    style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
+                    muted loop playsInline preload="metadata"
+                    onLoadedData={e => { e.target.currentTime = 1 }}
+                />
             )}
         </div>
     )
