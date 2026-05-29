@@ -386,6 +386,11 @@ connectDB().then(() => {
         startStuckJobSweeper();
     }).catch(err => console.error('❌ Failed to load stuckJobSweeper.js:', err));
 
+    // Start S3 orphaned assets cleanup sweep (daily)
+    import('./services/s3CleanupSweep.js').then(({ startS3CleanupSweep }) => {
+        startS3CleanupSweep();
+    }).catch(err => console.error('❌ Failed to load s3CleanupSweep.js:', err));
+
     // Start video archival sweep (catches videos missed by inline S3 upload — configurable via VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS)
     import('./services/videoArchivalSweep.js').then(({ startVideoArchivalSweep }) => {
         startVideoArchivalSweep();

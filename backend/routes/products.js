@@ -221,6 +221,13 @@ router.post('/scrape-url', protect, async (req, res) => {
         let siteUrl = url.trim();
         if (!/^https?:\/\//i.test(siteUrl)) siteUrl = `https://${siteUrl}`;
 
+        // Normalize double slashes in path (e.g. //products/ → /products/)
+        try {
+            const parsed = new URL(siteUrl);
+            parsed.pathname = parsed.pathname.replace(/\/{2,}/g, '/');
+            siteUrl = parsed.toString();
+        } catch {}
+
         if (!isUrlSafe(siteUrl)) {
             return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network. Use a public URL.' });
         }
@@ -230,16 +237,25 @@ router.post('/scrape-url', protect, async (req, res) => {
         let html = '';
         let fetchedSuccessfully = false;
 
-        // Try standard fetch first
+        // Try standard fetch first — use broader headers to avoid 406 rejections
         try {
             console.log(`[scrape-url] Fetching with node-fetch: ${siteUrl}`);
             const response = await fetch(siteUrl, {
                 headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Upgrade-Insecure-Requests': '1',
                 },
-                timeout: 10000
+                redirect: 'follow',
+                timeout: 12000
             });
             if (response.ok) {
                 html = await response.text();
@@ -251,50 +267,147 @@ router.post('/scrape-url', protect, async (req, res) => {
             console.warn(`[scrape-url] node-fetch failed: ${fetchErr.message}`);
         }
 
-        // Helper to parse HTML and extract product details
+        // Helper to parse HTML and extract product details (generic — works for ANY e-commerce site)
         const extractDetails = (rawHtml) => {
             const $ = cheerio.load(rawHtml);
-            const title = $('meta[property="og:title"]').attr('content') || $('title').text() || 'Product';
-            const description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
-            let imageUrl = $('meta[property="og:image"]').attr('content') || $('meta[name="twitter:image"]').attr('content') || '';
+            
+            // ── Title extraction (priority order) ──
+            const title = $('meta[property="og:title"]').attr('content')
+                || $('h1').first().text().trim()
+                || $('title').text().split('|')[0].split('–')[0].split('-')[0].trim()
+                || 'Product';
+            
+            // ── Description extraction ──
+            const description = $('meta[property="og:description"]').attr('content')
+                || $('meta[name="description"]').attr('content')
+                || '';
+            
+            // ── Image extraction (multi-strategy) ──
             let allImages = [];
-
-            // ── FALLBACK: Extract gallery images from HTML ──
-            $('img[src*="cdn.shopify"], .product__media img, .product-image img, .product-gallery img').each((_, el) => {
-                const src = $(el).attr('src') || $(el).attr('data-src') || '';
-                if (src && src.includes('cdn.shopify') && !src.includes('icon') && !src.includes('logo')) {
-                    try {
-                        const cleanSrc = src.replace(/_\d+x\d*\./g, '.').split('?')[0];
-                        const fullUrl = cleanSrc.startsWith('http') ? cleanSrc : `https:${cleanSrc}`;
-                        if (!allImages.includes(fullUrl)) allImages.push(fullUrl);
-                    } catch {}
-                }
+            const seenUrls = new Set();
+            
+            const addImage = (src) => {
+                if (!src || src.length < 10) return;
+                try {
+                    // Clean up the URL
+                    let cleanUrl = src.trim();
+                    if (cleanUrl.startsWith('//')) cleanUrl = 'https:' + cleanUrl;
+                    if (!cleanUrl.startsWith('http')) cleanUrl = new URL(cleanUrl, siteUrl).toString();
+                    
+                    // Remove resize params for highest resolution
+                    cleanUrl = cleanUrl.replace(/_\d+x\d*\./g, '.').split('?')[0];
+                    
+                    // Skip tiny icons, logos, tracking pixels
+                    const lower = cleanUrl.toLowerCase();
+                    if (lower.includes('icon') || lower.includes('logo') || lower.includes('favicon')
+                        || lower.includes('pixel') || lower.includes('tracker') || lower.includes('badge')
+                        || lower.includes('payment') || lower.includes('sprite')
+                        || lower.endsWith('.svg') || lower.endsWith('.gif')) return;
+                    
+                    if (!seenUrls.has(cleanUrl)) {
+                        seenUrls.add(cleanUrl);
+                        allImages.push(cleanUrl);
+                    }
+                } catch {}
+            };
+            
+            // Strategy 1: JSON-LD / Schema.org structured data (highest quality)
+            $('script[type="application/ld+json"]').each((_, el) => {
+                try {
+                    const json = JSON.parse($(el).html());
+                    const items = Array.isArray(json) ? json : [json];
+                    for (const item of items) {
+                        if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
+                            if (item.image) {
+                                const imgs = Array.isArray(item.image) ? item.image : [item.image];
+                                imgs.forEach(img => addImage(typeof img === 'string' ? img : img?.url || img?.contentUrl));
+                            }
+                        }
+                    }
+                } catch {}
             });
-            if (allImages.length > 0) imageUrl = allImages[0];
 
-            // ── FINAL FALLBACK: og:image or first img tag ──
-            if (!imageUrl) {
-                const firstImg = $('img').first().attr('src');
-                if (firstImg) {
-                    imageUrl = firstImg.startsWith('http') ? firstImg : new URL(firstImg, siteUrl).toString();
-                }
+            // Strategy 2: Open Graph image
+            const ogImage = $('meta[property="og:image"]').attr('content') || $('meta[property="og:image:url"]').attr('content');
+            if (ogImage) addImage(ogImage);
+
+            // Strategy 3: Twitter card image
+            const twitterImage = $('meta[name="twitter:image"]').attr('content') || $('meta[name="twitter:image:src"]').attr('content');
+            if (twitterImage) addImage(twitterImage);
+
+            // Strategy 4: Common e-commerce product image selectors (broad)
+            const productImgSelectors = [
+                '.product-image img', '.product__media img', '.product-gallery img',
+                '.product-detail img', '.product-single img', '.product-main img',
+                '.pdp-image img', '.gallery-image img', '.main-image img',
+                '[class*="product-image"] img', '[class*="productImage"] img',
+                '[class*="product-gallery"] img', '[class*="product-media"] img',
+                '[class*="slider"] img', '[class*="carousel"] img', '[class*="swiper"] img',
+                '[data-gallery] img', '[data-zoom] img', '[data-image]',
+                '.slick-slide img', '.owl-item img',
+                // Shopify-specific
+                'img[src*="cdn.shopify"]',
+            ];
+            for (const sel of productImgSelectors) {
+                $(sel).each((_, el) => {
+                    addImage($(el).attr('data-src') || $(el).attr('data-lazy-src') || $(el).attr('data-zoom-image')
+                        || $(el).attr('data-large') || $(el).attr('data-original') || $(el).attr('src'));
+                    // Also check srcset for highest resolution
+                    const srcset = $(el).attr('srcset') || $(el).attr('data-srcset');
+                    if (srcset) {
+                        const parts = srcset.split(',').map(s => s.trim().split(/\s+/));
+                        // Pick the largest image from srcset
+                        const sorted = parts.sort((a, b) => {
+                            const sizeA = parseInt(a[1]) || 0;
+                            const sizeB = parseInt(b[1]) || 0;
+                            return sizeB - sizeA;
+                        });
+                        if (sorted[0]?.[0]) addImage(sorted[0][0]);
+                    }
+                });
             }
 
-            if (allImages.length === 0 && imageUrl) allImages = [imageUrl];
+            // Strategy 5: Generic large images (fallback) — look for images with reasonable dimensions
+            if (allImages.length === 0) {
+                $('img').each((_, el) => {
+                    const width = parseInt($(el).attr('width')) || 0;
+                    const height = parseInt($(el).attr('height')) || 0;
+                    const src = $(el).attr('data-src') || $(el).attr('src');
+                    // Only consider images that are likely product images (>100px or no dimensions specified)
+                    if (src && (width === 0 || width > 100) && (height === 0 || height > 100)) {
+                        addImage(src);
+                    }
+                });
+            }
 
+            // Strategy 6: Background images in inline styles (some sites use this)
+            if (allImages.length === 0) {
+                $('[style*="background-image"]').each((_, el) => {
+                    const style = $(el).attr('style') || '';
+                    const match = style.match(/url\(['"]?([^'")\s]+)['"]?\)/);
+                    if (match?.[1]) addImage(match[1]);
+                });
+            }
+
+            const imageUrl = allImages[0] || '';
             return { title, description, imageUrl, allImages };
         };
 
-        // Try Shopify JSON details API first if it's a Shopify store product URL
+        // Try Shopify JSON details API first if it LOOKS like a Shopify store product URL
         let allImages = [];
         let imageUrl = '';
         let title = 'Product';
         let description = '';
 
+        const isLikelyShopify = (rawHtml) => {
+            if (!rawHtml) return false;
+            return rawHtml.includes('cdn.shopify.com') || rawHtml.includes('Shopify.theme') || rawHtml.includes('shopify-section');
+        };
+
         const tryShopifyApi = async () => {
             try {
                 const parsed = new URL(siteUrl);
-                const pathParts = parsed.pathname.split('/');
+                const pathParts = parsed.pathname.split('/').filter(Boolean); // filter(Boolean) removes empty strings from double slashes
                 const productsIdx = pathParts.indexOf('products');
                 if (productsIdx !== -1 && pathParts[productsIdx + 1]) {
                     const handle = pathParts[productsIdx + 1].split('?')[0];
@@ -325,11 +438,13 @@ router.post('/scrape-url', protect, async (req, res) => {
         };
 
         let shopifySuccess = false;
-        if (fetchedSuccessfully) {
+        
+        // Only try Shopify API if the HTML looks like a Shopify site
+        if (fetchedSuccessfully && isLikelyShopify(html)) {
             shopifySuccess = await tryShopifyApi();
         }
 
-        // If Shopify JSON API didn't extract images, parse the fetched HTML
+        // If Shopify JSON API didn't extract images, parse the fetched HTML with the generic extractor
         if (!shopifySuccess && fetchedSuccessfully && html) {
             const details = extractDetails(html);
             title = details.title || title;
@@ -338,14 +453,17 @@ router.post('/scrape-url', protect, async (req, res) => {
             allImages = details.allImages || allImages;
         }
 
-        // If fetch failed OR we retrieved no images (possibly bot-blocked or blank page response), fallback to Puppeteer
+        // If fetch failed OR we retrieved no images, fallback to Puppeteer
         if (!fetchedSuccessfully || (!imageUrl && allImages.length === 0)) {
             try {
                 console.log(`[scrape-url] No images found or fetch failed (success=${fetchedSuccessfully}, images=${allImages.length}). Falling back to Puppeteer...`);
                 html = await scrapeWithPuppeteer(siteUrl);
                 fetchedSuccessfully = true;
                 
-                shopifySuccess = await tryShopifyApi();
+                // Try Shopify API again only if Puppeteer HTML looks Shopify-ish
+                if (isLikelyShopify(html)) {
+                    shopifySuccess = await tryShopifyApi();
+                }
                 if (!shopifySuccess && html) {
                     const details = extractDetails(html);
                     title = details.title || title;
@@ -355,11 +473,14 @@ router.post('/scrape-url', protect, async (req, res) => {
                 }
             } catch (puppErr) {
                 console.error(`[scrape-url] Puppeteer fallback failed: ${puppErr.message}`);
-                throw new Error('Failed to scrape URL. The website might be blocking bots. Please upload the image manually.');
+                // Don't throw yet — we may have partial data from the initial fetch
+                if (!fetchedSuccessfully) {
+                    throw new Error('Failed to scrape URL. The website might be blocking bots. Please upload the image manually.');
+                }
             }
         }
 
-        // If even after Puppeteer we have no images, return a descriptive error
+        // If even after all strategies we have no images, return a descriptive error
         if (!imageUrl && allImages.length === 0) {
             throw new Error('Could not extract any product images from this URL. Please upload the image manually.');
         }

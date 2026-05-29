@@ -58,9 +58,19 @@ export const protect = async (req, res, next) => {
             return next();
         }
 
-        const user = await User.findById(decoded.id);
+        const user = await User.findById(decoded.id).populate('activeSubscription');
 
         if (user) {
+            // REL-020: Inline subscription expiry check
+            if (user.activeSubscription && user.activeSubscription.endDate && new Date(user.activeSubscription.endDate) < new Date()) {
+                console.log(`[Auth] Inline expiring subscription ${user.activeSubscription._id} for user ${user._id}`);
+                const Subscription = mongoose.model('Subscription');
+                await Subscription.findByIdAndUpdate(user.activeSubscription._id, { status: 'expired' });
+                user.plan = 'free';
+                user.activeSubscription = null;
+                await user.save();
+            }
+
             // Lazy credit sync/reset
             req.user = await performMonthlyReset(user);
             setCachedUser(req.user);

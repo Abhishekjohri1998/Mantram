@@ -22,6 +22,7 @@ import Brand from '../models/Brand.js';
 import Product from '../models/Product.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits as requireCredits, refundCredits } from '../middleware/credits.js';
+import { aiGenerationLimiter } from '../middleware/rateLimiter.js';
 import { requireStudio } from '../middleware/studioAccess.js';
 // orchestrator import removed — no fallback routing
 import { addWatermark } from '../utils/watermark.js';
@@ -2493,7 +2494,7 @@ No markdown, no explanation.`;
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/creatives/generate — Optimized Agentic Image Generation
 // ══════════════════════════════════════════════════════════════════════════════
-router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+router.post('/generate', protect, requireStudio('creativeStudio'), requireCredits('creative'), aiGenerationLimiter, async (req, res) => {
     try {
         const jobId = req.body.jobId || req.headers['x-job-id'];
         const result = await internalGenerateCreative({
@@ -2795,7 +2796,7 @@ router.post('/upload-to-bank', protect, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 const FAL_QUEUE_URL = 'https://queue.fal.run';
 
-router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireCredits('creative'), async (req, res) => {
+router.post('/virtual-tryon', protect, requireStudio('creativeStudio'), requireCredits('creative'), aiGenerationLimiter, async (req, res) => {
     try {
         const { personImage, garmentImage, brandId, mode = 'preview' } = req.body;
         if (!personImage || !garmentImage) {
