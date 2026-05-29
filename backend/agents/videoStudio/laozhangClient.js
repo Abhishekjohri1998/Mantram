@@ -123,7 +123,7 @@ export async function submitLaozhangVideoGeneration({
                 messages: [{ role: 'user', content: messageContent }],
             }),
             signal: AbortSignal.timeout(timeoutMs),
-        });
+        }));
     } catch (fetchErr) {
         // AbortError = timeout
         if (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError') {
@@ -223,7 +223,7 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
         signal: AbortSignal.timeout(timeoutMs),
-    });
+        }));
 
     if (!response.ok) {
         const errText = await response.text();
@@ -269,7 +269,7 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
                 console.log(`📥 [LaoZhang] Pre-fetching image URL to avoid CDN blocks: ${url.substring(0, 80)}...`);
                 const r = await fetch(url, fetchOptions({
                     headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
-                });
+                }));
                 if (r.ok) {
                     const mimeType = r.headers.get('content-type') || 'image/jpeg';
                     if (!mimeType.includes('text/html')) {
@@ -296,7 +296,7 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
         signal: AbortSignal.timeout(timeoutMs),
-    });
+        }));
 
     if (!response.ok) {
         const errText = await response.text();

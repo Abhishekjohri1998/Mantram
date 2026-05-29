@@ -195,7 +195,7 @@ async function uploadMediaToAtlasCDN(imageUrl) {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` },
             body: formData,
-        });
+        }));
         const json = await res.json();
         const finalUrl = json?.data?.download_url || json?.data?.url || json?.url;
         if (!finalUrl) {
@@ -226,7 +226,7 @@ async function uploadFaceAsset(imageUrl, name = 'face_ref') {
             method: 'POST',
             headers: authHeaders(),
             body: JSON.stringify({ url: compatibleUrl, name }),
-        });
+        }));
         const json = await res.json();
         const assetId       = json?.data?.id || json?.id;
         const atlasAssetId  = json?.data?.atlas_asset_id || json?.atlas_asset_id;
@@ -402,7 +402,7 @@ async function submitAtlasCloudPayload(payload) {
                 headers: authHeaders(),
                 body:    JSON.stringify(atlasPayload),
                 signal:  AbortSignal.timeout(30000),
-            });
+            }));
 
             const rawText = await response.text();
             console.log(`📥 [Atlas] Response ${response.status}:`, rawText.substring(0, 400));

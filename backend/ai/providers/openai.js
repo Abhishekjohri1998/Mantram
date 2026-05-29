@@ -55,7 +55,7 @@ export class OpenAIProvider extends BaseProvider {
                 temperature,
                 max_tokens: maxTokens,
             }),
-        });
+        }));
 
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
@@ -157,7 +157,7 @@ export class OpenAIProvider extends BaseProvider {
                 'Authorization': `Bearer ${this.apiKey}`,
             },
             body: JSON.stringify(body),
-        });
+        }));
 
         const data = await response.json();
         if (!response.ok || data.error) {
@@ -227,7 +227,7 @@ export class OpenAIProvider extends BaseProvider {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${editApiKey}` },
             body: formData,
-        });
+        }));
 
         const data = await response.json();
         if (!response.ok || data.error) {

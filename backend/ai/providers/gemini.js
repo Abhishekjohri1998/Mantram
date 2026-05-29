@@ -99,7 +99,7 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
-        });
+        }));
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
             const errMsg = data.error?.message || response.statusText;
@@ -148,7 +148,7 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
-        });
+        }));
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
@@ -234,7 +234,7 @@ export class GeminiProvider extends BaseProvider {
                     maxOutputTokens: maxTokens,
                 },
             }),
-        });
+        }));
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
@@ -399,7 +399,7 @@ export class GeminiProvider extends BaseProvider {
                         instances: [{ prompt }],
                         parameters: { sampleCount: 1, aspectRatio: '1:1' }
                     }),
-                });
+                }));
 
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);
