@@ -327,24 +327,7 @@ const PosterThumbnail = ({ src, poster }) => {
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
-    useEffect(() => {
-        if (hasPoster || !videoRef.current) return;
-        
-        // If cached, onLoadedData might not fire. Poll readyState briefly.
-        let attempts = 0;
-        const checkReady = () => {
-            if (!videoRef.current) return;
-            if (videoRef.current.readyState >= 1) {
-                // If it's ready, force the frame and stop polling
-                videoRef.current.currentTime = 1;
-            } else if (attempts < 20) {
-                // Not ready yet, check again in 50ms (up to 1 second)
-                attempts++;
-                setTimeout(checkReady, 50);
-            }
-        };
-        checkReady();
-    }, [hasPoster])
+    const videoUrl = src ? (src.includes('#') ? src : `${src}#t=1.0`) : ''
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
@@ -357,17 +340,15 @@ const PosterThumbnail = ({ src, poster }) => {
                         style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block',
                             opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'relative', zIndex: 2 }} />
                     {isHovered && (
-                        <video ref={videoRef} src={src}
+                        <video ref={videoRef} src={videoUrl}
                             style={{ height: '100%', width: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: 0 }}
                             muted loop playsInline preload="auto" />
                     )}
                 </>
             ) : (
-                <video ref={videoRef} src={src}
+                <video ref={videoRef} src={videoUrl}
                     style={{ height: '100%', width: 'auto', minWidth: '146px', objectFit: 'contain', display: 'block', position: 'relative' }}
                     muted loop playsInline preload="metadata"
-                    onLoadedData={e => { e.target.currentTime = 1 }}
-                    onLoadedMetadata={e => { e.target.currentTime = 1 }}
                 />
             )}
         </div>

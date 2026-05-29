@@ -77,46 +77,27 @@ const LazyVideoThumbnail = ({ src, poster }) => {
         else if (!isHovered && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
     }, [isHovered])
 
-    useEffect(() => {
-        if (hasPoster || !videoRef.current) return;
-        
-        // If cached, onLoadedData might not fire. Poll readyState briefly.
-        let attempts = 0;
-        const checkReady = () => {
-            if (!videoRef.current) return;
-            if (videoRef.current.readyState >= 1) {
-                // If it's ready, force the frame and stop polling
-                videoRef.current.currentTime = 1;
-            } else if (attempts < 20) {
-                // Not ready yet, check again in 50ms (up to 1 second)
-                attempts++;
-                setTimeout(checkReady, 50);
-            }
-        };
-        checkReady();
-    }, [hasPoster])
+    const videoUrl = src ? (src.includes('#') ? src : `${src}#t=1.0`) : ''
 
     return (
-        <div className="w-full h-full aspect-video bg-[var(--sys-surface)] relative overflow-hidden"
-            onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-
-            {/* Layer 1: Poster image (fades out on hover) */}
-            {hasPoster && (
-                <img src={posterUrl} className="w-full h-full object-cover block absolute inset-0 z-[2]" loading="lazy" fetchpriority="high" alt=""
-                    style={{ opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', pointerEvents: 'none' }} />
-            )}
-
-            {/* Layer 2: Video element
-                 - If poster exists: only mount on hover (saves bandwidth)
-                 - If NO poster: always mount with preload=metadata to grab a visual frame */}
-            {src && (hasPoster ? isHovered : true) && (
-                <video ref={videoRef} src={src}
+        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {hasPoster ? (
+                <>
+                    <img src={posterUrl} loading="lazy" alt=""
+                        style={{ height: '100%', width: '100%', objectFit: 'cover', display: 'block',
+                            opacity: isHovered ? 0 : 1, transition: 'opacity 0.3s ease', position: 'relative', zIndex: 2 }} />
+                    {isHovered && (
+                        <video ref={videoRef} src={videoUrl} className="w-full h-full object-cover block" muted loop playsInline preload="none" />
+                    )}
+                </>
+            ) : (
+                <video ref={videoRef} src={videoUrl}
                     className="w-full h-full object-cover block"
                     muted loop playsInline
-                    preload={hasPoster ? "none" : "metadata"}
-                    onError={e => { e.target.style.display = 'none' }}
-                    onLoadedData={e => { if (!hasPoster) e.target.currentTime = 1 }}
-                    onLoadedMetadata={e => { if (!hasPoster) e.target.currentTime = 1 }}
+                    preload="metadata"
                 />
             )}
         </div>
