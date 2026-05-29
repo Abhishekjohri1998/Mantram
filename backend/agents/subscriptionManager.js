@@ -156,7 +156,14 @@ async function assignFreePlan(user) {
  * Starts the Subscription Manager background agent
  */
 export function startSubscriptionManager() {
-    console.log('💎 [SubscriptionManager] Agent started');
+    // Only run on the primary PM2 worker
+    const instanceId = process.env.NODE_APP_INSTANCE || '0';
+    if (instanceId !== '0') {
+        console.log(`💎 [SubscriptionManager] Skipped on worker ${instanceId} (runs on primary only)`);
+        return;
+    }
+
+    console.log('💎 [SubscriptionManager] Agent started (primary worker)');
     
     // Initial run after 1 minute (give DB time to settle)
     setTimeout(processRenewals, 60000);

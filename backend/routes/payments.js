@@ -307,6 +307,12 @@ router.post('/verify', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid payment signature' });
         }
 
+        // REL-005: Idempotency check — prevent double processing
+        const existingSub = await Subscription.findOne({ transactionId: razorpay_payment_id });
+        if (existingSub) {
+            return res.json({ success: true, message: 'Payment already verified', subscription: existingSub });
+        }
+
         // BUG-2 FIX: Read packageId and billingCycle from Razorpay order notes
         // instead of trusting req.body (prevents plan upgrade attack)
         const order = await getRazorpay().orders.fetch(razorpay_order_id);
@@ -576,6 +582,13 @@ router.post('/verify-topup', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid payment signature' });
         }
 
+        // REL-011: Idempotency check — prevent double processing
+        const CreditUsage = (await import('../models/CreditUsage.js')).default;
+        const existingTopup = await CreditUsage.findOne({ paymentId: razorpay_payment_id });
+        if (existingTopup) {
+            return res.json({ success: true, message: 'Top-up already verified', credits: existingTopup.cost });
+        }
+
         const order = await getRazorpay().orders.fetch(razorpay_order_id);
         if (order.notes?.type !== 'credit_topup') {
             return res.status(400).json({ success: false, error: 'Not a top-up order' });
@@ -620,6 +633,15 @@ router.post('/verify-topup', protect, async (req, res) => {
         }
 
         console.log(`💎 Top-up verified: +${credits} credits for ${user.email}, expires ${expiry.toISOString()}`);
+
+        await CreditUsage.create({
+            user: req.user._id,
+            action: 'topup',
+            cost: -credits, // Negative cost means addition
+            paymentId: razorpay_payment_id,
+            description: `Purchased top-up of ${credits} credits`,
+            studio: 'billing'
+        });
 
         res.json({
             success: true,

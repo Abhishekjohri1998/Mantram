@@ -119,6 +119,21 @@ async function createCreativeJob(req, res) {
         // require Redis. It handles up to ~10 concurrent generations comfortably.
         // ─────────────────────────────────────────────────────────────────────
         setImmediate(async () => {
+            const JOB_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+            const timeout = setTimeout(async () => {
+                console.warn(`⏰ [Job] Background generation timed out after 10m: ${jobId}`);
+                await GenerationJob.findOneAndUpdate(
+                    { jobId, status: 'processing' },
+                    { status: 'failed', errorMessage: 'Generation timed out (10m)', completedAt: new Date() }
+                ).catch(() => {});
+                
+                if (req.creditsDeducted > 0) {
+                    refundCredits(req.user._id, req.creditsDeducted, 'creative',
+                        `Refund: Timeout refund for Job ${jobId}`, 'creative'
+                    ).catch(e => console.error(`❌ [Job] Timeout refund failed for ${jobId}:`, e.message));
+                }
+            }, JOB_TIMEOUT);
+
             try {
                 console.log(`🚀 [Job] Starting direct background generation: ${jobId}`);
 
@@ -147,7 +162,7 @@ async function createCreativeJob(req, res) {
             } catch (err) {
                 console.error(`❌ [Job] Background generation failed (${jobId}):`, err.message);
                 await GenerationJob.findOneAndUpdate(
-                    { jobId },
+                    { jobId, status: 'processing' },
                     { status: 'failed', completedAt: new Date(), errorMessage: err.message }
                 ).catch(() => { });
 
@@ -157,6 +172,8 @@ async function createCreativeJob(req, res) {
                         `Refund: Background Job ${jobId} Failed — ${err.message}`, 'creative'
                     ).catch(e => console.error(`❌ [Job] Refund failed for ${jobId}:`, e.message));
                 }
+            } finally {
+                clearTimeout(timeout);
             }
         });
 

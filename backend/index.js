@@ -4,8 +4,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
-import config from './config/env.js';
+import config, { validateConfig } from './config/env.js';
 import mongoose from 'mongoose';
+
+// Run boot-time config validation before anything else
+validateConfig();
 import { stripHtml } from './utils/sanitize.js';
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -338,6 +341,11 @@ connectDB().then(() => {
         startSubscriptionManager();
     }).catch(err => console.error('❌ Failed to load subscriptionManager.js:', err));
 
+    // Start stuck job sweeper (every 5 mins)
+    import('./services/stuckJobSweeper.js').then(({ startStuckJobSweeper }) => {
+        startStuckJobSweeper();
+    }).catch(err => console.error('❌ Failed to load stuckJobSweeper.js:', err));
+
     // Start video archival sweep (catches videos missed by inline S3 upload — configurable via VIDEO_ARCHIVAL_SWEEP_INTERVAL_MS)
     import('./services/videoArchivalSweep.js').then(({ startVideoArchivalSweep }) => {
         startVideoArchivalSweep();
@@ -572,6 +580,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.error('🚨 Uncaught Exception:', err);
+    // Allow time for the log to flush, then exit. PM2 will restart.
+    setTimeout(() => process.exit(1), 1000);
 });
 
 // Catch-all 404 logger removed from here and placed before the error handler
