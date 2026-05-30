@@ -133,6 +133,15 @@ const userSchema = new mongoose.Schema({
 
     // Persistence: track which onboarding walkthroughs have been completed
     completedWalkthroughs: { type: [String], default: [] },
+
+    // SEC-002: Token version — incremented on password change to invalidate existing JWTs
+    tokenVersion: { type: Number, default: 0 },
+
+    // SEC-002: Security tracking — per-account failed login lockout
+    security: {
+        failedLoginAttempts: { type: Number, default: 0 },
+        lastFailedLogin: { type: Date },
+    },
 }, { timestamps: true });
 
 // Virtual: remaining credits (includes non-expired top-up)
@@ -193,6 +202,11 @@ userSchema.pre('save', function () {
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return;
     this.password = await bcrypt.hash(this.password, 12);
+    // SEC-002 (FIX-03): Increment tokenVersion on password change
+    // This invalidates ALL existing JWTs for this user.
+    if (!this.isNew) {
+        this.tokenVersion = (this.tokenVersion || 0) + 1;
+    }
 });
 
 // Compare password

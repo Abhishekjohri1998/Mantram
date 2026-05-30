@@ -61,6 +61,13 @@ export const protect = async (req, res, next) => {
         const user = await User.findById(decoded.id).populate('activeSubscription');
 
         if (user) {
+            // SEC-002 (FIX-03): Verify token version matches DB
+            // Tokens issued before a password change have stale version and must be rejected.
+            // Tokens without 'v' claim (legacy) are accepted during migration window.
+            if (decoded.v !== undefined && user.tokenVersion !== undefined && decoded.v !== user.tokenVersion) {
+                return res.status(401).json({ success: false, error: 'Session expired. Please log in again.' });
+            }
+
             // REL-020: Inline subscription expiry check
             if (user.activeSubscription && user.activeSubscription.endDate && new Date(user.activeSubscription.endDate) < new Date()) {
                 console.log(`[Auth] Inline expiring subscription ${user.activeSubscription._id} for user ${user._id}`);
@@ -201,7 +208,11 @@ export const authorize = (...roles) => (req, res, next) => {
 
 export const superadmin = authorize('superadmin');
 
-// Generate JWT
-export const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, config.jwtSecret, { expiresIn: config.jwtExpire });
+// Generate JWT — SEC-002 (FIX-02): Includes tokenVersion, reduced to 24h expiry
+export const generateToken = (userId, tokenVersion = 0) => {
+    return jwt.sign(
+        { id: userId, v: tokenVersion },
+        config.jwtSecret,
+        { expiresIn: '24h' }  // Reduced from 7d for tighter session control
+    );
 };

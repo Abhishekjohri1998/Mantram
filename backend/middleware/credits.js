@@ -14,6 +14,7 @@
  */
 
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
@@ -207,9 +208,14 @@ export const requireCredits = (actionOrCost = 1) => {
             // ── Background Job Bypass ──
             // When runCreativeJobAsync calls /generate internally, credits are
             // already deducted at POST /jobs time. Skip re-deduction.
-            // SECURITY: Requires a server-only secret to prevent client-side forgery.
+            // SECURITY: Requires a server-only secret (min 32 chars) to prevent client-side forgery.
+            // SEC-002: Uses timing-safe comparison and minimum length guard.
             const internalJobSecret = process.env.INTERNAL_JOB_SECRET;
-            if (internalJobSecret && req.headers['x-internal-secret'] === internalJobSecret && req.headers['x-job-id']) {
+            const clientSecret = req.headers['x-internal-secret'];
+            if (internalJobSecret && internalJobSecret.length >= 32
+                && clientSecret && typeof clientSecret === 'string' && clientSecret.length === internalJobSecret.length
+                && crypto.timingSafeEqual(Buffer.from(internalJobSecret), Buffer.from(clientSecret))
+                && req.headers['x-job-id']) {
                 console.log(`⚡ [CREDITS] Skipping deduction for internal job call ${req.headers['x-job-id']}`);
                 req.creditsDeducted = 0; // Signal to handler: already deducted
                 return next();
@@ -413,12 +419,15 @@ export const requireCredits = (actionOrCost = 1) => {
 /**
  * Deduct credits manually — for use inside handlers where credit deduction 
  * depends on logic (e.g. only deduct if AI call succeeds)
+ * 
+ * SEC-002 (FIX-01): Uses atomic $expr balance precondition — identical to requireCredits.
+ * Returns null if user has insufficient credits (callers MUST handle this).
  */
 export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = null) => {
-    if (!userId) return;
+    if (!userId) return null;
     try {
         const user = await User.findById(userId);
-        if (!user) return;
+        if (!user) return null;
 
         // Bypass for superadmin
         if (user.role === 'superadmin' || user.plan === 'enterprise') {
@@ -432,17 +441,38 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             cost = costs[actionOrCost] || amount;
         }
 
-        const updateOps = [
-            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
-        ];
+        // SEC-002: Atomic balance check — prevents race condition where concurrent
+        // requests each pass the balance check individually and all succeed.
+        const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
+            ? user.credits.topUp : 0;
+
+        const updated = await User.findOneAndUpdate(
+            {
+                _id: userId,
+                $expr: {
+                    $gte: [
+                        { $subtract: [
+                            { $add: [{ $ifNull: ['$credits.total', 0] }, { $ifNull: ['$credits.bonus', 0] }, topUp > 0 ? topUp : 0] },
+                            { $ifNull: ['$credits.used', 0] }
+                        ] },
+                        cost
+                    ]
+                }
+            },
+            { $inc: { 'credits.used': cost } },
+            { returnDocument: 'after' }
+        );
+
+        if (!updated) {
+            console.warn(`❌ [CREDITS] Atomic deductCredits failed — insufficient balance for user ${userId} (action: ${actionOrCost}, cost: ${cost})`);
+            return null; // Callers MUST handle this
+        }
 
         // If user has an active subscription, sync deduction there too
         if (user.activeSubscription) {
             const Subscription = (await import('../models/Subscription.js')).default;
-            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+            Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }).catch(() => {});
         }
-
-        const [updated] = await Promise.all(updateOps);
 
         // Log usage
         const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
@@ -458,10 +488,14 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             metadata: { brandId },
         });
 
+        // Invalidate user cache after deduction
+        invalidateUserCache(userId);
+
         console.log(`💰 Manually deducted ${cost} credits from user ${userId} for ${actionOrCost}`);
         return updated;
     } catch (e) {
         console.error('Manual credit deduction failed:', e.message);
+        return null;
     }
 };
 

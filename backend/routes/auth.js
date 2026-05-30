@@ -250,7 +250,30 @@ router.post('/login', loginLimiter, async (req, res) => {
             });
         }
 
+        // ── SEC-002 (FIX-05): Per-account lockout check ──
+        // 10 failed attempts → 30 minute lock. This is IN ADDITION to the IP-based rate limiter.
+        const MAX_FAILED_ATTEMPTS = 10;
+        const LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+        if (user.security?.failedLoginAttempts >= MAX_FAILED_ATTEMPTS && user.security?.lastFailedLogin) {
+            const lockoutEnd = new Date(user.security.lastFailedLogin.getTime() + LOCKOUT_DURATION_MS);
+            if (new Date() < lockoutEnd) {
+                const minsRemaining = Math.ceil((lockoutEnd - new Date()) / 60000);
+                return res.status(429).json({
+                    success: false,
+                    error: `Account temporarily locked due to too many failed attempts. Try again in ${minsRemaining} minutes.`,
+                    code: 'ACCOUNT_LOCKED'
+                });
+            }
+            // Lockout expired — reset counter before proceeding
+            await User.findByIdAndUpdate(user._id, { $set: { 'security.failedLoginAttempts': 0 } });
+        }
+
         if (!(await user.matchPassword(password))) {
+            // Track failed attempt
+            await User.findByIdAndUpdate(user._id, {
+                $inc: { 'security.failedLoginAttempts': 1 },
+                $set: { 'security.lastFailedLogin': new Date() }
+            });
             return res.status(401).json({ success: false, error: 'Incorrect password. Please try again.' });
         }
 
@@ -273,10 +296,15 @@ router.post('/login', loginLimiter, async (req, res) => {
             });
         }
 
+        // Reset failed login counter on successful login
         user.lastActive = Date.now();
+        if (user.security?.failedLoginAttempts > 0) {
+            user.security.failedLoginAttempts = 0;
+        }
         await user.save();
 
-        const token = generateToken(user._id);
+        // SEC-002 (FIX-02): Pass tokenVersion to include in JWT
+        const token = generateToken(user._id, user.tokenVersion || 0);
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
         
         // Accurate brand count (Owned + Shared) - used for redirection logic
@@ -844,7 +872,9 @@ router.get('/google/callback', async (req, res) => {
         }
 
         const stringId = userId.toString();
-        const token = generateToken(stringId);
+        // SEC-002: Fetch tokenVersion for Google OAuth logins too
+        const oauthUser = await User.findById(userId).select('tokenVersion');
+        const token = generateToken(stringId, oauthUser?.tokenVersion || 0);
 
         // Accurate brand count (Owned + Shared)
         const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });

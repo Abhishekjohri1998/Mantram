@@ -199,7 +199,7 @@ export const ensureS3Url = async (input, folderOrFilename = 'video-studio/assets
  * @param {number} expiresIn - Expiration time in seconds (default: 3600 / 1 hour)
  * @returns {Promise<string>} - The signed URL
  */
-export const getSignedUrlForPath = async (urlOrKey, expiresIn = 604800) => { // 7 days default
+export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => { // SEC-002 (FIX-12): 1 hour default (was 7 days)
     if (!urlOrKey) return urlOrKey;
     
     try {
@@ -286,7 +286,7 @@ export const getObjectStream = async (urlOrKey) => {
  * to avoid redundant S3 presigning calls on hot paths.
  */
 const presignedCache = new Map();
-const PRESIGN_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const PRESIGN_CACHE_TTL = 50 * 60 * 1000; // SEC-002: 50 minutes (signed URLs expire in 1 hour)
 
 // Auto-evict stale entries every 30 minutes
 setInterval(() => {
