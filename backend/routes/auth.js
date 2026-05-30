@@ -502,9 +502,10 @@ router.put('/change-password', protect, async (req, res) => {
 });
 
 // GET /api/auth/me
+// SEC-001: Explicit field whitelist — never spread the full user document
 router.get('/me', protect, async (req, res) => {
     try {
-        let user = await User.findById(req.user._id).lean();
+        let user = await User.findById(req.user._id);
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
         // Auto-generate userId for existing users who don't have one
@@ -517,20 +518,37 @@ router.get('/me', protect, async (req, res) => {
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
         
         // Accurate brand count (Owned + Shared)
-        const userId = user._id || user.id;
-        const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
-        const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
+        const ownedCount = await Brand.countDocuments({ user: user._id, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: user._id, status: { $ne: 'archived' } });
         const brandCount = ownedCount + sharedCount;
 
-        res.json({ 
-            success: true, 
-            user: { 
-                ...user, 
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                plan: user.plan,
+                avatar: user.avatar || '',
+                company: user.company || '',
+                userId: user.userId,
+                teamRole: user.teamRole || '',
+                organization: user.organization || null,
+                credits: {
+                    total: user.credits?.total || 0,
+                    used: user.credits?.used || 0,
+                    remaining: user.creditsRemaining ?? 0,
+                },
+                streak: user.streak || 0,
+                preferences: user.preferences || {},
+                milestones: user.milestones || {},
+                usage: user.usage || {},
                 completedWalkthroughs: user.completedWalkthroughs || [],
-                planDetails, 
+                planDetails,
                 brandCount,
-                isTeamMember: ownedCount === 0 && sharedCount > 0 
-            } 
+                isTeamMember: ownedCount === 0 && sharedCount > 0,
+            }
         });
     } catch (error) {
         console.error('❌ /me Error:', error);
@@ -539,6 +557,7 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // PUT /api/auth/profile
+// SEC-001: Return only whitelisted fields after profile update
 router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, res) => {
     try {
         const { name, company, avatar, preferences } = req.body;
@@ -547,7 +566,20 @@ router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, r
             { name, company, avatar, preferences },
             { returnDocument: 'after', runValidators: true }
         );
-        res.json({ success: true, user });
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                plan: user.plan,
+                avatar: user.avatar || '',
+                company: user.company || '',
+                userId: user.userId,
+                preferences: user.preferences || {},
+            }
+        });
     } catch (error) {
         console.error('❌ Profile Update Error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

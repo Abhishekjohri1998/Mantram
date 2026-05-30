@@ -459,6 +459,12 @@ app.use((req, res, next) => {
     next();
 });
 
+// ── SEC-001: RESPONSE SANITIZER ──────────────────────────────
+// Strips security-critical fields (passwords, tokens, __v) from ALL JSON responses.
+// Defense-in-depth — catches anything Mongoose toJSON transforms miss (.lean() queries, etc.)
+import { responseSanitizer } from './middleware/responseSanitizer.js';
+app.use(responseSanitizer);
+
 // Request logging in dev
 if (config.nodeEnv === 'development') {
     app.use((req, res, next) => {
