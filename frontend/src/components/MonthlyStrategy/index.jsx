@@ -196,12 +196,10 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
     setImageLoading(true)
     setImageError(null)
     try {
-      // Build visual prompt from brief fields
+      // Build visual prompt purely from visualDirection and mood to avoid pollution
       const promptParts = [
-        brief.visualDirection && brief.visualDirection,
-        brief.angle           && `Campaign: ${brief.angle}`,
+        brief.visualDirection || 'Professional marketing creative showcasing the product.',
         brief.toneDirection   && `Mood: ${brief.toneDirection}`,
-        activeBrand.name      && `Brand: ${activeBrand.name}`,
       ].filter(Boolean)
       const prompt = promptParts.join('. ')
 
@@ -252,10 +250,8 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
     const slides = []
     try {
       const basePrompt = [
-        brief.visualDirection && brief.visualDirection,
-        brief.angle && `Campaign: ${brief.angle}`,
+        brief.visualDirection || 'Professional marketing creative showcasing the product.',
         brief.toneDirection && `Mood: ${brief.toneDirection}`,
-        activeBrand.name && `Brand: ${activeBrand.name}`,
       ].filter(Boolean).join('. ')
 
       for (let i = 0; i < carouselSlideCount; i++) {

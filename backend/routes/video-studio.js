@@ -7863,7 +7863,7 @@ ${tagMap.map(t => `   ${t}`).join('\n')}
 5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
 6. Specify EXACT shot durations that sum to ${duration}s total — follow the cut plan if provided.
 7. Describe product interaction: how the product moves, catches light, is handled.
-8. End with a cinematic brand CTA / closing shot.
+8. End with a cinematic brand CTA / closing shot — this must appear ONCE at the very end of the ENTIRE video, not repeated per segment. For long-form videos split into multiple segments, the brand logo and CTA belong ONLY in the final seconds of the last segment.
 9. 300–600 words. Extremely specific. Directly executable by Seedance.
 10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
 11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`;

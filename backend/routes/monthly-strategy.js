@@ -135,38 +135,69 @@ function extractJSON(text) {
 
 // MCP tool sets per strategy type
 const MCP_CALLS = {
-  'social-media':           (brandId) => [
-    { tool: 'fetch_trending', args: { brandId } },
-    { tool: 'web_search', args: { query: `top performing social media content this month D2C brand strategy`, mode: 'quick' } },
-  ],
-  'performance-marketing':  (brandId) => [
-    { tool: 'scrape_competitor', args: { brandId } },
-    { tool: 'fetch_trending', args: { brandId } },
-  ],
-  'seo':                    (brandId) => [
-    { tool: 'fetch_seo_audit', args: { brandId } },
-    { tool: 'web_search', args: { query: `competitor keyword rankings SEO content strategy`, mode: 'quick' } },
-  ],
-  'sales':                  (brandId) => [
-    { tool: 'scrape_competitor', args: { brandId } },
-    { tool: 'fetch_trending', args: { brandId } },
-  ],
-  'content-marketing':      (brandId) => [
-    { tool: 'web_search', args: { query: `trending content marketing topics this month`, mode: 'quick' } },
-    { tool: 'fetch_seo_audit', args: { brandId } },
-  ],
-  'email-retention':        (brandId) => [
-    { tool: 'fetch_content_history', args: { brandId, platform: '', limit: 20 } },
-    { tool: 'fetch_performance_learnings', args: { brandId } },
-  ],
-  'influencer-ugc':         (brandId) => [
-    { tool: 'fetch_trending', args: { brandId } },
-    { tool: 'scrape_competitor', args: { brandId } },
-  ],
-  'marketplace':            (brandId) => [
-    { tool: 'fetch_seo_audit', args: { brandId } },
-    { tool: 'scrape_competitor', args: { brandId } },
-  ],
+  'social-media':           (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    const country = brand?.dna?.country || 'India';
+    const monthName = new Date().toLocaleString('en', { month: 'long' });
+    return [
+      { tool: 'fetch_trending', args: { brandId } },
+      { tool: 'web_search', args: { query: `viral social media reels trends hooks ${industry} marketing ${monthName} 2026 ${country}`, mode: 'quick' } },
+    ];
+  },
+  'performance-marketing':  (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'scrape_competitor', args: { brandId } },
+      { tool: 'fetch_trending', args: { brandId } },
+      { tool: 'web_search', args: { query: `high conversion Meta Google ads creative frameworks ${industry} performance marketing`, mode: 'quick' } },
+    ];
+  },
+  'seo':                    (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'fetch_seo_audit', args: { brandId } },
+      { tool: 'web_search', args: { query: `competitor keyword rankings SEO content strategy ${industry}`, mode: 'quick' } },
+    ];
+  },
+  'sales':                  (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'scrape_competitor', args: { brandId } },
+      { tool: 'fetch_trending', args: { brandId } },
+      { tool: 'web_search', args: { query: `proven discount offers bundles promotions D2C conversion copy ${industry}`, mode: 'quick' } },
+    ];
+  },
+  'content-marketing':      (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'web_search', args: { query: `trending content marketing topics thought leadership ${industry}`, mode: 'quick' } },
+      { tool: 'fetch_seo_audit', args: { brandId } },
+    ];
+  },
+  'email-retention':        (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'fetch_content_history', args: { brandId, platform: '', limit: 20 } },
+      { tool: 'fetch_performance_learnings', args: { brandId } },
+      { tool: 'web_search', args: { query: `best email retention flows subject lines loyalty strategy ${industry}`, mode: 'quick' } },
+    ];
+  },
+  'influencer-ugc':         (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'fetch_trending', args: { brandId } },
+      { tool: 'scrape_competitor', args: { brandId } },
+      { tool: 'web_search', args: { query: `viral influencer UGC creator brief campaigns ${industry}`, mode: 'quick' } },
+    ];
+  },
+  'marketplace':            (brandId, brand) => {
+    const industry = brand?.dna?.industry || 'D2C';
+    return [
+      { tool: 'fetch_seo_audit', args: { brandId } },
+      { tool: 'scrape_competitor', args: { brandId } },
+      { tool: 'web_search', args: { query: `amazon ebc listing optimization product imagery keyword strategy ${industry}`, mode: 'quick' } },
+    ];
+  },
 };
 
 const TYPE_INSTRUCTIONS = {
@@ -185,7 +216,7 @@ function buildSocialMediaInstruction(connectedPlatforms) {
   const platformList = connectedPlatforms.length > 0
     ? connectedPlatforms.join(', ')
     : 'Instagram, LinkedIn';
-  return `Generate a social-media-first strategy. Calendar MUST include content for ALL these connected platforms: ${platformList}. Distribute content evenly across all platforms — every platform gets content every day. Mix: 40% Reels/video, 30% carousels/static, 20% stories/UGC, 10% text posts. Every brief must include a viral hook angle and platform-specific hashtag set.`;
+  return `Generate a high-impact, modern, trend-driven social media strategy. Content must feel platform-native, highly humanized, and visually premium (avoiding generic stock photography vibes). Calendar MUST include content for ALL these connected platforms: ${platformList}. Distribute content evenly across all platforms — every platform gets content every day. Mix: 40% Reels/video, 30% carousels/static, 20% stories/UGC, 10% text posts. Every brief must include a viral hook angle, structured copywriting guides, and platform-specific hashtag set.`;
 }
 
 const STUDIO_MAP = {
@@ -223,7 +254,7 @@ TONE OVERRIDE: Override brand default — use ${toneOverride} tone throughout al
     : (TYPE_INSTRUCTIONS[strategyType] || '');
 
   return {
-    system: `You are a Senior Brand Strategist and CMO. You generate data-driven monthly content strategies grounded in real brand data. Output ONLY valid JSON — no prose, no markdown fences, no explanation. Your JSON must be complete and parseable. Do NOT truncate.`,
+    system: `You are a Senior Brand Strategist, growth manager, and CMO. You generate data-driven monthly content strategies grounded in real brand data. Output ONLY valid JSON — no prose, no markdown fences, no explanation. Your JSON must be complete and parseable. Do NOT truncate.`,
     user: `${brandContext}
 
 <strategy_context>
@@ -249,9 +280,25 @@ CALENDAR RULES:
 - Generate approximately ${totalItems} calendar items total (${daysRemaining} days × ${numPlatforms} platforms)
 - Each day MUST have exactly 1 post for EACH connected platform: ${platformList}
 - Vary content types per platform: Instagram (reels, carousels, stories), LinkedIn (carousels, static, articles), Twitter (static, text), Facebook (static, carousels, video), YouTube (reels/shorts)
-- Keep captionDraft under 100 chars, angle under 80 chars — be concise
 - IMPORTANT: EVERY post caption and angle MUST mention the brand name or specific brand products. Generic content is NOT acceptable.
 ${launchEvents?.length ? `- CRITICAL: The following dates are launch anchors — they MUST appear in the calendar with launch content: ${launchEvents.map(e=>e.date).join(', ')}` : ''}
+
+🚨 COPY & WRITING RULES (FOR HIGHLY HUMANIZED CONTENT):
+- Keep angle under 150 chars. Ensure the angle details a creative, high-impact scroll-stopping concept.
+- Allow captionDraft to be up to 400 characters. Captions must be engaging, humanized, conversational, and platform-native (use emojis pacing, an engaging hook, a natural storytelling tone, and a clear call-to-action). Avoid dry corporate copy or simple sales pitches.
+- Relate content to the TRENDS and COMPETITOR GAPS found in <market_intelligence>. At least 30% of posts must actively tackle competitor gaps or hijack current industry trends/hooks.
+
+🚨 AESTHETIC VISUAL DIRECTION RULES (FOR PREMIUM VISUALS):
+- For visual platforms, visualDirection must be a highly descriptive, premium art-director prompt that visual generators (like NanoBanana 2 or Flux) can execute perfectly to create a stunning visual.
+- DO NOT write generic descriptions like "A photo of the product".
+- Instruct the AI to structure the visualDirection as a direct camera/set layout:
+  1. Style/Aesthetic: Choose a modern, on-trend style (e.g., editorial lifestyle photography, moody studio setup, quiet luxury realism, tactile analog film style, raw editorial brutalism).
+  2. Lighting: Specify a hyper-specific lighting setup (e.g., dramatic high-contrast side-lighting casting long sharp shadows, soft diffused window light, warm golden hour rim light with cinematic ambient glow).
+  3. Backdrop & Set Props: Specify detailed premium materials, surfaces, and props (e.g., warm cream travertine blocks, wrinkled linen fabrics, textured concrete or raw clay platforms, green foliage, delicate water droplets, raw organic ingredients scattered).
+  4. Composition & Framing: Detail camera angle and rules of composition (e.g., macro close-up showing fine texture detail, rule-of-thirds asymmetric balance, clean negative space for copy overlays, direct overhead flat lay, low-angle hero shot).
+  5. Anti-AI-Slop constraints: Do NOT default to generic glossy gradient backgrounds, floating products with no context, or shiny plastic textures. Emphasize physical, tactile, and photorealistic qualities.
+- Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, decorativeElements, colors).
+- CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself. The product design, packaging, and colors must remain exactly as originally designed.
 
 Return ONLY this JSON (no text before or after):
 {
@@ -379,8 +426,8 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   // Calculate starting date — skip past dates for current month
   const today = new Date();
   const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
-  const startingDate = isCurrentMonth ? today.getDate() + 1 : 1; // Start from tomorrow if current month
   const endDay = new Date(year, month, 0).getDate(); // Last day of month
+  const startingDate = isCurrentMonth ? Math.min(today.getDate() + 1, endDay) : 1; // Start from tomorrow if current month (capped at last day)
 
   // Strategy context block
   const strategyContext = [
@@ -396,7 +443,7 @@ async function runStrategyPipeline({ brandId, strategyType, month, year, userId,
   emitFn({ type: 'research_done', tool: 'brand_dna', label: 'Brand DNA loaded' });
 
   // 2. MCP calls
-  const mcpCalls = (MCP_CALLS[strategyType] || (() => []))(brandId);
+  const mcpCalls = (MCP_CALLS[strategyType] || (() => []))(brandId, brand);
   const toolLabels = {
     web_search: 'Web Research', fetch_trending: 'Trending Signals',
     scrape_competitor: 'Competitor Intel', fetch_seo_audit: 'SEO Audit',
@@ -865,7 +912,7 @@ router.post('/:id/items/:itemId/regenerate-brief', protect, requireCredits('mont
 
     const aiRouter = getAiRouter();
     const result = await aiRouter.generateText({
-      systemPrompt: `You are a senior content strategist. Generate a single content brief as JSON. Output ONLY valid JSON, no prose.`,
+      systemPrompt: `You are a Senior Brand Strategist, copywriter, and visual art director. Generate a single highly-humanized and premium content brief as JSON. Output ONLY valid JSON, no prose.`,
       userPrompt: `${brandContext}
 
 Regenerate the brief for this calendar item:
@@ -875,6 +922,23 @@ Regenerate the brief for this calendar item:
 - Month: ${monthName} ${doc.year}
 - Strategy Type: ${doc.strategyType}
 - Additional instructions: ${instructions || 'Improve quality and brand relevance'}
+
+🚨 COPY & WRITING RULES (FOR HIGHLY HUMANIZED CONTENT):
+- Keep angle under 150 chars. Ensure the angle details a creative, high-impact scroll-stopping concept.
+- Allow captionDraft to be up to 400 characters. Captions must be engaging, humanized, conversational, and platform-native (use emojis pacing, an engaging hook, a natural storytelling tone, and a clear call-to-action). Avoid dry corporate copy or simple sales pitches.
+- Relate content to the brand identity, products, and campaign focus if specified.
+
+🚨 AESTHETIC VISUAL DIRECTION RULES (FOR PREMIUM VISUALS):
+- For visual platforms, visualDirection must be a highly descriptive, premium art-director prompt that visual generators (like NanoBanana 2 or Flux) can execute perfectly to create a stunning visual.
+- DO NOT write generic descriptions like "A photo of the product".
+- Instruct the AI to structure the visualDirection as a direct camera/set layout:
+  1. Style/Aesthetic: Choose a modern, on-trend style (e.g., editorial lifestyle photography, moody studio setup, quiet luxury realism, tactile analog film style, raw editorial brutalism).
+  2. Lighting: Specify a hyper-specific lighting setup (e.g., dramatic high-contrast side-lighting casting long sharp shadows, soft diffused window light, warm golden hour rim light with cinematic ambient glow).
+  3. Backdrop & Set Props: Specify detailed premium materials, surfaces, and props (e.g., warm cream travertine blocks, wrinkled linen fabrics, textured concrete or raw clay platforms, green foliage, delicate water droplets, raw organic ingredients scattered).
+  4. Composition & Framing: Detail camera angle and rules of composition (e.g., macro close-up showing fine texture detail, rule-of-thirds asymmetric balance, clean negative space for copy overlays, direct overhead flat lay, low-angle hero shot).
+  5. Anti-AI-Slop constraints: Do NOT default to generic glossy gradient backgrounds, floating products with no context, or shiny plastic textures. Emphasize physical, tactile, and photorealistic qualities.
+- Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, decorativeElements, colors).
+- CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself. The product design, packaging, and colors must remain exactly as originally designed.
 
 Return JSON matching this exact schema:
 {
@@ -989,14 +1053,10 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
               break;
             }
 
-            // Build prompt from brief fields
+            // Build prompt purely from visualDirection and mood to avoid caption/conversational pollution
             const prompt = [
-              item.brief?.visualDirection && `VISUAL: ${item.brief.visualDirection}`,
-              item.brief?.angle && `CAMPAIGN: ${item.brief.angle}`,
-              item.brief?.toneDirection && `MOOD: ${item.brief.toneDirection}`,
-              item.brief?.captionDraft && `CAPTION CONTEXT: ${item.brief.captionDraft}`,
-              `Brand-consistent professional marketing visual for ${item.platform || 'instagram'}.`,
-              `FORMAT: ${item.contentType || 'static post'}`,
+              item.brief?.visualDirection || 'Professional marketing creative showcasing the product.',
+              item.brief?.toneDirection && `Mood and tone: ${item.brief.toneDirection}`,
             ].filter(Boolean).join('\n');
 
             // Mark item in_progress

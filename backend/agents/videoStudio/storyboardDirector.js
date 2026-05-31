@@ -66,21 +66,29 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 ═══════════════════════════════════════════════════════
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
+DENSITY: Pack the cuts — aim for fast-paced, high-energy commercial pacing. More cuts = more visual energy.
+
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime")
 - duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${MAX_SHOT_DURATION}s)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
-- scene: one crisp sentence describing what happens in this cut (who, what action, emotional note)
-- framePrompt: a detailed image generation prompt for this panel in the storyboard grid (describe the exact composition, lighting, subject position, product placement, mood — as if describing a still photograph)
+- scene: 2-3 sentence narrative beat — WHO is doing WHAT, the physical action or micro-emotion in this exact cut, and how it propels the story forward. Be specific and cinematic, not generic. E.g. "Presenter's hand slowly lifts the product into a beam of golden backlight. The label rotates toward camera. Her eyes meet the lens — a quiet smile of confidence."
+- framePrompt: a richly detailed, highly creative image generation prompt for this panel. INJECT extreme creativity:
+  • Specify dynamic camera angles: low-angle hero shots, Dutch tilt, kinetic tracking, extreme macro, sweeping aerial, over-shoulder reveal
+  • Demand professional lighting textures: volumetric god rays, chiaroscuro contrast, neon rim lights, softbox diffusion, condensation micro-highlights, golden-hour backlight
+  • Describe exact subject position, expression, product placement, props
+  • Reference the @image sequence: e.g. "Product as shown in @image1, presenter as in @image2"
+  • End with mood: "cinematic 4K still, award-winning commercial photography"
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
-- Follow a natural cinematic arc (wide → narrow → detail → emotion → resolve)
-- Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion)
-- The product must be visually featured in at least one INSERT/MACRO cut
-- If an avatar/presenter is provided, feature them in at least one CLOSE-UP
+- Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
+- Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
+- The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
+- If an avatar/presenter is provided, feature them in at least one CLOSE-UP and one TWO-SHOT with the product
+- INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
 - Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
 
 ═══════════════════════════════════════════════════════
@@ -202,12 +210,14 @@ DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR/PRESENTER: ${avatarUrl ? 'YES — avatar image provided. Feature this specific presenter in relevant cuts.' : 'NO — product-only ad, no presenter'}
 BRAND NAME: ${brandName}${logoDetails}
 
-Now act as the professional storyboard director. Deeply analyse the product, brief, and reference images.
-Write the complete 4-section structured storyboard JSON.
-Remember:
+Now act as the VISIONARY award-winning storyboard director. Deeply analyse every reference image, the brief, and the brand DNA.
+Write the complete 4-section structured storyboard JSON. Channel the energy of the world's best ad directors:
+- Make cuts dense, rich, and full of fast-cut narrative beats — each scene should feel like a story beat, not a shot description
+- Inject extreme creativity in every framePrompt: dynamic camera angles, professional lighting textures, kinetic motion
+- Build a genuine emotional arc — the audience must feel something by the last cut
+- Each framePrompt is your canvas — make it DETAILED enough that an AI image generator could produce a magazine-quality frame
 - cuts[] durations must SUM EXACTLY to ${duration}s
 - environmentFingerprint defines ONE single set — never changes
-- Each cut's framePrompt must be a detailed still-image description grounded in the actual product/avatar references
 - imagePrompt must be built from your cuts[] array — it is the grid poster prompt
 - Return ONLY the JSON object, no other text`;
 }

@@ -336,6 +336,7 @@ Analyze the brand category and vertical (e.g. luxury, tech, beauty, wellness, sp
 For each segment:
 1. Write a specific "visualPrompt" describing ONLY what happens in this segment of the storyboard sequence. Do NOT repeat the entire sequence. Focus on the camera movement, action, and continuity from the previous segment. Describe active dynamic motion, camera angles (e.g., slow dolly-in, tracking pan), lighting, and color grading. Subsequent segments should chain from the last frame of the previous one.
 2. Extract or write the DIALOGUE / VOICEOVER lines for this segment (in ${language}) in the format: DIALOGUE [emotion]: "text in ${language}". The dialogue lines must match the dialogues specified in the master storyboard video prompt, distributed chronologically. If no explicit dialogue is in the master storyboard for a segment, you may write relevant voiceover describing the product features or brand message.
+3. CRITICAL — NO REPEATED BRAND CLOSINGS: The brand logo, brand name lock-up, and CTA must appear ONLY in the FINAL segment's closing seconds. Do NOT include brand logo reveals, brand closing shots, or CTAs in any intermediate or opening segment. Segments 1 through ${sceneCount - 1} should be pure narrative/product/presenter content with NO brand intro or brand outro.
 
 OUTPUT FORMAT (strict JSON array):
 [
