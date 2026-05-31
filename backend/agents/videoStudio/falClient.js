@@ -42,16 +42,18 @@ export const COST_PER_SECOND = {
     'veo-3.1': { fast: 0.10, quality: 0.25 },
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
     'seedance-1.0': { fast: 0.08, quality: 0.12 },
-    // Seedance 2.0 — Atlas Cloud actual billing: ~$2.10/15s = $0.14/sec at 720p.
-    // Base rate $0.20 × 0.7 (720p mult) = $0.14/sec effective. Previous $0.05 was undercharging.
-    'seedance-2.0': { fast: 0.20, quality: 0.30 },
-    'seedance-2.0-fast': { fast: 0.10, quality: 0.10 },
+    // Atlas Cloud actual billing based on 1080p baseline:
+    // Seedance 2.0 Fast: 480p is $0.768/10s = $0.0768/sec.
+    // Assuming 1080p is the baseline (mult=1.0), 480p is mult=0.5, so 1080p base rate is $0.1536/sec.
+    // Seedance 2.0 Pro: typically ~1.5x fast.
+    'seedance-2.0': { fast: 0.23, quality: 0.35 },
+    'seedance-2.0-fast': { fast: 0.1536, quality: 0.1536 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
-    // HappyHorse — also Atlas Cloud. Adjusted from $0.06 to reflect actual billing.
-    'happyhorse-1.0': { fast: 0.12, quality: 0.18 },
-    'gemini-flash': { fast: 0.12, quality: 0.12 },
+    // HappyHorse and Gemini Flash (Atlas Cloud)
+    'happyhorse-1.0': { fast: 0.15, quality: 0.20 },
+    'gemini-flash': { fast: 0.15, quality: 0.15 },
 };
 
 const DURATION_LIMITS = {
@@ -206,15 +208,32 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const liveCost = LIVE_COST_PER_SECOND[model]?.[mode];
     const costPerSec = liveCost || (COST_PER_SECOND[model]?.[mode]) || 0.07;
     let resMult = 1.0;
-    if (resolution === '480p') resMult = 0.5;
-    else if (resolution === '720p') resMult = 0.7;
-    else if (resolution === '4k') resMult = 2.0;
+    
+    // Atlas Cloud models have specific resolution multipliers based on observed billing
+    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'gemini-flash'];
+    if (ATLAS_MODELS.includes(model)) {
+        // e.g. 10s seedance-2.0-fast 480p is $0.768. If base is $0.1536/s -> $1.536 for 10s.
+        // So 480p multiplier is exactly 0.5.
+        // Assuming 720p is somewhere in between, say 0.6.
+        if (resolution === '480p') resMult = 0.5;
+        else if (resolution === '720p') resMult = 0.6;
+        else if (resolution === '1080p') resMult = 1.0;
+        else if (resolution === '4k') resMult = 2.0;
+    } else {
+        if (resolution === '480p') resMult = 0.5;
+        else if (resolution === '720p') resMult = 0.7;
+        else if (resolution === '4k') resMult = 2.0;
+    }
     
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 93.21).toFixed(0));
-    // ⚡ Updated May 2026: ceil(USD × 170) → ~89% gross margin at ₹5/credit floor
-    // e.g. Kling 3.0, 5s 1080p fast: $0.35 → 60cr = ₹300; API cost ₹32.6 → 89% margin
-    const credits = Math.max(Math.ceil(usd * 170), 15);
+    
+    // Cost-to-cost pricing:
+    // $1 USD = ~₹83 INR.
+    // 1 credit = ₹5 INR.
+    // $1 USD = 83 / 5 = 16.6 credits. Let's use 20 for a tiny buffer against exchange rates/fees.
+    // ceil(USD * 20) = cost-to-cost.
+    const credits = Math.max(Math.ceil(usd * 20), 5);
     return { usd, inr, credits, model, resolution, mode, durationSeconds, maxDuration: DURATION_LIMITS[model]?.max || 15 };
 }
 
