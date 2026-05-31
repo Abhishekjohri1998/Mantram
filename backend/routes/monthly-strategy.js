@@ -293,6 +293,7 @@ ${launchEvents?.length ? `- CRITICAL: The following dates are launch anchors —
 - 🚨 TO AVOID TOKEN LIMITS: Be CONCISE! Keep visualDirection under 40 words per item. Combine the details into a dense, comma-separated list of keywords rather than long sentences.
 - DO NOT write generic descriptions like "A photo of the product".
 - Instruct the AI to structure the visualDirection as a direct camera/set layout covering Style, Lighting, Backdrop, and Composition.
+- 🚨 MANDATE HUMAN PRESENCE: For authenticity, 40-50% of visuals MUST feature humans (e.g. candid lifestyle shots, hands holding product) matching brand demographics. Avoid generic stock poses.
 - Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, decorativeElements, colors).
 - CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
 

@@ -155,6 +155,7 @@ const brandSchema = new mongoose.Schema({
             marketPosition: { type: String, default: '' },     // "premium" / "mid-range" / "budget" / "niche"
             differentiators: [String],                          // AI-extracted from competitor comparison
             industryTrends: [String],                           // Current trends in the brand's industry
+            competitorImages: [{ type: String }],               // Scraped competitor style/reference images
             lastAnalyzedAt: { type: Date },
         },
 

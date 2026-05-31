@@ -437,6 +437,42 @@ Rules:
     const publicSentiment = sentimentResult.status === 'fulfilled' ? sentimentResult.value : {};
     const platformVoice = platformVoiceResult.status === 'fulfilled' ? platformVoiceResult.value : {};
 
+    // ── Crawl competitor URLs to extract style reference images ──
+    let competitorImages = [];
+    if (competitiveIntel.competitors?.length > 0) {
+        try {
+            console.log(`🔍 Crawling competitor websites for style reference images...`);
+            const { crawlPage } = await import('../utils/web-research.js');
+            const urlsToCrawl = competitiveIntel.competitors
+                .map(c => c.url)
+                .filter(url => url && url.startsWith('http'))
+                .slice(0, 2); // crawl max 2 competitors
+
+            if (urlsToCrawl.length > 0) {
+                const crawlResults = await Promise.allSettled(
+                    urlsToCrawl.map(url =>
+                        Promise.race([
+                            crawlPage(url),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+                        ])
+                    )
+                );
+                
+                for (const r of crawlResults) {
+                    if (r.status === 'fulfilled' && r.value?.success) {
+                        const imgUrls = (r.value.images?.urls || [])
+                            .filter(u => u && u.startsWith('http') && !u.includes('logo') && !u.includes('Logo') && !u.includes('icon'))
+                            .slice(0, 3); // take top 3 images from each
+                        competitorImages.push(...imgUrls);
+                    }
+                }
+                console.log(`🔍 Discovered ${competitorImages.length} competitor style reference images`);
+            }
+        } catch (crawlErr) {
+            console.warn('⚠️ Failed to crawl competitor URLs for images:', crawlErr.message);
+        }
+    }
+
     if (competitiveIntel.competitors?.length) console.log(`  🏆 Discovered ${competitiveIntel.competitors.length} competitors`);
     if (publicSentiment.overallSentiment) console.log(`  ⭐ Public sentiment: ${publicSentiment.overallSentiment}`);
     if (Object.keys(platformVoice).some(k => platformVoice[k]?.tone)) console.log(`  📱 Per-platform voice: ✅`);
@@ -503,6 +539,7 @@ Rules:
                 marketPosition: competitiveIntel.marketPosition || '',
                 differentiators: competitiveIntel.differentiators || [],
                 industryTrends: competitiveIntel.industryTrends || [],
+                competitorImages: competitorImages || [],
                 lastAnalyzedAt: new Date(),
             },
             publicSentiment: {
