@@ -280,9 +280,13 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
                             </div>
 
                             {/* Progress Bar */}
-                            <div className="w-full h-1.5 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-3">
-                                <div className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${progress}%` }} />
+                            <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-3 border border-[var(--sys-border)]">
+                                <div className="h-full bg-primary rounded-full transition-all duration-700 ease-out relative"
+                                    style={{ width: `${Math.max(progress, 2)}%`, background: 'linear-gradient(90deg, var(--primary), #ff9040)' }}>
+                                    {progress < 100 && (
+                                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                                    )}
+                                </div>
                             </div>
 
                             {/* Progress indicator */}
@@ -474,9 +478,13 @@ function LocalBusinessScan({ onComplete, onBack }) {
                             </h2>
                             
                             {/* Progress Bar */}
-                            <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-4" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div className="h-full rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--primary), #ff9040)' }} />
+                            <div className="w-full h-2 bg-[var(--sys-surface)] rounded-full overflow-hidden mb-4 border border-[var(--sys-border)]">
+                                <div className="h-full rounded-full transition-all duration-700 ease-out relative"
+                                    style={{ width: `${Math.max(progress, 2)}%`, background: 'linear-gradient(90deg, var(--primary), #ff9040)' }}>
+                                    {progress < 100 && (
+                                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                                    )}
+                                </div>
                             </div>
 
                             {/* Current step */}
