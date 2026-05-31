@@ -378,7 +378,7 @@ export default function SocialMediaStudio() {
                                     <div className="flex items-center gap-2 mt-3">
                                         <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
                                         <span className="text-sm text-primary font-medium">{connectedAccounts.length} account{connectedAccounts.length > 1 ? 's' : ''} connected</span>
-                                        <div className="flex -space-x-1 ml-2">{connectedAccounts.slice(0, 4).map((a, i) => { const p = PLATFORMS.find(x => x.id === a.platform); return <span key={i} className="text-base" title={p?.label}>{p?.icon || 'smartphone'}</span> })}</div>
+                                        <div className="flex -space-x-1 ml-2">{connectedAccounts.slice(0, 4).map((a, i) => { const p = PLATFORMS.find(x => x.id === a.platform); return <span key={i} className="material-symbols-outlined text-base" title={p?.label}>{p?.icon || 'smartphone'}</span> })}</div>
                                     </div>
                                 )}
                                 {connectedAccounts.length === 0 && !accountsLoading && (
