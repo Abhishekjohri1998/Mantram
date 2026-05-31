@@ -35,7 +35,10 @@ function emitProgress(projectId, event) {
     if (!clients?.size) return;
     const data = JSON.stringify(event);
     clients.forEach(res => {
-        try { res.write(`data: ${data}\n\n`); } catch { }
+        try { 
+            res.write(`data: ${data}\n\n`); 
+            if (typeof res.flush === 'function') res.flush();
+        } catch { }
     });
 }
 
@@ -161,10 +164,14 @@ router.get('/:id/progress', protect, (req, res) => {
 
     // Send initial heartbeat
     res.write(`data: ${JSON.stringify({ type: 'connected', projectId: id })}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
 
     // Keepalive ping every 20s (prevents proxy timeout)
     const keepalive = setInterval(() => {
-        try { res.write(`: ping\n\n`); } catch { clearInterval(keepalive); }
+        try { 
+            res.write(`: ping\n\n`); 
+            if (typeof res.flush === 'function') res.flush();
+        } catch { clearInterval(keepalive); }
     }, 20_000);
 
     // Cleanup on disconnect
