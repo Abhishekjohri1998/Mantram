@@ -285,20 +285,16 @@ ${launchEvents?.length ? `- CRITICAL: The following dates are launch anchors —
 
 🚨 COPY & WRITING RULES (FOR HIGHLY HUMANIZED CONTENT):
 - Keep angle under 150 chars. Ensure the angle details a creative, high-impact scroll-stopping concept.
-- Allow captionDraft to be up to 400 characters. Captions must be engaging, humanized, conversational, and platform-native (use emojis pacing, an engaging hook, a natural storytelling tone, and a clear call-to-action). Avoid dry corporate copy or simple sales pitches.
+- Keep captionDraft concise (max 300 chars). Captions must be engaging, humanized, conversational, and platform-native (use emojis pacing, an engaging hook, a natural storytelling tone, and a clear call-to-action). Avoid dry corporate copy.
 - Relate content to the TRENDS and COMPETITOR GAPS found in <market_intelligence>. At least 30% of posts must actively tackle competitor gaps or hijack current industry trends/hooks.
 
 🚨 AESTHETIC VISUAL DIRECTION RULES (FOR PREMIUM VISUALS):
-- For visual platforms, visualDirection must be a highly descriptive, premium art-director prompt that visual generators (like NanoBanana 2 or Flux) can execute perfectly to create a stunning visual.
+- For visual platforms, visualDirection must be a highly descriptive, premium art-director prompt that visual generators (like NanoBanana 2 or Flux) can execute perfectly.
+- 🚨 TO AVOID TOKEN LIMITS: Be CONCISE! Keep visualDirection under 40 words per item. Combine the details into a dense, comma-separated list of keywords rather than long sentences.
 - DO NOT write generic descriptions like "A photo of the product".
-- Instruct the AI to structure the visualDirection as a direct camera/set layout:
-  1. Style/Aesthetic: Choose a modern, on-trend style (e.g., editorial lifestyle photography, moody studio setup, quiet luxury realism, tactile analog film style, raw editorial brutalism).
-  2. Lighting: Specify a hyper-specific lighting setup (e.g., dramatic high-contrast side-lighting casting long sharp shadows, soft diffused window light, warm golden hour rim light with cinematic ambient glow).
-  3. Backdrop & Set Props: Specify detailed premium materials, surfaces, and props (e.g., warm cream travertine blocks, wrinkled linen fabrics, textured concrete or raw clay platforms, green foliage, delicate water droplets, raw organic ingredients scattered).
-  4. Composition & Framing: Detail camera angle and rules of composition (e.g., macro close-up showing fine texture detail, rule-of-thirds asymmetric balance, clean negative space for copy overlays, direct overhead flat lay, low-angle hero shot).
-  5. Anti-AI-Slop constraints: Do NOT default to generic glossy gradient backgrounds, floating products with no context, or shiny plastic textures. Emphasize physical, tactile, and photorealistic qualities.
+- Instruct the AI to structure the visualDirection as a direct camera/set layout covering Style, Lighting, Backdrop, and Composition.
 - Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, decorativeElements, colors).
-- CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself. The product design, packaging, and colors must remain exactly as originally designed.
+- CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
 
 Return ONLY this JSON (no text before or after):
 {
@@ -353,7 +349,13 @@ function validateCalendar(calendar, startingDate, month, year) {
   const cutoffDate = startingDate ? `${year}-${String(month).padStart(2,'0')}-${String(startingDate).padStart(2,'0')}` : null;
 
   return (calendar || [])
-    .filter(item => item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+    .filter(item => item.date && /^\d{4}-\d{1,2}-\d{1,2}$/.test(item.date))
+    .map(item => {
+      // Auto-pad dates generated as YYYY-M-D to YYYY-MM-DD
+      const [y, m, d] = item.date.split('-');
+      item.date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      return item;
+    })
     .filter(item => {
       // Filter out any items before the starting date (past dates)
       if (cutoffDate && item.date < cutoffDate) return false;
