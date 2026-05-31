@@ -386,7 +386,8 @@ function extractImages(html) {
         withoutAlt: srcsMissingAlt.length, 
         srcsMissingAlt,
         missingDimensions: stability.missingDimensions,
-        missingLazy: stability.missingLazy
+        missingLazy: stability.missingLazy,
+        urls: imgs.map(i => i.src)
     };
 }
 
@@ -707,6 +708,15 @@ export async function crawlPage(url) {
         const jsonLd = extractJsonLd(html);
         const links = extractLinks(html, url);
         const images = extractImages(html);
+        if (images && images.urls && images.urls.length > 0) {
+            images.urls = images.urls.map(src => {
+                try {
+                    return new URL(src, url).href;
+                } catch {
+                    return src;
+                }
+            });
+        }
         const canonical = extractCanonical(html);
         const tech = detectTechSignals(html);
         const bodyText = getBodyText(html);

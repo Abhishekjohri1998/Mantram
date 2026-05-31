@@ -332,6 +332,7 @@ export async function brandIntelligenceNode(state) {
         brandImages: (dna.brandImages || []).slice(0, 5).map(img => img.url).filter(Boolean),
         matchedDnaImages,
         productCandidates,
+        competitorImages: dna.competitiveIntel?.competitorImages || [],
     };
 
     console.log(`🧠 Brand intel loaded in ${Date.now() - startMs}ms: ${intel.name} (${intel.industry}) — type: ${brandType}, products: ${products.length}, candidates: ${productCandidates.length}, brandImages: ${intel.brandImages.length}`);
@@ -1144,15 +1145,22 @@ export async function visualGroundingNode(state) {
         imagesToAnalyze.push(...mp.images.slice(0, 3));
     }
 
-    // Priority 2: Brand DNA images (for style grounding)
-    if (intel.matchedDnaImages?.length > 0 && imagesToAnalyze.length < 4) {
-        const remaining = 4 - imagesToAnalyze.length;
+    // Priority 2: Competitor style reference images
+    if (intel.competitorImages?.length > 0 && imagesToAnalyze.length < 5) {
+        const remaining = 5 - imagesToAnalyze.length;
+        const competitorSlice = intel.competitorImages.slice(0, Math.min(3, remaining));
+        imagesToAnalyze.push(...competitorSlice);
+    }
+
+    // Priority 3: Brand DNA images (for style grounding)
+    if (intel.matchedDnaImages?.length > 0 && imagesToAnalyze.length < 5) {
+        const remaining = 5 - imagesToAnalyze.length;
         imagesToAnalyze.push(...intel.matchedDnaImages.slice(0, remaining));
     }
 
-    // Priority 3: General brand images (fallback for brand aesthetic)
-    if (intel.brandImages?.length > 0 && imagesToAnalyze.length < 3) {
-        const remaining = 3 - imagesToAnalyze.length;
+    // Priority 4: General brand images (fallback for brand aesthetic)
+    if (intel.brandImages?.length > 0 && imagesToAnalyze.length < 5) {
+        const remaining = 5 - imagesToAnalyze.length;
         const nonDuplicates = intel.brandImages.filter(url => !imagesToAnalyze.includes(url));
         imagesToAnalyze.push(...nonDuplicates.slice(0, remaining));
     }
@@ -1171,7 +1179,7 @@ export async function visualGroundingNode(state) {
         `BRAND: ${intel.name || 'Unknown'}`,
         intel.industry ? `INDUSTRY: ${intel.industry}` : '',
         `\nAnalyze the ${imagesToAnalyze.length} provided image(s) and produce your visual rationale.`,
-        `These images show ${mp ? `the product "${mp.title}"` : 'the brand\'s visual identity'}.`,
+        `These images show ${mp ? `the product "${mp.title}"` : "the brand's visual identity"}, and/or competitor/industry visual style references.`,
     ].filter(Boolean).join('\n');
 
     const result = await agentUtils.callMultimodalAgent(

@@ -297,6 +297,10 @@ ${launchEvents?.length ? `- CRITICAL: The following dates are launch anchors —
   3. Backdrop & Set Props: Specify detailed premium materials, surfaces, and props (e.g., warm cream travertine blocks, wrinkled linen fabrics, textured concrete or raw clay platforms, green foliage, delicate water droplets, raw organic ingredients scattered).
   4. Composition & Framing: Detail camera angle and rules of composition (e.g., macro close-up showing fine texture detail, rule-of-thirds asymmetric balance, clean negative space for copy overlays, direct overhead flat lay, low-angle hero shot).
   5. Anti-AI-Slop constraints: Do NOT default to generic glossy gradient backgrounds, floating products with no context, or shiny plastic textures. Emphasize physical, tactile, and photorealistic qualities.
+- 🚨 MANDATE HUMAN CASTING & PRESENCE (40-50% OF VISUAL POSTS):
+  - At least 40% to 50% of visual posts on platforms like Instagram and Facebook MUST explicitly feature human presence to ensure authenticity and premium lifestyle connection.
+  - For these posts, direct the visual generator to cast humans matching the target audience demographics and geography from the brand DNA.
+  - Describe the humans naturally and realistically: use authentic actions and unposed candid settings (e.g. "hands holding the product organically", "candid shot of target audience wearing/using the product in a real-world active moment", "someone interacting naturally with the product in a lifestyle setting"). Avoid generic stock poses, forced smiles, or retouched model aesthetics.
 - Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, decorativeElements, colors).
 - CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself. The product design, packaging, and colors must remain exactly as originally designed.
 
