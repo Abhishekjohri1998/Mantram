@@ -564,10 +564,27 @@ export default function SocialMediaStudio() {
                     {calendarResult?.weeks?.map((week, wi) => (
                         <div key={wi} className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]"><h4 className="font-bold text-[var(--sys-text)] mb-1">Week {week.weekNumber}</h4><p className="text-xs text-primary mb-4">{week.theme}</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{week.posts?.map((post, pi) => { const pl = PLATFORMS.find(p => p.id === post.platform) || { icon:'smartphone' }; return (
-                                <div key={pi} className="p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all">
-                                    <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2"><span>{pl.icon}</span><span className="text-xs text-[var(--sys-text)] font-bold">{post.day}</span></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{post.type}</span></div>
-                                    <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed mb-2">{post.captionAngle}</p>
-                                    <div className="flex items-center justify-between"><span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>
+                                <div key={pi} className="p-3.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2"><span>{pl.icon}</span><span className="text-xs text-[var(--sys-text)] font-bold">{post.day}</span></div><span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text-muted)] capitalize">{post.type}</span></div>
+                                        <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed mb-3">{post.captionAngle}</p>
+                                        
+                                        {post.visualDirection && (
+                                            <div className="mt-2.5 pt-2.5 border-t border-[var(--sys-border)]/50">
+                                                <p className="text-[9px] text-[var(--sys-text-muted)] font-extrabold uppercase tracking-wider mb-1">Visual Direction</p>
+                                                <p className="text-[11px] text-[var(--sys-text-muted)]/90 italic leading-relaxed line-clamp-3" title={post.visualDirection}>🎨 {post.visualDirection}</p>
+                                            </div>
+                                        )}
+
+                                        {post.hashtags?.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2.5 mb-3">
+                                                {post.hashtags.map((tag, idx) => (
+                                                    <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--sys-surface)] text-primary border border-[var(--sys-border)] font-semibold">{tag}</span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--sys-border)]/20"><span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>
                                         <button onClick={() => { setPublishItem({ content: post.captionAngle, type: 'social' }); setIsPublishModalOpen(true) }} className="text-[10px] text-primary hover:underline cursor-pointer flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">send</span>Publish</button>
                                     </div>
                                 </div>

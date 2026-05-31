@@ -630,7 +630,12 @@ router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), r
         const { platforms, month, year, brand, themes, postsPerWeek } = req.body;
         if (!platforms?.length) return res.status(400).json({ success: false, error: 'Select at least one platform' });
 
-        const brandCtx = buildSocialContext(brand);
+        // Load full brand from DB for deep DNA access
+        const Brand = mongoose.model('Brand');
+        const fullBrand = (brand?._id || req.body.brandId) ? await Brand.findById(brand?._id || req.body.brandId).lean().catch(() => null) : null;
+        const brandToUse = fullBrand || brand;
+
+        const brandCtx = buildSocialContext(brandToUse);
         const targetMonth = month || new Date().getMonth() + 1;
         const targetYear = year || new Date().getFullYear();
         const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -641,10 +646,20 @@ router.post('/generate-calendar', protect, requireStudio('socialMediaStudio'), r
         const isCurrentMonth = today.getMonth() + 1 === targetMonth && today.getFullYear() === targetYear;
         const startingDate = isCurrentMonth ? today.getDate() : 1;
 
-        const systemPrompt = `You are a Social Media Content Calendar expert. Generate a detailed daily content calendar for ${monthName} ${targetYear}.
+        // Fetch smart calendar events for the target month to inject local cultural context & holidays
+        const dna = brandToUse?.dna || {};
+        const startDate = new Date(targetYear, targetMonth - 1, startingDate);
+        const smartCal = await generateSmartCalendar(dna.country, dna.targetMarkets, dna.industry, 'monthly', startDate).catch(() => null);
+        const eventContext = smartCal?.events?.length 
+            ? `\nUPCOMING CULTURAL EVENTS, AWARENESS DAYS & RETAIL WINDOWS:\n${smartCal.events.map(e => `- ${e.date}: ${e.name} (${e.type}) - Ideas: ${e.contentIdeas?.join(', ')}`).join('\n')}`
+            : '';
+
+        const systemPrompt = `You are a world-class Social Media Content Calendar expert, copywriter, and art director. Generate a detailed daily content calendar for ${monthName} ${targetYear}.
+Every single post must be highly creative, relatable, on-trend, and specifically tailored to the brand's unique identity. Generic placeholder content is NOT acceptable.
 
 BRAND CONTEXT:
 ${brandCtx}
+${eventContext}
 
 Platforms: ${platforms.join(', ')}
 Posts per week: ${postsPerWeek || 'recommend optimal'}
@@ -653,15 +668,22 @@ Content themes: ${themes || 'Use brand-appropriate themes'}
 Generate a calendar with specific post ideas for each day starting from ${monthName} ${startingDate}, ${targetYear} to the end of the month.
 🚨 CRITICAL RULE: DO NOT generate any posts or schedules for dates prior to ${monthName} ${startingDate}, ${targetYear}.
 
-Include:
-- Platform-specific post ideas
-- Content type (reel, carousel, story, post, thread, article)
-- Caption theme/hook (not full caption — just the angle)
-- Hashtag set (3-5 relevant hashtags per post)
-- Content pillar (educate, entertain, inspire, sell, community)
-- Best posting time
+🚨 COPY & WRITING RULES (FOR HIGHLY HUMANIZED CONTENT):
+- captionAngle MUST be a complete, highly humanized, scroll-stopping social media caption draft (up to 400 characters). 
+- Captions must be engaging, conversational, and platform-native (use natural emoji pacing, an engaging hook, a relatable storytelling tone, and a clear call-to-action). Avoid dry corporate copy, simple sales pitches, or placeholder summaries.
+- Relate content to the festivals, trending events, and competitor gaps identified in the context. At least 30% of posts must actively address competitor gaps or leverage upcoming cultural moments/sales events.
 
-Include relevant festivals, trending days, awareness days for the month.
+🚨 AESTHETIC VISUAL DIRECTION RULES (FOR PREMIUM VISUALS):
+- Generate a highly descriptive, premium art-director prompt in the "visualDirection" field that image generators (like NanoBanana 2 or Flux) can execute perfectly to create a stunning visual.
+- Specify:
+- Instruct the AI to structure the visualDirection as a direct camera/set layout:
+  1. Style/Aesthetic: Choose a modern, on-trend style (e.g., editorial lifestyle photography, moody studio setup, quiet luxury realism, tactile analog film style, raw editorial brutalism).
+  2. Lighting: Specify a hyper-specific lighting setup (e.g., dramatic high-contrast side-lighting casting long sharp shadows, soft diffused window light, warm golden hour rim light with cinematic ambient glow).
+  3. Backdrop & Set Props: Specify detailed premium materials, surfaces, and props (e.g., warm cream travertine blocks, wrinkled linen fabrics, textured concrete or raw clay platforms, green foliage, delicate water droplets, raw organic ingredients scattered).
+  4. Composition & Framing: Detail camera angle and rules of composition (e.g., macro close-up showing fine texture detail, rule-of-thirds asymmetric balance, clean negative space for copy overlays, direct overhead flat lay, low-angle hero shot).
+  5. Anti-AI-Slop constraints: Do NOT default to generic glossy gradient backgrounds, floating products with no context, or shiny plastic textures. Emphasize physical, tactile, and photorealistic qualities.
+- Incorporate the brand's Visual DNA rules (photographyStyle, layoutPreference, colors).
+- CRITICAL PRODUCT & COLOR FIDELITY: Brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself. The product design, packaging, and colors must remain exactly as originally designed.
 
 Respond in STRICT JSON:
 {
@@ -682,11 +704,12 @@ Respond in STRICT JSON:
           "platform": "instagram",
           "type": "reel",
           "pillar": "educate",
-          "captionAngle": "The hook or angle for this post",
+          "captionAngle": "The complete humanized caption draft with emojis, hooks, and CTA",
+          "visualDirection": "Detailed visual generation prompt (lighting, setup, props, composition)",
           "hashtags": ["#tag1", "#tag2", "#tag3"],
           "bestTime": "9:00 AM",
           "estimatedReach": "High / Medium / Low",
-          "notes": "Any special notes"
+          "notes": "Brief creative execution notes"
         }
       ]
     }
@@ -695,7 +718,7 @@ Respond in STRICT JSON:
   "contentMixSummary": { "reels": 8, "carousels": 5, "stories": 10, "posts": 4, "threads": 3 }
 }`;
 
-        const userPrompt = `Generate ${monthName} ${targetYear} content calendar for ${platforms.join(', ')} starting from ${monthName} ${startingDate}. ${themes ? `Themes: ${themes}` : ''}`;
+        const userPrompt = `Generate the ${monthName} ${targetYear} content calendar for ${platforms.join(', ')} starting from ${monthName} ${startingDate}. ${themes ? `Themes: ${themes}` : ''}`;
 
         const elapsed = Date.now() - (req.startTime || Date.now());
         const remainingBudget = Math.max(300000, 600000 - elapsed);

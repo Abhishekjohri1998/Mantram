@@ -412,7 +412,7 @@ PROMPT STRUCTURE: [canvas orientation + visual style], [hero subject + action], 
 
 Front-load the most important visual element in the first 8 words (that's 80% of the model's attention).
 COLOUR: describe by appearance — "deep forest green", "dusty rose". NEVER hex codes.
-QUALITY ANCHORS (end every prompt with): "professional commercial photography, ultra-sharp, award-winning, cinematic colour science"
+QUALITY ANCHORS (end every prompt with): "editorial lifestyle photography, natural 35mm film grain, raw tactile textures, authentic skin detail, candid unposed framing, soft directional shadows, atmospheric color grading, cinematic realism"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ROLE 3 — BRAND TYPOGRAPHER & COPYWRITER
@@ -462,8 +462,8 @@ RESPOND with valid JSON only — no markdown, no code fences, no explanatory tex
   "lightingDirection": "Hyper-specific: light source type, direction (e.g. 30° from camera-right), colour temperature (e.g. 5600K), shadow quality (hard/soft), any special light effect",
   "scrollStopFactor": "The ONE unexpected visual element that breaks the feed pattern and forces the viewer to pause",
   "primaryPrompt": "100-180 word image generation prompt — one flowing paragraph, front-loaded with canvas orientation + hero subject, ending with quality anchors",
-  "negativePrompt": "flat lighting, stock photo pose, floating product on plain gradient, centered product with no context, watermark, border, logo, brand name, text artifacts, hex codes, dimension labels, poor anatomy, extra limbs, blurry background, jpeg compression, generic AI aesthetic",
-  "styleModifiers": "professional commercial photography, ultra-sharp detail, award-winning composition, cinematic colour science, global colour grading",
+  "negativePrompt": "CGI, 3D render, plastic skin, smoothed skin, clinical studio lighting, centered floating product on plain gradient, watermark, border, logo, brand name, text artifacts, hex codes, dimension labels, poor anatomy, extra limbs, blurry background, jpeg compression, generic AI aesthetic",
+  "styleModifiers": "editorial lifestyle photography, 35mm film aesthetic, raw tactile texture, candid unposed gesture, natural ambient light, authentic skin detail, cinematic color science, soft negative space",
   "copyHeadline": ${textEnabled ? '"2-6 word headline derived from the brief — or null if image works without it"' : 'null'},
   "copySubtext": ${textEnabled ? '"Supporting phrase max 8 words — or null"' : 'null'},
   "copyCta": ${textEnabled ? '"2-4 word CTA button text (e.g. Shop Now) — or null if not action-oriented"' : 'null'},
@@ -534,7 +534,7 @@ WHAT SEPARATES GOOD FROM GREAT PROMPTS:
 ✓ PHYSICS GROUNDED: Describe how light actually interacts with materials
 ✓ ONE HERO: One clear focal point — not three competing subjects
 ✓ ENVIRONMENT SETS MOOD: A grey concrete wall reads differently than warm wooden planks
-✓ QUALITY ANCHORS AT END: "commercial fashion photography, Hasselblad H6D, ultra-sharp, award-winning"
+✓ QUALITY ANCHORS AT END: "editorial fashion photography, 35mm film grain, authentic skin detail, candid unposed framing, natural ambient light"
 
 RULES:
 1. FORMAT-FIRST: The first sentence MUST reference the canvas orientation — "vertical 9:16 reel composition", "horizontal 16:9 cinematic frame", "centered 1:1 square" — so the model commits to the right shape before painting anything else.
@@ -545,7 +545,7 @@ RULES:
 6. NEVER include brand names, logos, hex codes, font names, or metadata text. Logos are overlaid by post-process.
 7. Describe colours by visual: "deep forest green", "dusty rose", "electric cobalt".
 8. Include specific camera/lens hints for photorealistic styles: "85mm f/1.4, shallow depth of field, Hasselblad H6D".
-9. End with quality anchors: "professional commercial photography, award-winning composition, ultra-sharp detail, global colour grading, cinematic colour science".
+9. End with quality anchors: "editorial lifestyle photography, natural 35mm film grain, raw tactile textures, authentic skin detail, candid unposed framing, soft directional shadows, atmospheric color grading, cinematic realism".
 10. With REAL PRODUCT DATA, describe ONLY what the data says. Never invent features.
 11. If art direction includes a suggestedHeadline, add: 'Bold text reading "HEADLINE" in clean high-contrast lettering'.
 12. Integrate the DESIGN TREND from art direction into the prompt language.
@@ -555,7 +555,7 @@ RESPONSE FORMAT — valid JSON only:
 {
   "primaryPrompt": "The image prompt — one flowing paragraph, 100-180 words, purely visual",
   "negativePrompt": "flat lighting, stock photo pose, floating product, watermark, border, logo, brand name, typography, logo text, hex codes, color labels, dimension text, poor anatomy, extra fingers",
-  "styleModifiers": "Comma-separated quality tokens: award-winning commercial photography, Hasselblad medium format, ultra-sharp, global color grading, cinematic color science",
+  "styleModifiers": "Comma-separated quality tokens: editorial lifestyle photography, 35mm film aesthetic, raw tactile texture, candid unposed gesture, natural ambient light, authentic skin detail, cinematic color science, soft negative space",
   "engineeringNotes": "Brief rationale for key prompt choices and design trend applied"
 }`;
 
