@@ -21,30 +21,40 @@
  *   redis.isConnected()                  → boolean
  */
 
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 
-const REST_URL   = process.env.UPSTASH_REDIS_REST_URL;
-const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-const configured = !!(REST_URL && REST_TOKEN);
-
-// ── Build the Upstash REST client (only if configured) ────────────────────────
+// ── Build the TCP client ──────────────────────────────────────────────────
 let _client = null;
-if (configured) {
-    _client = new Redis({
-        url:   REST_URL,
-        token: REST_TOKEN,
+try {
+    const isTLS = REDIS_URL.startsWith('rediss://');
+    const opts = {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+        retryStrategy(times) {
+            if (times > 3) return null; // Fall back to cache misses
+            return Math.min(times * 500, 2000);
+        }
+    };
+    if (isTLS) opts.tls = { rejectUnauthorized: false };
+
+    _client = new Redis(REDIS_URL, opts);
+    
+    _client.on('error', (err) => {
+        console.warn('⚠️ Redis Connection Error:', err.message);
     });
-    console.log(`✅ Redis: Upstash REST client initialized (${REST_URL})`);
-} else {
-    console.warn('⚠️ Redis: UPSTASH_REDIS_REST_URL / TOKEN not set — running without cache');
+    
+    console.log(`✅ Redis: TCP client initialized (${REDIS_URL.split('@').pop()})`);
+} catch (e) {
+    console.warn('⚠️ Redis initialization failed:', e.message);
 }
 
 // ── Safe wrapper — every method is try/catch, never throws ───────────────────
 class SafeRedisClient {
 
     isConnected() {
-        return configured && _client !== null;
+        return _client !== null && _client.status === 'ready';
     }
 
     /**
@@ -53,11 +63,8 @@ class SafeRedisClient {
     async get(key) {
         if (!_client) return null;
         try {
-            // @upstash/redis returns parsed value directly (not raw string)
-            // For compatibility with legacy JSON.parse callers we return the raw string.
             const val = await _client.get(key);
             if (val === null || val === undefined) return null;
-            // If already an object/array (Upstash auto-parses JSON), re-stringify
             return typeof val === 'string' ? val : JSON.stringify(val);
         } catch (err) {
             console.warn(`⚠️ Redis.get("${key}"): ${err.message}`);

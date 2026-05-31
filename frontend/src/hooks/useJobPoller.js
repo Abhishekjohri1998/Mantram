@@ -12,7 +12,6 @@ import { jobs as jobsAPI } from '../services/api'
 import { useUI } from '../context/UIContext'
 import { useAuth } from '../context/AuthContext'
 
-const POLL_INTERVAL_MS = 5000
 const LS_KEY = (userId) => `mantram_active_jobs_${userId}`
 
 // ── Persistence helpers ──────────────────────────────────────────────────────
@@ -64,79 +63,94 @@ export function useJobPoller() {
         activeJobs.forEach(j => persistJob(user._id, j))
     }, [activeJobs, user?._id])
 
-    // ── Poll logic ──────────────────────────────────────────────────────────
-    const pollJob = useCallback(async (job) => {
-        if (polling.current.has(job.jobId)) return
-        polling.current.add(job.jobId)
-        try {
-            const data = await jobsAPI.status(job.jobId)
-            const j = data?.job
-            if (!j) return
+    // ── SSE Stream logic ────────────────────────────────────────────────────────
+    const streamsRef = useRef(new Map())
 
-            if (j.status === 'completed') {
-                removeActiveJob(job.jobId)
-                removePersistedJob(user?._id, job.jobId)
-                polling.current.delete(job.jobId)
-
-                // Optimistic in-memory notification (DB version fetched next poll)
-                const typeEmoji = j.type === 'monthly-strategy' ? '📅'
-                    : j.type === 'research' ? '🔬'
-                    : j.type === 'video'    ? '🎬'
-                    : '🎨'
-                addNotification({
-                    _id:   `optimistic_${j.jobId}`,
-                    type:  j.type,
-                    title: `${typeEmoji} ${j.type === 'monthly-strategy' ? 'Strategy' : j.type === 'research' ? 'Research' : j.type === 'video' ? 'Video' : 'Creative'} Ready`,
-                    body:  j.meta?.label || 'Your task has completed.',
-                    link:  j.meta?.page || '/',
-                    read:  false,
-                    createdAt: new Date().toISOString(),
-                    jobId: j.jobId,
-                })
-                // Sync notifications from server
-                setTimeout(() => fetchNotifications(), 1500)
-            }
-
-            if (j.status === 'failed') {
-                removeActiveJob(job.jobId)
-                removePersistedJob(user?._id, job.jobId)
-                polling.current.delete(job.jobId)
-                addNotification({
-                    _id:   `optimistic_fail_${j.jobId}`,
-                    type:  j.type,
-                    title: `⚠️ ${j.type === 'monthly-strategy' ? 'Strategy' : 'Task'} Failed`,
-                    body:  j.errorMessage || 'An error occurred.',
-                    link:  j.meta?.page || '/',
-                    read:  false,
-                    createdAt: new Date().toISOString(),
-                    jobId: j.jobId,
-                })
-                setTimeout(() => fetchNotifications(), 1500)
-            }
-
-            if (j.status === 'cancelled') {
-                removeActiveJob(job.jobId)
-                removePersistedJob(user?._id, job.jobId)
-                polling.current.delete(job.jobId)
-            }
-        } catch {
-            // Network error — keep polling
-        } finally {
-            polling.current.delete(job.jobId)
-        }
-    }, [user?._id, addNotification, removeActiveJob, fetchNotifications])
-
-    // ── Polling interval ────────────────────────────────────────────────────
     useEffect(() => {
-        if (pollRef.current) clearInterval(pollRef.current)
         if (!user?._id) return
 
-        pollRef.current = setInterval(() => {
-            activeJobs.forEach(job => pollJob(job))
-        }, POLL_INTERVAL_MS)
+        activeJobs.forEach(job => {
+            const jobId = job.jobId
+            if (streamsRef.current.has(jobId)) return
 
-        return () => clearInterval(pollRef.current)
-    }, [activeJobs, user?._id, pollJob])
+            const url = jobsAPI.getJobStreamUrl(jobId)
+            const source = new EventSource(url)
+            streamsRef.current.set(jobId, source)
+
+            source.onmessage = (event) => {
+                if (event.data === 'ping') return
+                try {
+                    const j = JSON.parse(event.data)
+                    if (j.error) {
+                        source.close()
+                        streamsRef.current.delete(jobId)
+                        removeActiveJob(jobId)
+                        removePersistedJob(user._id, jobId)
+                        return
+                    }
+
+                    if (j.status === 'completed') {
+                        source.close()
+                        streamsRef.current.delete(jobId)
+                        removeActiveJob(jobId)
+                        removePersistedJob(user._id, jobId)
+
+                        const typeEmoji = j.type === 'monthly-strategy' ? '📅'
+                            : j.type === 'research' ? '🔬'
+                            : j.type === 'video'    ? '🎬'
+                            : '🎨'
+                        addNotification({
+                            _id:   `optimistic_${j.jobId}`,
+                            type:  j.type,
+                            title: `${typeEmoji} ${j.type === 'monthly-strategy' ? 'Strategy' : j.type === 'research' ? 'Research' : j.type === 'video' ? 'Video' : 'Creative'} Ready`,
+                            body:  j.meta?.label || 'Your task has completed.',
+                            link:  j.meta?.page || '/',
+                            read:  false,
+                            createdAt: new Date().toISOString(),
+                            jobId: j.jobId,
+                        })
+                        setTimeout(() => fetchNotifications(), 1500)
+                    } else if (j.status === 'failed') {
+                        source.close()
+                        streamsRef.current.delete(jobId)
+                        removeActiveJob(jobId)
+                        removePersistedJob(user._id, jobId)
+
+                        addNotification({
+                            _id:   `optimistic_fail_${j.jobId}`,
+                            type:  j.type,
+                            title: `⚠️ ${j.type === 'monthly-strategy' ? 'Strategy' : 'Task'} Failed`,
+                            body:  j.errorMessage || 'An error occurred.',
+                            link:  j.meta?.page || '/',
+                            read:  false,
+                            createdAt: new Date().toISOString(),
+                            jobId: j.jobId,
+                        })
+                        setTimeout(() => fetchNotifications(), 1500)
+                    } else if (j.status === 'cancelled') {
+                        source.close()
+                        streamsRef.current.delete(jobId)
+                        removeActiveJob(jobId)
+                        removePersistedJob(user._id, jobId)
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+
+            source.onerror = () => {
+                // EventSource auto-reconnects, let it retry quietly.
+            }
+        })
+
+        // Cleanup streams for jobs that are no longer active
+        for (const [jobId, source] of streamsRef.current.entries()) {
+            if (!activeJobs.find(j => j.jobId === jobId)) {
+                source.close()
+                streamsRef.current.delete(jobId)
+            }
+        }
+    }, [activeJobs, user?._id, addNotification, removeActiveJob, fetchNotifications])
 
     // ── Expose helpers for call-sites ────────────────────────────────────────
     return {

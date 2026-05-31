@@ -250,7 +250,30 @@ router.post('/login', loginLimiter, async (req, res) => {
             });
         }
 
+        // ── SEC-002 (FIX-05): Per-account lockout check ──
+        // 10 failed attempts → 30 minute lock. This is IN ADDITION to the IP-based rate limiter.
+        const MAX_FAILED_ATTEMPTS = 10;
+        const LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+        if (user.security?.failedLoginAttempts >= MAX_FAILED_ATTEMPTS && user.security?.lastFailedLogin) {
+            const lockoutEnd = new Date(user.security.lastFailedLogin.getTime() + LOCKOUT_DURATION_MS);
+            if (new Date() < lockoutEnd) {
+                const minsRemaining = Math.ceil((lockoutEnd - new Date()) / 60000);
+                return res.status(429).json({
+                    success: false,
+                    error: `Account temporarily locked due to too many failed attempts. Try again in ${minsRemaining} minutes.`,
+                    code: 'ACCOUNT_LOCKED'
+                });
+            }
+            // Lockout expired — reset counter before proceeding
+            await User.findByIdAndUpdate(user._id, { $set: { 'security.failedLoginAttempts': 0 } });
+        }
+
         if (!(await user.matchPassword(password))) {
+            // Track failed attempt
+            await User.findByIdAndUpdate(user._id, {
+                $inc: { 'security.failedLoginAttempts': 1 },
+                $set: { 'security.lastFailedLogin': new Date() }
+            });
             return res.status(401).json({ success: false, error: 'Incorrect password. Please try again.' });
         }
 
@@ -273,10 +296,15 @@ router.post('/login', loginLimiter, async (req, res) => {
             });
         }
 
+        // Reset failed login counter on successful login
         user.lastActive = Date.now();
+        if (user.security?.failedLoginAttempts > 0) {
+            user.security.failedLoginAttempts = 0;
+        }
         await user.save();
 
-        const token = generateToken(user._id);
+        // SEC-002 (FIX-02): Pass tokenVersion to include in JWT
+        const token = generateToken(user._id, user.tokenVersion || 0);
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
         
         // Accurate brand count (Owned + Shared) - used for redirection logic
@@ -502,9 +530,10 @@ router.put('/change-password', protect, async (req, res) => {
 });
 
 // GET /api/auth/me
+// SEC-001: Explicit field whitelist — never spread the full user document
 router.get('/me', protect, async (req, res) => {
     try {
-        let user = await User.findById(req.user._id).lean();
+        let user = await User.findById(req.user._id);
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
         // Auto-generate userId for existing users who don't have one
@@ -517,20 +546,37 @@ router.get('/me', protect, async (req, res) => {
         const planDetails = await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean();
         
         // Accurate brand count (Owned + Shared)
-        const userId = user._id || user.id;
-        const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });
-        const sharedCount = await Brand.countDocuments({ sharedWith: userId, status: { $ne: 'archived' } });
+        const ownedCount = await Brand.countDocuments({ user: user._id, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: user._id, status: { $ne: 'archived' } });
         const brandCount = ownedCount + sharedCount;
 
-        res.json({ 
-            success: true, 
-            user: { 
-                ...user, 
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                plan: user.plan,
+                avatar: user.avatar || '',
+                company: user.company || '',
+                userId: user.userId,
+                teamRole: user.teamRole || '',
+                organization: user.organization || null,
+                credits: {
+                    total: user.credits?.total || 0,
+                    used: user.credits?.used || 0,
+                    remaining: user.creditsRemaining ?? 0,
+                },
+                streak: user.streak || 0,
+                preferences: user.preferences || {},
+                milestones: user.milestones || {},
+                usage: user.usage || {},
                 completedWalkthroughs: user.completedWalkthroughs || [],
-                planDetails, 
+                planDetails,
                 brandCount,
-                isTeamMember: ownedCount === 0 && sharedCount > 0 
-            } 
+                isTeamMember: ownedCount === 0 && sharedCount > 0,
+            }
         });
     } catch (error) {
         console.error('❌ /me Error:', error);
@@ -539,6 +585,7 @@ router.get('/me', protect, async (req, res) => {
 });
 
 // PUT /api/auth/profile
+// SEC-001: Return only whitelisted fields after profile update
 router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, res) => {
     try {
         const { name, company, avatar, preferences } = req.body;
@@ -547,7 +594,20 @@ router.put('/profile', protect, sanitizeBody(['name', 'company']), async (req, r
             { name, company, avatar, preferences },
             { returnDocument: 'after', runValidators: true }
         );
-        res.json({ success: true, user });
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                plan: user.plan,
+                avatar: user.avatar || '',
+                company: user.company || '',
+                userId: user.userId,
+                preferences: user.preferences || {},
+            }
+        });
     } catch (error) {
         console.error('❌ Profile Update Error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -812,7 +872,9 @@ router.get('/google/callback', async (req, res) => {
         }
 
         const stringId = userId.toString();
-        const token = generateToken(stringId);
+        // SEC-002: Fetch tokenVersion for Google OAuth logins too
+        const oauthUser = await User.findById(userId).select('tokenVersion');
+        const token = generateToken(stringId, oauthUser?.tokenVersion || 0);
 
         // Accurate brand count (Owned + Shared)
         const ownedCount = await Brand.countDocuments({ user: userId, status: { $ne: 'archived' } });

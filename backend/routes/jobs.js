@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/auth.js';
 import GenerationJob from '../models/GenerationJob.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
 
@@ -38,6 +39,55 @@ router.get('/:jobId', protect, async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
+});
+
+// ── GET /api/jobs/:jobId/stream ──────────────────────────────────────────────
+router.get('/:jobId/stream', protect, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const jobId = req.params.jobId;
+    const userId = req.user._id;
+
+    res.write(': ping\n\n');
+
+    let isClosed = false;
+    req.on('close', () => { isClosed = true; });
+
+    const pollInterval = setInterval(async () => {
+        if (isClosed) {
+            clearInterval(pollInterval);
+            return;
+        }
+        try {
+            const job = await GenerationJob.findOne({ jobId, user: userId })
+                .select('jobId status type progress errorMessage creativeId result warnings completedAt steps')
+                .lean();
+
+            if (!job) {
+                res.write(`data: ${JSON.stringify({ error: 'Job not found' })}\n\n`);
+                clearInterval(pollInterval);
+                res.end();
+                return;
+            }
+
+            if (job.result?.creative) {
+                job.result.creative.imageUrl = await getSignedUrlIfNeeded(job.result.creative.imageUrl);
+                job.result.creative.thumbnailUrl = await getSignedUrlIfNeeded(job.result.creative.thumbnailUrl);
+            }
+
+            res.write(`data: ${JSON.stringify(job)}\n\n`);
+
+            if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+                clearInterval(pollInterval);
+                res.end();
+            }
+        } catch (err) {
+            console.error(`❌ [SSE] Error polling job ${jobId}:`, err.message);
+        }
+    }, 2000);
 });
 
 // ── PATCH /api/jobs/:jobId/cancel ────────────────────────────────────────────

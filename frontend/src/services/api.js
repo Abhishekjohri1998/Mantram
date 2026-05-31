@@ -347,6 +347,11 @@ export const creatives = {
     // Returns jobId in ~100ms; pipeline runs server-side regardless of tab state
     createJob: (data) => apiFetch('/creatives/jobs', { method: 'POST', body: JSON.stringify(data) }),
     pollJob: (jobId) => apiFetch(`/creatives/jobs/${jobId}`),
+    getJobStreamUrl: (jobId) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        const baseUrl = API_BASE.replace('/api', '');
+        return `${API_BASE}/creatives/jobs/${jobId}/stream${token ? `?token=${token}` : ''}`;
+    },
     listJobs: () => apiFetch('/creatives/jobs'),
     cancelJob: (jobId) => apiFetch(`/creatives/jobs/${jobId}`, { method: 'DELETE' }),
     suggestCopy: (data) => apiFetch('/creatives/suggest-copy', { method: 'POST', body: JSON.stringify(data) }),
@@ -1525,6 +1530,11 @@ export const jobs = {
     active: () => apiFetch('/jobs/active'),
     // Poll a specific job by ID
     status: (jobId) => apiFetch(`/jobs/${jobId}`),
+    // Get SSE stream URL for job status
+    getJobStreamUrl: (jobId) => {
+        const token = localStorage.getItem('mantram_token') || '';
+        return `${API_BASE}/jobs/${jobId}/stream${token ? `?token=${token}` : ''}`;
+    },
     // Cancel a running job
     cancel: (jobId) => apiFetch(`/jobs/${jobId}/cancel`, { method: 'PATCH' }),
 };

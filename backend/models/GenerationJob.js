@@ -99,4 +99,17 @@ const GenerationJobSchema = new mongoose.Schema(
 GenerationJobSchema.index({ user: 1, createdAt: -1 });
 GenerationJobSchema.index({ user: 1, status: 1 });
 
+// ── SEC-001: Strip internal AI prompts and config from API responses ──
+GenerationJobSchema.set('toJSON', {
+    virtuals: true,
+    transform: (_doc, ret) => {
+        delete ret.__v;
+        delete ret.prompt;              // Raw AI prompt — trade secret / IP
+        delete ret.options;             // Internal provider config and routing
+        delete ret.photoshootPayload;   // Internal payload
+        delete ret.expiresAt;           // TTL field — internal
+        return ret;
+    }
+});
+
 export default mongoose.model('GenerationJob', GenerationJobSchema);

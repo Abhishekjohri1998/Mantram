@@ -24,16 +24,22 @@ export const keepAliveAgent = {
     })
 };
 
+import { Agent } from 'undici';
+
+export const keepAliveDispatcher = new Agent({
+    keepAliveTimeout: 30000,
+    keepAliveMaxTimeout: 60000,
+    connections: 64,
+    pipelining: 1,
+});
+
 /**
  * Global fetch options helper.
  * Provides a standardized way to pass agents to fetch.
- * NOTE: Native fetch (Node 18+) uses 'dispatcher' via undici.
- * If undici is unavailable, it is safest to skip the dispatcher.
  */
 export const fetchOptions = (opts = {}) => {
     return {
         ...opts,
-        // We avoid adding a 'dispatcher' here because it can cause crashes 
-        // in environments with incompatible undici/native-fetch builds.
+        dispatcher: keepAliveDispatcher,
     };
 };

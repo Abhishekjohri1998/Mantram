@@ -18,6 +18,7 @@ import fetch from 'node-fetch';
 import config from '../../config/env.js';
 import sharp from 'sharp';
 import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
+import { fetchOptions } from '../../utils/network.js';
 import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const ATLAS_INFERENCE_BASE  = 'https://api.atlascloud.ai/api/v1';
@@ -116,7 +117,7 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
 async function ensureAssetCompatible(imageUrl) {
     if (!imageUrl || !imageUrl.startsWith('http')) return imageUrl;
     try {
-        const res = await fetch(imageUrl);
+        const res = await fetch(imageUrl, fetchOptions({}));
         const buffer = Buffer.from(await res.arrayBuffer());
         const contentType = res.headers.get('content-type') || '';
         
@@ -161,7 +162,7 @@ async function uploadMediaToAtlasCDN(imageUrl) {
         console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${imageUrl.substring(0, 60)}...`);
         // Pre-process: ensure format + resolution are compatible before CDN upload
         const compatibleUrl = await ensureAssetCompatible(imageUrl);
-        const imageRes = await fetch(compatibleUrl);
+        const imageRes = await fetch(compatibleUrl, fetchOptions({}));
         const arrayBuffer = await imageRes.arrayBuffer();
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         
@@ -190,11 +191,11 @@ async function uploadMediaToAtlasCDN(imageUrl) {
         const formData = new FormData();
         formData.append('file', new Blob([finalBuffer], { type: finalType }), `media.${extension}`);
 
-        const res = await fetch(`${ATLAS_INFERENCE_BASE}/model/uploadMedia`, {
+        const res = await fetch(`${ATLAS_INFERENCE_BASE}/model/uploadMedia`, fetchOptions({
             method: 'POST',
             headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` },
             body: formData,
-        });
+        }));
         const json = await res.json();
         const finalUrl = json?.data?.download_url || json?.data?.url || json?.url;
         if (!finalUrl) {
@@ -221,11 +222,11 @@ async function uploadFaceAsset(imageUrl, name = 'face_ref') {
         // Pre-process: convert unsupported formats + ensure min 300x300 resolution
         const compatibleUrl = await ensureAssetCompatible(imageUrl);
         console.log(`👤 [Atlas Asset] Registering face asset: ${compatibleUrl.substring(0, 80)}...`);
-        const res = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets`, {
+        const res = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets`, fetchOptions({
             method: 'POST',
             headers: authHeaders(),
             body: JSON.stringify({ url: compatibleUrl, name }),
-        });
+        }));
         const json = await res.json();
         const assetId       = json?.data?.id || json?.id;
         const atlasAssetId  = json?.data?.atlas_asset_id || json?.atlas_asset_id;
@@ -249,7 +250,7 @@ async function pollFaceAssetUntilActive(assetId, atlasAssetId, maxWaitMs = 60000
 
     while (Date.now() - start < maxWaitMs) {
         try {
-            const res  = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets/${assetId}`, { headers: authHeaders() });
+            const res  = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets/${assetId}`, fetchOptions({ headers: authHeaders() }));
             const json = await res.json();
             const status       = json?.data?.status || json?.status || '';
             const latestAssetId = json?.data?.atlas_asset_id || atlasAssetId;
@@ -396,12 +397,12 @@ async function submitAtlasCloudPayload(payload) {
         console.log(`📝 [Atlas] Prompt (first 100): ${(atlasPayload.prompt || '').substring(0, 100)}...`);
 
         try {
-            const response = await fetch(`${ATLAS_INFERENCE_BASE}/model/generateVideo`, {
+            const response = await fetch(`${ATLAS_INFERENCE_BASE}/model/generateVideo`, fetchOptions({
                 method:  'POST',
                 headers: authHeaders(),
                 body:    JSON.stringify(atlasPayload),
                 signal:  AbortSignal.timeout(30000),
-            });
+            }));
 
             const rawText = await response.text();
             console.log(`📥 [Atlas] Response ${response.status}:`, rawText.substring(0, 400));
@@ -923,7 +924,7 @@ export async function getAtlasCloudGenerationStatus(taskId) {
     const statusUrl = `${ATLAS_INFERENCE_BASE}/model/prediction/${taskId}`;
     console.log(`📊 [Atlas Status] Polling: ${statusUrl}`);
 
-    const response  = await fetch(statusUrl, { headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` } });
+    const response  = await fetch(statusUrl, fetchOptions({ headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` } }));
     const rawText   = await response.text();
     console.log(`📊 [Atlas] Status raw for ${taskId}: ${rawText.substring(0, 300)}`);
 

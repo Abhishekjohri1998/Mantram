@@ -87,4 +87,20 @@ integrationSchema.index({ user: 1, brand: 1, platform: 1 }); // Removed unique c
 integrationSchema.index({ brand: 1, platform: 1 });
 integrationSchema.index({ 'platformData.shopDomain': 1, platform: 1 });
 
+// ── SEC-001: Strip OAuth tokens and platform secrets — defense-in-depth ──
+integrationSchema.set('toJSON', {
+    virtuals: true,
+    transform: (_doc, ret) => {
+        delete ret.accessToken;
+        delete ret.refreshToken;
+        delete ret.__v;
+        if (ret.platformData) {
+            delete ret.platformData.pageAccessToken;
+            delete ret.platformData.wooConsumerKey;
+            delete ret.platformData.wooConsumerSecret;
+        }
+        return ret;
+    }
+});
+
 export default mongoose.model('Integration', integrationSchema);

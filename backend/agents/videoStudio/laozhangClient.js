@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import config from "../../config/env.js";
 import { ensureS3Url } from '../../utils/s3.js';
+import { fetchOptions } from '../../utils/network.js';
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
@@ -111,7 +112,7 @@ export async function submitLaozhangVideoGeneration({
 
     let response;
     try {
-        response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, {
+        response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, fetchOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -122,7 +123,7 @@ export async function submitLaozhangVideoGeneration({
                 messages: [{ role: 'user', content: messageContent }],
             }),
             signal: AbortSignal.timeout(timeoutMs),
-        });
+        }));
     } catch (fetchErr) {
         // AbortError = timeout
         if (fetchErr.name === 'AbortError' || fetchErr.name === 'TimeoutError') {
@@ -217,12 +218,12 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
-    const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, {
+    const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
         signal: AbortSignal.timeout(timeoutMs),
-    });
+        }));
 
     if (!response.ok) {
         const errText = await response.text();
@@ -266,9 +267,9 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         if (url.startsWith('http')) {
             try {
                 console.log(`📥 [LaoZhang] Pre-fetching image URL to avoid CDN blocks: ${url.substring(0, 80)}...`);
-                const r = await fetch(url, {
+                const r = await fetch(url, fetchOptions({
                     headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
-                });
+                }));
                 if (r.ok) {
                     const mimeType = r.headers.get('content-type') || 'image/jpeg';
                     if (!mimeType.includes('text/html')) {
@@ -290,12 +291,12 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
     const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
     contentParts.push({ type: 'text', text: prompt + arInstruction });
 
-    const response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, fetchOptions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
         signal: AbortSignal.timeout(timeoutMs),
-    });
+        }));
 
     if (!response.ok) {
         const errText = await response.text();

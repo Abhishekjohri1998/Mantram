@@ -705,7 +705,15 @@ router.post('/users/:id/impersonate', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot impersonate super admin' });
         
-        const token = generateToken(user._id);
+        // SEC-002 (FIX-20): Short-lived impersonation token (1 hour, not 24h)
+        // Includes 'imp' claim to distinguish from normal login tokens.
+        const jwt = await import('jsonwebtoken');
+        const config = (await import('../config/env.js')).default;
+        const token = jwt.default.sign(
+            { id: user._id, v: user.tokenVersion || 0, imp: true, impBy: req.user._id },
+            config.jwtSecret,
+            { expiresIn: '1h' }
+        );
 
         await logAudit(req, {
             action: 'IMPERSONATE_USER',

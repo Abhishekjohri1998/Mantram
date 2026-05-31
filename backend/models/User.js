@@ -133,6 +133,15 @@ const userSchema = new mongoose.Schema({
 
     // Persistence: track which onboarding walkthroughs have been completed
     completedWalkthroughs: { type: [String], default: [] },
+
+    // SEC-002: Token version — incremented on password change to invalidate existing JWTs
+    tokenVersion: { type: Number, default: 0 },
+
+    // SEC-002: Security tracking — per-account failed login lockout
+    security: {
+        failedLoginAttempts: { type: Number, default: 0 },
+        lastFailedLogin: { type: Date },
+    },
 }, { timestamps: true });
 
 // Virtual: remaining credits (includes non-expired top-up)
@@ -143,7 +152,44 @@ userSchema.virtual('creditsRemaining').get(function () {
     return Math.max(0, (this.credits.total + this.credits.bonus + topUp) - this.credits.used);
 });
 
-userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toJSON', {
+    virtuals: true,
+    transform: (_doc, ret) => {
+        // ── SEC-001: Strip sensitive / internal-only fields from ALL API responses ──
+        // These fields must never reach the client, regardless of which endpoint returns the user.
+        delete ret.password;
+        delete ret.verificationToken;
+        delete ret.verificationExpires;
+        delete ret.resetPasswordToken;
+        delete ret.resetPasswordExpires;
+        delete ret.referralCode;
+        delete ret.referredBy;
+        delete ret.referralCount;
+        delete ret.queueNumber;
+        delete ret.approvalStatus;
+        delete ret.studioAccess;
+        delete ret.brandAccess;
+        delete ret.activeSkills;
+        delete ret.activeSubscription;
+        delete ret.isGoogleUser;
+        delete ret.lastActive;
+        delete ret.__v;
+        // Sanitize credits — only expose what the user needs to see
+        if (ret.credits) {
+            const total = ret.credits.total || 0;
+            const used = ret.credits.used || 0;
+            const bonus = ret.credits.bonus || 0;
+            const topUp = (ret.credits.topUp > 0 && ret.credits.topUpExpiry && new Date(ret.credits.topUpExpiry) > new Date())
+                ? ret.credits.topUp : 0;
+            ret.credits = {
+                total,
+                used,
+                remaining: Math.max(0, (total + bonus + topUp) - used),
+            };
+        }
+        return ret;
+    }
+});
 
 // Normalize email before save (safety net — catches all code paths)
 userSchema.pre('save', function () {
@@ -156,6 +202,11 @@ userSchema.pre('save', function () {
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return;
     this.password = await bcrypt.hash(this.password, 12);
+    // SEC-002 (FIX-03): Increment tokenVersion on password change
+    // This invalidates ALL existing JWTs for this user.
+    if (!this.isNew) {
+        this.tokenVersion = (this.tokenVersion || 0) + 1;
+    }
 });
 
 // Compare password

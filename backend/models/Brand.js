@@ -286,4 +286,20 @@ brandSchema.index({ 'sharedWith': 1 });
 // PERF-015: Compound index for sorted brand listing (covers the common query pattern)
 brandSchema.index({ user: 1, status: 1, updatedAt: -1 });
 
+// ── SEC-001: Strip internal-only fields from API responses ──
+brandSchema.set('toJSON', {
+    virtuals: true,
+    transform: (_doc, ret) => {
+        delete ret.__v;
+        delete ret.rawScanData;        // Raw HTML/scan data — large, internal only
+        delete ret.aiContext;           // Internal AI prompts and learnings — trade secret
+        delete ret.sharedWith;          // ObjectID array of other users — privacy
+        // Strip internal metadata timestamps from intelligence sections
+        if (ret.dna?.competitiveIntel) delete ret.dna.competitiveIntel.lastAnalyzedAt;
+        if (ret.dna?.publicSentiment) delete ret.dna.publicSentiment.lastAnalyzedAt;
+        if (ret.dna?.visualDNA) delete ret.dna.visualDNA.lastAnalyzedAt;
+        return ret;
+    }
+});
+
 export default mongoose.model('Brand', brandSchema);

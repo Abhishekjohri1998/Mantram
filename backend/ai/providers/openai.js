@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { fetchOptions } from '../../utils/network.js';
 
 /**
  * OpenAI Provider — GPT-4o / GPT-4o-mini + GPT Image 2 + gpt-4o Vision
@@ -39,7 +40,7 @@ export class OpenAIProvider extends BaseProvider {
         }
 
         const startTime = Date.now();
-        const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        const response = await fetch(`${this.baseUrl}/chat/completions`, fetchOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -54,7 +55,7 @@ export class OpenAIProvider extends BaseProvider {
                 temperature,
                 max_tokens: maxTokens,
             }),
-        });
+        }));
 
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
@@ -149,14 +150,14 @@ export class OpenAIProvider extends BaseProvider {
             body.quality = quality || 'high';
         }
 
-        const response = await fetch(`${this.baseUrl}/images/generations`, {
+        const response = await fetch(`${this.baseUrl}/images/generations`, fetchOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.apiKey}`,
             },
             body: JSON.stringify(body),
-        });
+        }));
 
         const data = await response.json();
         if (!response.ok || data.error) {
@@ -222,11 +223,11 @@ export class OpenAIProvider extends BaseProvider {
         if (!editApiKey) throw new Error('No API key for image edit — set LAOZHANG_API_KEY or OPENAI_API_KEY');
         console.log(`   📡 Sending to: ${editBaseUrl}/images/edits (${this.lzApiKey ? 'LaoZhang' : 'Direct OpenAI'})`);
 
-        const response = await fetch(`${editBaseUrl}/images/edits`, {
+        const response = await fetch(`${editBaseUrl}/images/edits`, fetchOptions({
             method: 'POST',
             headers: { 'Authorization': `Bearer ${editApiKey}` },
             body: formData,
-        });
+        }));
 
         const data = await response.json();
         if (!response.ok || data.error) {

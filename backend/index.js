@@ -16,10 +16,9 @@ import integrationsRoutes from './routes/integrations.js';
 import brandRoutes from './routes/brands.js';
 import contentRoutes from './routes/content.js';
 import creativeRoutes from './routes/creatives.js';
-// ⚡ Bull Queue REMOVED — it was burning ~500K Redis requests/month on Upstash
-// while idle (3 ioredis TCP connections spam BRPOP/PING/SUBSCRIBE continuously).
-// Creative generation already uses setImmediate() in creatives.js (line 88).
-// import { initCreativeWorker } from './utils/creativeQueue.js';
+// Bull Queue Enabled
+import { initCreativeWorker } from './utils/creativeQueue.js';
+import { internalGenerateCreative } from './routes/creatives.js';
 import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agents.js';
 import shopifyRoutes from './routes/shopify.js';
@@ -311,9 +310,11 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
-    // ⚡ Bull Queue worker REMOVED — was burning Upstash quota with idle TCP connections.
-    // Creative generation runs via setImmediate() in creatives.js (line 88).
+    // Pre-warm the credit costs cache
+    import('./middleware/credits.js').then(({ getCreditCosts }) => getCreditCosts()).catch(() => {});
 
+    // Init Bull Queue worker
+    initCreativeWorker(internalGenerateCreative);
     // Warm up MCP Registry — just connect, don't fire a real API call
     import('./mcp/registry.js').then(({ getMcpToolSchemas }) => {
         setTimeout(() => {
@@ -457,6 +458,12 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// ── SEC-001: RESPONSE SANITIZER ──────────────────────────────
+// Strips security-critical fields (passwords, tokens, __v) from ALL JSON responses.
+// Defense-in-depth — catches anything Mongoose toJSON transforms miss (.lean() queries, etc.)
+import { responseSanitizer } from './middleware/responseSanitizer.js';
+app.use(responseSanitizer);
 
 // Request logging in dev
 if (config.nodeEnv === 'development') {
