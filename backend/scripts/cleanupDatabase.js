@@ -11,16 +11,14 @@ import AuditLog from '../models/AuditLog.js';
 import BrandAuditLog from '../models/BrandAuditLog.js';
 import CreditUsage from '../models/CreditUsage.js';
 
-import connectDB from '../config/db.js';
-
 async function cleanup() {
     try {
         console.log('🔄 Connecting to MongoDB for cleanup...');
-        const conn = await connectDB();
-        if (!conn) {
-            console.warn('⚠️ Could not connect to DB for cleanup. Skipping.');
-            process.exit(0);
-        }
+        await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 15000,
+            connectTimeoutMS: 10000,
+        });
         console.log('✅ Connected.');
 
         const now = new Date();
