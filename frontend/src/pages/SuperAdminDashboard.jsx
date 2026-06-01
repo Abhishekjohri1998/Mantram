@@ -542,21 +542,19 @@ export default function SuperAdminDashboard() {
                                                     {statusBadge}
                                                 </p>
                                             </div>
-                                            {!isHidden && (
-                                                <div className="flex gap-1">
-                                                    <button onClick={() => handleUserStudioOverride(key, true)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
-                                                    >Grant</button>
-                                                    <button onClick={() => handleUserStudioOverride(key, false)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
-                                                    >Revoke</button>
-                                                    {hasOverride && (
-                                                        <button onClick={() => handleUserStudioOverride(key, null)}
-                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary border border-transparent"
-                                                        >Reset</button>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="flex gap-1">
+                                                <button onClick={() => handleUserStudioOverride(key, true)}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
+                                                >Grant</button>
+                                                <button onClick={() => handleUserStudioOverride(key, false)}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
+                                                >Revoke</button>
+                                                {hasOverride && (
+                                                    <button onClick={() => handleUserStudioOverride(key, null)}
+                                                        className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary border border-transparent"
+                                                    >Reset</button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
