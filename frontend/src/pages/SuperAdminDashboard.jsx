@@ -265,7 +265,7 @@ export default function SuperAdminDashboard() {
         if (!userStudioModal) return
         const userId = userStudioModal.userId
         try {
-            const d = await API.updateUserStudioAccess(userId, { [key]: val })
+            const d = await API.updateUserStudioAccess(userId, { overrides: { [key]: val } })
             setUserStudioModal(prev => ({ ...prev, resolvedAccess: d.resolvedAccess, userOverrides: { ...prev.userOverrides, [key]: val } }))
             showToast(`${studioLabels[key] || key} → ${val === true ? 'granted' : val === false ? 'revoked' : 'reset'}`)
             loadStudioOverrides()
