@@ -3337,7 +3337,6 @@ export default function SuperAdminDashboard() {
                         {/* Legend */}
                         <div className="flex gap-6 mb-5 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Public</b> — visible to everyone (per plan)</span></div>
-                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Private</b> — whitelisted users only</span></div>
                             <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Hidden</b> — off for everyone</span></div>
                         </div>
 
@@ -3346,11 +3345,10 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-2 mb-8">
                                 {studioKeys.map(key => {
                                     const status = studioVisibility[key] || 'public';
-                                    const rowBorder = { public: 'border-[var(--sys-border)]', private: 'border-[var(--sys-border)]', hidden: 'border-[var(--sys-border)]' };
-                                    const dotColor = { public: 'bg-[var(--sys-surface)]', private: 'bg-[var(--sys-surface)]', hidden: 'bg-[var(--sys-surface)]' };
+                                    const rowBorder = { public: 'border-[var(--sys-border)]', hidden: 'border-[var(--sys-border)]' };
+                                    const dotColor = { public: 'bg-[var(--sys-surface)]', hidden: 'bg-[var(--sys-surface)]' };
                                     const activeClasses = {
                                         public: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
-                                        private: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
                                         hidden: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
                                     };
                                     return (
@@ -3361,7 +3359,7 @@ export default function SuperAdminDashboard() {
                                                 <span className="text-[10px] text-[var(--sys-text-muted)] font-mono bg-[var(--sys-surface)] px-2 py-0.5 rounded">{key}</span>
                                             </div>
                                             <div className="flex gap-1.5">
-                                                {['public', 'private', 'hidden'].map(state => (
+                                                {['public', 'hidden'].map(state => (
                                                     <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
                                                         className={`px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
                                                             ? activeClasses[state]
