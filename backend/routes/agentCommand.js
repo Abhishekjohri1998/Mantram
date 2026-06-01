@@ -368,7 +368,7 @@ RESPONSE FORMAT — respond in STRICT JSON:
                             'Authorization': `Bearer ${internalToken}`,
                         },
                         body: JSON.stringify({
-                            model: 'seedance-2.0',
+                            model: 'kling-v2-master',
                             prompt: parsed.data.prompt,
                             duration: parsed.data.duration || 5,
                             aspectRatio: parsed.data.aspectRatio || "16:9",
