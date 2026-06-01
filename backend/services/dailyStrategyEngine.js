@@ -7,8 +7,7 @@ import { loadBrandContext, callAgent } from '../agents/shared/agentUtils.js';
 import { submitVideoGeneration } from '../agents/videoStudio/falClient.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } from '../agents/videoStudio/promptEnhancer.js';
 import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
-// To trigger auto-publishing:
-import { schedulePost } from './scheduledPostPublisher.js';
+
 
 export async function runDailyStrategyEngine() {
     console.log(`[DailyStrategyEngine] Waking up at ${new Date().toISOString()}`);
