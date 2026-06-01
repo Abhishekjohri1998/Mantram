@@ -12,8 +12,8 @@ const connectDB = async (attempt = 1) => {
             socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
             connectTimeoutMS: 30000,           // 30s initial connect
             heartbeatFrequencyMS: 10000,       // heartbeat every 10s to keep alive
-            maxPoolSize: 15,                   // Lowered for M0 Free Tier (limit 500 connections)
-            minPoolSize: 2,                    // keep fewer connections warm
+            maxPoolSize: process.env.SEED_MODE === 'true' ? 2 : 15,
+            minPoolSize: process.env.SEED_MODE === 'true' ? 1 : 2,
             maxIdleTimeMS: 30000,              // close idle connections faster (30s)
             readPreference: 'secondaryPreferred', // Phase 5: Offload reads to replicas
             w: 'majority',                      // Phase 5: Ensure data consistency across replicas
