@@ -119,8 +119,9 @@ Instructions:
                         // Draft for manual video generation
                         const calendarItem = {
                             date: new Date(),
+                            contentType: 'reel',
                             targetStudio: 'video',
-                            status: 'draft',
+                            status: 'pending',
                             brief: {
                                 angle: post.title,
                                 captionDraft: post.caption,
@@ -147,13 +148,14 @@ Instructions:
                         const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
 
                         const router = getRouter();
-                        const result = await router.generateImage({ prompt: finalPrompt, size: '1024x1024' });
+                        const result = await router.generateImage({ prompt: finalPrompt, aspectRatio: '1:1' });
                         const finalImageUrl = await persistToS3(result.imageUrl, 'daily-strategy');
                         
                         const calendarItem = {
                             date: new Date(),
+                            contentType: 'static',
                             targetStudio: 'creative',
-                            status: 'draft', // user wants it in draft state first
+                            status: 'pending', // user wants it in draft state first, 'pending' is valid enum
                             brief: {
                                 angle: post.title,
                                 captionDraft: post.caption,
