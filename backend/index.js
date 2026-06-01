@@ -397,6 +397,17 @@ connectDB().then(() => {
         startVideoArchivalSweep();
     }).catch(err => console.error('❌ Failed to load videoArchivalSweep.js:', err));
 
+    // Start autonomous daily strategy engine for trends and auto-publishing
+    import('./services/dailyStrategyEngine.js').then(({ runDailyStrategyEngine }) => {
+        // Run immediately on boot to catch up
+        setTimeout(() => runDailyStrategyEngine().catch(err => console.warn('⚠️ Initial Daily Strategy run failed:', err)), 30000);
+        // Then run every 6 hours
+        setInterval(() => {
+            runDailyStrategyEngine().catch(err => console.warn('⚠️ Scheduled Daily Strategy run failed:', err));
+        }, 6 * 60 * 60 * 1000);
+        console.log('📈 Daily Strategy Engine active');
+    }).catch(err => console.error('❌ Failed to load dailyStrategyEngine.js:', err));
+
 }).catch(err => {
     console.error('❌ Critical failure during background agent initialization:', err.message);
 });
