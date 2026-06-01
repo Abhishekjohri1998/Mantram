@@ -9,27 +9,33 @@ import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } from '../agents/vide
 import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
 
 
-export async function runDailyStrategyEngine() {
-    console.log(`[DailyStrategyEngine] Waking up at ${new Date().toISOString()}`);
+export async function runDailyStrategyEngine(targetStrategyId = null, pushStepFn = null) {
+    console.log(`[DailyStrategyEngine] Waking up at ${new Date().toISOString()}${targetStrategyId ? ` for strategy ${targetStrategyId}` : ''}`);
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find active campaigns that haven't run today and haven't expired
-    const activeStrategies = await MonthlyStrategy.find({
+    const query = {
         campaignStatus: 'active',
         endDate: { $gte: new Date() },
         $or: [
             { lastRunDate: { $lt: today } },
             { lastRunDate: { $exists: false } }
         ]
-    }).populate('user brand');
+    };
+    if (targetStrategyId) {
+        query._id = targetStrategyId;
+    }
+
+    // Find active campaigns that haven't run today and haven't expired
+    const activeStrategies = await MonthlyStrategy.find(query).populate('user brand');
 
     console.log(`[DailyStrategyEngine] Found ${activeStrategies.length} active campaigns to process.`);
 
     for (const strategy of activeStrategies) {
         try {
             console.log(`[DailyStrategyEngine] Processing brand: ${strategy.brand.name}`);
+            if (pushStepFn) await pushStepFn(`Analyzing live trends for ${strategy.brand.name}...`);
             
             // 1. Fetch live trends
             const trends = await getTrendingTopics(strategy.brand.dna?.industry || 'general');
@@ -37,6 +43,7 @@ export async function runDailyStrategyEngine() {
             
             // 2. Load Brand Context
             const { brandContext } = await loadBrandContext(strategy.brand._id);
+            if (pushStepFn) await pushStepFn(`Crafting viral strategies with AI...`);
             
             // 3. Formulate prompts and hooks using Gemini 1.5 Pro
             const systemPrompt = `You are a world-class, viral social media strategist. 
@@ -63,20 +70,24 @@ Instructions:
             const aiResponse = await callAgent(systemPrompt, 'Generate the 3 viral posts for today.', 0.7, 4000);
             
             let postsToCreate = [];
-            try {
-                // Parse JSON array from markdown response
-                const cleanJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-                postsToCreate = JSON.parse(cleanJson);
-            } catch (e) {
-                console.error(`[DailyStrategyEngine] Failed to parse AI response for ${strategy.brand.name}:`, e);
+            if (aiResponse && aiResponse.error) {
+                console.error(`[DailyStrategyEngine] Agent error for ${strategy.brand.name}:`, aiResponse.error);
+                continue;
+            } else if (Array.isArray(aiResponse)) {
+                postsToCreate = aiResponse;
+            } else if (aiResponse && Array.isArray(aiResponse.posts)) {
+                postsToCreate = aiResponse.posts;
+            } else {
+                console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}:`, typeof aiResponse);
                 continue;
             }
 
-            console.log(`[DailyStrategyEngine] Generated ${postsToCreate.length} post concepts for ${strategy.brand.name}. Proceeding to asset generation.`);
+            if (pushStepFn) await pushStepFn(`Generated ${postsToCreate.length} ideas. Submitting to Creative Studio...`);
 
             // 4. Generate assets & Schedule
             for (const post of postsToCreate.slice(0, 4)) {
                 console.log(`[DailyStrategyEngine] Generating asset for: ${post.title}`);
+                if (pushStepFn) await pushStepFn(`Drafting asset: ${post.title}`);
                 
                 let assetUrl = '';
                 try {

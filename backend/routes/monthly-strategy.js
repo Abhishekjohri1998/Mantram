@@ -667,10 +667,16 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         userBrief: sanitized.userBrief || '',
       });
 
-      // ── Trigger immediate run for today ──
-      import('../services/dailyStrategyEngine.js').then(({ runDailyStrategyEngine }) => {
-          runDailyStrategyEngine().catch(e => console.error('Immediate Daily run failed', e));
-      });
+      // ── Trigger immediate run for today (Wait for Day 1 posts to generate) ──
+      try {
+          const { runDailyStrategyEngine } = await import('../services/dailyStrategyEngine.js');
+          await runDailyStrategyEngine(doc._id, async (msg) => {
+              await pushStep(msg, 'working', { tool: 'generate' });
+          });
+      } catch (e) {
+          console.error('Immediate Daily run failed', e);
+      }
+      
       // ── Mark completed ──
       await GenerationJob.updateOne(
         { jobId },
