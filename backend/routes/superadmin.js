@@ -567,6 +567,27 @@ router.get('/users', async (req, res) => {
 
 
 // Get single user with full details
+/**
+ * GET /api/superadmin/users/studio-overrides
+ * Fetch all users who have active per-user studio overrides
+ */
+router.get('/users/studio-overrides', async (req, res) => {
+    try {
+        const conditions = STUDIO_KEYS.map(key => ({
+            [`studioAccess.${key}`]: { $in: [true, false] }
+        }));
+        
+        const users = await User.find({ $or: conditions })
+            .select('name email plan studioAccess')
+            .lean();
+            
+        res.json({ success: true, overrides: users });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
 router.get('/users/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password').populate('activeSubscription');
@@ -4115,26 +4136,6 @@ router.put('/users/:id/studio-access', async (req, res) => {
         });
 
         res.json({ success: true, message: `Studio access updated for ${user.name}`, resolvedAccess: access });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-/**
- * GET /api/superadmin/users/studio-overrides
- * Fetch all users who have active per-user studio overrides
- */
-router.get('/users/studio-overrides', async (req, res) => {
-    try {
-        const conditions = STUDIO_KEYS.map(key => ({
-            [`studioAccess.${key}`]: { $in: [true, false] }
-        }));
-        
-        const users = await User.find({ $or: conditions })
-            .select('name email plan studioAccess')
-            .lean();
-            
-        res.json({ success: true, overrides: users });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
