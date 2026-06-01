@@ -118,7 +118,7 @@ Instructions:
                     if (post.format === 'reel') {
                         // Draft for manual video generation
                         const calendarItem = {
-                            date: new Date(),
+                            date: new Date().toISOString().split('T')[0],
                             contentType: 'reel',
                             targetStudio: 'video',
                             status: 'pending',
@@ -152,7 +152,7 @@ Instructions:
                         const finalImageUrl = await persistToS3(result.imageUrl, 'daily-strategy');
                         
                         const calendarItem = {
-                            date: new Date(),
+                            date: new Date().toISOString().split('T')[0],
                             contentType: 'static',
                             targetStudio: 'creative',
                             status: 'pending', // user wants it in draft state first, 'pending' is valid enum
