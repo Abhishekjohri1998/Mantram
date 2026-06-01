@@ -60,16 +60,18 @@ ${JSON.stringify(trends?.trends?.slice(0, 5) || [])}
 ${JSON.stringify(suggestions?.suggestions?.slice(0, 3) || [])}
 
 Instructions:
-1. Create exactly 3 highly engaging posts/reels.
-2. For each post, provide:
+1. Create exactly 4 highly engaging pieces of content.
+2. The distribution MUST be: 1 'reel' for instagram, 1 'static' for linkedin, 1 'static' for facebook, and 1 'carousel' for instagram.
+3. For each post, provide:
    - title: A catchy title
    - hook: The scroll-stopping first line
    - caption: The full caption with emojis and hashtags
-   - format: "reel" or "post"
+   - format: strictly "reel", "static", or "carousel"
+   - platform: strictly "instagram", "linkedin", or "facebook"
    - visualPrompt: A highly detailed image/video generation prompt for the AI to create the visual asset. Make it cinematic and aesthetic.
-3. Return ONLY a valid JSON array of objects.`;
+4. Return ONLY a valid JSON array of these 4 objects.`;
 
-            const aiResponse = await callAgent(systemPrompt, 'Generate the 3 viral posts for today.', 0.7, 4000);
+            const aiResponse = await callAgent(systemPrompt, 'Generate the 4 viral posts for today.', 0.7, 4000);
             
             let postsToCreate = [];
             if (aiResponse && aiResponse.error) {
@@ -120,6 +122,7 @@ Instructions:
                         const calendarItem = {
                             date: new Date().toISOString().split('T')[0],
                             contentType: 'reel',
+                            platform: post.platform || 'instagram',
                             targetStudio: 'video',
                             status: 'pending',
                             brief: {
@@ -153,7 +156,8 @@ Instructions:
                         
                         const calendarItem = {
                             date: new Date().toISOString().split('T')[0],
-                            contentType: 'static',
+                            contentType: post.format === 'carousel' ? 'carousel' : 'static',
+                            platform: post.platform || 'linkedin',
                             targetStudio: 'creative',
                             status: 'pending', // user wants it in draft state first, 'pending' is valid enum
                             brief: {
