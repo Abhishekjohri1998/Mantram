@@ -116,13 +116,13 @@ Instructions:
                 try {
                     // For reels, use video generator. For posts, could use image generator.
                     // For simplicity, we use video generator (Seedance) for both or default to Kling.
-                    const enhancedSys = buildEnhanceSystemPrompt('kling-3.0', 'shortvideo', 5, '9:16', brandContext);
+                    const enhancedSys = buildEnhanceSystemPrompt('seedance-2.0', 'shortvideo', 5, '9:16', brandContext);
                     const enhancedUsr = buildEnhanceUserPrompt(post.visualPrompt, null, 'shortvideo');
                     const enhancedState = await callAgent(enhancedSys, enhancedUsr, 0.65, 2000);
                     const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
 
                     const genResult = await submitVideoGeneration({
-                        model: 'kling-3.0',
+                        model: 'seedance-2.0',
                         prompt: finalPrompt,
                         duration: 5,
                         aspectRatio: '9:16',
@@ -158,6 +158,10 @@ Instructions:
 
                 } catch (genErr) {
                     console.error(`[DailyStrategyEngine] Asset generation failed for post "${post.title}":`, genErr);
+                    if (targetStrategyId) {
+                        throw new Error(`Failed to generate video asset: ${genErr.message}`);
+                    }
+                    // If running in background, just continue to next post
                 }
             }
 
