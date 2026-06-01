@@ -251,7 +251,7 @@ export default function SuperAdminDashboard() {
     const handleStudioVisibilityChange = async (key, newState) => {
         const updated = { ...studioVisibility, [key]: newState }
         setStudioVisibility(updated)
-        try { await API.updateStudioVisibility(updated); showToast(`${studioLabels[key] || key} → ${newState}`) } catch { showToast('Failed', 'error') }
+        try { await API.updateStudioVisibility({ visibility: updated }); showToast(`${studioLabels[key] || key} → ${newState}`) } catch { showToast('Failed', 'error') }
     }
     const openUserStudioModal = async (userId) => {
         try {
