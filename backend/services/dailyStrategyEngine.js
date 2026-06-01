@@ -72,27 +72,36 @@ Instructions:
             let postsToCreate = [];
             if (aiResponse && aiResponse.error) {
                 console.error(`[DailyStrategyEngine] Agent error for ${strategy.brand.name}:`, aiResponse.error);
+                if (targetStrategyId) throw new Error("Agent error: " + aiResponse.error);
                 continue;
             } else if (Array.isArray(aiResponse)) {
                 postsToCreate = aiResponse;
             } else if (aiResponse && Array.isArray(aiResponse.posts)) {
                 postsToCreate = aiResponse.posts;
             } else if (aiResponse && typeof aiResponse === 'object') {
-                // Heuristic: find any array inside the object
-                const arrays = Object.values(aiResponse).filter(v => Array.isArray(v));
-                if (arrays.length > 0 && arrays[0].length > 0) {
-                    postsToCreate = arrays[0];
+                if (aiResponse.title && aiResponse.caption) {
+                    // AI returned a single post object instead of an array
+                    postsToCreate = [aiResponse];
                 } else {
-                    console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}. No arrays found. Raw AI Response:`, JSON.stringify(aiResponse).substring(0, 500));
-                    continue;
+                    // Heuristic: find any array inside the object
+                    const arrays = Object.values(aiResponse).filter(v => Array.isArray(v));
+                    if (arrays.length > 0 && arrays[0].length > 0) {
+                        postsToCreate = arrays[0];
+                    } else {
+                        console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}. No arrays found. Raw AI Response:`, JSON.stringify(aiResponse).substring(0, 500));
+                        if (targetStrategyId) throw new Error("Unexpected AI response format. No arrays found.");
+                        continue;
+                    }
                 }
             } else {
                 console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}:`, typeof aiResponse, aiResponse);
+                if (targetStrategyId) throw new Error("Unexpected AI response format.");
                 continue;
             }
             
             if (postsToCreate.length === 0) {
                  console.error(`[DailyStrategyEngine] 0 posts created for ${strategy.brand.name}. Raw AI Response:`, JSON.stringify(aiResponse).substring(0, 500));
+                 if (targetStrategyId) throw new Error("0 posts created by AI.");
                  continue;
             }
 
