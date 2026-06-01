@@ -11,15 +11,20 @@ import AuditLog from '../models/AuditLog.js';
 import BrandAuditLog from '../models/BrandAuditLog.js';
 import CreditUsage from '../models/CreditUsage.js';
 
+import connectDB from '../config/db.js';
+
 async function cleanup() {
     try {
         console.log('🔄 Connecting to MongoDB for cleanup...');
-        await mongoose.connect(process.env.MONGODB_URI);
+        const conn = await connectDB();
+        if (!conn) {
+            console.warn('⚠️ Could not connect to DB for cleanup. Skipping.');
+            process.exit(0);
+        }
         console.log('✅ Connected.');
 
         const now = new Date();
         const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-        const oneDayAgo = new Date(now.getTime() - (1 * 24 * 60 * 60 * 1000));
 
         console.log('🧹 Pruning collections...');
 
@@ -35,15 +40,13 @@ async function cleanup() {
         const creditResult = await CreditUsage.deleteMany({ createdAt: { $lt: sevenDaysAgo } });
         console.log(`- CreditUsage: Deleted ${creditResult.deletedCount} records older than 7 days.`);
 
-        // 4. Compact collections (Optional, but Atlas M0 doesn't support manual compaction. 
-        // Deleting documents already frees up space within the allocated files for new data.)
-
         console.log('\n✅ Cleanup complete.');
         await mongoose.disconnect();
         process.exit(0);
     } catch (error) {
         console.error('❌ Cleanup failed:', error.message);
-        process.exit(1);
+        // Exit 0 so that an intermittent cleanup failure doesn't halt the CI/CD deploy pipeline
+        process.exit(0);
     }
 }
 
