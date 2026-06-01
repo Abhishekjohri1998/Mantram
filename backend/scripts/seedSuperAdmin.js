@@ -6,6 +6,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
+import connectDB from '../config/db.js';
 
 // Import User model
 import User from '../models/User.js';
@@ -33,11 +34,11 @@ const SUPER_ADMINS = [
 
 async function seed() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            socketTimeoutMS: 15000,
-            connectTimeoutMS: 10000,
-        });
+        const conn = await connectDB();
+        if (!conn) {
+            console.error('❌ Failed to connect to MongoDB. Exiting.');
+            process.exit(0);
+        }
         console.log('✅ Connected to MongoDB');
 
         for (const admin of SUPER_ADMINS) {

@@ -5,6 +5,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
+import connectDB from '../config/db.js';
 
 // Import models
 import AuditLog from '../models/AuditLog.js';
@@ -14,11 +15,11 @@ import CreditUsage from '../models/CreditUsage.js';
 async function cleanup() {
     try {
         console.log('🔄 Connecting to MongoDB for cleanup...');
-        await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            socketTimeoutMS: 15000,
-            connectTimeoutMS: 10000,
-        });
+        const conn = await connectDB();
+        if (!conn) {
+            console.error('❌ Failed to connect to MongoDB. Exiting.');
+            process.exit(0);
+        }
         console.log('✅ Connected.');
 
         const now = new Date();
