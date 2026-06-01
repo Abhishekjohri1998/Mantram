@@ -121,12 +121,12 @@ export async function canAccessStudio(portalVisibility, user, studioKey) {
 
     const status = portalVisibility[studioKey] || 'public';
 
-    if (status === 'hidden') return false;
-
     // User-level explicit override (highest priority for individuals)
     const override = user?.studioAccess?.[studioKey];
     if (override === true) return true;
     if (override === false) return false;
+
+    if (status === 'hidden') return false;
 
     // Plan-level restriction (for 'public' and 'private' studios)
     const pkgs = await getAllPackages();

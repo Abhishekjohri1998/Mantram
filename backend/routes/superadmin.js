@@ -4121,6 +4121,26 @@ router.put('/users/:id/studio-access', async (req, res) => {
 });
 
 /**
+ * GET /api/superadmin/users/studio-overrides
+ * Fetch all users who have active per-user studio overrides
+ */
+router.get('/users/studio-overrides', async (req, res) => {
+    try {
+        const conditions = STUDIO_KEYS.map(key => ({
+            [`studioAccess.${key}`]: { $in: [true, false] }
+        }));
+        
+        const users = await User.find({ $or: conditions })
+            .select('name email plan studioAccess')
+            .lean();
+            
+        res.json({ success: true, overrides: users });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+/**
  * GET /api/superadmin/users/:id/studio-access
  * Get resolved studio access for a specific user (for the per-user modal)
  */
