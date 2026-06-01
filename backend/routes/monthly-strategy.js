@@ -830,7 +830,7 @@ router.patch('/:id/items/:itemId/status', protect, async (req, res) => {
 // ─── PATCH /:id/items/:itemId/asset ──────────────────────────────────────────
 router.patch('/:id/items/:itemId/asset', protect, async (req, res) => {
   try {
-    const { type, refId, url, preview } = req.body;
+    const { type, refId, url, preview, slides } = req.body;
     const doc = await MonthlyStrategy.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id, 'calendar._id': req.params.itemId },
       {
@@ -839,6 +839,7 @@ router.patch('/:id/items/:itemId/asset', protect, async (req, res) => {
           'calendar.$.generatedAsset.refId': refId ? new mongoose.Types.ObjectId(refId) : null,
           'calendar.$.generatedAsset.url': url || '',
           'calendar.$.generatedAsset.preview': preview || '',
+          'calendar.$.generatedAsset.slides': Array.isArray(slides) ? slides : (slides ? [slides] : (url ? [url] : [])),
           'calendar.$.status': 'complete',
         },
       },
@@ -1131,6 +1132,7 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
                   'calendar.$.generatedAsset': {
                     type: 'image',
                     url: assetUrl,
+                    slides: [assetUrl],
                     title: item.brief?.angle || 'Calendar asset',
                   },
                 },
