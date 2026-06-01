@@ -25,8 +25,7 @@ const connectDB = async (attempt = 1) => {
         if (!reconnectHandlerRegistered) {
             mongoose.connection.on('disconnected', () => {
                 if (mongoose.connection.isShuttingDown) return;
-                console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
-                setTimeout(() => connectDB(), RETRY_DELAY);
+                console.warn('⚠️  MongoDB disconnected. Native driver will attempt auto-reconnect...');
             });
 
             mongoose.connection.on('error', (err) => {
