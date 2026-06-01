@@ -6,6 +6,15 @@ const RETRY_DELAY = 3000; // 3 seconds
 let reconnectHandlerRegistered = false;
 
 const connectDB = async (attempt = 1) => {
+    // Prevent concurrent connection attempts or redundant calls
+    if (mongoose.connection.readyState === 1) {
+        return mongoose.connection;
+    }
+    if (mongoose.connection.readyState === 2) {
+        console.log('⏳ MongoDB connection already in progress...');
+        return mongoose.connection;
+    }
+
     try {
         const conn = await mongoose.connect(config.mongoUri, {
             serverSelectionTimeoutMS: 5000,            // 5s to pick a server
@@ -25,8 +34,11 @@ const connectDB = async (attempt = 1) => {
         if (!reconnectHandlerRegistered) {
             mongoose.connection.on('disconnected', () => {
                 if (mongoose.connection.isShuttingDown) return;
-                console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
-                setTimeout(() => connectDB(), RETRY_DELAY);
+                // Only trigger reconnect if fully disconnected and no connection is in progress
+                if (mongoose.connection.readyState === 0) {
+                    console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
+                    setTimeout(() => connectDB(), RETRY_DELAY);
+                }
             });
 
             mongoose.connection.on('error', (err) => {
@@ -46,8 +58,12 @@ const connectDB = async (attempt = 1) => {
             return connectDB(attempt + 1);
         }
 
-        // Don't crash in dev — allow running without DB for frontend dev
-        if (config.nodeEnv === 'production') {
+        console.log("process.execArgv:", process.execArgv);
+        console.log("config.nodeEnv:", config.nodeEnv);
+        // Don't crash in dev or under watch mode — allow running without DB for local run
+        const isWatchMode = process.execArgv.some(arg => arg.startsWith('--watch')) || process.env.NODE_ENV === 'development';
+        console.log("isWatchMode:", isWatchMode);
+        if (config.nodeEnv === 'production' && !isWatchMode) {
             process.exit(1);
         }
         console.log('⚠️  Running without database connection');
