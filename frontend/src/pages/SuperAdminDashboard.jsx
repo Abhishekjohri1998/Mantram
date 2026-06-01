@@ -1982,7 +1982,7 @@ export default function SuperAdminDashboard() {
                                 </h3>
                                 <p className="text-sm text-[var(--sys-text-muted)]">Create and track promotional discounts</p>
                             </div>
-                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text)] font-black text-sm flex items-center gap-2 hover:bg-[var(--sys-surface)] transition-all cursor-pointer border border-[var(--sys-border)]">
+                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-primary text-white font-black text-sm flex items-center gap-2 hover:bg-primary/90 transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">add</span>
                                 New Coupon
                             </button>
