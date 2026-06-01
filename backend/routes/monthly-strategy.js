@@ -675,6 +675,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
           });
       } catch (e) {
           console.error('Immediate Daily run failed', e);
+          throw new Error('Daily strategy engine failed to initialize posts: ' + e.message);
       }
       
       // ── Mark completed ──
@@ -722,10 +723,12 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         jobId,
       });
 
-      // Refund credits on non-retryable errors
-      if (err.status === 422 || err.status === 404) {
+      // Refund credits on pipeline failure
+      try {
         const { refundCredits } = await import('../middleware/credits.js');
-        await refundCredits(userId, req.creditsDeducted || 15, 'monthlyStrategy', 'Strategy generation blocked', 'brainstorm', { brandId });
+        await refundCredits(userId, req.creditsDeducted || 15, 'monthlyStrategy', 'Strategy generation failed', 'brainstorm', { brandId });
+      } catch (refundErr) {
+        console.error('[strategy/start] Refund failed:', refundErr);
       }
     }
   });

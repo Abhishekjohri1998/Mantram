@@ -77,9 +77,23 @@ Instructions:
                 postsToCreate = aiResponse;
             } else if (aiResponse && Array.isArray(aiResponse.posts)) {
                 postsToCreate = aiResponse.posts;
+            } else if (aiResponse && typeof aiResponse === 'object') {
+                // Heuristic: find any array inside the object
+                const arrays = Object.values(aiResponse).filter(v => Array.isArray(v));
+                if (arrays.length > 0 && arrays[0].length > 0) {
+                    postsToCreate = arrays[0];
+                } else {
+                    console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}. No arrays found. Raw AI Response:`, JSON.stringify(aiResponse).substring(0, 500));
+                    continue;
+                }
             } else {
-                console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}:`, typeof aiResponse);
+                console.error(`[DailyStrategyEngine] Unexpected AI response format for ${strategy.brand.name}:`, typeof aiResponse, aiResponse);
                 continue;
+            }
+            
+            if (postsToCreate.length === 0) {
+                 console.error(`[DailyStrategyEngine] 0 posts created for ${strategy.brand.name}. Raw AI Response:`, JSON.stringify(aiResponse).substring(0, 500));
+                 continue;
             }
 
             if (pushStepFn) await pushStepFn(`Generated ${postsToCreate.length} ideas. Submitting to Creative Studio...`);
@@ -141,9 +155,14 @@ Instructions:
             strategy.lastRunDate = new Date();
             await strategy.save();
             console.log(`[DailyStrategyEngine] Finished processing ${strategy.brand.name}.`);
+            
+            if (targetStrategyId && postsToCreate.length === 0) {
+                throw new Error("AI failed to generate viable post concepts for today. Please try again.");
+            }
 
         } catch (err) {
             console.error(`[DailyStrategyEngine] Error processing strategy ${strategy._id}:`, err);
+            if (targetStrategyId) throw err; // Re-throw if running synchronously for a specific user
         }
     }
 }
