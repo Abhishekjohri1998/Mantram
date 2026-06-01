@@ -5,7 +5,8 @@ import SocialPost from '../models/SocialPost.js';
 import { getTrendingTopics, getContentSuggestions } from './grokTrends.js';
 import { loadBrandContext, callAgent } from '../agents/shared/agentUtils.js';
 import { submitVideoGeneration } from '../agents/videoStudio/falClient.js';
-import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
+import { getRouter } from '../ai/router.js';
+import { persistToS3 } from '../utils/s3Upload.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } from '../agents/videoStudio/promptEnhancer.js';
 import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
 
@@ -140,12 +141,14 @@ Instructions:
                         // Generate image for post
                         if (pushStepFn) await pushStepFn(`Generating image for: ${post.title}`);
                         
-                        const enhancedSys = buildEnhanceSystemPrompt('fal-ai', 'image', 0, '1:1', brandContext);
+                        const enhancedSys = buildEnhanceSystemPrompt('gemini-3.1-flash-image-preview', 'image', 0, '1:1', brandContext);
                         const enhancedUsr = buildEnhanceUserPrompt(post.visualPrompt, null, 'image');
                         const enhancedState = await callAgent(enhancedSys, enhancedUsr, 0.65, 2000);
                         const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
 
-                        const imageUrl = await falGenerateImage({ prompt: finalPrompt, width: 1080, height: 1080 });
+                        const router = getRouter();
+                        const result = await router.generateImage({ prompt: finalPrompt, size: '1024x1024' });
+                        const finalImageUrl = await persistToS3(result.imageUrl, 'daily-strategy');
                         
                         const calendarItem = {
                             date: new Date(),
@@ -159,8 +162,8 @@ Instructions:
                             },
                             generatedAsset: {
                                 falRequestId: null,
-                                imageUrl: imageUrl,
-                                provider: 'fal-ai',
+                                imageUrl: finalImageUrl,
+                                provider: result.provider,
                                 status: 'completed',
                                 autoPublish: false // user requested manual review
                             }
