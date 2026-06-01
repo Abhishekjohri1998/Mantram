@@ -52,6 +52,8 @@ export const STUDIO_KEYS = [
     'funnelStudio',
     'd2cAnalytics',
     'skillsHub',
+    'pulseStudio',
+    'retentionStudio',
 ];
 
 export const STUDIO_LABELS = {
@@ -67,6 +69,8 @@ export const STUDIO_LABELS = {
     funnelStudio: 'Funnel Studio',
     d2cAnalytics: 'D2C Studio',
     skillsHub: 'Skills Hub',
+    pulseStudio: 'Pulse Studio',
+    retentionStudio: 'Retention Studio',
 };
 
 /**
