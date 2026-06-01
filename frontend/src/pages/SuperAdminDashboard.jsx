@@ -543,16 +543,20 @@ export default function SuperAdminDashboard() {
                                                 </p>
                                             </div>
                                             <div className="flex gap-1">
-                                                <button onClick={() => handleUserStudioOverride(key, true)}
-                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
-                                                >Grant</button>
-                                                <button onClick={() => handleUserStudioOverride(key, false)}
-                                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
-                                                >Revoke</button>
+                                                {!resolved ? (
+                                                    <button onClick={() => handleUserStudioOverride(key, true)}
+                                                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-emerald-500 hover:bg-emerald-500/10 border border-[var(--sys-border)]"
+                                                    >Grant</button>
+                                                ) : (
+                                                    <button onClick={() => handleUserStudioOverride(key, false)}
+                                                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-rose-500 hover:bg-rose-500/10 border border-[var(--sys-border)]"
+                                                    >Revoke</button>
+                                                )}
                                                 {hasOverride && (
                                                     <button onClick={() => handleUserStudioOverride(key, null)}
-                                                        className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary border border-transparent"
-                                                    >Reset</button>
+                                                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary transition-all"
+                                                        title="Reset to default"
+                                                    ><span className="material-symbols-outlined text-[14px]">device_reset</span></button>
                                                 )}
                                             </div>
                                         </div>
