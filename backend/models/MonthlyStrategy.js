@@ -85,6 +85,13 @@ const monthlyStrategySchema = new mongoose.Schema({
         default: 'draft',
     },
 
+    // Autonomous Campaign Fields
+    campaignStatus: { type: String, enum: ['active', 'paused', 'completed'], default: 'active' },
+    startDate: { type: Date, default: Date.now },
+    endDate: { type: Date },
+    lastRunDate: { type: Date },
+    totalPostsGenerated: { type: Number, default: 0 },
+
     // Short executive summary Claude returns
     summary: { type: String, default: '' },
 
