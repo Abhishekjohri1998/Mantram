@@ -5,6 +5,7 @@ import SocialPost from '../models/SocialPost.js';
 import { getTrendingTopics, getContentSuggestions } from './grokTrends.js';
 import { loadBrandContext, callAgent } from '../agents/shared/agentUtils.js';
 import { submitVideoGeneration } from '../agents/videoStudio/falClient.js';
+import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt } from '../agents/videoStudio/promptEnhancer.js';
 import { s3Client, getSignedUrlForPath } from '../utils/s3.js';
 
@@ -112,54 +113,66 @@ Instructions:
                 console.log(`[DailyStrategyEngine] Generating asset for: ${post.title}`);
                 if (pushStepFn) await pushStepFn(`Drafting asset: ${post.title}`);
                 
-                let assetUrl = '';
                 try {
-                    // For reels, use video generator. For posts, could use image generator.
-                    // For simplicity, we use video generator (Seedance) for both or default to Kling.
-                    const enhancedSys = buildEnhanceSystemPrompt('seedance-2.0', 'shortvideo', 5, '9:16', brandContext);
-                    const enhancedUsr = buildEnhanceUserPrompt(post.visualPrompt, null, 'shortvideo');
-                    const enhancedState = await callAgent(enhancedSys, enhancedUsr, 0.65, 2000);
-                    const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
+                    if (post.format === 'reel') {
+                        // Draft for manual video generation
+                        const calendarItem = {
+                            date: new Date(),
+                            targetStudio: 'video',
+                            status: 'draft',
+                            brief: {
+                                angle: post.title,
+                                captionDraft: post.caption,
+                                visualDirection: post.visualPrompt,
+                                hook: post.hook
+                            },
+                            generatedAsset: {
+                                falRequestId: null,
+                                provider: 'none',
+                                status: 'pending_user_approval',
+                                autoPublish: false 
+                            }
+                        };
+                        strategy.calendar.push(calendarItem);
+                        strategy.totalPostsGenerated += 1;
+                        if (pushStepFn) await pushStepFn(`Reel drafted: ${post.title}`);
+                    } else {
+                        // Generate image for post
+                        if (pushStepFn) await pushStepFn(`Generating image for: ${post.title}`);
+                        
+                        const enhancedSys = buildEnhanceSystemPrompt('fal-ai', 'image', 0, '1:1', brandContext);
+                        const enhancedUsr = buildEnhanceUserPrompt(post.visualPrompt, null, 'image');
+                        const enhancedState = await callAgent(enhancedSys, enhancedUsr, 0.65, 2000);
+                        const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
 
-                    const genResult = await submitVideoGeneration({
-                        model: 'seedance-2.0',
-                        prompt: finalPrompt,
-                        duration: 5,
-                        aspectRatio: '9:16',
-                        mode: 'standard',
-                        generateAudio: false
-                    });
-                    
-                    // Note: This is an async generation (Laozhang or Fal). 
-                    // To truly auto-publish, we need to wait/poll for it, or have the polling webhook do the publishing.
-                    // For this architecture, we will store the falRequestId and let the standard job polling handle it,
-                    // but we will mark it for 'auto-publish'.
-                    
-                    // Push to calendar
-                    const calendarItem = {
-                        date: new Date(),
-                        targetStudio: post.format === 'reel' ? 'video' : 'creative',
-                        status: 'in_progress', // waiting for asset
-                        brief: {
-                            angle: post.title,
-                            captionDraft: post.caption,
-                            visualDirection: post.visualPrompt,
-                            hook: post.hook
-                        },
-                        generatedAsset: {
-                            falRequestId: genResult.requestId,
-                            provider: genResult.provider,
-                            status: 'generating',
-                            autoPublish: true // Custom flag for auto-publishing once generated
-                        }
-                    };
-                    strategy.calendar.push(calendarItem);
-                    strategy.totalPostsGenerated += 1;
-
+                        const imageUrl = await falGenerateImage({ prompt: finalPrompt, width: 1080, height: 1080 });
+                        
+                        const calendarItem = {
+                            date: new Date(),
+                            targetStudio: 'creative',
+                            status: 'draft', // user wants it in draft state first
+                            brief: {
+                                angle: post.title,
+                                captionDraft: post.caption,
+                                visualDirection: post.visualPrompt,
+                                hook: post.hook
+                            },
+                            generatedAsset: {
+                                falRequestId: null,
+                                imageUrl: imageUrl,
+                                provider: 'fal-ai',
+                                status: 'completed',
+                                autoPublish: false // user requested manual review
+                            }
+                        };
+                        strategy.calendar.push(calendarItem);
+                        strategy.totalPostsGenerated += 1;
+                        if (pushStepFn) await pushStepFn(`Image generated: ${post.title}`);
+                    }
                 } catch (genErr) {
                     console.error(`[DailyStrategyEngine] Asset generation failed for post "${post.title}":`, genErr);
                     if (targetStrategyId) {
-                        throw new Error(`Failed to generate video asset: ${genErr.message}`);
+                        throw new Error(`Failed to generate asset: ${genErr.message}`);
                     }
                     // If running in background, just continue to next post
                 }
