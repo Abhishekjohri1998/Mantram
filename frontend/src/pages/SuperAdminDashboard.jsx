@@ -4027,7 +4027,7 @@ export default function SuperAdminDashboard() {
                                 {/* Controls */}
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <button onClick={handlePricingCheck} disabled={monitorChecking}
-                                        className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                                        className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none disabled:opacity-50 cursor-pointer flex items-center gap-2 border border-[var(--sys-border)]">
                                         {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
                                         {monitorChecking ? 'Scraping Models...' : 'Check Now'}
                                     </button>
@@ -4280,7 +4280,7 @@ export default function SuperAdminDashboard() {
                                     <span className="material-symbols-outlined text-sm mr-1 align-middle">database</span>Seed Defaults
                                 </button>
                                 <button onClick={() => { setEditingPack(null); setPackForm({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true }); setShowPackForm(true) }}
-                                    className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">
+                                    className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer border border-[var(--sys-border)]">
                                     + New Pack
                                 </button>
                             </div>
