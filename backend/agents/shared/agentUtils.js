@@ -87,6 +87,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
                 userPrompt: safeUser,
                 temperature,
                 maxTokens,
+                jsonMode: options.jsonMode || false,
             }, routingPrefs),
             timeoutPromise,
         ]);
@@ -478,6 +479,7 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
             temperature,
             maxTokens,
             images: validImages, 
+            jsonMode: options.jsonMode || false,
         }, { provider: options.provider || 'gemini' });
 
         const text = result.text || '';

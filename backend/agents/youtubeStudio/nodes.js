@@ -330,6 +330,7 @@ export async function analysisNode({ video, brandContext, knownCasts = [], writi
             maxTokens: 4096,
             model: 'gemini-2.5-pro',       // Best model for video understanding
             youtubeUrl: resolvedVideoUrl,  // Triggers fileData injection
+            jsonMode: true,
         }, { provider: 'gemini' });
         clearTimeout(analysisTimeout);
 
@@ -382,7 +383,7 @@ export async function analysisNode({ video, brandContext, knownCasts = [], writi
             const fallbackResult = await callAgent(
                 PROMPTS.VIDEO_ANALYST,
                 `${videoContext}\n\n${transcriptSection}\n\nNOTE: Gemini video analysis unavailable — analyse from transcript only.`,
-                0.3, 4096, { preferFast: false, timeoutMs: 120_000 }   // 2 min — full model on transcript can take 60-90s
+                0.3, 4096, { preferFast: false, timeoutMs: 120_000, jsonMode: true }   // 2 min — full model on transcript can take 60-90s
             );
             console.log(`✅ [analysisNode] Transcript-only fallback complete`);
             return { analysis: fallbackResult };
@@ -427,7 +428,7 @@ export async function chapterNode({ video, analysis }) {
     const result = await callAgent(
         PROMPTS.CHAPTER_DETECTOR,
         userPrompt,
-        0.2, 2048, { preferFast: false, timeoutMs: 90_000 }  // Full model — better chapter quality
+        0.2, 2048, { preferFast: false, timeoutMs: 90_000, jsonMode: true }  // Full model — better chapter quality
     );
 
     return { chapters: result.chapters || [] };
@@ -473,14 +474,14 @@ export async function seoNode({ video, analysis, chapters, brandContext, writing
         result = await callAgent(
             PROMPTS.SEO_COPYWRITER,
             userPrompt,
-            0.7, 3000, { provider: 'xai', timeoutMs: 60_000 }   // Grok-3 via xAI OpenAI-compatible endpoint
+            0.7, 3000, { provider: 'xai', timeoutMs: 60_000, jsonMode: true }   // Grok-3 via xAI OpenAI-compatible endpoint
         );
     } catch (err) {
         console.warn(`⚠️ [seoNode] xAI/Grok failed (${err.message}), falling back to best available model`);
         result = await callAgent(
             PROMPTS.SEO_COPYWRITER,
             userPrompt,
-            0.7, 3000, { preferFast: false, timeoutMs: 60_000 }
+            0.7, 3000, { preferFast: false, timeoutMs: 60_000, jsonMode: true }
         );
     }
 
@@ -513,7 +514,7 @@ export async function brandCriticNode({ video, analysis, brandContext }) {
     const result = await callAgent(
         PROMPTS.BRAND_CRITIC,
         userPrompt,
-        0.3, 2048, { preferFast: true, timeoutMs: 45_000 }  // Fast Gemini; 45s cap
+        0.3, 2048, { preferFast: true, timeoutMs: 45_000, jsonMode: true }  // Fast Gemini; 45s cap
     );
 
     return { brandAlignment: result };
@@ -617,7 +618,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
             PROMPTS.THUMBNAIL_DIRECTOR,
             userPrompt,
             [],
-            { temperature: 0.75, maxTokens: 2500 }
+            { temperature: 0.75, maxTokens: 2500, jsonMode: true }
         );
         return { thumbnailDirection: result };
     }
@@ -664,7 +665,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
             PROMPTS.THUMBNAIL_DIRECTOR,
             userPrompt,
             [],
-            { temperature: 0.75, maxTokens: 2500 }
+            { temperature: 0.75, maxTokens: 2500, jsonMode: true }
         );
         return { thumbnailDirection: result };
     }
@@ -1279,7 +1280,7 @@ export async function promoNode({ analysis, video, brandContext }) {
     const result = await callAgent(
         PROMPTS.PROMO_DIRECTOR,
         userPrompt,
-        0.7, 2048, { preferFast: true, timeoutMs: 45_000 }
+        0.7, 2048, { preferFast: true, timeoutMs: 45_000, jsonMode: true }
     );
 
     return { promoCuts: result.cuts || rawCuts };
