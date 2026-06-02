@@ -125,7 +125,7 @@ async function getUploadedVideoDuration(videoUrl) {
 async function extractFrameFromVideoUrl(videoUrl, timestampSecs, s3KeyPrefix) {
     const tempOut = path.join(os.tmpdir(), `frame-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`);
     try {
-        const cmd = `ffmpeg -y -ss ${timestampSecs} -i "${videoUrl}" -vframes 1 -q:v 2 "${tempOut}"`;
+        const cmd = `ffmpeg -y -i "${videoUrl}" -ss ${timestampSecs} -vframes 1 -q:v 2 "${tempOut}"`;
         await execAsync(cmd);
         if (fs.existsSync(tempOut)) {
             const buffer = fs.readFileSync(tempOut);
@@ -702,7 +702,8 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
 
     // ── Best extracted frame — use as visual context reference ───────────────────
     // HD frame (maxresdefault) is preferred; fall back to hqdefault
-    const bestFrame = extractedFrames.find(f => f.label === 'HD Cover Frame') 
+    const bestFrame = extractedFrames.find(f => f.label === 'Peak Moment Frame')
+        || extractedFrames.find(f => f.label === 'HD Cover Frame') 
         || extractedFrames.find(f => f.label === 'HQ Cover Frame')
         || extractedFrames[0] 
         || null;
@@ -1156,24 +1157,48 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
  *   0.jpg / maxresdefault.jpg = best auto frame
  *   1.jpg / 2.jpg / 3.jpg    = frames at ~25%, 50%, 75%
  */
-export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true }) {
+export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true, peakMoments = [], duration = null }) {
     if (!videoId) return { extractedFrames: [] };
+
+    // Helper: convert MM:SS or HH:MM:SS or raw numbers/strings to seconds
+    function parseTimestamp(ts) {
+        if (typeof ts === 'number') return ts;
+        if (!ts) return 0;
+        const parts = ts.toString().split(':').map(Number);
+        if (parts.some(isNaN)) return 0;
+        if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        }
+        return parts[0] || 0;
+    }
 
     if (!isYT) {
         if (!videoUrl) return { extractedFrames: [] };
         console.log(`🎬 [frameExtractionNode] Extracting S3 frames via FFmpeg for ${videoId}`);
-        const durationSecs = await getUploadedVideoDuration(videoUrl);
+        const durationSecs = duration || await getUploadedVideoDuration(videoUrl);
         const s3KeyPrefix = `youtube-studio-uploads/frames/${videoId}`;
         
-        const offsets = [
-            { secs: Math.min(5, Math.floor(durationSecs / 2)), label: 'HD Cover Frame' },
-            { secs: Math.round(durationSecs * 0.25), label: 'Frame at 25%' },
-            { secs: Math.round(durationSecs * 0.5), label: 'Frame at 50%' },
-            { secs: Math.round(durationSecs * 0.75), label: 'Frame at 75%' }
-        ];
+        let offsets = [];
+        if (peakMoments && peakMoments.length > 0) {
+            offsets = peakMoments.map((pm, idx) => ({
+                secs: parseTimestamp(pm.timestamp),
+                label: pm.label || (idx === 0 ? 'Peak Moment Frame' : `Highlight ${idx}`)
+            }));
+        } else {
+            offsets = [
+                { secs: Math.min(5, Math.floor(durationSecs / 2)), label: 'HD Cover Frame' },
+                { secs: Math.round(durationSecs * 0.25), label: 'Frame at 25%' },
+                { secs: Math.round(durationSecs * 0.5), label: 'Frame at 50%' },
+                { secs: Math.round(durationSecs * 0.75), label: 'Frame at 75%' }
+            ];
+        }
 
         const frames = [];
         for (const offset of offsets) {
+            console.log(`   🎬 Extracting frame at ${offset.secs}s (${offset.label})...`);
             const url = await extractFrameFromVideoUrl(videoUrl, offset.secs, s3KeyPrefix);
             if (url) {
                 frames.push({ url, label: offset.label, sizeKb: 0 });
@@ -1185,12 +1210,22 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
 
     console.log(`🎬 [frameExtractionNode] Extracting YouTube CDN frames for ${videoId}`);
 
+    const durationSecs = duration;
+    let peakIndex = -1;
+    if (peakMoments && peakMoments.length > 0 && durationSecs) {
+        const peakSecs = parseTimestamp(peakMoments[0].timestamp);
+        const pct = peakSecs / durationSecs;
+        if (pct < 0.38) peakIndex = 2; // Frame at 25% (idx 2 in frameUrls)
+        else if (pct < 0.63) peakIndex = 3; // Frame at 50% (idx 3 in frameUrls)
+        else peakIndex = 4; // Frame at 75% (idx 4 in frameUrls)
+    }
+
     const frameUrls = [
         { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame' },
         { url: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,     label: 'HQ Cover Frame' },
-        { url: `https://img.youtube.com/vi/${videoId}/1.jpg`,             label: 'Frame at 25%' },
-        { url: `https://img.youtube.com/vi/${videoId}/2.jpg`,             label: 'Frame at 50%' },
-        { url: `https://img.youtube.com/vi/${videoId}/3.jpg`,             label: 'Frame at 75%' },
+        { url: `https://img.youtube.com/vi/${videoId}/1.jpg`,             label: peakIndex === 2 ? 'Peak Moment Frame' : 'Frame at 25%' },
+        { url: `https://img.youtube.com/vi/${videoId}/2.jpg`,             label: peakIndex === 3 ? 'Peak Moment Frame' : 'Frame at 50%' },
+        { url: `https://img.youtube.com/vi/${videoId}/3.jpg`,             label: peakIndex === 4 ? 'Peak Moment Frame' : 'Frame at 75%' },
     ];
 
     const frames = [];

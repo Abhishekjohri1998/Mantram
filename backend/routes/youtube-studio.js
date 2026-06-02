@@ -341,38 +341,53 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
         let analysis = {};
         let extractedFrames = [];
-        const tasks = [];
-        let analysisIdx = -1;
-        let framesIdx = -1;
 
         if (needAnalysis) {
             emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
-            analysisIdx = tasks.length;
-            tasks.push(analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis }));
+            try {
+                const res = await analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis });
+                analysis = res.analysis;
+                emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
+                console.log(`✅ [Node 2] Analysis done: ${analysis.contentType}, ${analysis.characters?.length || 0} characters`);
+            } catch (err) {
+                console.error(`❌ [Node 2] Analysis failed: ${err.message}`);
+                emit('analysis', 'error', { error: err.message });
+            }
         } else {
             emit('analysis', 'done', { message: 'Skipped' });
         }
 
         if (needFrames) {
             emit('frames',    'running', { message: 'Extracting key video frames…' });
-            framesIdx = tasks.length;
-            tasks.push(frameExtractionNode({ videoId, videoUrl, isYT }));
-        } else {
-            emit('frames', 'done', { message: 'Skipped' });
-        }
+            try {
+                const peakMoments = [];
+                if (analysis?.peakMoment?.timestamp) {
+                    peakMoments.push({
+                        timestamp: analysis.peakMoment.timestamp,
+                        label: 'Peak Moment Frame'
+                    });
+                }
+                if (analysis?.promoCuts?.length) {
+                    analysis.promoCuts.slice(0, 3).forEach((cut, idx) => {
+                        if (cut.timestamp) {
+                            peakMoments.push({
+                                timestamp: cut.timestamp,
+                                label: `Highlight ${idx + 1}`
+                            });
+                        }
+                    });
+                }
 
-        if (tasks.length > 0) {
-            const results = await Promise.all(tasks);
-            if (analysisIdx !== -1) {
-                analysis = results[analysisIdx].analysis;
-                emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
-                console.log(`✅ [Node 2] Analysis done: ${analysis.contentType}, ${analysis.characters?.length || 0} characters`);
-            }
-            if (framesIdx !== -1) {
-                extractedFrames = results[framesIdx].extractedFrames;
+                const res = await frameExtractionNode({ videoId, videoUrl, isYT, peakMoments, duration: video.duration });
+                extractedFrames = res.extractedFrames;
                 emit('frames', 'done', { count: extractedFrames.length });
                 console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
+            } catch (err) {
+                console.error(`❌ [Node 2b] Frame extraction failed: ${err.message}`);
+                emit('frames', 'error', { error: err.message });
             }
+        } else {
+            emit('frames', 'done', { message: 'Skipped' });
         }
 
         // ── Stage 3: Chapter Detection (conditional) ──
