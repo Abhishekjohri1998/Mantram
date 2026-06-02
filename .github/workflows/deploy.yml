@@ -221,7 +221,14 @@ jobs:
             cd $RELEASE_DIR/backend
             PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund --loglevel=error
 
+            # 3.4 Stop old PM2 instances early to release MongoDB connections
+            echo "🛑 Stopping old PM2 instances to free DB connections..."
+            pm2 delete mantram-server mantram-autofix || true
+            echo "⏳ Waiting 10 seconds for TCP connections to close..."
+            sleep 10
+
             # 3.5 Cleanup & Seed
+            export SEED_MODE=true
             echo "🧹 Reclaiming database space..."
             node scripts/cleanupDatabase.js
 
@@ -247,7 +254,6 @@ jobs:
               exit 1
             fi
 
-            pm2 delete mantram-server || true
             NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env
             pm2 save
 
@@ -282,7 +288,6 @@ jobs:
             echo "🤖 Starting Auto-Fix Agent..."
             cd $CURRENT_LINK
             mkdir -p $HOME/Mantram/backend/logs
-            pm2 delete mantram-autofix || true
             pm2 start backend/deploy/autofix.config.cjs --update-env
             pm2 save
             echo "✅ Auto-Fix Agent started"

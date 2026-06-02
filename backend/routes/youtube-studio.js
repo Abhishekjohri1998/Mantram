@@ -36,11 +36,22 @@ const sseClients = new Map();
 
 function emitProgress(projectId, event) {
     const clients = sseClients.get(projectId);
-    if (!clients?.size) return;
-    const data = JSON.stringify(event);
-    clients.forEach(res => {
-        try { res.write(`data: ${data}\n\n`); } catch { }
-    });
+    if (clients?.size) {
+        const data = JSON.stringify(event);
+        clients.forEach(res => {
+            try { 
+                res.write(`data: ${data}\n\n`); 
+                if (typeof res.flush === 'function') res.flush();
+            } catch { }
+        });
+    }
+
+    // DB persistence for PM2 cluster support
+    if (event.type === 'node') {
+        const update = { $set: {} };
+        update.$set[`nodesProgress.${event.node}`] = { status: event.status, message: event.message };
+        YoutubeProject.updateOne({ _id: projectId }, update).catch(()=>{});
+    }
 }
 
 // ── POST /upload — Direct Video File Upload ───────────────────────────────
@@ -204,15 +215,49 @@ router.get('/:id/progress', protect, (req, res) => {
 
     // Send initial heartbeat
     res.write(`data: ${JSON.stringify({ type: 'connected', projectId: id })}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
 
     // Keepalive ping every 20s (prevents proxy timeout)
     const keepalive = setInterval(() => {
-        try { res.write(`: ping\n\n`); } catch { clearInterval(keepalive); }
+        try { 
+            res.write(`: ping\n\n`); 
+            if (typeof res.flush === 'function') res.flush();
+        } catch { clearInterval(keepalive); }
     }, 20_000);
+
+    // Database polling for PM2 cluster support (in case pipeline runs on another worker)
+    const dbPollInterval = setInterval(async () => {
+        try {
+            const project = await YoutubeProject.findById(id).select('nodesProgress status error videoId').lean();
+            if (!project) return;
+            
+            // Sync all nodes
+            if (project.nodesProgress) {
+                for (const [node, data] of Object.entries(project.nodesProgress)) {
+                    res.write(`data: ${JSON.stringify({ type: 'node', node, status: data.status, message: data.message })}\n\n`);
+                }
+                if (typeof res.flush === 'function') res.flush();
+            }
+            
+            // Check terminal state
+            if (project.status === 'done' || project.status === 'failed') {
+                clearInterval(dbPollInterval);
+                if (project.status === 'done') {
+                    res.write(`data: ${JSON.stringify({ type: 'done', videoId: project.videoId })}\n\n`);
+                } else {
+                    res.write(`data: ${JSON.stringify({ type: 'error', error: project.error })}\n\n`);
+                }
+                if (typeof res.flush === 'function') res.flush();
+            }
+        } catch (err) {
+            console.error('SSE DB Poll error:', err.message);
+        }
+    }, 2500); // 2.5s poll rate is lightweight for a single ID
 
     // Cleanup on disconnect
     req.on('close', () => {
         clearInterval(keepalive);
+        clearInterval(dbPollInterval);
         const clients = sseClients.get(id);
         if (clients) {
             clients.delete(res);

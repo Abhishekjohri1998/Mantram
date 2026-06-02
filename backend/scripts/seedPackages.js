@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
+import connectDB from '../config/db.js';
 
 dotenv.config();
 
@@ -199,7 +200,11 @@ const PACKAGES = [
 
 async function seed() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI);
+        const conn = await connectDB();
+        if (!conn) {
+            console.error('❌ Failed to connect to MongoDB. Exiting.');
+            process.exit(1);
+        }
         console.log('✅ Connected to MongoDB');
 
         console.log('🧹 Clearing existing packages...');

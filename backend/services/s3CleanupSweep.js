@@ -13,7 +13,7 @@ const s3 = new S3Client({
 
 export async function runS3CleanupSweep() {
     console.log('🧹 [S3Cleanup] Starting orphaned asset sweep...');
-    const bucket = config.aws.s3Bucket;
+    const bucket = config.aws.bucket;
     
     // We only clean the specific paths where user generations live
     const PREFIXES = ['generations/', 'canvas-assets/'];

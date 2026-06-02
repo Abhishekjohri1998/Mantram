@@ -183,7 +183,7 @@ export default function Integrations() {
             }
             if (socialData.status === 'fulfilled') {
                 (socialData.value.data || []).forEach(acc => {
-                    if (!mappedStatus[acc.platform]) mappedStatus[acc.platform] = { connected: true, accounts: [] }
+                    if (!mappedStatus[acc.platform]) mappedStatus[acc.platform] = { connected: true, status: 'connected', accounts: [] }
                     mappedStatus[acc.platform].accounts.push(acc)
                 })
             }

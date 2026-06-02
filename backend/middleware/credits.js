@@ -244,7 +244,7 @@ export const requireCredits = (actionOrCost = 1) => {
                         const segResolution = req.body.resolution || '720p';
                         const segQuality   = segModel.includes('quality') || segModel === 'seedance-2.0' ? 'quality' : 'fast';
                         const segEstimate  = estimateCost(segModel, Math.min(OPTIMAL_SEG, totalDuration), segResolution, segQuality);
-                        const perSeg       = Math.max(Math.ceil(segEstimate.usd * 70), 5);
+                        const perSeg       = segEstimate.credits;
                         cost = perSeg * segCount;
                         console.log(`🎬 Dynamic storyboard long-form credits: ${totalDuration}s → ${segCount} segs × ${perSeg}cr = ${cost} credits`);
 
@@ -255,7 +255,7 @@ export const requireCredits = (actionOrCost = 1) => {
                         const sbResolution = req.body.resolution || '720p';
                         const sbQuality    = sbModel === 'seedance-2.0' ? 'quality' : 'fast';
                         const sbEstimate   = estimateCost(sbModel, Math.min(dur, 15), sbResolution, sbQuality);
-                        cost = Math.max(Math.ceil(sbEstimate.usd * 70), 5);
+                        cost = sbEstimate.credits;
                         console.log(`🎬 Dynamic storyboard animate credits: ${dur}s ${sbModel} → $${sbEstimate.usd} → ${cost} credits`);
 
                     } else {
@@ -272,8 +272,7 @@ export const requireCredits = (actionOrCost = 1) => {
                             if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
                         }
                         const estimate = estimateCost(model || defaultModel, parsedDuration, resolution, qualityMode);
-                        // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
-                        cost = Math.max(Math.ceil(estimate.usd * 70), 5);
+                        cost = estimate.credits;
                         console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${model || defaultModel} ${parsedDuration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                     }
                 } else {

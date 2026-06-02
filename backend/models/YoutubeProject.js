@@ -169,6 +169,9 @@ const YoutubeProjectSchema = new mongoose.Schema({
     // New: Which model generated the thumbnail
     generatorModel: String,
 
+    // Real-time progress tracking for PM2 clustered environments
+    nodesProgress: { type: mongoose.Schema.Types.Mixed, default: {} },
+
 }, { timestamps: true });
 
 // Index for efficient user queries

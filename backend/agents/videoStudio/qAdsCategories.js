@@ -426,5 +426,5 @@ export function getQAdsCreditCost(duration) {
     const d = parseInt(duration) || 8;
     // Q-Ads always uses seedance-2.0 on Atlas Cloud at 720p
     const estimate = estimateCost('seedance-2.0', d, '720p', 'fast');
-    return Math.max(Math.ceil(estimate.usd * 70), 5);
+    return estimate.credits;
 }
