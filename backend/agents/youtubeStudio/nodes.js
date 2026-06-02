@@ -1035,15 +1035,15 @@ Return ONLY a JSON object, no markdown:
     try {
         const result = await router.generateImage({
             prompt: finalPrompt,
-            model: 'gemini-2.0-flash-exp', // Explicitly use Gemini 2.0 Flash for image generation
+            model: 'gpt-image-2', 
             aspectRatio: '16:9',
             imageParts: imageParts,
-        }, { provider: 'gemini' });
+        }, { provider: 'openai' });
 
         const rawUrl = typeof result === 'string' ? result : result.imageUrl;
         const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
-        console.log(`✅ [thumbnailGenerationNode] Gemini image generation success → S3: ${finalUrl?.substring(0, 80)}`);
-        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini-2.0-flash-exp' };
+        console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
 
     } catch (gemErr) {
         console.error(`❌ [thumbnailGenerationNode] Gemini image generation failed: ${gemErr.message}`);
