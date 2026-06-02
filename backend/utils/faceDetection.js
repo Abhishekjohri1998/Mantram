@@ -16,7 +16,7 @@ let modelsLoaded = false;
 
 async function loadModels() {
     if (modelsLoaded) return;
-    const modelPath = path.join(__dirname, '..', 'weights');
+    const modelPath = path.join(__dirname, '..', 'node_modules', '@vladmandic', 'face-api', 'model');
     
     // We only need SSD Mobilenet (fastest for basic detection) and Face Recognition for clustering
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath);
@@ -24,7 +24,7 @@ async function loadModels() {
     await faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath);
     
     modelsLoaded = true;
-    console.log('✅ face-api models loaded');
+    console.log('✅ face-api models loaded from node_modules');
 }
 
 /**
