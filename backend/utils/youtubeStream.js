@@ -1,4 +1,4 @@
-import youtubedl from 'youtube-dl-exec';
+import ytdl from '@distube/ytdl-core';
 
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
@@ -12,27 +12,20 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
 
     try {
-        console.log(`📡 [youtubeStream] Resolving stream for ${url}...`);
+        console.log(`📡 [youtubeStream] Resolving stream for ${url} via ytdl-core...`);
         
-        // Use yt-dlp to get the direct stream URL (-g / --get-url)
-        // We prefer a format that is easily seekable, ideally up to 1080p mp4
-        const output = await youtubedl(url, {
-            getUrl: true,
-            format: 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificate: true,
-        });
+        const info = await ytdl.getInfo(url);
+        
+        // Find the best video format that contains video (preferably with audio, but video is what matters for frames)
+        // We prioritize mp4 for best compatibility with FFmpeg seeking
+        const format = ytdl.chooseFormat(info.formats, { quality: 'highestvideo' });
 
-        // yt-dlp returns the direct stream URL as a string output
-        const streamUrl = typeof output === 'string' ? output.trim().split('\n')[0] : null;
-        
-        if (streamUrl) {
-            console.log(`✅ [youtubeStream] Stream URL resolved successfully.`);
-            return streamUrl;
+        if (format && format.url) {
+            console.log(`✅ [youtubeStream] Stream URL resolved successfully (${format.container} ${format.qualityLabel || ''}).`);
+            return format.url;
         }
         
-        throw new Error('No stream URL returned from yt-dlp.');
+        throw new Error('No valid video format found.');
     } catch (err) {
         console.warn(`⚠️ [youtubeStream] Failed to resolve stream for ${url}:`, err.message);
         return null;
