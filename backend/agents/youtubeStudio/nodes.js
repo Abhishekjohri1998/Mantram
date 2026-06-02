@@ -717,7 +717,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
  * Models: PRIMARY = gemini-3.1-flash-image-preview via @google/genai SDK
  *         FALLBACK = fal-ai/flux-pro/v1.1
  */
-export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [], extractedFrames = [] }) {
+export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [], extractedFrames = [], primaryFaceUrl = null }) {
     const videoTitle    = video?.metadata?.title       || '';
     const characters    = video?.analysis?.characters  || [];
     const peakMoment    = video?.analysis?.peakMoment  || null;
