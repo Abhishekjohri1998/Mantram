@@ -341,11 +341,33 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
         let analysis = {};
         let extractedFrames = [];
+        let primaryFaceUrl = null;
+
+        if (needFrames) {
+            emit('frames', 'running', { message: 'Extracting key video frames via FFmpeg & Face-API…' });
+            try {
+                const res = await frameExtractionNode({ videoId, videoUrl, isYT, duration: video.duration });
+                extractedFrames = res.extractedFrames;
+                primaryFaceUrl = res.primaryFaceUrl;
+                
+                // Add the face clusters to the video object so analysisNode can use them
+                video.faceClusters = res.faceClusters;
+                
+                emit('frames', 'done', { count: extractedFrames.length });
+                console.log(`✅ [Node 1.5] Frames: ${extractedFrames.length} extracted, Face found: ${!!primaryFaceUrl}`);
+            } catch (err) {
+                console.error(`❌ [Node 1.5] Frame extraction failed: ${err.message}`);
+                emit('frames', 'error', { error: err.message });
+            }
+        } else {
+            emit('frames', 'done', { message: 'Skipped' });
+        }
 
         if (needAnalysis) {
-            emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
+            emit('analysis',  'running', { message: 'Deep Semantic Analysis (Vision + Transcript)…' });
             try {
-                const res = await analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis });
+                // Pass the extracted frames to analysisNode so it can do Frame Content Analysis
+                const res = await analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis, extractedFrames });
                 analysis = res.analysis;
                 emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
                 console.log(`✅ [Node 2] Analysis done: ${analysis.contentType}, ${analysis.characters?.length || 0} characters`);
@@ -357,38 +379,6 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
             emit('analysis', 'done', { message: 'Skipped' });
         }
 
-        if (needFrames) {
-            emit('frames',    'running', { message: 'Extracting key video frames…' });
-            try {
-                const peakMoments = [];
-                if (analysis?.peakMoment?.timestamp) {
-                    peakMoments.push({
-                        timestamp: analysis.peakMoment.timestamp,
-                        label: 'Peak Moment Frame'
-                    });
-                }
-                if (analysis?.promoCuts?.length) {
-                    analysis.promoCuts.slice(0, 3).forEach((cut, idx) => {
-                        if (cut.timestamp) {
-                            peakMoments.push({
-                                timestamp: cut.timestamp,
-                                label: `Highlight ${idx + 1}`
-                            });
-                        }
-                    });
-                }
-
-                const res = await frameExtractionNode({ videoId, videoUrl, isYT, peakMoments, duration: video.duration });
-                extractedFrames = res.extractedFrames;
-                emit('frames', 'done', { count: extractedFrames.length });
-                console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
-            } catch (err) {
-                console.error(`❌ [Node 2b] Frame extraction failed: ${err.message}`);
-                emit('frames', 'error', { error: err.message });
-            }
-        } else {
-            emit('frames', 'done', { message: 'Skipped' });
-        }
 
         // ── Stage 3: Chapter Detection (conditional) ──
         let chapters = [];
@@ -488,6 +478,7 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
                 thumbnailDirection, video, brandContext, template,
                 characterPortraits,
                 extractedFrames,
+                primaryFaceUrl
             });
             generatedThumbnailUrl = genRes.generatedThumbnailUrl;
             generatorModel = genRes.generatorModel;

@@ -263,8 +263,8 @@ export async function transcriptNode({ videoId, videoUrl, isYT = true }) {
 
 // ── 2. Video Analysis Node (MCoT) ──────────────────────────────────────────
 
-export async function analysisNode({ video, brandContext, knownCasts = [], writingStyleAnalysis = null }) {
-    console.log(`🧠 [analysisNode] Running MCoT video analysis`);
+export async function analysisNode({ video, brandContext, knownCasts = [], writingStyleAnalysis = null, extractedFrames = [] }) {
+    console.log(`🧠 [analysisNode] Running MCoT video analysis (Deep Semantic Analysis)`);
 
     const { transcript, metadata, youtubeUrl } = video;
     const isYT = youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be');
@@ -294,12 +294,32 @@ export async function analysisNode({ video, brandContext, knownCasts = [], writi
         ? `TRANSCRIPT (timestamped):\n${transcript.text?.substring(0, 15000)}${transcript.text?.length > 15000 ? '\n... [transcript truncated for context]' : ''}`
         : `TRANSCRIPT: Not available — analyse based on video visuals and audio.`;
 
+    // ── Fetch screen grabs as inline images for Gemini Vision (Deep Analysis) ──
+    const frameImageParts = [];
+    if (extractedFrames.length > 0) {
+        console.log(`   📸 Fetching ${extractedFrames.length} screen grabs for deep video content analysis...`);
+        for (const frame of extractedFrames.slice(0, 8)) { // max 8 frames for analysis
+            if (!frame.url) continue;
+            try {
+                const res = await fetch(frame.url, { signal: AbortSignal.timeout(10000) });
+                if (!res.ok) continue;
+                const buf = await res.arrayBuffer();
+                const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+                frameImageParts.push({
+                    inlineData: { data: Buffer.from(buf).toString('base64'), mimeType },
+                });
+            } catch (e) {
+                /* ignore */
+            }
+        }
+    }
+
     const userPrompt = [
         castBankSection,
         knownCasts.length > 0 ? `CRITICAL INSTRUCTION: If any character/speaker appearing in the video matches a known cast member from the Cast Bank (based on their appearance/description/role), you MUST name them EXACTLY as they are named in the Cast Bank (e.g. use "${knownCasts[0].name}" instead of a generic description).` : '',
         '',
         videoContext,
-        isYT ? `YOUTUBE URL (watch this video): ${youtubeUrl}` : `VIDEO FILE: Undergoing direct visual analysis`,
+        frameImageParts.length > 0 ? `SCENE FRAMES (Attached): Visual context for the video.` : (isYT ? `YOUTUBE URL (watch this video): ${youtubeUrl}` : `VIDEO FILE: Undergoing direct visual analysis`),
         transcriptSection
     ].filter(Boolean).join('\n');
 
@@ -322,14 +342,15 @@ export async function analysisNode({ video, brandContext, knownCasts = [], writi
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        console.log(`🧠 [analysisNode] Sending video to Gemini 2.5 Pro for native video analysis`);
+        console.log(`🧠 [analysisNode] Sending video context to Gemini 2.5 Pro for deep analysis`);
         const result = await router.generateText({
             systemPrompt: PROMPTS.VIDEO_ANALYST,
             userPrompt: userPrompt,
             temperature: 0.3,
             maxTokens: 4096,
-            model: 'gemini-2.5-pro',       // Best model for video understanding
-            youtubeUrl: resolvedVideoUrl,  // Triggers fileData injection
+            model: 'gemini-2.5-pro',
+            youtubeUrl: frameImageParts.length > 0 ? null : resolvedVideoUrl, // skip url native if we pass frames directly
+            imageParts: frameImageParts.length > 0 ? frameImageParts : undefined,
             jsonMode: true,
         }, { provider: 'gemini' });
         clearTimeout(analysisTimeout);
@@ -791,10 +812,12 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
     console.log(`   Lead portrait anchor: ${leadPortraitPart ? '✅' : '❌ none (generating characters from text descriptions)'}`);
 
     // ── Load reference frame as actual inline image ────────────────────────────────
-    // This is the KEY fix: previously referenceFrameUrl was only mentioned in the text prompt.
-    // Now we fetch it inline so GPT Image 2 + Gemini can actually SEE the video frame.
     const referenceFramePart = referenceFrameUrl ? await fetchInline(referenceFrameUrl, 'Video screen grab (reference frame)') : null;
     console.log(`   Screen grab reference: ${referenceFramePart ? `✅ loaded (${bestFrame?.label})` : '❌ none'}`);
+
+    // ── Load extracted primary face from Face Detection (Phase 3) ──────────────────
+    const primaryFacePart = primaryFaceUrl ? await fetchInline(primaryFaceUrl, 'Primary Extracted Face Crop') : null;
+    console.log(`   Primary Extracted Face: ${primaryFacePart ? '✅ loaded' : '❌ none'}`);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP A — MCoT: Deep analysis of the template reference image
@@ -939,65 +962,45 @@ Return ONLY a JSON object, no markdown:
         `Professional YouTube thumbnail (16:9, 1536x1024).`,
         `Video title: "${videoTitle}"`,
         ``,
-        `=== CREATIVE DIRECTOR BRIEF ===`,
-        thumbnailDirection?.ctrStrategy ? `CTR STRATEGY: ${thumbnailDirection.ctrStrategy}` : '',
-        thumbnailDirection?.screenGrabInsight ? `VISUAL GROUNDING (from actual video frames): ${thumbnailDirection.screenGrabInsight}` : '',
-        thumbnailDirection?.concept ? `THUMBNAIL CONCEPT: ${thumbnailDirection.concept}` : '',
+        `=== IMAGE GENERATION STRUCTURE ===`,
         ``,
-        `=== KEY SCENE TO DEPICT ===`,
+        `[SUBJECT & IDENTITY]`,
+        primaryFacePart 
+            ? `IMAGE-TO-IMAGE RECONSTRUCTION: The attached face crop image contains the EXACT identity of the subject. You MUST perfectly preserve their likeness, facial structure, skin tone, and features. DO NOT hallucinate a generic face.` 
+            : `Focus on the lead character.`,
+        `Emotion: ${peakEmotion} — convey this STRONGLY through facial expression.`,
+        ``,
+        `[ACTION & SCENE]`,
         thumbnailDirection?.imageGenerationPrompt
-            ? `SCENE: ${thumbnailDirection.imageGenerationPrompt}`
-            : `SCENE: ${peakScene}`,
-        `Emotional tone: ${peakEmotion} — convey this STRONGLY through facial expression and body language.`,
-        `Composition: ${thumbnailDirection?.composition || 'center-subject'}`,
-        `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}`,
+            ? `Action: ${thumbnailDirection.imageGenerationPrompt}`
+            : `Action: ${peakScene}`,
         ``,
-        characterList
-            ? `CHARACTERS:\n  ${characterList.substring(0, 400)}`
-            : 'Focus on the lead character(s).',
+        `[ENVIRONMENT & BACKGROUND]`,
+        ta.backgroundScene ? `Environment: ${ta.backgroundScene}` : `Environment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}`,
         ``,
-        ta.overallAesthetic || baseTemplateStyle || directionStyle
-            ? `VISUAL STYLE: ${ta.overallAesthetic || baseTemplateStyle || directionStyle}`
-            : '',
-        `Dominant color: ${thumbnailDirection?.dominantColor || ta.colorPalette?.[0] || '#FF4500'}`,
-        ta.colorPalette?.length ? `Full color palette: ${ta.colorPalette.join(', ')}` : '',
-        ta.backgroundScene ? `Background scene type: ${ta.backgroundScene}` : '',
-        ta.mainSubjectPosition ? `Subject position: ${ta.mainSubjectPosition}` : '',
+        `[LIGHTING & COLOR]`,
+        `Lighting: Cinematic dramatic lighting, high contrast, rim lighting to make subject pop from background.`,
+        `Color Palette: ${thumbnailDirection?.dominantColor || ta.colorPalette?.[0] || 'Vibrant, high saturation'}`,
+        ta.colorPalette?.length ? `Specific Colors: ${ta.colorPalette.join(', ')}` : '',
         ``,
-        `=== TEXT OVERLAYS — TWO DISTINCT ELEMENTS ===`,
-        `ELEMENT 1 — BIG FLOATING HOOK TEXT (upper/center area of image):`,
+        `[COMPOSITION & BROADCAST ELEMENTS]`,
+        `Composition: ${thumbnailDirection?.composition || 'center-subject, rule of thirds'}`,
+        `Subject Position: ${ta.mainSubjectPosition || 'prominent'}`,
+        ``,
+        `TEXT OVERLAY 1 (BIG FLOATING HOOK):`,
         `  Text: "${overlayText}"`,
-        `  Style: ${thumbnailDirection?.textOverlay?.style || 'bold-block'} — color ${thumbnailDirection?.textOverlay?.color || '#FFFFFF'} — GIANT — readable at 160px — add bold stroke/outline`,
-        `  Place in the upper third OR center of the image, NEVER at the bottom (that is reserved for Element 2)`,
+        `  Style: ${thumbnailDirection?.textOverlay?.style || 'bold-block'}, color ${thumbnailDirection?.textOverlay?.color || '#FFFFFF'}, giant font, high visibility.`,
         ``,
-        `ELEMENT 2 — LOWER-THIRD TITLE BAR (bottom strip of image):`,
+        `TEXT OVERLAY 2 (LOWER-THIRD BAR):`,
         ta.lowerThird
             ? `  ${ta.lowerThird}. Text inside bar: "${bestClickbaitCopy}"`
             : `  Dark semi-transparent gradient bar occupying the bottom 15% of image. Bold white text: "${bestClickbaitCopy}"`,
-        `  This bar MUST be clearly separate from Element 1. Do NOT repeat Element 1's text here.`,
-        ta.reconstructionInstruction ? `RECONSTRUCTION: ${ta.reconstructionInstruction.substring(0, 300)}` : '',
-        ``,
-        `=== GRAPHIC ELEMENTS (APPLY THESE) ===`,
-        thumbnailDirection?.graphicElements
-            ? thumbnailDirection.graphicElements
-            : `Add bold visual emphasis — bright arrows or highlight circles directing attention to the main subject's expression`,
-        ``,
-        template?.generationPromptSuffix ? `SHOW STYLE DIRECTIVE: ${template.generationPromptSuffix}` : '',
-        brandSnippet ? `Brand context: ${brandSnippet}` : '',
-        referenceFramePart
-            ? `CRITICAL IMAGE-TO-IMAGE RECONSTRUCTION RULE: The attached screen grab contains the ACTUAL faces of the people. You MUST NOT hallucinate new faces. Preserve their exact likeness, facial structure, and expression perfectly. Enhance the lighting and background to be cinematic, but keep the core subjects identical to the reference image.`
-            : '',
         ``,
         `=== CTR HARD RULES ===`,
-        `- 16:9 landscape orientation, 1536x1024px output`,
-        `- Main subject's FACE must show EXTREME EMOTION — this is the #1 CTR driver`,
-        `- HIGH CONTRAST between subject and background — subject must POP visually`,
-        `- Cinematic dramatic lighting — chiaroscuro, rim lighting, or color contrast`,
-        `- BOTH text elements must be composited ON the image — bold, outlined, readable at 160px`,
-        `- Element 1 (hook text) and Element 2 (lower-third bar) must contain DIFFERENT text`,
-        `- NO brand logos, NO channel watermarks (will be overlaid digitally later)`,
-        `- Photorealistic, broadcast quality, not cartoonish`,
-        `- Make it look like the #1 most-clicked thumbnail in this video's niche`,
+        `- Main subject's FACE must show EXTREME EMOTION`,
+        `- HIGH CONTRAST between subject and background`,
+        `- NO brand logos or channel watermarks`,
+        `- Photorealistic, broadcast quality, not cartoonish`
     ].filter(Boolean).join('\n');
 
 
@@ -1008,10 +1011,11 @@ Return ONLY a JSON object, no markdown:
 
     // ── Inject explicit image role labels for Gemini ──
     const imageParts = [
-        ...(referenceFramePart ? [referenceFramePart] : []),  // ✅ actual video frame
-        ...(leadPortraitPart   ? [leadPortraitPart]   : []),  // ✅ character portrait
-        ...(templateRefPart    ? [templateRefPart]    : []),  // ✅ template style guide
-    ];
+        primaryFacePart,
+        leadPortraitPart,
+        templateRefPart,
+        referenceFramePart
+    ].filter(Boolean);
 
     let finalPrompt = genPrompt;
     if (imageParts.length > 0) {
@@ -1159,106 +1163,55 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
  *   0.jpg / maxresdefault.jpg = best auto frame
  *   1.jpg / 2.jpg / 3.jpg    = frames at ~25%, 50%, 75%
  */
-export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true, peakMoments = [], duration = null }) {
-    if (!videoId) return { extractedFrames: [] };
+export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true, peakMoments = [], duration = null, metadata = null }) {
+    if (!videoId) return { extractedFrames: [], primaryFaceUrl: null, faceClusters: [] };
 
-    // Helper: convert MM:SS or HH:MM:SS or raw numbers/strings to seconds
-    function parseTimestamp(ts) {
-        if (typeof ts === 'number') return ts;
-        if (!ts) return 0;
-        const parts = ts.toString().split(':').map(Number);
-        if (parts.some(isNaN)) return 0;
-        if (parts.length === 3) {
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        }
-        if (parts.length === 2) {
-            return parts[0] * 60 + parts[1];
-        }
-        return parts[0] || 0;
-    }
+    let streamUrl = videoUrl;
 
     if (isYT) {
         console.log(`🎬 [frameExtractionNode] Resolving YouTube stream for FFmpeg extraction...`);
         const { getYouTubeStreamUrl } = await import('../../utils/youtubeStream.js');
-        const streamUrl = await getYouTubeStreamUrl(videoId);
-        if (streamUrl) {
-            videoUrl = streamUrl;
-            isYT = false; // Trick the logic below into using the S3/Direct FFmpeg pipeline
-            duration = duration || 120; // Default if unknown
-        } else {
-            console.error(`❌ [frameExtractionNode] YouTube stream restricted. Cannot extract peak moments.`);
-            throw new Error('This video is restricted by YouTube. Please try another video.');
-        }
-    }
-
-    if (!isYT) {
-        if (!videoUrl) return { extractedFrames: [] };
-        console.log(`🎬 [frameExtractionNode] Extracting S3 frames via FFmpeg for ${videoId}`);
-        const durationSecs = duration || await getUploadedVideoDuration(videoUrl);
-        const s3KeyPrefix = `youtube-studio-uploads/frames/${videoId}`;
+        streamUrl = await getYouTubeStreamUrl(videoId);
         
-        let offsets = [];
-        if (peakMoments && peakMoments.length > 0) {
-            offsets = peakMoments.map((pm, idx) => ({
-                secs: parseTimestamp(pm.timestamp),
-                label: pm.label || (idx === 0 ? 'Peak Moment Frame' : `Highlight ${idx}`)
-            }));
-        } else {
-            offsets = [
-                { secs: Math.min(5, Math.floor(durationSecs / 2)), label: 'HD Cover Frame' },
-                { secs: Math.round(durationSecs * 0.25), label: 'Frame at 25%' },
-                { secs: Math.round(durationSecs * 0.5), label: 'Frame at 50%' },
-                { secs: Math.round(durationSecs * 0.75), label: 'Frame at 75%' }
+        if (!streamUrl) {
+            console.error(`❌ [frameExtractionNode] YouTube stream restricted. Using Metadata-Only fallback.`);
+            // Fall back to just returning the standard YouTube thumbnails without failing
+            const fallbackFrames = [
+                { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame (Metadata Fallback)', score: 100 },
+                { url: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,     label: 'HQ Cover Frame', score: 50 }
             ];
+            return { extractedFrames: fallbackFrames, primaryFaceUrl: null, faceClusters: [], isMetadataFallback: true };
         }
+    }
 
-        const frames = [];
-        for (const offset of offsets) {
-            console.log(`   🎬 Extracting frame at ${offset.secs}s (${offset.label})...`);
-            const url = await extractFrameFromVideoUrl(videoUrl, offset.secs, s3KeyPrefix);
-            if (url) {
-                frames.push({ url, label: offset.label, sizeKb: 0 });
-            }
+    if (streamUrl) {
+        console.log(`🎬 [frameExtractionNode] Initiating intelligent frame extraction...`);
+        const { intelligentFrameExtraction } = await import('../../utils/frameExtraction.js');
+        const { detectAndClusterFaces } = await import('../../utils/faceDetection.js');
+
+        // Extract frames intelligently (ffmpeg scene detection, scoring, deduplication)
+        const extractedFrames = await intelligentFrameExtraction(videoId, streamUrl, duration || 120, peakMoments);
+
+        if (extractedFrames.length > 0) {
+            // Run Face Detection and Clustering on the extracted top frames
+            console.log(`🎬 [frameExtractionNode] Running face detection on ${extractedFrames.length} top frames...`);
+            const { primaryFaceUrl, allFaces } = await detectAndClusterFaces(extractedFrames, videoId);
+
+            // Clean up the local buffers from memory since we already uploaded them
+            extractedFrames.forEach(f => {
+                delete f.localBuffer;
+            });
+
+            return { 
+                extractedFrames, 
+                primaryFaceUrl, 
+                faceClusters: allFaces,
+                isMetadataFallback: false
+            };
         }
-        console.log(`   🎬 Extracted ${frames.length} frames via FFmpeg for direct upload ${videoId}`);
-        return { extractedFrames: frames };
     }
 
-    console.log(`🎬 [frameExtractionNode] Extracting YouTube CDN frames for ${videoId}`);
-
-    const durationSecs = duration;
-    let peakIndex = -1;
-    if (peakMoments && peakMoments.length > 0 && durationSecs) {
-        const peakSecs = parseTimestamp(peakMoments[0].timestamp);
-        const pct = peakSecs / durationSecs;
-        if (pct < 0.38) peakIndex = 2; // Frame at 25% (idx 2 in frameUrls)
-        else if (pct < 0.63) peakIndex = 3; // Frame at 50% (idx 3 in frameUrls)
-        else peakIndex = 4; // Frame at 75% (idx 4 in frameUrls)
-    }
-
-    const frameUrls = [
-        { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame' },
-        { url: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,     label: 'HQ Cover Frame' },
-        { url: `https://img.youtube.com/vi/${videoId}/1.jpg`,             label: peakIndex === 2 ? 'Peak Moment Frame' : 'Frame at 25%' },
-        { url: `https://img.youtube.com/vi/${videoId}/2.jpg`,             label: peakIndex === 3 ? 'Peak Moment Frame' : 'Frame at 50%' },
-        { url: `https://img.youtube.com/vi/${videoId}/3.jpg`,             label: peakIndex === 4 ? 'Peak Moment Frame' : 'Frame at 75%' },
-    ];
-
-    const frames = [];
-    for (const { url, label } of frameUrls) {
-        try {
-            const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-            if (!res.ok) continue;
-            const buf = await res.arrayBuffer();
-            // Skip YouTube's 1×1 grey placeholder (returned when a frame doesn't exist)
-            if (buf.byteLength < 2000) continue;
-            frames.push({ url, label, sizeKb: Math.round(buf.byteLength / 1024) });
-            console.log(`   ✅ ${label} → ${url.split('/').pop()} (${Math.round(buf.byteLength / 1024)}KB)`);
-        } catch { /* skip unavailable frames silently */ }
-    }
-
-    console.log(`   🎬 Extracted ${frames.length} frames for video ${videoId}`);
-    return { extractedFrames: frames };
+    return { extractedFrames: [], primaryFaceUrl: null, faceClusters: [] };
 }
 
 
