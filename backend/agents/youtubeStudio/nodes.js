@@ -1035,21 +1035,40 @@ Return ONLY a JSON object, no markdown:
     }
 
     try {
-        const result = await router.generateImage({
-            prompt: finalPrompt,
-            model: 'gpt-image-2', 
-            aspectRatio: '16:9',
-            imageParts: imageParts,
-        }, { provider: 'openai' });
+        const { compositeThumbnail } = await import('../../utils/thumbnailCompositor.js');
+        const { uploadToS3 } = await import('../../utils/s3.js');
+        const crypto = await import('crypto');
 
-        const rawUrl = typeof result === 'string' ? result : result.imageUrl;
-        const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
-        console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
-        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
+        if (referenceFrameUrl) {
+            console.log(`🚀 [thumbnailGenerationNode] Bypassing AI generation — direct compositing onto extracted frame.`);
+            const finalBuffer = await compositeThumbnail(
+                referenceFrameUrl,
+                overlayText,
+                bestClickbaitCopy,
+                ta
+            );
+            const key = `yt-studio/thumbnails/${Date.now()}-${crypto.randomBytes(3).toString('hex')}.jpg`;
+            const finalUrl = await uploadToS3(finalBuffer, key, 'image/jpeg');
+            console.log(`✅ [thumbnailGenerationNode] Direct render success → S3: ${finalUrl?.substring(0, 80)}`);
+            return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'direct-compositor' };
+        } else {
+            console.warn(`⚠️ No reference frame available. Falling back to AI generation.`);
+            const result = await router.generateImage({
+                prompt: finalPrompt,
+                model: 'gpt-image-2', 
+                aspectRatio: '16:9',
+                imageParts: imageParts,
+            }, { provider: 'openai' });
 
-    } catch (gemErr) {
-        console.error(`❌ [thumbnailGenerationNode] Gemini image generation failed: ${gemErr.message}`);
-        return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
+            const rawUrl = typeof result === 'string' ? result : result.imageUrl;
+            const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
+            console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
+            return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
+        }
+
+    } catch (err) {
+        console.error(`❌ [thumbnailGenerationNode] Thumbnail rendering failed: ${err.message}`);
+        return { generatedThumbnailUrl: null, thumbnailGenerationError: err.message, generatorModel: null };
     }
 }
 
@@ -1174,6 +1193,19 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
             return parts[0] * 60 + parts[1];
         }
         return parts[0] || 0;
+    }
+
+    if (isYT) {
+        console.log(`🎬 [frameExtractionNode] Resolving YouTube stream for FFmpeg extraction...`);
+        const { getYouTubeStreamUrl } = await import('../../utils/youtubeStream.js');
+        const streamUrl = await getYouTubeStreamUrl(videoId);
+        if (streamUrl) {
+            videoUrl = streamUrl;
+            isYT = false; // Trick the logic below into using the S3/Direct FFmpeg pipeline
+            duration = duration || 120; // Default if unknown
+        } else {
+            console.warn(`⚠️ [frameExtractionNode] Failed to resolve YouTube stream. Falling back to CDN thumbnails.`);
+        }
     }
 
     if (!isYT) {
