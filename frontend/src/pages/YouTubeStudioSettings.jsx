@@ -371,6 +371,7 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
         defaultTemplateId: channel?.defaultTemplateId?._id || channel?.defaultTemplateId || '',
     })
     const [saving, setSaving] = useState(false)
+    const [newSample, setNewSample] = useState('')
 
     const set = (path, value) => {
         setForm(prev => {
@@ -565,6 +566,64 @@ function ChannelEditor({ channel, templates, onSave, onClose }) {
                         templates={templates}
                         onChange={v => set('shows', v)}
                     />
+
+                    {/* ── Writing Style Settings ── */}
+                    <div style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                            <MIcon name="history_edu" size={15} color="var(--sys-primary)" />
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 700 }}>Custom Writing Samples</p>
+                        </div>
+                        <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--sys-text-muted)', lineHeight: 1.4 }}>
+                            Add past descriptions, post samples, or titles. AI analyzes style fingerprints to write future scripts & SEO copy. If empty, falls back to Brand DNA.
+                        </p>
+                        
+                        {form.writingSamples?.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                                {form.writingSamples.map((sample, idx) => (
+                                    <div key={idx} style={{ display: 'flex', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', alignItems: 'flex-start' }}>
+                                        <div style={{ flex: 1, fontSize: 11, color: 'var(--sys-text)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', lineHeight: 1.4 }}>
+                                            "{sample}"
+                                        </div>
+                                        <button type="button" onClick={() => {
+                                            const filtered = form.writingSamples.filter((_, i) => i !== idx)
+                                            set('writingSamples', filtered)
+                                        }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}>
+                                            <MIcon name="delete" size={15} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <textarea 
+                                value={newSample} 
+                                onChange={e => setNewSample(e.target.value)}
+                                rows={2}
+                                placeholder="Paste caption/description samples here..."
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 12, resize: 'vertical' }}
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    if (!newSample.trim()) return
+                                    set('writingSamples', [...(form.writingSamples || []), newSample.trim()])
+                                    setNewSample('')
+                                }}
+                                disabled={!newSample.trim()}
+                                style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--sys-primary)', color: 'var(--sys-primary)', background: 'transparent', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                <MIcon name="add" size={13} /> Add Sample
+                            </button>
+                        </div>
+
+                        {form.writingStyleAnalysis && (
+                            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--sys-primary)08', border: '1px solid var(--sys-primary)30' }}>
+                                <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--sys-primary)' }}>Writing Style Analysis DNA:</p>
+                                <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text)', lineHeight: 1.5 }}>{form.writingStyleAnalysis}</p>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Preferences */}
                     <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 8 }}>

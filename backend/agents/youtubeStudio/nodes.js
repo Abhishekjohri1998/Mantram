@@ -22,6 +22,124 @@ import {
 } from './transcriptClient.js';
 import { getRouter } from '../../ai/router.js';
 import { uploadBase64ToS3, persistToS3 } from '../../utils/s3Upload.js';
+import { getObjectStream, uploadToS3 } from '../../utils/s3.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+
+const execAsync = promisify(exec);
+
+// ── Gemini Files API Upload & Deletion ──────────────────────────────────────
+async function uploadToGeminiFilesAPI(mediaUrl, contentType = 'video') {
+    console.log(`📤 Downloading ${mediaUrl} to buffer for Gemini upload...`);
+    let buffer;
+    let mimeType = contentType === 'video' ? 'video/mp4' : 'image/jpeg';
+    
+    try {
+        if (mediaUrl.includes('s3.amazonaws.com') || mediaUrl.includes('mantram')) {
+            const { stream, contentType: s3Type } = await getObjectStream(mediaUrl);
+            if (s3Type) mimeType = s3Type;
+            
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            buffer = Buffer.concat(chunks);
+        } else {
+            const response = await fetch(mediaUrl);
+            if (!response.ok) throw new Error(`Failed to fetch media: ${response.statusText}`);
+            const arrayBuffer = await response.arrayBuffer();
+            buffer = Buffer.from(arrayBuffer);
+            mimeType = response.headers.get('content-type') || mimeType;
+        }
+
+        console.log(`🚀 Uploading ${Math.round(buffer.length / 1024 / 1024)}MB to Gemini Files API...`);
+        
+        const initRes = await fetch(
+            `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: {
+                    'X-Goog-Upload-Protocol': 'resumable',
+                    'X-Goog-Upload-Command': 'start',
+                    'X-Goog-Upload-Header-Content-Length': buffer.length.toString(),
+                    'X-Goog-Upload-Header-Content-Type': mimeType,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ file: { displayName: `youtube_upload_${Date.now()}` } })
+            }
+        );
+
+        if (!initRes.ok) throw new Error(`Gemini init upload failed: ${initRes.statusText}`);
+        const uploadUrl = initRes.headers.get('x-goog-upload-url');
+        if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+
+        const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'X-Goog-Upload-Protocol': 'resumable',
+                'X-Goog-Upload-Command': 'upload, finalize',
+                'X-Goog-Upload-Offset': '0',
+                'Content-Length': buffer.length.toString(),
+            },
+            body: buffer
+        });
+
+        if (!uploadRes.ok) throw new Error(`Gemini file upload failed: ${uploadRes.statusText}`);
+        const fileInfo = await uploadRes.json();
+        
+        console.log(`✅ Gemini Upload Success: ${fileInfo.file.uri}`);
+        return { fileUri: fileInfo.file.uri, fileName: fileInfo.file.name, mimeType };
+
+    } catch (error) {
+        console.error('Gemini file upload error:', error);
+        throw error;
+    }
+}
+
+async function deleteFromGemini(fileName) {
+    if (!fileName) return;
+    try {
+        console.log(`🧹 Cleaning up Gemini file: ${fileName}`);
+        await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${process.env.GEMINI_API_KEY}`, {
+            method: 'DELETE'
+        });
+    } catch (e) {
+        console.error(`Failed to delete Gemini file ${fileName}:`, e.message);
+    }
+}
+
+// ── FFmpeg Frame Extraction for Direct Video Uploads ─────────────────────────
+async function getUploadedVideoDuration(videoUrl) {
+    try {
+        const { stdout } = await execAsync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoUrl}"`);
+        const durationSecs = parseFloat(stdout.trim());
+        return isNaN(durationSecs) ? 120 : durationSecs;
+    } catch (err) {
+        console.warn('⚠️ Failed to get video duration using ffprobe:', err.message);
+        return 120;
+    }
+}
+
+async function extractFrameFromVideoUrl(videoUrl, timestampSecs, s3KeyPrefix) {
+    const tempOut = path.join(os.tmpdir(), `frame-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`);
+    try {
+        const cmd = `ffmpeg -y -ss ${timestampSecs} -i "${videoUrl}" -vframes 1 -q:v 2 "${tempOut}"`;
+        await execAsync(cmd);
+        if (fs.existsSync(tempOut)) {
+            const buffer = fs.readFileSync(tempOut);
+            const key = `${s3KeyPrefix}/frame-${timestampSecs}s.jpg`;
+            const s3Url = await uploadToS3(buffer, key, 'image/jpeg');
+            fs.unlinkSync(tempOut);
+            return s3Url;
+        }
+    } catch (err) {
+        console.warn(`⚠️ Failed to extract frame at ${timestampSecs}s:`, err.message);
+        if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
+    }
+    return null;
+}
 
 const FAL_BASE = 'https://queue.fal.run';
 // FAL_API_KEY is what's in .env — FAL_KEY is the alternate alias some clients expect
@@ -83,7 +201,33 @@ export async function falGenerateImage({ prompt, imageUrl = null, width = 1280, 
 
 // ── 1. Transcript Node ─────────────────────────────────────────────────────
 
-export async function transcriptNode({ videoId, videoUrl }) {
+export async function transcriptNode({ videoId, videoUrl, isYT = true }) {
+    if (!isYT) {
+        console.log(`📹 [transcriptNode] Processing direct video file upload: ${videoId}`);
+        const filename = (videoUrl || '').split('/').pop() || 'Uploaded Video';
+        return {
+            videoId,
+            youtubeUrl: videoUrl,
+            metadata: {
+                title: filename.substring(0, 80),
+                description: 'Uploaded Video File',
+                channelTitle: 'Uploaded Video',
+                publishedAt: new Date(),
+                thumbnailUrl: '',
+                viewCount: 0,
+                tags: []
+            },
+            transcript: {
+                available: false,
+                text: null,
+                segments: [],
+                language: null,
+                source: 'none'
+            },
+            duration: null
+        };
+    }
+
     const id = videoId || extractVideoId(videoUrl);
     if (!id) throw new Error('Invalid YouTube URL or video ID');
 
@@ -119,13 +263,14 @@ export async function transcriptNode({ videoId, videoUrl }) {
 
 // ── 2. Video Analysis Node (MCoT) ──────────────────────────────────────────
 
-export async function analysisNode({ video, brandContext }) {
+export async function analysisNode({ video, brandContext, knownCasts = [], writingStyleAnalysis = null }) {
     console.log(`🧠 [analysisNode] Running MCoT video analysis`);
 
     const { transcript, metadata, youtubeUrl } = video;
+    const isYT = youtubeUrl.includes('youtube.com') || youtubeUrl.includes('youtu.be');
 
     // Build the analysis input
-    const videoContext = [
+    let videoContext = [
         `VIDEO TITLE: ${metadata.title || 'Unknown'}`,
         `CHANNEL: ${metadata.channelTitle || 'Unknown'}`,
         `DURATION: ${video.duration || 'Unknown'}`,
@@ -137,27 +282,54 @@ export async function analysisNode({ video, brandContext }) {
         '',
     ].join('\n');
 
+    if (writingStyleAnalysis) {
+        videoContext += `\nWRITING STYLE REFERENCE (CRITICAL):\nAdopt this exact writing style for all text outputs (summary, peakMoment title, highlight descriptions, etc.):\n${writingStyleAnalysis}\n`;
+    }
+
+    const castBankSection = knownCasts.length > 0
+        ? `KNOWN CAST BANK (Use this to map characters to exact names if they match descriptions):\n${knownCasts.map(c => `  - Name: "${c.name}" | Description: ${c.description} | Role: ${c.role}`).join('\n')}\n`
+        : '';
+
     const transcriptSection = transcript.available
         ? `TRANSCRIPT (timestamped):\n${transcript.text?.substring(0, 15000)}${transcript.text?.length > 15000 ? '\n... [transcript truncated for context]' : ''}`
-        : `TRANSCRIPT: Not available — analyse based on title and description only.`;
+        : `TRANSCRIPT: Not available — analyse based on video visuals and audio.`;
 
-    // Use Gemini natively via router — pass youtubeUrl as fileData for native video watching
-    // gemini-2.5-pro video analysis can take 60-120s — wrap in AbortController
+    const userPrompt = [
+        castBankSection,
+        knownCasts.length > 0 ? `CRITICAL INSTRUCTION: If any character/speaker appearing in the video matches a known cast member from the Cast Bank (based on their appearance/description/role), you MUST name them EXACTLY as they are named in the Cast Bank (e.g. use "${knownCasts[0].name}" instead of a generic description).` : '',
+        '',
+        videoContext,
+        isYT ? `YOUTUBE URL (watch this video): ${youtubeUrl}` : `VIDEO FILE: Undergoing direct visual analysis`,
+        transcriptSection
+    ].filter(Boolean).join('\n');
+
     const router = getRouter();
     let analysis;
-    // gemini-2.5-pro video analysis: typically 30-120s, can peak at 180s for long videos
     const analysisController = new AbortController();
     const analysisTimeout = setTimeout(() => analysisController.abort(), 180_000); // 3 min cap
 
+    let geminiFileName = null;
+    let resolvedVideoUrl = youtubeUrl;
+
     try {
-        console.log(`🧠 [analysisNode] Sending YouTube URL to Gemini 2.5 Pro for native video analysis`);
+        if (!isYT) {
+            console.log(`📤 Uploading direct video file to Gemini Files API for native analysis: ${youtubeUrl}`);
+            const fileData = await uploadToGeminiFilesAPI(youtubeUrl, 'video');
+            geminiFileName = fileData.fileName;
+            resolvedVideoUrl = fileData.fileUri;
+            
+            console.log('⏳ Waiting 5s for Gemini to process the uploaded video file...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+
+        console.log(`🧠 [analysisNode] Sending video to Gemini 2.5 Pro for native video analysis`);
         const result = await router.generateText({
             systemPrompt: PROMPTS.VIDEO_ANALYST,
-            userPrompt: `${videoContext}\n\nYOUTUBE URL (watch this video): ${youtubeUrl}\n\n${transcriptSection}`,
+            userPrompt: userPrompt,
             temperature: 0.3,
             maxTokens: 4096,
             model: 'gemini-2.5-pro',       // Best model for video understanding
-            youtubeUrl: youtubeUrl,         // Triggers fileData injection in Gemini provider
+            youtubeUrl: resolvedVideoUrl,  // Triggers fileData injection
         }, { provider: 'gemini' });
         clearTimeout(analysisTimeout);
 
@@ -218,6 +390,10 @@ export async function analysisNode({ video, brandContext }) {
 
         // No transcript + no video analysis = hard failure, propagate to pipeline
         throw new Error(`Video analysis failed and no transcript available: ${err.message}`);
+    } finally {
+        if (geminiFileName) {
+            await deleteFromGemini(geminiFileName);
+        }
     }
 
     return { analysis };
@@ -259,13 +435,17 @@ export async function chapterNode({ video, analysis }) {
 
 // ── 4. SEO Copywriter Node ─────────────────────────────────────────────────
 
-export async function seoNode({ video, analysis, chapters, brandContext }) {
+export async function seoNode({ video, analysis, chapters, brandContext, writingStyleAnalysis = null }) {
     console.log(`✍️ [seoNode] Generating SEO metadata`);
 
     const { metadata, transcript } = video;
     const chapterText = chapters?.length
         ? `DETECTED CHAPTERS:\n${chapters.map(c => `${c.timestamp} - ${c.title}: ${c.description}`).join('\n')}`
         : '';
+
+    const brandDnaSection = writingStyleAnalysis
+        ? `=== WRITING STYLE REFERENCE (CRITICAL) ===\nAdopt the writing style, tone, vocabulary, and formatting defined below for all SEO titles, descriptions, and tags. This style reference overrides standard brand DNA tone guidelines:\n${writingStyleAnalysis}\n`
+        : `=== BRAND DNA (THIS DICTATES VOICE, TONE AND KEYWORDS ONLY) ===\nCRITICAL INSTRUCTION: Do NOT hallucinate brand products, services, or taglines into the copy if they are not actually in the video content. The video content is the ground truth. Use Brand DNA ONLY for the stylistic voice, tone, and formatting.\n${brandContext || 'No brand context'}`;
 
     const userPrompt = [
         `=== VIDEO CONTENT (THIS DICTATES THE ACTUAL COPY) ===`,
@@ -283,9 +463,7 @@ export async function seoNode({ video, analysis, chapters, brandContext }) {
         '',
         `TRANSCRIPT EXCERPT:\n${transcript.text?.substring(0, 5000) || 'N/A'}`,
         '',
-        `=== BRAND DNA (THIS DICTATES VOICE, TONE AND KEYWORDS ONLY) ===`,
-        `CRITICAL INSTRUCTION: Do NOT hallucinate brand products, services, or taglines into the copy if they are not actually in the video content. The video content is the ground truth. Use Brand DNA ONLY for the stylistic voice, tone, and formatting.`,
-        brandContext || 'No brand context',
+        brandDnaSection
     ].join('\n');
 
     // Use xAI Grok for SEO — great at trending language and CTR-optimised copy
@@ -979,8 +1157,33 @@ export async function characterPortraitNode({ analysis, video, brandContext }) {
  *   0.jpg / maxresdefault.jpg = best auto frame
  *   1.jpg / 2.jpg / 3.jpg    = frames at ~25%, 50%, 75%
  */
-export async function frameExtractionNode({ videoId }) {
+export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true }) {
     if (!videoId) return { extractedFrames: [] };
+
+    if (!isYT) {
+        if (!videoUrl) return { extractedFrames: [] };
+        console.log(`🎬 [frameExtractionNode] Extracting S3 frames via FFmpeg for ${videoId}`);
+        const durationSecs = await getUploadedVideoDuration(videoUrl);
+        const s3KeyPrefix = `youtube-studio-uploads/frames/${videoId}`;
+        
+        const offsets = [
+            { secs: Math.min(5, Math.floor(durationSecs / 2)), label: 'HD Cover Frame' },
+            { secs: Math.round(durationSecs * 0.25), label: 'Frame at 25%' },
+            { secs: Math.round(durationSecs * 0.5), label: 'Frame at 50%' },
+            { secs: Math.round(durationSecs * 0.75), label: 'Frame at 75%' }
+        ];
+
+        const frames = [];
+        for (const offset of offsets) {
+            const url = await extractFrameFromVideoUrl(videoUrl, offset.secs, s3KeyPrefix);
+            if (url) {
+                frames.push({ url, label: offset.label, sizeKb: 0 });
+            }
+        }
+        console.log(`   🎬 Extracted ${frames.length} frames via FFmpeg for direct upload ${videoId}`);
+        return { extractedFrames: frames };
+    }
+
     console.log(`🎬 [frameExtractionNode] Extracting YouTube CDN frames for ${videoId}`);
 
     const frameUrls = [

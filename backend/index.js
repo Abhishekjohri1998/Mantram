@@ -45,6 +45,7 @@ import agentCommandRoutes from './routes/agentCommand.js';
 import videoStudioRoutes from './routes/video-studio.js';
 import youtubeStudioRoutes from './routes/youtube-studio.js';
 import youtubeStudioSettingsRoutes from './routes/youtube-studio-settings.js';
+import castingBayRoutes from './routes/casting-bay.js';
 import contentAgenticRoutes from './routes/content-agentic.js';
 import creativeAgenticRoutes from './routes/creative-agentic.js';
 import orchestratorRoutes from './routes/orchestrator-routes.js';
@@ -507,6 +508,7 @@ app.use('/api/video-studio', videoStudioRoutes);
 app.use('/api/youtube-studio/settings', youtubeStudioSettingsRoutes); // Legacy path kept
 app.use('/api/yt-studio-settings', youtubeStudioSettingsRoutes);      // Non-overlapping path (active)
 
+app.use('/api/casting-bay', castingBayRoutes);
 app.use('/api/youtube-studio', youtubeStudioRoutes);
 
 app.use('/api/content/agentic', contentAgenticRoutes);
