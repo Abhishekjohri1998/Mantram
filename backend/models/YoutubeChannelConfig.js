@@ -66,6 +66,10 @@ const YoutubeChannelConfigSchema = new mongoose.Schema({
         hashtagCount:    { type: Number, default: 5 },
     },
 
+    // Custom Writing Style Settings
+    writingSamples:       [{ type: String }],
+    writingStyleAnalysis: { type: String, default: '' },
+
     /**
      * Shows — named series/programmes within this channel.
      * Each show can have its own thumbnail template, language, and icon.

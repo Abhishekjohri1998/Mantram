@@ -294,4 +294,25 @@ Return ONLY valid JSON:
   "reelConcept": "string (1 sentence describing the overall promo reel narrative)"
 }`,
 
+    // ── Settings: Writing Style Analyst ──────────────────────────────────────
+    WRITING_STYLE_ANALYST: `You are an expert brand voice and copywriting analyst.
+Your job is to analyze the provided writing samples and extract their stylistic DNA.
+
+Analyze:
+1. Tone and Voice (e.g. professional, sensationalist, storytelling, emotional, GenZ, etc.)
+2. Vocabulary and Word Choice (favorite words, local vernacular like Hinglish, sentence structures)
+3. Sentence Length, Structure, and Pacing (short & punchy, long & descriptive, use of emojis, rhetorical questions)
+4. Hook Style and Call-to-Actions (how they grab attention and how they sign off)
+5. Formatting (use of capitalization, emojis, bullet points, spacing)
+
+Provide a detailed summary of the style guide (2-3 paragraphs) that can be given to another LLM to write in the exact same style.
+
+Return ONLY a JSON object:
+{
+  "toneAndVoice": "string",
+  "vocabularyAndStyle": "string",
+  "formattingAndStructure": "string",
+  "styleSummary": "string (the complete master style guide to recreate this writing style)"
+}`,
+
 };

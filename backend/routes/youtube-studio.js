@@ -24,6 +24,10 @@ import {
 } from '../agents/youtubeStudio/nodes.js';
 import { extractVideoId } from '../agents/youtubeStudio/transcriptClient.js';
 import YoutubeProject from '../models/YoutubeProject.js';
+import Cast from '../models/Cast.js';
+import multer from 'multer';
+import crypto from 'crypto';
+import { uploadToS3 } from '../utils/s3.js';
 
 const router = express.Router();
 
@@ -50,23 +54,61 @@ function emitProgress(projectId, event) {
     }
 }
 
+// ── POST /upload — Direct Video File Upload ───────────────────────────────
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for direct video analysis uploads
+    fileFilter: (req, file, cb) => {
+        const allowed = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'];
+        if (allowed.includes(file.mimetype) || file.originalname.match(/\.(mp4|mov|webm|mkv)$/i)) cb(null, true);
+        else cb(new Error('Invalid file type. Only video files (mp4, mov, webm, mkv) are allowed.'));
+    }
+});
+
+router.post('/upload', protect, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+        const { buffer, mimetype, originalname } = req.file;
+        const ext = originalname.split('.').pop()?.toLowerCase() || 'mp4';
+        const safeExt = ['mp4','mov','webm','mkv'].includes(ext) ? ext : 'mp4';
+        const key = `youtube-studio-uploads/${req.user._id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${safeExt}`;
+
+        console.log(`📤 [youtube-studio-upload] Uploading ${Math.round(buffer.length / 1024 / 1024)}MB → ${key}`);
+        const s3Url = await uploadToS3(buffer, key, mimetype);
+        console.log(`✅ [youtube-studio-upload] Uploaded: ${s3Url}`);
+
+        res.json({ success: true, url: s3Url, originalname });
+    } catch (error) {
+        console.error('YouTube Studio video upload error:', error);
+        res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });
+    }
+});
+
 // ── POST /analyse — Main 8-node pipeline ───────────────────────────────────
 // STATIC: registered FIRST
 
 router.post('/analyse', protect, async (req, res) => {
-    const { urls, url, brandId, channelConfigId, showId } = req.body;
+    const { urls, url, brandId, channelConfigId, showId, requestedFeatures } = req.body;
     const urlList = Array.isArray(urls) ? urls : (url ? [url] : []);
 
+    const features = Array.isArray(requestedFeatures) ? requestedFeatures : ['thumbnail', 'synopsis', 'seo', 'transcript', 'chapters', 'promo', 'brandCritic'];
+
     if (!urlList.length) {
-        return res.status(400).json({ success: false, error: 'Provide at least one YouTube URL' });
+        return res.status(400).json({ success: false, error: 'Provide at least one YouTube URL or uploaded video URL' });
     }
     if (urlList.length > 10) {
         return res.status(400).json({ success: false, error: 'Maximum 10 URLs per request' });
     }
 
     // Validate all URLs upfront
-    const videoIds = urlList.map(u => ({ url: u, id: extractVideoId(u) }));
-    const invalid = videoIds.filter(v => !v.id);
+    const videoIds = urlList.map(u => {
+        const isYT = u.includes('youtube.com') || u.includes('youtu.be');
+        const id = isYT ? extractVideoId(u) : `upload-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+        return { url: u, id, isYT };
+    });
+
+    const invalid = videoIds.filter(v => v.isYT && !v.id);
     if (invalid.length) {
         return res.status(400).json({
             success: false,
@@ -78,14 +120,15 @@ router.post('/analyse', protect, async (req, res) => {
     const { brandContext } = await loadBrandContext(brandId).catch(() => ({ brandContext: null }));
 
     // Create project records immediately so UI shows them
-    const projects = await Promise.all(videoIds.map(async ({ url: videoUrl, id }) => {
+    const projects = await Promise.all(videoIds.map(async ({ url: videoUrl, id, isYT }) => {
         const project = new YoutubeProject({
             userId: req.user._id,
             brandId: brandId || null,
             channelConfigId: channelConfigId || null,
             showId: showId || null,
             videoId: id,
-            videoUrl: `https://www.youtube.com/watch?v=${id}`,
+            videoUrl: videoUrl,
+            requestedFeatures: features,
             status: 'processing',
         });
         await project.save();
@@ -101,10 +144,10 @@ router.post('/analyse', protect, async (req, res) => {
 
     // Run pipeline async for each video
     for (let i = 0; i < videoIds.length; i++) {
-        const { url: videoUrl, id } = videoIds[i];
+        const { url: videoUrl, id, isYT } = videoIds[i];
         const project = projects[i];
 
-        runPipeline({ videoUrl, videoId: id, brandContext, brandId, channelConfigId, showId, project }).catch(err => {
+        runPipeline({ videoUrl, videoId: id, isYT, brandContext, brandId, channelConfigId, showId, project }).catch(err => {
             console.error(`❌ YouTube pipeline crashed for ${id}:`, err.message);
             YoutubeProject.findByIdAndUpdate(project._id, {
                 $set: { status: 'failed', error: err.message }
@@ -228,132 +271,233 @@ import ThumbnailTemplate from '../models/ThumbnailTemplate.js';
 
 // ── Pipeline Runner (8 nodes, all phases) ─────────────────────────────────
 
-async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelConfigId, showId, project }) {
+async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brandId, channelConfigId, showId, project }) {
     const pid = project._id.toString();
-    console.log(`🚀 [YouTube Pipeline] Starting 8-node pipeline for ${videoId}`);
+    console.log(`🚀 [YouTube Pipeline] Starting selective pipeline for ${videoId} (isYT: ${isYT})`);
     const startMs = Date.now();
 
     const emit = (node, status, data = {}) => emitProgress(pid, { type: 'node', node, status, ...data });
 
     try {
-        // ── Node 1: Transcript + Metadata ──────────────────────────────────
-        emit('transcript', 'running', { message: 'Fetching transcript & metadata…' });
-        const { transcript, metadata, duration, youtubeUrl } = await transcriptNode({ videoId, videoUrl });
-        await project.updateOne({ $set: { metadata, 'transcript.available': transcript.available, status: 'analysing' } });
-        emit('transcript', 'done', { transcriptAvailable: transcript.available, title: metadata.title });
-        console.log(`✅ [Node 1] Transcript: available=${transcript.available}, title="${metadata.title}"`);
+        const requestedFeatures = project.requestedFeatures || ['thumbnail', 'synopsis', 'seo', 'transcript', 'chapters', 'promo', 'brandCritic'];
+        const hasFeature = (f) => requestedFeatures.includes(f);
 
-        const video = { videoId, youtubeUrl, metadata, transcript, duration };
-
-        // ── Nodes 2 & 3 in parallel: Analysis + Frame Extraction ───────────────
-        emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
-        emit('frames',    'running', { message: 'Extracting key video frames…' });
-
-        const [analysisRes, framesRes] = await Promise.all([
-            analysisNode({ video, brandContext }),
-            frameExtractionNode({ videoId }),
-        ]);
-        const { analysis } = analysisRes;
-        const { extractedFrames } = framesRes;
-
-        emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
-        emit('frames',   'done', { count: extractedFrames.length });
-        console.log(`✅ [Node 2] Analysis: ${analysis.contentType}, ${analysis.characters?.length} characters`);
-        console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
-
-        // ── Node 3: Chapter Detection (AFTER analysis — uses highlights for alignment) ───
-        emit('chapters', 'running', { message: 'Detecting smart chapters (analysis-grounded)…' });
-        const { chapters } = await chapterNode({ video, analysis });
-        emit('chapters', 'done', { count: chapters.length });
-        console.log(`✅ [Node 3] Chapters: ${chapters.length} detected (analysis-grounded)`);
-
-        // ── Nodes 4, 5 & Promo in parallel: SEO + Brand Critic + Promo Cuts ──────
-        emit('seo',   'running', { message: 'Grok writing brand-aligned SEO copy…' });
-        emit('brand', 'running', { message: 'Scoring brand alignment…' });
-        emit('promo', 'running', { message: 'Building promo/teaser cut suggestions…' });
-
-        const [seoRes, brandRes, promoRes] = await Promise.all([
-            seoNode({ video, analysis, chapters, brandContext }),
-            brandCriticNode({ video, analysis, brandContext }),
-            promoNode({ analysis, video, brandContext }),
-        ]);
-        const { seo } = seoRes;
-        const { brandAlignment } = brandRes;
-        const { promoCuts } = promoRes;
-
-        emit('seo',   'done', { recommendedTitle: seo?.recommendedTitle });
-        emit('brand', 'done', { score: brandAlignment?.overallScore });
-        emit('promo', 'done', { count: promoCuts?.length || 0 });
-        console.log(`✅ [Node 4] SEO: title="${seo?.recommendedTitle}"`);
-        console.log(`✅ [Node 5] Brand: score=${brandAlignment?.overallScore}`);
-        console.log(`✅ [Node 5b] Promo: ${promoCuts?.length || 0} cuts`);
-
-        // ── Node 6: Thumbnail Direction — Creative Director + Screen Grab Vision ─
-        emit('thumbnailDirection', 'running', { message: 'Creative Director analyzing video frames (CTR strategy)…' });
-        const { thumbnailDirection } = await thumbnailDirectionNode({
-            video, analysis, seo, brandContext,
-            extractedFrames,   // ✅ Real video frames → Creative Director sees actual content
-        });
-        emit('thumbnailDirection', 'done', {
-            concept: thumbnailDirection?.concept?.substring(0, 80),
-            ctrScore: thumbnailDirection?.ctrScoreEstimate,
-        });
-        console.log(`✅ [Node 6] Creative Director: CTR=${thumbnailDirection?.ctrScoreEstimate}% | "${thumbnailDirection?.ctrStrategy?.substring(0, 60)}"`);
-
-        // ── Fetch Channel & Template Context ─────────────────────────────────────
-        // Priority: (1) show-level templateId > (2) channel defaultTemplateId
+        // Load channel config first for settings and templates
+        let channel = null;
         let template = null;
         let appliedShowName = null;
         if (channelConfigId) {
             try {
-                const channel = await YoutubeChannelConfig.findById(channelConfigId)
+                channel = await YoutubeChannelConfig.findById(channelConfigId)
                     .populate('shows.templateId', 'name icon visual classification generationPromptSuffix referenceImageUrl');
 
-                // Try show-level template first
-                if (showId && channel?.shows?.length) {
-                    const show = channel.shows.find(s => s.showId === showId);
-                    if (show?.templateId) {
-                        template = show.templateId; // already populated
-                        appliedShowName = show.showName;
-                        console.log(`   🎬 [runPipeline] Show template resolved: "${show.showName}" → ${template.name}`);
+                if (channel) {
+                    // Try show-level template first
+                    if (showId && channel.shows?.length) {
+                        const show = channel.shows.find(s => s.showId === showId);
+                        if (show?.templateId) {
+                            template = show.templateId;
+                            appliedShowName = show.showName;
+                            console.log(`   🎬 [runPipeline] Show template: "${show.showName}" → ${template.name}`);
+                        }
                     }
+                    // Fallback to channel default template
+                    if (!template && channel.defaultTemplateId) {
+                        template = await ThumbnailTemplate.findById(channel.defaultTemplateId);
+                        console.log(`   🎨 [runPipeline] Channel default template: ${template?.name}`);
+                    }
+                    if (appliedShowName) project.appliedShowName = appliedShowName;
+                    if (template) project.appliedTemplateId = template._id;
                 }
-
-                // Fallback to channel default template
-                if (!template && channel?.defaultTemplateId) {
-                    template = await ThumbnailTemplate.findById(channel.defaultTemplateId);
-                    console.log(`   🎨 [runPipeline] Channel default template: ${template?.name}`);
-                }
-
-                if (appliedShowName) project.appliedShowName = appliedShowName;
-                if (template) project.appliedTemplateId = template._id;
             } catch (err) {
-                console.warn(`⚠️ [runPipeline] Failed to load channel/template context: ${err.message}`);
+                console.warn(`⚠️ [runPipeline] Failed to load channel config: ${err.message}`);
             }
         }
 
-        // ── Node 7: Character Portraits (Phase 2 — generated FIRST to anchor thumbnail) ──
-        // Portraits must run before thumbnail generation so they can serve as face references
-        emit('characters', 'running', { message: 'Generating AI character portraits (face reference for thumbnail)…' });
-        const { characterPortraits } = await characterPortraitNode({ analysis, video, brandContext });
-        emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
-        console.log(`✅ [Node 7] Portraits: ${characterPortraits.filter(p => p.portraitUrl).length}/${analysis.characters?.length || 0}`);
+        const writingStyleAnalysis = channel?.writingStyleAnalysis || null;
 
-        // ── Node 8: Thumbnail Generation (Phase 3 — uses portraits + extracted frames) ──
-        emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with GPT Image 2 (HD)…' });
-        const { generatedThumbnailUrl, thumbnailGenerationError, generatorModel } = await thumbnailGenerationNode({
-            thumbnailDirection, video, brandContext, template,
-            characterPortraits,   // ✅ Pass portraits so lead portrait is used as face anchor
-            extractedFrames,      // ✅ YouTube CDN frames for visual grounding
-        });
-        emit('thumbnailGeneration', 'done', {
-            success: !!generatedThumbnailUrl,
-            model: generatorModel,
-            error: thumbnailGenerationError,
-        });
-        console.log(`✅ [Node 8] Thumbnail via ${generatorModel || 'unknown'}: ${generatedThumbnailUrl ? 'generated' : `failed — ${thumbnailGenerationError}`}`);
+        // Load known casts for auto-mapping
+        let knownCasts = [];
+        if (brandId) {
+            try {
+                knownCasts = await Cast.find({ brandId, userId: project.userId }).select('name description role imageUrl').lean();
+            } catch (err) {
+                console.warn(`⚠️ [runPipeline] Failed to load Cast Bank: ${err.message}`);
+            }
+        }
 
-        // ── Persist all results ────────────────────────────────────────────
+        // ── Node 1: Transcript + Metadata (always runs to get basic metadata) ──
+        emit('transcript', 'running', { message: 'Fetching transcript & metadata…' });
+        const { transcript, metadata, duration } = await transcriptNode({ videoId, videoUrl, isYT });
+        await project.updateOne({ $set: { metadata, 'transcript.available': transcript.available, status: 'analysing' } });
+        emit('transcript', 'done', { transcriptAvailable: transcript.available, title: metadata.title });
+        console.log(`✅ [Node 1] Metadata fetched: title="${metadata.title}"`);
+
+        const video = { videoId, youtubeUrl: videoUrl, metadata, transcript, duration };
+
+        // ── Stage 2: Analysis & Frame Extraction (conditional) ──
+        const needAnalysis = hasFeature('synopsis') || hasFeature('thumbnail') || hasFeature('seo') || hasFeature('chapters') || hasFeature('promo') || hasFeature('brandCritic');
+        const needFrames = hasFeature('thumbnail');
+
+        let analysis = {};
+        let extractedFrames = [];
+        const tasks = [];
+        let analysisIdx = -1;
+        let framesIdx = -1;
+
+        if (needAnalysis) {
+            emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
+            analysisIdx = tasks.length;
+            tasks.push(analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis }));
+        } else {
+            emit('analysis', 'done', { message: 'Skipped' });
+        }
+
+        if (needFrames) {
+            emit('frames',    'running', { message: 'Extracting key video frames…' });
+            framesIdx = tasks.length;
+            tasks.push(frameExtractionNode({ videoId, videoUrl, isYT }));
+        } else {
+            emit('frames', 'done', { message: 'Skipped' });
+        }
+
+        if (tasks.length > 0) {
+            const results = await Promise.all(tasks);
+            if (analysisIdx !== -1) {
+                analysis = results[analysisIdx].analysis;
+                emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
+                console.log(`✅ [Node 2] Analysis done: ${analysis.contentType}, ${analysis.characters?.length || 0} characters`);
+            }
+            if (framesIdx !== -1) {
+                extractedFrames = results[framesIdx].extractedFrames;
+                emit('frames', 'done', { count: extractedFrames.length });
+                console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
+            }
+        }
+
+        // ── Stage 3: Chapter Detection (conditional) ──
+        let chapters = [];
+        if (hasFeature('chapters') && transcript.available) {
+            emit('chapters', 'running', { message: 'Detecting smart chapters (analysis-grounded)…' });
+            const chapRes = await chapterNode({ video, analysis });
+            chapters = chapRes.chapters;
+            emit('chapters', 'done', { count: chapters.length });
+            console.log(`✅ [Node 3] Chapters: ${chapters.length} detected`);
+        } else {
+            emit('chapters', 'done', { message: 'Skipped' });
+        }
+
+        // ── Stage 4: SEO, Brand alignment, and Promo Cuts (conditional) ──
+        const nextTasks = [];
+        let seoIdx = -1;
+        let brandIdx = -1;
+        let promoIdx = -1;
+
+        if (hasFeature('seo')) {
+            emit('seo',   'running', { message: 'Grok writing brand-aligned SEO copy…' });
+            seoIdx = nextTasks.length;
+            nextTasks.push(seoNode({ video, analysis, chapters, brandContext, writingStyleAnalysis }));
+        } else {
+            emit('seo', 'done', { message: 'Skipped' });
+        }
+
+        if (hasFeature('brandCritic') && brandContext && !brandContext.includes('No brand data')) {
+            emit('brand', 'running', { message: 'Scoring brand alignment…' });
+            brandIdx = nextTasks.length;
+            nextTasks.push(brandCriticNode({ video, analysis, brandContext }));
+        } else {
+            emit('brand', 'done', { message: 'Skipped' });
+        }
+
+        if (hasFeature('promo')) {
+            emit('promo', 'running', { message: 'Building promo/teaser cut suggestions…' });
+            promoIdx = nextTasks.length;
+            nextTasks.push(promoNode({ analysis, video, brandContext }));
+        } else {
+            emit('promo', 'done', { message: 'Skipped' });
+        }
+
+        let seo = null;
+        let brandAlignment = null;
+        let promoCuts = [];
+
+        if (nextTasks.length > 0) {
+            const nextResults = await Promise.all(nextTasks);
+            if (seoIdx !== -1) {
+                seo = nextResults[seoIdx].seo;
+                emit('seo', 'done', { recommendedTitle: seo?.recommendedTitle });
+                console.log(`✅ [Node 4] SEO generated`);
+            }
+            if (brandIdx !== -1) {
+                brandAlignment = nextResults[brandIdx].brandAlignment;
+                emit('brand', 'done', { score: brandAlignment?.overallScore });
+                console.log(`✅ [Node 5] Brand align score: ${brandAlignment?.overallScore}`);
+            }
+            if (promoIdx !== -1) {
+                promoCuts = nextResults[promoIdx].promoCuts;
+                emit('promo', 'done', { count: promoCuts?.length || 0 });
+                console.log(`✅ [Node 5b] Promo cuts: ${promoCuts?.length || 0} cuts`);
+            }
+        }
+
+        // ── Stage 5: Thumbnail Generation (conditional) ──
+        let thumbnailDirection = null;
+        let characterPortraits = [];
+        let generatedThumbnailUrl = null;
+        let generatorModel = null;
+
+        if (hasFeature('thumbnail')) {
+            // Creative Director CTR strategy
+            emit('thumbnailDirection', 'running', { message: 'Creative Director analyzing video frames (CTR strategy)…' });
+            const dirRes = await thumbnailDirectionNode({
+                video, analysis, seo, brandContext,
+                extractedFrames,
+            });
+            thumbnailDirection = dirRes.thumbnailDirection;
+            emit('thumbnailDirection', 'done', {
+                concept: thumbnailDirection?.concept?.substring(0, 80),
+                ctrScore: thumbnailDirection?.ctrScoreEstimate,
+            });
+            console.log(`✅ [Node 6] Creative Direction CTR: ${thumbnailDirection?.ctrScoreEstimate}%`);
+
+            // Character portraits
+            emit('characters', 'running', { message: 'Generating AI character portraits (face reference for thumbnail)…' });
+            const portRes = await characterPortraitNode({ analysis, video, brandContext });
+            characterPortraits = portRes.characterPortraits;
+            emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
+            console.log(`✅ [Node 7] Character portraits mapped: ${characterPortraits.length}`);
+
+            // Final Thumbnail generation
+            emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with GPT Image 2 (HD)…' });
+            const genRes = await thumbnailGenerationNode({
+                thumbnailDirection, video, brandContext, template,
+                characterPortraits,
+                extractedFrames,
+            });
+            generatedThumbnailUrl = genRes.generatedThumbnailUrl;
+            generatorModel = genRes.generatorModel;
+            emit('thumbnailGeneration', 'done', {
+                success: !!generatedThumbnailUrl,
+                model: generatorModel,
+                error: genRes.thumbnailGenerationError,
+            });
+            console.log(`✅ [Node 8] Thumbnail: ${generatedThumbnailUrl ? 'success' : 'failed'}`);
+        } else {
+            emit('thumbnailDirection', 'done', { message: 'Skipped' });
+            emit('characters', 'done', { message: 'Skipped' });
+            emit('thumbnailGeneration', 'done', { message: 'Skipped' });
+        }
+
+        // ── Auto-save new characters to Cast Bank (Casting Bay) ──
+        if (analysis.characters?.length && brandId) {
+            try {
+                await saveCharactersToCastingBay(project.userId, brandId, analysis.characters, characterPortraits);
+            } catch (castErr) {
+                console.error('⚠️ Failed to save characters to Casting Bay:', castErr.message);
+            }
+        }
+
+        // ── Persist results to DB ──
         const elapsed = Math.round((Date.now() - startMs) / 1000);
         console.log(`\n🏁 [YouTube Pipeline] Complete for ${videoId} in ${elapsed}s`);
 
@@ -366,8 +510,8 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
                     available: transcript.available,
                     language: transcript.language,
                     source: transcript.source,
-                    segments: transcript.segments?.slice(0, 500) || [],
-                    fullText: transcript.text?.substring(0, 50000) || '',
+                    segments: hasFeature('transcript') ? (transcript.segments?.slice(0, 500) || []) : [],
+                    fullText: hasFeature('transcript') ? (transcript.text?.substring(0, 50000) || '') : '',
                 },
                 analysis,
                 chapters,
@@ -387,7 +531,6 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
             },
         });
 
-        // Signal completion to all SSE listeners
         emitProgress(pid, { type: 'done', elapsed, videoId });
 
     } catch (err) {
@@ -395,6 +538,33 @@ async function runPipeline({ videoUrl, videoId, brandContext, brandId, channelCo
         await project.updateOne({ $set: { status: 'failed', error: err.message } });
         emitProgress(pid, { type: 'error', error: err.message });
         throw err;
+    }
+}
+
+// ── Auto-save characters helper ──
+async function saveCharactersToCastingBay(userId, brandId, characters, portraits = []) {
+    if (!brandId) return;
+    for (const char of characters) {
+        const name = char.label?.trim();
+        if (!name) continue;
+        const exists = await Cast.findOne({
+            brandId,
+            name: { $regex: new RegExp(`^${name}$`, 'i') }
+        });
+        if (!exists) {
+            const portrait = portraits.find(p => p.label === char.label && p.portraitUrl);
+            const imageUrl = portrait?.portraitUrl || char.imageUrl || '';
+
+            await Cast.create({
+                userId,
+                brandId,
+                name,
+                description: char.visualDescription || '',
+                role: char.role || '',
+                imageUrl
+            });
+            console.log(`👤 [Casting Bay] Auto-saved new character to Cast Bank: "${name}"`);
+        }
     }
 }
 

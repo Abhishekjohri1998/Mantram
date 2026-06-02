@@ -26,6 +26,27 @@ import express from 'express';
 import { protect } from '../middleware/auth.js';
 import ThumbnailTemplate from '../models/ThumbnailTemplate.js';
 import YoutubeChannelConfig from '../models/YoutubeChannelConfig.js';
+import { callAgent } from '../agents/shared/agentUtils.js';
+import { PROMPTS } from '../agents/youtubeStudio/prompts.js';
+
+// Helper to analyze writing style from samples
+async function analyzeChannelWritingStyle(samples) {
+    if (!samples || !samples.length) return '';
+    const samplesText = samples.map((s, idx) => `Sample ${idx + 1}:\n${s}`).join('\n\n');
+    try {
+        const result = await callAgent(
+            PROMPTS.WRITING_STYLE_ANALYST,
+            `Analyze these writing samples from a YouTube creator. Identify their writing style, tone, vocabulary, and formatting habits:\n\n${samplesText}`,
+            0.3,
+            2048,
+            { preferFast: true } // Flash is perfect and fast for this
+        );
+        return result.styleSummary || '';
+    } catch (err) {
+        console.error('❌ Failed to analyze writing style samples:', err);
+        return '';
+    }
+}
 
 const router = express.Router();
 
@@ -428,6 +449,13 @@ router.post('/channel-configs', protect, async (req, res) => {
         const payload = { ...req.body };
         if (payload.defaultTemplateId === '') payload.defaultTemplateId = null;
 
+        // Perform writing style analysis if writing samples are provided
+        if (payload.writingSamples && payload.writingSamples.length > 0) {
+            payload.writingStyleAnalysis = await analyzeChannelWritingStyle(payload.writingSamples);
+        } else {
+            payload.writingStyleAnalysis = '';
+        }
+
         const internalId = `channel-${Date.now()}`;
         const channel = await YoutubeChannelConfig.create({
             ...payload,
@@ -449,6 +477,16 @@ router.put('/channel-configs/:id', protect, async (req, res) => {
         
         delete update.userId;
         delete update.internalId;
+
+        // Perform writing style analysis if writing samples are provided and changed
+        if (update.writingSamples) {
+            const existing = await YoutubeChannelConfig.findOne({ _id: req.params.id, userId: req.user._id });
+            const samplesChanged = !existing || JSON.stringify(existing.writingSamples) !== JSON.stringify(update.writingSamples);
+            if (samplesChanged) {
+                update.writingStyleAnalysis = await analyzeChannelWritingStyle(update.writingSamples);
+            }
+        }
+
         const channel = await YoutubeChannelConfig.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             { $set: update },

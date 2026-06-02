@@ -132,12 +132,14 @@ function PipelineProgress({ projectId, onComplete }) {
                     const meta = NODE_LABELS[key]
                     const state = nodes[key]
                     const status = state?.status || 'pending'
-                    const color = status === 'done' ? '#22c55e' : status === 'running' ? 'var(--sys-primary)' : 'var(--sys-text-muted)'
+                    const isSkipped = state?.message === 'Skipped'
+                    const color = isSkipped ? 'var(--sys-text-muted)' : status === 'done' ? '#22c55e' : status === 'running' ? 'var(--sys-primary)' : 'var(--sys-text-muted)'
+                    const iconName = isSkipped ? 'block' : status === 'done' ? 'check_circle' : status === 'running' ? meta.icon : 'radio_button_unchecked'
                     return (
-                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: status === 'running' ? 'var(--sys-primary-dim)' : 'var(--sys-surface)', border: `1px solid ${status === 'running' ? 'var(--sys-primary)' : 'var(--sys-border)'}`, transition: 'all .3s' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color }}>{status === 'done' ? 'check_circle' : status === 'running' ? meta.icon : 'radio_button_unchecked'}</span>
+                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: status === 'running' ? 'var(--sys-primary-dim)' : 'var(--sys-surface)', border: `1px solid ${status === 'running' ? 'var(--sys-primary)' : 'var(--sys-border)'}`, transition: 'all .3s', opacity: isSkipped ? 0.6 : 1 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color }}>{iconName}</span>
                             <span style={{ fontSize: 13, fontWeight: status === 'running' ? 700 : 500, color: status === 'pending' ? 'var(--sys-text-muted)' : 'var(--sys-text)' }}>{meta.label}</span>
-                            {status === 'running' && state?.message && (
+                            {state?.message && (
                                 <span style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginLeft: 'auto' }}>{state.message}</span>
                             )}
                         </div>
@@ -1084,6 +1086,27 @@ export default function YouTubeStudio() {
     const [selectedChannelId, setSelectedChannelId] = useState('')
     const [selectedShowId, setSelectedShowId] = useState('')  // for analyse tab
     const pollRef = useRef({})
+    
+    // Selective features and File Upload states
+    const [selectedFeatures, setSelectedFeatures] = useState(['thumbnail', 'synopsis', 'seo', 'transcript', 'chapters', 'promo', 'brandCritic'])
+    const [inputType, setInputType] = useState('youtube') // 'youtube' or 'upload'
+    const [uploadingFile, setUploadingFile] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState(0)
+    const [uploadedFileUrl, setUploadedFileUrl] = useState('')
+    const [uploadedFileName, setUploadedFileName] = useState('')
+    const fileInputRef = useRef(null)
+
+    // Casting Bay states
+    const [casts, setCasts] = useState([])
+    const [loadingCasts, setLoadingCasts] = useState(false)
+    const [showCastEditor, setShowCastEditor] = useState(false)
+    const [editingCast, setEditingCast] = useState(null)
+    const [newCastName, setNewCastName] = useState('')
+    const [newCastRole, setNewCastRole] = useState('')
+    const [newCastDesc, setNewCastDesc] = useState('')
+    const [newCastImage, setNewCastImage] = useState('')
+    const [uploadingCastImage, setUploadingCastImage] = useState(false)
+    const castImageInputRef = useRef(null)
 
     // Derived: shows for the currently selected channel
     const selectedChannelShows = channels.find(c => c._id === selectedChannelId)?.shows || []
@@ -1098,6 +1121,87 @@ export default function YouTubeStudio() {
             const def = ch.find(c => c.isDefault) || ch[0]
             if (def) setSelectedChannelId(def._id)
         } catch {}
+    }
+
+    async function loadCasts() {
+        if (!activeBrand?._id) return
+        setLoadingCasts(true)
+        try {
+            const d = await api(`/casting-bay?brandId=${activeBrand._id}`)
+            setCasts(d.casts || [])
+        } catch (e) { console.error('Failed to load casts:', e.message) }
+        setLoadingCasts(false)
+    }
+
+    useEffect(() => {
+        if (tab === 'casting') {
+            loadCasts()
+        }
+    }, [tab, activeBrand?._id])
+
+    async function handleSaveCast() {
+        if (!newCastName.trim()) return alert('Name is required')
+        if (!activeBrand?._id) return
+        
+        const payload = {
+            brandId: activeBrand._id,
+            name: newCastName.trim(),
+            role: newCastRole.trim(),
+            description: newCastDesc.trim(),
+            imageUrl: newCastImage.trim(),
+        }
+        
+        try {
+            if (editingCast) {
+                await api(`/casting-bay/${editingCast._id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                })
+            } else {
+                await api('/casting-bay', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
+            }
+            setShowCastEditor(false)
+            setEditingCast(null)
+            setNewCastName('')
+            setNewCastRole('')
+            setNewCastDesc('')
+            setNewCastImage('')
+            loadCasts()
+        } catch (e) { alert('Failed to save cast: ' + e.message) }
+    }
+
+    async function handleDeleteCast(id) {
+        if (!confirm('Are you sure you want to delete this cast member?')) return
+        try {
+            await api(`/casting-bay/${id}`, { method: 'DELETE' })
+            loadCasts()
+        } catch (e) { alert('Failed to delete cast: ' + e.message) }
+    }
+
+    async function handleCastImageUpload(e) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (file.size > 5 * 1024 * 1024) return alert('Max 5MB allowed')
+        
+        setUploadingCastImage(true)
+        try {
+            const reader = new FileReader()
+            reader.onload = async (ev) => {
+                try {
+                    const imageData = ev.target.result
+                    const d = await api('/media/upload', {
+                        method: 'POST',
+                        body: JSON.stringify({ imageData, folder: 'casts' }),
+                    })
+                    setNewCastImage(d.url)
+                } catch (err) { alert('Upload failed: ' + err.message) }
+                setUploadingCastImage(false)
+            }
+            reader.readAsDataURL(file)
+        } catch { setUploadingCastImage(false) }
     }
 
     async function loadProjects() {
@@ -1143,10 +1247,75 @@ export default function YouTubeStudio() {
 
     useEffect(() => () => Object.values(pollRef.current).forEach(clearTimeout), [])
 
+    async function handleFileUpload(e) {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        if (file.size > 100 * 1024 * 1024) {
+            setError('File is too large. Max 100MB allowed.')
+            return
+        }
+        
+        setUploadingFile(true)
+        setError(null)
+        setUploadProgress(0)
+        
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            
+            const token = localStorage.getItem('mantram_token')
+            
+            const xhr = new XMLHttpRequest()
+            xhr.open('POST', `${API_BASE}/youtube-studio/upload`)
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+            
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percentage = Math.round((event.loaded / event.total) * 100)
+                    setUploadProgress(percentage)
+                }
+            }
+            
+            xhr.onload = () => {
+                setUploadingFile(false)
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const response = JSON.parse(xhr.responseText)
+                    if (response.success) {
+                        setUploadedFileUrl(response.url)
+                        setUploadedFileName(response.originalname || file.name)
+                    } else {
+                        setError(response.error || 'Upload failed')
+                    }
+                } else {
+                    setError(`Upload failed: status ${xhr.status}`)
+                }
+            }
+            
+            xhr.onerror = () => {
+                setUploadingFile(false)
+                setError('Network error during file upload')
+            }
+            
+            xhr.send(formData)
+        } catch (err) {
+            setUploadingFile(false)
+            setError(`Upload failed: ${err.message}`)
+        }
+    }
+
     async function handleAnalyse() {
-        const rawUrls = urlInput.split('\n').map(u => u.trim()).filter(Boolean)
-        if (!rawUrls.length) return setError('Enter at least one YouTube URL')
+        let rawUrls = []
+        if (inputType === 'youtube') {
+            rawUrls = urlInput.split('\n').map(u => u.trim()).filter(Boolean)
+            if (!rawUrls.length) return setError('Enter at least one YouTube URL')
+        } else {
+            if (!uploadedFileUrl) return setError('Please upload a video file first')
+            rawUrls = [uploadedFileUrl]
+        }
+        
         if (rawUrls.length > 10) return setError('Maximum 10 URLs at a time')
+        if (selectedFeatures.length === 0) return setError('Please select at least one feature to run')
 
         setLoading(true)
         setError(null)
@@ -1158,10 +1327,13 @@ export default function YouTubeStudio() {
                     brandId: activeBrand?._id,
                     channelConfigId: selectedChannelId,
                     showId: selectedShowId || null,
+                    requestedFeatures: selectedFeatures,
                 }),
             })
             const newProjects = d.projects || []
             setUrlInput('')
+            setUploadedFileUrl('')
+            setUploadedFileName('')
 
             if (newProjects.length === 1) {
                 setActiveProject({ _id: newProjects[0]._id, videoId: newProjects[0].videoId, status: 'processing' })
@@ -1187,6 +1359,7 @@ export default function YouTubeStudio() {
                         { id: 'analyse',  icon: 'link',       label: 'Analyse' },
                         { id: 'result',   icon: 'analytics',  label: 'Result',            disabled: !activeProject },
                         { id: 'history',  icon: 'history',    label: `History (${projects.length})` },
+                        { id: 'casting',  icon: 'group',      label: 'Casting Bay' },
                         { id: 'channels', icon: 'tv',         label: 'Channel Setup',     badge: channels.length === 0 ? '!' : null },
                         { id: 'settings', icon: 'tune',       label: 'Settings' },
                     ].map(t => (
@@ -1304,25 +1477,132 @@ export default function YouTubeStudio() {
                             </div>
                         )}
 
-                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>
-                            YouTube URL(s) — one per line, up to 10
-                        </label>
-                        <textarea value={urlInput} onChange={e => setUrlInput(e.target.value)}
-                            placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://www.youtube.com/shorts/...'}
-                            style={{ width: '100%', minHeight: 110, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                        {/* Input Type Selector */}
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--sys-border)', paddingBottom: 12 }}>
+                            <button 
+                                type="button"
+                                onClick={() => setInputType('youtube')} 
+                                style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all .2s',
+                                    background: inputType === 'youtube' ? 'var(--sys-primary)15' : 'transparent',
+                                    color: inputType === 'youtube' ? 'var(--sys-primary)' : 'var(--sys-text-muted)' }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, marginRight: 6, verticalAlign: 'middle' }}>link</span>
+                                YouTube Link(s)
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => setInputType('upload')} 
+                                style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all .2s',
+                                    background: inputType === 'upload' ? 'var(--sys-primary)15' : 'transparent',
+                                    color: inputType === 'upload' ? 'var(--sys-primary)' : 'var(--sys-text-muted)' }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, marginRight: 6, verticalAlign: 'middle' }}>upload_file</span>
+                                Direct Video Upload
+                            </button>
+                        </div>
+
+                        {inputType === 'youtube' ? (
+                            <div>
+                                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>
+                                    YouTube URL(s) — one per line, up to 10
+                                </label>
+                                <textarea value={urlInput} onChange={e => setUrlInput(e.target.value)}
+                                    placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\nhttps://www.youtube.com/shorts/...'}
+                                    style={{ width: '100%', minHeight: 110, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                            </div>
+                        ) : (
+                            <div>
+                                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>
+                                    Upload Video File (MP4, MOV, WEBM, MKV — max 100MB)
+                                </label>
+                                <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" onChange={handleFileUpload} style={{ display: 'none' }} />
+                                
+                                {!uploadedFileUrl && !uploadingFile ? (
+                                    <div 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        style={{ border: '2px dashed var(--sys-border)', borderRadius: 12, padding: '24px 20px', textAlign: 'center', background: 'var(--sys-surface)', cursor: 'pointer', transition: 'border-color 0.2s' }}
+                                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--sys-primary)'}
+                                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--sys-border)'}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8 }}>cloud_upload</span>
+                                        <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13 }}>Click to upload video</p>
+                                        <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>Or drag and drop your file here</p>
+                                    </div>
+                                ) : uploadingFile ? (
+                                    <div style={{ padding: '20px', borderRadius: 12, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', textAlign: 'center' }}>
+                                        <div style={{ width: 28, height: 28, border: '3px solid var(--sys-border)', borderTopColor: 'var(--sys-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                                        <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 12 }}>Uploading video: {uploadProgress}%</p>
+                                        <div style={{ height: 6, background: 'var(--sys-border)', borderRadius: 4, overflow: 'hidden', maxWidth: 300, margin: '0 auto' }}>
+                                            <div style={{ height: '100%', background: 'var(--sys-primary)', width: `${uploadProgress}%`, transition: 'width 0.15s ease' }} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, border: '1.5px solid #22c55e33', background: '#22c55e08' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#22c55e' }}>check_circle</span>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadedFileName}</p>
+                                            <p style={{ margin: 0, fontSize: 11, color: 'var(--sys-text-muted)' }}>Ready for visual & transcript analysis</p>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setUploadedFileUrl('')
+                                                setUploadedFileName('')
+                                                if (fileInputRef.current) fileInputRef.current.value = ''
+                                            }}
+                                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #ef444433', background: 'transparent', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Selective Features */}
+                        <div style={{ marginTop: 20, marginBottom: 16 }}>
+                            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Select analysis modules to run (Save cost & time)
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                                {[
+                                    { id: 'thumbnail',   label: 'AI Thumbnail Generation', icon: 'image', color: '#3b82f6' },
+                                    { id: 'synopsis',    label: 'Video Synopsis & Scene Info', icon: 'psychology', color: '#a855f7' },
+                                    { id: 'seo',         label: 'SEO Copy (Titles/Desc)', icon: 'search', color: '#ec4899' },
+                                    { id: 'transcript',  label: 'Transcript Generation', icon: 'subtitles', color: '#ef4444' },
+                                    { id: 'chapters',    label: 'Smart chapters creation', icon: 'list_alt', color: '#f59e0b' },
+                                    { id: 'promo',       label: 'Promo Cut Points suggestions', icon: 'cut', color: '#14b8a6' },
+                                    { id: 'brandCritic',  label: 'Brand Alignment Analysis', icon: 'corporate_fare', color: '#6366f1' },
+                                ].map(f => {
+                                    const checked = selectedFeatures.includes(f.id)
+                                    return (
+                                        <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, background: 'var(--sys-surface)', border: `1px solid ${checked ? 'var(--sys-primary)45' : 'var(--sys-border)'}`, cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}>
+                                            <input type="checkbox" checked={checked} onChange={() => {
+                                                setSelectedFeatures(prev => prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id])
+                                            }} style={{ cursor: 'pointer' }} />
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: checked ? f.color : 'var(--sys-text-muted)' }}>{f.icon}</span>
+                                            {f.label}
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
 
                         {activeBrand && (
                             <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sys-text-muted)' }}>
-                                🎯 Brand DNA from <strong>{activeBrand.name}</strong> will be injected into all 8 pipeline nodes
+                                🎯 Brand DNA from <strong>{activeBrand.name}</strong> will be injected into all selected pipeline nodes
                             </p>
                         )}
                         {error && <p style={{ margin: '10px 0 0', fontSize: 12, color: '#ef4444' }}>⚠️ {error}</p>}
 
-                        <button onClick={handleAnalyse} disabled={loading || !urlInput.trim()}
-                            style={{ width: '100%', marginTop: 14, padding: '13px', borderRadius: 10, border: 'none', background: loading || !urlInput.trim() ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, cursor: loading || !urlInput.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <button 
+                            onClick={handleAnalyse} 
+                            disabled={loading || uploadingFile || (inputType === 'youtube' ? !urlInput.trim() : !uploadedFileUrl) || selectedFeatures.length === 0}
+                            style={{ width: '100%', marginTop: 14, padding: '13px', borderRadius: 10, border: 'none', background: loading || uploadingFile || (inputType === 'youtube' ? !urlInput.trim() : !uploadedFileUrl) || selectedFeatures.length === 0 ? 'var(--sys-border)' : 'linear-gradient(135deg, #ff0000, #cc0000)', color: 'white', fontWeight: 700, fontSize: 14, cursor: loading || uploadingFile || (inputType === 'youtube' ? !urlInput.trim() : !uploadedFileUrl) || selectedFeatures.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                        >
                             {loading
                                 ? <><div style={{ width: 16, height: 16, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Starting pipeline…</>
-                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Analyse with AI (8 nodes)</>
+                                : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>Analyse with AI</>
                             }
                         </button>
                     </div>
@@ -1423,6 +1703,209 @@ export default function YouTubeStudio() {
                         onSelect={setActiveTemplate}
                         brandId={activeBrand?._id}
                     />
+                </div>
+            )}
+
+            {/* ── Casting Bay Tab ── */}
+            {tab === 'casting' && (
+                <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+                    {/* Header banner */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '16px 20px', borderRadius: 14, background: 'linear-gradient(135deg, var(--sys-primary)10, var(--sys-primary)05)', border: '1px solid var(--sys-primary)22' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--sys-primary)' }}>group</span>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>Casting Bay</p>
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--sys-text-muted)' }}>
+                                Manage recurring faces, presenters, and characters. Gemini automatically maps names based on descriptions when analyzing videos.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setEditingCast(null)
+                                setNewCastName('')
+                                setNewCastRole('')
+                                setNewCastDesc('')
+                                setNewCastImage('')
+                                setShowCastEditor(true)
+                            }}
+                            className="btn btn-primary"
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', background: 'var(--sys-primary)', color: 'white', cursor: 'pointer' }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+                            Add Cast Member
+                        </button>
+                    </div>
+
+                    {loadingCasts ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12 }}>
+                            <div style={{ width: 32, height: 32, border: '3px solid var(--sys-primary)33', borderTopColor: 'var(--sys-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                            <p style={{ fontSize: 13, color: 'var(--sys-text-muted)' }}>Loading cast library...</p>
+                        </div>
+                    ) : casts.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--sys-surface)', borderRadius: 16, border: '1px dashed var(--sys-border)' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--sys-text-muted)', marginBottom: 12 }}>face</span>
+                            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700 }}>Empty Casting Bay</h3>
+                            <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--sys-text-muted)', maxWidth: 400, marginLeft: 'auto', marginRight: 'auto' }}>
+                                You haven't added any cast members yet. Add actors, presenters, or upload videos to automatically build your face database.
+                            </p>
+                            <button
+                                onClick={() => {
+                                    setEditingCast(null)
+                                    setNewCastName('')
+                                    setNewCastRole('')
+                                    setNewCastDesc('')
+                                    setNewCastImage('')
+                                    setShowCastEditor(true)
+                                }}
+                                className="btn btn-primary"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', background: 'var(--sys-primary)', color: 'white', cursor: 'pointer' }}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+                                Add First Member
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 }}>
+                            {casts.map(cast => (
+                                <div key={cast._id} className="studio-card" style={{ background: 'var(--sys-surface)', borderRadius: 16, border: '1px solid var(--sys-border)', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease' }}>
+                                    <div style={{ height: 180, width: '100%', background: 'var(--sys-bg)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                        {cast.imageUrl ? (
+                                            <img src={cast.imageUrl} alt={cast.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 44, color: 'var(--sys-text-muted)' }}>person</span>
+                                                <span style={{ fontSize: 11, color: 'var(--sys-text-muted)' }}>No Portrait</span>
+                                            </div>
+                                        )}
+                                        {cast.role && (
+                                            <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'white' }}>{cast.role}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--sys-text)' }}>{cast.name}</p>
+                                        <p style={{ margin: 0, fontSize: 12, color: 'var(--sys-text-muted)', flex: 1, lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                                            {cast.description || 'No description provided.'}
+                                        </p>
+                                        <div style={{ display: 'flex', gap: 8, marginTop: 8, borderTop: '1px solid var(--sys-border)', paddingTop: 12 }}>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingCast(cast)
+                                                    setNewCastName(cast.name || '')
+                                                    setNewCastRole(cast.role || '')
+                                                    setNewCastDesc(cast.description || '')
+                                                    setNewCastImage(cast.imageUrl || '')
+                                                    setShowCastEditor(true)
+                                                }}
+                                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text)', cursor: 'pointer', transition: 'all 0.2s' }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteCast(cast._id)}
+                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 8px', borderRadius: 8, border: '1px solid #ef444433', background: 'transparent', color: '#ef4444', cursor: 'pointer', transition: 'all 0.2s' }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Casting Editor Modal */}
+                    {showCastEditor && (
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                            <div style={{ background: 'var(--sys-surface)', borderRadius: 16, border: '1px solid var(--sys-border)', width: '100%', maxWidth: 480, boxShadow: '0 20px 40px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--sys-border)' }}>
+                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span className="material-symbols-outlined" style={{ color: 'var(--sys-primary)' }}>face</span>
+                                        {editingCast ? 'Edit Cast Member' : 'Add New Cast Member'}
+                                    </h3>
+                                    <button onClick={() => setShowCastEditor(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--sys-text-muted)' }}>✕</button>
+                                </div>
+                                <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)' }}>Name *</label>
+                                        <input
+                                            type="text"
+                                            value={newCastName}
+                                            onChange={e => setNewCastName(e.target.value)}
+                                            placeholder="e.g. John Doe, Sarah Jenkins"
+                                            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13 }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)' }}>Role / Relationship</label>
+                                        <input
+                                            type="text"
+                                            value={newCastRole}
+                                            onChange={e => setNewCastRole(e.target.value)}
+                                            placeholder="e.g. Host, Co-host, Interviewee, Tech Expert"
+                                            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13 }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)' }}>Description / AI Identification Hints</label>
+                                        <textarea
+                                            value={newCastDesc}
+                                            onChange={e => setNewCastDesc(e.target.value)}
+                                            placeholder="Describe physical features, typical clothing, hair color, glasses, etc. so Gemini can accurately map them."
+                                            rows={3}
+                                            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-bg)', color: 'var(--sys-text)', fontSize: 13, resize: 'none', fontFamily: 'inherit' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sys-text-muted)' }}>Portrait Image</label>
+                                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                            <div style={{ width: 64, height: 64, borderRadius: 8, background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                                {newCastImage ? (
+                                                    <img src={newCastImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--sys-text-muted)' }}>person</span>
+                                                )}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <input
+                                                    type="file"
+                                                    ref={castImageInputRef}
+                                                    onChange={handleCastImageUpload}
+                                                    accept="image/*"
+                                                    style={{ display: 'none' }}
+                                                />
+                                                <button
+                                                    onClick={() => castImageInputRef.current?.click()}
+                                                    disabled={uploadingCastImage}
+                                                    style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'transparent', color: 'var(--sys-text)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span>
+                                                    {uploadingCastImage ? 'Uploading...' : 'Upload Image'}
+                                                </button>
+                                                <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--sys-text-muted)' }}>Max 5MB allowed.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 20px', borderTop: '1px solid var(--sys-border)', background: 'var(--sys-bg)' }}>
+                                    <button
+                                        onClick={() => setShowCastEditor(false)}
+                                        style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--sys-text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCast}
+                                        disabled={!newCastName.trim()}
+                                        style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: 'var(--sys-primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: !newCastName.trim() ? 0.6 : 1 }}
+                                    >
+                                        Save Member
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
