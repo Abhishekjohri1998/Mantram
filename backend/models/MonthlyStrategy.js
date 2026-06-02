@@ -47,6 +47,12 @@ const calendarItemSchema = new mongoose.Schema({
         refId: { type: mongoose.Schema.Types.ObjectId, default: null },
         url:   { type: String, default: '' },         // quick-access URL for the asset
         preview: { type: String, default: '' },       // thumbnail or text snippet
+        slides: [{ type: String }],                   // array of URLs for carousels
+        imageUrl: { type: String, default: '' },      // exact image URL from generation
+        provider: { type: String, default: '' },
+        status: { type: String, default: '' },
+        autoPublish: { type: Boolean, default: false },
+        falRequestId: { type: String, default: '' },
     },
     publishedAt:    { type: Date, default: null },
 }, { _id: true });
@@ -84,6 +90,13 @@ const monthlyStrategySchema = new mongoose.Schema({
         enum: ['generating', 'draft', 'active', 'complete', 'archived'],
         default: 'draft',
     },
+
+    // Autonomous Campaign Fields
+    campaignStatus: { type: String, enum: ['active', 'paused', 'completed'], default: 'active' },
+    startDate: { type: Date, default: Date.now },
+    endDate: { type: Date },
+    lastRunDate: { type: Date },
+    totalPostsGenerated: { type: Number, default: 0 },
 
     // Short executive summary Claude returns
     summary: { type: String, default: '' },

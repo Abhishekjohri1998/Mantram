@@ -734,6 +734,7 @@ function BriefDrawer({ item, strategyId, onClose, onStatusChange, onAssetWriteba
         prefill={{
           caption:        brief.captionDraft || '',
           imageUrl:       (!isVideo && (generatedImageUrl || item.generatedAsset?.url)) || '',
+          imageUrls:      (item.contentType === 'carousel' && carouselImages.length > 0) ? carouselImages : (item.generatedAsset?.imageUrls || []),
           videoUrl:       (isVideo && (generatedImageUrl || item.generatedAsset?.url)) || '',
           platform:       item.platform || '',
           scheduledAt:    item.date ? new Date(item.date + 'T09:00:00').toISOString() : null,

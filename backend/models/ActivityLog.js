@@ -23,6 +23,8 @@ const activityLogSchema = new mongoose.Schema({
             'content.created', 'content.edited', 'content.deleted',
             // Creative Studio
             'creative.generated', 'creative.downloaded', 'creative.saved',
+            // Brainstorm Studio
+            'brainstorm.generated',
             // Video Studio
             'video.generated', 'video.downloaded',
             // Social Media

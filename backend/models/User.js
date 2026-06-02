@@ -50,6 +50,8 @@ const userSchema = new mongoose.Schema({
         funnelStudio: { type: Boolean },
         d2cAnalytics: { type: Boolean },
         skillsHub: { type: Boolean },
+        pulseStudio: { type: Boolean },
+        retentionStudio: { type: Boolean },
     },
 
     // Which brands this team member can access

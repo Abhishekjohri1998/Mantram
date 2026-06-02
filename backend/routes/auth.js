@@ -12,6 +12,7 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { sendVerificationEmail, sendQueueRegistrationEmails } from '../utils/email.js';
 import { normalizeEmail } from '../utils/normalizeEmail.js';
 import { sanitizeBody } from '../utils/sanitize.js';
+import { resolveStudioAccess, STUDIO_KEYS, STUDIO_LABELS } from '../middleware/studioAccess.js';
 
 const router = Router();
 
@@ -550,6 +551,8 @@ router.get('/me', protect, async (req, res) => {
         const sharedCount = await Brand.countDocuments({ sharedWith: user._id, status: { $ne: 'archived' } });
         const brandCount = ownedCount + sharedCount;
 
+        const { access: resolvedStudioAccess } = await resolveStudioAccess(user);
+
         res.json({
             success: true,
             user: {
@@ -572,6 +575,7 @@ router.get('/me', protect, async (req, res) => {
                 preferences: user.preferences || {},
                 milestones: user.milestones || {},
                 usage: user.usage || {},
+                studioAccess: resolvedStudioAccess,
                 completedWalkthroughs: user.completedWalkthroughs || [],
                 planDetails,
                 brandCount,
@@ -942,7 +946,6 @@ ${error
 // ══════════════════════════════════════════════════════════════
 // STUDIO ACCESS — Public endpoint for frontend sidebar filtering
 // ══════════════════════════════════════════════════════════════
-import { resolveStudioAccess, STUDIO_KEYS, STUDIO_LABELS } from '../middleware/studioAccess.js';
 
 /**
  * GET /api/auth/studio-access

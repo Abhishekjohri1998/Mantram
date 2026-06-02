@@ -127,6 +127,7 @@ export default function SuperAdminDashboard() {
     const [packForm, setPackForm] = useState({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true })
     // Studio Visibility (3-tier access control)
     const [studioVisibility, setStudioVisibility] = useState(null)
+    const [studioOverrides, setStudioOverrides] = useState([])
     const [studioKeys, setStudioKeys] = useState([])
     const [studioLabels, setStudioLabels] = useState({})
     // Per-user studio access modal
@@ -194,7 +195,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'storeConfig') { loadSettings(); loadCreditCosts() }
         if (tab === 'content') { loadBrands(); loadContent() }
         if (tab === 'ai') { loadAIHealth(); loadSettings(); loadCreditCosts(); loadApiKeys(); loadVideoProviders(); loadImageProviders() }
-        if (tab === 'studios') { loadStudioVisibility() }
+        if (tab === 'studios') { loadStudioVisibility(); loadStudioOverrides(); }
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
@@ -248,10 +249,11 @@ export default function SuperAdminDashboard() {
     const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
     // Studio visibility
     const loadStudioVisibility = async () => { try { const d = await API.getStudioVisibility(); setStudioVisibility(d.portalVisibility); setStudioKeys(d.studioKeys || []); setStudioLabels(d.studioLabels || {}) } catch (e) { console.error(e) } }
+    const loadStudioOverrides = async () => { try { const d = await API.getStudioOverrides(); setStudioOverrides(d.overrides || []) } catch (e) { console.error(e) } }
     const handleStudioVisibilityChange = async (key, newState) => {
         const updated = { ...studioVisibility, [key]: newState }
         setStudioVisibility(updated)
-        try { await API.updateStudioVisibility(updated); showToast(`${studioLabels[key] || key} → ${newState}`) } catch { showToast('Failed', 'error') }
+        try { await API.updateStudioVisibility({ visibility: updated }); showToast(`${studioLabels[key] || key} → ${newState}`) } catch { showToast('Failed', 'error') }
     }
     const openUserStudioModal = async (userId) => {
         try {
@@ -263,9 +265,10 @@ export default function SuperAdminDashboard() {
         if (!userStudioModal) return
         const userId = userStudioModal.userId
         try {
-            const d = await API.updateUserStudioAccess(userId, { [key]: val })
+            const d = await API.updateUserStudioAccess(userId, { overrides: { [key]: val } })
             setUserStudioModal(prev => ({ ...prev, resolvedAccess: d.resolvedAccess, userOverrides: { ...prev.userOverrides, [key]: val } }))
             showToast(`${studioLabels[key] || key} → ${val === true ? 'granted' : val === false ? 'revoked' : 'reset'}`)
+            loadStudioOverrides()
         } catch { showToast('Failed', 'error') }
     }
     // Credit Pack management
@@ -539,21 +542,23 @@ export default function SuperAdminDashboard() {
                                                     {statusBadge}
                                                 </p>
                                             </div>
-                                            {!isHidden && (
-                                                <div className="flex gap-1">
+                                            <div className="flex gap-1">
+                                                {!resolved ? (
                                                     <button onClick={() => handleUserStudioOverride(key, true)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === true ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
+                                                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-emerald-500 hover:bg-emerald-500/10 border border-[var(--sys-border)]"
                                                     >Grant</button>
+                                                ) : (
                                                     <button onClick={() => handleUserStudioOverride(key, false)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${hasOverride && overrideVal === false ? 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]' : 'text-[var(--sys-text-muted)] hover:text-primary border border-transparent'}`}
+                                                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-rose-500 hover:bg-rose-500/10 border border-[var(--sys-border)]"
                                                     >Revoke</button>
-                                                    {hasOverride && (
-                                                        <button onClick={() => handleUserStudioOverride(key, null)}
-                                                            className="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary border border-transparent"
-                                                        >Reset</button>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                                {hasOverride && (
+                                                    <button onClick={() => handleUserStudioOverride(key, null)}
+                                                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer text-[var(--sys-text-muted)] hover:text-primary transition-all"
+                                                        title="Reset to default"
+                                                    ><span className="material-symbols-outlined text-[14px]">device_reset</span></button>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -1982,7 +1987,7 @@ export default function SuperAdminDashboard() {
                                 </h3>
                                 <p className="text-sm text-[var(--sys-text-muted)]">Create and track promotional discounts</p>
                             </div>
-                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-black font-black text-sm flex items-center gap-2 hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                            <button onClick={() => setShowCouponForm(!showCouponForm)} className="px-5 py-2.5 rounded-xl bg-primary text-white font-black text-sm flex items-center gap-2 hover:bg-primary/90 transition-all cursor-pointer">
                                 <span className="material-symbols-outlined text-sm">add</span>
                                 New Coupon
                             </button>
@@ -3337,7 +3342,6 @@ export default function SuperAdminDashboard() {
                         {/* Legend */}
                         <div className="flex gap-6 mb-5 px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
                             <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Public</b> — visible to everyone (per plan)</span></div>
-                            <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Private</b> — whitelisted users only</span></div>
                             <div className="flex items-center gap-2 text-xs"><span className="w-2.5 h-2.5 rounded-full bg-[var(--sys-surface)]" /><span className="text-[var(--sys-text-muted)]"><b className="text-primary">Hidden</b> — off for everyone</span></div>
                         </div>
 
@@ -3346,11 +3350,10 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-2 mb-8">
                                 {studioKeys.map(key => {
                                     const status = studioVisibility[key] || 'public';
-                                    const rowBorder = { public: 'border-[var(--sys-border)]', private: 'border-[var(--sys-border)]', hidden: 'border-[var(--sys-border)]' };
-                                    const dotColor = { public: 'bg-[var(--sys-surface)]', private: 'bg-[var(--sys-surface)]', hidden: 'bg-[var(--sys-surface)]' };
+                                    const rowBorder = { public: 'border-[var(--sys-border)]', hidden: 'border-[var(--sys-border)]' };
+                                    const dotColor = { public: 'bg-[var(--sys-surface)]', hidden: 'bg-[var(--sys-surface)]' };
                                     const activeClasses = {
                                         public: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
-                                        private: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
                                         hidden: 'bg-[var(--sys-primary-dim)] text-primary border border-[var(--sys-border)]',
                                     };
                                     return (
@@ -3361,7 +3364,7 @@ export default function SuperAdminDashboard() {
                                                 <span className="text-[10px] text-[var(--sys-text-muted)] font-mono bg-[var(--sys-surface)] px-2 py-0.5 rounded">{key}</span>
                                             </div>
                                             <div className="flex gap-1.5">
-                                                {['public', 'private', 'hidden'].map(state => (
+                                                {['public', 'hidden'].map(state => (
                                                     <button key={state} onClick={() => handleStudioVisibilityChange(key, state)}
                                                         className={`px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${status === state
                                                             ? activeClasses[state]
@@ -3389,7 +3392,7 @@ export default function SuperAdminDashboard() {
                                 <span className="material-symbols-outlined text-primary">shield_person</span>
                                 Per-User Studio Access
                             </h4>
-                            <p className="text-xs text-[var(--sys-text-muted)] mb-4">Search for a user to grant or revoke individual studio access. User overrides take priority over global settings (except Hidden).</p>
+                            <p className="text-xs text-[var(--sys-text-muted)] mb-4">Search for a user to grant or revoke individual studio access. User overrides take priority over global settings.</p>
                             <div className="flex items-center gap-3 bg-[var(--sys-surface)] rounded-xl border border-[var(--sys-border)] px-4 py-2.5">
                                 <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">search</span>
                                 <input
@@ -3417,6 +3420,43 @@ export default function SuperAdminDashboard() {
                                             </button>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {studioOverrides.length > 0 && (
+                                <div className="mt-6 border-t border-[var(--sys-border)] pt-5">
+                                    <h5 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">Active User Overrides</h5>
+                                    <div className="space-y-2">
+                                        {studioOverrides.map(u => (
+                                            <div key={u._id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center text-[var(--sys-text)] text-xs font-black">{u.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-[var(--sys-text)]">{u.name}</p>
+                                                        <p className="text-[10px] text-[var(--sys-text-muted)]">{u.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1.5 flex-wrap justify-end max-w-[50%]">
+                                                    {Object.entries(u.studioAccess || {}).map(([key, val]) => {
+                                                        if (val !== true && val !== false) return null;
+                                                        const isHidden = studioVisibility?.[key] === 'hidden';
+                                                        const isGranted = val === true;
+                                                        
+                                                        let badgeClass = "bg-[var(--sys-surface)] text-[var(--sys-text-muted)]";
+                                                        if (isGranted && isHidden) badgeClass = "bg-rose-500/10 text-rose-500 border border-rose-500/20";
+                                                        else if (isGranted) badgeClass = "bg-emerald-500/10 text-emerald-500";
+                                                        else badgeClass = "bg-rose-500/10 text-rose-500";
+
+                                                        return (
+                                                            <span key={key} title={isGranted && isHidden ? "Granted (Globally Hidden)" : ""} className={`px-2 py-1 rounded text-[10px] font-bold ${badgeClass}`}>
+                                                                {studioLabels?.[key] || key}: {isGranted ? 'Granted' : 'Revoked'} {isGranted && isHidden && '⚠️'}
+                                                            </span>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -4027,7 +4067,7 @@ export default function SuperAdminDashboard() {
                                 {/* Controls */}
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <button onClick={handlePricingCheck} disabled={monitorChecking}
-                                        className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none disabled:opacity-50 cursor-pointer flex items-center gap-2">
+                                        className="px-5 py-2.5 rounded-xl bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none disabled:opacity-50 cursor-pointer flex items-center gap-2 border border-[var(--sys-border)]">
                                         {monitorChecking ? <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span> : <span className="material-symbols-outlined text-sm">radar</span>}
                                         {monitorChecking ? 'Scraping Models...' : 'Check Now'}
                                     </button>
@@ -4280,7 +4320,7 @@ export default function SuperAdminDashboard() {
                                     <span className="material-symbols-outlined text-sm mr-1 align-middle">database</span>Seed Defaults
                                 </button>
                                 <button onClick={() => { setEditingPack(null); setPackForm({ name: '', slug: '', credits: 100, bonusCredits: 0, price: 499, validityDays: 180, icon: 'bolt', badge: '', description: '', isPromo: false, promoDiscount: 0, promoOriginalPrice: 0, promoLabel: '', displayOrder: 0, isActive: true, isFirstPurchaseEligible: true }); setShowPackForm(true) }}
-                                    className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-slate-950 text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer">
+                                    className="px-4 py-2 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-black uppercase tracking-wider hover:bg-[var(--sys-surface)] transition-all shadow-none cursor-pointer border border-[var(--sys-border)]">
                                     + New Pack
                                 </button>
                             </div>

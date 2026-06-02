@@ -646,59 +646,38 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
     };
 
     try {
-      await pushStep('Gathering market intelligence…', 'working', { tool: 'init' });
+      await pushStep('Initializing autonomous daily strategy campaign…', 'working', { tool: 'init' });
       if (await isCancelled()) return;
 
-      const doc = await runStrategyPipeline({
-        brandId, strategyType, month: Number(month), year: Number(year), userId,
-        userBrief: sanitized.userBrief, launchEvents: sanitized.launchEvents, focusKeywords: sanitized.focusKeywords, toneOverride,
-        emitFn: async (obj) => {
-          // Map pipeline events to detailed job steps for frontend thinking UI
-          if (obj.type === 'research_start') {
-            const thinkingLabels = {
-              brand_dna:                  '🧬 Analyzing brand identity, audience, and positioning...',
-              web_search:                 '🔍 Searching the web for market trends and competitor insights...',
-              fetch_trending:             '📈 Pulling trending topics, hooks, and cultural moments...',
-              scrape_competitor:          '🕵️ Analyzing competitor strategies and content gaps...',
-              fetch_seo_audit:            '🎯 Auditing SEO keywords, rankings, and content opportunities...',
-              fetch_performance_learnings:'📊 Reviewing past content performance and engagement patterns...',
-              fetch_content_history:      '📋 Loading content history to avoid repetition...',
-              ai_synthesis:               '🧠 AI is synthesizing research into a cohesive strategy...',
-              ai_fallback:                '🔄 Switching to backup AI model for generation...',
-              validation:                 '✨ Validating and polishing calendar items...',
-            };
-            // Include search queries / tool args as detail for richer UI
-            const toolDetails = {
-              web_search:                 obj.args?.query || 'market trends, competitor analysis',
-              fetch_trending:             'trending hooks, cultural moments, viral formats',
-              scrape_competitor:          'competitor content gaps, positioning, ad strategies',
-              fetch_seo_audit:            'keyword rankings, content opportunities, technical SEO',
-              fetch_performance_learnings:'top-performing posts, engagement patterns, audience insights',
-              fetch_content_history:      'recent posts, content themes, frequency analysis',
-              ai_synthesis:               `structuring ${strategyType.replace(/-/g, ' ')} calendar with research data`,
-              ai_fallback:                'retrying with backup model for reliability',
-              validation:                 'checking dates, briefs, and brand specificity',
-            };
-            await pushStep(
-              thinkingLabels[obj.tool] || `🔄 ${obj.label || obj.tool}...`,
-              'working',
-              { tool: obj.tool, detail: toolDetails[obj.tool] || '' }
-            );
-          }
-          else if (obj.type === 'research_done') {
-            await pushStep(`✅ ${obj.label || obj.tool}`, 'done', { tool: obj.tool });
-          }
-          else if (obj.type === 'generating') {
-            await pushStep(`🧠 ${obj.message || 'Building strategy calendar...'}`, 'working', { tool: 'generating' });
-          }
-          else if (obj.type === 'error') {
-            await pushStep(obj.message || 'Error', 'error', { tool: 'error' });
-          }
-          // Check cancellation at every pipeline step
-          if (await isCancelled()) throw Object.assign(new Error('Cancelled by user'), { code: 'CANCELLED' });
-        },
+      const endDate = new Date(year, month, 0); // Last day of month
+      
+      const doc = await MonthlyStrategy.create({
+        user: userId,
+        brand: brandId,
+        strategyType,
+        month,
+        year,
+        version: 1,
+        status: 'draft',
+        campaignStatus: 'active',
+        summary: 'Autonomous Daily Trend Campaign Initialized',
+        calendar: [],
+        startDate: new Date(),
+        endDate: endDate,
+        userBrief: sanitized.userBrief || '',
       });
 
+      // ── Trigger immediate run for today (Wait for Day 1 posts to generate) ──
+      try {
+          const { runDailyStrategyEngine } = await import('../services/dailyStrategyEngine.js');
+          await runDailyStrategyEngine(doc._id, async (msg) => {
+              await pushStep(msg, 'working', { tool: 'generate' });
+          });
+      } catch (e) {
+          console.error('Immediate Daily run failed', e);
+          throw new Error('Daily strategy engine failed to initialize posts: ' + e.message);
+      }
+      
       // ── Mark completed ──
       await GenerationJob.updateOne(
         { jobId },
@@ -708,7 +687,7 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
             completedAt: new Date(),
             result: { strategyId: doc._id.toString(), version: doc.version },
           },
-          $push: { steps: { agent: 'strategy', message: 'Strategy ready!', status: 'done', ts: new Date() } },
+          $push: { steps: { agent: 'strategy', message: 'Strategy initialized successfully!', status: 'done', ts: new Date() } },
         }
       ).catch(() => {});
 
@@ -717,8 +696,8 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         userId,
         brandId,
         type:  'monthly-strategy',
-        title: '📅 Strategy Ready',
-        body:  `${label} has been generated successfully.`,
+        title: '📅 Strategy Active',
+        body:  `${label} is now active and will generate daily.`,
         link:  '/brainstorm',
         jobId,
       });
@@ -744,10 +723,12 @@ router.post('/generate/start', protect, requireCredits('monthlyStrategy'), async
         jobId,
       });
 
-      // Refund credits on non-retryable errors
-      if (err.status === 422 || err.status === 404) {
+      // Refund credits on pipeline failure
+      try {
         const { refundCredits } = await import('../middleware/credits.js');
-        await refundCredits(userId, req.creditsDeducted || 15, 'monthlyStrategy', 'Strategy generation blocked', 'brainstorm', { brandId });
+        await refundCredits(userId, req.creditsDeducted || 15, 'monthlyStrategy', 'Strategy generation failed', 'brainstorm', { brandId });
+      } catch (refundErr) {
+        console.error('[strategy/start] Refund failed:', refundErr);
       }
     }
   });
@@ -849,7 +830,7 @@ router.patch('/:id/items/:itemId/status', protect, async (req, res) => {
 // ─── PATCH /:id/items/:itemId/asset ──────────────────────────────────────────
 router.patch('/:id/items/:itemId/asset', protect, async (req, res) => {
   try {
-    const { type, refId, url, preview } = req.body;
+    const { type, refId, url, preview, slides } = req.body;
     const doc = await MonthlyStrategy.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id, 'calendar._id': req.params.itemId },
       {
@@ -858,6 +839,7 @@ router.patch('/:id/items/:itemId/asset', protect, async (req, res) => {
           'calendar.$.generatedAsset.refId': refId ? new mongoose.Types.ObjectId(refId) : null,
           'calendar.$.generatedAsset.url': url || '',
           'calendar.$.generatedAsset.preview': preview || '',
+          'calendar.$.generatedAsset.slides': Array.isArray(slides) ? slides : (slides ? [slides] : (url ? [url] : [])),
           'calendar.$.status': 'complete',
         },
       },
@@ -1150,6 +1132,7 @@ router.post('/:id/batch-generate', protect, async (req, res) => {
                   'calendar.$.generatedAsset': {
                     type: 'image',
                     url: assetUrl,
+                    slides: [assetUrl],
                     title: item.brief?.angle || 'Calendar asset',
                   },
                 },

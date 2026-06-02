@@ -567,6 +567,27 @@ router.get('/users', async (req, res) => {
 
 
 // Get single user with full details
+/**
+ * GET /api/superadmin/users/studio-overrides
+ * Fetch all users who have active per-user studio overrides
+ */
+router.get('/users/studio-overrides', async (req, res) => {
+    try {
+        const conditions = STUDIO_KEYS.map(key => ({
+            [`studioAccess.${key}`]: { $in: [true, false] }
+        }));
+        
+        const users = await User.find({ $or: conditions })
+            .select('name email plan studioAccess')
+            .lean();
+            
+        res.json({ success: true, overrides: users });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
 router.get('/users/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password').populate('activeSubscription');
@@ -4043,7 +4064,7 @@ router.put('/studio-visibility', async (req, res) => {
         }
 
         // Validate: only allow known keys and valid values
-        const validStates = ['public', 'private', 'hidden'];
+        const validStates = ['public', 'hidden'];
         const cleaned = {};
         for (const [key, val] of Object.entries(visibility)) {
             if (STUDIO_KEYS.includes(key) && validStates.includes(val)) {
@@ -4059,7 +4080,7 @@ router.put('/studio-visibility', async (req, res) => {
             action: 'UPDATE_STUDIO_VISIBILITY',
             targetModel: 'SystemSettings',
             targetId: 'studio_portal_visibility',
-            severity: 'high',
+            severity: 'warning',
             changes: { before, after },
         });
 

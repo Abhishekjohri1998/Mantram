@@ -835,6 +835,7 @@ export const superadmin = {
     updateStudioVisibility: (data) => apiFetch('/superadmin/studio-visibility', { method: 'PUT', body: JSON.stringify(data) }),
     getUserStudioAccess: (userId) => apiFetch(`/superadmin/users/${userId}/studio-access`),
     updateUserStudioAccess: (userId, data) => apiFetch(`/superadmin/users/${userId}/studio-access`, { method: 'PUT', body: JSON.stringify(data) }),
+    getStudioOverrides: () => apiFetch('/superadmin/users/studio-overrides'),
 
     // Waitlist
     getWaitlist: () => apiFetch('/superadmin/waitlist'),

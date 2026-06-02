@@ -37,6 +37,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
     const [selAccts,   setSelAccts]   = useState([])
     const [caption,    setCaption]    = useState('')
     const [imageUrl,   setImageUrl]   = useState('')
+    const [imageUrls,  setImageUrls]  = useState([]) // For Carousels
     const [videoUrl,   setVideoUrl]   = useState('')
     const [schedAt,    setSchedAt]    = useState(toLocalDatetimeValue(null))
     const [loading,    setLoading]    = useState(false)
@@ -54,6 +55,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
         if (!open) { setSuccess(false); setError(''); return }
         setCaption(prefill.caption || '')
         setImageUrl(prefill.imageUrl || '')
+        setImageUrls(prefill.imageUrls || [])
         setVideoUrl(prefill.videoUrl || '')
         setSchedAt(toLocalDatetimeValue(prefill.scheduledAt || null))
         // Pre-select accounts that match the prefilled platform
@@ -105,6 +107,7 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
                 accountIds:  selAccts,
                 text:        caption,
                 imageUrl:    imageUrl || undefined,
+                imageUrls:   imageUrls.length > 0 ? imageUrls : undefined,
                 videoUrl:    videoUrl || undefined,
                 scheduledFor,
                 brandId:     activeBrand?._id,
@@ -264,12 +267,26 @@ export default function ScheduleDrawer({ open, onClose, onScheduled, prefill = {
                         <p className="text-[10px] text-[var(--sys-text-muted)] text-right mt-1">{caption.length} chars</p>
                     </div>
 
-                    {/* Image/Video preview */}
+                    {/* Image/Video/Carousel preview */}
                     {videoUrl ? (
                         <div>
                             <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Media Preview</label>
                             <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] bg-black flex justify-center items-center">
                                 <video src={videoUrl} controls autoPlay muted loop className="w-full max-h-52 object-contain" />
+                            </div>
+                        </div>
+                    ) : imageUrls.length > 0 ? (
+                        <div>
+                            <label className="block text-xs font-semibold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">Carousel Preview ({imageUrls.length} Slides)</label>
+                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                                {imageUrls.map((url, i) => (
+                                    <div key={i} className="flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden border border-[var(--sys-border)] relative">
+                                        <img src={url} alt={`Slide ${i + 1}`} className="w-full h-full object-cover" onError={e => e.target.style.display = 'none'} />
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-0.5">
+                                            {i + 1}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : imageUrl ? (

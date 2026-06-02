@@ -52,6 +52,8 @@ export const STUDIO_KEYS = [
     'funnelStudio',
     'd2cAnalytics',
     'skillsHub',
+    'pulseStudio',
+    'retentionStudio',
 ];
 
 export const STUDIO_LABELS = {
@@ -67,6 +69,8 @@ export const STUDIO_LABELS = {
     funnelStudio: 'Funnel Studio',
     d2cAnalytics: 'D2C Studio',
     skillsHub: 'Skills Hub',
+    pulseStudio: 'Pulse Studio',
+    retentionStudio: 'Retention Studio',
 };
 
 /**
@@ -117,12 +121,12 @@ export async function canAccessStudio(portalVisibility, user, studioKey) {
 
     const status = portalVisibility[studioKey] || 'public';
 
-    if (status === 'hidden') return false;
-
     // User-level explicit override (highest priority for individuals)
     const override = user?.studioAccess?.[studioKey];
     if (override === true) return true;
     if (override === false) return false;
+
+    if (status === 'hidden') return false;
 
     // Plan-level restriction (for 'public' and 'private' studios)
     const pkgs = await getAllPackages();
