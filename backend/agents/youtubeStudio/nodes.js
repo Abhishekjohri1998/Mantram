@@ -1035,6 +1035,7 @@ Return ONLY a JSON object, no markdown:
     try {
         const result = await router.generateImage({
             prompt: finalPrompt,
+            model: 'gemini-2.0-flash-exp', // Explicitly use Gemini 2.0 Flash for image generation
             aspectRatio: '16:9',
             imageParts: imageParts,
         }, { provider: 'gemini' });
@@ -1042,44 +1043,11 @@ Return ONLY a JSON object, no markdown:
         const rawUrl = typeof result === 'string' ? result : result.imageUrl;
         const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
         console.log(`✅ [thumbnailGenerationNode] Gemini image generation success → S3: ${finalUrl?.substring(0, 80)}`);
-        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini' };
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gemini-2.0-flash-exp' };
 
     } catch (gemErr) {
-        console.warn(`❌ [thumbnailGenerationNode] Gemini failed: ${gemErr.message}`);
-        
-        // ── Fallback to OpenAI GPT Image 2 if Gemini fails ──
-        try {
-            console.log(`   🎨 [gpt-image-2 generate] Falling back to text-to-image...`);
-            const fallbackResult = await router.generateImage({
-                prompt:      genPrompt, // use original text-only prompt
-                model:       'gpt-image-2',
-                aspectRatio: '16:9',
-                quality:     'high',
-            }, { provider: 'openai' });
-
-            const rawUrl   = typeof fallbackResult === 'string' ? fallbackResult : fallbackResult.imageUrl;
-            const b64Raw   = fallbackResult?.b64 || fallbackResult?.b64_json || null;
-            const isDataUri = rawUrl?.startsWith('data:');
-
-            let finalUrl;
-            if (b64Raw) {
-                const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
-                finalUrl = await uploadBase64ToS3(b64Raw, s3Key);
-            } else if (isDataUri) {
-                const b64Stripped = rawUrl.split(',')[1];
-                const s3Key = `yt-studio/thumbnails/yt-thumb-${Date.now()}.png`;
-                finalUrl = await uploadBase64ToS3(b64Stripped, s3Key);
-            } else if (rawUrl?.startsWith('http')) {
-                finalUrl = await persistToS3(rawUrl, 'yt-studio/thumbnails');
-            } else {
-                throw new Error('GPT Image 2 returned no usable image data');
-            }
-            console.log(`   ✅ [gpt-image-2 generate fallback] → S3: ${finalUrl.substring(0, 80)}`);
-            return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2-fallback' };
-        } catch (gptErr) {
-            console.warn(`❌ [thumbnailGenerationNode] Both providers failed: ${gptErr.message}`);
-            return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
-        }
+        console.error(`❌ [thumbnailGenerationNode] Gemini image generation failed: ${gemErr.message}`);
+        return { generatedThumbnailUrl: null, thumbnailGenerationError: gemErr.message, generatorModel: null };
     }
 }
 
@@ -1106,7 +1074,7 @@ Return ONLY a JSON object, no markdown:
  *
  * Result: Portraits that visually match the real people in the video
  */
-export async function characterPortraitNode({ analysis, video, brandContext }) {
+export async function characterPortraitNode({ analysis, video, brandContext, knownCasts = [] }) {
     const characters   = analysis?.characters || [];
     const referenceUrl = video?.metadata?.thumbnailUrl || null;
     const ytId         = video?.videoId || (video?.youtubeUrl && video.youtubeUrl.split('v=')[1]);
@@ -1118,7 +1086,8 @@ export async function characterPortraitNode({ analysis, video, brandContext }) {
 
     console.log(`👤 [characterPortraitNode] Fetching visual screen grabs for ${characters.length} character(s)`);
 
-    const characterPortraits = characters.slice(0, 3).map((char) => {
+    const characterPortraits = [];
+    for (const char of characters.slice(0, 3)) {
         let frameSeek = null;
         if (char.firstAppearance) {
             const parts = char.firstAppearance.split(':').map(Number);
@@ -1127,23 +1096,53 @@ export async function characterPortraitNode({ analysis, video, brandContext }) {
                 : parts[0] * 60 + (parts[1] || 0);
         }
 
-        const portraitUrl = (ytId && frameSeek != null)
-            ? `https://img.youtube.com/vi_webp/${ytId}/${Math.max(1, Math.floor(frameSeek))}.webp`
-            : referenceUrl;
+        // Check if there is a match in the Cast Bank (case-insensitive name match)
+        const matchCast = knownCasts?.find(kc =>
+            kc.name?.toLowerCase().trim() === char.label?.toLowerCase().trim() ||
+            char.label?.toLowerCase().includes(kc.name?.toLowerCase().trim()) ||
+            kc.name?.toLowerCase().includes(char.label?.toLowerCase().trim())
+        );
 
-        console.log(`   ✅ Real character portrait mapped for: ${char.label}`);
-        return {
+        let portraitUrl = matchCast?.imageUrl || null;
+        let isCastMatch = !!matchCast;
+
+        if (!portraitUrl) {
+            const isYT = video?.isYT !== false;
+            if (!isYT && video?.youtubeUrl && frameSeek != null) {
+                console.log(`   🎥 Extracting exact frame for ${char.label} at ${frameSeek}s from direct upload...`);
+                const s3KeyPrefix = `youtube-studio-uploads/characters/${video.videoId || 'direct'}`;
+                portraitUrl = await extractFrameFromVideoUrl(video.youtubeUrl, frameSeek, s3KeyPrefix);
+            } else if (ytId) {
+                if (frameSeek != null && video.duration) {
+                    const pct = frameSeek / video.duration;
+                    let frameNum = 1;
+                    if (pct >= 0.35 && pct < 0.65) {
+                        frameNum = 2;
+                    } else if (pct >= 0.65) {
+                        frameNum = 3;
+                    }
+                    portraitUrl = `https://img.youtube.com/vi/${ytId}/${frameNum}.jpg`;
+                } else {
+                    portraitUrl = `https://img.youtube.com/vi/${ytId}/1.jpg`;
+                }
+            } else {
+                portraitUrl = referenceUrl;
+            }
+        }
+
+        console.log(`   ✅ Character portrait mapped for: ${char.label} (${isCastMatch ? 'Cast Bank Match' : portraitUrl ? 'Video Frame' : 'None'})`);
+        characterPortraits.push({
             label:           char.label,
             role:            char.role,
             firstAppearance: char.firstAppearance,
             screenTimePct:   char.screenTimePct,
             visualDescription: char.visualDescription || null,
             portraitUrl,
-        };
-    });
+        });
+    }
 
     const successCount = characterPortraits.filter(p => p.portraitUrl).length;
-    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits mapped from video frames`);
+    console.log(`✅ [characterPortraitNode] ${successCount}/${characters.slice(0,3).length} portraits mapped successfully`);
     return { characterPortraits };
 }
 

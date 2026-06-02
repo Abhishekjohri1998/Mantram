@@ -333,7 +333,7 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
         emit('transcript', 'done', { transcriptAvailable: transcript.available, title: metadata.title });
         console.log(`✅ [Node 1] Metadata fetched: title="${metadata.title}"`);
 
-        const video = { videoId, youtubeUrl: videoUrl, metadata, transcript, duration };
+        const video = { videoId, youtubeUrl: videoUrl, metadata, transcript, duration, isYT };
 
         // ── Stage 2: Analysis & Frame Extraction (conditional) ──
         const needAnalysis = hasFeature('synopsis') || hasFeature('thumbnail') || hasFeature('seo') || hasFeature('chapters') || hasFeature('promo') || hasFeature('brandCritic');
@@ -462,7 +462,7 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
             // Character portraits
             emit('characters', 'running', { message: 'Generating AI character portraits (face reference for thumbnail)…' });
-            const portRes = await characterPortraitNode({ analysis, video, brandContext });
+            const portRes = await characterPortraitNode({ analysis, video, brandContext, knownCasts });
             characterPortraits = portRes.characterPortraits;
             emit('characters', 'done', { count: characterPortraits.filter(p => p.portraitUrl).length });
             console.log(`✅ [Node 7] Character portraits mapped: ${characterPortraits.length}`);
@@ -645,10 +645,26 @@ router.post('/:id/characters', protect, async (req, res) => {
 
         const { brandContext } = await loadBrandContext(project.brandId?.toString()).catch(() => ({ brandContext: null }));
 
+        let knownCasts = [];
+        if (project.brandId) {
+            try {
+                knownCasts = await Cast.find({ brandId: project.brandId, userId: req.user._id }).select('name description role imageUrl').lean();
+            } catch (err) {
+                console.warn(`⚠️ [characters route] Failed to load Cast Bank: ${err.message}`);
+            }
+        }
+
         const { characterPortraits } = await characterPortraitNode({
             analysis: project.analysis,
-            video: { metadata: project.metadata },
+            video: {
+                videoId: project.videoId,
+                youtubeUrl: project.youtubeUrl,
+                metadata: project.metadata,
+                duration: project.duration,
+                isYT: project.isYT !== false,
+            },
             brandContext,
+            knownCasts,
         });
 
         await project.updateOne({ $set: { characterPortraits } });
