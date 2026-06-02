@@ -953,8 +953,8 @@ Return ONLY a JSON object, no markdown:
         `Background treatment: ${thumbnailDirection?.backgroundTreatment || 'dramatic-scene'}`,
         ``,
         characterList
-            ? `CHARACTERS (generate these people from scratch matching descriptions):\n  ${characterList.substring(0, 400)}`
-            : 'Generate the lead character(s) appropriate to the content.',
+            ? `CHARACTERS:\n  ${characterList.substring(0, 400)}`
+            : 'Focus on the lead character(s).',
         ``,
         ta.overallAesthetic || baseTemplateStyle || directionStyle
             ? `VISUAL STYLE: ${ta.overallAesthetic || baseTemplateStyle || directionStyle}`
@@ -985,7 +985,7 @@ Return ONLY a JSON object, no markdown:
         template?.generationPromptSuffix ? `SHOW STYLE DIRECTIVE: ${template.generationPromptSuffix}` : '',
         brandSnippet ? `Brand context: ${brandSnippet}` : '',
         referenceFramePart
-            ? `SCREEN GRAB REFERENCE IMAGE PROVIDED: The actual video frame is attached. Use it as the visual foundation — match character appearance, scene setting, and color palette. Then generate a HEIGHTENED, cinematic, high-contrast version of that exact moment.`
+            ? `CRITICAL IMAGE-TO-IMAGE RECONSTRUCTION RULE: The attached screen grab contains the ACTUAL faces of the people. You MUST NOT hallucinate new faces. Preserve their exact likeness, facial structure, and expression perfectly. Enhance the lighting and background to be cinematic, but keep the core subjects identical to the reference image.`
             : '',
         ``,
         `=== CTR HARD RULES ===`,
@@ -1035,36 +1035,18 @@ Return ONLY a JSON object, no markdown:
     }
 
     try {
-        const { compositeThumbnail } = await import('../../utils/thumbnailCompositor.js');
-        const { uploadToS3 } = await import('../../utils/s3.js');
-        const crypto = await import('crypto');
+        console.log(`🚀 [thumbnailGenerationNode] Using AI generation with strict face preservation...`);
+        const result = await router.generateImage({
+            prompt: finalPrompt,
+            model: 'gpt-image-2', 
+            aspectRatio: '16:9',
+            imageParts: imageParts,
+        }, { provider: 'openai' });
 
-        if (referenceFrameUrl) {
-            console.log(`🚀 [thumbnailGenerationNode] Bypassing AI generation — direct compositing onto extracted frame.`);
-            const finalBuffer = await compositeThumbnail(
-                referenceFrameUrl,
-                overlayText,
-                bestClickbaitCopy,
-                ta
-            );
-            const key = `yt-studio/thumbnails/${Date.now()}-${crypto.randomBytes(3).toString('hex')}.jpg`;
-            const finalUrl = await uploadToS3(finalBuffer, key, 'image/jpeg');
-            console.log(`✅ [thumbnailGenerationNode] Direct render success → S3: ${finalUrl?.substring(0, 80)}`);
-            return { generatedThumbnailUrl: finalUrl, thumbnailGenerationError: null, generatorModel: 'direct-compositor' };
-        } else {
-            console.warn(`⚠️ No reference frame available. Falling back to AI generation.`);
-            const result = await router.generateImage({
-                prompt: finalPrompt,
-                model: 'gpt-image-2', 
-                aspectRatio: '16:9',
-                imageParts: imageParts,
-            }, { provider: 'openai' });
-
-            const rawUrl = typeof result === 'string' ? result : result.imageUrl;
-            const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
-            console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
-            return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
-        }
+        const rawUrl = typeof result === 'string' ? result : result.imageUrl;
+        const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
+        console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
 
     } catch (err) {
         console.error(`❌ [thumbnailGenerationNode] Thumbnail rendering failed: ${err.message}`);
@@ -1204,7 +1186,8 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
             isYT = false; // Trick the logic below into using the S3/Direct FFmpeg pipeline
             duration = duration || 120; // Default if unknown
         } else {
-            console.warn(`⚠️ [frameExtractionNode] Failed to resolve YouTube stream. Falling back to CDN thumbnails.`);
+            console.error(`❌ [frameExtractionNode] YouTube stream restricted. Cannot extract peak moments.`);
+            throw new Error('This video is restricted by YouTube. Please try another video.');
         }
     }
 
