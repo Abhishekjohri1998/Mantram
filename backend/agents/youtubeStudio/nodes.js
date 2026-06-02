@@ -29,8 +29,41 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import ffmpegPath from 'ffmpeg-static';
+
 
 const execAsync = promisify(exec);
+
+// Helper: convert MM:SS or HH:MM:SS or raw numbers/strings to seconds
+function parseTimestamp(ts) {
+    if (typeof ts === 'number') return ts;
+    if (!ts) return 0;
+    const parts = ts.toString().split(':').map(Number);
+    if (parts.some(isNaN)) return 0;
+    if (parts.length === 3) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    if (parts.length === 2) {
+        return parts[0] * 60 + parts[1];
+    }
+    return parts[0] || 0;
+}
+
+// ── Helper: fetch any URL as inline image data ───────────────────────────────
+async function fetchInline(url, label) {
+    try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+        if (!res.ok) { console.warn(`   ⚠️ ${label}: HTTP ${res.status}`); return null; }
+        const buf = await res.arrayBuffer();
+        const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+        console.log(`   ✅ ${label} (${Math.round(buf.byteLength / 1024)}KB)`);
+        return { inlineData: { data: Buffer.from(buf).toString('base64'), mimeType } };
+    } catch (e) {
+        console.warn(`   ⚠️ ${label} failed: ${e.message}`);
+        return null;
+    }
+}
+
 
 // ── Gemini Files API Upload & Deletion ──────────────────────────────────────
 async function uploadToGeminiFilesAPI(mediaUrl, contentType = 'video') {
@@ -113,19 +146,20 @@ async function deleteFromGemini(fileName) {
 // ── FFmpeg Frame Extraction for Direct Video Uploads ─────────────────────────
 async function getUploadedVideoDuration(videoUrl) {
     try {
-        const { stdout } = await execAsync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoUrl}"`);
-        const durationSecs = parseFloat(stdout.trim());
-        return isNaN(durationSecs) ? 120 : durationSecs;
+        await execAsync(`"${ffmpegPath}" -i "${videoUrl}"`);
     } catch (err) {
-        console.warn('⚠️ Failed to get video duration using ffprobe:', err.message);
-        return 120;
+        const match = err.message.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2,3})/);
+        if (match) {
+            return (parseInt(match[1], 10) * 3600) + (parseInt(match[2], 10) * 60) + parseFloat(match[3]);
+        }
     }
+    return 120; // fallback default 2 minutes
 }
 
 async function extractFrameFromVideoUrl(videoUrl, timestampSecs, s3KeyPrefix) {
     const tempOut = path.join(os.tmpdir(), `frame-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`);
     try {
-        const cmd = `ffmpeg -y -i "${videoUrl}" -ss ${timestampSecs} -vframes 1 -q:v 2 "${tempOut}"`;
+        const cmd = `"${ffmpegPath}" -y -i "${videoUrl}" -ss ${timestampSecs} -vframes 1 -q:v 2 "${tempOut}"`;
         await execAsync(cmd);
         if (fs.existsSync(tempOut)) {
             const buffer = fs.readFileSync(tempOut);
@@ -766,20 +800,7 @@ export async function thumbnailGenerationNode({ thumbnailDirection, video, brand
     const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
     if (!geminiKey) throw new Error('GEMINI_IMAGE_API_KEY not configured');
 
-    // ── Helper: fetch any URL as inline image data ───────────────────────────────
-    async function fetchInline(url, label) {
-        try {
-            const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-            if (!res.ok) { console.warn(`   ⚠️ ${label}: HTTP ${res.status}`); return null; }
-            const buf = await res.arrayBuffer();
-            const mimeType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
-            console.log(`   ✅ ${label} (${Math.round(buf.byteLength / 1024)}KB)`);
-            return { inlineData: { data: Buffer.from(buf).toString('base64'), mimeType } };
-        } catch (e) {
-            console.warn(`   ⚠️ ${label} failed: ${e.message}`);
-            return null;
-        }
-    }
+
 
     // ── Load template reference image (style guide, NOT face reference) ──────────
     const templateRefPart = templateRef ? await fetchInline(templateRef, 'Template style reference') : null;
@@ -1036,15 +1057,15 @@ Return ONLY a JSON object, no markdown:
     try {
         const result = await router.generateImage({
             prompt: finalPrompt,
-            model: 'gpt-image-2', 
             aspectRatio: '16:9',
             imageParts: imageParts,
-        }, { provider: 'openai' });
+        }, { provider: 'gemini' });
 
         const rawUrl = typeof result === 'string' ? result : result.imageUrl;
+        const genModel = typeof result === 'string' ? 'gemini-3.1-flash-image-preview' : (result.model || 'gemini-3.1-flash-image-preview');
         const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
         console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
-        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: 'gpt-image-2' };
+        return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: genModel };
 
     } catch (gemErr) {
         console.error(`❌ [thumbnailGenerationNode] Gemini image generation failed: ${gemErr.message}`);
@@ -1091,10 +1112,7 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
     for (const char of characters.slice(0, 3)) {
         let frameSeek = null;
         if (char.firstAppearance) {
-            const parts = char.firstAppearance.split(':').map(Number);
-            frameSeek = parts.length === 3
-                ? parts[0] * 3600 + parts[1] * 60 + parts[2]
-                : parts[0] * 60 + (parts[1] || 0);
+            frameSeek = parseTimestamp(char.firstAppearance);
         }
 
         // Check if there is a match in the Cast Bank (case-insensitive name match)
@@ -1115,7 +1133,8 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
                 portraitUrl = await extractFrameFromVideoUrl(video.youtubeUrl, frameSeek, s3KeyPrefix);
             } else if (ytId) {
                 if (frameSeek != null && video.duration) {
-                    const pct = frameSeek / video.duration;
+                    const durationSecs = parseTimestamp(video.duration);
+                    const pct = durationSecs > 0 ? (frameSeek / durationSecs) : 0;
                     let frameNum = 1;
                     if (pct >= 0.35 && pct < 0.65) {
                         frameNum = 2;
@@ -1131,14 +1150,43 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
             }
         }
 
-        console.log(`   ✅ Character portrait mapped for: ${char.label} (${isCastMatch ? 'Cast Bank Match' : portraitUrl ? 'Video Frame' : 'None'})`);
+        let finalPortraitUrl = portraitUrl;
+        if (portraitUrl && !isCastMatch) {
+            console.log(`   🎨 Generating clean AI portrait for ${char.label} using frame reference...`);
+            try {
+                const inlinePart = await fetchInline(portraitUrl, `${char.label} frame ref`);
+                if (inlinePart) {
+                    const router = getRouter();
+                    const portraitPrompt = `A clean, professional close-up studio portrait photo of ${char.label} (Role: ${char.role || 'character'}). Visual details to match from reference image: ${char.visualDescription || 'person'}. Focus strictly on the face/portrait, neutral solid background, cinematic studio lighting, photorealistic, high likeness, clear features, no text overlays, no frames.`;
+                    
+                    const result = await router.generateImage({
+                        prompt: portraitPrompt,
+                        aspectRatio: '1:1', // 1:1 is perfect for portraits
+                        imageParts: [inlinePart],
+                    }, { provider: 'gemini' });
+
+                    const rawPortraitUrl = typeof result === 'string' ? result : result.imageUrl;
+                    if (rawPortraitUrl) {
+                        const s3Url = await persistToS3(rawPortraitUrl, `yt-studio/portraits/${char.label.replace(/\s+/g, '_')}_${Date.now()}`);
+                        if (s3Url) {
+                            finalPortraitUrl = s3Url;
+                            console.log(`   ✅ AI Portrait generated for ${char.label} -> S3: ${s3Url.substring(0, 60)}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn(`   ⚠️ Failed to generate AI portrait for ${char.label}:`, err.message);
+            }
+        }
+
+        console.log(`   ✅ Character portrait mapped for: ${char.label} (${isCastMatch ? 'Cast Bank Match' : finalPortraitUrl !== portraitUrl ? 'AI Generated Portrait' : portraitUrl ? 'Video Frame Fallback' : 'None'})`);
         characterPortraits.push({
             label:           char.label,
             role:            char.role,
             firstAppearance: char.firstAppearance,
             screenTimePct:   char.screenTimePct,
             visualDescription: char.visualDescription || null,
-            portraitUrl,
+            portraitUrl:     finalPortraitUrl,
         });
     }
 
@@ -1160,25 +1208,11 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
 export async function frameExtractionNode({ videoId, videoUrl = null, isYT = true, peakMoments = [], duration = null }) {
     if (!videoId) return { extractedFrames: [] };
 
-    // Helper: convert MM:SS or HH:MM:SS or raw numbers/strings to seconds
-    function parseTimestamp(ts) {
-        if (typeof ts === 'number') return ts;
-        if (!ts) return 0;
-        const parts = ts.toString().split(':').map(Number);
-        if (parts.some(isNaN)) return 0;
-        if (parts.length === 3) {
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        }
-        if (parts.length === 2) {
-            return parts[0] * 60 + parts[1];
-        }
-        return parts[0] || 0;
-    }
-
     if (!isYT) {
         if (!videoUrl) return { extractedFrames: [] };
         console.log(`🎬 [frameExtractionNode] Extracting S3 frames via FFmpeg for ${videoId}`);
-        const durationSecs = duration || await getUploadedVideoDuration(videoUrl);
+        const parsedDuration = duration ? parseTimestamp(duration) : null;
+        const durationSecs = parsedDuration || await getUploadedVideoDuration(videoUrl);
         const s3KeyPrefix = `youtube-studio-uploads/frames/${videoId}`;
         
         let offsets = [];
@@ -1210,7 +1244,7 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
 
     console.log(`🎬 [frameExtractionNode] Extracting YouTube CDN frames for ${videoId}`);
 
-    const durationSecs = duration;
+    const durationSecs = parseTimestamp(duration);
     let peakIndex = -1;
     if (peakMoments && peakMoments.length > 0 && durationSecs) {
         const peakSecs = parseTimestamp(peakMoments[0].timestamp);
@@ -1235,7 +1269,7 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
             if (!res.ok) continue;
             const buf = await res.arrayBuffer();
             // Skip YouTube's 1×1 grey placeholder (returned when a frame doesn't exist)
-            if (buf.byteLength < 2000) continue;
+            if (buf.byteLength < 1200) continue;
             frames.push({ url, label, sizeKb: Math.round(buf.byteLength / 1024) });
             console.log(`   ✅ ${label} → ${url.split('/').pop()} (${Math.round(buf.byteLength / 1024)}KB)`);
         } catch { /* skip unavailable frames silently */ }

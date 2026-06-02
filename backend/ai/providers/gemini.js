@@ -300,12 +300,15 @@ export class GeminiProvider extends BaseProvider {
                 
                 // Build content parts
                 const parts = [];
-                if (prompt) parts.push({ text: prompt });
                 
+                // Push image reference parts first to maximize likeness/style grounding
                 for (const ip of imageParts) {
                     if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
                     if (ip.text) parts.push({ text: ip.text });
                 }
+                
+                // Push prompt text last
+                if (prompt) parts.push({ text: prompt });
                 
                 // Clean aspectRatio parameter to guarantee valid native values (default to 1:1)
                 const safeARs = ["1:1","1:4","1:8","2:3","3:2","3:4","4:1","4:3","4:5","5:4","8:1","9:16","16:9","21:9"];
