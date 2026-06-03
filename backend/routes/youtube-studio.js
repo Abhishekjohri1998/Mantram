@@ -20,7 +20,7 @@ import {
     transcriptNode, analysisNode, chapterNode,
     seoNode, brandCriticNode, thumbnailDirectionNode,
     thumbnailGenerationNode, characterPortraitNode,
-    frameExtractionNode, promoNode,
+    frameExtractionNode, highlightFrameExtractionNode, promoNode,
 } from '../agents/youtubeStudio/nodes.js';
 import { extractVideoId } from '../agents/youtubeStudio/transcriptClient.js';
 import YoutubeProject from '../models/YoutubeProject.js';
@@ -341,11 +341,33 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
         let analysis = {};
         let extractedFrames = [];
+        let primaryFaceUrl = null;
+
+        if (needFrames) {
+            emit('frames', 'running', { message: 'Extracting key video frames via FFmpeg & Face-API…' });
+            try {
+                const res = await frameExtractionNode({ videoId, videoUrl, isYT, duration: video.duration });
+                extractedFrames = res.extractedFrames;
+                primaryFaceUrl = res.primaryFaceUrl;
+                
+                // Add the face clusters to the video object so analysisNode can use them
+                video.faceClusters = res.faceClusters;
+                
+                emit('frames', 'done', { count: extractedFrames.length });
+                console.log(`✅ [Node 1.5] Frames: ${extractedFrames.length} extracted, Face found: ${!!primaryFaceUrl}`);
+            } catch (err) {
+                console.error(`❌ [Node 1.5] Frame extraction failed: ${err.message}`);
+                emit('frames', 'error', { error: err.message });
+            }
+        } else {
+            emit('frames', 'done', { message: 'Skipped' });
+        }
 
         if (needAnalysis) {
-            emit('analysis',  'running', { message: 'Gemini 2.5 Pro watching the video…' });
+            emit('analysis',  'running', { message: 'Deep Semantic Analysis (Vision + Transcript)…' });
             try {
-                const res = await analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis });
+                // Pass the extracted frames to analysisNode so it can do Frame Content Analysis
+                const res = await analysisNode({ video, brandContext, knownCasts, writingStyleAnalysis, extractedFrames });
                 analysis = res.analysis;
                 emit('analysis', 'done', { summary: analysis.summary?.substring(0, 100), characters: analysis.characters?.length });
                 console.log(`✅ [Node 2] Analysis done: ${analysis.contentType}, ${analysis.characters?.length || 0} characters`);
@@ -357,43 +379,32 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
             emit('analysis', 'done', { message: 'Skipped' });
         }
 
-        if (needFrames) {
-            emit('frames',    'running', { message: 'Extracting key video frames…' });
+        // ── Stage 2b: Highlight Frame Extraction (after analysis) ──
+        // Maps each key highlight timestamp to an actual video frame from YouTube storyboards
+        if (analysis?.highlights?.length > 0 && video.videoId) {
             try {
-                const peakMoments = [];
-                if (analysis?.peakMoment?.timestamp) {
-                    peakMoments.push({
-                        timestamp: analysis.peakMoment.timestamp,
-                        label: 'Peak Moment Frame'
-                    });
-                }
-                if (analysis?.promoCuts?.length) {
-                    analysis.promoCuts.slice(0, 3).forEach((cut, idx) => {
-                        if (cut.timestamp) {
-                            peakMoments.push({
-                                timestamp: cut.timestamp,
-                                label: `Highlight ${idx + 1}`
-                            });
-                        }
-                    });
-                }
-
-                const res = await frameExtractionNode({ videoId, videoUrl, isYT, peakMoments, duration: video.duration });
-                extractedFrames = res.extractedFrames;
-                emit('frames', 'done', { count: extractedFrames.length });
-                console.log(`✅ [Node 2b] Frames: ${extractedFrames.length} extracted`);
+                emit('highlightFrames', 'running', { message: `Extracting frames for ${analysis.highlights.length} key highlights…` });
+                const hfRes = await highlightFrameExtractionNode({
+                    videoId: video.videoId,
+                    analysis,
+                    duration: video.duration || duration || null,
+                    existingFrames: extractedFrames,
+                });
+                extractedFrames = hfRes.extractedFrames;
+                emit('highlightFrames', 'done', { count: extractedFrames.length });
+                console.log(`✅ [Node 2b] Highlight frames: ${extractedFrames.length} total`);
             } catch (err) {
-                console.error(`❌ [Node 2b] Frame extraction failed: ${err.message}`);
-                emit('frames', 'error', { error: err.message });
+                console.error(`❌ [Node 2b] Highlight frame extraction failed: ${err.message}`);
+                emit('highlightFrames', 'error', { error: err.message });
             }
-        } else {
-            emit('frames', 'done', { message: 'Skipped' });
         }
+
 
         // ── Stage 3: Chapter Detection (conditional) ──
         let chapters = [];
-        if (hasFeature('chapters') && transcript.available) {
-            emit('chapters', 'running', { message: 'Detecting smart chapters (analysis-grounded)…' });
+        const isYTVideo = video.youtubeUrl?.includes('youtube.com') || video.youtubeUrl?.includes('youtu.be');
+        if (hasFeature('chapters') && (transcript.available || isYTVideo)) {
+            emit('chapters', 'running', { message: transcript.available ? 'Detecting smart chapters (analysis-grounded)…' : 'Detecting chapters via Gemini video analysis…' });
             const chapRes = await chapterNode({ video, analysis });
             chapters = chapRes.chapters;
             emit('chapters', 'done', { count: chapters.length });
@@ -462,6 +473,40 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
         let generatorModel = null;
 
         if (hasFeature('thumbnail')) {
+            // --- Extract EXACT Peak Moment Frame ---
+            if (analysis?.peakMoment?.timestamp && video.youtubeUrl) {
+                emit('frames', 'running', { message: 'Extracting Exact Peak Moment Frame...' });
+                try {
+                    const { extractFrameFromVideoUrl } = await import('../agents/youtubeStudio/nodes.js');
+                    const { getYouTubeStreamUrl } = await import('../utils/youtubeStream.js');
+                    
+                    const tsStr = analysis.peakMoment.timestamp;
+                    const parts = tsStr.split(':').map(Number);
+                    let secs = 0;
+                    if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
+                    else if (parts.length === 2) secs = parts[0] * 60 + parts[1]; // MM:SS
+                    else secs = parts[0] || 0; // SS
+
+                    if (secs > 0) {
+                        const streamUrl = await getYouTubeStreamUrl(video.videoId);
+                        if (streamUrl) {
+                            const s3Prefix = `youtube-studio-uploads/frames/${video.videoId}/exact`;
+                            const exactFrameUrl = await extractFrameFromVideoUrl(streamUrl, secs, s3Prefix);
+                            if (exactFrameUrl) {
+                                console.log(`✅ [Node 5.5] Exact peak frame extracted: ${exactFrameUrl}`);
+                                extractedFrames.unshift({
+                                    url: exactFrameUrl,
+                                    label: 'Peak Moment Frame',
+                                    score: 100
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Exact peak frame extraction failed: ${e.message}`);
+                }
+            }
+
             // Creative Director CTR strategy
             emit('thumbnailDirection', 'running', { message: 'Creative Director analyzing video frames (CTR strategy)…' });
             const dirRes = await thumbnailDirectionNode({
@@ -484,10 +529,19 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
             // Final Thumbnail generation
             emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with GPT Image 2 (HD)…' });
+            
+            // Use original YouTube thumbnail as face reference when no face was detected from frames
+            let faceRefUrl = primaryFaceUrl;
+            if (!faceRefUrl && video.isYT !== false && video.videoId) {
+                faceRefUrl = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
+                console.log(`   📸 Using original YouTube thumbnail as face reference: ${faceRefUrl}`);
+            }
+            
             const genRes = await thumbnailGenerationNode({
                 thumbnailDirection, video, brandContext, template,
                 characterPortraits,
                 extractedFrames,
+                primaryFaceUrl: faceRefUrl
             });
             generatedThumbnailUrl = genRes.generatedThumbnailUrl;
             generatorModel = genRes.generatorModel;

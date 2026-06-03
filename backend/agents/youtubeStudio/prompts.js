@@ -41,8 +41,8 @@ Return ONLY valid JSON:
     "sceneDescription": "string (describe the scene visually in detail — what is happening, what does it look LIKE)",
     "emotion": "string (shock|romance|anger|joy|revelation|tension|comedy|triumph)"
   },
-  "highlights": [
-    { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string" }
+  "highlights": [ // CRITICAL: Generate AT LEAST 1 highlight per 3-5 minutes of video. For a 1-hour video = 12-20 highlights minimum. Cover the FULL video timeline.
+    { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string", "sceneDescription": "string (what visually happens in this moment)" }
   ],
   "promoCuts": [ // YOU MUST ALWAYS OUTPUT AT LEAST 2 PROMO CUTS EVEN IF THE VIDEO IS SHORT
     {
@@ -72,7 +72,7 @@ Return ONLY valid JSON:
 
     // ── Node 2: Chapter Detector ────────────────────────────────────────────
     CHAPTER_DETECTOR: `You are a YouTube chapter detection specialist.
-Your task is to analyze a timestamped transcript AND the AI video analysis to divide the video into logical, well-timed chapters.
+Your task is to analyze a timestamped transcript AND the AI video analysis to divide the video into logical, highly detailed, and perfectly timed chapters.
 
 You will receive:
 - The full timestamped transcript
@@ -82,16 +82,17 @@ Rules:
 - Chapter 1 MUST start at 0:00 — use "Intro" or a descriptive hook title
 - Last chapter should capture the CTA/Outro/Conclusion (if applicable)
 - Chapter titles should be 3–6 words, punchy and descriptive, YouTube-style
-- Align chapter boundaries with topic shifts AND highlight timestamps from the analysis
+- Align chapter boundaries exactly with topic shifts AND highlight timestamps from the analysis
 - Minimum gap: 30 seconds between chapters
 - Minimum 3 chapters for videos under 5 minutes, minimum 5 chapters for longer videos
-- Max 12 chapters per video
-- Use ONLY timestamps that exist in the transcript
-- screenshotTimestamp: the BEST timestamp within that chapter to capture a representative still frame
+- Max 15 chapters per video
+- Use ONLY timestamps that actually exist in the transcript
+- screenshotTimestamp: the EXACT BEST timestamp within that chapter to capture a visually representative still frame
+- description: MUST BE DETAILED. Write 2-4 sentences summarizing exactly what happens in this chapter, the key points discussed, and the emotional tone. Do not just write a generic 1-liner.
 
 STRUCTURAL GUIDE (apply where applicable):
 - First chapter: Hook/Intro (0:00)
-- Middle chapters: Topic segments — align with highlights
+- Middle chapters: Detailed Topic segments — align with highlights
 - Second-to-last: Climax/Peak (near the peak moment timestamp)
 - Last chapter: Conclusion/CTA/Outro
 
@@ -101,8 +102,8 @@ Return ONLY valid JSON:
     {
       "timestamp": "0:00",
       "title": "string",
-      "description": "string (1 sentence describing this chapter)",
-      "screenshotTimestamp": "MM:SS (best frame to capture for this chapter)"
+      "description": "string (2-4 sentences describing the detailed content, sub-topics, and action of this chapter)",
+      "screenshotTimestamp": "MM:SS (exact best frame to capture for this chapter)"
     }
   ]
 }`,

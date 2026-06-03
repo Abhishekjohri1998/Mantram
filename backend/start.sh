@@ -16,4 +16,4 @@ if lsof -i -n -P 2>/dev/null | grep -q "3001.*LISTEN"; then
 fi
 
 echo "✅ Port 3001 free. Starting backend..."
-cd "$(dirname "$0")/backend" && node index.js
+cd "$(dirname "$0")" && node index.js

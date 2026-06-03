@@ -16,7 +16,7 @@ export class GeminiProvider extends BaseProvider {
         this.imageApiKey = config.imageApiKey || this.apiKey;
     }
 
-    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [], youtubeUrl = null }) {
+    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [], youtubeUrl = null, jsonMode = false }) {
         const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
@@ -97,6 +97,7 @@ export class GeminiProvider extends BaseProvider {
                 generationConfig: {
                     temperature,
                     maxOutputTokens: maxTokens,
+                    ...(jsonMode ? { responseMimeType: 'application/json' } : {})
                 },
             }),
         }));
