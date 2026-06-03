@@ -648,8 +648,24 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
             jsonMode: true
         });
 
-        // The router natively handles jsonMode and parsing
-        const parsed = typeof result.text === 'string' ? JSON.parse(result.text) : result.text;
+        // Clean Gemini response: strip markdown fences and think tags before parsing
+        let rawText = typeof result.text === 'string' ? result.text : JSON.stringify(result.text);
+        rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        rawText = rawText.replace(/```(?:json)?\s*\n?/gi, '').trim();
+        
+        let parsed;
+        // Strategy 1: Direct parse
+        try {
+            parsed = JSON.parse(rawText);
+        } catch (_) {
+            // Strategy 2: Extract JSON object with regex
+            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                parsed = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error(`No valid JSON in Gemini response: ${rawText.substring(0, 200)}`);
+            }
+        }
         
         console.log(`✅ [thumbnailDirectionNode] Creative direction complete:`);
         console.log(`   CTR strategy: ${parsed.ctrStrategy?.substring(0, 80)}`);

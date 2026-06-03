@@ -4,11 +4,9 @@ import { exec } from 'child_process';
 import util from 'util';
 import crypto from 'crypto';
 import sharp from 'sharp';
-import YTDlpWrap from 'yt-dlp-wrap';
 import { uploadToS3 } from './s3.js';
 
 const execPromise = util.promisify(exec);
-const ytDlp = new YTDlpWrap.default();
 
 /**
  * Calculates a simple perceptual hash (average hash) for an image.

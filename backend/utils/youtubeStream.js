@@ -1,6 +1,27 @@
 import ytdl from '@distube/ytdl-core';
 import youtubedl from 'youtube-dl-exec';
 import fs from 'fs';
+import { execSync } from 'child_process';
+
+// Flag to ensure we only try to update yt-dlp once per process lifetime
+let ytDlpUpdateAttempted = false;
+
+/**
+ * Ensures the yt-dlp binary bundled by youtube-dl-exec is up-to-date.
+ * Runs once per process startup. Critical for EC2 where cached binaries get stale.
+ */
+async function ensureYtDlpUpdated() {
+    if (ytDlpUpdateAttempted) return;
+    ytDlpUpdateAttempted = true;
+    try {
+        console.log(`🔄 [youtubeStream] Updating yt-dlp binary...`);
+        await youtubedl.raw('--update');
+        console.log(`✅ [youtubeStream] yt-dlp updated successfully`);
+    } catch (e) {
+        // --update may fail if binary is read-only; that's fine — continue with whatever version we have
+        console.log(`   ℹ️ yt-dlp update skipped: ${e.message?.split('\n')[0]}`);
+    }
+}
 
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
@@ -16,6 +37,9 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
 
     console.log(`📡 [youtubeStream] Resolving stream for ${url}...`);
 
+    // Ensure yt-dlp is up-to-date before trying any strategy
+    await ensureYtDlpUpdated();
+
     // Strategy 1: @distube/ytdl-core (Standard)
     try {
         console.log(`   ➡️ Strategy 1: @distube/ytdl-core`);
@@ -29,58 +53,78 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         console.log(`   ⚠️ Strategy 1 failed: ${err.message}`);
     }
 
-    // Strategy 2: youtube-dl-exec with web_safari client
+    // Strategy 2: youtube-dl-exec with android client (most reliable for bot bypass)
     try {
-        console.log(`   ➡️ Strategy 2: youtube-dl-exec (web_safari)`);
-        const output = await youtubedl(url, {
-            getUrl: true,
-            format: 'best',
-            extractorArgs: 'youtube:player_client=web_safari',
-            noWarnings: true
-        });
-        if (output && output.startsWith('http')) {
-            console.log(`   ✅ Strategy 2 success`);
-            return output;
-        }
-    } catch (err) {
-        console.log(`   ⚠️ Strategy 2 (web_safari) failed: ${err.message.trim().split('\n')[0]}`);
-    }
-
-    // Strategy 2b: youtube-dl-exec with android client (Bypasses bot block)
-    try {
-        console.log(`   ➡️ Strategy 2b: youtube-dl-exec (android)`);
+        console.log(`   ➡️ Strategy 2: youtube-dl-exec (android)`);
         const output = await youtubedl(url, {
             getUrl: true,
             format: 'best',
             extractorArgs: 'youtube:player_client=android',
-            noWarnings: true
+            noWarnings: true,
+            noCheckCertificates: true,
         });
-        if (output && output.startsWith('http')) {
-            console.log(`   ✅ Strategy 2b success`);
+        if (output && typeof output === 'string' && output.startsWith('http')) {
+            console.log(`   ✅ Strategy 2 success`);
             return output;
         }
     } catch (err) {
-        console.log(`   ⚠️ Strategy 2b (android) failed: ${err.message.trim().split('\n')[0]}`);
+        console.log(`   ⚠️ Strategy 2 (android) failed: ${err.message.trim().split('\n')[0]}`);
     }
 
-    // Strategy 3: youtube-dl-exec with cookies (if available)
+    // Strategy 3: youtube-dl-exec with web_safari client
+    try {
+        console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari)`);
+        const output = await youtubedl(url, {
+            getUrl: true,
+            format: 'best',
+            extractorArgs: 'youtube:player_client=web_safari',
+            noWarnings: true,
+            noCheckCertificates: true,
+        });
+        if (output && typeof output === 'string' && output.startsWith('http')) {
+            console.log(`   ✅ Strategy 3 success`);
+            return output;
+        }
+    } catch (err) {
+        console.log(`   ⚠️ Strategy 3 (web_safari) failed: ${err.message.trim().split('\n')[0]}`);
+    }
+
+    // Strategy 4: youtube-dl-exec with default client (no extractor args)
+    try {
+        console.log(`   ➡️ Strategy 4: youtube-dl-exec (default client)`);
+        const output = await youtubedl(url, {
+            getUrl: true,
+            format: 'best',
+            noWarnings: true,
+            noCheckCertificates: true,
+        });
+        if (output && typeof output === 'string' && output.startsWith('http')) {
+            console.log(`   ✅ Strategy 4 success`);
+            return output;
+        }
+    } catch (err) {
+        console.log(`   ⚠️ Strategy 4 (default) failed: ${err.message.trim().split('\n')[0]}`);
+    }
+
+    // Strategy 5: youtube-dl-exec with cookies (if available on EC2)
     try {
         const cookiePath = '/home/ec2-user/secrets/youtube-cookies.txt';
         if (fs.existsSync(cookiePath)) {
-            console.log(`   ➡️ Strategy 3: youtube-dl-exec (cookies)`);
+            console.log(`   ➡️ Strategy 5: youtube-dl-exec (cookies)`);
             const output = await youtubedl(url, {
                 getUrl: true,
                 format: 'best',
                 cookies: cookiePath,
-                noWarnings: true
+                noWarnings: true,
+                noCheckCertificates: true,
             });
-            if (output && output.startsWith('http')) {
-                console.log(`   ✅ Strategy 3 success`);
+            if (output && typeof output === 'string' && output.startsWith('http')) {
+                console.log(`   ✅ Strategy 5 success`);
                 return output;
             }
         }
     } catch (err) {
-        console.log(`   ⚠️ Strategy 3 failed: ${err.message.trim().split('\n')[0]}`);
+        console.log(`   ⚠️ Strategy 5 failed: ${err.message.trim().split('\n')[0]}`);
     }
 
     // All streaming strategies failed.
