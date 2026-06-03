@@ -847,8 +847,8 @@ export async function submitGeminiFlashVideoGeneration({
         ? 'google/gemini-omni-flash/image-to-video-developer' 
         : 'google/gemini-omni-flash/text-to-video-developer';
 
-    // Round duration to closest of [4, 6, 8, 10]
-    const allowedDurations = [4, 6, 8, 10];
+    // Round duration to closest allowed value
+    const allowedDurations = [4, 6, 8, 10, 15, 20, 30, 45, 60, 90];
     const targetDur = parseInt(duration, 10) || 6;
     const finalDur = allowedDurations.reduce((prev, curr) => 
         Math.abs(curr - targetDur) < Math.abs(prev - targetDur) ? curr : prev
