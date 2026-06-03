@@ -1251,39 +1251,48 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
             //   2.jpg = frame at ~50% of video  
             //   3.jpg = frame at ~75% of video
             // These are REAL video content (not the creator's custom thumbnail).
-            //
-            // We also try to parse the YouTube page to extract storyboard sprites
-            // which contain 25+ frames across the full video timeline.
             // ══════════════════════════════════════════════════════════════════
             
             try {
-                const { uploadToS3 } = await import('../../utils/s3.js');
                 const allFrames = [];
                 
                 // ── STEP 1: Fetch YouTube auto-generated video frames ──────────
+                // Try both img.youtube.com and i.ytimg.com domains (redundancy)
                 const autoFrameUrls = [
-                    { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame (Face Reference)', score: 100 },
-                    { url: `https://img.youtube.com/vi/${videoId}/1.jpg`, label: 'Video Frame @25%', score: 85 },
-                    { url: `https://img.youtube.com/vi/${videoId}/2.jpg`, label: 'Video Frame @50%', score: 80 },
-                    { url: `https://img.youtube.com/vi/${videoId}/3.jpg`, label: 'Video Frame @75%', score: 75 },
+                    { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame (Face Reference)', score: 100 },
+                    { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, label: 'HQ Cover Frame', score: 95 },
+                    { url: `https://i.ytimg.com/vi/${videoId}/1.jpg`, label: 'Video Frame @25%', score: 85 },
+                    { url: `https://i.ytimg.com/vi/${videoId}/2.jpg`, label: 'Video Frame @50%', score: 80 },
+                    { url: `https://i.ytimg.com/vi/${videoId}/3.jpg`, label: 'Video Frame @75%', score: 75 },
                 ];
                 
                 for (const frame of autoFrameUrls) {
                     try {
-                        const res = await fetch(frame.url, { signal: AbortSignal.timeout(5000) });
+                        const res = await fetch(frame.url, { 
+                            signal: AbortSignal.timeout(8000),
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                        });
                         if (res.ok) {
                             const ct = res.headers.get('content-type') || '';
                             if (ct.includes('image')) {
                                 const buf = Buffer.from(await res.arrayBuffer());
-                                // Check it's a real frame (>5KB) not a placeholder
-                                if (buf.length > 5000) {
+                                // YouTube placeholder is ~1.3KB, real frames are >2KB
+                                if (buf.length > 2000) {
                                     frame.sizeKb = Math.round(buf.length / 1024);
                                     allFrames.push(frame);
                                     console.log(`   ✅ ${frame.label} (${frame.sizeKb}KB)`);
+                                } else {
+                                    console.log(`   ⚠️ ${frame.label}: too small (${buf.length}B) — placeholder`);
                                 }
+                            } else {
+                                console.log(`   ⚠️ ${frame.label}: non-image content-type: ${ct}`);
                             }
+                        } else {
+                            console.log(`   ⚠️ ${frame.label}: HTTP ${res.status}`);
                         }
-                    } catch (e) { /* skip */ }
+                    } catch (e) {
+                        console.log(`   ⚠️ ${frame.label}: fetch error: ${e.message}`);
+                    }
                 }
                 
                 // ── STEP 2: Try storyboard extraction from YouTube page ────────
@@ -1294,11 +1303,14 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
                         headers: { 
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                             'Accept-Language': 'en-US,en;q=0.9',
+                            'Cookie': 'CONSENT=YES+cb; SOCS=CAESEwgDEgk2MTQyNzEyNjUaAmVuIAEaBgiA_LyaBg',
                         }
                     });
                     
                     if (pageRes.ok) {
                         const html = await pageRes.text();
+                        console.log(`   📄 YouTube page fetched (${Math.round(html.length / 1024)}KB)`);
+                        
                         // Extract storyboard spec from ytInitialPlayerResponse
                         const specMatch = html.match(/"playerStoryboardSpecRenderer"\s*:\s*\{\s*"spec"\s*:\s*"([^"]+)"/);
                         
@@ -1307,21 +1319,19 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
                             const segments = spec.split('|');
                             
                             if (segments.length > 1) {
+                                const { uploadToS3 } = await import('../../utils/s3.js');
                                 // Use the highest resolution storyboard (last segment)
-                                const baseUrl = segments[0].split('$')[0]; // Base URL before $
+                                const baseUrl = segments[0].split('$')[0];
                                 const lastSeg = segments[segments.length - 1];
                                 const segParts = lastSeg.split('#');
-                                // Format: width#height#count#cols#rows#...#sigh#url_suffix
                                 
                                 if (segParts.length >= 5) {
                                     const [tileW, tileH, count, cols, rows] = segParts.map(Number);
                                     const sigh = segParts[segParts.length - 1];
-                                    
-                                    // Construct the storyboard URL
                                     const sbLevel = segments.length - 1;
                                     const storyboardUrl = baseUrl.replace('$L', `L${sbLevel}`).replace('$N', 'M0') + `&sigh=${sigh}`;
                                     
-                                    console.log(`   🔨 Storyboard found: ${cols}x${rows} grid, ${count} frames, tile ${tileW}x${tileH}`);
+                                    console.log(`   🔨 Storyboard found: ${cols}x${rows} grid, ${count} frames`);
                                     
                                     const sbRes = await fetch(storyboardUrl, { 
                                         signal: AbortSignal.timeout(10000),
@@ -1337,22 +1347,20 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
                                             const actualTileW = Math.floor(meta.width / (cols || 5));
                                             const actualTileH = Math.floor(meta.height / (rows || 5));
                                             
-                                            console.log(`   ✅ Storyboard sprite fetched (${Math.round(spriteBuf.length / 1024)}KB, ${meta.width}x${meta.height})`);
+                                            console.log(`   ✅ Storyboard sprite (${Math.round(spriteBuf.length / 1024)}KB, ${meta.width}x${meta.height})`);
                                             
-                                            // Extract every 3rd tile for diversity
                                             let tileCount = 0;
                                             for (let r = 0; r < (rows || 5); r++) {
                                                 for (let c = 0; c < (cols || 5); c++) {
-                                                    if (tileCount % 3 !== 0) { tileCount++; continue; } // Every 3rd
+                                                    if (tileCount % 3 !== 0) { tileCount++; continue; }
                                                     try {
                                                         const tileBuf = await sharp(spriteBuf)
                                                             .extract({ left: c * actualTileW, top: r * actualTileH, width: actualTileW, height: actualTileH })
                                                             .jpeg({ quality: 85 })
                                                             .toBuffer();
                                                         
-                                                        const key = `youtube-studio-uploads/frames/${videoId}/storyboard_${tileCount}.jpg`;
+                                                        const key = `youtube-studio-uploads/frames/${videoId}/sb_${tileCount}.jpg`;
                                                         const s3Url = await uploadToS3(tileBuf, key, 'image/jpeg');
-                                                        
                                                         allFrames.push({
                                                             url: s3Url,
                                                             label: `Video Scene ${tileCount + 1} (Storyboard)`,
@@ -1363,13 +1371,13 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
                                                     tileCount++;
                                                 }
                                             }
-                                            console.log(`   ✅ Storyboard: ${allFrames.filter(f => f.label.includes('Storyboard')).length} scene frames extracted`);
+                                            console.log(`   ✅ Storyboard: extracted ${allFrames.filter(f => f.label.includes('Storyboard')).length} scene frames`);
                                         }
                                     }
                                 }
                             }
                         } else {
-                            console.log(`   ℹ️ No storyboard spec found in YouTube page`);
+                            console.log(`   ℹ️ No storyboard spec found in YouTube page HTML`);
                         }
                     }
                 } catch (sbErr) {
@@ -1378,38 +1386,27 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
                 
                 if (allFrames.length > 0) {
                     console.log(`✅ [frameExtractionNode] CDN extraction complete: ${allFrames.length} frames`);
-                    
-                    // Run face detection on extracted frames
-                    try {
-                        const { detectAndClusterFaces } = await import('../../utils/faceDetection.js');
-                        const { primaryFaceUrl, allFaces } = await detectAndClusterFaces(allFrames, videoId);
-                        return {
-                            extractedFrames: allFrames,
-                            primaryFaceUrl,
-                            faceClusters: allFaces,
-                            isMetadataFallback: false,
-                        };
-                    } catch (faceErr) {
-                        console.warn(`⚠️ Face detection failed: ${faceErr.message}`);
-                        return {
-                            extractedFrames: allFrames,
-                            primaryFaceUrl: null,
-                            faceClusters: [],
-                            isMetadataFallback: false,
-                        };
-                    }
+                    // Skip face detection — @tensorflow/tfjs-node is not available on EC2
+                    // Face reference will use the YouTube thumbnail directly via primaryFaceUrl fallback
+                    return {
+                        extractedFrames: allFrames,
+                        primaryFaceUrl: null,
+                        faceClusters: [],
+                        isMetadataFallback: false,
+                    };
                 }
             } catch (extractErr) {
                 console.warn(`⚠️ CDN frame extraction failed: ${extractErr.message}`);
             }
             
-            // ── FINAL FALLBACK: Metadata-only (YouTube cover thumbnails) ──
+            // ── FINAL FALLBACK: Metadata-only (YouTube cover thumbnails + auto frames) ──
             console.error(`❌ [frameExtractionNode] All extraction methods failed. Using Metadata-Only fallback.`);
             const fallbackFrames = [
-                { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame (Face Reference)', score: 100 },
-                { url: `https://img.youtube.com/vi/${videoId}/1.jpg`, label: 'Video Frame @25%', score: 85 },
-                { url: `https://img.youtube.com/vi/${videoId}/2.jpg`, label: 'Video Frame @50%', score: 80 },
-                { url: `https://img.youtube.com/vi/${videoId}/3.jpg`, label: 'Video Frame @75%', score: 75 },
+                { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, label: 'HD Cover Frame (Face Reference)', score: 100 },
+                { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, label: 'HQ Cover Frame', score: 95 },
+                { url: `https://i.ytimg.com/vi/${videoId}/1.jpg`, label: 'Video Frame @25%', score: 85 },
+                { url: `https://i.ytimg.com/vi/${videoId}/2.jpg`, label: 'Video Frame @50%', score: 80 },
+                { url: `https://i.ytimg.com/vi/${videoId}/3.jpg`, label: 'Video Frame @75%', score: 75 },
             ];
             return { extractedFrames: fallbackFrames, primaryFaceUrl: null, faceClusters: [], isMetadataFallback: true };
         }
@@ -1418,25 +1415,24 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
     if (streamUrl) {
         console.log(`🎬 [frameExtractionNode] Initiating intelligent frame extraction...`);
         const { intelligentFrameExtraction } = await import('../../utils/frameExtraction.js');
-        const { detectAndClusterFaces } = await import('../../utils/faceDetection.js');
 
         // Extract frames intelligently (ffmpeg scene detection, scoring, deduplication)
         const extractedFrames = await intelligentFrameExtraction(videoId, streamUrl, duration || 120, peakMoments);
 
         if (extractedFrames.length > 0) {
-            // Run Face Detection and Clustering on the extracted top frames
-            console.log(`🎬 [frameExtractionNode] Running face detection on ${extractedFrames.length} top frames...`);
-            const { primaryFaceUrl, allFaces } = await detectAndClusterFaces(extractedFrames, videoId);
+            console.log(`🎬 [frameExtractionNode] ${extractedFrames.length} frames extracted via FFmpeg`);
 
             // Clean up the local buffers from memory since we already uploaded them
             extractedFrames.forEach(f => {
                 delete f.localBuffer;
             });
 
+            // Skip face detection — @tensorflow/tfjs-node not available on EC2
+            // Face reference uses YouTube thumbnail via primaryFaceUrl fallback in youtube-studio.js
             return { 
                 extractedFrames, 
-                primaryFaceUrl, 
-                faceClusters: allFaces,
+                primaryFaceUrl: null, 
+                faceClusters: [],
                 isMetadataFallback: false
             };
         }
