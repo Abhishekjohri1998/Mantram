@@ -387,6 +387,7 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
                 const hfRes = await highlightFrameExtractionNode({
                     videoId: video.videoId,
                     analysis,
+                    duration: video.duration || duration || null,
                     existingFrames: extractedFrames,
                 });
                 extractedFrames = hfRes.extractedFrames;
