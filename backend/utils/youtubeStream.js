@@ -18,7 +18,17 @@ async function initYTDlp() {
     }
     const binPath = path.join(binDir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
     
-    if (!fs.existsSync(binPath)) {
+    // Check if it exists and is a valid size (>1MB)
+    let needsDownload = !fs.existsSync(binPath);
+    if (!needsDownload) {
+        const stats = fs.statSync(binPath);
+        if (stats.size < 1000000) { // less than 1MB means it's broken
+            needsDownload = true;
+            fs.unlinkSync(binPath);
+        }
+    }
+
+    if (needsDownload) {
         console.log(`📡 [youtubeStream] Downloading yt-dlp binary to ${binPath}...`);
         try {
             await YTDlpWrap.default.downloadFromGithub(binPath);
@@ -30,6 +40,7 @@ async function initYTDlp() {
             ytDlp = new YTDlpWrap.default(); // fallback to global PATH
         }
     } else {
+        if (process.platform !== 'win32') fs.chmodSync(binPath, '755'); // Guarantee executable
         ytDlp = new YTDlpWrap.default(binPath);
     }
     
@@ -81,7 +92,27 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
             return streamUrl;
         }
     } catch (err) {
-        console.log(`   ⚠️ Strategy 2 failed: ${err.message.split('\n')[0]}`);
+        console.log(`   ⚠️ Strategy 2 (web_safari) failed: ${err.message.trim().split('\n')[0]}`);
+    }
+
+    // Strategy 2b: yt-dlp-wrap with android client (Bypasses bot block)
+    try {
+        console.log(`   ➡️ Strategy 2b: yt-dlp-wrap (android)`);
+        const ytdlInstance = await initYTDlp();
+        const output = await ytdlInstance.execPromise([
+            url,
+            '-g', 
+            '-f', 'bestvideo[ext=mp4]/best',
+            '--extractor-args', 'youtube:player_client=android',
+            '--no-warnings'
+        ]);
+        const streamUrl = output.split('\n')[0]?.trim();
+        if (streamUrl && streamUrl.startsWith('http')) {
+            console.log(`   ✅ Strategy 2b success`);
+            return streamUrl;
+        }
+    } catch (err) {
+        console.log(`   ⚠️ Strategy 2b (android) failed: ${err.message.trim().split('\n')[0]}`);
     }
 
     // Strategy 3: yt-dlp-wrap with cookies (if available)
