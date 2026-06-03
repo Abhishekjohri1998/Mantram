@@ -347,7 +347,7 @@ export async function analysisNode({ video, brandContext, knownCasts = [], writi
             systemPrompt: PROMPTS.VIDEO_ANALYST,
             userPrompt: userPrompt,
             temperature: 0.3,
-            maxTokens: 4096,
+            maxTokens: 8192,
             model: 'gemini-2.5-pro',
             youtubeUrl: frameImageParts.length > 0 ? null : resolvedVideoUrl, // skip url native if we pass frames directly
             imageParts: frameImageParts.length > 0 ? frameImageParts : undefined,
@@ -630,63 +630,38 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
         brandContext || 'No brand context',
     ].join('\n');
 
-    // ── Call Gemini Vision directly (supports inline image arrays) ────────────
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_IMAGE_API_KEY;
-    if (!geminiKey) {
-        // Fallback to text-only callMultimodalAgent
-        console.warn(`   ⚠️ No GEMINI_API_KEY — falling back to text-only creative direction`);
-        const result = await callMultimodalAgent(
-            PROMPTS.THUMBNAIL_DIRECTOR,
-            userPrompt,
-            [],
-            { temperature: 0.75, maxTokens: 2500, jsonMode: true }
-        );
-        return { thumbnailDirection: result };
-    }
-
+    // ── Call Multimodal AI via Router ─────────────────────────────────────────
     try {
-        const parts = [
-            { text: PROMPTS.THUMBNAIL_DIRECTOR + '\n\n---\n\n' + userPrompt },
-            ...frameImageParts.map(({ inlineData }) => ({ inlineData })),
-        ];
+        const router = getRouter();
+        const result = await router.generateText({
+            systemPrompt: PROMPTS.THUMBNAIL_DIRECTOR,
+            userPrompt: userPrompt,
+            temperature: 0.75,
+            maxTokens: 8192,
+            images: frameImageParts, // Passes base64 image objects natively
+            jsonMode: true
+        });
 
-        const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: { temperature: 0.75, maxOutputTokens: 2500, responseMimeType: 'application/json' },
-                }),
-                signal: AbortSignal.timeout(45000),
-            }
-        );
+        // The router natively handles jsonMode and parsing
+        const parsed = typeof result.text === 'string' ? JSON.parse(result.text) : result.text;
+        
+        console.log(`✅ [thumbnailDirectionNode] Creative direction complete:`);
+        console.log(`   CTR strategy: ${parsed.ctrStrategy?.substring(0, 80)}`);
+        console.log(`   Screen grab insight: ${parsed.screenGrabInsight?.substring(0, 80)}`);
+        console.log(`   Overlay: "${parsed.textOverlay?.line1}" | Power word: ${parsed.textOverlay?.powerWordUsed}`);
+        console.log(`   Clickbait variants: ${parsed.clickbaitCopyVariants?.length || 0} generated`);
+        console.log(`   Est. CTR: ${parsed.ctrScoreEstimate}%`);
+        return { thumbnailDirection: parsed };
 
-        const d = await resp.json();
-        const raw = d.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
-        const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-        const match = cleaned.match(/\{[\s\S]*\}/);
-
-        if (match) {
-            const result = JSON.parse(match[0]);
-            console.log(`✅ [thumbnailDirectionNode] Creative direction complete:`);
-            console.log(`   CTR strategy: ${result.ctrStrategy?.substring(0, 80)}`);
-            console.log(`   Screen grab insight: ${result.screenGrabInsight?.substring(0, 80)}`);
-            console.log(`   Overlay: "${result.textOverlay?.line1}" | Power word: ${result.textOverlay?.powerWordUsed}`);
-            console.log(`   Clickbait variants: ${result.clickbaitCopyVariants?.length || 0} generated`);
-            console.log(`   Est. CTR: ${result.ctrScoreEstimate}%`);
-            return { thumbnailDirection: result };
-        } else {
-            throw new Error(`Creative Director returned non-JSON: ${raw.substring(0, 100)}`);
-        }
     } catch (e) {
-        console.warn(`   ⚠️ Gemini Vision creative direction failed: ${e.message} — falling back to text-only`);
+        console.warn(`   ⚠️ Multimodal creative direction failed: ${e.message} — falling back to text-only`);
+        
+        // Fallback to text-only callMultimodalAgent without images
         const result = await callMultimodalAgent(
             PROMPTS.THUMBNAIL_DIRECTOR,
             userPrompt,
             [],
-            { temperature: 0.75, maxTokens: 2500, jsonMode: true }
+            { temperature: 0.75, maxTokens: 4096, jsonMode: true }
         );
         return { thumbnailDirection: result };
     }

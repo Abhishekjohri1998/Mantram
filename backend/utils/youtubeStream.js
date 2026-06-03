@@ -7,10 +7,34 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure yt-dlp binary is configured for the wrapper
-const ytDlp = new YTDlpWrap.default(); 
-// Or you can specify a specific binary path:
-// const ytDlp = new YTDlpWrap.default('/usr/local/bin/yt-dlp');
+let ytDlp = null;
+
+async function initYTDlp() {
+    if (ytDlp) return ytDlp;
+
+    const binDir = path.join(__dirname, '..', 'bin');
+    if (!fs.existsSync(binDir)) {
+        fs.mkdirSync(binDir, { recursive: true });
+    }
+    const binPath = path.join(binDir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    
+    if (!fs.existsSync(binPath)) {
+        console.log(`📡 [youtubeStream] Downloading yt-dlp binary to ${binPath}...`);
+        try {
+            await YTDlpWrap.default.downloadFromGithub(binPath);
+            if (process.platform !== 'win32') fs.chmodSync(binPath, '755');
+            console.log(`✅ [youtubeStream] yt-dlp downloaded successfully.`);
+            ytDlp = new YTDlpWrap.default(binPath);
+        } catch (e) {
+            console.error(`❌ [youtubeStream] Failed to download yt-dlp: ${e.message}`);
+            ytDlp = new YTDlpWrap.default(); // fallback to global PATH
+        }
+    } else {
+        ytDlp = new YTDlpWrap.default(binPath);
+    }
+    
+    return ytDlp;
+}
 
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
@@ -43,7 +67,8 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     // Strategy 2: yt-dlp-wrap with web_safari client
     try {
         console.log(`   ➡️ Strategy 2: yt-dlp-wrap (web_safari)`);
-        const output = await ytDlp.execPromise([
+        const ytdlInstance = await initYTDlp();
+        const output = await ytdlInstance.execPromise([
             url,
             '-g', // Get URL
             '-f', 'bestvideo[ext=mp4]/best',
@@ -64,7 +89,8 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         const cookiePath = '/home/ec2-user/secrets/youtube-cookies.txt';
         if (fs.existsSync(cookiePath)) {
             console.log(`   ➡️ Strategy 3: yt-dlp-wrap (cookies)`);
-            const output = await ytDlp.execPromise([
+            const ytdlInstance = await initYTDlp();
+            const output = await ytdlInstance.execPromise([
                 url,
                 '-g', 
                 '-f', 'bestvideo[ext=mp4]/best',
