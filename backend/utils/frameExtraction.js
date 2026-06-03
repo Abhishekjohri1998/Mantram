@@ -88,54 +88,33 @@ async function calculateSharpness(imageBuffer) {
  */
 export async function intelligentFrameExtraction(videoId, videoUrl, duration, chapters = []) {
     const tmpDir = '/tmp/mantram_frames_' + crypto.randomBytes(4).toString('hex');
-    const videoFile = path.join('/tmp', `yt_${videoId}.mp4`);
-    
     fs.mkdirSync(tmpDir, { recursive: true });
 
     let frames = [];
 
     try {
-        console.log(`🎬 [frameExtraction] Phase 1: Downloading video ${videoId}...`);
+        console.log(`🎬 [frameExtraction] Phase 1: Fast HTTP Interval Extraction...`);
+        // Extract 15 frames evenly spaced across the video.
+        // Using -ss BEFORE -i ensures fast network seeking without downloading the whole video.
+        const frameCount = 15;
+        const interval = Math.max(1, Math.floor((duration || 120) / (frameCount + 1)));
         
-        // Download the video via yt-dlp to tmp
-        await ytDlp.execPromise([
-            videoUrl,
-            '-f', 'bestvideo[height<=720][ext=mp4]/best[height<=720][ext=mp4]/best',
-            '--no-playlist',
-            '-o', videoFile
-        ]);
-
-        if (!fs.existsSync(videoFile)) {
-            throw new Error('Video download failed.');
+        for (let i = 1; i <= frameCount; i++) {
+            const ts = i * interval;
+            try {
+                // -ss before -i is extremely fast for network streams
+                await execPromise(`ffmpeg -y -ss ${ts} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/interval_${ts}.jpg"`);
+            } catch (e) {
+                console.warn(`⚠️ FFmpeg interval extraction failed at ${ts}s:`, e.message);
+            }
         }
 
-        console.log(`🎬 [frameExtraction] Phase 2: Running FFmpeg Scene Detection...`);
-        // Extract up to 30 frames at scene changes > 0.35
-        try {
-            await execPromise(`ffmpeg -i ${videoFile} -vf "select='gt(scene,0.35)',scale=640:-1" -vsync vfr -frames:v 30 ${tmpDir}/scene_%04d.jpg`);
-        } catch (e) {
-            console.warn('⚠️ FFmpeg scene extraction failed or returned fewer frames:', e.message);
-        }
-
-        console.log(`🎬 [frameExtraction] Phase 3: Extracting Chapter Boundaries...`);
+        console.log(`🎬 [frameExtraction] Phase 2: Extracting Chapter/Peak Boundaries...`);
         for (const chapter of chapters) {
             const startSec = chapter.startTime || 0;
             if (startSec > 0) {
                 try {
-                    await execPromise(`ffmpeg -ss ${startSec} -i ${videoFile} -frames:v 1 -q:v 2 -scale=640:-1 ${tmpDir}/chapter_${startSec}.jpg`);
-                } catch (e) { /* ignore */ }
-            }
-        }
-
-        // Phase 4: Backup interval extraction if too few frames
-        let files = fs.readdirSync(tmpDir).filter(f => f.endsWith('.jpg'));
-        if (files.length < 8) {
-            console.log(`🎬 [frameExtraction] Phase 4: Too few frames (${files.length}), extracting intervals...`);
-            const interval = Math.floor((duration || 120) / 7);
-            for (let i = 1; i <= 7; i++) {
-                const ts = i * interval;
-                try {
-                    await execPromise(`ffmpeg -ss ${ts} -i ${videoFile} -frames:v 1 -q:v 2 -scale=640:-1 ${tmpDir}/interval_${ts}.jpg`);
+                    await execPromise(`ffmpeg -y -ss ${startSec} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/chapter_${startSec}.jpg"`);
                 } catch (e) { /* ignore */ }
             }
         }
@@ -212,7 +191,6 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
     } finally {
         // Cleanup Phase 7
         try {
-            if (fs.existsSync(videoFile)) fs.unlinkSync(videoFile);
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         } catch (e) {
             console.error('Error cleaning up temp files:', e);

@@ -122,23 +122,29 @@ async function getUploadedVideoDuration(videoUrl) {
     }
 }
 
-async function extractFrameFromVideoUrl(videoUrl, timestampSecs, s3KeyPrefix) {
-    const tempOut = path.join(os.tmpdir(), `frame-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`);
-    try {
-        const cmd = `ffmpeg -y -i "${videoUrl}" -ss ${timestampSecs} -vframes 1 -q:v 2 "${tempOut}"`;
-        await execAsync(cmd);
-        if (fs.existsSync(tempOut)) {
-            const buffer = fs.readFileSync(tempOut);
-            const key = `${s3KeyPrefix}/frame-${timestampSecs}s.jpg`;
-            const s3Url = await uploadToS3(buffer, key, 'image/jpeg');
-            fs.unlinkSync(tempOut);
-            return s3Url;
+export async function extractFrameFromVideoUrl(videoUrl, timestampSecs, s3KeyPrefix) {
+    const frames = [];
+    // Extract 3 frames at t, t+1, t+2 to ensure we get a sharp peak frame without motion blur
+    for (let offset = 0; offset < 3; offset++) {
+        const t = timestampSecs + offset;
+        const tempOut = path.join(os.tmpdir(), `frame-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`);
+        try {
+            const cmd = `ffmpeg -y -ss ${t} -i "${videoUrl}" -frames:v 1 -q:v 2 "${tempOut}"`;
+            await execAsync(cmd);
+            if (fs.existsSync(tempOut)) {
+                const buffer = fs.readFileSync(tempOut);
+                const key = `${s3KeyPrefix}/frame-${t}s.jpg`;
+                const s3Url = await uploadToS3(buffer, key, 'image/jpeg');
+                fs.unlinkSync(tempOut);
+                frames.push({ url: s3Url, timestamp: t });
+            }
+        } catch (err) {
+            console.warn(`⚠️ Failed to extract frame at ${t}s:`, err.message);
+            if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
         }
-    } catch (err) {
-        console.warn(`⚠️ Failed to extract frame at ${timestampSecs}s:`, err.message);
-        if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
     }
-    return null;
+    // Return the first successfully extracted frame URL
+    return frames.length > 0 ? frames[0].url : null;
 }
 
 const FAL_BASE = 'https://queue.fal.run';

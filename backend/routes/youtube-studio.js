@@ -452,6 +452,40 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
         let generatorModel = null;
 
         if (hasFeature('thumbnail')) {
+            // --- Extract EXACT Peak Moment Frame ---
+            if (analysis?.peakMoment?.timestamp && video.youtubeUrl) {
+                emit('frames', 'running', { message: 'Extracting Exact Peak Moment Frame...' });
+                try {
+                    const { extractFrameFromVideoUrl } = await import('../agents/youtubeStudio/nodes.js');
+                    const { getYouTubeStreamUrl } = await import('../utils/youtubeStream.js');
+                    
+                    const tsStr = analysis.peakMoment.timestamp;
+                    const parts = tsStr.split(':').map(Number);
+                    let secs = 0;
+                    if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
+                    else if (parts.length === 2) secs = parts[0] * 60 + parts[1]; // MM:SS
+                    else secs = parts[0] || 0; // SS
+
+                    if (secs > 0) {
+                        const streamUrl = await getYouTubeStreamUrl(video.videoId);
+                        if (streamUrl) {
+                            const s3Prefix = `youtube-studio-uploads/frames/${video.videoId}/exact`;
+                            const exactFrameUrl = await extractFrameFromVideoUrl(streamUrl, secs, s3Prefix);
+                            if (exactFrameUrl) {
+                                console.log(`✅ [Node 5.5] Exact peak frame extracted: ${exactFrameUrl}`);
+                                extractedFrames.unshift({
+                                    url: exactFrameUrl,
+                                    label: 'Peak Moment Frame',
+                                    score: 100
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Exact peak frame extraction failed: ${e.message}`);
+                }
+            }
+
             // Creative Director CTR strategy
             emit('thumbnailDirection', 'running', { message: 'Creative Director analyzing video frames (CTR strategy)…' });
             const dirRes = await thumbnailDirectionNode({
