@@ -1447,45 +1447,45 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
 /**
  * Highlight Frame Extraction Node
  * 
- * After analysisNode identifies key highlights (each with a timestamp),
- * this node extracts the ACTUAL video frame at each highlight's timestamp
- * from YouTube's storyboard sprite sheets.
- * 
- * For a 1-hour video with 20 highlights → 20 real video frames at exact moments.
- * 
- * Storyboard sourcing strategy:
- *   1. YouTube Internal Player API (/youtubei/v1/player) — returns storyboard JSON directly
- *   2. YouTube page HTML parsing — regex for playerStoryboardSpecRenderer
- *   3. Fallback: YouTube auto-frames at nearest 25/50/75% position
+ * Extracts the ACTUAL video frame at each highlight's timestamp from
+ * YouTube's storyboard sprite sheets. Multiple sourcing strategies.
  */
 export async function highlightFrameExtractionNode({ videoId, analysis, duration = null, existingFrames = [] }) {
     const highlights = analysis?.highlights || [];
     const peakMoment = analysis?.peakMoment || null;
     
     if (!videoId || highlights.length === 0) {
-        console.log(`ℹ️ [highlightFrames] No highlights to map — keeping existing ${existingFrames.length} frames`);
+        console.log(`ℹ️ [highlightFrames] No highlights — keeping existing ${existingFrames.length} frames`);
         return { extractedFrames: existingFrames };
     }
     
-    console.log(`🎯 [highlightFrames] Mapping ${highlights.length} key highlights + peak moment to video frames...`);
+    console.log(`🎯 [highlightFrames] Mapping ${highlights.length} highlights + peak moment to storyboard frames...`);
     
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 1: Get storyboard spec via YouTube Internal Player API
-    // This is far more reliable than HTML scraping — returns clean JSON
+    // STEP 1: Get storyboard spec (try multiple strategies)
     // ══════════════════════════════════════════════════════════════════════════
     let storyboardSpec = null;
     
-    // Strategy 1: YouTube Internal Player API
-    try {
-        console.log(`   📡 Fetching storyboard spec via YouTube Player API...`);
-        const playerRes = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
-            method: 'POST',
-            signal: AbortSignal.timeout(10000),
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            body: JSON.stringify({
+    // Try multiple YouTube Player API client identities
+    // ANDROID and TVHTML5 are less bot-blocked than WEB
+    const clientConfigs = [
+        {
+            name: 'ANDROID',
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: 'ANDROID',
+                        clientVersion: '19.02.39',
+                        androidSdkVersion: 30,
+                        hl: 'en',
+                    }
+                }
+            }
+        },
+        {
+            name: 'WEB',
+            body: {
                 videoId,
                 context: {
                     client: {
@@ -1494,32 +1494,59 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
                         hl: 'en',
                     }
                 }
-            }),
-        });
-        
-        if (playerRes.ok) {
-            const playerData = await playerRes.json();
-            
-            // Extract storyboard spec from player response
-            const sbSpec = playerData?.storyboards?.playerStoryboardSpecRenderer?.spec;
-            
-            if (sbSpec) {
-                storyboardSpec = parseStoryboardSpec(sbSpec);
-                if (storyboardSpec) {
-                    console.log(`   ✅ Player API: ${storyboardSpec.cols}x${storyboardSpec.rows} grid, ${storyboardSpec.frameCount} frames, ${storyboardSpec.intervalMs}ms interval`);
-                }
-            } else {
-                console.log(`   ℹ️ Player API: no storyboard spec in response`);
             }
+        },
+        {
+            name: 'TVHTML5_EMBEDDED',
+            body: {
+                videoId,
+                context: {
+                    client: {
+                        clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+                        clientVersion: '2.0',
+                        hl: 'en',
+                    }
+                }
+            }
+        },
+    ];
+    
+    for (const client of clientConfigs) {
+        if (storyboardSpec) break;
+        try {
+            console.log(`   📡 Strategy: YouTube Player API (${client.name})...`);
+            const playerRes = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+                method: 'POST',
+                signal: AbortSignal.timeout(8000),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                },
+                body: JSON.stringify(client.body),
+            });
+            
+            if (playerRes.ok) {
+                const data = await playerRes.json();
+                const sbSpec = data?.storyboards?.playerStoryboardSpecRenderer?.spec;
+                const playability = data?.playabilityStatus?.status;
+                console.log(`   📡 ${client.name}: playability=${playability || 'unknown'}, hasStoryboard=${!!sbSpec}`);
+                
+                if (sbSpec) {
+                    storyboardSpec = parseStoryboardSpec(sbSpec);
+                    if (storyboardSpec) {
+                        console.log(`   ✅ Storyboard via ${client.name}: ${storyboardSpec.cols}x${storyboardSpec.rows}, ${storyboardSpec.frameCount} frames, ${storyboardSpec.intervalMs}ms interval, ${storyboardSpec.totalSheets} sheets`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn(`   ⚠️ ${client.name} API failed: ${e.message?.split('\n')[0]}`);
         }
-    } catch (e) {
-        console.warn(`   ⚠️ Player API failed: ${e.message}`);
     }
     
-    // Strategy 2: YouTube page HTML parsing (fallback)
+    // Strategy 2: YouTube page HTML parsing
     if (!storyboardSpec) {
         try {
-            console.log(`   📄 Fallback: parsing YouTube page HTML for storyboard spec...`);
+            console.log(`   📄 Strategy: HTML page parsing...`);
             const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
                 signal: AbortSignal.timeout(10000),
                 headers: { 
@@ -1531,38 +1558,63 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
             
             if (pageRes.ok) {
                 const html = await pageRes.text();
-                console.log(`   📄 Page size: ${Math.round(html.length / 1024)}KB`);
+                console.log(`   📄 Page: ${Math.round(html.length / 1024)}KB`);
                 
-                // Try multiple regex patterns
                 const patterns = [
                     /"playerStoryboardSpecRenderer"\s*:\s*\{\s*"spec"\s*:\s*"([^"]+)"/,
-                    /storyboard_spec"?\s*[:=]\s*"?([^"&]+)/,
-                    /"spec":"(https:\/\/i\.ytimg\.com\/sb\/[^"]+)"/,
+                    /"spec"\s*:\s*"(https?:\/\/i\.ytimg\.com\/sb\/[^"]+)"/,
                 ];
                 
-                for (const pattern of patterns) {
-                    const match = html.match(pattern);
-                    if (match) {
-                        const spec = match[1].replace(/\\u0026/g, '&').replace(/\\\\u0026/g, '&');
-                        storyboardSpec = parseStoryboardSpec(spec);
+                for (const p of patterns) {
+                    const m = html.match(p);
+                    if (m) {
+                        storyboardSpec = parseStoryboardSpec(m[1]);
                         if (storyboardSpec) {
-                            console.log(`   ✅ HTML parse: ${storyboardSpec.cols}x${storyboardSpec.rows} grid, ${storyboardSpec.frameCount} frames`);
+                            console.log(`   ✅ Storyboard via HTML: ${storyboardSpec.cols}x${storyboardSpec.rows}, ${storyboardSpec.frameCount} frames`);
                             break;
                         }
                     }
                 }
-                
-                if (!storyboardSpec) {
-                    console.log(`   ℹ️ No storyboard spec found in HTML`);
-                }
+                if (!storyboardSpec) console.log(`   ℹ️ No storyboard spec found in HTML`);
             }
         } catch (e) {
-            console.warn(`   ⚠️ HTML parse failed: ${e.message}`);
+            console.warn(`   ⚠️ HTML parse failed: ${e.message?.split('\n')[0]}`);
+        }
+    }
+    
+    // Strategy 3: yt-dlp --dump-json (metadata only, no stream download)
+    if (!storyboardSpec) {
+        try {
+            console.log(`   🔧 Strategy: yt-dlp --dump-json for storyboard metadata...`);
+            const { execSync } = await import('child_process');
+            const ytdlpBin = (await import('youtube-dl-exec')).default.raw;
+            const raw = execSync(
+                `${ytdlpBin || 'yt-dlp'} --dump-json --no-download --no-warnings "https://www.youtube.com/watch?v=${videoId}"`,
+                { timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 10 * 1024 * 1024 }
+            ).toString();
+            
+            const meta = JSON.parse(raw);
+            // yt-dlp provides storyboard frames in the 'thumbnails' array
+            // Format: { url: "https://i.ytimg.com/sb/...", width, height, id: "storyboard" }
+            const sbThumbs = (meta.thumbnails || []).filter(t => t.url?.includes('/sb/') || t.id?.includes('storyboard'));
+            
+            if (sbThumbs.length > 0) {
+                console.log(`   ✅ yt-dlp found ${sbThumbs.length} storyboard thumbnails`);
+                // Use yt-dlp storyboard URLs directly
+                storyboardSpec = {
+                    ytdlpFrames: sbThumbs,
+                    isYtdlp: true,
+                };
+            } else {
+                console.log(`   ℹ️ yt-dlp: no storyboard data in metadata`);
+            }
+        } catch (e) {
+            console.warn(`   ⚠️ yt-dlp metadata failed: ${e.message?.split('\n')[0]}`);
         }
     }
     
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 2: Build highlight moment list (peak + all highlights)
+    // STEP 2: Build highlight moment list
     // ══════════════════════════════════════════════════════════════════════════
     const allMoments = [];
     
@@ -1584,42 +1636,35 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
         });
     }
     
-    console.log(`   📍 ${allMoments.length} unique moments to extract frames for`);
+    console.log(`   📍 ${allMoments.length} unique moments to extract`);
     
     // ══════════════════════════════════════════════════════════════════════════
     // STEP 3: Extract frame at each timestamp
     // ══════════════════════════════════════════════════════════════════════════
     const highlightFrames = [];
     const { uploadToS3 } = await import('../../utils/s3.js');
+    const sharp = (await import('sharp')).default;
     
-    if (storyboardSpec) {
-        // ── STORYBOARD PATH: Extract exact frame from sprite sheets ──────────
-        const sharp = (await import('sharp')).default;
+    if (storyboardSpec && !storyboardSpec.isYtdlp) {
+        // ── STORYBOARD SPRITE PATH ───────────────────────────────────────────
         const { fullUrls, cols, rows, intervalMs, framesPerSheet } = storyboardSpec;
         const sheetCache = new Map();
         
         for (const moment of allMoments) {
             try {
                 const totalSecs = parseTimestamp(moment.timestamp);
-                
-                // Calculate which frame, sheet, and tile
                 const frameIdx = Math.floor((totalSecs * 1000) / intervalMs);
                 const sheetIdx = Math.floor(frameIdx / framesPerSheet);
                 const tileInSheet = frameIdx % framesPerSheet;
                 const tileRow = Math.floor(tileInSheet / cols);
                 const tileCol = tileInSheet % cols;
                 
-                // Fetch the sprite sheet (cached per sheet index)
                 let spriteBuf = sheetCache.get(sheetIdx);
                 if (!spriteBuf) {
-                    // Build sheet URL from template
-                    const sheetUrl = fullUrls[sheetIdx] || buildSheetUrl(storyboardSpec, sheetIdx);
-                    if (!sheetUrl) {
-                        console.warn(`   ⚠️ No URL for sheet ${sheetIdx}`);
-                        continue;
-                    }
+                    const sheetUrl = fullUrls[sheetIdx];
+                    if (!sheetUrl) { console.warn(`   ⚠️ No URL for sheet ${sheetIdx}`); continue; }
                     
-                    console.log(`   📥 Fetching storyboard sheet ${sheetIdx}: ${sheetUrl.substring(0, 80)}...`);
+                    console.log(`   📥 Sheet ${sheetIdx}: ${sheetUrl.substring(0, 100)}...`);
                     const res = await fetch(sheetUrl, { 
                         signal: AbortSignal.timeout(15000),
                         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
@@ -1627,12 +1672,12 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
                     
                     if (res.ok) {
                         const ct = res.headers.get('content-type') || '';
-                        if (ct.includes('image') || ct.includes('jpeg') || ct.includes('webp')) {
+                        if (ct.includes('image') || ct.includes('jpeg') || ct.includes('webp') || ct.includes('octet')) {
                             spriteBuf = Buffer.from(await res.arrayBuffer());
                             sheetCache.set(sheetIdx, spriteBuf);
                             console.log(`   ✅ Sheet ${sheetIdx}: ${Math.round(spriteBuf.length / 1024)}KB`);
                         } else {
-                            console.warn(`   ⚠️ Sheet ${sheetIdx}: unexpected content-type ${ct}`);
+                            console.warn(`   ⚠️ Sheet ${sheetIdx}: content-type=${ct}`);
                         }
                     } else {
                         console.warn(`   ⚠️ Sheet ${sheetIdx}: HTTP ${res.status}`);
@@ -1641,20 +1686,17 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
                 
                 if (spriteBuf) {
                     const meta = await sharp(spriteBuf).metadata();
-                    const actualTileW = Math.floor(meta.width / cols);
-                    const actualTileH = Math.floor(meta.height / rows);
+                    const tileW = Math.floor(meta.width / cols);
+                    const tileH = Math.floor(meta.height / rows);
                     
+                    // Extract tile and UPSCALE to 640x360 for better UI quality
                     const tileBuf = await sharp(spriteBuf)
-                        .extract({
-                            left: tileCol * actualTileW,
-                            top: tileRow * actualTileH,
-                            width: actualTileW,
-                            height: actualTileH,
-                        })
-                        .jpeg({ quality: 90 })
+                        .extract({ left: tileCol * tileW, top: tileRow * tileH, width: tileW, height: tileH })
+                        .resize(640, 360, { fit: 'fill', kernel: 'lanczos3' })
+                        .jpeg({ quality: 85 })
                         .toBuffer();
                     
-                    const key = `youtube-studio-uploads/frames/${videoId}/highlight_${totalSecs}s.jpg`;
+                    const key = `youtube-studio-uploads/frames/${videoId}/hl_${totalSecs}s.jpg`;
                     const s3Url = await uploadToS3(tileBuf, key, 'image/jpeg');
                     
                     highlightFrames.push({
@@ -1664,31 +1706,49 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
                         sizeKb: Math.round(tileBuf.length / 1024),
                         timestamp: moment.timestamp,
                     });
-                    
-                    console.log(`   ✅ ${moment.timestamp} → Sheet ${sheetIdx}[${tileRow},${tileCol}] → ${moment.label}`);
+                    console.log(`   ✅ ${moment.timestamp} → Sheet${sheetIdx}[${tileRow},${tileCol}] → ${Math.round(tileBuf.length / 1024)}KB`);
                 }
             } catch (e) {
-                console.warn(`   ⚠️ Failed frame for ${moment.timestamp}: ${e.message}`);
+                console.warn(`   ⚠️ ${moment.timestamp}: ${e.message?.split('\n')[0]}`);
             }
         }
-    } else {
-        // ── NO STORYBOARD: Use YouTube auto-frames at nearest position ────────
-        // YouTube serves 3 auto-generated frames: 1.jpg (25%), 2.jpg (50%), 3.jpg (75%)
-        // Map each highlight to the nearest one based on its timestamp
-        console.log(`   ℹ️ No storyboard — using YouTube auto-frames at nearest video position`);
+    } else if (storyboardSpec?.isYtdlp) {
+        // ── YT-DLP STORYBOARD FRAMES ─────────────────────────────────────────
+        const sbFrames = storyboardSpec.ytdlpFrames;
+        console.log(`   📸 Using ${sbFrames.length} yt-dlp storyboard frames`);
         
-        const videoDuration = duration || 600; // default 10 min if unknown
+        for (const moment of allMoments) {
+            const totalSecs = parseTimestamp(moment.timestamp);
+            // Pick the storyboard frame closest to the timestamp
+            // yt-dlp storyboard URLs contain fragment info like #t=120
+            const closest = sbFrames[Math.min(Math.floor(totalSecs / 2), sbFrames.length - 1)];
+            if (closest?.url) {
+                highlightFrames.push({
+                    url: closest.url,
+                    label: `${moment.label} [${moment.timestamp}]`,
+                    score: moment.score,
+                    timestamp: moment.timestamp,
+                });
+            }
+        }
+    }
+    
+    // ── FALLBACK: If storyboard failed, use YouTube CDN auto-frames ──────────
+    if (highlightFrames.length === 0) {
+        console.log(`   ℹ️ No storyboard frames — using YouTube CDN auto-frames as fallback`);
+        const videoDuration = duration || 600;
         
         for (const moment of allMoments) {
             const totalSecs = parseTimestamp(moment.timestamp);
             const pct = totalSecs / videoDuration;
             
-            // Choose the nearest auto-frame based on position in video
+            // YouTube serves auto-generated frames at fixed positions:
+            // 0.jpg = auto-selected (may differ from custom thumbnail)
+            // 1.jpg = ~25%, 2.jpg = ~50%, 3.jpg = ~75%
             let frameNum;
-            if (pct < 0.125)      frameNum = 1; // 0–12.5%  → frame @25% (closest to start)
-            else if (pct < 0.375) frameNum = 1; // 12.5–37.5% → frame @25%
-            else if (pct < 0.625) frameNum = 2; // 37.5–62.5% → frame @50%
-            else                  frameNum = 3; // 62.5%+    → frame @75%
+            if (pct < 0.375) frameNum = 1;
+            else if (pct < 0.625) frameNum = 2;
+            else frameNum = 3;
             
             highlightFrames.push({
                 url: `https://i.ytimg.com/vi/${videoId}/${frameNum}.jpg`,
@@ -1700,95 +1760,95 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
     }
     
     // ══════════════════════════════════════════════════════════════════════════
-    // STEP 4: Merge — cover frame + all highlight frames
+    // STEP 4: Merge — cover frame first, then highlights
     // ══════════════════════════════════════════════════════════════════════════
     const coverFrame = existingFrames.find(f => f.label?.includes('Cover Frame'));
     const mergedFrames = [];
-    
-    if (coverFrame) {
-        mergedFrames.push(coverFrame);
-    }
-    
+    if (coverFrame) mergedFrames.push(coverFrame);
     mergedFrames.push(...highlightFrames);
     
     if (highlightFrames.length === 0) {
-        console.log(`   ⚠️ No highlight frames extracted — keeping original ${existingFrames.length} frames`);
+        console.log(`   ⚠️ No highlight frames — keeping original ${existingFrames.length} frames`);
         return { extractedFrames: existingFrames };
     }
     
-    console.log(`✅ [highlightFrames] ${highlightFrames.length} highlight frames extracted (${mergedFrames.length} total with cover)`);
+    console.log(`✅ [highlightFrames] ${highlightFrames.length} frames extracted (${mergedFrames.length} total)`);
     return { extractedFrames: mergedFrames };
 }
 
 /**
- * Parse a YouTube storyboard spec string into a usable storyboard config.
- * Spec format: "baseUrl|seg0|seg1|seg2|..."
+ * Parse a YouTube storyboard spec string.
+ * Format: "baseUrl|seg0|seg1|seg2|..."
  * Each segment: "width#height#count#cols#rows#interval_ms#namePattern#sigh"
+ * 
+ * Picks the level with the BEST balance of resolution and frame precision.
  */
-function parseStoryboardSpec(spec) {
+function parseStoryboardSpec(rawSpec) {
     try {
-        const decoded = spec.replace(/\\u0026/g, '&').replace(/%26/g, '&');
-        const segments = decoded.split('|');
-        
+        const spec = rawSpec.replace(/\\u0026/g, '&').replace(/%26/g, '&');
+        const segments = spec.split('|');
         if (segments.length < 2) return null;
         
-        // Use the highest resolution tier (last segment, usually L2)
-        const baseUrlTemplate = segments[0]; // Contains $L and $N placeholders
-        const lastSeg = segments[segments.length - 1];
-        const segParts = lastSeg.split('#');
+        const baseUrlTemplate = segments[0];
         
-        if (segParts.length < 7) return null;
+        // Parse ALL levels to find the best one
+        let bestLevel = null;
+        for (let lvl = 1; lvl < segments.length; lvl++) {
+            const parts = segments[lvl].split('#');
+            if (parts.length < 7) continue;
+            
+            const tileW = parseInt(parts[0]);
+            const tileH = parseInt(parts[1]);
+            const frameCount = parseInt(parts[2]);
+            const cols = parseInt(parts[3]);
+            const rows = parseInt(parts[4]);
+            const intervalMs = parseInt(parts[5]);
+            const namePattern = parts[6];
+            const sigh = parts[parts.length - 1];
+            
+            // Skip level 0 (interval=0 is just a single static frame)
+            if (intervalMs === 0 || frameCount === 0) continue;
+            
+            const level = {
+                lvl, tileW, tileH, frameCount, cols, rows,
+                intervalMs, namePattern, sigh,
+                framesPerSheet: cols * rows,
+                // Score: prefer highest resolution with interval ≤ 5000ms
+                quality: tileW * tileH * (intervalMs <= 5000 ? 2 : 1),
+            };
+            
+            if (!bestLevel || level.quality > bestLevel.quality) {
+                bestLevel = level;
+            }
+        }
         
-        const tileW = parseInt(segParts[0]);
-        const tileH = parseInt(segParts[1]);
-        const frameCount = parseInt(segParts[2]);
-        const cols = parseInt(segParts[3]);
-        const rows = parseInt(segParts[4]);
-        const intervalMs = parseInt(segParts[5]) || 2000;
-        const namePattern = segParts[6]; // e.g. "M$M"
-        const sigh = segParts[segParts.length - 1]; // Signature
-        const sbLevel = segments.length - 1;
-        const framesPerSheet = cols * rows;
+        if (!bestLevel) return null;
+        
+        const { lvl, cols, rows, frameCount, intervalMs, namePattern, sigh, framesPerSheet } = bestLevel;
         const totalSheets = Math.ceil(frameCount / framesPerSheet);
         
-        // Pre-build URLs for all sheets
-        // Replace $L with level, $N with sheet name using the namePattern
-        const levelUrl = baseUrlTemplate.replace('$L', `L${sbLevel}`);
+        // Build URLs for all sheets
+        const levelUrl = baseUrlTemplate.replace('$L', `L${lvl - 1}`);
         const fullUrls = [];
         
         for (let i = 0; i < totalSheets; i++) {
-            // Build sheet name from pattern: "M$M" → "M0", "M1", etc.  "default" → "default"
             const sheetName = namePattern.includes('$M') 
                 ? namePattern.replace('$M', String(i))
                 : namePattern;
-            
-            const url = levelUrl.replace('$N', sheetName) + `&sigh=${sigh}`;
-            fullUrls.push(url);
+            fullUrls.push(levelUrl.replace('$N', sheetName) + `&sigh=${sigh}`);
         }
         
         return {
-            tileW, tileH, frameCount, cols, rows,
-            intervalMs, framesPerSheet, totalSheets,
-            fullUrls, // Pre-built URLs for each sheet
+            tileW: bestLevel.tileW, tileH: bestLevel.tileH,
+            frameCount, cols, rows, intervalMs, framesPerSheet,
+            totalSheets, fullUrls,
         };
     } catch (e) {
-        console.warn(`   ⚠️ parseStoryboardSpec error: ${e.message}`);
+        console.warn(`   ⚠️ parseStoryboardSpec: ${e.message}`);
         return null;
     }
 }
 
-/**
- * Build a storyboard sheet URL for a given sheet index from the spec.
- * Fallback if fullUrls doesn't have this index.
- */
-function buildSheetUrl(spec, sheetIdx) {
-    if (spec.fullUrls?.[sheetIdx]) return spec.fullUrls[sheetIdx];
-    return null;
-}
-
-/**
- * Parse "MM:SS" or "HH:MM:SS" timestamp to total seconds.
- */
 function parseTimestamp(ts) {
     if (!ts) return 0;
     const parts = ts.split(':').map(Number);
