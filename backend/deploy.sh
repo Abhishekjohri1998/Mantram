@@ -1,7 +1,7 @@
 #!/bin/bash
 # Mantram Deploy Script
-# Usage: bash /home/ec2-user/Mantram/deploy.sh
-# Or full one-liner: cd /home/ec2-user/Mantram && git pull origin main && bash deploy.sh
+# Usage: bash /home/ec2-user/Mantram/backend/deploy.sh
+# Or full one-liner: cd /home/ec2-user/Mantram && git pull origin main && bash backend/deploy.sh
 
 set -e
 
