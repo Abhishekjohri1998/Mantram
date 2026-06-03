@@ -1226,69 +1226,105 @@ export default function VideoStudio() {
                     </div>
                 )}
 
-                <Suspense fallback={
-                    <div className="w-full min-h-[100vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
-                        <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
-                    </div>
-                }>
                 <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
                 {visitedTabs.has('advanced') && (
                     <div style={{ display: studioMode === 'advanced' ? 'contents' : 'none' }}>
-                        <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
                 {visitedTabs.has('ugc') && (
                     <div style={{ display: studioMode === 'ugc' ? 'contents' : 'none' }}>
-                        <UGCCreator activeBrand={activeBrand} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <UGCCreator activeBrand={activeBrand} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
                 {visitedTabs.has('ugc-pro') && (
                     <div style={{ display: studioMode === 'ugc-pro' ? 'contents' : 'none' }}>
-                        <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {visitedTabs.has('q-ads') && (
                     <div style={{ display: studioMode === 'q-ads' ? 'contents' : 'none' }}>
-                        <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
                 {visitedTabs.has('agent') && (
                     <div style={{ display: studioMode === 'agent' ? 'contents' : 'none' }}>
-                        <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── MOTION GRAPHICS MODE ── */}
                 {visitedTabs.has('motion-graphics') && (
                     <div style={{ display: studioMode === 'motion-graphics' ? 'contents' : 'none' }}>
-                        <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── STORYBOARD MODE — New AI Ad Film Director ── */}
                 {visitedTabs.has('storyboard') && (
                     <div style={{ display: studioMode === 'storyboard' ? 'contents' : 'none' }}>
-                        <Storyboard
-                            activeBrand={activeBrand}
-                            projects={projects}
-                            onVideoComplete={() => fetchHistory(50)}
-                            canCreateVideo={canCreateVideo}
-                            onUpgradeRequired={() => setShowUpgradeModal(true)}
-                            user={user}
-                        />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <Storyboard
+                                activeBrand={activeBrand}
+                                projects={projects}
+                                onVideoComplete={() => fetchHistory(50)}
+                                canCreateVideo={canCreateVideo}
+                                onUpgradeRequired={() => setShowUpgradeModal(true)}
+                                user={user}
+                            />
+                        </Suspense>
                     </div>
                 )}
                 </div>
-                </Suspense>
 
                 {/* ── OLD STORYBOARD PIPELINE (archived below — do not render) ── */}
                 {false && studioMode === 'storyboard-old' && (<>

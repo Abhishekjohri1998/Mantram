@@ -349,17 +349,23 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [analyzing, setAnalyzing] = useState(false)
     const [avatarGenerating, setAvatarGenerating] = useState(false)
 
-    // History sync from parent props
-    const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
-    })
+    // History sync from parent props — always rebuild from projects as source of truth
+    const [gridVideos, setGridVideos] = useState([])
 
     useEffect(() => {
+        const incoming = projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
+        if (incoming.length === 0 && projects.length === 0) return // Skip empty initial render
+
         setGridVideos(prev => {
-            const existingIds = new Set(prev.map(p => p._id))
-            const incoming = projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
-            const newOnes = incoming.filter(p => !existingIds.has(p._id))
-            return newOnes.length ? [...newOnes, ...prev] : prev
+            const incomingMap = new Map(incoming.map(p => [p._id, p]))
+            // Start with incoming (API truth), add optimistic local items
+            const nextGrid = [...incoming]
+            prev.forEach(p => {
+                if (!incomingMap.has(p._id)) {
+                    nextGrid.push(p)
+                }
+            })
+            return nextGrid
         })
     }, [projects])
 

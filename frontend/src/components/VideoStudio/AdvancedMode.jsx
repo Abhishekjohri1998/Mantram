@@ -363,21 +363,19 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
     const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
     
-    const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(isCompleted)
-    })
+    const [gridVideos, setGridVideos] = useState([])
 
-    // Sync if parent projects prop updates (on mount / history refresh)
-    // Also updates existing entries that transitioned from generating → completed
+    // Sync if parent projects prop updates (on mount / history refresh / tab switch)
+    // Always rebuilds from incoming projects as the source of truth,
+    // while preserving optimistic items that were added locally during generation.
     useEffect(() => {
+        const incoming = projects.filter(isCompleted)
+        if (incoming.length === 0 && projects.length === 0) return // Skip empty initial render
+
         setGridVideos(prev => {
-            const incoming = projects.filter(isCompleted)
-            const existingMap = new Map(prev.map(p => [p._id, p]))
-            
-            // We want to keep all incoming, AND any prev items that aren't in incoming (optimistic items)
             const incomingMap = new Map(incoming.map(p => [p._id, p]))
             
-            // Start with incoming (latest truth)
+            // Start with incoming (latest truth from API)
             const nextGrid = [...incoming]
             
             // Add optimistic items from prev that haven't shown up in incoming yet
@@ -386,12 +384,6 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     nextGrid.push(p)
                 }
             })
-            
-            // Sort by creation time if needed, but since it's just prepending, it's mostly correct.
-            // If length and IDs are identical, avoid unnecessary re-renders.
-            if (nextGrid.length === prev.length && nextGrid.every((p, i) => p._id === prev[i]._id)) {
-                // To be perfectly safe about updates, we'll just return the nextGrid so it gets new data.
-            }
             
             return nextGrid
         })
