@@ -354,7 +354,7 @@ export default function VideoStudio() {
     const fetchHistory = useCallback(async (limit = 50) => {
         try {
             const url = `/video-studio?limit=${limit}${activeBrand?._id ? `&brandId=${activeBrand._id}` : ''}`
-            const d = await api(url)
+            const d = await api(url, { cache: 'no-store' })
             setProjects(d.projects || [])
         } catch { }
         finally { setProjectsLoaded(true) }
@@ -1261,7 +1261,7 @@ export default function VideoStudio() {
                                 <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
                             </div>
                         }>
-                            <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                            <UGCPro activeBrand={activeBrand} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
                         </Suspense>
                     </div>
                 )}
@@ -1274,7 +1274,7 @@ export default function VideoStudio() {
                                 <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
                             </div>
                         }>
-                            <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                            <QAdsV2 activeBrand={activeBrand} projects={projects} projectsLoaded={projectsLoaded} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
                         </Suspense>
                     </div>
                 )}

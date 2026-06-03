@@ -353,8 +353,12 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
     const [gridVideos, setGridVideos] = useState([])
 
     useEffect(() => {
+        if (!projectsLoaded) return // Wait for API response before syncing grid
         const incoming = projects.filter(p => p.studioMode === 'ugc-pro' && (p.status === 'done' || p.status === 'completed') && (p.generation?.videoUrl || p.finalVideoUrl))
-        if (incoming.length === 0 && projects.length === 0) return // Skip empty initial render
+        if (incoming.length === 0 && projects.length === 0) {
+            setGridVideos([])
+            return // Skip if backend truly has no projects
+        }
 
         setGridVideos(prev => {
             const incomingMap = new Map(incoming.map(p => [p._id, p]))
