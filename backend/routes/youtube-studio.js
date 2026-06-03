@@ -382,8 +382,9 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
         // ── Stage 3: Chapter Detection (conditional) ──
         let chapters = [];
-        if (hasFeature('chapters') && transcript.available) {
-            emit('chapters', 'running', { message: 'Detecting smart chapters (analysis-grounded)…' });
+        const isYTVideo = video.youtubeUrl?.includes('youtube.com') || video.youtubeUrl?.includes('youtu.be');
+        if (hasFeature('chapters') && (transcript.available || isYTVideo)) {
+            emit('chapters', 'running', { message: transcript.available ? 'Detecting smart chapters (analysis-grounded)…' : 'Detecting chapters via Gemini video analysis…' });
             const chapRes = await chapterNode({ video, analysis });
             chapters = chapRes.chapters;
             emit('chapters', 'done', { count: chapters.length });
@@ -508,11 +509,19 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
 
             // Final Thumbnail generation
             emit('thumbnailGeneration', 'running', { message: 'Generating thumbnail with GPT Image 2 (HD)…' });
+            
+            // Use original YouTube thumbnail as face reference when no face was detected from frames
+            let faceRefUrl = primaryFaceUrl;
+            if (!faceRefUrl && video.isYT !== false && video.videoId) {
+                faceRefUrl = `https://img.youtube.com/vi/${video.videoId}/maxresdefault.jpg`;
+                console.log(`   📸 Using original YouTube thumbnail as face reference: ${faceRefUrl}`);
+            }
+            
             const genRes = await thumbnailGenerationNode({
                 thumbnailDirection, video, brandContext, template,
                 characterPortraits,
                 extractedFrames,
-                primaryFaceUrl
+                primaryFaceUrl: faceRefUrl
             });
             generatedThumbnailUrl = genRes.generatedThumbnailUrl;
             generatorModel = genRes.generatorModel;
