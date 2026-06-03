@@ -27,16 +27,23 @@ async function ensureYtDlpUpdated() {
     }
     
     // Fallback: Download latest standalone yt-dlp binary via curl (Linux/EC2 only)
+    // IMPORTANT: Use yt-dlp_linux (PyInstaller frozen binary) — NOT yt-dlp (Python zipapp)
     if (process.platform !== 'win32') {
         try {
             const binDir = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin');
             const binPath = path.join(binDir, 'yt-dlp');
-            console.log(`🔄 [youtubeStream] Downloading latest standalone yt-dlp binary...`);
-            execSync(`curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "${binPath}" && chmod +x "${binPath}"`, {
-                timeout: 30000,
+            console.log(`🔄 [youtubeStream] Downloading latest standalone yt-dlp_linux binary...`);
+            execSync(`curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o "${binPath}" && chmod +x "${binPath}"`, {
+                timeout: 60000,
                 stdio: 'pipe'
             });
-            console.log(`✅ [youtubeStream] Standalone yt-dlp binary downloaded to ${binPath}`);
+            // Verify it's actually executable (not a Python script)
+            try {
+                const version = execSync(`"${binPath}" --version`, { timeout: 5000, stdio: 'pipe' }).toString().trim();
+                console.log(`✅ [youtubeStream] Standalone yt-dlp binary v${version} ready at ${binPath}`);
+            } catch (verifyErr) {
+                console.log(`⚠️ [youtubeStream] Binary downloaded but version check failed: ${verifyErr.message?.split('\n')[0]}`);
+            }
         } catch (e2) {
             console.log(`   ⚠️ Standalone download also failed: ${e2.message?.split('\n')[0]}`);
         }
