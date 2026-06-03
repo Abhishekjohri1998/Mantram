@@ -391,7 +391,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             
             return nextGrid
         })
-    }, [projects])
+    }, [projects, projectsLoaded])
 
     // ── Concurrent jobs (up to MAX_CONCURRENT) ──
     // Each job: { id, projectId, prompt, model, duration, aspectRatio, quality, thumbUrl, progress, status, videoUrl, error }

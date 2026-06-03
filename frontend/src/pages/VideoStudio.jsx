@@ -352,6 +352,7 @@ export default function VideoStudio() {
 
     // ── Fetch history with brand filter ──
     const fetchHistory = useCallback(async (limit = 50) => {
+        setProjectsLoaded(false)
         try {
             const url = `/video-studio?limit=${limit}${activeBrand?._id ? `&brandId=${activeBrand._id}` : ''}`
             const d = await api(url, { cache: 'no-store' })

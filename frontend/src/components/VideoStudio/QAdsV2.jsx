@@ -646,7 +646,7 @@ function GridVideo({ project, onPreview, onSaveTemplate, isAdmin }) {
     </div>
 }
 
-export default function QAdsV2({ activeBrand, projects = [], onVideoComplete, initialTemplateId, canCreateVideo = true, onUpgradeRequired, user }) {
+export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = false, onVideoComplete, initialTemplateId, canCreateVideo = true, onUpgradeRequired, user }) {
     const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
     const [previewVideo, setPreviewVideo] = useState(null)
     const [savingTemplate, setSavingTemplate] = useState(null)

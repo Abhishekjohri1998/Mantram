@@ -340,7 +340,7 @@ function UGCSaveTemplateForm({ project, onClose }) {
     )
 }
 
-export default function UGCPro({ activeBrand, projects = [], canCreateVideo = true, onUpgradeRequired, user }) {
+export default function UGCPro({ activeBrand, projects = [], projectsLoaded = false, canCreateVideo = true, onUpgradeRequired, user }) {
     const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
     const [previewVideo, setPreviewVideo] = useState(null)
     const [savingTemplate, setSavingTemplate] = useState(null)
@@ -371,7 +371,7 @@ export default function UGCPro({ activeBrand, projects = [], canCreateVideo = tr
             })
             return nextGrid
         })
-    }, [projects])
+    }, [projects, projectsLoaded])
 
     // Product
     const [productUrl, setProductUrl] = useState('')
