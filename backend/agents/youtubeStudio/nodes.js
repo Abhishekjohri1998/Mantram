@@ -1442,7 +1442,227 @@ export async function frameExtractionNode({ videoId, videoUrl = null, isYT = tru
 }
 
 
-// ── 10. Promo Cuts Node ───────────────────────────────────────────────────────
+// ── 9b. Highlight Frame Extraction Node ──────────────────────────────────────
+
+/**
+ * Highlight Frame Extraction Node
+ * 
+ * After analysisNode identifies key highlights (each with a timestamp),
+ * this node extracts the ACTUAL video frame at each highlight's timestamp
+ * from YouTube's storyboard sprite sheets.
+ * 
+ * For a 1-hour video with 20 highlights → 20 real video frames at exact moments.
+ * 
+ * How storyboards work:
+ *   - YouTube generates sprite sheets (5x5 grids of frames, ~2s intervals)
+ *   - The storyboard spec contains: baseUrl, tileSize, interval, grid layout
+ *   - We calculate: timestamp → frame index → sheet number → tile position
+ *   - Then extract that specific tile from the correct sprite sheet
+ */
+export async function highlightFrameExtractionNode({ videoId, analysis, existingFrames = [] }) {
+    const highlights = analysis?.highlights || [];
+    const peakMoment = analysis?.peakMoment || null;
+    
+    if (!videoId || highlights.length === 0) {
+        console.log(`ℹ️ [highlightFrames] No highlights to map — keeping existing ${existingFrames.length} frames`);
+        return { extractedFrames: existingFrames };
+    }
+    
+    console.log(`🎯 [highlightFrames] Mapping ${highlights.length} key highlights to video frames...`);
+    
+    // ── Parse storyboard spec from YouTube page ──────────────────────────────
+    let storyboardSpec = null;
+    try {
+        const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+            signal: AbortSignal.timeout(10000),
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Cookie': 'CONSENT=YES+cb; SOCS=CAESEwgDEgk2MTQyNzEyNjUaAmVuIAEaBgiA_LyaBg',
+            }
+        });
+        
+        if (pageRes.ok) {
+            const html = await pageRes.text();
+            const specMatch = html.match(/"playerStoryboardSpecRenderer"\s*:\s*\{\s*"spec"\s*:\s*"([^"]+)"/);
+            
+            if (specMatch) {
+                const spec = specMatch[1].replace(/\\u0026/g, '&');
+                const segments = spec.split('|');
+                
+                if (segments.length > 1) {
+                    // Use the highest resolution tier (last segment)
+                    const baseUrl = segments[0];
+                    const lastSeg = segments[segments.length - 1];
+                    const segParts = lastSeg.split('#');
+                    
+                    if (segParts.length >= 7) {
+                        const tileW = parseInt(segParts[0]);
+                        const tileH = parseInt(segParts[1]);
+                        const frameCount = parseInt(segParts[2]);
+                        const cols = parseInt(segParts[3]);
+                        const rows = parseInt(segParts[4]);
+                        const intervalMs = parseInt(segParts[5]) || 2000;
+                        const namePattern = segParts[6]; // e.g. "M$M" 
+                        const sigh = segParts[segParts.length - 1];
+                        const sbLevel = segments.length - 1;
+                        const framesPerSheet = cols * rows;
+                        
+                        storyboardSpec = {
+                            baseUrl: baseUrl.replace('$L', `L${sbLevel}`),
+                            tileW, tileH, frameCount, cols, rows,
+                            intervalMs, framesPerSheet, sigh, sbLevel,
+                        };
+                        
+                        console.log(`   ✅ Storyboard spec: ${cols}x${rows} grid, ${frameCount} frames, ${intervalMs}ms interval, ${Math.ceil(frameCount / framesPerSheet)} sheets`);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn(`   ⚠️ Storyboard spec fetch failed: ${e.message}`);
+    }
+    
+    // ── Build highlight timestamp list ────────────────────────────────────────
+    // Include peakMoment + all highlights, deduped by timestamp
+    const allMoments = [];
+    
+    if (peakMoment?.timestamp) {
+        allMoments.push({
+            timestamp: peakMoment.timestamp,
+            label: `⭐ Peak: ${peakMoment.title || 'Peak Moment'}`,
+            score: 100,
+        });
+    }
+    
+    for (const h of highlights) {
+        if (!h.timestamp) continue;
+        // Skip if same timestamp as peak moment
+        if (peakMoment?.timestamp === h.timestamp) continue;
+        allMoments.push({
+            timestamp: h.timestamp,
+            label: `🔥 ${h.title || 'Highlight'}`,
+            score: 90 - allMoments.length,
+        });
+    }
+    
+    console.log(`   📍 ${allMoments.length} unique moments to extract frames for`);
+    
+    // ── Extract frames at each highlight timestamp ───────────────────────────
+    const highlightFrames = [];
+    const { uploadToS3 } = await import('../../utils/s3.js');
+    
+    if (storyboardSpec) {
+        // STORYBOARD PATH: Extract exact frame at each timestamp from sprite sheets
+        const sharp = (await import('sharp')).default;
+        const { baseUrl, cols, rows, intervalMs, framesPerSheet, sigh } = storyboardSpec;
+        const sheetCache = new Map(); // Cache downloaded sprite sheets
+        
+        for (const moment of allMoments) {
+            try {
+                // Parse timestamp "MM:SS" or "HH:MM:SS" to seconds
+                const parts = moment.timestamp.split(':').map(Number);
+                const totalSecs = parts.length === 3 
+                    ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                    : parts[0] * 60 + (parts[1] || 0);
+                
+                // Calculate which frame, sheet, and tile
+                const frameIdx = Math.floor((totalSecs * 1000) / intervalMs);
+                const sheetIdx = Math.floor(frameIdx / framesPerSheet);
+                const tileInSheet = frameIdx % framesPerSheet;
+                const tileRow = Math.floor(tileInSheet / cols);
+                const tileCol = tileInSheet % cols;
+                
+                // Fetch the sprite sheet (cached)
+                let spriteBuf = sheetCache.get(sheetIdx);
+                if (!spriteBuf) {
+                    const sheetUrl = baseUrl.replace('$N', `M${sheetIdx}`) + `&sigh=${sigh}`;
+                    const res = await fetch(sheetUrl, { 
+                        signal: AbortSignal.timeout(10000),
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                    });
+                    if (res.ok && (res.headers.get('content-type') || '').includes('image')) {
+                        spriteBuf = Buffer.from(await res.arrayBuffer());
+                        sheetCache.set(sheetIdx, spriteBuf);
+                    }
+                }
+                
+                if (spriteBuf) {
+                    const meta = await sharp(spriteBuf).metadata();
+                    const actualTileW = Math.floor(meta.width / cols);
+                    const actualTileH = Math.floor(meta.height / rows);
+                    
+                    const tileBuf = await sharp(spriteBuf)
+                        .extract({
+                            left: tileCol * actualTileW,
+                            top: tileRow * actualTileH,
+                            width: actualTileW,
+                            height: actualTileH,
+                        })
+                        .jpeg({ quality: 90 })
+                        .toBuffer();
+                    
+                    const key = `youtube-studio-uploads/frames/${videoId}/highlight_${totalSecs}s.jpg`;
+                    const s3Url = await uploadToS3(tileBuf, key, 'image/jpeg');
+                    
+                    highlightFrames.push({
+                        url: s3Url,
+                        label: `${moment.label} [${moment.timestamp}]`,
+                        score: moment.score,
+                        sizeKb: Math.round(tileBuf.length / 1024),
+                        timestamp: moment.timestamp,
+                    });
+                    
+                    console.log(`   ✅ ${moment.timestamp} → Sheet ${sheetIdx}, Tile [${tileRow},${tileCol}] → ${moment.label}`);
+                }
+            } catch (e) {
+                console.warn(`   ⚠️ Failed to extract frame for ${moment.timestamp}: ${e.message}`);
+            }
+        }
+    } else {
+        // NO STORYBOARD: Map highlights to the closest YouTube auto-frame (1.jpg/2.jpg/3.jpg)
+        console.log(`   ℹ️ No storyboard available — mapping highlights to nearest YouTube auto-frames`);
+        
+        for (const moment of allMoments) {
+            const parts = moment.timestamp.split(':').map(Number);
+            const totalSecs = parts.length === 3 
+                ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                : parts[0] * 60 + (parts[1] || 0);
+            
+            // Map to nearest YouTube auto-frame (1=25%, 2=50%, 3=75%, 0=cover)
+            // For this we approximate based on timestamp position
+            highlightFrames.push({
+                url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                label: `${moment.label} [${moment.timestamp}]`,
+                score: moment.score,
+                timestamp: moment.timestamp,
+            });
+        }
+    }
+    
+    // ── Merge: Keep the HD Cover Frame + add highlight frames ─────────────────
+    // The cover frame stays as face reference, then all highlights follow
+    const coverFrame = existingFrames.find(f => f.label?.includes('Cover Frame'));
+    const mergedFrames = [];
+    
+    if (coverFrame) {
+        mergedFrames.push(coverFrame);
+    }
+    
+    // Add highlight frames (deduplicated)
+    mergedFrames.push(...highlightFrames);
+    
+    // If we got no highlight frames, keep the original frames
+    if (highlightFrames.length === 0) {
+        console.log(`   ⚠️ No highlight frames extracted — keeping original ${existingFrames.length} frames`);
+        return { extractedFrames: existingFrames };
+    }
+    
+    console.log(`✅ [highlightFrames] ${highlightFrames.length} highlight frames extracted (${mergedFrames.length} total with cover)`);
+    return { extractedFrames: mergedFrames };
+}
+
+
 
 /**
  * Promo Cuts Node

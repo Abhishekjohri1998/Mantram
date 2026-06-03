@@ -41,8 +41,8 @@ Return ONLY valid JSON:
     "sceneDescription": "string (describe the scene visually in detail — what is happening, what does it look LIKE)",
     "emotion": "string (shock|romance|anger|joy|revelation|tension|comedy|triumph)"
   },
-  "highlights": [
-    { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string" }
+  "highlights": [ // CRITICAL: Generate AT LEAST 1 highlight per 3-5 minutes of video. For a 1-hour video = 12-20 highlights minimum. Cover the FULL video timeline.
+    { "timestamp": "MM:SS", "title": "string", "why": "string (why this matters)", "emotionalMoment": "string", "sceneDescription": "string (what visually happens in this moment)" }
   ],
   "promoCuts": [ // YOU MUST ALWAYS OUTPUT AT LEAST 2 PROMO CUTS EVEN IF THE VIDEO IS SHORT
     {

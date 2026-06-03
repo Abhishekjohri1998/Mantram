@@ -20,7 +20,7 @@ import {
     transcriptNode, analysisNode, chapterNode,
     seoNode, brandCriticNode, thumbnailDirectionNode,
     thumbnailGenerationNode, characterPortraitNode,
-    frameExtractionNode, promoNode,
+    frameExtractionNode, highlightFrameExtractionNode, promoNode,
 } from '../agents/youtubeStudio/nodes.js';
 import { extractVideoId } from '../agents/youtubeStudio/transcriptClient.js';
 import YoutubeProject from '../models/YoutubeProject.js';
@@ -377,6 +377,25 @@ async function runPipeline({ videoUrl, videoId, isYT = true, brandContext, brand
             }
         } else {
             emit('analysis', 'done', { message: 'Skipped' });
+        }
+
+        // ── Stage 2b: Highlight Frame Extraction (after analysis) ──
+        // Maps each key highlight timestamp to an actual video frame from YouTube storyboards
+        if (analysis?.highlights?.length > 0 && video.videoId) {
+            try {
+                emit('highlightFrames', 'running', { message: `Extracting frames for ${analysis.highlights.length} key highlights…` });
+                const hfRes = await highlightFrameExtractionNode({
+                    videoId: video.videoId,
+                    analysis,
+                    existingFrames: extractedFrames,
+                });
+                extractedFrames = hfRes.extractedFrames;
+                emit('highlightFrames', 'done', { count: extractedFrames.length });
+                console.log(`✅ [Node 2b] Highlight frames: ${extractedFrames.length} total`);
+            } catch (err) {
+                console.error(`❌ [Node 2b] Highlight frame extraction failed: ${err.message}`);
+                emit('highlightFrames', 'error', { error: err.message });
+            }
         }
 
 
