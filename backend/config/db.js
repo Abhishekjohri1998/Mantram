@@ -4,19 +4,22 @@ import config from './env.js';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3000; // 3 seconds
 let reconnectHandlerRegistered = false;
+let connectionPromise = null;
 
 const connectDB = async (attempt = 1) => {
     // Prevent concurrent connection attempts or redundant calls
     if (mongoose.connection.readyState === 1) {
         return mongoose.connection;
     }
-    if (mongoose.connection.readyState === 2) {
+    
+    // If a connection is already in progress, await that exact promise
+    if (connectionPromise) {
         console.log('⏳ MongoDB connection already in progress...');
-        return mongoose.connection;
+        return connectionPromise;
     }
 
     try {
-        const conn = await mongoose.connect(config.mongoUri, {
+        connectionPromise = mongoose.connect(config.mongoUri, {
             serverSelectionTimeoutMS: 5000,            // 5s to pick a server
             socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
             connectTimeoutMS: 30000,           // 30s initial connect
@@ -27,18 +30,17 @@ const connectDB = async (attempt = 1) => {
             readPreference: 'secondaryPreferred', // Phase 5: Offload reads to replicas
             w: 'majority',                      // Phase 5: Ensure data consistency across replicas
         });
+        
+        const conn = await connectionPromise;
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 
-        // Auto-reconnect on disconnect (unless shutting down)
-        // Guard: register only once to prevent exponential handler accumulation
+        // Register listeners only once
         if (!reconnectHandlerRegistered) {
             mongoose.connection.on('disconnected', () => {
                 if (mongoose.connection.isShuttingDown) return;
-                // Only trigger reconnect if fully disconnected and no connection is in progress
-                if (mongoose.connection.readyState === 0) {
-                    console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
-                    setTimeout(() => connectDB(), RETRY_DELAY);
-                }
+                console.warn('⚠️  MongoDB disconnected. The driver will attempt to automatically reconnect in the background.');
+                // Note: We deliberately DO NOT manually call `mongoose.connect()` here
+                // to prevent connection storms. The MongoDB Node.js driver auto-reconnects on its own.
             });
 
             mongoose.connection.on('error', (err) => {
@@ -50,6 +52,7 @@ const connectDB = async (attempt = 1) => {
 
         return conn;
     } catch (error) {
+        connectionPromise = null; // Clear the cache on failure so we can retry
         console.error(`❌ MongoDB Error (attempt ${attempt}/${MAX_RETRIES}): ${error.message}`);
 
         if (attempt < MAX_RETRIES) {
