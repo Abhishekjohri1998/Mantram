@@ -29,6 +29,7 @@ const connectDB = async (attempt = 1) => {
             maxIdleTimeMS: 30000,              // close idle connections faster (30s)
             readPreference: 'secondaryPreferred', // Phase 5: Offload reads to replicas
             w: 'majority',                      // Phase 5: Ensure data consistency across replicas
+            autoSelectFamily: false,            // Fix for SSL alert 80 / IP resolving issues
         });
         
         const conn = await connectionPromise;
