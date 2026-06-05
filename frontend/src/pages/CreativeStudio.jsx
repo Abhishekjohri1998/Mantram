@@ -451,7 +451,7 @@ export default function CreativeStudio() {
 
     // ── Global State ──
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
-    const [selectedType, setSelectedType] = useState('instagram-post')
+    const [selectedType, setSelectedType] = useState(() => sessionStorage.getItem('cs-selectedType') || 'instagram-post')
     const [prompt, setPrompt] = useState('')
     const [selectedProduct, setSelectedProduct] = useState(null)
     const [showProductPicker, setShowProductPicker] = useState(false)
@@ -1103,7 +1103,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [bankLoading, setBankLoading] = useState(false)
     const [bankTotal, setBankTotal] = useState(0)
     const [lightboxIdx, setLightboxIdx] = useState(null)
-    const [bankView, setBankView] = useState('list')
+    const [bankView, setBankView] = useState(() => sessionStorage.getItem('cs-bankView') || 'list')
     const [bankCopiedId, setBankCopiedId] = useState(null)
     const [bankTab, setBankTab] = useState('generated')
     const [bankCounts, setBankCounts] = useState({ uploaded: 0, generated: 0 })
@@ -1148,11 +1148,17 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [logoPosition, setLogoPosition] = useState('bottom-right')
     const [logoSize, setLogoSize] = useState('medium')
     const [galleryFilter, setGalleryFilter] = useState('All')
-    const [viewMode, setViewMode] = useState('list')
+    const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('cs-viewMode') || 'list')
     const [historyPage, setHistoryPage] = useState(1)
-    const [sidebarPanel, setSidebarPanel] = useState('create')
+    const [sidebarPanel, setSidebarPanel] = useState(() => sessionStorage.getItem('cs-sidebarPanel') || 'create')
     const [exploreExpanded, setExploreExpanded] = useState({})
     const [showAdvanced, setShowAdvanced] = useState(false)
+
+    // ── Persist secondary UI state to sessionStorage ──
+    useEffect(() => { sessionStorage.setItem('cs-selectedType', selectedType) }, [selectedType])
+    useEffect(() => { sessionStorage.setItem('cs-sidebarPanel', sidebarPanel) }, [sidebarPanel])
+    useEffect(() => { sessionStorage.setItem('cs-viewMode', viewMode) }, [viewMode])
+    useEffect(() => { sessionStorage.setItem('cs-bankView', bankView) }, [bankView])
     const [floatingTray, setFloatingTray] = useState(null) // null | 'format' | 'camera' | 'references' | 'text' | 'advanced'
     const [psTray, setPsTray] = useState(null) // null | 'product' | 'camera' | 'scene' | 'ratio' | 'refs'
     const [carouselTray, setCarouselTray] = useState(null) // null | 'format' | 'genre' | 'style' | 'products' | 'slides'
