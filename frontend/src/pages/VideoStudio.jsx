@@ -122,8 +122,14 @@ export default function VideoStudio() {
     const [isPending, startTransition] = useTransition()
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
-    const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
-    const [visitedTabs, setVisitedTabs] = useState(new Set(['advanced'])) // Track visited tabs for CSS persistence
+    // Restore studioMode from sessionStorage so refresh preserves the active tab
+    const [studioMode, setStudioMode] = useState(() => sessionStorage.getItem('vs-studioMode') || 'advanced')
+    const [visitedTabs, setVisitedTabs] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('vs-visitedTabs')
+            return saved ? new Set(JSON.parse(saved)) : new Set(['advanced'])
+        } catch { return new Set(['advanced']) }
+    })
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
@@ -172,7 +178,7 @@ export default function VideoStudio() {
     // History
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
-    const [showHistory, setShowHistory] = useState(false)
+    const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('vs-showHistory') === 'true')
     const [playingVideo, setPlayingVideo] = useState(null)
     const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
     const [showGenVirality, setShowGenVirality] = useState(false) // Toggle for virality panel on newly generated video
@@ -365,6 +371,15 @@ export default function VideoStudio() {
     useEffect(() => {
         fetchHistory(50)
     }, [fetchHistory])
+
+    // Persist studioMode to sessionStorage so refresh preserves the active tab
+    useEffect(() => { sessionStorage.setItem('vs-studioMode', studioMode) }, [studioMode])
+
+    // Persist visitedTabs to sessionStorage so lazy-loaded components aren't re-mounted on refresh
+    useEffect(() => { sessionStorage.setItem('vs-visitedTabs', JSON.stringify([...visitedTabs])) }, [visitedTabs])
+
+    // Persist showHistory toggle
+    useEffect(() => { sessionStorage.setItem('vs-showHistory', showHistory ? 'true' : 'false') }, [showHistory])
 
     useEffect(() => {
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
