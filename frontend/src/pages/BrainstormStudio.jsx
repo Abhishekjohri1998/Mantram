@@ -1107,10 +1107,21 @@ export default function BrainstormStudio() {
   const [feedbackToast, setFeedbackToast] = useState({ message: '', visible: false })
 
   // ── Studio view toggle ────────────────────────────────────────────────────
-  const [studioView, setStudioView] = useState('brainstorm') // 'brainstorm' | 'monthly'
+  // Restore studioView from sessionStorage so refresh preserves the active view
+  const [studioView, setStudioView] = useState(() => sessionStorage.getItem('bs-studioView') || 'brainstorm') // 'brainstorm' | 'monthly'
 
   // ── Strategy Mode state ───────────────────────────────────────────────────
-  const [smActiveMode, setSmActiveMode] = useState(STRATEGY_MODES_LIST[0])
+  // Restore active strategy mode from sessionStorage
+  const [smActiveMode, setSmActiveMode] = useState(() => {
+    try {
+      const savedId = sessionStorage.getItem('bs-smActiveModeId')
+      if (savedId) {
+        const match = STRATEGY_MODES_LIST.find(m => m.id === savedId)
+        if (match) return match
+      }
+    } catch {}
+    return STRATEGY_MODES_LIST[0]
+  })
   const [smInputs, setSmInputs] = useState({})
   const [smLoading, setSmLoading] = useState(false)
   const [smError, setSmError] = useState(null)
@@ -1221,9 +1232,10 @@ export default function BrainstormStudio() {
 
 
   // Session history state
-  const [activeSessionId, setActiveSessionId] = useState(null)
+  // Restore activeSessionId and sidebarOpen from sessionStorage
+  const [activeSessionId, setActiveSessionId] = useState(() => sessionStorage.getItem('bs-activeSessionId') || null)
   const [sessionList, setSessionList] = useState([])
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => sessionStorage.getItem('bs-sidebarOpen') === 'true')
 
   const fetchSessionsList = useCallback(() => {
     if (!activeBrand?._id) return
@@ -1238,6 +1250,15 @@ export default function BrainstormStudio() {
   const recognitionRef = useRef(null)
 
   const firstName = user?.name?.split(' ')[0] || 'there'
+
+  // ── Persist state to sessionStorage ───────────────────────────────────────
+  useEffect(() => { sessionStorage.setItem('bs-studioView', studioView) }, [studioView])
+  useEffect(() => { if (smActiveMode?.id) sessionStorage.setItem('bs-smActiveModeId', smActiveMode.id) }, [smActiveMode])
+  useEffect(() => {
+    if (activeSessionId) sessionStorage.setItem('bs-activeSessionId', activeSessionId)
+    else sessionStorage.removeItem('bs-activeSessionId')
+  }, [activeSessionId])
+  useEffect(() => { sessionStorage.setItem('bs-sidebarOpen', sidebarOpen ? 'true' : 'false') }, [sidebarOpen])
   const brandName = activeBrand?.name || null
   const detectedLangKey = detectBrandLang(activeBrand)
   const langInfo = detectedLangKey ? LANG_DISPLAY[detectedLangKey] : null
@@ -1285,6 +1306,16 @@ export default function BrainstormStudio() {
   useEffect(() => {
     fetchSessionsList()
   }, [fetchSessionsList])
+
+  // Auto-resume saved session on mount (handles browser refresh)
+  const hasResumedSession = useRef(false)
+  useEffect(() => {
+    const savedSessionId = sessionStorage.getItem('bs-activeSessionId')
+    if (savedSessionId && !hasResumedSession.current) {
+      hasResumedSession.current = true
+      loadSession(savedSessionId)
+    }
+  }, [loadSession])
 
   // Phase sync — now includes deep dive and calendar stages
   useEffect(() => {
