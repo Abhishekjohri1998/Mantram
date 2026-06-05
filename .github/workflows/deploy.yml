@@ -227,13 +227,12 @@ jobs:
             echo "⏳ Waiting 10 seconds for TCP connections to close..."
             sleep 10
 
-            # 3.5 Cleanup & Seed
+            # 3.5 Cleanup & Seed (single connection instead of 3 separate scripts)
             export SEED_MODE=true
-            echo "🧹 Reclaiming database space..."
-            node scripts/cleanupDatabase.js
+            echo "🧹 Running deploy initialization (cleanup + seed)..."
+            node scripts/deployInit.js
 
-            echo "🔑 Seeding data..."
-            node scripts/seedSuperAdmin.js
+            echo "🔑 Seeding packages..."
             node scripts/seedPackages.js
 
             # 4. Atomic Symlink Switch
