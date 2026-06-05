@@ -325,54 +325,79 @@ connectDB().then(() => {
         }, 8000);
     }).catch(() => {});
 
-    // Start follow-up scheduler (every 4 hours — Meta Compliance)
-    import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
-        setInterval(() => {
-            runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
-        }, 4 * 60 * 60 * 1000);
-        console.log('🤖 Autonomous Agent active');
-    }).catch(() => { });
+    // ── PRIMARY WORKER ONLY: Background schedulers & agents ────────────
+    // In PM2 cluster mode, index.js runs in EVERY worker. Schedulers must
+    // only run once (on worker 0) to avoid duplicate DB queries and work.
+    const instanceId = process.env.NODE_APP_INSTANCE || '0';
+    if (instanceId === '0') {
+        console.log(`🏠 Primary worker (instance ${instanceId}) — starting background schedulers`);
 
-    // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
-    import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
-        setInterval(() => {
-            runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
-        }, 6 * 60 * 60 * 1000);
-        console.log('🕵️ Agent Intelligence active');
-    }).catch(() => { });
+        // Start follow-up scheduler (every 4 hours — Meta Compliance)
+        import('./services/autonomousAgent.js').then(({ runFollowUpCheck }) => {
+            setInterval(() => {
+                runFollowUpCheck().catch(err => console.warn('⚠️ Follow-up check failed:', err.message));
+            }, 4 * 60 * 60 * 1000);
+            console.log('🤖 Autonomous Agent active');
+        }).catch(() => { });
 
-    // Start scheduled post publisher
-    import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
-        startScheduledPostPublisher();
-    }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
+        // Start intelligence agent scheduler (every 6 hours — Meta Compliance)
+        import('./services/intelligenceAgent.js').then(({ runIntelMissions }) => {
+            setInterval(() => {
+                runIntelMissions().catch(err => console.warn('🕵️ Intel Agent check failed:', err.message));
+            }, 6 * 60 * 60 * 1000);
+            console.log('🕵️ Agent Intelligence active');
+        }).catch(() => { });
 
-    // Start pricing monitor (24h checks)
-    import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
-        startPricingMonitor();
-    }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
+        // Start scheduled post publisher
+        import('./services/scheduledPostPublisher.js').then(({ startScheduledPostPublisher }) => {
+            startScheduledPostPublisher();
+        }).catch((err) => { console.warn('📅 Scheduled Post Publisher failed to start:', err.message); });
 
-    // Auto-seed credit packs if collection is empty
-    import('./models/CreditPack.js').then(async ({ default: CreditPack }) => {
-        const count = await CreditPack.countDocuments();
-        if (count === 0) {
-            const defaults = [
-                { name: '🎁 Festive Special', slug: 'festive-special', credits: 800, bonusCredits: 200, price: 3000, promoOriginalPrice: 4286, promoDiscount: 30, isPromo: true, icon: 'redeem', badge: 'LIMITED TIME', badgeColor: '#ec4899', displayOrder: 0, validityDays: 365, description: '30% OFF! Best value deal', color: '#ec4899' },
-                { name: '🔹 Micro', slug: 'micro', credits: 20, bonusCredits: 0, price: 149, icon: 'token', badge: '', displayOrder: 1, validityDays: 180, description: 'Try it out', color: '#64748b' },
-                { name: '⚡ Spark', slug: 'spark', credits: 50, bonusCredits: 0, price: 349, icon: 'bolt', badge: '', displayOrder: 2, validityDays: 180, description: 'Quick power-up', color: '#f59e0b' },
-                { name: '🚀 Boost', slug: 'boost', credits: 150, bonusCredits: 15, price: 899, icon: 'rocket_launch', badge: '', displayOrder: 3, validityDays: 180, description: '+15 bonus credits', color: '#3b82f6' },
-                { name: '💪 Power', slug: 'power', credits: 300, bonusCredits: 45, price: 1699, icon: 'fitness_center', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 4, validityDays: 180, description: '+45 bonus credits', color: '#ef4444' },
-                { name: '🔥 Ultra', slug: 'ultra', credits: 500, bonusCredits: 100, price: 2499, icon: 'local_fire_department', badge: 'Popular', badgeColor: '#f59e0b', displayOrder: 5, validityDays: 365, description: '+100 bonus! Best value', color: '#f97316' },
-                { name: '🌟 Stellar', slug: 'stellar', credits: 650, bonusCredits: 150, price: 3000, icon: 'stars', badge: 'Most Popular', badgeColor: '#8b5cf6', displayOrder: 6, validityDays: 365, description: '+150 bonus! Superior value', color: '#8b5cf6' },
-                { name: '💎 Mega', slug: 'mega', credits: 1000, bonusCredits: 250, price: 4499, icon: 'diamond', badge: 'Best Value', badgeColor: '#06b6d4', displayOrder: 7, validityDays: 365, description: '+250 bonus! Pro creators', color: '#06b6d4' },
-                { name: '👑 Elite', slug: 'elite', credits: 2500, bonusCredits: 750, price: 9999, icon: 'military_tech', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 8, validityDays: 365, description: '+750 bonus! Agency tier', color: '#a855f7' },
-                { name: '🏢 Enterprise', slug: 'enterprise-pack', credits: 5000, bonusCredits: 2000, price: 17999, icon: 'corporate_fare', badge: 'Max Savings', badgeColor: '#8b5cf6', displayOrder: 9, validityDays: 365, description: '+2000 bonus! Enterprise power', color: '#8b5cf6' },
-            ];
-            await CreditPack.insertMany(defaults);
-            console.log('🛒 Seeded 8 default credit packs');
-        } else {
-            console.log(`🛒 Credit Store: ${count} packs loaded`);
-        }
-    }).catch(err => console.warn('⚠️ Credit pack seed check failed:', err.message));
+        // Start pricing monitor (24h checks)
+        import('./agents/pricingMonitor.js').then(({ startPricingMonitor }) => {
+            startPricingMonitor();
+        }).catch(err => console.error('❌ Failed to load pricingMonitor.js:', err));
+
+        // Auto-seed credit packs if collection is empty
+        import('./models/CreditPack.js').then(async ({ default: CreditPack }) => {
+            const count = await CreditPack.countDocuments();
+            if (count === 0) {
+                const defaults = [
+                    { name: '🎁 Festive Special', slug: 'festive-special', credits: 800, bonusCredits: 200, price: 3000, promoOriginalPrice: 4286, promoDiscount: 30, isPromo: true, icon: 'redeem', badge: 'LIMITED TIME', badgeColor: '#ec4899', displayOrder: 0, validityDays: 365, description: '30% OFF! Best value deal', color: '#ec4899' },
+                    { name: '🔹 Micro', slug: 'micro', credits: 20, bonusCredits: 0, price: 149, icon: 'token', badge: '', displayOrder: 1, validityDays: 180, description: 'Try it out', color: '#64748b' },
+                    { name: '⚡ Spark', slug: 'spark', credits: 50, bonusCredits: 0, price: 349, icon: 'bolt', badge: '', displayOrder: 2, validityDays: 180, description: 'Quick power-up', color: '#f59e0b' },
+                    { name: '🚀 Boost', slug: 'boost', credits: 150, bonusCredits: 15, price: 899, icon: 'rocket_launch', badge: '', displayOrder: 3, validityDays: 180, description: '+15 bonus credits', color: '#3b82f6' },
+                    { name: '💪 Power', slug: 'power', credits: 300, bonusCredits: 45, price: 1699, icon: 'fitness_center', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 4, validityDays: 180, description: '+45 bonus credits', color: '#ef4444' },
+                    { name: '🔥 Ultra', slug: 'ultra', credits: 500, bonusCredits: 100, price: 2499, icon: 'local_fire_department', badge: 'Popular', badgeColor: '#f59e0b', displayOrder: 5, validityDays: 365, description: '+100 bonus! Best value', color: '#f97316' },
+                    { name: '🌟 Stellar', slug: 'stellar', credits: 650, bonusCredits: 150, price: 3000, icon: 'stars', badge: 'Most Popular', badgeColor: '#8b5cf6', displayOrder: 6, validityDays: 365, description: '+150 bonus! Superior value', color: '#8b5cf6' },
+                    { name: '💎 Mega', slug: 'mega', credits: 1000, bonusCredits: 250, price: 4499, icon: 'diamond', badge: 'Best Value', badgeColor: '#06b6d4', displayOrder: 7, validityDays: 365, description: '+250 bonus! Pro creators', color: '#06b6d4' },
+                    { name: '👑 Elite', slug: 'elite', credits: 2500, bonusCredits: 750, price: 9999, icon: 'military_tech', badge: 'Flash Sale', badgeColor: '#ef4444', displayOrder: 8, validityDays: 365, description: '+750 bonus! Agency tier', color: '#a855f7' },
+                    { name: '🏢 Enterprise', slug: 'enterprise-pack', credits: 5000, bonusCredits: 2000, price: 17999, icon: 'corporate_fare', badge: 'Max Savings', badgeColor: '#8b5cf6', displayOrder: 9, validityDays: 365, description: '+2000 bonus! Enterprise power', color: '#8b5cf6' },
+                ];
+                await CreditPack.insertMany(defaults);
+                console.log('🛒 Seeded 8 default credit packs');
+            } else {
+                console.log(`🛒 Credit Store: ${count} packs loaded`);
+            }
+        }).catch(err => console.warn('⚠️ Credit pack seed check failed:', err.message));
+
+        // Start autonomous daily strategy engine for trends and auto-publishing
+        import('./services/dailyStrategyEngine.js').then(({ runDailyStrategyEngine }) => {
+            // Run immediately on boot to catch up
+            setTimeout(() => runDailyStrategyEngine().catch(err => console.warn('⚠️ Initial Daily Strategy run failed:', err)), 30000);
+            // Then run every 6 hours
+            setInterval(() => {
+                runDailyStrategyEngine().catch(err => console.warn('⚠️ Scheduled Daily Strategy run failed:', err));
+            }, 6 * 60 * 60 * 1000);
+            console.log('📈 Daily Strategy Engine active');
+        }).catch(err => console.error('❌ Failed to load dailyStrategyEngine.js:', err));
+
+    } else {
+        console.log(`👷 Secondary worker (instance ${instanceId}) — skipping background schedulers`);
+    }
+
+    // ── ALL WORKERS: Services with their own internal NODE_APP_INSTANCE guard ──
+    // These services check NODE_APP_INSTANCE internally, so they're safe to import everywhere.
 
     // Start funnel scheduler (nurture sequences, automation, score decay)
     import('./services/funnelScheduler.js').then(({ startFunnelScheduler }) => {
@@ -397,17 +422,6 @@ connectDB().then(() => {
     import('./services/videoArchivalSweep.js').then(({ startVideoArchivalSweep }) => {
         startVideoArchivalSweep();
     }).catch(err => console.error('❌ Failed to load videoArchivalSweep.js:', err));
-
-    // Start autonomous daily strategy engine for trends and auto-publishing
-    import('./services/dailyStrategyEngine.js').then(({ runDailyStrategyEngine }) => {
-        // Run immediately on boot to catch up
-        setTimeout(() => runDailyStrategyEngine().catch(err => console.warn('⚠️ Initial Daily Strategy run failed:', err)), 30000);
-        // Then run every 6 hours
-        setInterval(() => {
-            runDailyStrategyEngine().catch(err => console.warn('⚠️ Scheduled Daily Strategy run failed:', err));
-        }, 6 * 60 * 60 * 1000);
-        console.log('📈 Daily Strategy Engine active');
-    }).catch(err => console.error('❌ Failed to load dailyStrategyEngine.js:', err));
 
 }).catch(err => {
     console.error('❌ Critical failure during background agent initialization:', err.message);

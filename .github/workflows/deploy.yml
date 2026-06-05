@@ -223,7 +223,7 @@ jobs:
 
             # 3.4 Stop old PM2 instances early to release MongoDB connections
             echo "🛑 Stopping old PM2 instances to free DB connections..."
-            pm2 delete mantram-server mantram-autofix || true
+            pm2 delete mantram-server mantram-autofix mantram-server-autofix || true
             echo "⏳ Waiting 10 seconds for TCP connections to close..."
             sleep 10
 

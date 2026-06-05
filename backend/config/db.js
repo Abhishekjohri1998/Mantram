@@ -22,12 +22,13 @@ const connectDB = async (attempt = 1) => {
 
     try {
         connectionPromise = mongoose.connect(config.mongoUri, {
-            maxPoolSize: 10,                   // 2 workers × 10 × 3 replica nodes = 60 total
-            minPoolSize: 2,                    // keep 2 warm connections alive
+            maxPoolSize: 5,                    // 2 prod workers × 5 × 3 replica nodes = 30 total
+            minPoolSize: 1,                    // keep 1 warm connection alive per node
             serverSelectionTimeoutMS: 5000,    // 5s to pick a server
             socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
             connectTimeoutMS: 30000,           // 30s initial connect
             heartbeatFrequencyMS: 10000,       // heartbeat every 10s to keep alive
+            maxIdleTimeMS: 30000,              // close idle connections after 30s
             readPreference: 'secondaryPreferred',
             w: 'majority',
             autoSelectFamily: false,            // Fix for SSL alert 80 / IP resolving issues

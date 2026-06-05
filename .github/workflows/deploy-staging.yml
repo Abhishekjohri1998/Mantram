@@ -213,7 +213,7 @@ jobs:
             echo "🔄 Restarting staging backend..."
             cd $CURRENT_LINK
             pm2 delete mantram-staging || true
-            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env
+            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env -i 1
             pm2 save
 
             # 6. Dump PM2 logs early so crash reason is always visible
