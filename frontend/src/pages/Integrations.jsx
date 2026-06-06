@@ -1404,7 +1404,7 @@ export default function Integrations() {
                                 }
                             }}
                             className={`md:w-1/2 bg-[var(--sys-surface-dim)] flex items-center justify-center relative min-h-[300px] md:min-h-0 border-r border-[var(--sys-border)] overflow-hidden ${
-                                isEditingProduct ? 'relative group/editimg' : 'cursor-zoom-in group/img'
+                                isEditingProduct ? 'relative' : 'cursor-zoom-in group/img'
                             }`}>
                             {isEditingProduct ? (
                                 <>
@@ -1415,11 +1415,13 @@ export default function Integrations() {
                                             <span className="material-symbols-outlined text-6xl">inventory_2</span>
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/editimg:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                                        <span className="material-symbols-outlined text-white text-3xl">upload_file</span>
-                                        <span className="text-xs text-white font-bold">Upload New Image</span>
-                                        <input type="file" accept="image/*" onChange={handleEditImageUpload} disabled={uploadingEditImage || savingProduct}
-                                            className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                                        <div className="relative bg-[#0c0f1a]/85 hover:bg-[#0c0f1a] backdrop-blur-md border border-[var(--sys-border)] hover:border-primary/50 text-[var(--sys-text)] shadow-lg rounded-full px-4 py-2 flex items-center gap-2 text-xs font-bold transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                                            <span>Upload Image</span>
+                                            <input type="file" accept="image/*" onChange={handleEditImageUpload} disabled={uploadingEditImage || savingProduct}
+                                                className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                                        </div>
                                     </div>
                                     {uploadingEditImage && (
                                         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
@@ -1507,6 +1509,12 @@ export default function Integrations() {
                                             <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Description</label>
                                             <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
                                                 className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none resize-none custom-scrollbar" />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Image URL</label>
+                                            <input type="url" value={editImageUrl} onChange={e => setEditImageUrl(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
                                         </div>
 
                                         <div className="space-y-1">
