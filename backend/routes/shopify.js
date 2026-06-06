@@ -280,13 +280,13 @@ router.get('/callback', async (req, res) => {
     const frontendUrl = (Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl) || 'http://localhost:5173';
     try {
         const { code, shop, state } = req.query;
-        if (!code || !shop) return res.redirect(`${frontendUrl}/integrations?error=missing_params`);
+        if (!code || !shop) return res.redirect(`${frontendUrl}/shopify-callback.html?error=missing_params`);
 
         // C2 FIX: Validate shop domain format — must be *.myshopify.com
         const SHOPIFY_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
         if (!SHOPIFY_DOMAIN_REGEX.test(shop)) {
             console.warn(`⚠️ OAuth callback rejected — invalid shop domain: ${shop}`);
-            return res.redirect(`${frontendUrl}/integrations?error=invalid_shop_domain`);
+            return res.redirect(`${frontendUrl}/shopify-callback.html?error=invalid_shop_domain`);
         }
 
         const clientId = config.shopify.apiKey;
@@ -316,7 +316,7 @@ router.get('/callback', async (req, res) => {
         if (pendingIntegration && receivedNonce && pendingIntegration.metadata?.oauthNonce) {
             if (pendingIntegration.metadata.oauthNonce !== receivedNonce) {
                 console.warn(`⚠️ CSRF: Nonce mismatch for ${shop} — expected ${pendingIntegration.metadata.oauthNonce}, got ${receivedNonce}`);
-                return res.redirect(`${frontendUrl}/integrations?error=csrf_state_mismatch`);
+                return res.redirect(`${frontendUrl}/shopify-callback.html?error=csrf_state_mismatch`);
             }
         }
 
@@ -367,11 +367,11 @@ router.get('/callback', async (req, res) => {
             res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
         } else {
             // Standard redirect back to mantram.ai after successful OAuth
-            res.redirect(`${frontendUrl}/integrations?shopify=connected`);
+            res.redirect(`${frontendUrl}/shopify-callback.html?shopify=connected`);
         }
     } catch (error) {
         console.error('Shopify callback error:', error);
-        res.redirect(`${frontendUrl}/integrations?error=shopify_auth_failed&detail=${encodeURIComponent(error.message)}`);
+        res.redirect(`${frontendUrl}/shopify-callback.html?error=shopify_auth_failed&detail=${encodeURIComponent(error.message)}`);
     }
 });
 
