@@ -507,7 +507,12 @@ router.post('/products/publish', protect, async (req, res) => {
 
     } catch (error) {
         console.error('Shopify product publish error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        let errMsg = safeErrorMessage(error);
+        const lowerMsg = String(error.message || error).toLowerCase();
+        if (lowerMsg.includes('write_products') || lowerMsg.includes('merchant approval')) {
+            errMsg = 'This action requires product write permission. Please disconnect and reconnect your Shopify store in the Integrations tab to approve the updated permissions.';
+        }
+        res.status(500).json({ success: false, error: errMsg });
     }
 });
 
