@@ -224,7 +224,7 @@ export default function Integrations() {
         loadAllStatuses()
     }, [loadAllStatuses])
 
-    // Listen for OAuth popup messages (Social + GA + PM platforms)
+    // Listen for OAuth popup messages (Social + GA + PM platforms + Shopify)
     useEffect(() => {
         const syncChannel = new BroadcastChannel('mantram_sync')
         const handler = (e) => {
@@ -244,6 +244,13 @@ export default function Integrations() {
                 const p = e.data.platform
                 if (p) setLoading(l => ({ ...l, [p]: false }))
             }
+            if (e.data?.type === 'SHOPIFY_CONNECTED') {
+                loadAllStatuses()
+                syncChannel.postMessage(e.data) // Notify other tabs
+            }
+            if (e.data?.type === 'SHOPIFY_FAILED') {
+                setShopifyError(e.data.detail || 'OAuth connection failed. Please try again.')
+            }
         }
         window.addEventListener('message', handler)
         return () => {
@@ -257,6 +264,10 @@ export default function Integrations() {
         const params = new URLSearchParams(window.location.search)
         const socialStatus = params.get('social')
         const platform = params.get('platform')
+        const shopifyStatus = params.get('shopify')
+        const error = params.get('error')
+        const detail = params.get('detail')
+
         if (window.opener) {
             if (socialStatus === 'success') {
                 window.opener.postMessage({ type: 'SOCIAL_PLATFORM_CONNECTED', platform }, window.location.origin)
@@ -264,6 +275,12 @@ export default function Integrations() {
             } else if (socialStatus === 'denied' || socialStatus === 'processing_failed' || socialStatus === 'invalid_request') {
                 // User cancelled Twitter auth or another error — notify parent to stop spinner
                 window.opener.postMessage({ type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }, window.location.origin)
+                window.close()
+            } else if (shopifyStatus === 'connected') {
+                window.opener.postMessage({ type: 'SHOPIFY_CONNECTED' }, window.location.origin)
+                window.close()
+            } else if (error === 'shopify_auth_failed') {
+                window.opener.postMessage({ type: 'SHOPIFY_FAILED', detail }, window.location.origin)
                 window.close()
             }
         }
@@ -298,6 +315,18 @@ export default function Integrations() {
         } else if (etsyStatusParam === 'error') {
             setEtsyError(`Connection failed: ${decodeURIComponent(etsyMsg || 'Unknown error')}`)
             setTimeout(() => setEtsyError(''), 5000)
+            navigate('/integrations', { replace: true })
+        }
+
+        const shopifyStatusParam = params.get('shopify')
+        const shopifyErrParam = params.get('error')
+        const shopifyDetailParam = params.get('detail')
+
+        if (shopifyStatusParam === 'connected') {
+            loadAllStatuses()
+            navigate('/integrations', { replace: true })
+        } else if (shopifyErrParam === 'shopify_auth_failed') {
+            setShopifyError(decodeURIComponent(shopifyDetailParam || 'OAuth connection failed.'))
             navigate('/integrations', { replace: true })
         }
     }, [navigate, loadAllStatuses])
