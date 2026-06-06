@@ -461,14 +461,18 @@ router.post('/products/publish', protect, async (req, res) => {
             variants: product.variants ? product.variants.map(v => ({
                 price: String(v.price),
                 compare_at_price: v.compareAtPrice ? String(v.compareAtPrice) : undefined,
-                sku: v.sku || '',
-                inventory_quantity: v.inventoryQuantity || 0,
-                inventory_management: v.inventoryQuantity !== undefined ? 'shopify' : undefined
+                sku: v.sku || ''
             })) : undefined,
-            images: product.images ? product.images.map(img => ({
-                src: img.url,
-                alt: img.alt || ''
-            })) : undefined
+            images: product.images ? product.images.map(img => {
+                let src = img.url || '';
+                if (src.includes('amazonaws.com') && src.includes(config.aws.bucket)) {
+                    src = src.split('?')[0];
+                }
+                return {
+                    src,
+                    alt: img.alt || ''
+                };
+            }) : undefined
         };
 
         const createdShopifyProduct = await createShopifyProduct(
