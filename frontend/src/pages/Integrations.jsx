@@ -11,7 +11,7 @@ import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
-import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI } from '../services/api'
+import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI, products as productsAPI, uploadFileToS3 } from '../services/api'
 
 // ── SVG Platform Logos ──────────────────────────────────────────────────────
 function PlatformLogo({ id, size = 28 }) {
@@ -146,6 +146,32 @@ export default function Integrations() {
     const [selectedAccount, setSelectedAccount] = useState(null)
     const [posts, setPosts] = useState([])
     const [loadingPosts, setLoadingPosts] = useState(false)
+    const [selectedProductDetails, setSelectedProductDetails] = useState(null)
+    const [toast, setToast] = useState(null)
+    const [deletingId, setDeletingId] = useState(null)
+    const [confirmDialog, setConfirmDialog] = useState(null)
+    const [enlargedImage, setEnlargedImage] = useState(null)
+
+    const showConfirm = (title, message, onConfirm, isDanger = true, confirmText = 'Confirm', cancelText = 'Cancel') => {
+        setConfirmDialog({
+            title,
+            message,
+            confirmText,
+            cancelText,
+            isDanger,
+            onConfirm: () => {
+                onConfirm();
+                setConfirmDialog(null);
+            }
+        });
+    };
+
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 4000)
+            return () => clearTimeout(timer)
+        }
+    }, [toast])
 
     // ── Google Analytics state ──
     const [gaConnected, setGaConnected] = useState(false)
@@ -331,7 +357,7 @@ export default function Integrations() {
             // Clean URL
             navigate('/integrations', { replace: true })
         } else if (gaStatus === 'error') {
-            alert(`Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`)
+            setToast({ message: `Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`, type: 'error' })
             navigate('/integrations', { replace: true })
         }
 
@@ -372,12 +398,24 @@ export default function Integrations() {
                 // Now redirect the main window to the Google Auth URL
                 window.location.href = d.authUrl
             }
-        } catch (e) { alert(`Connection failed: ${e.message}`) }
+        } catch (e) { setToast({ message: `Connection failed: ${e.message}`, type: 'error' }) }
         finally { setGaLoading(false) }
     }
     const disconnectGA = async () => {
-        if (!confirm('Disconnect Google Analytics for this brand?')) return
-        try { await gaAPI.disconnect(brandId); setGaConnected(false); setGaEmail('') } catch { }
+        showConfirm(
+            'Disconnect Google Analytics',
+            'Are you sure you want to disconnect Google Analytics for this brand?',
+            async () => {
+                try {
+                    await gaAPI.disconnect(brandId)
+                    setGaConnected(false)
+                    setGaEmail('')
+                    setToast({ message: 'Google Analytics disconnected successfully!', type: 'success' })
+                } catch (err) {
+                    setToast({ message: `Disconnect failed: ${err.message}`, type: 'error' })
+                }
+            }
+        )
     }
 
     // ── Ad Platform Actions ──
@@ -387,16 +425,25 @@ export default function Integrations() {
             const data = await apiFetch(`/pm-studio/connect/${platformKey}/auth${brandId ? `?brandId=${brandId}` : ''}`)
             if (data.authUrl) window.open(data.authUrl, `connect_${platformKey}`, 'width=600,height=700,scrollbars=yes')
         } catch (e) {
-            alert(`Connection failed: ${e.message}`)
+            setToast({ message: `Connection failed: ${e.message}`, type: 'error' })
             setConnectingPlatform(null)
         }
     }
     const disconnectAdPlatform = async (platformKey) => {
-        if (!confirm(`Disconnect ${platformKey === 'meta' ? 'Meta Ads' : 'Google Ads'} for this brand?`)) return
-        try {
-            await apiFetch(`/pm-studio/connect/${platformKey}${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' })
-            loadAllStatuses()
-        } catch (e) { alert(e.message) }
+        const platformName = platformKey === 'meta' ? 'Meta Ads' : 'Google Ads'
+        showConfirm(
+            `Disconnect ${platformName}`,
+            `Are you sure you want to disconnect ${platformName} for this brand?`,
+            async () => {
+                try {
+                    await apiFetch(`/pm-studio/connect/${platformKey}${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' })
+                    loadAllStatuses()
+                    setToast({ message: `${platformName} disconnected successfully!`, type: 'success' })
+                } catch (e) {
+                    setToast({ message: e.message, type: 'error' })
+                }
+            }
+        )
     }
 
     // ── Social Platform Actions ──
@@ -405,12 +452,23 @@ export default function Integrations() {
         try {
             const data = await social.connect(platform, brandId)
             if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
-        } catch (err) { alert(`Connection failed: ${err.message}`) }
+        } catch (err) { setToast({ message: `Connection failed: ${err.message}`, type: 'error' }) }
         finally { setLoading(l => ({ ...l, [platform]: false })) }
     }
     const disconnectPlatform = async (accountId) => {
-        if (!confirm(`Disconnect this account?`)) return
-        try { await social.disconnect(accountId); loadAllStatuses() } catch (err) { alert(err.message) }
+        showConfirm(
+            'Disconnect Account',
+            'Are you sure you want to disconnect this account?',
+            async () => {
+                try {
+                    await social.disconnect(accountId)
+                    loadAllStatuses()
+                    setToast({ message: 'Account disconnected successfully!', type: 'success' })
+                } catch (err) {
+                    setToast({ message: err.message, type: 'error' })
+                }
+            }
+        )
     }
     const loadPosts = async (account) => {
         setSelectedAccount(account); setLoadingPosts(true)
@@ -443,9 +501,33 @@ export default function Integrations() {
         setSyncing(true)
         try {
             const data = await shopifyAPI.sync(brandId)
-            alert(` Synced ${data.products || 0} products from Shopify!`); loadProducts()
-        } catch (err) { alert(`Sync failed: ${err.message}`) }
-        finally { setSyncing(false) }
+            setToast({ message: `Synced ${data.products || 0} products from Shopify!`, type: 'success' })
+            loadProducts()
+        } catch (err) {
+            setToast({ message: `Sync failed: ${err.message}`, type: 'error' })
+        } finally { setSyncing(false) }
+    }
+
+    const deleteProduct = async (id) => {
+        showConfirm(
+            'Delete Product',
+            'Are you sure you want to delete this product? This action cannot be undone.',
+            async () => {
+                setDeletingId(id)
+                try {
+                    await productsAPI.delete(id)
+                    setToast({ message: 'Product deleted successfully!', type: 'success' })
+                    setSelectedProductDetails(null)
+                    loadProducts()
+                } catch (err) {
+                    setToast({ message: `Failed to delete product: ${err.message}`, type: 'error' })
+                } finally {
+                    setDeletingId(null)
+                }
+            },
+            true,
+            'Delete'
+        )
     }
     const loadProducts = async () => {
         try { const data = await shopifyAPI.products({ search: productSearch }); setProducts(data.products || []) } catch { }
@@ -457,6 +539,29 @@ export default function Integrations() {
     return (
         <DashboardLayout title="Integrations" subtitle="Connect your platforms & tools">
             <SEOHead title="Integrations — Mantram AI" noIndex={true} />
+            <style>{`
+                @keyframes slideUp {
+                    from { transform: translateY(100%) scale(0.95); opacity: 0; }
+                    to { transform: translateY(0) scale(1); opacity: 1; }
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .animate-slide-up {
+                    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.2s ease-out forwards;
+                }
+                .animate-scale-in {
+                    animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                }
+            `}</style>
             {/* Brand Indicator */}
             {activeBrand && (
                 <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10">
@@ -651,12 +756,23 @@ export default function Integrations() {
                                                     className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/50 text-[var(--sys-text)] transition-all flex items-center gap-1.5 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">inventory_2</span> View Products
                                                 </button>
-                                                <button onClick={async () => {
-                                                    if (!confirm('Disconnect Shopify for this brand?')) return;
-                                                    setLoading(l => ({ ...l, shopify: true }));
-                                                    try { await shopifyAPI.disconnect(brandId); loadAllStatuses(); }
-                                                    catch (err) { alert(err.message); }
-                                                    finally { setLoading(l => ({ ...l, shopify: false })); }
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect Shopify',
+                                                        'Are you sure you want to disconnect Shopify for this brand?',
+                                                        async () => {
+                                                            setLoading(l => ({ ...l, shopify: true }));
+                                                            try {
+                                                                await shopifyAPI.disconnect(brandId);
+                                                                loadAllStatuses();
+                                                                setToast({ message: 'Shopify disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            } finally {
+                                                                setLoading(l => ({ ...l, shopify: false }));
+                                                            }
+                                                        }
+                                                    );
                                                 }}
                                                     className="px-4 py-2 rounded-xl text-sm text-primary hover:bg-[var(--sys-primary-dim)]">
                                                     Disconnect
@@ -754,7 +870,23 @@ export default function Integrations() {
                                                     {loading.wooSync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
                                                     Sync Now
                                                 </button>
-                                                <button onClick={async () => { if (!confirm('Disconnect WooCommerce?')) return; await wooAPI.disconnect(brandId); setWooStatus({ connected: false }); setWooKey(''); setWooSecret(''); }}
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect WooCommerce',
+                                                        'Are you sure you want to disconnect WooCommerce for this brand?',
+                                                        async () => {
+                                                            try {
+                                                                await wooAPI.disconnect(brandId);
+                                                                setWooStatus({ connected: false });
+                                                                setWooKey('');
+                                                                setWooSecret('');
+                                                                setToast({ message: 'WooCommerce disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            }
+                                                        }
+                                                    );
+                                                }}
                                                     className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
                                                     style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
                                                     <span className="material-symbols-outlined text-sm">link_off</span>
@@ -830,7 +962,21 @@ export default function Integrations() {
                                                     {loading.etsySync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
                                                     Sync Now
                                                 </button>
-                                                <button onClick={async () => { if (!confirm('Disconnect Etsy?')) return; await etsyAPI.disconnect(brandId); setEtsyStatus({ connected: false }); }}
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect Etsy',
+                                                        'Are you sure you want to disconnect Etsy for this brand?',
+                                                        async () => {
+                                                            try {
+                                                                await etsyAPI.disconnect(brandId);
+                                                                setEtsyStatus({ connected: false });
+                                                                setToast({ message: 'Etsy disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            }
+                                                        }
+                                                    );
+                                                }}
                                                     className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
                                                     style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
                                                     <span className="material-symbols-outlined text-sm">link_off</span>
@@ -1029,7 +1175,9 @@ export default function Integrations() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map(product => (
-                                    <div key={product._id} className="glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all group">
+                                    <div key={product._id} 
+                                        onClick={() => setSelectedProductDetails(product)}
+                                        className="glass-panel rounded-2xl overflow-hidden hover:border-primary/45 hover:scale-[1.01] transition-all group cursor-pointer">
                                         <div className="h-40 overflow-hidden bg-[var(--sys-surface)] flex items-center justify-center relative">
                                             {product.images?.[0]?.url ? (
                                                 <>
@@ -1150,6 +1298,173 @@ export default function Integrations() {
                     loadProducts();
                 }}
             />
+
+            {/* Product Details Modal (Enlarge & View Details & Delete) */}
+            {selectedProductDetails && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setSelectedProductDetails(null)} />
+                    <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-3xl flex flex-col md:flex-row max-h-[85vh] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                        {/* Image Section */}
+                        <div 
+                            onClick={() => setEnlargedImage(selectedProductDetails.images?.[0]?.url)}
+                            className="md:w-1/2 bg-[var(--sys-surface-dim)] flex items-center justify-center relative min-h-[300px] md:min-h-0 border-r border-[var(--sys-border)] cursor-zoom-in group/img overflow-hidden">
+                            {selectedProductDetails.images?.[0]?.url ? (
+                                <>
+                                    <img src={selectedProductDetails.images[0].url} alt={selectedProductDetails.title}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                        className="w-full h-full object-contain group-hover/img:scale-105 transition-transform duration-300" />
+                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                        <div className="bg-[#0c0f1a]/85 border border-primary/20 rounded-full p-2.5 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-primary text-xl">zoom_in</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                        <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                    <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Details Section */}
+                        <div className="md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                        {selectedProductDetails.source || 'Shopify'}
+                                    </span>
+                                    <button onClick={() => setSelectedProductDetails(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+                                <h3 className="text-xl font-bold text-[var(--sys-text)] mb-1 leading-tight">{selectedProductDetails.title}</h3>
+                                <p className="text-xs text-[var(--sys-text-muted)] mb-3">
+                                    Type: {selectedProductDetails.productType || 'N/A'} | Vendor: {selectedProductDetails.vendor || 'N/A'}
+                                </p>
+                                <div className="text-xl font-extrabold text-primary mb-4">
+                                    ₹{selectedProductDetails.variants?.[0]?.price || '—'}
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    {selectedProductDetails.description && (
+                                        <div>
+                                            <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1">Description</h4>
+                                            <p className="text-sm text-[var(--sys-text)] leading-relaxed max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                                                {selectedProductDetails.description}
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    {selectedProductDetails.tags?.length > 0 && (
+                                        <div>
+                                            <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1.5">Tags</h4>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {selectedProductDetails.tags.map((tag, i) => (
+                                                    <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="mt-8 pt-4 border-t border-[var(--sys-border)] flex items-center justify-between gap-4">
+                                <span className="text-[10px] text-[var(--sys-text-muted)]">
+                                    Synced: {new Date(selectedProductDetails.syncedAt || selectedProductDetails.createdAt).toLocaleDateString()}
+                                </span>
+                                <button
+                                    onClick={() => deleteProduct(selectedProductDetails._id)}
+                                    disabled={deletingId === selectedProductDetails._id}
+                                    className="px-4 py-2 bg-red-950/45 hover:bg-red-900 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                    {deletingId === selectedProductDetails._id ? (
+                                        <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Deleting...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-xs">delete</span> Delete Product</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Toast Notifications Container */}
+            {toast && (
+                <div className="fixed bottom-6 right-6 z-[100] animate-slide-up flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-[#0c0f1a]/95 border border-primary/20 backdrop-blur-md shadow-2xl">
+                    <span className="material-symbols-outlined text-primary text-xl">
+                        {toast.type === 'success' ? 'check_circle' : 'error'}
+                    </span>
+                    <span className="text-sm font-medium text-[var(--sys-text)]">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] ml-2 transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Immersive Image Lightbox Overlay */}
+            {enlargedImage && (
+                <div 
+                    onClick={() => setEnlargedImage(null)}
+                    className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 cursor-zoom-out animate-fade-in">
+                    <button 
+                        onClick={() => setEnlargedImage(null)}
+                        className="absolute top-6 right-6 text-white/60 hover:text-white transition-colors p-2 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer">
+                        <span className="material-symbols-outlined text-2xl">close</span>
+                    </button>
+                    <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center relative animate-scale-in">
+                        <img 
+                            src={enlargedImage} 
+                            alt="Enlarged product" 
+                            className="max-w-full max-h-[85vh] object-contain rounded-xl select-none" 
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirmation Modal */}
+            {confirmDialog && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmDialog(null)} />
+                    <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-scale-in space-y-6">
+                        <div className="flex items-start gap-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${confirmDialog.isDanger ? 'bg-red-500/10 text-red-500' : 'bg-primary/10 text-primary'}`}>
+                                <span className="material-symbols-outlined text-xl">
+                                    {confirmDialog.isDanger ? 'warning' : 'help'}
+                                </span>
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)]">{confirmDialog.title}</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{confirmDialog.message}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setConfirmDialog(null)}
+                                className="px-4 py-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] rounded-xl text-xs font-bold transition-all cursor-pointer">
+                                {confirmDialog.cancelText || 'Cancel'}
+                            </button>
+                            <button
+                                onClick={confirmDialog.onConfirm}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    confirmDialog.isDanger 
+                                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                        : 'bg-primary hover:opacity-90 text-black'
+                                }`}>
+                                {confirmDialog.confirmText || 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     )
 }
@@ -1181,9 +1496,25 @@ function PublishProductModal({ isOpen, onClose, brandId, onPublishSuccess }) {
     const [productType, setProductType] = useState('');
     const [status, setStatus] = useState('draft');
     const [tags, setTags] = useState('');
-    const [imageUrl, setImageUrl] = useState('');
     const [publishing, setPublishing] = useState(false);
     const [error, setError] = useState('');
+    const [uploadingFile, setUploadingFile] = useState(false);
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingFile(true);
+        setError('');
+        try {
+            const s3Url = await uploadFileToS3(file, 'shopify');
+            setImageUrl(s3Url);
+        } catch (err) {
+            setError(err.message || 'Image upload failed');
+        } finally {
+            setUploadingFile(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -1329,6 +1660,32 @@ function PublishProductModal({ isOpen, onClose, brandId, onPublishSuccess }) {
                         <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
                             placeholder="https://example.com/image.jpg"
                             className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Or Upload Image File</label>
+                        <div className="relative flex items-center justify-center border-2 border-dashed border-[var(--sys-border)] hover:border-primary/40 rounded-xl p-4 transition-all bg-[var(--sys-surface)] min-h-[90px]">
+                            <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingFile || publishing}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                            <div className="text-center space-y-1 pointer-events-none">
+                                {uploadingFile ? (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-primary">
+                                        <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                                        <span>Uploading to S3...</span>
+                                    </div>
+                                ) : imageUrl ? (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-emerald-400">
+                                        <span className="material-symbols-outlined text-lg">check_circle</span>
+                                        <span className="truncate max-w-[250px]">Image uploaded successfully</span>
+                                    </div>
+                                ) : (
+                                    <div className="text-[var(--sys-text-muted)]">
+                                        <span className="material-symbols-outlined text-3xl block mb-1">upload_file</span>
+                                        <span className="text-xs font-semibold">Click to upload JPG, PNG, WEBP</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-1">
