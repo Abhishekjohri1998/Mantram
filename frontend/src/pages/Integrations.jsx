@@ -648,7 +648,7 @@ export default function Integrations() {
                                                     {syncing ? 'Syncing...' : 'Sync Products'}
                                                 </button>
                                                 <button onClick={() => setActiveTab('products')}
-                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/50 text-[var(--sys-text)] transition-all flex items-center gap-1.5 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">inventory_2</span> View Products
                                                 </button>
                                                 <button onClick={async () => {
@@ -1030,12 +1030,25 @@ export default function Integrations() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map(product => (
                                     <div key={product._id} className="glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all group">
-                                        {product.images?.[0] && (
-                                            <div className="h-40 overflow-hidden bg-[var(--sys-surface)]">
-                                                <img src={product.images[0].url} alt={product.title}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                            </div>
-                                        )}
+                                        <div className="h-40 overflow-hidden bg-[var(--sys-surface)] flex items-center justify-center relative">
+                                            {product.images?.[0]?.url ? (
+                                                <>
+                                                    <img src={product.images[0].url} alt={product.title}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                    <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                                    <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="p-4">
                                             <h3 className="font-bold text-[var(--sys-text)] text-sm truncate">{product.title}</h3>
                                             <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{product.productType || product.vendor}</p>
