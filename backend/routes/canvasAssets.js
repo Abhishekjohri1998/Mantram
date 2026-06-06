@@ -1424,7 +1424,7 @@ Remember: landscape formats = horizontal split, portrait = vertical stack, squar
 Return ONLY valid JSON, no explanation text outside the JSON.`
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const modelsToTry = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro']
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
         let resp, data
 
         // Try models in order until one works

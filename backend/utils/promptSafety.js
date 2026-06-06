@@ -24,7 +24,7 @@ export async function checkPromptSafety(prompt) {
     try {
         const router = getRouter();
         const result = await router.generateText({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash',
             systemPrompt: SAFETY_SYSTEM,
             userPrompt: `Classify this video prompt:\n\n"${prompt.substring(0, 500)}"`,
             temperature: 0,
