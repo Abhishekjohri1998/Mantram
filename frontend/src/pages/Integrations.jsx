@@ -138,6 +138,7 @@ export default function Integrations() {
     const [shopifyMode, setShopifyMode] = useState('oauth') // Default to OAuth — Shopify reviewers expect standard OAuth
     const [shopifyError, setShopifyError] = useState('')
     const [products, setProducts] = useState([])
+    const [showPublishModal, setShowPublishModal] = useState(false)
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
     const [syncing, setSyncing] = useState(false)
@@ -941,10 +942,17 @@ export default function Integrations() {
                                     className="w-full pl-11 pr-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
                             </div>
                             {shopifyStatus.connected && (
-                                <button onClick={syncProducts} disabled={syncing}
-                                    className="btn-primary px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap">
-                                    {syncing ? '⏳ Syncing...' : '🔄 Sync from Shopify'}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowPublishModal(true)}
+                                        className="px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">add_box</span>
+                                        Create Live Listing
+                                    </button>
+                                    <button onClick={syncProducts} disabled={syncing}
+                                        className="btn-primary px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap">
+                                        {syncing ? '⏳ Syncing...' : '🔄 Sync from Shopify'}
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -1060,6 +1068,15 @@ export default function Integrations() {
                     </div>
                 </div>
             )}
+            {/* Create Live Listing Modal */}
+            <PublishProductModal
+                isOpen={showPublishModal}
+                onClose={() => setShowPublishModal(false)}
+                brandId={brandId}
+                onPublishSuccess={() => {
+                    loadProducts();
+                }}
+            />
         </DashboardLayout>
     )
 }
@@ -1079,4 +1096,191 @@ function StatusBadge({ status }) {
             {c.label}
         </span>
     )
+}
+
+function PublishProductModal({ isOpen, onClose, brandId, onPublishSuccess }) {
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [price, setPrice] = useState('');
+    const [sku, setSku] = useState('');
+    const [inventoryQuantity, setInventoryQuantity] = useState('10');
+    const [vendor, setVendor] = useState('');
+    const [productType, setProductType] = useState('');
+    const [status, setStatus] = useState('draft');
+    const [tags, setTags] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
+    const [publishing, setPublishing] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!title.trim()) {
+            setError('Product title is required');
+            return;
+        }
+        if (!price || isNaN(price) || parseFloat(price) <= 0) {
+            setError('Please enter a valid price greater than 0');
+            return;
+        }
+
+        setPublishing(true);
+        try {
+            const productData = {
+                title,
+                description,
+                vendor,
+                productType,
+                status,
+                tags,
+                variants: [
+                    {
+                        price: parseFloat(price),
+                        sku,
+                        inventoryQuantity: parseInt(inventoryQuantity) || 0
+                    }
+                ],
+                images: imageUrl ? [{ url: imageUrl, alt: title }] : []
+            };
+
+            await shopifyAPI.publishProduct(brandId, productData);
+            
+            // Clear fields
+            setTitle('');
+            setDescription('');
+            setPrice('');
+            setSku('');
+            setInventoryQuantity('10');
+            setVendor('');
+            setProductType('');
+            setStatus('draft');
+            setTags('');
+            setImageUrl('');
+            
+            onPublishSuccess();
+            onClose();
+        } catch (err) {
+            setError(err.message || 'Failed to publish product');
+        } finally {
+            setPublishing(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                <div className="flex items-center justify-between p-6 border-b border-[var(--sys-border)]">
+                    <div>
+                        <h3 className="text-xl font-bold text-[var(--sys-text)]">Create Live Shopify Listing</h3>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Publish a new product directly to your store</p>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm">error</span>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Product Title *</label>
+                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} required
+                            placeholder="e.g. Premium Cotton Unisex T-Shirt"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Description</label>
+                        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                            placeholder="Product description (HTML supported)..."
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none resize-none" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Price (INR) *</label>
+                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required
+                                placeholder="999.00"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Status</label>
+                            <select value={status} onChange={e => setStatus(e.target.value)}
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary focus:outline-none">
+                                <option value="draft">Draft (Unpublished)</option>
+                                <option value="active">Active (Live in Store)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">SKU</label>
+                            <input type="text" value={sku} onChange={e => setSku(e.target.value)}
+                                placeholder="TSHIRT-BLK-M"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Inventory Qty</label>
+                            <input type="number" value={inventoryQuantity} onChange={e => setInventoryQuantity(e.target.value)}
+                                placeholder="10"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Vendor</label>
+                            <input type="text" value={vendor} onChange={e => setVendor(e.target.value)}
+                                placeholder="e.g. My Brand"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Product Type</label>
+                            <input type="text" value={productType} onChange={e => setProductType(e.target.value)}
+                                placeholder="e.g. Apparel"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Image URL</label>
+                        <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Tags (comma-separated)</label>
+                        <input type="text" value={tags} onChange={e => setTags(e.target.value)}
+                            placeholder="summer, casual, new-arrival"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-[var(--sys-border)]">
+                        <button type="button" onClick={onClose} disabled={publishing}
+                            className="flex-1 py-3 rounded-xl text-sm font-medium border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer disabled:opacity-50">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={publishing}
+                            className="flex-1 py-3 rounded-xl text-sm font-medium bg-primary text-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+                            {publishing ? (
+                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Publishing...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-sm">publish</span> Publish Live</>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 }

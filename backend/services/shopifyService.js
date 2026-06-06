@@ -13,7 +13,7 @@ const backendHost = (config.backendUrl || 'https://api.mantram.ai').replace(/^ht
 export const shopify = shopifyApi({
     apiKey: config.shopify.apiKey || process.env.SHOPIFY_API_KEY || 'dummy',
     apiSecretKey: config.shopify.apiSecret || process.env.SHOPIFY_API_SECRET || 'dummy',
-    scopes: (config.shopify.scope || 'read_products,read_orders,read_customers,read_inventory').split(','),
+    scopes: (config.shopify.scope || 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products').split(','),
     hostName: backendHost,
     hostScheme: (config.backendUrl && config.backendUrl.startsWith('https')) ? 'https' : 'http',
     apiVersion: ApiVersion.January25,
@@ -23,7 +23,7 @@ export const shopify = shopifyApi({
 /**
  * Build Shopify OAuth authorization URL (Manual fallback)
  */
-export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products,read_orders,read_customers,read_inventory') {
+export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products') {
     const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return `https://${cleanDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
@@ -197,6 +197,21 @@ export async function fetchShopifyProduct(accessToken, shopDomain, productId) {
     
     const response = await client.get({
         path: `products/${productId}`
+    });
+    return response.body?.product;
+}
+
+/**
+ * Create a new product on Shopify using REST client
+ */
+export async function createShopifyProduct(accessToken, shopDomain, productData) {
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Rest({ session });
+    
+    const response = await client.post({
+        path: 'products',
+        data: { product: productData },
+        type: 'application/json'
     });
     return response.body?.product;
 }

@@ -22,7 +22,8 @@ import {
     syncStoreData,
     registerShopifyWebhooks,
     transformShopifyOrder,
-    transformShopifyCustomer
+    transformShopifyCustomer,
+    createShopifyProduct
 } from '../services/shopifyService.js';
 import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
@@ -428,6 +429,85 @@ async function signProductAssets(product) {
     }
     return p;
 }
+
+// POST /api/shopify/products/publish — Create a live product listing on Shopify and sync it locally
+router.post('/products/publish', protect, async (req, res) => {
+    try {
+        const { brandId, product } = req.body;
+        if (!product || !product.title) {
+            return res.status(400).json({ success: false, error: 'Product details with title are required' });
+        }
+
+        const query = {
+            user: req.user._id,
+            platform: 'shopify',
+            status: 'connected',
+        };
+        if (brandId) query.brand = brandId;
+
+        const integration = await Integration.findOne(query).select('+accessToken');
+        if (!integration || !integration.accessToken) {
+            return res.status(400).json({ success: false, error: 'Shopify is not connected for this brand.' });
+        }
+
+        const shopDomain = integration.platformData.shopDomain;
+        console.log(`🚀 Publishing product to Shopify (${shopDomain}): ${product.title}`);
+
+        // Prepare payload for Shopify Product creation API
+        const shopifyPayload = {
+            title: product.title,
+            body_html: product.description || '',
+            vendor: product.vendor || '',
+            product_type: product.productType || '',
+            status: product.status || 'draft',
+            variants: product.variants ? product.variants.map(v => ({
+                price: String(v.price),
+                compare_at_price: v.compareAtPrice ? String(v.compareAtPrice) : undefined,
+                sku: v.sku || '',
+                inventory_quantity: v.inventoryQuantity || 0,
+                inventory_management: v.inventoryQuantity !== undefined ? 'shopify' : undefined
+            })) : undefined,
+            images: product.images ? product.images.map(img => ({
+                src: img.url,
+                alt: img.alt || ''
+            })) : undefined
+        };
+
+        const createdShopifyProduct = await createShopifyProduct(
+            integration.accessToken,
+            shopDomain,
+            shopifyPayload
+        );
+
+        if (!createdShopifyProduct) {
+            return res.status(500).json({ success: false, error: 'Failed to create product on Shopify' });
+        }
+
+        // Transform and save/upsert in local database
+        const transformedProduct = transformShopifyProduct(createdShopifyProduct, req.user._id, brandId || integration.brand);
+        transformedProduct.source = 'shopify_public';
+        
+        const localProduct = await Product.findOneAndUpdate(
+            { brand: brandId || integration.brand, shopifyId: String(createdShopifyProduct.id) },
+            transformedProduct,
+            { upsert: true, new: true }
+        );
+
+        console.log(`✅ Product published and synced locally: ${localProduct.title} (${localProduct._id})`);
+
+        const signedProduct = await signProductAssets(localProduct);
+
+        res.json({
+            success: true,
+            message: 'Product published successfully to Shopify',
+            product: signedProduct
+        });
+
+    } catch (error) {
+        console.error('Shopify product publish error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
 
 // GET /api/shopify/products — List synced products
 router.get('/products', protect, async (req, res) => {

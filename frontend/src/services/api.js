@@ -401,6 +401,7 @@ export const shopify = {
         return apiFetch(`/shopify/products?${query}`);
     },
     getProduct: (id) => apiFetch(`/shopify/products/${id}`),
+    publishProduct: (brandId, product) => apiFetch('/shopify/products/publish', { method: 'POST', body: JSON.stringify({ brandId, product }) }),
     disconnect: (brandId) => apiFetch(`/shopify/disconnect${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' }),
     status: (brandId) => apiFetch(`/shopify/status${brandId ? `?brandId=${brandId}` : ''}`),
 };
