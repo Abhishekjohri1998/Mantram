@@ -87,13 +87,19 @@ async function run() {
         // ── Step 3: Seed Subscription Packages ────────────────────────
         console.log('\n📦 Step 3/3: Seeding subscription packages...');
         // Dynamically import to avoid duplicating the large PACKAGES array
-        const { default: seedPackagesData } = await import('./seedPackages.js').catch(() => ({ default: null }));
+        const { PACKAGES } = await import('./seedPackages.js').catch(() => ({}));
         
-        // If seedPackages exports its data, use it. Otherwise run seedPackages inline.
-        // For safety, we just call the model directly with a minimal set
         const pkgCount = await SubscriptionPackage.countDocuments();
         if (pkgCount > 0) {
             console.log(`  📦 ${pkgCount} subscription packages already exist. Skipping seed.`);
+        } else if (PACKAGES && PACKAGES.length > 0) {
+            console.log('  🧹 Seeding subscription packages...');
+            for (const pkg of PACKAGES) {
+                await SubscriptionPackage.create(pkg);
+                const priceStr = pkg.contactForPricing ? 'Contact for pricing' : `₹${pkg.pricing.monthly}/mo`;
+                console.log(`  📦 Seeded: ${pkg.name} (${priceStr}) — ${pkg.credits.monthly} credits/mo`);
+            }
+            console.log('  ✅ Subscription packages seeded successfully.');
         } else {
             console.log('  ⚠️ No packages found — run seedPackages.js separately if needed.');
         }

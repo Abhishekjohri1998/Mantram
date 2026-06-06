@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import connectDB from '../config/db.js';
 
@@ -230,4 +232,11 @@ async function seed() {
     }
 }
 
-seed();
+// Run only if executed directly
+const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const filePath = fileURLToPath(import.meta.url);
+if (nodePath && (nodePath === path.resolve(filePath) || nodePath.endsWith('seedPackages.js'))) {
+    seed();
+}
+
+export { PACKAGES, seed };
