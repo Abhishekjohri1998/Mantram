@@ -198,7 +198,6 @@ router.post('/connect', protect, async (req, res) => {
             {
                 user: req.user._id,
                 platform: 'shopify',
-                'platformData.shopDomain': cleanDomain,
                 ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
             },
             {
@@ -240,7 +239,6 @@ router.post('/connect-token', protect, async (req, res) => {
         const query = {
             user: req.user._id,
             platform: 'shopify',
-            'platformData.shopDomain': cleanDomain,
             ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
         };
 
