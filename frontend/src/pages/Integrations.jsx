@@ -224,37 +224,52 @@ export default function Integrations() {
         loadAllStatuses()
     }, [loadAllStatuses])
 
-    // Listen for OAuth popup messages (Social + GA + PM platforms + Shopify)
+    // Listen for OAuth popup messages (Social + GA + PM platforms + Shopify) via postMessage and BroadcastChannel
     useEffect(() => {
         const syncChannel = new BroadcastChannel('mantram_sync')
-        const handler = (e) => {
-            if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
-                setGaConnected(true); setGaEmail(e.data.email || ''); loadAllStatuses()
+        
+        const handleMessage = (data) => {
+            if (data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
+                setGaConnected(true); setGaEmail(data.email || ''); loadAllStatuses()
             }
-            if (e.data?.type === 'PM_PLATFORM_CONNECTED') {
+            if (data?.type === 'PM_PLATFORM_CONNECTED') {
                 setConnectingPlatform(null); loadAllStatuses()
-                syncChannel.postMessage(e.data) // Notify other tabs
             }
-            if (e.data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
+            if (data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
                 loadAllStatuses()
-                syncChannel.postMessage(e.data) // Notify other tabs
             }
-            if (e.data?.type === 'SOCIAL_PLATFORM_DENIED') {
+            if (data?.type === 'SOCIAL_PLATFORM_DENIED') {
                 // User cancelled Twitter (or other) OAuth — clear loading spinner
-                const p = e.data.platform
+                const p = data.platform
                 if (p) setLoading(l => ({ ...l, [p]: false }))
             }
-            if (e.data?.type === 'SHOPIFY_CONNECTED') {
+            if (data?.type === 'SHOPIFY_CONNECTED') {
                 loadAllStatuses()
-                syncChannel.postMessage(e.data) // Notify other tabs
             }
-            if (e.data?.type === 'SHOPIFY_FAILED') {
-                setShopifyError(e.data.detail || 'OAuth connection failed. Please try again.')
+            if (data?.type === 'SHOPIFY_FAILED') {
+                setShopifyError(data.detail || 'OAuth connection failed. Please try again.')
             }
         }
-        window.addEventListener('message', handler)
+
+        const windowHandler = (e) => {
+            if (e.origin !== window.location.origin) return
+            handleMessage(e.data)
+            // Notify other open tabs/windows
+            if (e.data?.type) {
+                syncChannel.postMessage(e.data)
+            }
+        }
+
+        const channelHandler = (e) => {
+            handleMessage(e.data)
+        }
+
+        window.addEventListener('message', windowHandler)
+        syncChannel.addEventListener('message', channelHandler)
+
         return () => {
-            window.removeEventListener('message', handler)
+            window.removeEventListener('message', windowHandler)
+            syncChannel.removeEventListener('message', channelHandler)
             syncChannel.close()
         }
     }, [loadAllStatuses])
@@ -268,19 +283,35 @@ export default function Integrations() {
         const error = params.get('error')
         const detail = params.get('detail')
 
-        if (window.opener) {
+        // We are inside a popup if opener exists or if the window name matches a popup signature
+        const isPopup = window.opener || window.name === 'shopify_oauth_popup' || window.name.startsWith('connect_')
+
+        if (isPopup) {
+            const syncChannel = new BroadcastChannel('mantram_sync')
+            
             if (socialStatus === 'success') {
-                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_CONNECTED', platform }, window.location.origin)
+                const msg = { type: 'SOCIAL_PLATFORM_CONNECTED', platform }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             } else if (socialStatus === 'denied' || socialStatus === 'processing_failed' || socialStatus === 'invalid_request') {
-                // User cancelled Twitter auth or another error — notify parent to stop spinner
-                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }, window.location.origin)
+                const msg = { type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             } else if (shopifyStatus === 'connected') {
-                window.opener.postMessage({ type: 'SHOPIFY_CONNECTED' }, window.location.origin)
+                const msg = { type: 'SHOPIFY_CONNECTED' }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             } else if (error === 'shopify_auth_failed') {
-                window.opener.postMessage({ type: 'SHOPIFY_FAILED', detail }, window.location.origin)
+                const msg = { type: 'SHOPIFY_FAILED', detail }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             }
         }
@@ -403,7 +434,7 @@ export default function Integrations() {
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connect(shopifyDomain, brandId)
-                if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
+                if (data.authUrl) window.open(data.authUrl, 'shopify_oauth_popup', 'width=600,height=700')
             } catch (err) { setShopifyError(err.message || 'OAuth connection failed. Please try again.') }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         }
@@ -412,7 +443,7 @@ export default function Integrations() {
         setSyncing(true)
         try {
             const data = await shopifyAPI.sync(brandId)
-            alert(` Synced ${data.synced} products from Shopify!`); loadProducts()
+            alert(` Synced ${data.products || 0} products from Shopify!`); loadProducts()
         } catch (err) { alert(`Sync failed: ${err.message}`) }
         finally { setSyncing(false) }
     }

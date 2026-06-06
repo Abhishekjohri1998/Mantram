@@ -69,7 +69,7 @@ export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250)
     const allProducts = [];
     let response = await client.get({
         path: 'products',
-        query: { limit, status: 'active' }
+        query: { limit }
     });
     
     if (response.body?.products) allProducts.push(...response.body.products);
