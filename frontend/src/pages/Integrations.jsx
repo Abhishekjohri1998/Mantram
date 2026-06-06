@@ -152,6 +152,19 @@ export default function Integrations() {
     const [confirmDialog, setConfirmDialog] = useState(null)
     const [enlargedImage, setEnlargedImage] = useState(null)
 
+    const [isEditingProduct, setIsEditingProduct] = useState(false)
+    const [editTitle, setEditTitle] = useState('')
+    const [editDescription, setEditDescription] = useState('')
+    const [editPrice, setEditPrice] = useState('')
+    const [editVendor, setEditVendor] = useState('')
+    const [editProductType, setEditProductType] = useState('')
+    const [editSku, setEditSku] = useState('')
+    const [editInventoryQuantity, setEditInventoryQuantity] = useState('')
+    const [editTags, setEditTags] = useState('')
+    const [editImageUrl, setEditImageUrl] = useState('')
+    const [savingProduct, setSavingProduct] = useState(false)
+    const [uploadingEditImage, setUploadingEditImage] = useState(false)
+
     const showConfirm = (title, message, onConfirm, isDanger = true, confirmText = 'Confirm', cancelText = 'Cancel') => {
         setConfirmDialog({
             title,
@@ -164,6 +177,85 @@ export default function Integrations() {
                 setConfirmDialog(null);
             }
         });
+    };
+
+    const startEditingProduct = () => {
+        setEditTitle(selectedProductDetails.title || '');
+        setEditDescription(selectedProductDetails.description || '');
+        setEditPrice(selectedProductDetails.variants?.[0]?.price || selectedProductDetails.price?.amount || '');
+        setEditVendor(selectedProductDetails.vendor || '');
+        setEditProductType(selectedProductDetails.productType || '');
+        setEditSku(selectedProductDetails.variants?.[0]?.sku || '');
+        setEditInventoryQuantity(selectedProductDetails.variants?.[0]?.inventoryQuantity || '');
+        setEditTags(selectedProductDetails.tags?.join(', ') || '');
+        setEditImageUrl(selectedProductDetails.images?.[0]?.url || '');
+        setIsEditingProduct(true);
+    };
+
+    const handleEditImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingEditImage(true);
+        try {
+            const s3Url = await uploadFileToS3(file, 'shopify');
+            setEditImageUrl(s3Url);
+        } catch (err) {
+            setToast({ message: `Image upload failed: ${err.message}`, type: 'error' });
+        } finally {
+            setUploadingEditImage(false);
+        }
+    };
+
+    const saveProductDetails = async () => {
+        if (!editTitle.trim()) {
+            setToast({ message: 'Product title is required', type: 'error' });
+            return;
+        }
+        if (!editPrice || isNaN(editPrice) || parseFloat(editPrice) < 0) {
+            setToast({ message: 'Please enter a valid price', type: 'error' });
+            return;
+        }
+
+        setSavingProduct(true);
+        try {
+            const parsedTags = editTags.split(',').map(t => t.trim()).filter(Boolean);
+            const updatedData = {
+                title: editTitle,
+                description: editDescription,
+                vendor: editVendor,
+                productType: editProductType,
+                tags: parsedTags,
+                price: {
+                    amount: parseFloat(editPrice),
+                    currency: selectedProductDetails.price?.currency || 'INR'
+                },
+                variants: [
+                    {
+                        ...selectedProductDetails.variants?.[0],
+                        price: parseFloat(editPrice),
+                        sku: editSku,
+                        inventoryQuantity: parseInt(editInventoryQuantity) || 0
+                    }
+                ],
+                images: editImageUrl ? [{ url: editImageUrl, alt: editTitle }] : []
+            };
+
+            const response = await productsAPI.update(selectedProductDetails._id, updatedData);
+            setToast({ message: 'Product updated successfully!', type: 'success' });
+            setSelectedProductDetails(response.product || { ...selectedProductDetails, ...updatedData });
+            setIsEditingProduct(false);
+            loadProducts();
+        } catch (err) {
+            setToast({ message: `Failed to update product: ${err.message}`, type: 'error' });
+        } finally {
+            setSavingProduct(false);
+        }
+    };
+
+    const closeDetailsModal = () => {
+        setSelectedProductDetails(null);
+        setIsEditingProduct(false);
     };
 
     useEffect(() => {
@@ -1302,95 +1394,211 @@ export default function Integrations() {
             {/* Product Details Modal (Enlarge & View Details & Delete) */}
             {selectedProductDetails && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setSelectedProductDetails(null)} />
+                    <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={closeDetailsModal} />
                     <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-3xl flex flex-col md:flex-row max-h-[85vh] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
                         {/* Image Section */}
                         <div 
-                            onClick={() => setEnlargedImage(selectedProductDetails.images?.[0]?.url)}
-                            className="md:w-1/2 bg-[var(--sys-surface-dim)] flex items-center justify-center relative min-h-[300px] md:min-h-0 border-r border-[var(--sys-border)] cursor-zoom-in group/img overflow-hidden">
-                            {selectedProductDetails.images?.[0]?.url ? (
+                            onClick={() => {
+                                if (!isEditingProduct) {
+                                    setEnlargedImage(editImageUrl || selectedProductDetails.images?.[0]?.url);
+                                }
+                            }}
+                            className={`md:w-1/2 bg-[var(--sys-surface-dim)] flex items-center justify-center relative min-h-[300px] md:min-h-0 border-r border-[var(--sys-border)] overflow-hidden ${
+                                isEditingProduct ? 'relative group/editimg' : 'cursor-zoom-in group/img'
+                            }`}>
+                            {isEditingProduct ? (
                                 <>
-                                    <img src={selectedProductDetails.images[0].url} alt={selectedProductDetails.title}
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.nextSibling.style.display = 'flex';
-                                        }}
-                                        className="w-full h-full object-contain group-hover/img:scale-105 transition-transform duration-300" />
-                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                        <div className="bg-[#0c0f1a]/85 border border-primary/20 rounded-full p-2.5 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-primary text-xl">zoom_in</span>
+                                    {editImageUrl ? (
+                                        <img src={editImageUrl} alt="" className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-6xl">inventory_2</span>
                                         </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/editimg:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                        <span className="material-symbols-outlined text-white text-3xl">upload_file</span>
+                                        <span className="text-xs text-white font-bold">Upload New Image</span>
+                                        <input type="file" accept="image/*" onChange={handleEditImageUpload} disabled={uploadingEditImage || savingProduct}
+                                            className="absolute inset-0 opacity-0 cursor-pointer" />
                                     </div>
-                                    <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
-                                        <span className="material-symbols-outlined text-6xl">inventory_2</span>
-                                    </div>
+                                    {uploadingEditImage && (
+                                        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined animate-spin text-primary text-3xl">progress_activity</span>
+                                            <span className="text-xs text-primary font-bold">Uploading to S3...</span>
+                                        </div>
+                                    )}
                                 </>
                             ) : (
-                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
-                                    <span className="material-symbols-outlined text-6xl">inventory_2</span>
-                                </div>
+                                selectedProductDetails.images?.[0]?.url ? (
+                                    <>
+                                        <img src={selectedProductDetails.images[0].url} alt={selectedProductDetails.title}
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                            className="w-full h-full object-contain group-hover/img:scale-105 transition-transform duration-300" />
+                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <div className="bg-[#0c0f1a]/85 border border-primary/20 rounded-full p-2.5 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-primary text-xl">zoom_in</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                        <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                    </div>
+                                )
                             )}
                         </div>
 
                         {/* Details Section */}
                         <div className="md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                        {selectedProductDetails.source || 'Shopify'}
-                                    </span>
-                                    <button onClick={() => setSelectedProductDetails(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
-                                        <span className="material-symbols-outlined text-lg">close</span>
-                                    </button>
-                                </div>
-                                <h3 className="text-xl font-bold text-[var(--sys-text)] mb-1 leading-tight">{selectedProductDetails.title}</h3>
-                                <p className="text-xs text-[var(--sys-text-muted)] mb-3">
-                                    Type: {selectedProductDetails.productType || 'N/A'} | Vendor: {selectedProductDetails.vendor || 'N/A'}
-                                </p>
-                                <div className="text-xl font-extrabold text-primary mb-4">
-                                    ₹{selectedProductDetails.variants?.[0]?.price || '—'}
-                                </div>
-                                
-                                <div className="space-y-4">
-                                    {selectedProductDetails.description && (
-                                        <div>
-                                            <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1">Description</h4>
-                                            <p className="text-sm text-[var(--sys-text)] leading-relaxed max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
-                                                {selectedProductDetails.description}
-                                            </p>
+                            {isEditingProduct ? (
+                                <div className="space-y-4 flex-1 flex flex-col justify-between">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-primary uppercase">Edit Product Details</span>
+                                            <button onClick={closeDetailsModal} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
                                         </div>
-                                    )}
-                                    
-                                    {selectedProductDetails.tags?.length > 0 && (
-                                        <div>
-                                            <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1.5">Tags</h4>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {selectedProductDetails.tags.map((tag, i) => (
-                                                    <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
-                                                        {tag}
-                                                    </span>
-                                                ))}
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Product Title *</label>
+                                            <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary focus:outline-none" />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Vendor</label>
+                                                <input type="text" value={editVendor} onChange={e => setEditVendor(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Product Type</label>
+                                                <input type="text" value={editProductType} onChange={e => setEditProductType(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
 
-                            <div className="mt-8 pt-4 border-t border-[var(--sys-border)] flex items-center justify-between gap-4">
-                                <span className="text-[10px] text-[var(--sys-text-muted)]">
-                                    Synced: {new Date(selectedProductDetails.syncedAt || selectedProductDetails.createdAt).toLocaleDateString()}
-                                </span>
-                                <button
-                                    onClick={() => deleteProduct(selectedProductDetails._id)}
-                                    disabled={deletingId === selectedProductDetails._id}
-                                    className="px-4 py-2 bg-red-950/45 hover:bg-red-900 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
-                                    {deletingId === selectedProductDetails._id ? (
-                                        <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Deleting...</>
-                                    ) : (
-                                        <><span className="material-symbols-outlined text-xs">delete</span> Delete Product</>
-                                    )}
-                                </button>
-                            </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Price *</label>
+                                                <input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">SKU</label>
+                                                <input type="text" value={editSku} onChange={e => setEditSku(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Qty</label>
+                                                <input type="number" value={editInventoryQuantity} onChange={e => setEditInventoryQuantity(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Description</label>
+                                            <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none resize-none custom-scrollbar" />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Tags (comma-separated)</label>
+                                            <input type="text" value={editTags} onChange={e => setEditTags(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-4 border-t border-[var(--sys-border)] mt-4">
+                                        <button onClick={() => setIsEditingProduct(false)} disabled={savingProduct}
+                                            className="flex-1 py-2 rounded-xl text-xs font-bold border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                                            Cancel
+                                        </button>
+                                        <button onClick={saveProductDetails} disabled={savingProduct || uploadingEditImage}
+                                            className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-black hover:opacity-90 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                            {savingProduct ? (
+                                                <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Saving...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-xs">save</span> Save</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                {selectedProductDetails.source || 'Shopify'}
+                                            </span>
+                                            <button onClick={closeDetailsModal} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-[var(--sys-text)] mb-1 leading-tight">{selectedProductDetails.title}</h3>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-3">
+                                            Type: {selectedProductDetails.productType || 'N/A'} | Vendor: {selectedProductDetails.vendor || 'N/A'}
+                                        </p>
+                                        <div className="text-xl font-extrabold text-primary mb-4">
+                                            ₹{selectedProductDetails.variants?.[0]?.price || selectedProductDetails.price?.amount || '—'}
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            {selectedProductDetails.description && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1">Description</h4>
+                                                    <p className="text-sm text-[var(--sys-text)] leading-relaxed max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                                                        {selectedProductDetails.description}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            
+                                            {selectedProductDetails.tags?.length > 0 && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1.5">Tags</h4>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {selectedProductDetails.tags.map((tag, i) => (
+                                                            <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 pt-4 border-t border-[var(--sys-border)] flex items-center justify-between gap-4">
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">
+                                            Synced: {new Date(selectedProductDetails.syncedAt || selectedProductDetails.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={startEditingProduct}
+                                                className="px-4 py-2 bg-[var(--sys-surface)] hover:bg-[var(--sys-border)] border border-[var(--sys-border)] text-[var(--sys-text)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                                                <span className="material-symbols-outlined text-xs">edit</span> Edit Details
+                                            </button>
+                                            <button
+                                                onClick={() => deleteProduct(selectedProductDetails._id)}
+                                                disabled={deletingId === selectedProductDetails._id}
+                                                className="px-4 py-2 bg-red-950/45 hover:bg-red-900 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                                {deletingId === selectedProductDetails._id ? (
+                                                    <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Deleting...</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-xs">delete</span> Delete Product</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1496,6 +1704,7 @@ function PublishProductModal({ isOpen, onClose, brandId, onPublishSuccess }) {
     const [productType, setProductType] = useState('');
     const [status, setStatus] = useState('draft');
     const [tags, setTags] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
     const [publishing, setPublishing] = useState(false);
     const [error, setError] = useState('');
     const [uploadingFile, setUploadingFile] = useState(false);
