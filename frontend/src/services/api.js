@@ -1408,27 +1408,50 @@ export const media = {
 };
 
 /**
- * Upload a File object directly to S3 via presigned PUT (no base64, no Node proxying).
+ * Helper to convert file to data URL
+ */
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Upload a File object directly to S3.
+ * Attempts to upload via the Node backend /api/media/upload (base64) to bypass browser CORS.
+ * Falls back to direct presigned PUT to S3 if the proxy upload fails.
  * @param {File} file - The browser File object from an <input type="file">
  * @param {string} folder - S3 folder prefix (default: 'refs')
  * @returns {Promise<string>} - The permanent S3 URL
  */
 export async function uploadFileToS3(file, folder = 'refs') {
-    // 1. Get presigned PUT URL from backend
-    const { uploadUrl, s3Url } = await media.presignUpload({
-        fileName: file.name,
-        contentType: file.type || 'image/jpeg',
-        folder,
-    });
-    // 2. PUT the raw binary directly to S3
-    const putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'image/jpeg' },
-        body: file,
-    });
-    if (!putRes.ok) throw new Error(`S3 upload failed: ${putRes.status}`);
-    return s3Url;
+    try {
+        const dataUrl = await fileToDataUrl(file);
+        const res = await media.upload({ imageData: dataUrl, folder });
+        if (!res.success) throw new Error(res.error || 'Upload via backend failed');
+        return res.url;
+    } catch (err) {
+        console.warn('S3 upload proxy failed, attempting fallback direct presigned PUT:', err);
+        // 1. Get presigned PUT URL from backend
+        const { uploadUrl, s3Url } = await media.presignUpload({
+            fileName: file.name,
+            contentType: file.type || 'image/jpeg',
+            folder,
+        });
+        // 2. PUT the raw binary directly to S3
+        const putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'image/jpeg' },
+            body: file,
+        });
+        if (!putRes.ok) throw new Error(`S3 upload failed: ${putRes.status}`);
+        return s3Url;
+    }
 }
+
 
 // ============ Studio Reports API (Unified Branded Reports) ============
 export const studioReports = {
