@@ -6,7 +6,22 @@
  * 2. Fallback: Gemini native YouTube URL analysis (no transcript needed — Gemini watches the video)
  */
 
-import { YoutubeTranscript } from 'youtube-transcript/dist/youtube-transcript.esm.js';
+let YoutubeTranscript;
+try {
+    // Try standard ESM subpath import
+    const mod = await import('youtube-transcript/dist/youtube-transcript.esm.js');
+    YoutubeTranscript = mod.YoutubeTranscript;
+} catch (err) {
+    try {
+        // Try main package import (if package exports are properly mapped in npm release)
+        const mod = await import('youtube-transcript');
+        YoutubeTranscript = mod.YoutubeTranscript || mod.default?.YoutubeTranscript || mod.default || mod;
+    } catch (err2) {
+        // Ultimate relative path fallback to bypass strict package exports checking
+        const mod = await import('../../node_modules/youtube-transcript/dist/youtube-transcript.esm.js');
+        YoutubeTranscript = mod.YoutubeTranscript;
+    }
+}
 
 /**
  * Extract video ID from YouTube URL in any format:
