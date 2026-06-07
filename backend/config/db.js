@@ -4,45 +4,49 @@ import config from './env.js';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3000; // 3 seconds
 let reconnectHandlerRegistered = false;
+let connectionPromise = null;
+let isConnected = false;
 
 const connectDB = async (attempt = 1) => {
-    // Prevent concurrent connection attempts or redundant calls
+    // Enforce strict singleton connection pattern
+    if (isConnected) return mongoose.connection;
     if (mongoose.connection.readyState === 1) {
+        isConnected = true;
         return mongoose.connection;
     }
-    if (mongoose.connection.readyState === 2) {
-        console.log('⏳ MongoDB connection already in progress...');
-        return mongoose.connection;
+    
+    // If a connection is already in progress, await that exact promise
+    if (connectionPromise) {
+        return connectionPromise;
     }
 
     try {
-        const conn = await mongoose.connect(config.mongoUri, {
-            serverSelectionTimeoutMS: 5000,            // 5s to pick a server
-            socketTimeoutMS: 45000,            // 45s socket timeout (fail faster under load)
+        connectionPromise = mongoose.connect(config.mongoUri, {
+            maxPoolSize: 3,                    // Low pool — most ops are sequential, not concurrent
+            minPoolSize: 0,                    // No idle connections — create on demand
+            serverSelectionTimeoutMS: 5000,    // 5s to pick a server
+            socketTimeoutMS: 45000,            // 45s socket timeout
             connectTimeoutMS: 30000,           // 30s initial connect
-            heartbeatFrequencyMS: 10000,       // heartbeat every 10s to keep alive
-            maxPoolSize: process.env.SEED_MODE === 'true' ? 2 : 15,
-            minPoolSize: process.env.SEED_MODE === 'true' ? 1 : 2,
-            maxIdleTimeMS: 30000,              // close idle connections faster (30s)
-            readPreference: 'secondaryPreferred', // Phase 5: Offload reads to replicas
-            w: 'majority',                      // Phase 5: Ensure data consistency across replicas
+            heartbeatFrequencyMS: 30000,       // heartbeat every 30s (was 10s — less monitoring overhead)
+            maxIdleTimeMS: 10000,              // close idle connections after 10s (aggressive cleanup)
+            readPreference: 'primary',         // M0 Free Tier: no benefit from secondaries, saves ~66% connections
+            autoSelectFamily: false,           // Fix for SSL alert 80 / IP resolving issues
         });
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+        
+        const conn = await connectionPromise;
+        isConnected = conn.connections[0].readyState === 1;
 
-        // Auto-reconnect on disconnect (unless shutting down)
-        // Guard: register only once to prevent exponential handler accumulation
+        // Register event logging only once
         if (!reconnectHandlerRegistered) {
+            mongoose.connection.on('connected', () =>
+                console.log(`[DB] Pool connected | pid: ${process.pid}`)
+            );
             mongoose.connection.on('disconnected', () => {
-                if (mongoose.connection.isShuttingDown) return;
-                // Only trigger reconnect if fully disconnected and no connection is in progress
-                if (mongoose.connection.readyState === 0) {
-                    console.warn('⚠️  MongoDB disconnected. Attempting reconnect...');
-                    setTimeout(() => connectDB(), RETRY_DELAY);
-                }
+                isConnected = false;
+                console.warn(`[DB] Disconnected | pid: ${process.pid}`);
             });
-
             mongoose.connection.on('error', (err) => {
-                console.error('❌ MongoDB connection error:', err.message);
+                console.error(`[DB] Connection error | pid: ${process.pid} |`, err.message);
             });
 
             reconnectHandlerRegistered = true;
@@ -50,6 +54,8 @@ const connectDB = async (attempt = 1) => {
 
         return conn;
     } catch (error) {
+        connectionPromise = null; // Clear the cache on failure so we can retry
+        isConnected = false;
         console.error(`❌ MongoDB Error (attempt ${attempt}/${MAX_RETRIES}): ${error.message}`);
 
         if (attempt < MAX_RETRIES) {
@@ -58,11 +64,7 @@ const connectDB = async (attempt = 1) => {
             return connectDB(attempt + 1);
         }
 
-        console.log("process.execArgv:", process.execArgv);
-        console.log("config.nodeEnv:", config.nodeEnv);
-        // Don't crash in dev or under watch mode — allow running without DB for local run
         const isWatchMode = process.execArgv.some(arg => arg.startsWith('--watch')) || process.env.NODE_ENV === 'development';
-        console.log("isWatchMode:", isWatchMode);
         if (config.nodeEnv === 'production' && !isWatchMode) {
             process.exit(1);
         }

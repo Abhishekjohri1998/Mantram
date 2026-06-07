@@ -13,7 +13,7 @@ const backendHost = (config.backendUrl || 'https://api.mantram.ai').replace(/^ht
 export const shopify = shopifyApi({
     apiKey: config.shopify.apiKey || process.env.SHOPIFY_API_KEY || 'dummy',
     apiSecretKey: config.shopify.apiSecret || process.env.SHOPIFY_API_SECRET || 'dummy',
-    scopes: (config.shopify.scope || 'read_products,read_orders,read_customers,read_inventory').split(','),
+    scopes: (config.shopify.scope || 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products').split(','),
     hostName: backendHost,
     hostScheme: (config.backendUrl && config.backendUrl.startsWith('https')) ? 'https' : 'http',
     apiVersion: ApiVersion.January25,
@@ -23,7 +23,7 @@ export const shopify = shopifyApi({
 /**
  * Build Shopify OAuth authorization URL (Manual fallback)
  */
-export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_products,read_orders,read_customers,read_inventory') {
+export function getShopifyAuthUrl(shopDomain, clientId, redirectUri, scopes = 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products') {
     const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
     return `https://${cleanDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
@@ -69,7 +69,7 @@ export async function fetchShopifyProducts(accessToken, shopDomain, limit = 250)
     const allProducts = [];
     let response = await client.get({
         path: 'products',
-        query: { limit, status: 'active' }
+        query: { limit }
     });
     
     if (response.body?.products) allProducts.push(...response.body.products);
@@ -199,6 +199,56 @@ export async function fetchShopifyProduct(accessToken, shopDomain, productId) {
         path: `products/${productId}`
     });
     return response.body?.product;
+}
+
+/**
+ * Create a new product on Shopify using REST client
+ */
+export async function createShopifyProduct(accessToken, shopDomain, productData) {
+    const session = getShopifySession(shopDomain, accessToken);
+    const client = new shopify.clients.Graphql({ session });
+    
+    const input = {
+        title: productData.title,
+        descriptionHtml: productData.body_html || '',
+        vendor: productData.vendor || '',
+        productType: productData.product_type || '',
+        status: (productData.status || 'draft').toUpperCase()
+    };
+    
+    const mutation = `
+        mutation productCreate($input: ProductInput!) {
+            productCreate(input: $input) {
+                product {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+    `;
+    
+    const response = await client.request(mutation, { variables: { input } });
+    
+    if (response.data?.productCreate?.userErrors?.length > 0) {
+        throw new Error(response.data.productCreate.userErrors[0].message);
+    }
+    
+    const productId = response.data?.productCreate?.product?.id?.split('/').pop();
+    
+    // Return a REST-formatted object for compatibility with transformShopifyProduct
+    return {
+        id: productId,
+        title: productData.title,
+        body_html: productData.body_html,
+        vendor: productData.vendor,
+        product_type: productData.product_type,
+        status: productData.status,
+        variants: [],
+        images: []
+    };
 }
 
 /**

@@ -64,11 +64,11 @@ export async function generateImageWithVertex(
     let mappedModelId = modelId;
     if (modelId === 'gemini-3.1-flash-image-preview') {
         const hasReferenceImages = parts.some(p => p.inlineData);
-        mappedModelId = hasReferenceImages ? 'gemini-2.0-flash-exp' : 'imagen-3.0-generate-002';
+        mappedModelId = hasReferenceImages ? 'gemini-2.5-flash' : 'imagen-3.0-generate-002';
     }
 
-    // gemini-2.0-flash-exp does not support imageSize token
-    if (mappedModelId === 'gemini-2.0-flash-exp' && generationConfig.imageConfig?.imageSize) {
+    // gemini-2.5-flash does not support imageSize token
+    if (mappedModelId === 'gemini-2.5-flash' && generationConfig.imageConfig?.imageSize) {
         delete generationConfig.imageConfig.imageSize;
     }
 

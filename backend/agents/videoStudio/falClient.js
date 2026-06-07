@@ -173,7 +173,7 @@ export const MODEL_CAPABILITIES = {
         id: 'gemini-flash', name: 'Gemini Flash Video', icon: '⚡', provider: 'atlascloud',
         description: 'Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration',
         bestFor: 'High-speed cinematic actions, visual storytelling, text/image-to-video',
-        duration: { min: 4, max: 10, native: 6, step: 2 },
+        duration: { min: 4, max: 90, native: 6, step: 2 },
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
         features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
         maxReferenceImages: 1, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,

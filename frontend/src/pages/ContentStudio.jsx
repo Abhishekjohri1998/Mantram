@@ -4735,7 +4735,12 @@ export default function ContentStudio() {
     const { activeBrand } = useBrand()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [step, setStep] = useState(0)   // 0=brief, 1=refinement, 2=brief-review, 5=result, 6=PR, 7=product, 8=youtube, 9=yt-result, 10=yt-seo, 11=yt-seo-result, 12=blog wizard, 13=blog editor, 14=custom blog
+    // Restore step from sessionStorage — but only for wizard steps (0-2).
+    // Result steps (5+) reset to 0 because the result data isn't persisted.
+    const [step, setStep] = useState(() => {
+        const saved = parseInt(sessionStorage.getItem('cnt-step'), 10)
+        return !isNaN(saved) && saved >= 0 && saved <= 2 ? saved : 0
+    })   // 0=brief, 1=refinement, 2=brief-review, 5=result, 6=PR, 7=product, 8=youtube, 9=yt-result, 10=yt-seo, 11=yt-seo-result, 12=blog wizard, 13=blog editor, 14=custom blog
     const [goal, setGoal] = useState(null)
     const [subType, setSubType] = useState(null)
     const [channel, setChannel] = useState(null)
@@ -4772,7 +4777,7 @@ export default function ContentStudio() {
     const [inlineVisualActive, setInlineVisualActive] = useState(false)
     const [inlineVisualProgress, setInlineVisualProgress] = useState(0)
     const [inlineVisualUrl, setInlineVisualUrl] = useState(null)
-    const [showHistory, setShowHistory] = useState(false)
+    const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('cnt-showHistory') === 'true')
     const [photoshootImage, setPhotoshootImage] = useState(null)
     const [modelOverride, setModelOverride] = useState('auto')
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -4806,6 +4811,10 @@ export default function ContentStudio() {
             .then(data => { if (data.providers?.length) setAvailableProviders(data.providers) })
             .catch(() => { })
     }, [])
+
+    // ── Persist wizard state to sessionStorage ──
+    useEffect(() => { sessionStorage.setItem('cnt-step', String(step)) }, [step])
+    useEffect(() => { sessionStorage.setItem('cnt-showHistory', showHistory ? 'true' : 'false') }, [showHistory])
 
     // Read URL params on mount (from Calendar, Dashboard, etc.)
     useEffect(() => {

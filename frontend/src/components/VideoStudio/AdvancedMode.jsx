@@ -22,7 +22,7 @@ async function api(path, opts = {}) {
 }
 
 const MODELS = {
-    'gemini-flash': { id: 'gemini-flash', name: 'Gemini Flash Video', msIcon: 'flash_on', durs: [4, 6, 8, 10], ratios: ['16:9', '9:16'], res: ['4k', '1080p', '720p'], has: { firstFrame: true, refImages: false, audio: false, quality: false }, cost: 0.12, desc: "Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration, 4K." },
+    'gemini-flash': { id: 'gemini-flash', name: 'Gemini Flash Video', msIcon: 'flash_on', durs: [4, 6, 8, 10, 15, 20, 30, 45, 60, 90], ratios: ['16:9', '9:16'], res: ['4k', '1080p', '720p'], has: { firstFrame: true, refImages: false, audio: false, quality: false }, cost: 0.12, desc: "Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration, 4K." },
     'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
     'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
     'seedance-2.0-fast': { id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.05, desc: "Ultra-fast generation for testing and rapid prototyping." },
@@ -363,21 +363,23 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
     const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
     
-    const [gridVideos, setGridVideos] = useState(() => {
-        return projects.filter(isCompleted)
-    })
+    const [gridVideos, setGridVideos] = useState([])
 
-    // Sync if parent projects prop updates (on mount / history refresh)
-    // Also updates existing entries that transitioned from generating → completed
+    // Sync if parent projects prop updates (on mount / history refresh / tab switch)
+    // Always rebuilds from incoming projects as the source of truth,
+    // while preserving optimistic items that were added locally during generation.
     useEffect(() => {
+        if (!projectsLoaded) return // Wait for API response before syncing grid
+        const incoming = projects.filter(isCompleted)
+        if (incoming.length === 0 && projects.length === 0) {
+            setGridVideos([])
+            return // Skip if backend truly has no projects
+        }
+
         setGridVideos(prev => {
-            const incoming = projects.filter(isCompleted)
-            const existingMap = new Map(prev.map(p => [p._id, p]))
-            
-            // We want to keep all incoming, AND any prev items that aren't in incoming (optimistic items)
             const incomingMap = new Map(incoming.map(p => [p._id, p]))
             
-            // Start with incoming (latest truth)
+            // Start with incoming (latest truth from API)
             const nextGrid = [...incoming]
             
             // Add optimistic items from prev that haven't shown up in incoming yet
@@ -387,15 +389,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                 }
             })
             
-            // Sort by creation time if needed, but since it's just prepending, it's mostly correct.
-            // If length and IDs are identical, avoid unnecessary re-renders.
-            if (nextGrid.length === prev.length && nextGrid.every((p, i) => p._id === prev[i]._id)) {
-                // To be perfectly safe about updates, we'll just return the nextGrid so it gets new data.
-            }
-            
             return nextGrid
         })
-    }, [projects])
+    }, [projects, projectsLoaded])
 
     // ── Concurrent jobs (up to MAX_CONCURRENT) ──
     // Each job: { id, projectId, prompt, model, duration, aspectRatio, quality, thumbUrl, progress, status, videoUrl, error }

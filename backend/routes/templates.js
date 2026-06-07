@@ -18,7 +18,15 @@ const router = express.Router();
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/public/homepage', async (req, res) => {
     try {
-        const templates = await Template.find({ isActive: true, isPublished: true, showOnHomeScreen: true })
+        const templates = await Template.find({
+            isActive: true,
+            isPublished: true,
+            showOnHomeScreen: true,
+            $or: [
+                { userCreated: { $ne: true } },
+                { isFeatured: true }
+            ]
+        })
             .select('name previewUrl previewImageUrl previewVideoUrl previewType studioOrigin')
             .populate('categoryId', 'name color iconEmoji')
             .sort({ isFeatured: -1, createdAt: -1 })
@@ -40,7 +48,15 @@ router.get('/public/homepage', async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         const { limit = 50, page = 1, categoryId, studioOrigin, studioSection, brandId, search } = req.query;
-        const baseFilter = { isActive: true, isPublished: true };
+        const baseFilter = {
+            isActive: true,
+            isPublished: true,
+            $or: [
+                { userCreated: { $ne: true } },
+                { createdBy: req.user._id },
+                { isFeatured: true }
+            ]
+        };
 
         if (categoryId) baseFilter.categoryId = categoryId;
         if (studioOrigin) baseFilter.studioOrigin = studioOrigin;
@@ -108,7 +124,16 @@ router.get('/by-section/:section', protect, async (req, res) => {
     try {
         const { section } = req.params;
         const { brandId, limit = 30 } = req.query;
-        const filter = { isActive: true, isPublished: true, studioSection: section };
+        const filter = {
+            isActive: true,
+            isPublished: true,
+            studioSection: section,
+            $or: [
+                { userCreated: { $ne: true } },
+                { createdBy: req.user._id },
+                { isFeatured: true }
+            ]
+        };
 
         let templates;
         if (brandId) {
@@ -395,7 +420,15 @@ The promptFormula is the MOST IMPORTANT field. It will be used directly as an im
 // ══════════════════════════════════════════════════════════════════════════════
 router.get('/:id', protect, async (req, res) => {
     try {
-        const template = await Template.findOne({ _id: req.params.id, isActive: true })
+        const template = await Template.findOne({
+            _id: req.params.id,
+            isActive: true,
+            $or: [
+                { userCreated: { $ne: true } },
+                { createdBy: req.user._id },
+                { isFeatured: true }
+            ]
+        })
             .populate('categoryId', 'name color iconEmoji')
             .lean();
 
@@ -419,7 +452,16 @@ router.post('/:id/use', protect, async (req, res) => {
     let usageLog = null;
 
     try {
-        const template = await Template.findOne({ _id: req.params.id, isActive: true, isPublished: true });
+        const template = await Template.findOne({
+            _id: req.params.id,
+            isActive: true,
+            isPublished: true,
+            $or: [
+                { userCreated: { $ne: true } },
+                { createdBy: req.user._id },
+                { isFeatured: true }
+            ]
+        });
         if (!template) {
             return res.status(404).json({ success: false, error: 'Template not found or inactive' });
         }

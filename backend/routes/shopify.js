@@ -22,7 +22,8 @@ import {
     syncStoreData,
     registerShopifyWebhooks,
     transformShopifyOrder,
-    transformShopifyCustomer
+    transformShopifyCustomer,
+    createShopifyProduct
 } from '../services/shopifyService.js';
 import config from '../config/env.js';
 import { verifyShopifyWebhook } from '../middleware/shopifyWebhookAuth.js';
@@ -197,7 +198,6 @@ router.post('/connect', protect, async (req, res) => {
             {
                 user: req.user._id,
                 platform: 'shopify',
-                'platformData.shopDomain': cleanDomain,
                 ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
             },
             {
@@ -239,7 +239,6 @@ router.post('/connect-token', protect, async (req, res) => {
         const query = {
             user: req.user._id,
             platform: 'shopify',
-            'platformData.shopDomain': cleanDomain,
             ...(brandId ? { brand: brandId } : { brand: { $exists: false } })
         };
 
@@ -281,13 +280,13 @@ router.get('/callback', async (req, res) => {
     const frontendUrl = (Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl) || 'http://localhost:5173';
     try {
         const { code, shop, state } = req.query;
-        if (!code || !shop) return res.redirect(`${frontendUrl}/integrations?error=missing_params`);
+        if (!code || !shop) return res.redirect(`${frontendUrl}/shopify-callback.html?error=missing_params`);
 
         // C2 FIX: Validate shop domain format — must be *.myshopify.com
         const SHOPIFY_DOMAIN_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
         if (!SHOPIFY_DOMAIN_REGEX.test(shop)) {
             console.warn(`⚠️ OAuth callback rejected — invalid shop domain: ${shop}`);
-            return res.redirect(`${frontendUrl}/integrations?error=invalid_shop_domain`);
+            return res.redirect(`${frontendUrl}/shopify-callback.html?error=invalid_shop_domain`);
         }
 
         const clientId = config.shopify.apiKey;
@@ -317,7 +316,7 @@ router.get('/callback', async (req, res) => {
         if (pendingIntegration && receivedNonce && pendingIntegration.metadata?.oauthNonce) {
             if (pendingIntegration.metadata.oauthNonce !== receivedNonce) {
                 console.warn(`⚠️ CSRF: Nonce mismatch for ${shop} — expected ${pendingIntegration.metadata.oauthNonce}, got ${receivedNonce}`);
-                return res.redirect(`${frontendUrl}/integrations?error=csrf_state_mismatch`);
+                return res.redirect(`${frontendUrl}/shopify-callback.html?error=csrf_state_mismatch`);
             }
         }
 
@@ -368,11 +367,11 @@ router.get('/callback', async (req, res) => {
             res.redirect(`https://${shop}/admin/apps/${apiKey}/integrations?shopify=connected&shop=${shop}&host=${host}`);
         } else {
             // Standard redirect back to mantram.ai after successful OAuth
-            res.redirect(`${frontendUrl}/integrations?shopify=connected`);
+            res.redirect(`${frontendUrl}/shopify-callback.html?shopify=connected`);
         }
     } catch (error) {
         console.error('Shopify callback error:', error);
-        res.redirect(`${frontendUrl}/integrations?error=shopify_auth_failed&detail=${encodeURIComponent(error.message)}`);
+        res.redirect(`${frontendUrl}/shopify-callback.html?error=shopify_auth_failed&detail=${encodeURIComponent(error.message)}`);
     }
 });
 
@@ -411,7 +410,15 @@ router.post('/sync', protect, async (req, res) => {
         res.json({ success: true, ...results });
     } catch (error) {
         console.error('Shopify sync error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        const errorBody = error.response?.body;
+        const bodyStr = errorBody ? (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) : '';
+        const fullErrorText = `${error.message || ''} ${bodyStr}`;
+        const lowerMsg = fullErrorText.toLowerCase();
+        let errMsg = safeErrorMessage(error);
+        if (lowerMsg.includes('scope') || lowerMsg.includes('merchant approval') || lowerMsg.includes('permission') || lowerMsg.includes('forbidden') || error.response?.code === 403) {
+            errMsg = 'Shopify sync failed due to permissions. Please disconnect and reconnect your Shopify store in the Integrations tab to authorize the required scopes.';
+        }
+        res.status(500).json({ success: false, error: errMsg });
     }
 });
 
@@ -428,6 +435,97 @@ async function signProductAssets(product) {
     }
     return p;
 }
+
+// POST /api/shopify/products/publish — Create a live product listing on Shopify and sync it locally
+router.post('/products/publish', protect, async (req, res) => {
+    try {
+        const { brandId, product } = req.body;
+        if (!product || !product.title) {
+            return res.status(400).json({ success: false, error: 'Product details with title are required' });
+        }
+
+        const query = {
+            user: req.user._id,
+            platform: 'shopify',
+            status: 'connected',
+        };
+        if (brandId) query.brand = brandId;
+
+        const integration = await Integration.findOne(query).select('+accessToken');
+        if (!integration || !integration.accessToken) {
+            return res.status(400).json({ success: false, error: 'Shopify is not connected for this brand.' });
+        }
+
+        const shopDomain = integration.platformData.shopDomain;
+        console.log(`🚀 Publishing product to Shopify (${shopDomain}): ${product.title}`);
+
+        // Prepare payload for Shopify Product creation API
+        const shopifyPayload = {
+            title: product.title,
+            body_html: product.description || '',
+            vendor: product.vendor || '',
+            product_type: product.productType || '',
+            status: product.status || 'draft',
+            variants: product.variants ? product.variants.map(v => ({
+                price: String(v.price),
+                compare_at_price: v.compareAtPrice ? String(v.compareAtPrice) : undefined,
+                sku: v.sku || ''
+            })) : undefined,
+            images: product.images ? product.images.map(img => {
+                let src = img.url || '';
+                if (src.includes('amazonaws.com') && src.includes(config.aws.bucket)) {
+                    src = src.split('?')[0];
+                }
+                return {
+                    src,
+                    alt: img.alt || ''
+                };
+            }) : undefined
+        };
+
+        const createdShopifyProduct = await createShopifyProduct(
+            integration.accessToken,
+            shopDomain,
+            shopifyPayload
+        );
+
+        if (!createdShopifyProduct) {
+            return res.status(500).json({ success: false, error: 'Failed to create product on Shopify' });
+        }
+
+        // Transform and save/upsert in local database
+        const transformedProduct = transformShopifyProduct(createdShopifyProduct, req.user._id, brandId || integration.brand);
+        transformedProduct.source = 'shopify_public';
+        
+        const localProduct = await Product.findOneAndUpdate(
+            { brand: brandId || integration.brand, shopifyId: String(createdShopifyProduct.id) },
+            transformedProduct,
+            { upsert: true, new: true }
+        );
+
+        console.log(`✅ Product published and synced locally: ${localProduct.title} (${localProduct._id})`);
+
+        const signedProduct = await signProductAssets(localProduct);
+
+        res.json({
+            success: true,
+            message: 'Product published successfully to Shopify',
+            product: signedProduct
+        });
+
+    } catch (error) {
+        console.error('Shopify product publish error:', error);
+        const errorBody = error.response?.body;
+        const bodyStr = errorBody ? (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) : '';
+        const fullErrorText = `${error.message || ''} ${bodyStr}`;
+        const lowerMsg = fullErrorText.toLowerCase();
+        let errMsg = safeErrorMessage(error);
+        if (lowerMsg.includes('write_products') || lowerMsg.includes('merchant approval') || lowerMsg.includes('scope') || lowerMsg.includes('forbidden') || error.response?.code === 403) {
+            errMsg = 'This action requires product write permission (write_products scope). If you connected via OAuth, please disconnect and reconnect your store in the Integrations tab. If you used a Custom App Access Token, please update your app configuration in Shopify Admin to grant the "write_products" Admin API scope.';
+        }
+        res.status(500).json({ success: false, error: errMsg });
+    }
+});
 
 // GET /api/shopify/products — List synced products
 router.get('/products', protect, async (req, res) => {

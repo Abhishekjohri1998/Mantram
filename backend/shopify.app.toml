@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "3316fa753006b2de85d8cc512cb462c5"
+client_id = "43970544d2e2cfa2e02dc38b94b62af5"
 name = "Mantram AI"
 application_url = "https://mantram.ai"
 embedded = true
@@ -14,7 +14,7 @@ api_version = "2025-01"
   shop_deletion_url = "https://api.mantram.ai/api/shopify/webhooks/shop-redact"
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_customers,read_orders,read_products"
+scopes = "read_customers,write_inventory,read_inventory,read_orders,read_products,write_products"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 

@@ -77,30 +77,59 @@ function PipelineProgress({ projectId, onComplete }) {
     const esRef = useRef(null)
 
     useEffect(() => {
-        const token = localStorage.getItem('mantram_token')
-        const es = new EventSource(`${API_BASE}/youtube-studio/${projectId}/progress?token=${token}`)
-        esRef.current = es
+        let cancelled = false
 
-        es.onmessage = e => {
-            try {
-                const evt = JSON.parse(e.data)
-                if (evt.type === 'node') {
-                    setNodes(prev => ({ ...prev, [evt.node]: { status: evt.status, message: evt.message } }))
-                } else if (evt.type === 'done') {
-                    setDone(true)
-                    es.close()
-                    setTimeout(() => onComplete?.(), 1500)
-                } else if (evt.type === 'error') {
-                    setDone(true)
-                    es.close()
-                    onComplete?.()
-                }
-                // ignore type: 'connected' and keepalive pings
-            } catch { /* ignore malformed SSE frames */ }
+        function connectSSE() {
+            if (cancelled) return
+            const token = localStorage.getItem('mantram_token')
+            const es = new EventSource(`${API_BASE}/youtube-studio/${projectId}/progress?token=${token}`)
+            esRef.current = es
+
+            es.onmessage = e => {
+                try {
+                    const evt = JSON.parse(e.data)
+                    if (evt.type === 'node') {
+                        setNodes(prev => ({ ...prev, [evt.node]: { status: evt.status, message: evt.message } }))
+                    } else if (evt.type === 'done') {
+                        setDone(true)
+                        es.close()
+                        setTimeout(() => onComplete?.(), 1500)
+                    } else if (evt.type === 'error') {
+                        setDone(true)
+                        es.close()
+                        onComplete?.()
+                    }
+                } catch { /* ignore malformed SSE frames */ }
+            }
+            es.onerror = () => { es.close(); setTimeout(() => onComplete?.(), 3000) }
         }
-        es.onerror = () => { es.close(); setTimeout(() => onComplete?.(), 3000) }
 
-        return () => es.close()
+        // Fetch current progress from DB first (handles tab switch / refresh resume)
+        api(`/youtube-studio/${projectId}`).then(d => {
+            if (cancelled) return
+            const project = d.project
+            // Seed nodes state from persisted nodesProgress so UI shows correct progress immediately
+            if (project.nodesProgress && Object.keys(project.nodesProgress).length > 0) {
+                setNodes(project.nodesProgress)
+            }
+            if (project.status === 'done') {
+                setDone(true)
+                setTimeout(() => onComplete?.(), 1500)
+                return // Don't open SSE for completed projects
+            }
+            if (project.status === 'failed') {
+                setDone(true)
+                onComplete?.()
+                return
+            }
+            // Project still running — connect SSE for live updates
+            connectSSE()
+        }).catch(() => {
+            // Fallback: connect SSE anyway if DB fetch fails
+            connectSSE()
+        })
+
+        return () => { cancelled = true; esRef.current?.close() }
     }, [projectId])
 
     const nodeKeys = Object.keys(NODE_LABELS)
@@ -1074,7 +1103,8 @@ function ProjectDetail({ project, onRefresh }) {
 export default function YouTubeStudio() {
     const { activeBrand } = useBrand()
 
-    const [tab, setTab] = useState('analyse')
+    // Restore tab from sessionStorage so refresh/navigation preserves the active view
+    const [tab, setTab] = useState(() => sessionStorage.getItem('yt-studio-tab') || 'analyse')
     const [urlInput, setUrlInput] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -1086,6 +1116,7 @@ export default function YouTubeStudio() {
     const [selectedChannelId, setSelectedChannelId] = useState('')
     const [selectedShowId, setSelectedShowId] = useState('')  // for analyse tab
     const pollRef = useRef({})
+    const hasResumed = useRef(false)  // guard to prevent double-resume
     
     // Selective features and File Upload states
     const [selectedFeatures, setSelectedFeatures] = useState(['thumbnail', 'synopsis', 'seo', 'transcript', 'chapters', 'promo', 'brandCritic'])
@@ -1110,6 +1141,25 @@ export default function YouTubeStudio() {
 
     // Derived: shows for the currently selected channel
     const selectedChannelShows = channels.find(c => c._id === selectedChannelId)?.shows || []
+
+    // Persist tab to sessionStorage so refresh preserves the view
+    useEffect(() => { sessionStorage.setItem('yt-studio-tab', tab) }, [tab])
+
+    // Persist active project ID so refresh can resume the pipeline view
+    useEffect(() => {
+        if (activeProject?._id) {
+            sessionStorage.setItem('yt-studio-activeProjectId', activeProject._id)
+        }
+    }, [activeProject?._id])
+
+    // On mount: resume saved active project if one exists (handles browser refresh)
+    useEffect(() => {
+        const savedId = sessionStorage.getItem('yt-studio-activeProjectId')
+        if (savedId && !hasResumed.current) {
+            hasResumed.current = true
+            openProject(savedId)
+        }
+    }, [])
 
     useEffect(() => { loadProjects(); loadChannels() }, [])
 

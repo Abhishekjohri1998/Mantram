@@ -11,7 +11,7 @@ import SEOHead from '../components/SEOHead'
 import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
-import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI } from '../services/api'
+import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI, products as productsAPI, uploadFileToS3 } from '../services/api'
 
 // ── SVG Platform Logos ──────────────────────────────────────────────────────
 function PlatformLogo({ id, size = 28 }) {
@@ -138,6 +138,7 @@ export default function Integrations() {
     const [shopifyMode, setShopifyMode] = useState('oauth') // Default to OAuth — Shopify reviewers expect standard OAuth
     const [shopifyError, setShopifyError] = useState('')
     const [products, setProducts] = useState([])
+    const [showPublishModal, setShowPublishModal] = useState(false)
     const [productSearch, setProductSearch] = useState('')
     const [loading, setLoading] = useState({})
     const [syncing, setSyncing] = useState(false)
@@ -145,6 +146,124 @@ export default function Integrations() {
     const [selectedAccount, setSelectedAccount] = useState(null)
     const [posts, setPosts] = useState([])
     const [loadingPosts, setLoadingPosts] = useState(false)
+    const [selectedProductDetails, setSelectedProductDetails] = useState(null)
+    const [toast, setToast] = useState(null)
+    const [deletingId, setDeletingId] = useState(null)
+    const [confirmDialog, setConfirmDialog] = useState(null)
+    const [enlargedImage, setEnlargedImage] = useState(null)
+
+    const [isEditingProduct, setIsEditingProduct] = useState(false)
+    const [editTitle, setEditTitle] = useState('')
+    const [editDescription, setEditDescription] = useState('')
+    const [editPrice, setEditPrice] = useState('')
+    const [editVendor, setEditVendor] = useState('')
+    const [editProductType, setEditProductType] = useState('')
+    const [editSku, setEditSku] = useState('')
+    const [editInventoryQuantity, setEditInventoryQuantity] = useState('')
+    const [editTags, setEditTags] = useState('')
+    const [editImageUrl, setEditImageUrl] = useState('')
+    const [savingProduct, setSavingProduct] = useState(false)
+    const [uploadingEditImage, setUploadingEditImage] = useState(false)
+
+    const showConfirm = (title, message, onConfirm, isDanger = true, confirmText = 'Confirm', cancelText = 'Cancel') => {
+        setConfirmDialog({
+            title,
+            message,
+            confirmText,
+            cancelText,
+            isDanger,
+            onConfirm: () => {
+                onConfirm();
+                setConfirmDialog(null);
+            }
+        });
+    };
+
+    const startEditingProduct = () => {
+        setEditTitle(selectedProductDetails.title || '');
+        setEditDescription(selectedProductDetails.description || '');
+        setEditPrice(selectedProductDetails.variants?.[0]?.price || selectedProductDetails.price?.amount || '');
+        setEditVendor(selectedProductDetails.vendor || '');
+        setEditProductType(selectedProductDetails.productType || '');
+        setEditSku(selectedProductDetails.variants?.[0]?.sku || '');
+        setEditInventoryQuantity(selectedProductDetails.variants?.[0]?.inventoryQuantity || '');
+        setEditTags(selectedProductDetails.tags?.join(', ') || '');
+        setEditImageUrl(selectedProductDetails.images?.[0]?.url || '');
+        setIsEditingProduct(true);
+    };
+
+    const handleEditImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingEditImage(true);
+        try {
+            const s3Url = await uploadFileToS3(file, 'shopify');
+            setEditImageUrl(s3Url);
+        } catch (err) {
+            setToast({ message: `Image upload failed: ${err.message}`, type: 'error' });
+        } finally {
+            setUploadingEditImage(false);
+        }
+    };
+
+    const saveProductDetails = async () => {
+        if (!editTitle.trim()) {
+            setToast({ message: 'Product title is required', type: 'error' });
+            return;
+        }
+        if (!editPrice || isNaN(editPrice) || parseFloat(editPrice) < 0) {
+            setToast({ message: 'Please enter a valid price', type: 'error' });
+            return;
+        }
+
+        setSavingProduct(true);
+        try {
+            const parsedTags = editTags.split(',').map(t => t.trim()).filter(Boolean);
+            const updatedData = {
+                title: editTitle,
+                description: editDescription,
+                vendor: editVendor,
+                productType: editProductType,
+                tags: parsedTags,
+                price: {
+                    amount: parseFloat(editPrice),
+                    currency: selectedProductDetails.price?.currency || 'INR'
+                },
+                variants: [
+                    {
+                        ...selectedProductDetails.variants?.[0],
+                        price: parseFloat(editPrice),
+                        sku: editSku,
+                        inventoryQuantity: parseInt(editInventoryQuantity) || 0
+                    }
+                ],
+                images: editImageUrl ? [{ url: editImageUrl, alt: editTitle }] : []
+            };
+
+            const response = await productsAPI.update(selectedProductDetails._id, updatedData);
+            setToast({ message: 'Product updated successfully!', type: 'success' });
+            setSelectedProductDetails(response.product || { ...selectedProductDetails, ...updatedData });
+            setIsEditingProduct(false);
+            loadProducts();
+        } catch (err) {
+            setToast({ message: `Failed to update product: ${err.message}`, type: 'error' });
+        } finally {
+            setSavingProduct(false);
+        }
+    };
+
+    const closeDetailsModal = () => {
+        setSelectedProductDetails(null);
+        setIsEditingProduct(false);
+    };
+
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 4000)
+            return () => clearTimeout(timer)
+        }
+    }, [toast])
 
     // ── Google Analytics state ──
     const [gaConnected, setGaConnected] = useState(false)
@@ -223,30 +342,52 @@ export default function Integrations() {
         loadAllStatuses()
     }, [loadAllStatuses])
 
-    // Listen for OAuth popup messages (Social + GA + PM platforms)
+    // Listen for OAuth popup messages (Social + GA + PM platforms + Shopify) via postMessage and BroadcastChannel
     useEffect(() => {
         const syncChannel = new BroadcastChannel('mantram_sync')
-        const handler = (e) => {
-            if (e.data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
-                setGaConnected(true); setGaEmail(e.data.email || ''); loadAllStatuses()
+        
+        const handleMessage = (data) => {
+            if (data?.type === 'GOOGLE_ANALYTICS_CONNECTED') {
+                setGaConnected(true); setGaEmail(data.email || ''); loadAllStatuses()
             }
-            if (e.data?.type === 'PM_PLATFORM_CONNECTED') {
+            if (data?.type === 'PM_PLATFORM_CONNECTED') {
                 setConnectingPlatform(null); loadAllStatuses()
-                syncChannel.postMessage(e.data) // Notify other tabs
             }
-            if (e.data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
+            if (data?.type === 'SOCIAL_PLATFORM_CONNECTED') {
                 loadAllStatuses()
-                syncChannel.postMessage(e.data) // Notify other tabs
             }
-            if (e.data?.type === 'SOCIAL_PLATFORM_DENIED') {
+            if (data?.type === 'SOCIAL_PLATFORM_DENIED') {
                 // User cancelled Twitter (or other) OAuth — clear loading spinner
-                const p = e.data.platform
+                const p = data.platform
                 if (p) setLoading(l => ({ ...l, [p]: false }))
             }
+            if (data?.type === 'SHOPIFY_CONNECTED') {
+                loadAllStatuses()
+            }
+            if (data?.type === 'SHOPIFY_FAILED') {
+                setShopifyError(data.detail || 'OAuth connection failed. Please try again.')
+            }
         }
-        window.addEventListener('message', handler)
+
+        const windowHandler = (e) => {
+            if (e.origin !== window.location.origin) return
+            handleMessage(e.data)
+            // Notify other open tabs/windows
+            if (e.data?.type) {
+                syncChannel.postMessage(e.data)
+            }
+        }
+
+        const channelHandler = (e) => {
+            handleMessage(e.data)
+        }
+
+        window.addEventListener('message', windowHandler)
+        syncChannel.addEventListener('message', channelHandler)
+
         return () => {
-            window.removeEventListener('message', handler)
+            window.removeEventListener('message', windowHandler)
+            syncChannel.removeEventListener('message', channelHandler)
             syncChannel.close()
         }
     }, [loadAllStatuses])
@@ -256,13 +397,39 @@ export default function Integrations() {
         const params = new URLSearchParams(window.location.search)
         const socialStatus = params.get('social')
         const platform = params.get('platform')
-        if (window.opener) {
+        const shopifyStatus = params.get('shopify')
+        const error = params.get('error')
+        const detail = params.get('detail')
+
+        // We are inside a popup if opener exists or if the window name matches a popup signature
+        const isPopup = window.opener || window.name === 'shopify_oauth_popup' || window.name.startsWith('connect_')
+
+        if (isPopup) {
+            const syncChannel = new BroadcastChannel('mantram_sync')
+            
             if (socialStatus === 'success') {
-                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_CONNECTED', platform }, window.location.origin)
+                const msg = { type: 'SOCIAL_PLATFORM_CONNECTED', platform }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             } else if (socialStatus === 'denied' || socialStatus === 'processing_failed' || socialStatus === 'invalid_request') {
-                // User cancelled Twitter auth or another error — notify parent to stop spinner
-                window.opener.postMessage({ type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }, window.location.origin)
+                const msg = { type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
+                window.close()
+            } else if (shopifyStatus === 'connected') {
+                const msg = { type: 'SHOPIFY_CONNECTED' }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
+                window.close()
+            } else if (error === 'shopify_auth_failed') {
+                const msg = { type: 'SHOPIFY_FAILED', detail }
+                if (window.opener) window.opener.postMessage(msg, window.location.origin)
+                syncChannel.postMessage(msg)
+                syncChannel.close()
                 window.close()
             }
         }
@@ -282,7 +449,7 @@ export default function Integrations() {
             // Clean URL
             navigate('/integrations', { replace: true })
         } else if (gaStatus === 'error') {
-            alert(`Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`)
+            setToast({ message: `Google Analytics Connection Failed: ${decodeURIComponent(gaMsg || 'Unknown error')}`, type: 'error' })
             navigate('/integrations', { replace: true })
         }
 
@@ -299,6 +466,18 @@ export default function Integrations() {
             setTimeout(() => setEtsyError(''), 5000)
             navigate('/integrations', { replace: true })
         }
+
+        const shopifyStatusParam = params.get('shopify')
+        const shopifyErrParam = params.get('error')
+        const shopifyDetailParam = params.get('detail')
+
+        if (shopifyStatusParam === 'connected') {
+            loadAllStatuses()
+            navigate('/integrations', { replace: true })
+        } else if (shopifyErrParam === 'shopify_auth_failed') {
+            setShopifyError(decodeURIComponent(shopifyDetailParam || 'OAuth connection failed.'))
+            navigate('/integrations', { replace: true })
+        }
     }, [navigate, loadAllStatuses])
 
     // ── Google Analytics Actions ──
@@ -311,12 +490,24 @@ export default function Integrations() {
                 // Now redirect the main window to the Google Auth URL
                 window.location.href = d.authUrl
             }
-        } catch (e) { alert(`Connection failed: ${e.message}`) }
+        } catch (e) { setToast({ message: `Connection failed: ${e.message}`, type: 'error' }) }
         finally { setGaLoading(false) }
     }
     const disconnectGA = async () => {
-        if (!confirm('Disconnect Google Analytics for this brand?')) return
-        try { await gaAPI.disconnect(brandId); setGaConnected(false); setGaEmail('') } catch { }
+        showConfirm(
+            'Disconnect Google Analytics',
+            'Are you sure you want to disconnect Google Analytics for this brand?',
+            async () => {
+                try {
+                    await gaAPI.disconnect(brandId)
+                    setGaConnected(false)
+                    setGaEmail('')
+                    setToast({ message: 'Google Analytics disconnected successfully!', type: 'success' })
+                } catch (err) {
+                    setToast({ message: `Disconnect failed: ${err.message}`, type: 'error' })
+                }
+            }
+        )
     }
 
     // ── Ad Platform Actions ──
@@ -326,16 +517,25 @@ export default function Integrations() {
             const data = await apiFetch(`/pm-studio/connect/${platformKey}/auth${brandId ? `?brandId=${brandId}` : ''}`)
             if (data.authUrl) window.open(data.authUrl, `connect_${platformKey}`, 'width=600,height=700,scrollbars=yes')
         } catch (e) {
-            alert(`Connection failed: ${e.message}`)
+            setToast({ message: `Connection failed: ${e.message}`, type: 'error' })
             setConnectingPlatform(null)
         }
     }
     const disconnectAdPlatform = async (platformKey) => {
-        if (!confirm(`Disconnect ${platformKey === 'meta' ? 'Meta Ads' : 'Google Ads'} for this brand?`)) return
-        try {
-            await apiFetch(`/pm-studio/connect/${platformKey}${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' })
-            loadAllStatuses()
-        } catch (e) { alert(e.message) }
+        const platformName = platformKey === 'meta' ? 'Meta Ads' : 'Google Ads'
+        showConfirm(
+            `Disconnect ${platformName}`,
+            `Are you sure you want to disconnect ${platformName} for this brand?`,
+            async () => {
+                try {
+                    await apiFetch(`/pm-studio/connect/${platformKey}${brandId ? `?brandId=${brandId}` : ''}`, { method: 'DELETE' })
+                    loadAllStatuses()
+                    setToast({ message: `${platformName} disconnected successfully!`, type: 'success' })
+                } catch (e) {
+                    setToast({ message: e.message, type: 'error' })
+                }
+            }
+        )
     }
 
     // ── Social Platform Actions ──
@@ -344,12 +544,23 @@ export default function Integrations() {
         try {
             const data = await social.connect(platform, brandId)
             if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
-        } catch (err) { alert(`Connection failed: ${err.message}`) }
+        } catch (err) { setToast({ message: `Connection failed: ${err.message}`, type: 'error' }) }
         finally { setLoading(l => ({ ...l, [platform]: false })) }
     }
     const disconnectPlatform = async (accountId) => {
-        if (!confirm(`Disconnect this account?`)) return
-        try { await social.disconnect(accountId); loadAllStatuses() } catch (err) { alert(err.message) }
+        showConfirm(
+            'Disconnect Account',
+            'Are you sure you want to disconnect this account?',
+            async () => {
+                try {
+                    await social.disconnect(accountId)
+                    loadAllStatuses()
+                    setToast({ message: 'Account disconnected successfully!', type: 'success' })
+                } catch (err) {
+                    setToast({ message: err.message, type: 'error' })
+                }
+            }
+        )
     }
     const loadPosts = async (account) => {
         setSelectedAccount(account); setLoadingPosts(true)
@@ -373,7 +584,7 @@ export default function Integrations() {
             setLoading(l => ({ ...l, shopify: true }))
             try {
                 const data = await shopifyAPI.connect(shopifyDomain, brandId)
-                if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
+                if (data.authUrl) window.open(data.authUrl, 'shopify_oauth_popup', 'width=600,height=700')
             } catch (err) { setShopifyError(err.message || 'OAuth connection failed. Please try again.') }
             finally { setLoading(l => ({ ...l, shopify: false })) }
         }
@@ -382,9 +593,33 @@ export default function Integrations() {
         setSyncing(true)
         try {
             const data = await shopifyAPI.sync(brandId)
-            alert(` Synced ${data.synced} products from Shopify!`); loadProducts()
-        } catch (err) { alert(`Sync failed: ${err.message}`) }
-        finally { setSyncing(false) }
+            setToast({ message: `Synced ${data.products || 0} products from Shopify!`, type: 'success' })
+            loadProducts()
+        } catch (err) {
+            setToast({ message: `Sync failed: ${err.message}`, type: 'error' })
+        } finally { setSyncing(false) }
+    }
+
+    const deleteProduct = async (id) => {
+        showConfirm(
+            'Delete Product',
+            'Are you sure you want to delete this product? This action cannot be undone.',
+            async () => {
+                setDeletingId(id)
+                try {
+                    await productsAPI.delete(id)
+                    setToast({ message: 'Product deleted successfully!', type: 'success' })
+                    setSelectedProductDetails(null)
+                    loadProducts()
+                } catch (err) {
+                    setToast({ message: `Failed to delete product: ${err.message}`, type: 'error' })
+                } finally {
+                    setDeletingId(null)
+                }
+            },
+            true,
+            'Delete'
+        )
     }
     const loadProducts = async () => {
         try { const data = await shopifyAPI.products({ search: productSearch }); setProducts(data.products || []) } catch { }
@@ -396,6 +631,29 @@ export default function Integrations() {
     return (
         <DashboardLayout title="Integrations" subtitle="Connect your platforms & tools">
             <SEOHead title="Integrations — Mantram AI" noIndex={true} />
+            <style>{`
+                @keyframes slideUp {
+                    from { transform: translateY(100%) scale(0.95); opacity: 0; }
+                    to { transform: translateY(0) scale(1); opacity: 1; }
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .animate-slide-up {
+                    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.2s ease-out forwards;
+                }
+                .animate-scale-in {
+                    animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                }
+            `}</style>
             {/* Brand Indicator */}
             {activeBrand && (
                 <div className="flex items-center gap-2 mb-5 px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-primary/10">
@@ -587,15 +845,26 @@ export default function Integrations() {
                                                     {syncing ? 'Syncing...' : 'Sync Products'}
                                                 </button>
                                                 <button onClick={() => setActiveTab('products')}
-                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] flex items-center gap-1.5">
+                                                    className="px-4 py-2 rounded-xl text-sm bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-primary/50 text-[var(--sys-text)] transition-all flex items-center gap-1.5 cursor-pointer">
                                                     <span className="material-symbols-outlined text-sm">inventory_2</span> View Products
                                                 </button>
-                                                <button onClick={async () => {
-                                                    if (!confirm('Disconnect Shopify for this brand?')) return;
-                                                    setLoading(l => ({ ...l, shopify: true }));
-                                                    try { await shopifyAPI.disconnect(brandId); loadAllStatuses(); }
-                                                    catch (err) { alert(err.message); }
-                                                    finally { setLoading(l => ({ ...l, shopify: false })); }
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect Shopify',
+                                                        'Are you sure you want to disconnect Shopify for this brand?',
+                                                        async () => {
+                                                            setLoading(l => ({ ...l, shopify: true }));
+                                                            try {
+                                                                await shopifyAPI.disconnect(brandId);
+                                                                loadAllStatuses();
+                                                                setToast({ message: 'Shopify disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            } finally {
+                                                                setLoading(l => ({ ...l, shopify: false }));
+                                                            }
+                                                        }
+                                                    );
                                                 }}
                                                     className="px-4 py-2 rounded-xl text-sm text-primary hover:bg-[var(--sys-primary-dim)]">
                                                     Disconnect
@@ -640,7 +909,7 @@ export default function Integrations() {
                                                         <ol className="text-[11px] text-[var(--sys-text-muted)] space-y-2 list-decimal ml-4">
                                                             <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
                                                             <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
-                                                            <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, <code>read_customers</code></li>
+                                                            <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>write_products</code>, <code>read_orders</code>, <code>read_customers</code>, <code>read_inventory</code>, <code>write_inventory</code></li>
                                                             <li>Click <strong>Install app</strong> and copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>)</li>
                                                         </ol>
                                                     </div>
@@ -693,7 +962,23 @@ export default function Integrations() {
                                                     {loading.wooSync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
                                                     Sync Now
                                                 </button>
-                                                <button onClick={async () => { if (!confirm('Disconnect WooCommerce?')) return; await wooAPI.disconnect(brandId); setWooStatus({ connected: false }); setWooKey(''); setWooSecret(''); }}
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect WooCommerce',
+                                                        'Are you sure you want to disconnect WooCommerce for this brand?',
+                                                        async () => {
+                                                            try {
+                                                                await wooAPI.disconnect(brandId);
+                                                                setWooStatus({ connected: false });
+                                                                setWooKey('');
+                                                                setWooSecret('');
+                                                                setToast({ message: 'WooCommerce disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            }
+                                                        }
+                                                    );
+                                                }}
                                                     className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
                                                     style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
                                                     <span className="material-symbols-outlined text-sm">link_off</span>
@@ -769,7 +1054,21 @@ export default function Integrations() {
                                                     {loading.etsySync ? <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> : <span className="material-symbols-outlined text-sm">sync</span>}
                                                     Sync Now
                                                 </button>
-                                                <button onClick={async () => { if (!confirm('Disconnect Etsy?')) return; await etsyAPI.disconnect(brandId); setEtsyStatus({ connected: false }); }}
+                                                <button onClick={() => {
+                                                    showConfirm(
+                                                        'Disconnect Etsy',
+                                                        'Are you sure you want to disconnect Etsy for this brand?',
+                                                        async () => {
+                                                            try {
+                                                                await etsyAPI.disconnect(brandId);
+                                                                setEtsyStatus({ connected: false });
+                                                                setToast({ message: 'Etsy disconnected successfully!', type: 'success' });
+                                                            } catch (err) {
+                                                                setToast({ message: err.message, type: 'error' });
+                                                            }
+                                                        }
+                                                    );
+                                                }}
                                                     className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
                                                     style={{ background: '#ff4d0010', color: '#ff4d00', border: '1px solid #ff4d0020' }}>
                                                     <span className="material-symbols-outlined text-sm">link_off</span>
@@ -941,10 +1240,17 @@ export default function Integrations() {
                                     className="w-full pl-11 pr-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
                             </div>
                             {shopifyStatus.connected && (
-                                <button onClick={syncProducts} disabled={syncing}
-                                    className="btn-primary px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap">
-                                    {syncing ? '⏳ Syncing...' : '🔄 Sync from Shopify'}
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowPublishModal(true)}
+                                        className="px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer">
+                                        <span className="material-symbols-outlined text-sm">add_box</span>
+                                        Create Live Listing
+                                    </button>
+                                    <button onClick={syncProducts} disabled={syncing}
+                                        className="btn-primary px-5 py-3 rounded-xl text-sm font-medium whitespace-nowrap">
+                                        {syncing ? '⏳ Syncing...' : '🔄 Sync from Shopify'}
+                                    </button>
+                                </div>
                             )}
                         </div>
 
@@ -961,13 +1267,28 @@ export default function Integrations() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {products.map(product => (
-                                    <div key={product._id} className="glass-panel rounded-2xl overflow-hidden hover:border-[var(--sys-border)] transition-all group">
-                                        {product.images?.[0] && (
-                                            <div className="h-40 overflow-hidden bg-[var(--sys-surface)]">
-                                                <img src={product.images[0].url} alt={product.title}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                            </div>
-                                        )}
+                                    <div key={product._id} 
+                                        onClick={() => setSelectedProductDetails(product)}
+                                        className="glass-panel rounded-2xl overflow-hidden hover:border-primary/45 hover:scale-[1.01] transition-all group cursor-pointer">
+                                        <div className="h-40 overflow-hidden bg-[var(--sys-surface)] flex items-center justify-center relative">
+                                            {product.images?.[0]?.url ? (
+                                                <>
+                                                    <img src={product.images[0].url} alt={product.title}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                    <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                                        <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                                    <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="p-4">
                                             <h3 className="font-bold text-[var(--sys-text)] text-sm truncate">{product.title}</h3>
                                             <p className="text-sm text-[var(--sys-text-muted)] mt-0.5">{product.productType || product.vendor}</p>
@@ -1060,6 +1381,306 @@ export default function Integrations() {
                     </div>
                 </div>
             )}
+            {/* Create Live Listing Modal */}
+            <PublishProductModal
+                isOpen={showPublishModal}
+                onClose={() => setShowPublishModal(false)}
+                brandId={brandId}
+                onPublishSuccess={() => {
+                    loadProducts();
+                }}
+            />
+
+            {/* Product Details Modal (Enlarge & View Details & Delete) */}
+            {selectedProductDetails && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={closeDetailsModal} />
+                    <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-3xl flex flex-col md:flex-row max-h-[85vh] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                        {/* Image Section */}
+                        <div 
+                            onClick={() => {
+                                if (!isEditingProduct) {
+                                    setEnlargedImage(editImageUrl || selectedProductDetails.images?.[0]?.url);
+                                }
+                            }}
+                            className={`md:w-1/2 bg-[var(--sys-surface-dim)] flex items-center justify-center relative min-h-[300px] md:min-h-0 border-r border-[var(--sys-border)] overflow-hidden ${
+                                isEditingProduct ? 'relative' : 'cursor-zoom-in group/img'
+                            }`}>
+                            {isEditingProduct ? (
+                                <>
+                                    {editImageUrl ? (
+                                        <img src={editImageUrl} alt="" className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                        </div>
+                                    )}
+                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                                        <div className="relative bg-[#0c0f1a]/85 hover:bg-[#0c0f1a] backdrop-blur-md border border-[var(--sys-border)] hover:border-primary/50 text-[var(--sys-text)] shadow-lg rounded-full px-4 py-2 flex items-center gap-2 text-xs font-bold transition-all cursor-pointer">
+                                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                                            <span>Upload Image</span>
+                                            <input type="file" accept="image/*" onChange={handleEditImageUpload} disabled={uploadingEditImage || savingProduct}
+                                                className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                                        </div>
+                                    </div>
+                                    {uploadingEditImage && (
+                                        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined animate-spin text-primary text-3xl">progress_activity</span>
+                                            <span className="text-xs text-primary font-bold">Uploading to S3...</span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                selectedProductDetails.images?.[0]?.url ? (
+                                    <>
+                                        <img src={selectedProductDetails.images[0].url} alt={selectedProductDetails.title}
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
+                                            }}
+                                            className="w-full h-full object-contain group-hover/img:scale-105 transition-transform duration-300" />
+                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <div className="bg-[#0c0f1a]/85 border border-primary/20 rounded-full p-2.5 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-primary text-xl">zoom_in</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'none' }} className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-[var(--sys-surface-dim)] text-[var(--sys-text-muted)]">
+                                        <span className="material-symbols-outlined text-6xl">inventory_2</span>
+                                    </div>
+                                )
+                            )}
+                        </div>
+
+                        {/* Details Section */}
+                        <div className="md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto">
+                            {isEditingProduct ? (
+                                <div className="space-y-4 flex-1 flex flex-col justify-between">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-bold text-primary uppercase">Edit Product Details</span>
+                                            <button onClick={closeDetailsModal} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Product Title *</label>
+                                            <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary focus:outline-none" />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Vendor</label>
+                                                <input type="text" value={editVendor} onChange={e => setEditVendor(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Product Type</label>
+                                                <input type="text" value={editProductType} onChange={e => setEditProductType(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Price *</label>
+                                                <input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">SKU</label>
+                                                <input type="text" value={editSku} onChange={e => setEditSku(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Qty</label>
+                                                <input type="number" value={editInventoryQuantity} onChange={e => setEditInventoryQuantity(e.target.value)}
+                                                    className="w-full px-2 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Description</label>
+                                            <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none resize-none custom-scrollbar" />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Image URL</label>
+                                            <input type="url" value={editImageUrl} onChange={e => setEditImageUrl(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase">Tags (comma-separated)</label>
+                                            <input type="text" value={editTags} onChange={e => setEditTags(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-xs focus:border-primary focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-4 border-t border-[var(--sys-border)] mt-4">
+                                        <button onClick={() => setIsEditingProduct(false)} disabled={savingProduct}
+                                            className="flex-1 py-2 rounded-xl text-xs font-bold border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer">
+                                            Cancel
+                                        </button>
+                                        <button onClick={saveProductDetails} disabled={savingProduct || uploadingEditImage}
+                                            className="flex-1 py-2 rounded-xl text-xs font-bold bg-primary text-black hover:opacity-90 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                            {savingProduct ? (
+                                                <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Saving...</>
+                                            ) : (
+                                                <><span className="material-symbols-outlined text-xs">save</span> Save</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                {selectedProductDetails.source || 'Shopify'}
+                                            </span>
+                                            <button onClick={closeDetailsModal} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer">
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-[var(--sys-text)] mb-1 leading-tight">{selectedProductDetails.title}</h3>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mb-3">
+                                            Type: {selectedProductDetails.productType || 'N/A'} | Vendor: {selectedProductDetails.vendor || 'N/A'}
+                                        </p>
+                                        <div className="text-xl font-extrabold text-primary mb-4">
+                                            ₹{selectedProductDetails.variants?.[0]?.price || selectedProductDetails.price?.amount || '—'}
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            {selectedProductDetails.description && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1">Description</h4>
+                                                    <p className="text-sm text-[var(--sys-text)] leading-relaxed max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                                                        {selectedProductDetails.description}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            
+                                            {selectedProductDetails.tags?.length > 0 && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-[var(--sys-text-muted)] tracking-wider mb-1.5">Tags</h4>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {selectedProductDetails.tags.map((tag, i) => (
+                                                            <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)]">
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 pt-4 border-t border-[var(--sys-border)] flex items-center justify-between gap-4">
+                                        <span className="text-[10px] text-[var(--sys-text-muted)]">
+                                            Synced: {new Date(selectedProductDetails.syncedAt || selectedProductDetails.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={startEditingProduct}
+                                                className="px-4 py-2 bg-[var(--sys-surface)] hover:bg-[var(--sys-border)] border border-[var(--sys-border)] text-[var(--sys-text)] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                                                <span className="material-symbols-outlined text-xs">edit</span> Edit Details
+                                            </button>
+                                            <button
+                                                onClick={() => deleteProduct(selectedProductDetails._id)}
+                                                disabled={deletingId === selectedProductDetails._id}
+                                                className="px-4 py-2 bg-red-950/45 hover:bg-red-900 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                                {deletingId === selectedProductDetails._id ? (
+                                                    <><span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Deleting...</>
+                                                ) : (
+                                                    <><span className="material-symbols-outlined text-xs">delete</span> Delete Product</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Toast Notifications Container */}
+            {toast && (
+                <div className="fixed bottom-6 right-6 z-[100] animate-slide-up flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-[#0c0f1a]/95 border border-primary/20 backdrop-blur-md shadow-2xl">
+                    <span className="material-symbols-outlined text-primary text-xl">
+                        {toast.type === 'success' ? 'check_circle' : 'error'}
+                    </span>
+                    <span className="text-sm font-medium text-[var(--sys-text)]">{toast.message}</span>
+                    <button onClick={() => setToast(null)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] ml-2 transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+            )}
+
+            {/* Immersive Image Lightbox Overlay */}
+            {enlargedImage && (
+                <div 
+                    onClick={() => setEnlargedImage(null)}
+                    className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 cursor-zoom-out animate-fade-in">
+                    <button 
+                        onClick={() => setEnlargedImage(null)}
+                        className="absolute top-6 right-6 text-white/60 hover:text-white transition-colors p-2 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer">
+                        <span className="material-symbols-outlined text-2xl">close</span>
+                    </button>
+                    <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center relative animate-scale-in">
+                        <img 
+                            src={enlargedImage} 
+                            alt="Enlarged product" 
+                            className="max-w-full max-h-[85vh] object-contain rounded-xl select-none" 
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirmation Modal */}
+            {confirmDialog && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmDialog(null)} />
+                    <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-scale-in space-y-6">
+                        <div className="flex items-start gap-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${confirmDialog.isDanger ? 'bg-red-500/10 text-red-500' : 'bg-primary/10 text-primary'}`}>
+                                <span className="material-symbols-outlined text-xl">
+                                    {confirmDialog.isDanger ? 'warning' : 'help'}
+                                </span>
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-lg font-bold text-[var(--sys-text)]">{confirmDialog.title}</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] leading-relaxed">{confirmDialog.message}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setConfirmDialog(null)}
+                                className="px-4 py-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] rounded-xl text-xs font-bold transition-all cursor-pointer">
+                                {confirmDialog.cancelText || 'Cancel'}
+                            </button>
+                            <button
+                                onClick={confirmDialog.onConfirm}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    confirmDialog.isDanger 
+                                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                        : 'bg-primary hover:opacity-90 text-black'
+                                }`}>
+                                {confirmDialog.confirmText || 'Confirm'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     )
 }
@@ -1079,4 +1700,234 @@ function StatusBadge({ status }) {
             {c.label}
         </span>
     )
+}
+
+function PublishProductModal({ isOpen, onClose, brandId, onPublishSuccess }) {
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [price, setPrice] = useState('');
+    const [sku, setSku] = useState('');
+    const [inventoryQuantity, setInventoryQuantity] = useState('10');
+    const [vendor, setVendor] = useState('');
+    const [productType, setProductType] = useState('');
+    const [status, setStatus] = useState('draft');
+    const [tags, setTags] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
+    const [publishing, setPublishing] = useState(false);
+    const [error, setError] = useState('');
+    const [uploadingFile, setUploadingFile] = useState(false);
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingFile(true);
+        setError('');
+        try {
+            const s3Url = await uploadFileToS3(file, 'shopify');
+            setImageUrl(s3Url);
+        } catch (err) {
+            setError(err.message || 'Image upload failed');
+        } finally {
+            setUploadingFile(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!title.trim()) {
+            setError('Product title is required');
+            return;
+        }
+        if (!price || isNaN(price) || parseFloat(price) <= 0) {
+            setError('Please enter a valid price greater than 0');
+            return;
+        }
+
+        setPublishing(true);
+        try {
+            const productData = {
+                title,
+                description,
+                vendor,
+                productType,
+                status,
+                tags,
+                variants: [
+                    {
+                        price: parseFloat(price),
+                        sku,
+                        inventoryQuantity: parseInt(inventoryQuantity) || 0
+                    }
+                ],
+                images: imageUrl ? [{ url: imageUrl, alt: title }] : []
+            };
+
+            await shopifyAPI.publishProduct(brandId, productData);
+            
+            // Clear fields
+            setTitle('');
+            setDescription('');
+            setPrice('');
+            setSku('');
+            setInventoryQuantity('10');
+            setVendor('');
+            setProductType('');
+            setStatus('draft');
+            setTags('');
+            setImageUrl('');
+            
+            onPublishSuccess();
+            onClose();
+        } catch (err) {
+            setError(err.message || 'Failed to publish product');
+        } finally {
+            setPublishing(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-[#0c0f1a] border border-[var(--sys-border)] rounded-3xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
+                <div className="flex items-center justify-between p-6 border-b border-[var(--sys-border)]">
+                    <div>
+                        <h3 className="text-xl font-bold text-[var(--sys-text)]">Create Live Shopify Listing</h3>
+                        <p className="text-xs text-[var(--sys-text-muted)]">Publish a new product directly to your store</p>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+                    {error && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm">error</span>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Product Title *</label>
+                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} required
+                            placeholder="e.g. Premium Cotton Unisex T-Shirt"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Description</label>
+                        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                            placeholder="Product description (HTML supported)..."
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none resize-none" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Price (INR) *</label>
+                            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required
+                                placeholder="999.00"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Status</label>
+                            <select value={status} onChange={e => setStatus(e.target.value)}
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:border-primary focus:outline-none">
+                                <option value="draft">Draft (Unpublished)</option>
+                                <option value="active">Active (Live in Store)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">SKU</label>
+                            <input type="text" value={sku} onChange={e => setSku(e.target.value)}
+                                placeholder="TSHIRT-BLK-M"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Inventory Qty</label>
+                            <input type="number" value={inventoryQuantity} onChange={e => setInventoryQuantity(e.target.value)}
+                                placeholder="10"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Vendor</label>
+                            <input type="text" value={vendor} onChange={e => setVendor(e.target.value)}
+                                placeholder="e.g. My Brand"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Product Type</label>
+                            <input type="text" value={productType} onChange={e => setProductType(e.target.value)}
+                                placeholder="e.g. Apparel"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Image URL</label>
+                        <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Or Upload Image File</label>
+                        <div className="relative flex items-center justify-center border-2 border-dashed border-[var(--sys-border)] hover:border-primary/40 rounded-xl p-4 transition-all bg-[var(--sys-surface)] min-h-[90px]">
+                            <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingFile || publishing}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                            <div className="text-center space-y-1 pointer-events-none">
+                                {uploadingFile ? (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-primary">
+                                        <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                                        <span>Uploading to S3...</span>
+                                    </div>
+                                ) : imageUrl ? (
+                                    <div className="flex items-center justify-center gap-2 text-sm text-emerald-400">
+                                        <span className="material-symbols-outlined text-lg">check_circle</span>
+                                        <span className="truncate max-w-[250px]">Image uploaded successfully</span>
+                                    </div>
+                                ) : (
+                                    <div className="text-[var(--sys-text-muted)]">
+                                        <span className="material-symbols-outlined text-3xl block mb-1">upload_file</span>
+                                        <span className="text-xs font-semibold">Click to upload JPG, PNG, WEBP</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-[var(--sys-text-muted)] uppercase">Tags (comma-separated)</label>
+                        <input type="text" value={tags} onChange={e => setTags(e.target.value)}
+                            placeholder="summer, casual, new-arrival"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] focus:border-primary focus:outline-none" />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-[var(--sys-border)]">
+                        <button type="button" onClick={onClose} disabled={publishing}
+                            className="flex-1 py-3 rounded-xl text-sm font-medium border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer disabled:opacity-50">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={publishing}
+                            className="flex-1 py-3 rounded-xl text-sm font-medium bg-primary text-black hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+                            {publishing ? (
+                                <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Publishing...</>
+                            ) : (
+                                <><span className="material-symbols-outlined text-sm">publish</span> Publish Live</>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 }

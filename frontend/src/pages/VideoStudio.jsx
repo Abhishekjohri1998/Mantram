@@ -122,8 +122,14 @@ export default function VideoStudio() {
     const [isPending, startTransition] = useTransition()
     const [step, setStep] = useState(0) // 0=input, 1=concepts, 2=script, 3=voiceover, 4=cost, 5=generate, 6=review
     const [loading, setLoading] = useState(false)
-    const [studioMode, setStudioMode] = useState('advanced') // 'advanced' | 'storyboard' | 'ugc'
-    const [visitedTabs, setVisitedTabs] = useState(new Set(['advanced'])) // Track visited tabs for CSS persistence
+    // Restore studioMode from sessionStorage so refresh preserves the active tab
+    const [studioMode, setStudioMode] = useState(() => sessionStorage.getItem('vs-studioMode') || 'advanced')
+    const [visitedTabs, setVisitedTabs] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem('vs-visitedTabs')
+            return saved ? new Set(JSON.parse(saved)) : new Set(['advanced'])
+        } catch { return new Set(['advanced']) }
+    })
     const [error, setError] = useState(null)
     const [autoStart, setAutoStart] = useState(false)
     const [showTemplateLibrary, setShowTemplateLibrary] = useState(false)
@@ -172,7 +178,7 @@ export default function VideoStudio() {
     // History
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
-    const [showHistory, setShowHistory] = useState(false)
+    const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('vs-showHistory') === 'true')
     const [playingVideo, setPlayingVideo] = useState(null)
     const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
     const [showGenVirality, setShowGenVirality] = useState(false) // Toggle for virality panel on newly generated video
@@ -352,9 +358,10 @@ export default function VideoStudio() {
 
     // ── Fetch history with brand filter ──
     const fetchHistory = useCallback(async (limit = 50) => {
+        setProjectsLoaded(false)
         try {
             const url = `/video-studio?limit=${limit}${activeBrand?._id ? `&brandId=${activeBrand._id}` : ''}`
-            const d = await api(url)
+            const d = await api(url, { cache: 'no-store' })
             setProjects(d.projects || [])
         } catch { }
         finally { setProjectsLoaded(true) }
@@ -364,6 +371,15 @@ export default function VideoStudio() {
     useEffect(() => {
         fetchHistory(50)
     }, [fetchHistory])
+
+    // Persist studioMode to sessionStorage so refresh preserves the active tab
+    useEffect(() => { sessionStorage.setItem('vs-studioMode', studioMode) }, [studioMode])
+
+    // Persist visitedTabs to sessionStorage so lazy-loaded components aren't re-mounted on refresh
+    useEffect(() => { sessionStorage.setItem('vs-visitedTabs', JSON.stringify([...visitedTabs])) }, [visitedTabs])
+
+    // Persist showHistory toggle
+    useEffect(() => { sessionStorage.setItem('vs-showHistory', showHistory ? 'true' : 'false') }, [showHistory])
 
     useEffect(() => {
         api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
@@ -1226,69 +1242,105 @@ export default function VideoStudio() {
                     </div>
                 )}
 
-                <Suspense fallback={
-                    <div className="w-full min-h-[100vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
-                        <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
-                    </div>
-                }>
                 <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
                 {/* ── ADVANCED MODE ── */}
                 {visitedTabs.has('advanced') && (
                     <div style={{ display: studioMode === 'advanced' ? 'contents' : 'none' }}>
-                        <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── UGC CREATOR MODE (HeyGen) ── */}
                 {visitedTabs.has('ugc') && (
                     <div style={{ display: studioMode === 'ugc' ? 'contents' : 'none' }}>
-                        <UGCCreator activeBrand={activeBrand} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <UGCCreator activeBrand={activeBrand} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── UGC PRO MODE (Seedance 2.0 / MuAPI) ── */}
                 {visitedTabs.has('ugc-pro') && (
                     <div style={{ display: studioMode === 'ugc-pro' ? 'contents' : 'none' }}>
-                        <UGCPro activeBrand={activeBrand} projects={projects} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <UGCPro activeBrand={activeBrand} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── Q-ADS MODE (Cinematic Intelligence V2) ── */}
                 {visitedTabs.has('q-ads') && (
                     <div style={{ display: studioMode === 'q-ads' ? 'contents' : 'none' }}>
-                        <QAdsV2 activeBrand={activeBrand} projects={projects} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <QAdsV2 activeBrand={activeBrand} projects={projects} projectsLoaded={projectsLoaded} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── VIDEO AGENT MODE ── */}
                 {visitedTabs.has('agent') && (
                     <div style={{ display: studioMode === 'agent' ? 'contents' : 'none' }}>
-                        <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <VideoAgent activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── MOTION GRAPHICS MODE ── */}
                 {visitedTabs.has('motion-graphics') && (
                     <div style={{ display: studioMode === 'motion-graphics' ? 'contents' : 'none' }}>
-                        <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <MotionGraphics activeBrand={activeBrand} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                        </Suspense>
                     </div>
                 )}
 
                 {/* ── STORYBOARD MODE — New AI Ad Film Director ── */}
                 {visitedTabs.has('storyboard') && (
                     <div style={{ display: studioMode === 'storyboard' ? 'contents' : 'none' }}>
-                        <Storyboard
-                            activeBrand={activeBrand}
-                            projects={projects}
-                            onVideoComplete={() => fetchHistory(50)}
-                            canCreateVideo={canCreateVideo}
-                            onUpgradeRequired={() => setShowUpgradeModal(true)}
-                            user={user}
-                        />
+                        <Suspense fallback={
+                            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                            </div>
+                        }>
+                            <Storyboard
+                                activeBrand={activeBrand}
+                                projects={projects}
+                                onVideoComplete={() => fetchHistory(50)}
+                                canCreateVideo={canCreateVideo}
+                                onUpgradeRequired={() => setShowUpgradeModal(true)}
+                                user={user}
+                            />
+                        </Suspense>
                     </div>
                 )}
                 </div>
-                </Suspense>
 
                 {/* ── OLD STORYBOARD PIPELINE (archived below — do not render) ── */}
                 {false && studioMode === 'storyboard-old' && (<>
@@ -2019,7 +2071,7 @@ export default function VideoStudio() {
                             {/* Model Selector Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {[
-                                    { id: 'gemini-flash', name: 'Gemini Flash Video', icon: 'flash_on', desc: 'Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration', bestFor: 'High-speed action, cinematic camera tracking, text/image-to-video', features: ['i2v', '4-10s'], available: true, recommended: false },
+                                    { id: 'gemini-flash', name: 'Gemini Flash Video', icon: 'flash_on', desc: 'Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration', bestFor: 'High-speed action, cinematic camera tracking, text/image-to-video', features: ['i2v', '4-90s'], available: true, recommended: false },
                                     { id: 'grok-imagine', name: 'Grok Imagine', icon: 'smart_toy', desc: 'xAI native — reference images, I2V, extend, native audio, 1-15s', bestFor: 'Social reels, product placement, character-consistent storytelling', features: ['ref-images', 'i2v', 'extend', 'native-audio', '1-15s'], available: true, recommended: true },
                                     { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', icon: 'pets', desc: 'Premium cinematic animation & realism from Alibaba', bestFor: 'High-end branding, realistic motion, expressive portraits', features: ['ref-images', 'i2v', '3-15s'], available: true, recommended: true },
                                     { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: false },

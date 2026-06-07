@@ -33,7 +33,7 @@ export default {
         defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-3-flash-preview',
         defaultOpenAIModel: process.env.DEFAULT_OPENAI_MODEL || 'gpt-4o-mini',
         defaultAnthropicModel: process.env.DEFAULT_ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.0-flash-exp',
+        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.5-flash',
         providers: {
             gemini: {
                 apiKey: process.env.GEMINI_API_KEY,
@@ -129,7 +129,7 @@ export default {
     shopify: {
         apiKey: process.env.SHOPIFY_API_KEY,
         apiSecret: process.env.SHOPIFY_API_SECRET,
-        scope: process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers',
+        scope: process.env.SHOPIFY_SCOPES || 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products',
         callbackUrl: process.env.SHOPIFY_CALLBACK_URL,
     },
 
