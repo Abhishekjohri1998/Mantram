@@ -206,14 +206,49 @@ export async function fetchShopifyProduct(accessToken, shopDomain, productId) {
  */
 export async function createShopifyProduct(accessToken, shopDomain, productData) {
     const session = getShopifySession(shopDomain, accessToken);
-    const client = new shopify.clients.Rest({ session });
+    const client = new shopify.clients.Graphql({ session });
     
-    const response = await client.post({
-        path: 'products',
-        data: { product: productData },
-        type: 'application/json'
-    });
-    return response.body?.product;
+    const input = {
+        title: productData.title,
+        descriptionHtml: productData.body_html || '',
+        vendor: productData.vendor || '',
+        productType: productData.product_type || '',
+        status: (productData.status || 'draft').toUpperCase()
+    };
+    
+    const mutation = `
+        mutation productCreate($input: ProductInput!) {
+            productCreate(input: $input) {
+                product {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+    `;
+    
+    const response = await client.request(mutation, { variables: { input } });
+    
+    if (response.data?.productCreate?.userErrors?.length > 0) {
+        throw new Error(response.data.productCreate.userErrors[0].message);
+    }
+    
+    const productId = response.data?.productCreate?.product?.id?.split('/').pop();
+    
+    // Return a REST-formatted object for compatibility with transformShopifyProduct
+    return {
+        id: productId,
+        title: productData.title,
+        body_html: productData.body_html,
+        vendor: productData.vendor,
+        product_type: productData.product_type,
+        status: productData.status,
+        variants: [],
+        images: []
+    };
 }
 
 /**
