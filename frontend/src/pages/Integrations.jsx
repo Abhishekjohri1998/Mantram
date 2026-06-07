@@ -909,7 +909,7 @@ export default function Integrations() {
                                                         <ol className="text-[11px] text-[var(--sys-text-muted)] space-y-2 list-decimal ml-4">
                                                             <li>Go to <strong>Shopify Admin</strong> → Settings → Apps and sales channels</li>
                                                             <li>Click <strong>Develop apps</strong> → <strong>Create an app</strong></li>
-                                                            <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>read_orders</code>, <code>read_customers</code></li>
+                                                            <li><strong>Configure Admin API scopes</strong>: Select <code>read_products</code>, <code>write_products</code>, <code>read_orders</code>, <code>read_customers</code>, <code>read_inventory</code>, <code>write_inventory</code></li>
                                                             <li>Click <strong>Install app</strong> and copy the <strong>Admin API access token</strong> (starts with <code>shpat_</code>)</li>
                                                         </ol>
                                                     </div>
