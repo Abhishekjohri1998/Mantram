@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "43970544d2e2cfa2e02dc38b94b62af5"
+client_id = "cbb3be9fe77a0d80b7552f78cdd87a98"
 name = "Mantram AI"
 application_url = "https://mantram.ai"
 embedded = true
