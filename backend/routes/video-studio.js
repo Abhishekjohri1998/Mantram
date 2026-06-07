@@ -7356,8 +7356,10 @@ const storyboardUpload = multer({ storage: multer.memoryStorage(), limits: { fil
 // Step 1: Director Brain (Claude) generates shot plan + Gemini generates frames
 // Returns full storyboard JSON with frameUrls
 router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), storyboardUpload.fields([
-    { name: 'productImages', maxCount: 20 }, // Accept all uploaded images
-    { name: 'avatarImage', maxCount: 1 },
+    { name: 'productImages', maxCount: 20 },
+    { name: 'avatarImages', maxCount: 4 },    // multi-character support (replaces avatarImage)
+    { name: 'avatarImage',  maxCount: 1 },    // legacy single-avatar compat
+    { name: 'refImages',    maxCount: 3 },    // location/element/mood reference images
 ]), async (req, res) => {
     try {
         const {
@@ -7365,11 +7367,30 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             style = 'hyperrealistic', duration = '30', format = '9:16',
             resolution = '2k',
             productImageUrls: bodyProductImgUrls,
+            // Multi-avatar: accept avatarUrls[] array or legacy avatarUrl string
+            avatarUrls: bodyAvatarUrls,
             avatarUrl: bodyAvatarUrl,
+            avatarNames: bodyAvatarNames,
+            // Location/element reference images
+            refImageUrls: bodyRefImageUrls,
+            // Visual branding toggle
+            includeBranding: bodyIncludeBranding,
             directorModel = 'claude',
             imageModel = 'gpt-image-2',
             dialogueLanguage = 'English'
         } = req.body;
+
+        // Parse includeBranding (default true — branding ON by default)
+        const includeBranding = bodyIncludeBranding === 'false' || bodyIncludeBranding === false ? false : true;
+
+        // Parse avatar names array
+        let avatarNames = [];
+        if (bodyAvatarNames) {
+            if (Array.isArray(bodyAvatarNames)) avatarNames = bodyAvatarNames;
+            else if (typeof bodyAvatarNames === 'string') {
+                try { avatarNames = JSON.parse(bodyAvatarNames); } catch { avatarNames = [bodyAvatarNames]; }
+            }
+        }
 
         // Map resolution string to NanoBanana imageSize token
         const RESOLUTION_TO_IMAGESIZE = { '480p': '1K', '720p': '1K', '1080p': '1K', '2k': '2K', '4k': '4K' };
@@ -7381,9 +7402,12 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         console.log(`\n🔍 [Storyboard Create] ══ INCOMING REQUEST DUMP ══`);
         console.log(`  req.files keys: ${JSON.stringify(Object.keys(req.files || {}))}`);
         console.log(`  productImages files: ${req.files?.productImages?.length || 0}`);
-        console.log(`  avatarImage files: ${req.files?.avatarImage?.length || 0}`);
+        console.log(`  avatarImages files: ${(req.files?.avatarImages || req.files?.avatarImage)?.length || 0}`);
+        console.log(`  refImages files: ${req.files?.refImages?.length || 0}`);
         console.log(`  body.productImageUrls: ${JSON.stringify(bodyProductImgUrls)?.substring(0, 200)}`);
-        console.log(`  body.avatarUrl: ${bodyAvatarUrl?.substring(0, 100)}`);
+        console.log(`  body.avatarUrls/avatarUrl: ${JSON.stringify(bodyAvatarUrls || bodyAvatarUrl)?.substring(0, 100)}`);
+        console.log(`  body.avatarNames: ${JSON.stringify(avatarNames)}`);
+        console.log(`  body.includeBranding: ${includeBranding}`);
         console.log(`  body.imageModel: ${imageModel}`);
         console.log(`  body.brief: ${brief?.substring(0, 80)}`);
 
@@ -7412,18 +7436,62 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             productImageUrls.push(...(Array.isArray(parsed) ? parsed : [parsed]).filter(u => u?.startsWith('http')));
         }
 
-        // Upload avatar if provided as file
-        let avatarUrl = bodyAvatarUrl || null;
+        // ── Upload avatars (multi-character, up to 4) ──────────────────────────
+        const avatarUrls = [];
+
+        // New multi-avatar file field
+        if (req.files?.avatarImages?.length) {
+            for (const f of req.files.avatarImages) {
+                const s3Key = `storyboard/avatars/${req.user._id}/${Date.now()}-${f.originalname}`;
+                const url = await uploadToS3(f.buffer, s3Key, f.mimetype);
+                console.log(`  ✅ Avatar image uploaded to S3: ${url}`);
+                avatarUrls.push(url);
+            }
+        }
+        // Legacy single avatarImage field
         if (req.files?.avatarImage?.[0]) {
             const f = req.files.avatarImage[0];
             const s3Key = `storyboard/avatars/${req.user._id}/${Date.now()}-${f.originalname}`;
-            avatarUrl = await uploadToS3(f.buffer, s3Key, f.mimetype);
-            console.log(`  ✅ Avatar image uploaded to S3: ${avatarUrl}`);
+            const url = await uploadToS3(f.buffer, s3Key, f.mimetype);
+            console.log(`  ✅ Legacy avatar image uploaded to S3: ${url}`);
+            if (!avatarUrls.includes(url)) avatarUrls.push(url);
+        }
+        // Pre-existing avatar URLs from body (avatarUrls[] or legacy avatarUrl string)
+        if (bodyAvatarUrls) {
+            let parsed = [];
+            if (Array.isArray(bodyAvatarUrls)) parsed = bodyAvatarUrls;
+            else if (typeof bodyAvatarUrls === 'string') {
+                try { parsed = JSON.parse(bodyAvatarUrls); } catch { parsed = [bodyAvatarUrls]; }
+            }
+            avatarUrls.push(...parsed.filter(u => u?.startsWith('http') && !avatarUrls.includes(u)));
+        }
+        if (bodyAvatarUrl && bodyAvatarUrl.startsWith('http') && !avatarUrls.includes(bodyAvatarUrl)) {
+            avatarUrls.push(bodyAvatarUrl);
         }
 
-        console.log(`  📸 FINAL productImageUrls (${productImageUrls.length}): ${JSON.stringify(productImageUrls)}`);
-        console.log(`  🧑 FINAL avatarUrl: ${avatarUrl}`);
-        console.log(`[Storyboard Create] brand=${brandId}, duration=${totalDuration}s, style=${style}, imgs=${productImageUrls.length}, avatar=${!!avatarUrl}`);
+        // ── Upload location/element reference images (up to 3) ────────────────
+        const refImageUrls = [];
+        if (req.files?.refImages?.length) {
+            for (const f of req.files.refImages) {
+                const s3Key = `storyboard/refs/${req.user._id}/${Date.now()}-${f.originalname}`;
+                const url = await uploadToS3(f.buffer, s3Key, f.mimetype);
+                console.log(`  ✅ Ref image uploaded to S3: ${url}`);
+                refImageUrls.push(url);
+            }
+        }
+        if (bodyRefImageUrls) {
+            let parsed = [];
+            if (Array.isArray(bodyRefImageUrls)) parsed = bodyRefImageUrls;
+            else if (typeof bodyRefImageUrls === 'string') {
+                try { parsed = JSON.parse(bodyRefImageUrls); } catch { parsed = [bodyRefImageUrls]; }
+            }
+            refImageUrls.push(...parsed.filter(u => u?.startsWith('http') && !refImageUrls.includes(u)).slice(0, 3 - refImageUrls.length));
+        }
+
+        console.log(`  📸 FINAL productImageUrls (${productImageUrls.length}): ${JSON.stringify(productImageUrls).substring(0, 200)}`);
+        console.log(`  🧑 FINAL avatarUrls (${avatarUrls.length}): ${JSON.stringify(avatarUrls).substring(0, 200)}`);
+        console.log(`  📍 FINAL refImageUrls (${refImageUrls.length}): ${JSON.stringify(refImageUrls).substring(0, 200)}`);
+        console.log(`[Storyboard Create] brand=${brandId}, duration=${totalDuration}s, style=${style}, imgs=${productImageUrls.length}, avatars=${avatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
         console.log(`🔍 [Storyboard Create] ══ END DUMP ══\n`);
 
         // Step 1: Director Brain — generate shot plan via Claude
@@ -7433,7 +7501,10 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             productName,
             productFeatures,
             productImageUrls,
-            avatarUrl,
+            avatarUrls,
+            avatarNames,
+            refImageUrls,
+            includeBranding,
             style,
             duration: totalDuration,
             format,
@@ -7445,59 +7516,54 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
         // Pass raw file buffers directly (bypasses S3 re-download which can silently fail)
         let rawProductBuffers = (req.files?.productImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
-        let rawAvatarBuffer = req.files?.avatarImage?.[0] ? { buffer: req.files.avatarImage[0].buffer, mimeType: req.files.avatarImage[0].mimetype } : null;
 
-        // Eagerly download avatar image URL to buffer if no file was uploaded
-        if (!rawAvatarBuffer && avatarUrl) {
-            console.log(`[Storyboard Create] rawAvatarBuffer empty — downloading avatar URL to buffer...`);
+        // Multi-avatar: collect raw buffers from avatarImages (new) and legacy avatarImage field
+        let rawAvatarBuffers = [
+            ...(req.files?.avatarImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype })),
+            ...(req.files?.avatarImage || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype })),
+        ];
+
+        // Location/element ref buffers
+        let rawRefBuffers = (req.files?.refImages || []).map(f => ({ buffer: f.buffer, mimeType: f.mimetype }));
+
+        // Helper: download a URL to a buffer
+        const dlBufCreate = async (url) => {
             try {
-                const signedAvatarUrl = await getSignedUrlIfNeeded(avatarUrl);
-                const resp = await fetch(signedAvatarUrl, { 
-                    headers: { 'User-Agent': 'Mozilla/5.0' }, 
-                    signal: AbortSignal.timeout(15000) 
-                });
-                if (resp.ok) {
-                    rawAvatarBuffer = {
-                        buffer: Buffer.from(await resp.arrayBuffer()),
-                        mimeType: resp.headers.get('content-type') || 'image/jpeg'
-                    };
-                    console.log(`[Storyboard Create] Successfully downloaded avatar to buffer`);
-                } else {
-                    console.warn(`[Storyboard Create] Failed to download avatar buffer: HTTP ${resp.status}`);
-                }
+                const signedUrl = await getSignedUrlIfNeeded(url);
+                const resp = await fetch(signedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                return { buffer: Buffer.from(await resp.arrayBuffer()), mimeType: resp.headers.get('content-type') || 'image/jpeg' };
             } catch (e) {
-                console.warn(`[Storyboard Create] Failed to download avatar buffer: ${e.message}`);
+                console.warn(`[Storyboard Create] Failed to download buffer from URL: ${e.message}`);
+                return null;
             }
+        };
+
+        // Eagerly download avatar URLs to buffers if no file buffers available
+        if (rawAvatarBuffers.length === 0 && avatarUrls.length > 0) {
+            console.log(`[Storyboard Create] Downloading ${avatarUrls.length} avatar URL(s) to buffers...`);
+            rawAvatarBuffers = (await Promise.all(avatarUrls.map(dlBufCreate))).filter(Boolean);
+            console.log(`[Storyboard Create] Downloaded ${rawAvatarBuffers.length} avatar buffers`);
+        }
+
+        // Eagerly download ref image URLs to buffers if no file buffers available
+        if (rawRefBuffers.length === 0 && refImageUrls.length > 0) {
+            console.log(`[Storyboard Create] Downloading ${refImageUrls.length} ref image URL(s) to buffers...`);
+            rawRefBuffers = (await Promise.all(refImageUrls.map(dlBufCreate))).filter(Boolean);
+            console.log(`[Storyboard Create] Downloaded ${rawRefBuffers.length} ref image buffers`);
         }
 
         // ✅ KEY FIX: When product images arrive as URLs (scraped via URL, not file-uploaded),
         // rawProductBuffers will be empty and NanoBanana will hallucinate because it never
         // receives actual image pixels. We eagerly download the S3 URLs to buffers here.
         if (rawProductBuffers.length === 0 && productImageUrls.length > 0) {
-            console.log(`[Storyboard Create] rawProductBuffers empty — downloading ${Math.min(productImageUrls.length, 2)} URL images to buffers...`);
-            const downloadBuffer = async (url) => {
-                try {
-                    const signedUrl = await getSignedUrlIfNeeded(url);
-                    const resp = await fetch(signedUrl, { 
-                        headers: { 'User-Agent': 'Mozilla/5.0' }, 
-                        signal: AbortSignal.timeout(15000) 
-                    });
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                    const buf = Buffer.from(await resp.arrayBuffer());
-                    const mimeType = resp.headers.get('content-type') || 'image/jpeg';
-                    return { buffer: buf, mimeType };
-                } catch (e) {
-                    console.warn(`[Storyboard Create] Failed to download product image buffer: ${e.message}`);
-                    return null;
-                }
-            };
-            // Download ALL URL images to buffers — no cap
-            const downloaded = await Promise.all(productImageUrls.map(downloadBuffer));
+            console.log(`[Storyboard Create] rawProductBuffers empty — downloading ${productImageUrls.length} URL images to buffers...`);
+            const downloaded = await Promise.all(productImageUrls.map(dlBufCreate));
             rawProductBuffers = downloaded.filter(Boolean);
             console.log(`[Storyboard Create] Downloaded ${rawProductBuffers.length} product image buffers from URLs`);
         }
 
-        console.log(`[Storyboard Create] Passing ${rawProductBuffers.length} raw buffers + avatar=${!!rawAvatarBuffer} directly to poster generator`);
+        console.log(`[Storyboard Create] Passing product=${rawProductBuffers.length} avatar=${rawAvatarBuffers.length} ref=${rawRefBuffers.length} buffers to poster generator`);
 
         // Download logo URL to buffer
         let rawLogoBuffer = null;
@@ -7525,14 +7591,21 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             plan.imagePrompt,
             style,
             format,
-            productImageUrls,   // S3 URLs (fallback if no raw buffers)
-            avatarUrl,
+            productImageUrls,      // S3 URLs (fallback if no raw buffers)
+            null,                  // legacy single avatarUrl — not used (multi-avatar below)
             imageModel,
-            rawProductBuffers,  // raw buffers — contains actual pixel data
-            rawAvatarBuffer,
-            imageSizeForModel,  // ✅ Pass resolved imageSize (e.g. '2K') to NanoBanana
-            logoUrl,
-            rawLogoBuffer
+            rawProductBuffers,     // raw buffers — contains actual pixel data
+            null,                  // legacy single rawAvatarBuffer — not used
+            imageSizeForModel,     // NanoBanana resolution e.g. '2K'
+            plan.logoUrl || null,  // brand logo URL (null if includeBranding=false)
+            rawLogoBuffer,         // brand logo buffer (null if includeBranding=false)
+            // ── New multi-character + ref image params ──
+            avatarUrls,
+            avatarNames,
+            rawAvatarBuffers,
+            refImageUrls,
+            rawRefBuffers,
+            Math.min(plan.cuts?.length || 5, 8),  // dynamic panel count
         );
 
 
@@ -7561,7 +7634,12 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 brief,
                 productName: productName || '',
                 productFeatures: productFeatures || '',
-                avatarUrl: avatarUrl || '',
+                // Multi-avatar: store all avatar URLs + names + legacy compat
+                avatarUrl: avatarUrls[0] || '',
+                avatarUrls: avatarUrls,
+                avatarNames: avatarNames,
+                // Location/element refs
+                refImageUrls: refImageUrls,
                 images: productImageUrls.map(url => ({ url, source: 'upload' })),
             },
             storyboard: {
@@ -7577,7 +7655,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 format,
                 style,
                 dialogueLanguage,
-                // ── 4-section structured plan (new) ──
+                includeBranding,
+                // ── 4-section structured plan ──
                 structuredPlan: {
                     colorPalette:           plan.colorPalette || [],
                     paletteNames:           plan.paletteNames || [],
@@ -7619,7 +7698,11 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         // ✅ FIX: Load the project's saved product images from DB so the regenerated poster
         // is grounded to the actual product — not hallucinated from scratch
         let productImageUrls = [];
-        let avatarUrl = null;
+        let avatarUrls = [];
+        let avatarUrl = null;          // legacy compat (first avatar)
+        let avatarNames = [];
+        let refImageUrls = [];
+        let panelCount = 5;
         let dialogueLanguageSelected = dialogueLanguage || 'English';
         let brief = '';
         let productName = '';
@@ -7633,7 +7716,17 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             if (proj?.input?.images?.length > 0) {
                 productImageUrls = proj.input.images.map(img => img.url).filter(Boolean);
             }
-            avatarUrl = proj?.input?.avatarUrl || null;
+            // Multi-avatar
+            if (proj?.input?.avatarUrls?.length > 0) {
+                avatarUrls = proj.input.avatarUrls;
+            } else if (proj?.input?.avatarUrl) {
+                avatarUrls = [proj.input.avatarUrl];
+            }
+            avatarUrl = avatarUrls[0] || null; // legacy compat
+            avatarNames = proj?.input?.avatarNames || [];
+            refImageUrls = proj?.input?.refImageUrls || [];
+            // Panel count from the stored structured plan
+            panelCount = Math.min(proj?.storyboard?.structuredPlan?.cuts?.length || 5, 8);
             if (!dialogueLanguage) {
                 dialogueLanguageSelected = proj?.storyboard?.dialogueLanguage || 'English';
             }
@@ -7661,20 +7754,31 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             } catch { return null; }
         };
 
-        // Download product image URLs to buffers so NanoBanana/GPT-Image-2 gets actual pixel data
+        // Sign all product image URLs and download to buffers
         let rawProductBuffers = [];
         let signedProductUrls = [];
         if (productImageUrls.length > 0) {
             signedProductUrls = await Promise.all(productImageUrls.map(url => getSignedUrlIfNeeded(url)));
-            rawProductBuffers = (await Promise.all(signedProductUrls.map(dlBuf))).filter(Boolean); // ALL images
+            rawProductBuffers = (await Promise.all(signedProductUrls.map(dlBuf))).filter(Boolean);
         }
 
-        // Download avatar URL to buffer to fix avatar reference loss on regeneration
-        let rawAvatarBuffer = null;
-        let signedAvatarUrl = avatarUrl;
-        if (avatarUrl) {
-            signedAvatarUrl = await getSignedUrlIfNeeded(avatarUrl);
-            rawAvatarBuffer = await dlBuf(signedAvatarUrl);
+        // Sign all avatar URLs and download to buffers (multi-avatar)
+        let rawAvatarBuffers = [];
+        let signedAvatarUrls = [];
+        if (avatarUrls.length > 0) {
+            signedAvatarUrls = await Promise.all(avatarUrls.map(url => getSignedUrlIfNeeded(url)));
+            rawAvatarBuffers = (await Promise.all(signedAvatarUrls.map(dlBuf))).filter(Boolean);
+        }
+        // Legacy compat: single avatarUrl
+        const signedAvatarUrl = signedAvatarUrls[0] || null;
+        const rawAvatarBuffer = rawAvatarBuffers[0] || null;
+
+        // Sign ref image URLs and download to buffers
+        let rawRefBuffers = [];
+        let signedRefUrls = [];
+        if (refImageUrls.length > 0) {
+            signedRefUrls = await Promise.all(refImageUrls.map(url => getSignedUrlIfNeeded(url)));
+            rawRefBuffers = (await Promise.all(signedRefUrls.map(dlBuf))).filter(Boolean);
         }
 
         // Download logo URL to buffer
@@ -7685,7 +7789,7 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
             rawLogoBuffer = await dlBuf(signedLogoUrl);
         }
 
-        console.log(`[Storyboard Regen Poster] product refs=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, logo=${!!rawLogoBuffer}, model=${imageModel}`);
+        console.log(`[Storyboard Regen Poster] products=${rawProductBuffers.length}, avatars=${rawAvatarBuffers.length} (${avatarNames.join(', ') || 'unnamed'}), refs=${rawRefBuffers.length}, logo=${!!rawLogoBuffer}, panels=${panelCount}, model=${imageModel}`);
 
         // Import frame generator
         const { generateStoryboardPoster } = await import('../agents/videoStudio/storyboardFrames.js');
@@ -7693,13 +7797,20 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         const posterDataUrl = await generateStoryboardPoster(
             imagePrompt, style, format,
             signedProductUrls,     // signed S3 URL fallback
-            signedAvatarUrl,
+            signedAvatarUrl,       // legacy single avatar URL (first)
             imageModel,
-            rawProductBuffers,    // actual pixel data
-            rawAvatarBuffer,       // actual avatar pixel data
+            rawProductBuffers,     // actual product pixel data
+            rawAvatarBuffer,       // legacy single avatar buffer (first)
             '2K',
             signedLogoUrl,
-            rawLogoBuffer
+            rawLogoBuffer,
+            // ── Multi-character + ref image params ──
+            signedAvatarUrls,      // all avatar URLs
+            avatarNames,           // character names
+            rawAvatarBuffers,      // all avatar buffers
+            signedRefUrls,         // ref image URLs
+            rawRefBuffers,         // ref image buffers
+            panelCount,            // dynamic panel count from saved plan
         );
 
         if (!posterDataUrl) throw new Error('Poster generation failed');
@@ -7944,6 +8055,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             format = '9:16',
             resolution = '480p',
             productImageUrls = [],
+            // Multi-avatar from frontend
+            avatarUrls: bodyAvatarUrls,
             avatarUrl,
             model = 'seedance-2.0-fast',
         } = req.body;
@@ -7955,7 +8068,10 @@ router.post('/storyboard/animate', protect, async (req, res) => {
 
         // ── Load full context from DB ─────────────────────────────────────────
         let dbProductImgs = [];
-        let dbAvatar = null;
+        let dbAvatar = null;             // legacy compat (first avatar)
+        let dbAvatarUrls = [];           // all avatar URLs (multi-character)
+        let dbAvatarNames = [];          // character names
+        let dbRefImageUrls = [];         // location/element ref images
         let dbBrief = '';
         let dbProductName = '';
         let dbProductFeatures = '';
@@ -7972,25 +8088,29 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 .lean();
             if (project) {
                 const rawProductImgs = (project.input?.images || []).map(img => img.url).filter(Boolean);
-                const rawAvatar      = project.input?.avatarUrl || null;
-                dbBrief       = project.input?.brief || '';
-                dbProductName = project.input?.productName || '';
-                dbProductFeatures = project.input?.productFeatures || '';
-                dbFormat      = project.storyboard?.format || format;
-                dbStyle       = project.storyboard?.style || 'hyperrealistic';
-                dbDialogueLanguage = project.storyboard?.dialogueLanguage || 'English';
-                dbStructuredPlan  = project.storyboard?.structuredPlan || null;
+                // Multi-avatar: read avatarUrls[] with fallback to legacy avatarUrl
+                const rawAvatarUrls  = project.input?.avatarUrls?.length > 0
+                    ? project.input.avatarUrls
+                    : (project.input?.avatarUrl ? [project.input.avatarUrl] : []);
+                dbAvatarNames        = project.input?.avatarNames || [];
+                dbRefImageUrls       = project.input?.refImageUrls || [];
+                dbBrief              = project.input?.brief || '';
+                dbProductName        = project.input?.productName || '';
+                dbProductFeatures    = project.input?.productFeatures || '';
+                dbFormat             = project.storyboard?.format || format;
+                dbStyle              = project.storyboard?.style || 'hyperrealistic';
+                dbDialogueLanguage   = project.storyboard?.dialogueLanguage || 'English';
+                dbStructuredPlan     = project.storyboard?.structuredPlan || null;
 
-                // ✅ FIX: S3 bucket has ACLs disabled — raw S3 URLs stored in DB are NOT publicly
-                // accessible. Sign all product image URLs and the avatar URL before passing them
-                // to Atlas Cloud, which must be able to fetch them over HTTPS.
+                // Sign all product image URLs
                 dbProductImgs = await Promise.all(rawProductImgs.map(url => getSignedUrlIfNeeded(url)));
-                dbAvatar      = rawAvatar ? await getSignedUrlIfNeeded(rawAvatar) : null;
+                // Sign all avatar URLs
+                dbAvatarUrls  = await Promise.all(rawAvatarUrls.map(url => getSignedUrlIfNeeded(url)));
+                dbAvatar      = dbAvatarUrls[0] || null; // legacy compat
 
-                // ✅ FIX: Always refresh the poster URL with a new signed URL so Atlas can always fetch it.
-                // The client-sent imageUrl may be an expired signed URL from a stale session.
+                // Re-sign the storyboard poster URL
                 const rawDbPosterUrl = project.storyboard?.imageUrl || null;
-                const posterSource = rawDbPosterUrl || imageUrl; // prefer DB copy (raw S3 URL)
+                const posterSource = rawDbPosterUrl || imageUrl;
                 if (posterSource) {
                     try {
                         imageUrl = await getSignedUrlIfNeeded(posterSource);
@@ -8009,10 +8129,9 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                     const voiceDesc = dna.voice?.description || '';
                     const usps = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
                     dbBrandContext = `Brand: ${project.brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nPersonality: ${personality} - ${voiceDesc}\nUSPs: ${usps}`;
-                    // Sign logo URL
                     if (dbLogoUrl) dbLogoUrl = await getSignedUrlIfNeeded(dbLogoUrl);
                 }
-                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs (signed), avatar=${!!dbAvatar} (signed), logo=${!!dbLogoUrl}`);
+                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs, ${dbAvatarUrls.length} avatars, ${dbRefImageUrls.length} refs, logo=${!!dbLogoUrl}`);
             }
         }
 
@@ -8021,7 +8140,16 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             const parsed = typeof productImageUrls === 'string' ? JSON.parse(productImageUrls) : (productImageUrls || []);
             dbProductImgs = parsed.filter(u => u?.startsWith('http'));
         }
-        if (!dbAvatar && avatarUrl) dbAvatar = avatarUrl;
+        // Fallback avatars from body (frontend sends avatarUrls[])
+        if (dbAvatarUrls.length === 0 && bodyAvatarUrls) {
+            const parsed = Array.isArray(bodyAvatarUrls) ? bodyAvatarUrls : [bodyAvatarUrls];
+            dbAvatarUrls = parsed.filter(u => u?.startsWith('http'));
+            dbAvatar = dbAvatarUrls[0] || null;
+        }
+        if (dbAvatarUrls.length === 0 && avatarUrl) {
+            dbAvatarUrls = [avatarUrl];
+            dbAvatar = avatarUrl;
+        }
 
         // ── Reference image routing ────────────────────────────────────────────
         //
@@ -8035,24 +8163,31 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         // The storyboard poster is NEVER used as a video first frame.
         // It is a style reference — it defines what the video should LOOK LIKE, not what it starts with.
 
-        const firstFrameUrl = dbProductImgs[0] || dbAvatar || null;
+        const firstFrameUrl = dbProductImgs[0] || dbAvatarUrls[0] || null;
 
         // Determine if first frame is a product or avatar (affects @image1 tag description)
         const firstFrameIsProduct = !!dbProductImgs[0];
-        const firstFrameIsAvatar = !dbProductImgs[0] && !!dbAvatar;
+        const firstFrameIsAvatar = !dbProductImgs[0] && dbAvatarUrls.length > 0;
+
+        // Multi-avatar: each avatar gets its own character_reference entry
+        const avatarRefs = dbAvatarUrls.map((url, i) => ({
+            url,
+            role: 'character_reference',
+            name: dbAvatarNames[i] || `Character ${i + 1}`,
+        }));
 
         const combinedReferences = [
-            { url: imageUrl, role: 'style_reference' },                                   // @image2: storyboard poster style guide
-            ...dbProductImgs.map(url => ({ url, role: 'product' })),                      // @image3+: product references
-            ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),                       // avatar face reference
-            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),                     // logo
+            { url: imageUrl, role: 'style_reference' },           // storyboard poster style guide
+            ...dbProductImgs.map(url => ({ url, role: 'product' })),
+            ...avatarRefs,                                         // all characters
+            ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
 
         // For long-form segments, pass refs WITHOUT the poster
         // (storyboardLongForm.js adds the poster per-segment from params.imageUrl)
         const longFormRefs = [
             ...dbProductImgs.map(url => ({ url, role: 'product' })),
-            ...(dbAvatar ? [{ url: dbAvatar, role: 'face' }] : []),
+            ...avatarRefs,
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
 
@@ -8119,6 +8254,10 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 voiceoverScript,
                 voiceoverLanguage,
                 bgmPreset,
+                // ── Multi-character support ──
+                avatarUrls:  dbAvatarUrls,
+                avatarNames: dbAvatarNames,
+                refImageUrls: dbRefImageUrls,
             });
 
             if (projectId) {

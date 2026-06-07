@@ -137,6 +137,10 @@ export function startStoryboardLongForm({
     voiceoverScript = '',
     voiceoverLanguage = 'English',
     bgmPreset = 'cinematic',
+    // New multi-character + ref image params
+    avatarUrls = [],
+    avatarNames = [],
+    refImageUrls = [],
 }) {
     const jobId = `sb-lf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -164,6 +168,7 @@ export function startStoryboardLongForm({
         projectId, userId, imageUrl, firstFrameUrl, videoPrompt,
         totalDuration, format, resolution, referenceImages, model, qualityMode,
         voiceoverScript, voiceoverLanguage, bgmPreset,
+        avatarUrls, avatarNames, refImageUrls,
     }).catch(err => {
         const j = activeJobs.get(jobId);
         if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
@@ -209,6 +214,10 @@ async function _runPipeline(jobId, params) {
         let productFeatures = '';
         let dialogueLanguage = params.voiceoverLanguage || 'English';
         let voiceoverScript = params.voiceoverScript || '';
+        // Multi-character support — loaded from DB if not in params
+        let avatarUrls = params.avatarUrls || [];
+        let avatarNames = params.avatarNames || [];
+        let refImageUrls = params.refImageUrls || [];
 
         if (params.projectId) {
             try {
@@ -225,6 +234,21 @@ async function _runPipeline(jobId, params) {
                             voiceoverScript = project.storyboard.voiceoverScript;
                         }
                     }
+                    // Load multi-avatar data from DB (stored by /storyboard/create)
+                    if (project.input) {
+                        if (project.input.avatarUrls?.length > 0 && avatarUrls.length === 0) {
+                            avatarUrls = project.input.avatarUrls;
+                        } else if (project.input.avatarUrl && avatarUrls.length === 0) {
+                            avatarUrls = [project.input.avatarUrl];
+                        }
+                        if (project.input.avatarNames?.length > 0 && avatarNames.length === 0) {
+                            avatarNames = project.input.avatarNames;
+                        }
+                        if (project.input.refImageUrls?.length > 0 && refImageUrls.length === 0) {
+                            refImageUrls = project.input.refImageUrls;
+                        }
+                        productFeatures = project.input.brief || '';
+                    }
                     if (project.brand) {
                         const brand = project.brand;
                         productName = brand.name || '';
@@ -237,14 +261,33 @@ async function _runPipeline(jobId, params) {
                             brandContext = `Brand Name: ${brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nVoice/Personality: ${personality} - ${voiceDesc}\nUSPs: ${uniqueSellingPoints}`;
                         }
                     }
-                    if (project.input) {
-                        productFeatures = project.input.brief || '';
-                    }
                 }
             } catch (dbErr) {
                 console.warn(`[SB LongForm ${jobId}] Failed to load project metadata from DB: ${dbErr.message}`);
             }
         }
+
+        // Build enriched referenceImages: all avatars as character_reference
+        // Merge any passed-in referenceImages with the DB-loaded avatar refs
+        const avatarRefs = avatarUrls.map((url, i) => ({
+            url,
+            role: 'character_reference',
+            name: avatarNames[i] || `Character ${i + 1}`,
+        }));
+        const refImgRefs = refImageUrls.map((url, i) => ({
+            url,
+            role: 'location_reference',
+            name: `ref_${i + 1}`,
+        }));
+        // Combine: existing referenceImages (product etc.) + avatars + location refs
+        // (deduplicate by URL)
+        const existingUrls = new Set((params.referenceImages || []).map(r => r.url || r));
+        const extraRefs = [...avatarRefs, ...refImgRefs].filter(r => !existingUrls.has(r.url));
+        const enrichedReferenceImages = [...(params.referenceImages || []), ...extraRefs];
+
+        console.log(`[SB LongForm ${jobId}] 🧑 Multi-char refs: ${avatarRefs.length} avatars, ${refImgRefs.length} location refs`);
+        console.log(`[SB LongForm ${jobId}] 🎭 Characters: ${avatarNames.join(', ') || 'none'}`);
+        console.log(`[SB LongForm ${jobId}] 📋 Total reference images: ${enrichedReferenceImages.length}`);
 
         _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
         let scenes = [];
@@ -258,7 +301,8 @@ async function _runPipeline(jobId, params) {
                 brandContext,
                 productName,
                 productFeatures,
-                referenceImages: params.referenceImages || [],
+                referenceImages: enrichedReferenceImages,
+                characterNames: avatarNames,   // named characters for @imageN mapping
             });
             console.log(`[SB LongForm ${jobId}] 📋 Decomposed into ${scenes.length} scenes.`);
         } catch (planErr) {
@@ -307,7 +351,7 @@ async function _runPipeline(jobId, params) {
             // Build references: always inject storyboard poster as style guide for EVERY segment.
             // This keeps colour grading, composition and overall visual style consistent.
             const posterStyleRef = params.imageUrl ? [{ url: params.imageUrl, role: 'style_reference' }] : [];
-            const segmentRefs = [...posterStyleRef, ...params.referenceImages];
+            const segmentRefs = [...posterStyleRef, ...enrichedReferenceImages];
 
             // Build per-segment prompt — enrich with position context
             const isLast   = i === segCount - 1;

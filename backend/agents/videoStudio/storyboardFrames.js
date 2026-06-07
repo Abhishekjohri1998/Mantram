@@ -21,23 +21,42 @@ const STYLE_PREFIXES = {
     '2d': 'Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout. 2D animated commercial style, clean flat vector illustration, bold black outlines, vibrant colors, clean design, beige/creme background canvas.',
 };
 
-const STYLE_SUFFIX = `CRITICAL CANVAS LAYOUT REQUIREMENT: This MUST be a single, large consolidated infographic image structured into 4 distinct horizontal sections:
-1. TOP META HEADER: Displaying 'Cut Count: X', 'Color Palette: ...', 'Environment Fingerprint: ...' in clean black typography.
+/**
+ * Build a dynamic STYLE_SUFFIX for the storyboard poster prompt.
+ * @param {number} panelCount — how many storyboard panels to render (default 5, max 8)
+ * @param {string[]} avatarNames — character names for the CHARACTER REFERENCE section
+ * @returns {string}
+ */
+function buildStyleSuffix(panelCount = 5, avatarNames = []) {
+    const visiblePanels = Math.min(Math.max(panelCount, 5), 8);
+    const panelRow = visiblePanels <= 5
+        ? `A clean horizontal row of ${visiblePanels} main storyboard panels (Cut 1${visiblePanels > 1 ? ' through Cut ' + visiblePanels : ''}).`
+        : `ROW 1: panels Cut 1–5 horizontal. ROW 2: panels Cut 6–${visiblePanels} horizontal.`;
+
+    const charRefDesc = avatarNames.length === 0
+        ? `'CHARACTER REFERENCE' showing 6 small panels of the presenter/model from different angles (front, side, back, face close-up, side close-up, wardrobe detail).`
+        : avatarNames.length === 1
+        ? `'CHARACTER REFERENCE' showing 6 small panels of Character "${avatarNames[0]}" from different angles (front, side, back, face close-up, side close-up, wardrobe detail).`
+        : `'CHARACTER REFERENCE' showing one panel per character, labelled with their name: ${avatarNames.map(n => `"${n}"`).join(', ')} — front view + face close-up for each.`;
+
+    return `CRITICAL CANVAS LAYOUT REQUIREMENT: This MUST be a single, large consolidated infographic image structured into 4 distinct horizontal sections:
+1. TOP META HEADER: Displaying 'Cut Count: ${visiblePanels}', 'Color Palette: ...', 'Environment Fingerprint: ...' in clean black typography.
 2. SECTION 1 (CHARACTER & HERO PRODUCT REFERENCE):
-   - 'CHARACTER REFERENCE' showing 6 small panels of the presenter/model from different angles (front, side, back, face close-up, side close-up, wardrobe detail).
+   - ${charRefDesc}
    - 'HERO PRODUCT REFERENCE' showing 5 small panels of the product from different angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
    - Bottom row: Color palette circular swatches and text material notes.
 3. SECTION 2 (ENVIRONMENT / SET DESIGN):
    - A large 16:9 set design render of the environment on the left.
    - A clean top-down floor plan schematic diagram on the right, showing counter/furniture layout and camera paths/arrows labeled with cut numbers (e.g. Cut 1, Cut 2).
 4. SECTION 3 (STORYBOARD CUTS):
-   - A clean horizontal row of 5 main storyboard panels (Cut 1, Cut 2, Cut 3, Cut 4, Cut 5).
+   - ${panelRow}
    - Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type — short action description'.
 5. SECTION 4 (LIGHTING / MOOD / STYLE NOTES):
    - 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
    - On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
 
 This must look exactly like a real professional advertising agency presentation deck or director's pre-production storyboard template. All panels, text labels, schemas, and diagrams must be crisp, clean, and perfectly organized on a single cohesive canvas page.`;
+}
 
 // ── Aspect ratio → GPT Image 2 size ──────────────────────────────────────────
 const AR_TO_SIZE = {
@@ -78,15 +97,24 @@ async function downloadBuffer(url) {
 /**
  * Generate a single storyboard poster with visual reference grounding.
  *
- * @param {string}   imagePrompt        — prompt from storyboardDirector
- * @param {string}   style              — 'hyperrealistic' | '3d' | '2d'
- * @param {string}   format             — '9:16' | '16:9' | '1:1' | '4:3'
- * @param {string[]} productImageUrls   — S3/CDN URLs (fallback if no raw buffers)
- * @param {string|null} avatarUrl       — S3/CDN URL (fallback if no raw avatar buffer)
- * @param {string}   imageModel         — 'gpt-image-2' | 'nanobanana'
+ * @param {string}   imagePrompt           — prompt from storyboardDirector
+ * @param {string}   style                 — 'hyperrealistic' | '3d' | '2d'
+ * @param {string}   format                — '9:16' | '16:9' | '1:1' | '4:3'
+ * @param {string[]} productImageUrls      — S3/CDN URLs (fallback if no raw buffers)
+ * @param {string|null} avatarUrl          — single legacy avatar URL (or null)
+ * @param {string}   imageModel            — 'gpt-image-2' | 'nanobanana'
  * @param {Array<{buffer: Buffer, mimeType: string}>} rawProductBuffers — direct multer buffers
- * @param {{buffer: Buffer, mimeType: string}|null}   rawAvatarBuffer   — direct multer buffer
- * @returns {string|null}              — data URI or null on failure
+ * @param {{buffer: Buffer, mimeType: string}|null}   rawAvatarBuffer   — single legacy avatar buffer
+ * @param {string}   imageSize             — NanoBanana resolution: '1K' | '2K' | '4K'
+ * @param {string|null} logoUrl            — brand logo URL
+ * @param {{buffer: Buffer, mimeType: string}|null}   rawLogoBuffer     — brand logo buffer
+ * @param {string[]} avatarUrls            — multi-avatar S3/CDN URLs (NEW)
+ * @param {string[]} avatarNames           — names matching avatarUrls (NEW)
+ * @param {Array<{buffer: Buffer, mimeType: string}>} rawAvatarBuffers  — multi-avatar buffers (NEW)
+ * @param {string[]} refImageUrls          — location/element reference URLs (NEW)
+ * @param {Array<{buffer: Buffer, mimeType: string}>} rawRefBuffers     — ref image buffers (NEW)
+ * @param {number}   panelCount            — number of storyboard panels to render in STYLE_SUFFIX
+ * @returns {string|null}                  — data URI or null on failure
  */
 export async function generateStoryboardPoster(
     imagePrompt,
@@ -97,29 +125,48 @@ export async function generateStoryboardPoster(
     imageModel = 'gpt-image-2',
     rawProductBuffers = [],
     rawAvatarBuffer = null,
-    imageSize = '2K',  // ✅ NanoBanana resolution: '1K' | '2K' | '4K'
+    imageSize = '2K',
     logoUrl = null,
     rawLogoBuffer = null,
+    // ─── NEW multi-character + ref image params ───
+    avatarUrls = [],
+    avatarNames = [],
+    rawAvatarBuffers = [],
+    refImageUrls = [],
+    rawRefBuffers = [],
+    panelCount = 5,
 ) {
+    // Merge legacy single-avatar with multi-avatar arrays
+    const allAvatarUrls = avatarUrls.length > 0 ? avatarUrls : (avatarUrl ? [avatarUrl] : []);
+    const allRawAvatarBuffers = rawAvatarBuffers.length > 0 ? rawAvatarBuffers : (rawAvatarBuffer ? [rawAvatarBuffer] : []);
+
     const stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
     const ar = format || '16:9';
-    let finalPrompt = `${stylePrefix} ${imagePrompt} ${STYLE_SUFFIX}`;
-    
+    const styleSuffix = buildStyleSuffix(panelCount, avatarNames);
+    let finalPrompt = `${stylePrefix} ${imagePrompt} ${styleSuffix}`;
+
     const hasProductRefs = rawProductBuffers.length > 0 || productImageUrls.length > 0;
-    const hasAvatarRef = !!rawAvatarBuffer || !!avatarUrl;
+    const hasAvatarRef = allRawAvatarBuffers.length > 0 || allAvatarUrls.length > 0;
     const hasLogoRef = !!rawLogoBuffer || !!logoUrl;
+    const hasRefImages = rawRefBuffers.length > 0 || refImageUrls.length > 0;
     
-    if (hasProductRefs || hasAvatarRef || hasLogoRef) {
+    if (hasProductRefs || hasAvatarRef || hasLogoRef || hasRefImages) {
         finalPrompt += `\n\nCRITICAL INSTRUCTION: You have been provided with reference images. You MUST use them exactly as they appear.`;
         finalPrompt += ` IMPORTANT: Do NOT confuse the human character with the product! Keep them entirely separate.`;
         if (hasProductRefs) {
             finalPrompt += ` The PRODUCT to feature in the scene MUST perfectly match the attached product reference (its exact shape, design details, color shades, labels, and branding). Do NOT change the product's colors, materials, or structure. The product must look exactly as in the original reference. The brand colors/color palette must ONLY be used for the background, set environment, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.`;
         }
         if (hasAvatarRef) {
-            finalPrompt += ` The HUMAN CHARACTER/PRESENTER in the scene MUST perfectly match the attached human face/avatar reference. Do NOT mix product features onto the human face, and keep facial features, skin tone, hair, and look completely original.`;
+            const charDesc = avatarNames.length > 1
+                ? `Each CHARACTER REFERENCE image corresponds to a specific named character: ${avatarNames.map((n, i) => `Image ${i + 1} = "${n}"`).join(', ')}. Each character must match their specific reference ONLY — never mix faces between characters.`
+                : `The HUMAN CHARACTER/PRESENTER in the scene MUST perfectly match the attached human face/avatar reference. Do NOT mix product features onto the human face, and keep facial features, skin tone, hair, and look completely original.`;
+            finalPrompt += ` ${charDesc}`;
         }
         if (hasLogoRef) {
             finalPrompt += ` The brand logo MUST perfectly match the attached logo reference (colors, font, and shape must be identical).`;
+        }
+        if (hasRefImages) {
+            finalPrompt += ` The LOCATION/ELEMENT REFERENCE images are provided for set design inspiration, background visual language, or prop reference — absorb their style, lighting, and spatial composition into the environment without copying any faces, logos, or text from them.`;
         }
         finalPrompt += ` Do NOT hallucinate new products, generic faces, or custom logos. Do NOT stylize, modify, or simplify any of the reference details. Keep all shapes and colors completely true to the references.`;
     }
@@ -136,7 +183,7 @@ export async function generateStoryboardPoster(
         } catch (e) {
             console.warn(`[SB Poster] Credentials check failed: ${e.message}`);
         }
-        
+
         if (!credsExist) {
             throw new Error(`GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Cannot generate image with NanoBanana (Gemini Vertex AI).`);
         }
@@ -144,15 +191,21 @@ export async function generateStoryboardPoster(
 
     console.log(`\n[SB Poster] ══ GENERATING STORYBOARD POSTER ══`);
     console.log(`  selected model: ${imageModel}`);
-    console.log(`  format=${ar}, style=${style}`);
-    console.log(`  raw buffers: product=${rawProductBuffers.length}, avatar=${!!rawAvatarBuffer}, logo=${!!rawLogoBuffer}`);
+    console.log(`  format=${ar}, style=${style}, panels=${panelCount}`);
+    console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
     const TIMEOUT_MS = 240000;
 
     if (useNanoBanana) {
         try {
-            const result = await generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer);
+            const result = await generateWithNanoBanana(
+                finalPrompt, ar,
+                rawProductBuffers, null, productImageUrls, null,
+                TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
+                allRawAvatarBuffers, allAvatarUrls, avatarNames,
+                rawRefBuffers, refImageUrls,
+            );
             if (result) return result;
             throw new Error(`NanoBanana returned null or empty result.`);
         } catch (bananaErr) {
@@ -160,8 +213,14 @@ export async function generateStoryboardPoster(
             throw new Error(`NanoBanana image generation failed: ${bananaErr.message}`);
         }
     }
-    
-    const result = await generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl, rawLogoBuffer);
+
+    const result = await generateWithGptImage2(
+        finalPrompt, ar,
+        rawProductBuffers, null, productImageUrls, null,
+        TIMEOUT_MS, logoUrl, rawLogoBuffer,
+        allRawAvatarBuffers, allAvatarUrls, avatarNames,
+        rawRefBuffers, refImageUrls,
+    );
     if (!result) {
         throw new Error(`GPT Image 2 generation failed.`);
     }
@@ -169,13 +228,21 @@ export async function generateStoryboardPoster(
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────
-async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, logoUrl = null, rawLogoBuffer = null) {
+async function generateWithGptImage2(
+    finalPrompt, ar,
+    rawProductBuffers, _legacyAvatarBuffer, productImageUrls, _legacyAvatarUrl,
+    TIMEOUT_MS,
+    logoUrl = null, rawLogoBuffer = null,
+    // Multi-character + ref image params
+    allRawAvatarBuffers = [], allAvatarUrls = [], avatarNames = [],
+    rawRefBuffers = [], refImageUrls = [],
+) {
     const size = AR_TO_SIZE[ar] || '1792x1024';
     const modelId = 'gpt-image-2';
 
     const refBuffers = [];
-    
-    // 1. Collect Product Images (Only the first one to avoid slot/reference confusion in LaoZhang edits)
+
+    // 1. Collect Product Image (first only to avoid slot confusion)
     if (rawProductBuffers.length > 0) {
         const rb = rawProductBuffers[0];
         if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: 'product' });
@@ -192,16 +259,27 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
         }
     }
 
-    // 2. Collect Avatar Image
-    if (rawAvatarBuffer?.buffer) {
-        refBuffers.push({ buffer: rawAvatarBuffer.buffer, mimeType: rawAvatarBuffer.mimeType || 'image/jpeg', label: 'character' });
-    } else if (avatarUrl?.startsWith('http')) {
-        try {
-            const { buffer, mimeType } = await downloadBuffer(avatarUrl);
-            refBuffers.push({ buffer, mimeType, label: 'character' });
-            console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
-        } catch (dlErr) {
-            console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+    // 2. Collect All Avatar Images (multi-character support)
+    for (let i = 0; i < allRawAvatarBuffers.length; i++) {
+        const rb = allRawAvatarBuffers[i];
+        if (rb?.buffer) {
+            const name = avatarNames[i] || `character_${i + 1}`;
+            refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: `character_${name.replace(/\s+/g, '_')}` });
+        }
+    }
+    // Fallback: download from URLs if no buffers
+    if (allRawAvatarBuffers.length === 0 && allAvatarUrls.length > 0) {
+        for (let i = 0; i < allAvatarUrls.length; i++) {
+            const url = allAvatarUrls[i];
+            if (!url?.startsWith('http')) continue;
+            try {
+                const { buffer, mimeType } = await downloadBuffer(url);
+                const name = avatarNames[i] || `character_${i + 1}`;
+                refBuffers.push({ buffer, mimeType, label: `character_${name.replace(/\s+/g, '_')}` });
+                console.log(`[SB Poster][GPT-Image-2] Downloaded avatar ref (${name}): ${url.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+            }
         }
     }
 
@@ -215,6 +293,25 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
             console.log(`[SB Poster][GPT-Image-2] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
         } catch (dlErr) {
             console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download logo ref: ${dlErr.message}`);
+        }
+    }
+
+    // 4. Collect Location/Element Reference Images
+    for (let i = 0; i < rawRefBuffers.length; i++) {
+        const rb = rawRefBuffers[i];
+        if (rb?.buffer) refBuffers.push({ buffer: rb.buffer, mimeType: rb.mimeType || 'image/jpeg', label: `ref_location_${i + 1}` });
+    }
+    if (rawRefBuffers.length === 0 && refImageUrls.length > 0) {
+        for (let i = 0; i < refImageUrls.length; i++) {
+            const url = refImageUrls[i];
+            if (!url?.startsWith('http')) continue;
+            try {
+                const { buffer, mimeType } = await downloadBuffer(url);
+                refBuffers.push({ buffer, mimeType, label: `ref_location_${i + 1}` });
+                console.log(`[SB Poster][GPT-Image-2] Downloaded ref image ${i + 1}: ${url.substring(0, 80)}`);
+            } catch (dlErr) {
+                console.warn(`[SB Poster][GPT-Image-2] ⚠️ Could not download ref image: ${dlErr.message}`);
+            }
         }
     }
 
@@ -283,9 +380,15 @@ async function generateWithGptImage2(finalPrompt, ar, rawProductBuffers, rawAvat
 }
 
 // ── NanoBanana (Gemini Vertex AI) ────────────────────────────────────────────
-async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAvatarBuffer, productImageUrls, avatarUrl, TIMEOUT_MS, imageSize = '2K', logoUrl = null, rawLogoBuffer = null) {
-    // ✅ FIX: gemini-3.1-flash-image-preview is IMAGE OUTPUT ONLY — it cannot read input images.
-    // gemini-3.1-flash-image-preview supports both image INPUT (reference) and image OUTPUT (generation).
+async function generateWithNanoBanana(
+    finalPrompt, ar,
+    rawProductBuffers, _legacyAvatarBuffer, productImageUrls, _legacyAvatarUrl,
+    TIMEOUT_MS, imageSize = '2K',
+    logoUrl = null, rawLogoBuffer = null,
+    // Multi-character + ref image params
+    allRawAvatarBuffers = [], allAvatarUrls = [], avatarNames = [],
+    rawRefBuffers = [], refImageUrls = [],
+) {
     const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 
     try {
@@ -318,18 +421,29 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
             }
         }
 
-        // 2. Collect Avatar Image
-        if (rawAvatarBuffer?.buffer) {
-            parts.push({ text: "CHARACTER REFERENCE IMAGE (The human presenter must look exactly like this):" });
-            parts.push({ inlineData: { mimeType: sanitizeMimeType(rawAvatarBuffer.mimeType), data: rawAvatarBuffer.buffer.toString('base64') } });
-        } else if (avatarUrl?.startsWith('http')) {
-            try {
-                const { buffer, mimeType } = await downloadBuffer(avatarUrl);
-                parts.push({ text: "CHARACTER REFERENCE IMAGE (The human presenter must look exactly like this):" });
-                parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
-                console.log(`[SB Poster][NanoBanana] Downloaded avatar ref: ${avatarUrl.substring(0, 80)}`);
-            } catch (dlErr) {
-                console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+        // 2. Collect All Avatar Images (multi-character support)
+        for (let i = 0; i < allRawAvatarBuffers.length; i++) {
+            const rb = allRawAvatarBuffers[i];
+            if (rb?.buffer) {
+                const name = avatarNames[i] || `Character ${i + 1}`;
+                parts.push({ text: `CHARACTER REFERENCE IMAGE — Character "${name}" (use this face ONLY for "${name}", do not mix with other characters):` });
+                parts.push({ inlineData: { mimeType: sanitizeMimeType(rb.mimeType), data: rb.buffer.toString('base64') } });
+            }
+        }
+        // Fallback: download from URLs
+        if (allRawAvatarBuffers.length === 0 && allAvatarUrls.length > 0) {
+            for (let i = 0; i < allAvatarUrls.length; i++) {
+                const url = allAvatarUrls[i];
+                if (!url?.startsWith('http')) continue;
+                try {
+                    const { buffer, mimeType } = await downloadBuffer(url);
+                    const name = avatarNames[i] || `Character ${i + 1}`;
+                    parts.push({ text: `CHARACTER REFERENCE IMAGE — Character "${name}" (use this face ONLY for "${name}", do not mix with other characters):` });
+                    parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
+                    console.log(`[SB Poster][NanoBanana] Downloaded avatar ref (${name}): ${url.substring(0, 80)}`);
+                } catch (dlErr) {
+                    console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download avatar ref: ${dlErr.message}`);
+                }
             }
         }
 
@@ -345,6 +459,29 @@ async function generateWithNanoBanana(finalPrompt, ar, rawProductBuffers, rawAva
                 console.log(`[SB Poster][NanoBanana] Downloaded logo ref: ${logoUrl.substring(0, 80)}`);
             } catch (dlErr) {
                 console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download logo ref: ${dlErr.message}`);
+            }
+        }
+
+        // 4. Collect Location/Element Reference Images
+        for (let i = 0; i < rawRefBuffers.length; i++) {
+            const rb = rawRefBuffers[i];
+            if (rb?.buffer) {
+                parts.push({ text: `LOCATION/ELEMENT REFERENCE IMAGE ${i + 1} (use for set design, background, or prop inspiration — do not copy faces or logos):` });
+                parts.push({ inlineData: { mimeType: sanitizeMimeType(rb.mimeType), data: rb.buffer.toString('base64') } });
+            }
+        }
+        if (rawRefBuffers.length === 0 && refImageUrls.length > 0) {
+            for (let i = 0; i < refImageUrls.length; i++) {
+                const url = refImageUrls[i];
+                if (!url?.startsWith('http')) continue;
+                try {
+                    const { buffer, mimeType } = await downloadBuffer(url);
+                    parts.push({ text: `LOCATION/ELEMENT REFERENCE IMAGE ${i + 1} (use for set design, background, or prop inspiration):` });
+                    parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
+                    console.log(`[SB Poster][NanoBanana] Downloaded ref image ${i + 1}: ${url.substring(0, 80)}`);
+                } catch (dlErr) {
+                    console.warn(`[SB Poster][NanoBanana] ⚠️ Could not download ref image: ${dlErr.message}`);
+                }
             }
         }
 

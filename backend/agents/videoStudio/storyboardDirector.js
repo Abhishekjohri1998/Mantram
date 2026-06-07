@@ -1,7 +1,7 @@
 /**
  * Storyboard Director — Claude-powered Ad Film Storyboard Generator
  *
- * Takes product + avatar + brief → writes a 4-section structured storyboard plan:
+ * Takes product + avatars (multiple) + ref images + brief → writes a 4-section structured storyboard plan:
  *
  *   Section 1 — Character + Product DNA
  *     colorPalette, paletteNames, materialNotes
@@ -17,7 +17,7 @@
  *     moodKeywords, cinematographyRules, emotionalArc
  *
  * Additionally outputs:
- *   imagePrompt — a rich grid-poster prompt built from the cuts (for GPT-Image-2 / NanoBanana)
+ *   imagePrompt — a rich grid-poster prompt built from ALL cuts (dynamic panel count)
  *   narrativeArc, hookStrategy — story-level metadata
  *
  * The structuredPlan is stored in MongoDB and used at animate-time to build
@@ -30,16 +30,101 @@ const MIN_SHOT_DURATION = 2;  // seconds per cut
 const MAX_SHOT_DURATION = 15; // Seedance I2V max per segment
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Dynamic panel builder — generates storyboard panel descriptions from cuts[]
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a dynamic storyboard panel block for the imagePrompt.
+ * Shows all cuts up to MAX_VISIBLE_PANELS (8), split into rows of 5 for 6+ cuts.
+ * @param {Array} cuts — the cuts[] array from the storyboard plan
+ * @param {number} duration — total video duration in seconds
+ * @returns {string} storyboard panel block text
+ */
+function buildDynamicPanelBlock(cuts = [], duration = 30) {
+    const MAX_VISIBLE = 8;
+    const visible = cuts.slice(0, MAX_VISIBLE);
+    const panelCount = visible.length || 5;
+
+    if (panelCount <= 5) {
+        // Single row
+        const panels = visible.map((cut, i) => (
+            `  - Panel ${i + 1} (Cut ${cut.id || i + 1}): ${cut.scene || cut.framePrompt || `Shot ${i + 1}`} (max 12 words).`
+        )).join('\n');
+        return `- A clean horizontal row of ${panelCount} storyboard panels showing:\n${panels}
+- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.`;
+    } else {
+        // Two rows for 6–8 panels
+        const row1 = visible.slice(0, 5);
+        const row2 = visible.slice(5);
+        const panelsRow1 = row1.map((cut, i) => (
+            `  - Panel ${i + 1} (Cut ${cut.id || i + 1}): ${cut.scene || cut.framePrompt || `Shot ${i + 1}`} (max 12 words).`
+        )).join('\n');
+        const panelsRow2 = row2.map((cut, i) => (
+            `  - Panel ${i + 6} (Cut ${cut.id || i + 6}): ${cut.scene || cut.framePrompt || `Shot ${i + 6}`} (max 12 words).`
+        )).join('\n');
+        return `- ROW 1 (Cuts 1–5) horizontal panels:\n${panelsRow1}
+- ROW 2 (Cuts 6–${panelCount}) horizontal panels:\n${panelsRow2}
+- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.
+- Note: ${cuts.length - MAX_VISIBLE > 0 ? `${cuts.length - MAX_VISIBLE} additional cuts are planned but not shown in this poster.` : ''}`;
+    }
+}
+
+/**
+ * Build a dynamic CHARACTER REFERENCE block for the imagePrompt.
+ * Handles 1–4 named characters.
+ * @param {Array} avatarNames — array of character names e.g. ['Riya', 'Arjun']
+ * @returns {string}
+ */
+function buildCharacterReferenceBlock(avatarNames = []) {
+    if (avatarNames.length === 0) {
+        return `- CHARACTER REFERENCE: 6 panels showing the presenter/model from angles (front, side, back, face close-up, side close-up, wardrobe detail).`;
+    }
+    if (avatarNames.length === 1) {
+        return `- CHARACTER REFERENCE: 6 panels showing Character "${avatarNames[0]}" from angles (front, side, back, face close-up, side close-up, wardrobe detail).`;
+    }
+    // Multiple characters — one panel per character
+    const charPanels = avatarNames.map(name => `"${name}" (front view + face close-up)`).join(', ');
+    return `- CHARACTER REFERENCE: ${avatarNames.length} panels — one per character: ${charPanels}. Label each panel with the character name.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — Professional 4-Section Storyboard Director
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '' }) {
-    const logoTagInstruction = logoUrl
+function buildStoryboardDirectorPrompt({
+    brandContext,
+    duration,
+    format,
+    style,
+    dialogueLanguage = 'English',
+    brandName = '',
+    logoUrl = '',
+    logoDescription = '',
+    includeBranding = true,
+    cuts = [],
+    avatarNames = [],
+}) {
+    const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
         : '';
-    const logoPromptInstruction = logoUrl
+    const logoPromptInstruction = (includeBranding && logoUrl)
         ? `\n- Brand logo: Whenever the logo appears in the grid panels or footer, reference it as "the brand logo (<<<image_logo>>>)".`
         : '';
+
+    const brandDNASection = includeBranding
+        ? `═══════════════════════════════════════════════════════
+BRAND DNA & CREATIVE ESSENCE
+═══════════════════════════════════════════════════════
+${brandContext || 'No brand data. Use premium cinematic style throughout.'}`
+        : `═══════════════════════════════════════════════════════
+CREATIVE STYLE
+═══════════════════════════════════════════════════════
+No brand data injected (branding toggle is OFF). Use premium cinematic style throughout. Do not include any brand logo, brand name lock-up, or colour palette drawn from brand assets.`;
+
+    // Dynamic storyboard panels from cuts (for imagePrompt field)
+    const panelBlock = buildDynamicPanelBlock(cuts, duration);
+    const charRefBlock = buildCharacterReferenceBlock(avatarNames);
+    const panelCount = Math.min(Math.max(cuts.length, 5), 8);
 
     return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
 
@@ -78,13 +163,15 @@ Each cut must have:
 - framePrompt: a concise image generation prompt for this panel. CRITICAL: Keep under 40 words to avoid token limits:
   • Specify dynamic camera angles, lighting, subject position, and props.
   • Reference the @image sequence: e.g. "Product as shown in @image1, presenter as in @image2"
+  • When multiple characters are present, name them explicitly: "Character 'Riya' (@image3) hands product to Character 'Arjun' (@image4)"
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
 - Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
 - Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
 - The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
-- If an avatar/presenter is provided, feature them in at least one CLOSE-UP and one TWO-SHOT with the product
+- If multiple characters are provided, DISTRIBUTE them across cuts — do not show all characters in every cut. Build ensemble storytelling: different characters carry different narrative beats.
+- Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
 - INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
 - Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
 
@@ -102,28 +189,22 @@ ADDITIONAL OUTPUTS
 - hookStrategy: one sentence describing the opening hook strategy
 - imagePrompt: a rich, detailed prompt to generate a SINGLE CONSOLIDATED INFOGRAPHIC storyboard pitch deck sheet image. Build it from your cuts[] so the storyboard row is described precisely. It MUST follow this exact structure:
 
-"Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout for a ${brandName} advertisement.
+"Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout for a ${brandName || 'product'} advertisement.
 
 Beige/creme background canvas.
-Top Meta Header: Display 'Cut Count: ${duration > 15 ? '5+' : '5'}', 'Color Palette: [hex colors/names]', 'Environment Fingerprint: [environment description]' in clean black typography.
+Top Meta Header: Display 'Cut Count: ${panelCount}', 'Color Palette: [hex colors/names]', 'Environment Fingerprint: [environment description]' in clean black typography.
 
 Section 1 (CHARACTER & HERO PRODUCT REFERENCE):
-- CHARACTER REFERENCE: 6 panels showing the presenter/model (using avatar reference) from angles (front, side, back, face close-up, side close-up, wardrobe detail).
-- HERO PRODUCT REFERENCE: 5 panels showing the product (using product image reference) from angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
+- ${charRefBlock}
+- HERO PRODUCT REFERENCE: 5 panels showing the product from angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
 - Bottom row: Color palette circular swatches and text material notes.
 
 Section 2 (ENVIRONMENT / SET DESIGN):
 - Left side: A large 16:9 set design render of the environment ([environment description]).
-- Right side: A top-down floor plan schematic diagram showing furniture layout and camera paths/arrows labeled with cut numbers (e.g. Cut 1, Cut 2).
+- Right side: A top-down floor plan schematic diagram showing furniture layout and camera paths/arrows labeled with cut numbers.
 
 Section 3 (STORYBOARD):
-- A clean horizontal row of 5 storyboard panels showing:
-  - Panel 1 (Cut 1): Describe Panel 1 concisely (max 10 words).
-  - Panel 2 (Cut 2): Describe Panel 2 concisely (max 10 words).
-  - Panel 3 (Cut 3): Describe Panel 3 concisely (max 10 words).
-  - Panel 4 (Cut 4): Describe Panel 4 concisely (max 10 words).
-  - Panel 5 (Cut 5): Describe Panel 5 concisely (max 10 words).
-- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.
+${panelBlock}
 
 Section 4 (LIGHTING / MOOD / STYLE NOTES):
 - 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
@@ -131,10 +212,7 @@ Section 4 (LIGHTING / MOOD / STYLE NOTES):
 
 Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${duration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors."
 
-═══════════════════════════════════════════════════════
-BRAND DNA & CREATIVE ESSENCE
-═══════════════════════════════════════════════════════
-${brandContext || 'No brand data. Use premium cinematic style throughout.'}
+${brandDNASection}
 
 ═══════════════════════════════════════════════════════
 AD FILM SPECIFICATIONS
@@ -177,22 +255,64 @@ The JSON must match this exact schema:
 // USER PROMPT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage = 'English', brandName = '', logoUrl = '', logoDescription = '', productImageUrls = [] }) {
-    const logoDetails = logoUrl ? `\nBRAND LOGO DETAILS: description="${logoDescription}"` : '';
+function buildUserPrompt({
+    brief,
+    productName,
+    productFeatures,
+    avatarUrls = [],
+    avatarNames = [],
+    refImageUrls = [],
+    duration,
+    format,
+    style,
+    dialogueLanguage = 'English',
+    brandName = '',
+    logoUrl = '',
+    logoDescription = '',
+    productImageUrls = [],
+    includeBranding = true,
+}) {
+    const logoDetails = (includeBranding && logoUrl)
+        ? `\nBRAND LOGO DETAILS: description="${logoDescription}"`
+        : '';
 
     const imageMappingLines = [];
     let imgIdx = 1;
+
+    // Product images
     if (productImageUrls?.length > 0) {
-        productImageUrls.forEach((url, i) => {
+        productImageUrls.forEach(() => {
             imageMappingLines.push(`  - Attached Image ${imgIdx++}: PRODUCT reference — "${productName || 'product'}". Use this for exact product appearance (shape, color, branding, materials) in all framePrompts and in the imagePrompt grid panels. Do NOT recolor or color-shift the product itself to match the brand colors.`);
         });
     }
-    if (avatarUrl) {
-        imageMappingLines.push(`  - Attached Image ${imgIdx++}: AVATAR/PRESENTER — the presenter's exact face and body. Use this for all cuts that feature a human presenter. Do NOT confuse with the product.`);
+
+    // Avatar images — each labelled with character name
+    if (avatarUrls.length > 0) {
+        avatarUrls.forEach((_, i) => {
+            const name = avatarNames[i] || `Character ${i + 1}`;
+            imageMappingLines.push(`  - Attached Image ${imgIdx++}: CHARACTER "${name}" — the exact face, body, and wardrobe of this character. Use this face ONLY for Character "${name}" in all cuts that feature them. Do NOT confuse with the product or other characters.`);
+        });
+    }
+
+    // Reference images (location/element/mood)
+    if (refImageUrls.length > 0) {
+        refImageUrls.forEach((_, i) => {
+            imageMappingLines.push(`  - Attached Image ${imgIdx++}: LOCATION/ELEMENT REFERENCE ${i + 1} — use this for set design inspiration, background visual language, prop design, or mood reference. Do NOT use faces from this image as characters.`);
+        });
     }
 
     const imageMappingText = imageMappingLines.length > 0
-        ? `\nIMAGE REFERENCES:\n${imageMappingLines.join('\n')}\n\nCRITICAL: Even if a product reference image contains a model, treat it STRICTLY as the PRODUCT reference. The presenter must match the AVATAR reference only.`
+        ? `\nIMAGE REFERENCES:\n${imageMappingLines.join('\n')}\n\nCRITICAL: Even if a product reference image contains a model, treat it STRICTLY as the PRODUCT reference. Each character must match their specific CHARACTER reference image only.`
+        : '';
+
+    const avatarInstruction = avatarUrls.length === 0
+        ? 'NO — product-only ad, no presenter'
+        : avatarUrls.length === 1
+        ? `YES — 1 character provided: "${avatarNames[0] || 'Character 1'}". Feature this presenter in relevant cuts.`
+        : `YES — ${avatarUrls.length} characters: ${avatarNames.map((n, i) => `"${n || `Character ${i + 1}`}"`).join(', ')}. Distribute them across cuts for ensemble storytelling. Assign each character to specific narrative beats.`;
+
+    const refImageInstruction = refImageUrls.length > 0
+        ? `\nLOCATION/ELEMENT REFS: ${refImageUrls.length} reference image(s) provided for set design, background, or prop inspiration.`
         : '';
 
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
@@ -204,7 +324,7 @@ TOTAL VIDEO DURATION: ${duration}s (cuts must sum EXACTLY to this)
 FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
-AVATAR/PRESENTER: ${avatarUrl ? 'YES — avatar image provided. Feature this specific presenter in relevant cuts.' : 'NO — product-only ad, no presenter'}
+AVATAR/PRESENTER(S): ${avatarInstruction}${refImageInstruction}
 BRAND NAME: ${brandName}${logoDetails}
 
 Now act as the VISIONARY award-winning storyboard director. Deeply analyse every reference image, the brief, and the brand DNA.
@@ -302,50 +422,107 @@ function parseStoryboardOutput(rawText, targetDuration) {
  * Run the Storyboard Director — generates a complete 4-section structured storyboard plan
  *
  * @param {object} params
- * @param {string} params.brandId
- * @param {string} params.brief                 — user's creative brief
- * @param {string} params.productName           — product name
- * @param {string} params.productFeatures       — key features text
- * @param {string[]} params.productImageUrls    — S3 URLs of product images
- * @param {string|null} params.avatarUrl        — S3 URL of avatar (or null)
- * @param {string} params.style                 — 'hyperrealistic' | '3d' | '2d'
- * @param {number} params.duration              — total video duration in seconds
- * @param {string} params.format                — '9:16' | '16:9' | '1:1'
- * @param {string} params.userId
- * @param {string} params.directorModel         — 'claude' | 'gemini'
- * @param {string} params.dialogueLanguage      — dialogue language
+ * @param {string}   params.brandId
+ * @param {string}   params.brief                  — user's creative brief
+ * @param {string}   params.productName            — product name
+ * @param {string}   params.productFeatures        — key features text
+ * @param {string[]} params.productImageUrls       — S3 URLs of product images
+ * @param {string[]} params.avatarUrls             — S3 URLs of avatar images (1–4 characters)
+ * @param {string[]} params.avatarNames            — display names for each avatar (matching avatarUrls order)
+ * @param {string[]} params.refImageUrls           — S3 URLs of location/element reference images (max 3)
+ * @param {string}   params.style                  — 'hyperrealistic' | '3d' | '2d'
+ * @param {number}   params.duration               — total video duration in seconds
+ * @param {string}   params.format                 — '9:16' | '16:9' | '1:1'
+ * @param {string}   params.userId
+ * @param {string}   params.directorModel          — 'claude' | 'gemini'
+ * @param {string}   params.dialogueLanguage       — dialogue language
+ * @param {boolean}  params.includeBranding        — whether to inject brand DNA + logo (default true)
  * @returns {object} full storyboard plan JSON with structuredPlan fields
  */
 export async function runStoryboardDirector({
     brandId, brief, productName, productFeatures,
-    productImageUrls = [], avatarUrl = null,
+    productImageUrls = [],
+    avatarUrls = [],
+    avatarNames = [],
+    refImageUrls = [],
     style = 'hyperrealistic', duration = 30, format = '9:16', userId, directorModel = 'claude',
-    dialogueLanguage = 'English'
+    dialogueLanguage = 'English',
+    includeBranding = true,
+    // Legacy single-avatar compat
+    avatarUrl = null,
 }) {
-    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}`);
+    // Back-compat: if old single avatarUrl is passed, wrap it
+    const resolvedAvatarUrls = (avatarUrls && avatarUrls.length > 0)
+        ? avatarUrls
+        : (avatarUrl ? [avatarUrl] : []);
 
-    // 1. Load brand DNA
+    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}, avatars=${resolvedAvatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
+
+    // 1. Load brand DNA (even if not injecting into prompt — we need logoUrl)
     const { brand, brandContext } = await loadBrandContext(brandId);
-    console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars`);
+    console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars (injecting=${includeBranding})`);
 
     const logoUrl = brand?.dna?.logo?.url || null;
     const logoDescription = brand?.dna?.logo?.metadata?.visionDescription || '';
     const brandName = brand?.name || 'the brand';
 
-    // 2. Build prompts
-    const systemPrompt = buildStoryboardDirectorPrompt({ brandContext, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription });
-    const userPrompt = buildUserPrompt({ brief, productName, productFeatures, avatarUrl, duration, format, style, dialogueLanguage, brandName, logoUrl, logoDescription, productImageUrls });
+    // 2. Build a preliminary cuts array for the imagePrompt panel builder.
+    //    We run a two-pass approach: first generate the plan (no imagePrompt yet)
+    //    then rebuild the imagePrompt with the actual cuts. But since the LLM
+    //    generates cuts AND imagePrompt in one call, we seed the system prompt
+    //    with the expected panel count based on duration heuristic.
+    //    The actual panel block in the final imagePrompt will be built by the LLM
+    //    using its own cuts[] output. We provide a heuristic panel count seed here.
+    const expectedCutCount = Math.max(5, Math.round(duration / 5));
+    const heuristicCuts = Array.from({ length: Math.min(expectedCutCount, 8) }, (_, i) => ({
+        id: i + 1,
+        scene: `Cut ${i + 1} — narrative beat`,
+        framePrompt: '',
+    }));
 
-    // 3. Build image URLs for Claude vision — ALL product images + avatar
+    // 3. Build prompts
+    const systemPrompt = buildStoryboardDirectorPrompt({
+        brandContext: includeBranding ? brandContext : '',
+        duration,
+        format,
+        style,
+        dialogueLanguage,
+        brandName: includeBranding ? brandName : '',
+        logoUrl: includeBranding ? logoUrl : null,
+        logoDescription: includeBranding ? logoDescription : '',
+        includeBranding,
+        cuts: heuristicCuts,
+        avatarNames,
+    });
+
+    const userPrompt = buildUserPrompt({
+        brief, productName, productFeatures,
+        avatarUrls: resolvedAvatarUrls,
+        avatarNames,
+        refImageUrls,
+        duration, format, style, dialogueLanguage,
+        brandName: includeBranding ? brandName : '',
+        logoUrl: includeBranding ? logoUrl : null,
+        logoDescription: includeBranding ? logoDescription : '',
+        productImageUrls,
+        includeBranding,
+    });
+
+    // 4. Build image URLs for multimodal agent — ALL product images + avatars + ref images
     const imageUrls = [];
     for (const url of (productImageUrls || []).filter(u => u?.startsWith('http'))) {
         imageUrls.push(url);
     }
-    if (avatarUrl?.startsWith('http')) imageUrls.push(avatarUrl);
+    for (const url of resolvedAvatarUrls.filter(u => u?.startsWith('http'))) {
+        imageUrls.push(url);
+    }
+    for (const url of (refImageUrls || []).filter(u => u?.startsWith('http'))) {
+        imageUrls.push(url);
+    }
 
-    console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images...`);
+    console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images (${productImageUrls.length} product + ${resolvedAvatarUrls.length} avatar + ${refImageUrls.length} ref)...`);
 
-    // 4. Call Agent (multimodal)
+    // 5. Call Agent (multimodal)
     let rawOutput;
     try {
         rawOutput = await callMultimodalAgent(
@@ -358,7 +535,7 @@ export async function runStoryboardDirector({
         throw new Error(`Storyboard Director (${directorModel}) failed: ${err.message}`);
     }
 
-    // 5. Parse + validate
+    // 6. Parse + validate
     let plan;
     try {
         plan = parseStoryboardOutput(rawOutput, duration);
@@ -376,14 +553,17 @@ export async function runStoryboardDirector({
 
     return {
         ...plan,
-        brandContext,
+        brandContext: includeBranding ? brandContext : '',
         requestedDuration: duration,
         format,
         defaultStyle: style,
         productImageUrls,
-        avatarUrl,
+        avatarUrls: resolvedAvatarUrls,
+        avatarNames,
+        refImageUrls,
         dialogueLanguage,
-        logoUrl,
+        logoUrl: includeBranding ? logoUrl : null,
+        includeBranding,
     };
 }
 

@@ -303,11 +303,27 @@ export async function planStoryboardScenes({
     productName = '',
     productFeatures = '',
     referenceImages = [],
+    characterNames = [],   // NEW: names of characters mapped to @imageN (after product + poster)
 }) {
     const sceneCount = calculateSceneCount(targetDuration, model);
     const durations = allocateSceneDurations(targetDuration, sceneCount, model);
 
     const isNonEnglish = language.toLowerCase() !== 'english';
+
+    // Build the character context for the system prompt
+    // @image1 = first frame (product or first avatar), @image2 = storyboard poster,
+    // @image3+ = additional product refs and then avatars
+    let characterContext = '';
+    if (characterNames.length > 0) {
+        // Estimate tag positions: we know product images come before avatars in the reference list
+        // The exact mapping depends on how many product images were passed, but we provide a best-effort
+        const productRefCount = Math.max(0, referenceImages.length - characterNames.length - 1); // -1 for poster
+        const charLines = characterNames.map((name, i) => {
+            const tagIdx = 2 + productRefCount + i + 1; // 1=first-frame, 2=poster, then products, then chars
+            return `  @image${tagIdx} = Character "${name}" — use this face for "${name}" in relevant segments`;
+        });
+        characterContext = `\nCHARACTERS (distribute across segments for ensemble storytelling):\n${charLines.join('\n')}\nFeature different characters in different segments. Include at least one segment with two characters interacting.`;
+    }
 
     const systemPrompt = `You are a world-class ad director, screenwriter, and cinematographer. You are planning a long-form video ad of ${targetDuration} seconds based on a master storyboard.
 
@@ -327,7 +343,7 @@ PRODUCT:
   Features: ${productFeatures || 'Highlight product features visually'}
 
 REFERENCE IMAGES: ${referenceImages.length} images provided (product + avatar).
-Every scene MUST reference these images to maintain visual consistency. Use @image1, @image2, etc.
+Every scene MUST reference these images to maintain visual consistency. Use @image1, @image2, etc.${characterContext}
 
 YOUR TASK:
 Decompose the master storyboard video prompt into exactly ${sceneCount} sequential segments.

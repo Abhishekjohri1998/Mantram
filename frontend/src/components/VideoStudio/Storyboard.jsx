@@ -137,16 +137,25 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [productImages, setProductImages] = useState([]); // { file, preview }
     const [productUrlInput, setProductUrlInput] = useState('');
     const [isScrapingUrl, setIsScrapingUrl] = useState(false);
-    const [avatarImage, setAvatarImage] = useState(null);  // { file, preview }
+    // Multi-avatar support (up to 4 named characters)
+    const [avatarImages, setAvatarImages] = useState([]);   // [{ file, preview, name }]
     const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [avatarPickerTargetIdx, setAvatarPickerTargetIdx] = useState(null); // which slot to fill
+    // Location/element reference images (up to 3)
+    const [refImages, setRefImages] = useState([]);          // [{ file, preview, label }]
+    // Visual branding toggle (default ON)
+    const [includeBranding, setIncludeBranding] = useState(true);
     const [defaultStyle, setDefaultStyle] = useState('hyperrealistic');
-    const [format, setFormat] = useState('9:16'); // Default to 9:16 for storyboard grids
+    const [format, setFormat] = useState('9:16');
     const [duration, setDuration] = useState(5);
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('480p');
-    const [directorModel, setDirectorModel] = useState('claude'); // 'claude' or 'gemini'
-    const [imageModel, setImageModel] = useState('nanobanana-2'); // default: NanoBanana 2 (gemini-2.0-flash-exp) supports reference image input
+    const [directorModel, setDirectorModel] = useState('claude');
+    const [imageModel, setImageModel] = useState('nanobanana-2');
     const [dialogueLanguage, setDialogueLanguage] = useState('English');
+
+    // Legacy compat: avatarImage getter (first avatar) — kept for AvatarPicker
+    const avatarImage = avatarImages[0] || null;
 
     // ── Generated storyboard state ──
     const [phase, setPhase] = useState('input'); // 'input' | 'directing' | 'storyboarding' | 'review' | 'animating' | 'complete'
@@ -173,6 +182,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
     const productInputRef = useRef();
     const avatarInputRef = useRef();
+    const refInputRef = useRef();
 
     // ── Reuse Project Settings ──
     const handleReuse = useCallback((project) => {
@@ -193,10 +203,26 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             setProductImages([{ file: project.storyboard.imageUrl, preview: project.storyboard.imageUrl }]);
         }
 
-        if (project.input?.avatarUrl) {
-            setAvatarImage({ file: project.input.avatarUrl, preview: project.input.avatarUrl });
+        // Multi-avatar: restore from DB
+        if (project.input?.avatarUrls?.length > 0) {
+            const names = project.input.avatarNames || [];
+            setAvatarImages(project.input.avatarUrls.map((url, i) => ({ file: url, preview: url, name: names[i] || '' })));
+        } else if (project.input?.avatarUrl) {
+            setAvatarImages([{ file: project.input.avatarUrl, preview: project.input.avatarUrl, name: '' }]);
         } else {
-            setAvatarImage(null);
+            setAvatarImages([]);
+        }
+
+        // Ref images: restore from DB
+        if (project.input?.refImageUrls?.length > 0) {
+            setRefImages(project.input.refImageUrls.map((url, i) => ({ file: url, preview: url, label: `Ref ${i + 1}` })));
+        } else {
+            setRefImages([]);
+        }
+
+        // Branding
+        if (project.storyboard?.includeBranding !== undefined) {
+            setIncludeBranding(project.storyboard.includeBranding);
         }
 
         // 3. Config (format, model, etc)
@@ -219,21 +245,75 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         setProductImages(prev => [...prev, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))]);
     };
 
-    const handleAvatarImage = (e) => {
-        const f = e.target.files?.[0];
-        if (f) setAvatarImage({ file: f, preview: URL.createObjectURL(f) });
+    // ── Avatar upload handlers (multi-avatar, up to 4) ──
+    const handleAvatarFileUpload = (e, idx = null) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        setAvatarImages(prev => {
+            const next = [...prev];
+            if (idx !== null && idx < next.length) {
+                // Replace a specific slot
+                if (next[idx].preview?.startsWith('blob:')) URL.revokeObjectURL(next[idx].preview);
+                next[idx] = { ...next[idx], file: files[0], preview: URL.createObjectURL(files[0]) };
+            } else {
+                // Append up to 4
+                const remaining = 4 - next.length;
+                files.slice(0, remaining).forEach(f => next.push({ file: f, preview: URL.createObjectURL(f), name: '' }));
+            }
+            return next;
+        });
     };
 
     const handleAvatarPickerSelect = (avatar) => {
-        if (avatar && avatar.imageUrl) {
-            setAvatarImage({ file: avatar.imageUrl, preview: avatar.imageUrl, name: avatar.name });
-        }
+        if (!avatar?.imageUrl) return;
+        setAvatarImages(prev => {
+            const next = [...prev];
+            const idx = avatarPickerTargetIdx;
+            const newEntry = { file: avatar.imageUrl, preview: avatar.imageUrl, name: avatar.name || '' };
+            if (idx !== null && idx < next.length) {
+                next[idx] = newEntry;
+            } else if (next.length < 4) {
+                next.push(newEntry);
+            }
+            return next;
+        });
+        setAvatarPickerTargetIdx(null);
     };
 
-    const handleAvatarUrl = (e) => {
-        e.stopPropagation();
-        const url = window.prompt("Enter Avatar Image URL:");
-        if (url) setAvatarImage({ file: url, preview: url });
+    const handleAvatarNameChange = (idx, name) => {
+        setAvatarImages(prev => prev.map((a, i) => i === idx ? { ...a, name } : a));
+    };
+
+    const handleAddAvatar = () => {
+        if (avatarImages.length >= 4) return;
+        setAvatarPickerTargetIdx(null);
+        setShowAvatarPicker(true);
+    };
+
+    const handleRemoveAvatar = (idx) => {
+        setAvatarImages(prev => {
+            const entry = prev[idx];
+            if (entry?.preview?.startsWith('blob:')) URL.revokeObjectURL(entry.preview);
+            return prev.filter((_, i) => i !== idx);
+        });
+    };
+
+    // ── Ref image upload (location/element) ──
+    const handleRefImages = (e) => {
+        const files = Array.from(e.target.files || []);
+        setRefImages(prev => {
+            const remaining = 3 - prev.length;
+            const toAdd = files.slice(0, remaining).map(f => ({ file: f, preview: URL.createObjectURL(f), label: '' }));
+            return [...prev, ...toAdd];
+        });
+    };
+
+    const handleRemoveRef = (idx) => {
+        setRefImages(prev => {
+            const entry = prev[idx];
+            if (entry?.preview?.startsWith('blob:')) URL.revokeObjectURL(entry.preview);
+            return prev.filter((_, i) => i !== idx);
+        });
     };
 
     const handleProductUrlAdd = async () => {
@@ -330,15 +410,29 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             fd.append('style', defaultStyle);
             fd.append('duration', String(duration));
             fd.append('format', format);
-            fd.append('resolution', resolution); // ✅ Pass resolution so NanoBanana uses correct imageSize
+            fd.append('resolution', resolution);
+            fd.append('includeBranding', String(includeBranding));
             productImages.forEach(pi => {
                 if (typeof pi.file === 'string') fd.append('productImageUrls', pi.file);
                 else fd.append('productImages', pi.file);
             });
-            if (avatarImage) {
-                if (typeof avatarImage.file === 'string') fd.append('avatarUrl', avatarImage.file);
-                else fd.append('avatarImage', avatarImage.file);
-            }
+            // Multi-avatar: send each avatar
+            const avatarNamesArr = avatarImages.map(a => a.name || '');
+            fd.append('avatarNames', JSON.stringify(avatarNamesArr));
+            avatarImages.forEach(ai => {
+                if (typeof ai.file === 'string') {
+                    // Pre-existing URL from DB/picker
+                    fd.append('avatarUrls', ai.file);
+                } else {
+                    // New file upload — use avatarImages field (multi, up to 4)
+                    fd.append('avatarImages', ai.file);
+                }
+            });
+            // Ref images (location/element)
+            refImages.forEach(ri => {
+                if (typeof ri.file === 'string') fd.append('refImageUrls', ri.file);
+                else fd.append('refImages', ri.file);
+            });
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
             fd.append('dialogueLanguage', dialogueLanguage);
@@ -402,15 +496,19 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 body: JSON.stringify({
                     projectId,
                     imageUrl,
-                    // videoPrompt intentionally NOT sent — backend generates it fresh at animate-time
-                    // with correct @imageN tags mapped to the actual reference images being sent.
                     duration,
                     format,
                     resolution,
                     productImageUrls: productImages
                         .map(pi => typeof pi.file === 'string' ? pi.file : null)
                         .filter(Boolean),
-                    avatarUrl: avatarImage && typeof avatarImage.file === 'string' ? avatarImage.file : undefined,
+                    // Multi-avatar: send all avatar URLs
+                    avatarUrls: avatarImages
+                        .filter(ai => typeof ai.file === 'string')
+                        .map(ai => ai.file),
+                    avatarUrl: (avatarImages[0] && typeof avatarImages[0].file === 'string')
+                        ? avatarImages[0].file
+                        : undefined,
                     model,
                     brandId: activeBrand?._id,
                 }),
@@ -594,15 +692,92 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                             )}
                             <input ref={productInputRef} type="file" accept="image/*" multiple hidden onChange={handleProductImages} />
 
-                            {/* Avatar Block */}
-                            <button className={`scott-block-btn ${avatarImage ? 'active' : ''}`} onClick={() => setShowAvatarPicker(true)}>
-                                {avatarImage ? (
-                                    <img src={avatarImage.preview} className="scott-block-img" alt="avatar" />
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>person</span>
-                                        <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>AVATAR</span>
-                                    </>
+                            {/* Avatar Block — Multi-character strip (up to 4) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {avatarImages.map((ai, idx) => (
+                                    <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
+                                        <img
+                                            src={ai.preview}
+                                            alt={`avatar-${idx + 1}`}
+                                            title={ai.name || `Character ${idx + 1}`}
+                                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '50%', display: 'block', border: '2px solid rgba(99,102,241,0.6)', cursor: 'pointer' }}
+                                            onClick={() => { setAvatarPickerTargetIdx(idx); setShowAvatarPicker(true); }}
+                                        />
+                                        {/* Name badge */}
+                                        {ai.name && (
+                                            <span style={{ position: 'absolute', bottom: -9, left: '50%', transform: 'translateX(-50%)', fontSize: 7, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.5)', borderRadius: 3, padding: '0 2px', letterSpacing: 0.3 }}>{ai.name.slice(0, 6)}</span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveAvatar(idx)}
+                                            style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
+                                        >✕</button>
+                                    </div>
+                                ))}
+                                {/* Add avatar button — shows if < 4 */}
+                                {avatarImages.length < 4 && (
+                                    <button
+                                        className={`scott-block-btn ${avatarImages.length === 0 ? '' : 'active'}`}
+                                        title={avatarImages.length === 0 ? 'Add character' : 'Add another character'}
+                                        style={{ width: 36, height: 36, borderRadius: '50%', padding: 0 }}
+                                        onClick={handleAddAvatar}
+                                    >
+                                        {avatarImages.length === 0 ? (
+                                            <>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2 }}>person_add</span>
+                                                <span style={{ zIndex: 2, fontSize: 7, letterSpacing: 0.5 }}>CAST</span>
+                                            </>
+                                        ) : (
+                                            <span className="material-symbols-outlined" style={{ fontSize: 16, zIndex: 2 }}>add</span>
+                                        )}
+                                    </button>
+                                )}
+                                <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={(e) => handleAvatarFileUpload(e)} />
+                            </div>
+
+                            {/* Ref image Block (location / element) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {refImages.map((ri, idx) => (
+                                    <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
+                                        <img
+                                            src={ri.preview}
+                                            alt={`ref-${idx + 1}`}
+                                            title={ri.label || `Location/Ref ${idx + 1}`}
+                                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '2px solid rgba(234,179,8,0.5)', display: 'block' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveRef(idx)}
+                                            style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
+                                        >✕</button>
+                                    </div>
+                                ))}
+                                {refImages.length < 3 && (
+                                    <button
+                                        className="scott-block-btn"
+                                        title="Upload location/element reference"
+                                        style={{ width: 36, height: 36, borderRadius: 6, padding: 0 }}
+                                        onClick={() => refInputRef.current?.click()}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2 }}>add_location_alt</span>
+                                        <span style={{ zIndex: 2, fontSize: 7, letterSpacing: 0.5 }}>PLACE</span>
+                                    </button>
+                                )}
+                                <input ref={refInputRef} type="file" accept="image/*" multiple hidden onChange={handleRefImages} />
+                            </div>
+
+                            {/* Branding toggle */}
+                            <button
+                                type="button"
+                                className={`scott-block-btn ${includeBranding ? 'active' : ''}`}
+                                title={includeBranding ? 'Brand DNA included — click to disable' : 'Brand DNA excluded — click to enable'}
+                                style={{ gap: 2, padding: '4px 8px', borderColor: includeBranding ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)', position: 'relative' }}
+                                onClick={() => setIncludeBranding(v => !v)}
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2, color: includeBranding ? '#a5b4fc' : 'rgba(255,255,255,0.3)' }}>verified</span>
+                                <span style={{ zIndex: 2, fontSize: 8, letterSpacing: 0.5, color: includeBranding ? '#a5b4fc' : 'rgba(255,255,255,0.3)' }}>BRAND</span>
+                                {!includeBranding && (
+                                    <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#6b7280', zIndex: 3 }} />
                                 )}
                             </button>
 
