@@ -293,8 +293,8 @@ export class GeminiProvider extends BaseProvider {
         try {
             // Modern models (Flash 2.5, Flash 3.1 Preview, etc.) use generateContent
             if (modelId.includes('flash') || modelId.includes('pro') || modelId.includes('preview')) {
-                // gemini-2.0-flash-exp requires v1alpha for responseModalities: ['IMAGE']
-                const apiVersion = modelId === 'gemini-2.0-flash-exp' ? 'v1alpha' : 'v1beta';
+                // gemini-2.5-flash requires v1beta for responseModalities: ['IMAGE'] (it is now GA)
+                const apiVersion = 'v1beta';
                 const baseUrl = this.baseUrl.replace('v1beta', apiVersion);
                 const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
 

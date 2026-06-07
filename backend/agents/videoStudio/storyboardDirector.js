@@ -74,13 +74,10 @@ Each cut must have:
 - duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${MAX_SHOT_DURATION}s)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
-- scene: 2-3 sentence narrative beat — WHO is doing WHAT, the physical action or micro-emotion in this exact cut, and how it propels the story forward. Be specific and cinematic, not generic. E.g. "Presenter's hand slowly lifts the product into a beam of golden backlight. The label rotates toward camera. Her eyes meet the lens — a quiet smile of confidence."
-- framePrompt: a richly detailed, highly creative image generation prompt for this panel. INJECT extreme creativity:
-  • Specify dynamic camera angles: low-angle hero shots, Dutch tilt, kinetic tracking, extreme macro, sweeping aerial, over-shoulder reveal
-  • Demand professional lighting textures: volumetric god rays, chiaroscuro contrast, neon rim lights, softbox diffusion, condensation micro-highlights, golden-hour backlight
-  • Describe exact subject position, expression, product placement, props
+- scene: 1 short sentence narrative beat — WHO is doing WHAT in this exact cut. Be specific but VERY concise.
+- framePrompt: a concise image generation prompt for this panel. CRITICAL: Keep under 40 words to avoid token limits:
+  • Specify dynamic camera angles, lighting, subject position, and props.
   • Reference the @image sequence: e.g. "Product as shown in @image1, presenter as in @image2"
-  • End with mood: "cinematic 4K still, award-winning commercial photography"
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
@@ -121,12 +118,12 @@ Section 2 (ENVIRONMENT / SET DESIGN):
 
 Section 3 (STORYBOARD):
 - A clean horizontal row of 5 storyboard panels showing:
-  - Panel 1 (Cut 1): Describe Panel 1 in detail using the specific lens, shot type, camera move, and action description from your Cut 1 plan.
-  - Panel 2 (Cut 2): Describe Panel 2 in detail using the details from your Cut 2 plan.
-  - Panel 3 (Cut 3): Describe Panel 3 in detail using the details from your Cut 3 plan.
-  - Panel 4 (Cut 4): Describe Panel 4 in detail using the details from your Cut 4 plan.
-  - Panel 5 (Cut 5): Describe Panel 5 in detail using the details from your Cut 5 plan.
-- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type — short action description'.
+  - Panel 1 (Cut 1): Describe Panel 1 concisely (max 10 words).
+  - Panel 2 (Cut 2): Describe Panel 2 concisely (max 10 words).
+  - Panel 3 (Cut 3): Describe Panel 3 concisely (max 10 words).
+  - Panel 4 (Cut 4): Describe Panel 4 concisely (max 10 words).
+  - Panel 5 (Cut 5): Describe Panel 5 concisely (max 10 words).
+- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.
 
 Section 4 (LIGHTING / MOOD / STYLE NOTES):
 - 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
