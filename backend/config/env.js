@@ -129,7 +129,7 @@ export default {
     shopify: {
         apiKey: process.env.SHOPIFY_API_KEY,
         apiSecret: process.env.SHOPIFY_API_SECRET,
-        scope: process.env.SHOPIFY_SCOPES || 'read_products,read_orders,read_customers',
+        scope: process.env.SHOPIFY_SCOPES || 'read_customers,write_inventory,read_inventory,read_orders,read_products,write_products',
         callbackUrl: process.env.SHOPIFY_CALLBACK_URL,
     },
 

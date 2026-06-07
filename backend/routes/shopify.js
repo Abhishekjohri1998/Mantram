@@ -410,7 +410,15 @@ router.post('/sync', protect, async (req, res) => {
         res.json({ success: true, ...results });
     } catch (error) {
         console.error('Shopify sync error:', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        const errorBody = error.response?.body;
+        const bodyStr = errorBody ? (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) : '';
+        const fullErrorText = `${error.message || ''} ${bodyStr}`;
+        const lowerMsg = fullErrorText.toLowerCase();
+        let errMsg = safeErrorMessage(error);
+        if (lowerMsg.includes('scope') || lowerMsg.includes('merchant approval') || lowerMsg.includes('permission') || lowerMsg.includes('forbidden') || error.response?.code === 403) {
+            errMsg = 'Shopify sync failed due to permissions. Please disconnect and reconnect your Shopify store in the Integrations tab to authorize the required scopes.';
+        }
+        res.status(500).json({ success: false, error: errMsg });
     }
 });
 
@@ -507,10 +515,13 @@ router.post('/products/publish', protect, async (req, res) => {
 
     } catch (error) {
         console.error('Shopify product publish error:', error);
+        const errorBody = error.response?.body;
+        const bodyStr = errorBody ? (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) : '';
+        const fullErrorText = `${error.message || ''} ${bodyStr}`;
+        const lowerMsg = fullErrorText.toLowerCase();
         let errMsg = safeErrorMessage(error);
-        const lowerMsg = String(error.message || error).toLowerCase();
-        if (lowerMsg.includes('write_products') || lowerMsg.includes('merchant approval')) {
-            errMsg = 'This action requires product write permission. Please disconnect and reconnect your Shopify store in the Integrations tab to approve the updated permissions.';
+        if (lowerMsg.includes('write_products') || lowerMsg.includes('merchant approval') || lowerMsg.includes('scope') || lowerMsg.includes('forbidden') || error.response?.code === 403) {
+            errMsg = 'This action requires product write permission (write_products scope). If you connected via OAuth, please disconnect and reconnect your store in the Integrations tab. If you used a Custom App Access Token, please update your app configuration in Shopify Admin to grant the "write_products" Admin API scope.';
         }
         res.status(500).json({ success: false, error: errMsg });
     }
