@@ -403,7 +403,7 @@ router.post('/sync', protect, async (req, res) => {
         );
 
         integration.lastSyncAt = new Date();
-        integration.syncCount++;
+        integration.syncCount = (integration.syncCount || 0) + 1;
         await integration.save();
 
         console.log(`✅ Synced products: ${results.products}, orders: ${results.orders}, customers: ${results.customers}`);
@@ -416,9 +416,27 @@ router.post('/sync', protect, async (req, res) => {
         const lowerMsg = fullErrorText.toLowerCase();
         let errMsg = safeErrorMessage(error);
         if (lowerMsg.includes('scope') || lowerMsg.includes('merchant approval') || lowerMsg.includes('permission') || lowerMsg.includes('forbidden') || error.response?.code === 403) {
-            errMsg = 'Shopify sync failed due to permissions. Please disconnect and reconnect your Shopify store in the Integrations tab to authorize the required scopes.';
+            errMsg = 'Shopify sync failed due to permissions. Please disconnect and reconnect your Shopify store to authorize the required scopes.';
         }
-        res.status(500).json({ success: false, error: errMsg });
+        res.status(400).json({ success: false, error: errMsg });
+    }
+});
+
+// GET /api/shopify/debug-token — Helper to check exactly what scopes the token has
+router.get('/debug-token', protect, async (req, res) => {
+    try {
+        const query = { user: req.user._id, platform: 'shopify', status: 'connected' };
+        if (req.query.brandId) query.brand = req.query.brandId;
+        const integration = await Integration.findOne(query).select('+accessToken');
+        if (!integration || !integration.accessToken) return res.json({ success: false, error: 'No token found' });
+
+        const response = await fetch(`https://${integration.platformData.shopDomain}/admin/oauth/access_scopes.json`, {
+            headers: { 'X-Shopify-Access-Token': integration.accessToken }
+        });
+        const data = await response.json();
+        res.json({ success: true, scopes: data });
+    } catch (err) {
+        res.json({ success: false, error: err.message });
     }
 });
 
