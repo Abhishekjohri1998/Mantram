@@ -6,6 +6,7 @@ const PLATFORM_META = {
     facebook: { label: 'Facebook', icon: '👥', color: '#1877F2', accent: 'from-[#FF4D00]/20 to-[#FF7A00]/20', border: 'border-[#FF4D00]/30' },
     twitter: { label: 'Twitter / X', icon: '𝕏', color: '#000000', accent: 'from-slate-500/20 to-slate-600/20', border: 'border-[var(--sys-border)]' },
     linkedin: { label: 'LinkedIn', icon: '💼', color: '#0A66C2', accent: 'from-sky-500/20 to-[#FF7A00]/20', border: 'border-sky-500/30' },
+    tiktok: { label: 'TikTok', icon: '🎵', color: '#010101', accent: 'from-[#00f2ea]/20 to-[#ff0050]/20', border: 'border-[#00f2ea]/30' },
 }
 
 /**

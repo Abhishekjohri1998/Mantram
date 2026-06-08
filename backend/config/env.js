@@ -25,6 +25,12 @@ export default {
         .map(url => url.trim().replace(/^["']|["']$/g, '')),
     backendUrl: process.env.BACKEND_URL || 'https://api.mantram.ai',
 
+    // TikTok Integration
+    tiktok: {
+        clientKey: process.env.TIKTOK_CLIENT_KEY,
+        clientSecret: process.env.TIKTOK_CLIENT_SECRET,
+    },
+
     // AI Provider Config — Claude primary, Gemini for images
     ai: {
         defaultTextProvider: process.env.DEFAULT_TEXT_PROVIDER || 'anthropic',

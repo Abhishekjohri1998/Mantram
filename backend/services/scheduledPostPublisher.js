@@ -25,6 +25,7 @@ import {
     publishCarouselToFacebook,
     publishCarouselToLinkedIn,
 } from './socialService.js';
+import { publishVideoToTikTok } from './tiktokService.js';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { sendRetentionEmail } from '../agents/retention/mailer.js';
 import config from '../config/env.js';
@@ -243,6 +244,9 @@ async function publishScheduledPost(post) {
                     accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
                 };
                 postId = await publishToTwitter(caption, absoluteImageUrl, absoluteVideoUrl, twCreds);
+            } else if (post.platform === 'tiktok') {
+                if (!absoluteVideoUrl) throw new Error('TikTok requires a video URL');
+                postId = await publishVideoToTikTok(account.accessToken, absoluteVideoUrl, caption);
             } else {
                 post.status = 'failed';
                 post.error = `Unsupported platform: ${post.platform}`;

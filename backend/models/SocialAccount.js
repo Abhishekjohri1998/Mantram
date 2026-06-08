@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const socialAccountSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    platform: { type: String, enum: ['facebook', 'instagram', 'linkedin', 'twitter'], required: true },
+    platform: { type: String, enum: ['facebook', 'instagram', 'linkedin', 'twitter', 'tiktok'], required: true },
 
     // The ID of the specific Page, IG Account, or Profile
     accountId: { type: String, required: true },

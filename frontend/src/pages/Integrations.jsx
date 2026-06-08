@@ -116,7 +116,7 @@ const SOCIAL_PLATFORMS = [
     { id: 'facebook', name: 'Facebook', color: '#1877F2', desc: 'Pages, groups & marketplace' },
     { id: 'linkedin', name: 'LinkedIn', color: '#0A66C2', desc: 'Professional posts & articles' },
     { id: 'twitter', name: 'X (Twitter)', color: '#14171A', desc: 'Tweets & threads' },
-    { id: 'tiktok', name: 'TikTok', color: '#010101', desc: 'Short-form video content', comingSoon: true },
+    { id: 'tiktok', name: 'TikTok', color: '#010101', desc: 'Short-form video content' },
     { id: 'youtube', name: 'YouTube', color: '#FF0000', desc: 'Long-form video & shorts', comingSoon: true },
 ]
 
@@ -543,7 +543,11 @@ export default function Integrations() {
         setLoading(l => ({ ...l, [platform]: true }))
         try {
             const data = await social.connect(platform, brandId)
-            if (data.authUrl) window.open(data.authUrl, '_blank', 'width=600,height=700')
+            if (data.url) {
+                window.location.href = data.url;
+            } else if (data.authUrl) {
+                window.open(data.authUrl, '_blank', 'width=600,height=700')
+            }
         } catch (err) { setToast({ message: `Connection failed: ${err.message}`, type: 'error' }) }
         finally { setLoading(l => ({ ...l, [platform]: false })) }
     }

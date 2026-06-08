@@ -28,6 +28,7 @@ import {
 import config from '../config/env.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { publishVideoToTikTok, getAuthorizationUrl as getTikTokAuthUrl, getAccessToken as getTikTokAccessToken } from '../services/tiktokService.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
@@ -119,6 +120,12 @@ router.get('/auth/:platform', protect, async (req, res) => {
                 console.error('[SOCIAL] Twitter request token error:', twErr.response?.data || twErr.message);
                 return res.status(500).json({ success: false, error: twErr.message || 'Failed to initiate Twitter OAuth' });
             }
+        }
+        
+        if (platform === 'tiktok') {
+            const callbackUrl = `${config.backendUrl}/api/social/auth/tiktok/callback`;
+            const authUrl = getTikTokAuthUrl(callbackUrl, state);
+            return res.json({ success: true, authUrl });
         }
 
         const authUrl = platform === 'linkedin' ? getLinkedInAuthUrl(state) : getMetaAuthUrl(state, platform);
@@ -355,6 +362,62 @@ router.get('/auth/twitter/callback', async (req, res) => {
     } catch (error) {
         console.error('[SOCIAL] Twitter Callback Error:', error.response?.data || error.message);
         res.redirect(`${targetFrontend}/integrations?social=processing_failed&platform=twitter`);
+    }
+});
+
+/**
+ * @route   GET /api/social/auth/tiktok/callback
+ * @desc    Handle TikTok OAuth callback
+ * @access  Public
+ */
+router.get('/auth/tiktok/callback', async (req, res) => {
+    const { code, state, error, error_description } = req.query;
+    let targetFrontend = config.frontendUrl[0];
+
+    try {
+        if (state) {
+            const parts = state.split(':');
+            if (parts.length >= 3) {
+                targetFrontend = getSafeRedirectUrl(parts[2]);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to parse origin from state', e);
+    }
+
+    if (error) {
+        console.error('TikTok OAuth Error:', error, error_description);
+        return res.redirect(`${targetFrontend}/integrations?social=error&platform=tiktok`);
+    }
+
+    try {
+        const verifiedParts = verifyState(state);
+        if (!verifiedParts) {
+            return res.redirect(`${targetFrontend}/integrations?social=invalid_state&platform=tiktok`);
+        }
+        const [userId] = verifiedParts;
+        
+        const callbackUrl = `${config.backendUrl}/api/social/auth/tiktok/callback`;
+        const tokenData = await getTikTokAccessToken(code, callbackUrl);
+
+        await SocialAccount.findOneAndUpdate(
+            { user: userId, platform: 'tiktok', accountId: tokenData.openId },
+            {
+                user: userId,
+                platform: 'tiktok',
+                accountId: tokenData.openId,
+                accountName: `TikTok Creator (${tokenData.creatorId || tokenData.openId})`,
+                accessToken: tokenData.accessToken,
+                refreshToken: tokenData.refreshToken,
+                isActive: true
+            },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        res.redirect(`${targetFrontend}/integrations?social=success&platform=tiktok`);
+    } catch (error) {
+        console.error('TikTok Callback Error:', error);
+        res.redirect(`${targetFrontend}/integrations?social=processing_failed&platform=tiktok`);
     }
 });
 
@@ -714,6 +777,9 @@ router.post('/publish', protect, async (req, res) => {
                             accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
                         };
                         postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl, twCreds);
+                    } else if (account.platform === 'tiktok') {
+                        if (!videoUrl) throw new Error('TikTok requires a video URL');
+                        postId = await publishVideoToTikTok(account.accessToken, videoUrl, postText);
                     }
                 }
 
