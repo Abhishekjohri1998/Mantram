@@ -145,6 +145,8 @@ export function startStoryboardLongForm({
     includeBranding = true,
     // Pre-generated character reference sheet (stable face anchor per segment)
     characterRefSheetUrl = null,
+    // Structured 4-section plan from storyboardDirector (contains cuts[] with exact timings)
+    structuredPlan = null,
 }) {
     const jobId = `sb-lf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -174,6 +176,7 @@ export function startStoryboardLongForm({
         voiceoverScript, voiceoverLanguage, bgmPreset,
         avatarUrls, avatarNames, refImageUrls,
         includeBranding, characterRefSheetUrl,
+        structuredPlan,
     }).catch(err => {
         const j = activeJobs.get(jobId);
         if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
@@ -313,9 +316,34 @@ async function _runPipeline(jobId, params) {
         console.log(`[SB LongForm ${jobId}] 🎭 Characters: ${avatarNames.join(', ') || 'none'}`);
         console.log(`[SB LongForm ${jobId}] 📋 Total reference images: ${finalReferenceImages.length} | branding=${includeBranding}`);
 
+        // Build a CHARACTER IDENTITY LOCK preamble for use in every segment prompt.
+        // This tells the model exactly which @imageN slot is the char ref sheet,
+        // what to lock (face/hair/skin only), and that wardrobe comes from the scene text.
+        // Reference order in every segment: @image1=firstFrame, @image2=poster, @image3=charSheet
+        // (product refs come after charSheet if > 1 product image).
+        const charRefTag = charSheetRef.length > 0 ? '@image3' : null;
+        const charIdentityPreamble = (charSheetRef.length > 0 && avatarNames.length > 0)
+            ? `CHARACTER IDENTITY LOCK (apply to ALL cuts in this segment):
+${charRefTag} = CHARACTER REFERENCE SHEET showing: ${avatarNames.map(n => `"${n}"`).join(', ')}
+• LOCK for each character: face shape, facial features, hair colour/style, skin tone, eye colour.
+• DO NOT lock wardrobe — each character wears the costume/attire described in their cut line below.
+• Never swap or blend character faces.
+
+`
+            : avatarNames.length > 0
+            ? `CHARACTER IDENTITY LOCK:
+Characters in this video: ${avatarNames.map(n => `"${n}"`).join(', ')}.
+Maintain exact face, hair colour, skin tone for each character across all cuts.
+Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
+
+`
+            : '';
+
         _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
         let scenes = [];
         try {
+            // Pass structuredPlan so scenePlanner can use cuts[] directly (no LLM re-decomposition)
+            const structuredPlan = params.structuredPlan || null;
             scenes = await planStoryboardScenes({
                 videoPrompt: params.videoPrompt,
                 imageUrl: params.imageUrl,
@@ -326,7 +354,8 @@ async function _runPipeline(jobId, params) {
                 productName,
                 productFeatures,
                 referenceImages: finalReferenceImages,
-                characterNames: avatarNames,   // named characters for @imageN mapping
+                characterNames: avatarNames,
+                structuredPlan,  // ← NEW: passes cuts[] for direct timing mapping
             });
             console.log(`[SB LongForm ${jobId}] 📋 Decomposed into ${scenes.length} scenes.`);
         } catch (planErr) {
@@ -388,8 +417,12 @@ async function _runPipeline(jobId, params) {
                 ? 'This is the FINAL segment — build to the story\'s emotional peak with a strong cinematic close. No brand logo or CTA.'
                 : `This is a CONTINUATION segment — maintain exact visual style from the previous segment. Seamlessly continue the action. DO NOT include any brand opening, brand logo, or closing CTA — those belong only in the final segment.`;
 
+            // Build per-segment prompt:
+            // 1. Character identity preamble (face lock + wardrobe-from-scene instruction)
+            // 2. Scene visual prompt (already contains CUT N [Xs-Ys] timing if structuredPlan was used)
+            // 3. Position hint (opening / continuation / final)
             const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
-            const segPrompt = `${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency.`;
+            const segPrompt = `${charIdentityPreamble}${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency with the character reference sheet.`;
 
             const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
 

@@ -7946,24 +7946,36 @@ async function generateAnimateVideoPrompt({
     if (structuredPlan && Array.isArray(structuredPlan.cuts) && structuredPlan.cuts.length > 0) {
         console.log(`[generateAnimateVideoPrompt] Using structured plan — ${structuredPlan.cuts.length} cuts`);
 
-        // Build timed cut list (accumulate start time per cut)
+        // Build timed cut list with attire/staging from framePrompt
         let elapsed = 0;
         const cutLines = structuredPlan.cuts.map(cut => {
             const start = elapsed;
             const end = elapsed + cut.duration;
             elapsed = end;
-            return `  Cut ${cut.id} [${start}s–${end}s]: ${cut.lens} | ${cut.shot} | ${cut.move} — ${cut.scene}`;
+            // Include framePrompt as attire/staging directive (truncated to avoid token bloat)
+            const attireLine = cut.framePrompt && cut.framePrompt.trim().length > 10
+                ? `\n      → Attire/Staging: ${cut.framePrompt.substring(0, 150)}`
+                : '';
+            return `  CUT ${cut.id} [${start}s–${end}s] ${cut.duration}s | ${cut.lens} | ${cut.shot} | ${cut.move}\n      Scene: ${cut.scene}${attireLine}`;
         }).join('\n');
 
         const colorStr = structuredPlan.colorPalette?.length
             ? structuredPlan.colorPalette.map((hex, i) => `${hex} (${structuredPlan.paletteNames?.[i] || ''})`).join(', ')
             : '';
 
+        // Build character identity lock block for the prompt
+        const charLockBlock = avatarUrl
+            ? `\nCHARACTER IDENTITY LOCK (mandatory for entire video):
+The character reference image defines FACE, HAIR, SKIN TONE only.
+Wardrobe/costume is defined per-cut in the CUT PLAN below — follow it EXACTLY for each cut.
+Do NOT carry the reference image's outfit into any cut that specifies a different costume.\n`
+            : '';
+
         structuredContext = `
 ═══════════════════════════════════════════════════════
 STRUCTURED STORYBOARD PLAN (4-SECTION BRIEF)
 ═══════════════════════════════════════════════════════
-
+${charLockBlock}
 ── SECTION 1: CHARACTER + PRODUCT DNA ──
 Color Palette: ${colorStr || 'See storyboard poster'}
 Materials in scene: ${structuredPlan.materialNotes || 'See storyboard poster'}
@@ -7972,7 +7984,7 @@ Materials in scene: ${structuredPlan.materialNotes || 'See storyboard poster'}
 Set: ${structuredPlan.environmentFingerprint || 'See storyboard poster'}
 IMPORTANT: The background / environment NEVER changes between cuts.
 
-── SECTION 3: CUT PLAN (timed shot list for ONE continuous video) ──
+── SECTION 3: CUT PLAN (MANDATORY TIMING — each cut duration is non-negotiable) ──
 Total: ${duration}s across ${structuredPlan.cuts.length} cuts
 ${cutLines}
 
@@ -7983,12 +7995,12 @@ Emotional arc: ${structuredPlan.emotionalArc || ''}
 Narrative: ${structuredPlan.narrativeArc || ''}
 ═══════════════════════════════════════════════════════
 
-YOUR PRIMARY TASK: Translate the cut plan above into precise Seedance video generation instructions.
-For EACH cut, specify:
-  - Exact timing [Xs–Ys]
-  - Camera movement (${structuredPlan.cuts.map(c => c.move).join(' → ')})
-  - Lens character and depth of field behaviour
-  - What the subject does / how the product moves / emotional beat
+YOUR PRIMARY TASK: Translate each CUT from the plan above into precise Seedance video generation instructions.
+For EACH cut, you MUST specify:
+  - Exact timing [Xs–Ys] (from the plan — do not change these)
+  - Lens, shot type, camera movement as listed
+  - What the subject does, how the product moves, the emotional beat
+  - The exact costume/attire stated in the cut's Attire/Staging line
   - Any spoken dialogue or VO in ${dialogueLanguage}
 The environment (${structuredPlan.environmentFingerprint}) must remain visually consistent throughout.`;
     } else {
@@ -8314,7 +8326,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 projectId: projectId || null,
                 userId: req.user._id,
                 imageUrl,           // storyboard poster → style ref injected per-segment in storyboardLongForm.js
-                firstFrameUrl: firstFrameUrl || null,  // ── FIX: NEVER fall back to poster URL
+                firstFrameUrl: firstFrameUrl || null,  // FIX: NEVER fall back to poster URL
                 videoPrompt: finalVideoPrompt,
                 totalDuration: rawDuration,
                 format: dbFormat,
@@ -8333,6 +8345,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 includeBranding: dbIncludeBranding,
                 // ── Character reference sheet ──
                 characterRefSheetUrl: dbCharRefSheetUrlSigned || null,
+                // ── Structured plan: director's cuts[] for exact per-segment timing ──
+                structuredPlan: dbStructuredPlan || null,
             });
 
             if (projectId) {

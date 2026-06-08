@@ -557,7 +557,7 @@ export async function submitAtlasCloudVideoGeneration({
             } else if (role === 'character') {
                 desc = `${tag} = animated character — maintain exact look in every frame.`;
             } else if (role === 'character_reference') {
-                desc = `${tag} = CHARACTER REFERENCE SHEET — contains one or more named characters with their exact face, hair, skin tone, and wardrobe. Maintain pixel-accurate identity for every character in all shots they appear in. Never blend or swap character identities.`;
+                desc = `${tag} = CHARACTER REFERENCE SHEET — contains one or more named characters. LOCK: exact face shape, facial features, hair colour/style, skin tone, eye colour. DO NOT LOCK wardrobe or clothing — costume/attire is defined per scene in the prompt text and must be followed exactly as written, overriding anything worn in this reference image.`;
             } else if (role === 'logo') {
                 desc = `${tag} = brand logo — show in closing shot / overlay without distortion.`;
             } else {

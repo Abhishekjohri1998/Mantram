@@ -557,16 +557,22 @@ export async function generateCharacterReferenceSheet(avatarBuffers = [], avatar
         ? 'clean 2D flat illustrated style'
         : 'hyperrealistic cinematic photographic style';
 
-    const prompt = `Create a professional CHARACTER REFERENCE SHEET on a plain white background.
+    const prompt = `Create a professional CHARACTER IDENTITY REFERENCE SHEET on a plain white background.
+PURPOSE: This sheet is a FACE and IDENTITY reference ONLY — not a wardrobe reference.
 Layout: A clean labelled grid showing each character in their own column.
 For each character, show 3 panels stacked vertically:
-  1. Face close-up (frontal, neutral expression)
-  2. Full body standing (frontal view, showing complete wardrobe)
-  3. Profile / three-quarter view
+  1. Face close-up (frontal, neutral expression) — the most important panel
+  2. Three-quarter face view
+  3. Side profile
 Characters: ${charList}
 Style: ${styleDesc}
-CRITICAL: Use the attached reference images as the EXACT pixel-accurate source for each character's face, hair color, skin tone, eye color, and wardrobe. Do NOT alter or blend any facial features. Label each column with the character's name in clean black typography below their panels.
-White background, clinical reference sheet format, no extra people or props, no background scenes.`;
+CRITICAL IDENTITY RULES:
+- Use the attached reference images as the EXACT source for each character's face shape, facial features, hair colour/style, skin tone, and eye colour ONLY.
+- Show characters in plain neutral clothing (simple white or grey top) — the purpose is a FACE REFERENCE SHEET, not a wardrobe sheet. Actual costumes will be described per scene.
+- DO NOT replicate or preserve the clothing/outfit from the reference images.
+- Label each column with the character's name in clean black typography below their panels.
+White background, clinical reference sheet format, no extra people or props, no background scenes.
+IMPORTANT: The model/director will use this ONLY to maintain facial identity consistency across different scenes where characters wear different costumes.`;
 
     console.log(`[Char Ref Sheet] Generating for ${avatarBuffers.length} character(s): ${charList}`);
 
