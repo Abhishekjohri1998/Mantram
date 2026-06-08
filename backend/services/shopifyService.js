@@ -206,49 +206,19 @@ export async function fetchShopifyProduct(accessToken, shopDomain, productId) {
  */
 export async function createShopifyProduct(accessToken, shopDomain, productData) {
     const session = getShopifySession(shopDomain, accessToken);
-    const client = new shopify.clients.Graphql({ session });
+    const client = new shopify.clients.Rest({ session });
     
-    const input = {
-        title: productData.title,
-        descriptionHtml: productData.body_html || '',
-        vendor: productData.vendor || '',
-        productType: productData.product_type || '',
-        status: (productData.status || 'draft').toUpperCase()
-    };
-    
-    const mutation = `
-        mutation productCreate($input: ProductInput!) {
-            productCreate(input: $input) {
-                product {
-                    id
-                }
-                userErrors {
-                    field
-                    message
-                }
-            }
-        }
-    `;
-    
-    const response = await client.request(mutation, { variables: { input } });
-    
-    if (response.data?.productCreate?.userErrors?.length > 0) {
-        throw new Error(response.data.productCreate.userErrors[0].message);
+    try {
+        const response = await client.post({
+            path: 'products',
+            data: { product: productData }
+        });
+        
+        return response.body?.product;
+    } catch (e) {
+        console.error('Error creating Shopify product:', e.response?.body || e.message);
+        throw e;
     }
-    
-    const productId = response.data?.productCreate?.product?.id?.split('/').pop();
-    
-    // Return a REST-formatted object for compatibility with transformShopifyProduct
-    return {
-        id: productId,
-        title: productData.title,
-        body_html: productData.body_html,
-        vendor: productData.vendor,
-        product_type: productData.product_type,
-        status: productData.status,
-        variants: [],
-        images: []
-    };
 }
 
 /**
@@ -392,27 +362,35 @@ export async function syncStoreData(accessToken, shopDomain, userId, brandId, mo
         }
 
         // 2. Sync Orders (last 60 days)
-        const orders = await fetchShopifyOrders(accessToken, shopDomain, 60);
-        for (const o of orders) {
-            const transformed = transformShopifyOrder(o, userId, brandId);
-            await ShopifyOrder.findOneAndUpdate(
-                { brand: brandId, shopifyOrderId: String(o.id) },
-                transformed,
-                { upsert: true }
-            );
-            results.orders++;
+        try {
+            const orders = await fetchShopifyOrders(accessToken, shopDomain, 60);
+            for (const o of orders) {
+                const transformed = transformShopifyOrder(o, userId, brandId);
+                await ShopifyOrder.findOneAndUpdate(
+                    { brand: brandId, shopifyOrderId: String(o.id) },
+                    transformed,
+                    { upsert: true }
+                );
+                results.orders++;
+            }
+        } catch (e) {
+            console.warn(`⚠️ Skipped syncing orders for ${shopDomain}: ${e.message}`);
         }
 
         // 3. Sync Customers
-        const customers = await fetchShopifyCustomers(accessToken, shopDomain);
-        for (const c of customers) {
-            const transformed = transformShopifyCustomer(c, userId, brandId);
-            await ShopifyCustomer.findOneAndUpdate(
-                { brand: brandId, shopifyCustomerId: String(c.id) },
-                transformed,
-                { upsert: true }
-            );
-            results.customers++;
+        try {
+            const customers = await fetchShopifyCustomers(accessToken, shopDomain);
+            for (const c of customers) {
+                const transformed = transformShopifyCustomer(c, userId, brandId);
+                await ShopifyCustomer.findOneAndUpdate(
+                    { brand: brandId, shopifyCustomerId: String(c.id) },
+                    transformed,
+                    { upsert: true }
+                );
+                results.customers++;
+            }
+        } catch (e) {
+            console.warn(`⚠️ Skipped syncing customers for ${shopDomain}: ${e.message}`);
         }
 
         return results;
