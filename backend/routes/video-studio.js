@@ -8020,7 +8020,7 @@ ${brandingRule}
 11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`;
 
     const userPrompt = `APPROVED STORYBOARD STYLE (from @image2 poster):
-Use @image2 for style grounding only — not as a literal first frame.
+IMPORTANT: @image2 is a STORYBOARD STYLE REFERENCE GRID — NOT the opening frame. The video must OPEN with @image1.
 
 CREATIVE BRIEF: "${brief || 'Create a high-energy, cinematic ad film.'}"
 PRODUCT: ${productName || 'See @image1'}
@@ -8029,6 +8029,7 @@ VIDEO DURATION: ${duration}s | FORMAT: ${format} | STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR PRESENT: ${avatarUrl ? `YES — presenter's face is in @image${nextTag - (logoUrl ? 2 : 1)}` : 'NO'}
 BRAND LOGO: ${logoUrl ? `YES — logo appears in @image${nextTag - 1}` : 'NO'}
+BRANDING ENABLED: ${includeBranding ? 'YES — end with brand CTA in final seconds only' : 'NO — absolutely no brand logo, no CTA, no closing brand shot'}
 ${structuredContext}
 ${existingVideoPrompt ? `\nREFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 600)}"\n` : ''}
 Write the final video prompt now. Follow the cut plan timings exactly. Ensure every @imageN tag matches the mapping above.`;
@@ -8121,6 +8122,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbBrandContext = '';
         let dbLogoUrl = null;
         let dbStructuredPlan = null;
+        let dbIncludeBranding = true;    // branding flag — read from DB below
+        let dbCharRefSheetUrl = null;    // pre-generated character reference sheet URL
 
         if (projectId) {
             const project = await VideoProject.findById(projectId)
@@ -8132,8 +8135,6 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 const rawAvatarUrls  = project.input?.avatarUrls?.length > 0
                     ? project.input.avatarUrls
                     : (project.input?.avatarUrl ? [project.input.avatarUrl] : []);
-                let dbIncludeBranding = true;    // branding flag
-                let dbCharRefSheetUrl = null;    // consolidated character reference sheet
                 dbAvatarNames        = project.input?.avatarNames || [];
                 dbRefImageUrls       = project.input?.refImageUrls || [];
                 dbBrief              = project.input?.brief || '';
