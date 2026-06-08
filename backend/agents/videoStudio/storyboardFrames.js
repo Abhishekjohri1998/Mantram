@@ -518,3 +518,95 @@ async function generateWithNanoBanana(
         return null;
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHARACTER REFERENCE SHEET GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Generate a consolidated Character Reference Sheet image.
+ *
+ * Produces a single clean image showing every character in labelled panels
+ * (frontal face close-up, full-body, profile). This sheet is stored once per
+ * storyboard project and injected as a stable face anchor for EVERY video
+ * segment during animation — eliminating the per-segment atlas asset re-registration
+ * problem and ensuring character identity is consistent across all cuts.
+ *
+ * @param {Array<{buffer: Buffer, mimeType: string}>} avatarBuffers — raw buffers per character
+ * @param {string[]} avatarNames — display names matching avatarBuffers order
+ * @param {string}   style       — 'hyperrealistic' | '3d' | '2d'
+ * @returns {string|null}        — data URI (base64) or null on failure
+ */
+export async function generateCharacterReferenceSheet(avatarBuffers = [], avatarNames = [], style = 'hyperrealistic') {
+    if (avatarBuffers.length === 0) {
+        console.log('[Char Ref Sheet] No avatar buffers — skipping');
+        return null;
+    }
+
+    const apiKey = config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY;
+    const baseUrl = config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
+    const endpoint = `${baseUrl}/images/edits`;
+
+    const charList = avatarNames.length > 0
+        ? avatarNames.map((n, i) => `Character ${i + 1}: "${n || `Character ${i + 1}`}"`).join(', ')
+        : avatarBuffers.map((_, i) => `Character ${i + 1}`).join(', ');
+
+    const styleDesc = style === '3d'
+        ? 'Pixar/Unreal Engine 3D animated style'
+        : style === '2d'
+        ? 'clean 2D flat illustrated style'
+        : 'hyperrealistic cinematic photographic style';
+
+    const prompt = `Create a professional CHARACTER REFERENCE SHEET on a plain white background.
+Layout: A clean labelled grid showing each character in their own column.
+For each character, show 3 panels stacked vertically:
+  1. Face close-up (frontal, neutral expression)
+  2. Full body standing (frontal view, showing complete wardrobe)
+  3. Profile / three-quarter view
+Characters: ${charList}
+Style: ${styleDesc}
+CRITICAL: Use the attached reference images as the EXACT pixel-accurate source for each character's face, hair color, skin tone, eye color, and wardrobe. Do NOT alter or blend any facial features. Label each column with the character's name in clean black typography below their panels.
+White background, clinical reference sheet format, no extra people or props, no background scenes.`;
+
+    console.log(`[Char Ref Sheet] Generating for ${avatarBuffers.length} character(s): ${charList}`);
+
+    try {
+        const fd = new FormData();
+        fd.append('model', 'gpt-image-2');
+        fd.append('prompt', prompt);
+        fd.append('size', '1792x1024');
+        fd.append('quality', 'high');
+        fd.append('n', '1');
+        fd.append('response_format', 'b64_json');
+
+        avatarBuffers.forEach(({ buffer, mimeType }, i) => {
+            const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
+            const name = avatarNames[i] ? avatarNames[i].replace(/\s+/g, '_') : `character_${i + 1}`;
+            fd.append('image[]', buffer, { filename: `char_ref_${name}_${i}.${ext}`, contentType: mimeType || 'image/jpeg' });
+        });
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, ...fd.getHeaders() },
+            body: fd,
+            signal: AbortSignal.timeout(120000),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`LaoZhang ${response.status}: ${errText.substring(0, 300)}`);
+        }
+
+        const json = await response.json();
+        const b64 = json?.data?.[0]?.b64_json;
+        if (!b64) throw new Error('No b64_json in char ref sheet response');
+
+        const dataUri = `data:image/png;base64,${b64}`;
+        console.log(`[Char Ref Sheet] ✅ Generated — ${Math.round(b64.length * 0.75 / 1024)}KB`);
+        return dataUri;
+
+    } catch (err) {
+        console.error(`[Char Ref Sheet] ❌ Failed: ${err.message}`);
+        return null;
+    }
+}

@@ -3,13 +3,13 @@
  *
  * Enables the Storyboard Studio to generate videos LONGER than 15 seconds
  * by splitting the requested duration into multiple segments, generating each
- * via Atlas Seedance I2V, and stitching them together with FFmpeg crossfades.
+ * via Atlas Seedance I2V, and stitching them together with FFmpeg hard cuts.
  *
  * Architecture:
  *   1. PLANNING    — allocate N segments from totalDuration (re-uses scenePlanner helpers)
  *   2. GENERATING  — sequential I2V with last-frame chaining for visual continuity
  *   3. TTS         — per-segment voiceover if voiceoverScript provided (from longFormGenerator)
- *   4. STITCHING   — FFmpeg normalize + crossfade stitch
+ *   4. STITCHING   — FFmpeg normalize + hard concat (no dissolves)
  *   5. MUXING      — mix BGM + voiceover onto stitched video
  *   6. UPLOADING   — S3 upload + MongoDB auto-persist
  *
@@ -141,6 +141,10 @@ export function startStoryboardLongForm({
     avatarUrls = [],
     avatarNames = [],
     refImageUrls = [],
+    // Branding control
+    includeBranding = true,
+    // Pre-generated character reference sheet (stable face anchor per segment)
+    characterRefSheetUrl = null,
 }) {
     const jobId = `sb-lf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -169,6 +173,7 @@ export function startStoryboardLongForm({
         totalDuration, format, resolution, referenceImages, model, qualityMode,
         voiceoverScript, voiceoverLanguage, bgmPreset,
         avatarUrls, avatarNames, refImageUrls,
+        includeBranding, characterRefSheetUrl,
     }).catch(err => {
         const j = activeJobs.get(jobId);
         if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
@@ -267,27 +272,46 @@ async function _runPipeline(jobId, params) {
             }
         }
 
-        // Build enriched referenceImages: all avatars as character_reference
-        // Merge any passed-in referenceImages with the DB-loaded avatar refs
-        const avatarRefs = avatarUrls.map((url, i) => ({
-            url,
-            role: 'character_reference',
-            name: avatarNames[i] || `Character ${i + 1}`,
-        }));
+        // Build enriched referenceImages:
+        // 1. Character Reference Sheet (if generated) — FIRST, stable @imageN slot for all segments
+        // 2. Individual avatar refs (fallback if no sheet, or supplemental)
+        // 3. Location/element refs
+        // Gate brand context and logo behind includeBranding flag
+        const includeBranding = params.includeBranding !== false; // default true
+        const characterRefSheetUrl = params.characterRefSheetUrl || null;
+
+        // Build the char ref sheet ref entry (stable face anchor)
+        const charSheetRef = characterRefSheetUrl ? [{ url: characterRefSheetUrl, role: 'character_reference' }] : [];
+
+        // Individual avatar refs (used only if no char ref sheet was generated)
+        const avatarRefs = charSheetRef.length === 0
+            ? avatarUrls.map((url, i) => ({
+                url,
+                role: 'character_reference',
+                name: avatarNames[i] || `Character ${i + 1}`,
+              }))
+            : [];
+
         const refImgRefs = refImageUrls.map((url, i) => ({
             url,
             role: 'location_reference',
             name: `ref_${i + 1}`,
         }));
-        // Combine: existing referenceImages (product etc.) + avatars + location refs
-        // (deduplicate by URL)
+
+        // Deduplicate and build enrichedReferenceImages
+        // Order: char ref sheet first → product/other existing refs → avatar fallbacks → location refs
         const existingUrls = new Set((params.referenceImages || []).map(r => r.url || r));
-        const extraRefs = [...avatarRefs, ...refImgRefs].filter(r => !existingUrls.has(r.url));
+        const extraRefs = [...charSheetRef, ...avatarRefs, ...refImgRefs].filter(r => !existingUrls.has(r.url));
         const enrichedReferenceImages = [...(params.referenceImages || []), ...extraRefs];
 
-        console.log(`[SB LongForm ${jobId}] 🧑 Multi-char refs: ${avatarRefs.length} avatars, ${refImgRefs.length} location refs`);
+        // If branding is OFF, strip any logo reference from enrichedReferenceImages
+        const finalReferenceImages = includeBranding
+            ? enrichedReferenceImages
+            : enrichedReferenceImages.filter(r => r.role !== 'logo');
+
+        console.log(`[SB LongForm ${jobId}] 🧑 Char ref sheet: ${characterRefSheetUrl ? 'YES' : 'no'} | avatar fallbacks: ${avatarRefs.length} | location refs: ${refImgRefs.length}`);
         console.log(`[SB LongForm ${jobId}] 🎭 Characters: ${avatarNames.join(', ') || 'none'}`);
-        console.log(`[SB LongForm ${jobId}] 📋 Total reference images: ${enrichedReferenceImages.length}`);
+        console.log(`[SB LongForm ${jobId}] 📋 Total reference images: ${finalReferenceImages.length} | branding=${includeBranding}`);
 
         _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
         let scenes = [];
@@ -298,10 +322,10 @@ async function _runPipeline(jobId, params) {
                 targetDuration: params.totalDuration,
                 model: params.model,
                 language: dialogueLanguage,
-                brandContext,
+                brandContext: includeBranding ? brandContext : '',
                 productName,
                 productFeatures,
-                referenceImages: enrichedReferenceImages,
+                referenceImages: finalReferenceImages,
                 characterNames: avatarNames,   // named characters for @imageN mapping
             });
             console.log(`[SB LongForm ${jobId}] 📋 Decomposed into ${scenes.length} scenes.`);
@@ -349,19 +373,19 @@ async function _runPipeline(jobId, params) {
             const segmentFirstFrameUrl = i === 0 ? (params.firstFrameUrl || null) : lastFrameUrl;
 
             // Build references: always inject storyboard poster as style guide for EVERY segment.
-            // This keeps colour grading, composition and overall visual style consistent.
             const posterStyleRef = params.imageUrl ? [{ url: params.imageUrl, role: 'style_reference' }] : [];
-            const segmentRefs = [...posterStyleRef, ...enrichedReferenceImages];
+            const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
 
             // Build per-segment prompt — enrich with position context
             const isLast   = i === segCount - 1;
-            // IMPORTANT: Only the FINAL segment should close with the brand logo/CTA.
-            // Do NOT add brand opening or closing hooks to intermediate segments —
-            // that causes the logo to appear at the start/end of every video cut.
+            // Only the FINAL segment should close with the brand logo/CTA (when branding is ON).
+            // When branding is OFF, never include any brand CTA in any segment.
             const positionHint = i === 0
                 ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately. The scene should open strong and cinematic.'
-                : isLast
+                : isLast && includeBranding
                 ? 'This is the FINAL segment — build to the story\'s emotional peak, then end with a single, unified brand closing shot in the last few seconds ONLY (product beauty shot + brand name). The brand logo/CTA must appear exactly ONCE at the very end of this segment, not before.'
+                : isLast && !includeBranding
+                ? 'This is the FINAL segment — build to the story\'s emotional peak with a strong cinematic close. No brand logo or CTA.'
                 : `This is a CONTINUATION segment — maintain exact visual style from the previous segment. Seamlessly continue the action. DO NOT include any brand opening, brand logo, or closing CTA — those belong only in the final segment.`;
 
             const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
@@ -598,7 +622,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         : aspectRatio === '1:1'  ? [1080, 1080]
         : [1080, 1920]; // 9:16 default
 
-    const CROSSFADE_DURATION = 0.5; // 0.5s crossfade — subtle, not jarring
+
 
     if (segmentPaths.length === 1) {
         const outPath = path.join(tmpDir, 'stitched.mp4');
@@ -613,14 +637,11 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         return outPath;
     }
 
-    // Step 1: Normalize all segments to the same resolution/fps — PRESERVE AUDIO
-    // Add a silent audio track if a segment has no audio, so concat doesn't fail
+    // Step 1: Normalize all segments to the same resolution/fps/audio
     console.log(`[SB LongForm ${jobId}] Normalizing ${segmentPaths.length} segments → ${w}x${h}@24fps (with audio)`);
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
-        // Use -f lavfi to generate silence as a fallback audio input.
-        // Map 0:a? (optional audio from source), fall back to generated silence.
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[i],
             '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
@@ -628,13 +649,11 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
             '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
             '-map', '0:v:0',
-            '-map', '0:a:0?',  // Use source audio if it exists
+            '-map', '0:a:0?',
             '-shortest',
             '-movflags', '+faststart',
             normPath,
         ], { timeout: 120000 }).catch(async () => {
-            // If source had no audio stream, -map 0:a:0? might still fail on some ffmpeg versions.
-            // Retry with generated silence.
             console.warn(`[SB LongForm ${jobId}] Segment ${i+1} has no audio — adding silent track`);
             await execFileAsync(ffmpegPath, [
                 '-y', '-i', segmentPaths[i],
@@ -651,67 +670,33 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         normPaths.push(normPath);
     }
 
-    // Step 2: Get actual durations of each normalized clip
-    const durations = [];
-    for (let i = 0; i < normPaths.length; i++) {
-        const np = normPaths[i];
-        try {
-            const { stdout } = await execFileAsync('ffprobe', [
-                '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', np,
-            ], { timeout: 15000 });
-            durations.push(parseFloat(stdout.trim()) || prePlannedDurations[i] || 10);
-        } catch {
-            durations.push(prePlannedDurations[i] || 10);
-        }
-    }
-
-    // Step 3: Build xfade filter chain (VIDEO) + audio concat (AUDIO)
-    console.log(`[SB LongForm ${jobId}] Building crossfade filter (${CROSSFADE_DURATION}s transitions) with audio...`);
-    const inputs = normPaths.flatMap(p => ['-i', p]);
-
-    // VIDEO: xfade chain
-    const videoFilterParts = [];
-    let lastLabel = '[0:v]';
-    let accOffset = 0;
-
-    for (let i = 1; i < normPaths.length; i++) {
-        accOffset += durations[i - 1] - CROSSFADE_DURATION;
-        const outLabel = i === normPaths.length - 1 ? '[vout]' : `[v${i}]`;
-        videoFilterParts.push(
-            `${lastLabel}[${i}:v]xfade=transition=fade:duration=${CROSSFADE_DURATION}:offset=${accOffset.toFixed(2)}${outLabel}`,
-        );
-        lastLabel = outLabel;
-    }
-
-    // AUDIO: acrossfade chain for smooth audio transitions
-    const audioFilterParts = [];
-    let lastAudioLabel = '[0:a]';
-
-    for (let i = 1; i < normPaths.length; i++) {
-        const outLabel = i === normPaths.length - 1 ? '[aout]' : `[a${i}]`;
-        audioFilterParts.push(
-            `${lastAudioLabel}[${i}:a]acrossfade=d=${CROSSFADE_DURATION}:c1=tri:c2=tri${outLabel}`,
-        );
-        lastAudioLabel = outLabel;
-    }
-
-    const fullFilter = [...videoFilterParts, ...audioFilterParts].join(';');
+    // Step 2: Write a concat list file for hard-cut joining (no xfade dissolves)
+    // Since each segment's last frame is extracted and used as the next segment's
+    // first frame anchor, segments are already visually adjacent at cut points.
+    // A hard cut therefore looks perfectly seamless.
+    console.log(`[SB LongForm ${jobId}] Stitching ${normPaths.length} segments with HARD CUTS (no dissolves)`);
+    const concatListPath = path.join(tmpDir, 'concat.txt');
+    const concatContent = normPaths.map(p => `file '${p}'`).join('\n');
+    fs.writeFileSync(concatListPath, concatContent, 'utf8');
 
     const outputPath = path.join(tmpDir, 'stitched.mp4');
     try {
         await execFileAsync(ffmpegPath, [
-            '-y', ...inputs,
-            '-filter_complex', fullFilter,
-            '-map', '[vout]', '-map', '[aout]',
+            '-y',
+            '-f', 'concat',
+            '-safe', '0',
+            '-i', concatListPath,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
             '-c:a', 'aac', '-b:a', '192k',
             '-movflags', '+faststart',
             outputPath,
         ], { timeout: 300000 });
-    } catch (xfadeErr) {
-        console.warn(`[SB LongForm ${jobId}] xfade/acrossfade failed: ${xfadeErr.message}. Falling back to simple concat...`);
-        // Fallback: simple concat with both video and audio
+        return outputPath;
+    } catch (stitchErr) {
+        // Fallback: use FFmpeg concat filter if concat demuxer fails
+        console.warn(`[SB LongForm ${jobId}] Concat demuxer failed: ${stitchErr.message}. Trying filter_complex concat...`);
         const concatFilter = normPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout][aout]`;
+        const inputs = normPaths.flatMap(p => ['-i', p]);
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
             '-filter_complex', concatFilter,
