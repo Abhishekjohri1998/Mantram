@@ -214,6 +214,7 @@ async function _runPipeline(jobId, params) {
         const segCount  = Math.ceil(params.totalDuration / OPTIMAL_SEGMENT_DURATION);
         const durations = allocateSceneDurations(params.totalDuration, segCount, params.model || 'seedance-2.0');
 
+        // Provisional estimate for the UI before planning completes
         job.segmentStatuses = durations.map(() => ({ status: 'pending', progress: 0 }));
 
         // Load project info and brand context from MongoDB
@@ -370,29 +371,36 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
         job.scenes = scenes;
 
-        _setProgress(jobId, 'PLANNING', `${segCount} segments × ~${durations[0]}s each`, 100);
-        console.log(`[SB LongForm ${jobId}] 📋 Segment plan: ${durations.map((d, i) => `#${i+1}(${d}s)`).join(' → ')}`);
+        // ── CRITICAL: re-derive segment count and per-segment durations from scenes[] ──
+        // planStoryboardScenes may return a DIFFERENT number of segments than segCount
+        // (especially when structuredPlan.cuts[] are grouped into segments).
+        // Always use scenes[].duration, not the old durations[] array, for API calls.
+        const actualSegCount = scenes.length;
+        const sceneDurations = scenes.map(s => s.duration || 10);
+
+        _setProgress(jobId, 'PLANNING', `${actualSegCount} segments planned`, 100);
+        console.log(`[SB LongForm ${jobId}] 📋 Segment plan: ${sceneDurations.map((d, i) => `#${i+1}(${d}s)`).join(' → ')}`);
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
         // ═══ Phase 2: Sequential I2V Generation ══════════════════════════════
-        const segmentVideoUrls = new Array(segCount).fill(null);
-        const segmentAudioUrls = new Array(segCount).fill(null);
+        // Reset segmentStatuses to actual segment count now that we know it
+        job.segmentStatuses = Array.from({ length: actualSegCount }, () => ({ status: 'pending', progress: 0 }));
+        const segmentVideoUrls = new Array(actualSegCount).fill(null);
+        const segmentAudioUrls = new Array(actualSegCount).fill(null);
         // Initialize lastFrameUrl for segment chaining.
         // Segment 1 uses params.firstFrameUrl (product/avatar image) as its opening frame.
-        // If firstFrameUrl is null (no product image), segment 1 runs as text-to-video.
         // Subsequent segments chain from the last frame of the previous segment.
-        // NOTE: params.imageUrl is the STORYBOARD POSTER — it's a style reference, never a first frame.
         let lastFrameUrl = params.firstFrameUrl || null;
         let completedCount = 0;
 
-        for (let i = 0; i < segCount; i++) {
+        for (let i = 0; i < actualSegCount; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
 
             job.segmentStatuses[i] = { status: 'generating', progress: 0 };
             _setProgress(jobId, 'GENERATING',
-                `Segment ${i+1}/${segCount} — ${durations[i]}s`,
-                (completedCount / segCount) * 100,
+                `Segment ${i+1}/${actualSegCount} — ${sceneDurations[i]}s`,
+                (completedCount / actualSegCount) * 100,
             );
 
             // First segment: use product/avatar image as the opening frame anchor.
@@ -406,7 +414,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
             const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
 
             // Build per-segment prompt — enrich with position context
-            const isLast   = i === segCount - 1;
+            const isLast = i === actualSegCount - 1;
             // Only the FINAL segment should close with the brand logo/CTA (when branding is ON).
             // When branding is OFF, never include any brand CTA in any segment.
             const positionHint = i === 0
@@ -432,7 +440,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                     genResult = await submitGeminiFlashVideoGeneration({
                         prompt: segPrompt,
                         imageUrl: segmentFirstFrameUrl,
-                        duration: durations[i],
+                        duration: sceneDurations[i],
                         aspectRatio: params.format,
                         resolution: params.resolution,
                         referenceImages: segmentRefs.slice(0, 6),
@@ -441,9 +449,9 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                     genResult = await submitAtlasCloudVideoGeneration({
                         prompt: segPrompt,
                         imageUrl: segmentFirstFrameUrl,
-                        duration: durations[i],
+                        duration: sceneDurations[i],
                         aspectRatio: params.format,
-                        generateAudio: true,  // Native audio only
+                        generateAudio: true,
                         referenceImages: segmentRefs.slice(0, 6),
                         qualityMode,
                         resolution: params.resolution,
@@ -451,27 +459,23 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                     });
                 }
 
-                // Poll until complete
-                const videoUrl = await _pollSegment(genResult, jobId, i, segCount);
+                const videoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
 
                 segmentVideoUrls[i] = videoUrl;
                 job.segmentStatuses[i] = { status: 'completed', progress: 100, videoUrl };
                 completedCount++;
 
                 _setProgress(jobId, 'GENERATING',
-                    `${completedCount}/${segCount} segments done`,
-                    (completedCount / segCount) * 100,
+                    `${completedCount}/${actualSegCount} segments done`,
+                    (completedCount / actualSegCount) * 100,
                 );
 
-                // Extract last frame for the next segment's first-frame anchor
-                if (i < segCount - 1) {
+                if (i < actualSegCount - 1) {
                     try {
                         lastFrameUrl = await extractLastFrameToS3(videoUrl);
                         console.log(`[SB LongForm ${jobId}] 🖼️ Last frame seg ${i+1}: ${lastFrameUrl?.substring(0, 70)}`);
                     } catch (frameErr) {
                         console.warn(`[SB LongForm ${jobId}] ⚠️ Last frame extraction failed: ${frameErr.message} — next segment will use firstFrameUrl fallback`);
-                        // Fallback: use product/avatar first-frame rather than the poster
-                        // (poster is a style reference, not suitable as a video start-frame)
                         lastFrameUrl = params.firstFrameUrl || null;
                     }
                 }
@@ -480,15 +484,14 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 console.error(`[SB LongForm ${jobId}] ❌ Segment ${i+1} failed: ${segErr.message}`);
                 job.segmentStatuses[i] = { status: 'failed', error: segErr.message };
 
-                // One retry — without refAudio to maximize success
                 try {
-                    console.log(`[SB LongForm ${jobId}] 🔄 Retrying segment ${i+1} (no TTS)...`);
+                    console.log(`[SB LongForm ${jobId}] 🔄 Retrying segment ${i+1}...`);
                     let retryResult;
                     if (params.model === 'gemini-flash') {
                         retryResult = await submitGeminiFlashVideoGeneration({
                             prompt: segPrompt,
                             imageUrl: segmentFirstFrameUrl,
-                            duration: durations[i],
+                            duration: sceneDurations[i],
                             aspectRatio: params.format,
                             resolution: params.resolution,
                             referenceImages: segmentRefs.slice(0, 6),
@@ -497,7 +500,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         retryResult = await submitAtlasCloudVideoGeneration({
                             prompt: segPrompt,
                             imageUrl: segmentFirstFrameUrl,
-                            duration: durations[i],
+                            duration: sceneDurations[i],
                             aspectRatio: params.format,
                             generateAudio: true,
                             referenceImages: segmentRefs.slice(0, 6),
@@ -506,17 +509,16 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                             imageRole: 'mixed',
                         });
                     }
-                    const retryUrl = await _pollSegment(retryResult, jobId, i, segCount);
+                    const retryUrl = await _pollSegment(retryResult, jobId, i, actualSegCount);
                     segmentVideoUrls[i] = retryUrl;
                     job.segmentStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
                     completedCount++;
 
-                    if (i < segCount - 1) {
+                    if (i < actualSegCount - 1) {
                         try { lastFrameUrl = await extractLastFrameToS3(retryUrl); }
                         catch { lastFrameUrl = params.firstFrameUrl || null; }
                     }
                 } catch (retryErr) {
-                    // If even the retry fails, skip this segment and continue
                     console.error(`[SB LongForm ${jobId}] ❌ Segment ${i+1} retry also failed: ${retryErr.message}. Skipping.`);
                 }
             }
