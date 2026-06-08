@@ -7669,8 +7669,35 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                     hookStrategy:           plan.hookStrategy || '',
                     narrativeArc:           plan.narrativeArc || '',
                 },
+                // Character Reference Sheet URL — generated below and back-patched
+                characterRefSheetUrl: null,
             },
         });
+
+        // ── Generate Character Reference Sheet (if avatars present) ──────────────────
+        // One consolidated image showing all characters, generated once and reused
+        // as a stable face anchor in every video segment during animation.
+        if (rawAvatarBuffers.length > 0) {
+            try {
+                const { generateCharacterReferenceSheet } = await import('../agents/videoStudio/storyboardFrames.js');
+                const charSheetDataUrl = await generateCharacterReferenceSheet(rawAvatarBuffers, avatarNames, style);
+                if (charSheetDataUrl) {
+                    let charSheetUrl = charSheetDataUrl;
+                    if (charSheetDataUrl.startsWith('data:')) {
+                        charSheetUrl = await ensureS3Url(charSheetDataUrl, `storyboard/char-sheets/${req.user._id}`);
+                    }
+                    console.log(`[Storyboard Create] 🎭 Character ref sheet → S3: ${charSheetUrl?.substring(0, 80)}`);
+                    // Back-patch onto the created project
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        $set: { 'storyboard.characterRefSheetUrl': charSheetUrl }
+                    });
+                    // Also expose in plan response so frontend can show it
+                    plan.characterRefSheetUrl = charSheetUrl;
+                }
+            } catch (charSheetErr) {
+                console.warn(`[Storyboard Create] ⚠️ Character ref sheet generation failed: ${charSheetErr.message} — will use raw avatar refs instead`);
+            }
+        }
 
         if (plan.imageUrl) plan.imageUrl = await getSignedUrlIfNeeded(plan.imageUrl);
         if (plan.avatarUrl) plan.avatarUrl = await getSignedUrlIfNeeded(plan.avatarUrl);
@@ -7879,7 +7906,14 @@ async function generateAnimateVideoPrompt({
     existingVideoPrompt = '',
     firstFrameIsAvatar = false, // true when avatar is used as first frame (no product images)
     structuredPlan = null,     // 4-section storyboard plan from DB (new)
+    includeBranding = true,    // when false: strip all brand CTA, logo, brand context
 }) {
+    // Enforce branding toggle
+    if (!includeBranding) {
+        brandContext = '';
+        logoUrl = null;
+    }
+
     // Build the precise @imageN tag mapping so Claude can write them correctly.
     // The video model sees: firstFrame then referenceImages in order.
     // @image1 = the I2V first frame (product image OR avatar if no product images).
@@ -7961,12 +7995,18 @@ The environment (${structuredPlan.environmentFingerprint}) must remain visually 
         console.log(`[generateAnimateVideoPrompt] No structuredPlan — using generic prompt`);
     }
 
+    const brandingRule = includeBranding
+        ? '8. End with a cinematic brand CTA / closing shot — this must appear ONCE at the very end of the ENTIRE video, not repeated per segment.'
+        : '8. NO brand logo, NO brand CTA, NO brand closing shot. End with a strong cinematic close. No branding elements whatsoever.';
+
+    const openingInstruction = 'Use the attached storyboard image (@image2) as the VISUAL STYLE REFERENCE ONLY. Do NOT open the video with this storyboard grid — the video must open with @image1.';
+
     const systemPrompt = `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
 
 Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will animate an approved storyboard into a high-end commercial video.
 
 CRITICAL PROMPT RULES:
-1. MUST start with: "Use the attached storyboard image (@image2) as the visual style reference."
+1. MUST start with: "${openingInstruction}"
 2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
 3. Use @imageN tags precisely. The mapping is:
 ${tagMap.map(t => `   ${t}`).join('\n')}
@@ -7974,13 +8014,13 @@ ${tagMap.map(t => `   ${t}`).join('\n')}
 5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
 6. Specify EXACT shot durations that sum to ${duration}s total — follow the cut plan if provided.
 7. Describe product interaction: how the product moves, catches light, is handled.
-8. End with a cinematic brand CTA / closing shot — this must appear ONCE at the very end of the ENTIRE video, not repeated per segment. For long-form videos split into multiple segments, the brand logo and CTA belong ONLY in the final seconds of the last segment.
+${brandingRule}
 9. 300–600 words. Extremely specific. Directly executable by Seedance.
 10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
 11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`;
 
     const userPrompt = `APPROVED STORYBOARD STYLE (from @image2 poster):
-Use @image2 for style grounding only — not as a literal first frame.
+IMPORTANT: @image2 is a STORYBOARD STYLE REFERENCE GRID — NOT the opening frame. The video must OPEN with @image1.
 
 CREATIVE BRIEF: "${brief || 'Create a high-energy, cinematic ad film.'}"
 PRODUCT: ${productName || 'See @image1'}
@@ -7989,6 +8029,7 @@ VIDEO DURATION: ${duration}s | FORMAT: ${format} | STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR PRESENT: ${avatarUrl ? `YES — presenter's face is in @image${nextTag - (logoUrl ? 2 : 1)}` : 'NO'}
 BRAND LOGO: ${logoUrl ? `YES — logo appears in @image${nextTag - 1}` : 'NO'}
+BRANDING ENABLED: ${includeBranding ? 'YES — end with brand CTA in final seconds only' : 'NO — absolutely no brand logo, no CTA, no closing brand shot'}
 ${structuredContext}
 ${existingVideoPrompt ? `\nREFERENCE VIDEO PROMPT (improve and correct @imageN tags):\n"${existingVideoPrompt.substring(0, 600)}"\n` : ''}
 Write the final video prompt now. Follow the cut plan timings exactly. Ensure every @imageN tag matches the mapping above.`;
@@ -8081,6 +8122,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbBrandContext = '';
         let dbLogoUrl = null;
         let dbStructuredPlan = null;
+        let dbIncludeBranding = true;    // branding flag — read from DB below
+        let dbCharRefSheetUrl = null;    // pre-generated character reference sheet URL
 
         if (projectId) {
             const project = await VideoProject.findById(projectId)
@@ -8101,6 +8144,12 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dbStyle              = project.storyboard?.style || 'hyperrealistic';
                 dbDialogueLanguage   = project.storyboard?.dialogueLanguage || 'English';
                 dbStructuredPlan     = project.storyboard?.structuredPlan || null;
+                // Read branding toggle from DB
+                if (typeof project.storyboard?.includeBranding === 'boolean') {
+                    dbIncludeBranding = project.storyboard.includeBranding;
+                }
+                // Read pre-generated character reference sheet
+                dbCharRefSheetUrl = project.storyboard?.characterRefSheetUrl || null;
 
                 // Sign all product image URLs
                 dbProductImgs = await Promise.all(rawProductImgs.map(url => getSignedUrlIfNeeded(url)));
@@ -8122,16 +8171,21 @@ router.post('/storyboard/animate', protect, async (req, res) => {
 
                 if (project.brand?.dna) {
                     const dna = project.brand.dna;
-                    dbLogoUrl = dna.logo?.url || null;
-                    const desc = dna.brandDescription || dna.companyOverview || '';
-                    const tagline = dna.tagline || '';
-                    const personality = dna.voice?.personality || '';
-                    const voiceDesc = dna.voice?.description || '';
-                    const usps = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
-                    dbBrandContext = `Brand: ${project.brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nPersonality: ${personality} - ${voiceDesc}\nUSPs: ${usps}`;
-                    if (dbLogoUrl) dbLogoUrl = await getSignedUrlIfNeeded(dbLogoUrl);
+                    // Only load brand DNA if branding is ON
+                    if (dbIncludeBranding) {
+                        dbLogoUrl = dna.logo?.url || null;
+                        const desc = dna.brandDescription || dna.companyOverview || '';
+                        const tagline = dna.tagline || '';
+                        const personality = dna.voice?.personality || '';
+                        const voiceDesc = dna.voice?.description || '';
+                        const usps = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
+                        dbBrandContext = `Brand: ${project.brand.name || ''}\nTagline: ${tagline}\nDescription: ${desc}\nPersonality: ${personality} - ${voiceDesc}\nUSPs: ${usps}`;
+                        if (dbLogoUrl) dbLogoUrl = await getSignedUrlIfNeeded(dbLogoUrl);
+                    } else {
+                        console.log(`[Storyboard Animate] includeBranding=false — skipping brand context and logo`);
+                    }
                 }
-                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs, ${dbAvatarUrls.length} avatars, ${dbRefImageUrls.length} refs, logo=${!!dbLogoUrl}`);
+                console.log(`[Storyboard Animate] DB: ${dbProductImgs.length} product imgs, ${dbAvatarUrls.length} avatars, ${dbRefImageUrls.length} refs, logo=${!!dbLogoUrl}, branding=${dbIncludeBranding}, charSheet=${!!dbCharRefSheetUrl}`);
             }
         }
 
@@ -8169,27 +8223,43 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         const firstFrameIsProduct = !!dbProductImgs[0];
         const firstFrameIsAvatar = !dbProductImgs[0] && dbAvatarUrls.length > 0;
 
-        // Multi-avatar: each avatar gets its own character_reference entry
-        const avatarRefs = dbAvatarUrls.map((url, i) => ({
-            url,
-            role: 'character_reference',
-            name: dbAvatarNames[i] || `Character ${i + 1}`,
-        }));
+        // ── Character reference sheet handling ─────────────────────────────────
+        // If a consolidated character ref sheet was generated at storyboard creation time,
+        // use it as the PRIMARY character reference (single stable @imageN slot).
+        // Otherwise fall back to individual avatar URLs.
+        let dbCharRefSheetUrlSigned = null;
+        if (dbCharRefSheetUrl) {
+            try { dbCharRefSheetUrlSigned = await getSignedUrlIfNeeded(dbCharRefSheetUrl); }
+            catch { dbCharRefSheetUrlSigned = dbCharRefSheetUrl; }
+        }
+
+        // Multi-avatar: each avatar gets its own character_reference entry (fallback if no sheet)
+        const avatarRefs = dbCharRefSheetUrlSigned
+            ? [{ url: dbCharRefSheetUrlSigned, role: 'character_reference' }]
+            : dbAvatarUrls.map((url, i) => ({
+                url,
+                role: 'character_reference',
+                name: dbAvatarNames[i] || `Character ${i + 1}`,
+              }));
 
         const combinedReferences = [
             { url: imageUrl, role: 'style_reference' },           // storyboard poster style guide
             ...dbProductImgs.map(url => ({ url, role: 'product' })),
-            ...avatarRefs,                                         // all characters
+            ...avatarRefs,                                         // char ref sheet OR individual avatars
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
 
-        // For long-form segments, pass refs WITHOUT the poster
-        // (storyboardLongForm.js adds the poster per-segment from params.imageUrl)
+        // For long-form segments — same but without poster (storyboardLongForm.js adds it per-segment)
         const longFormRefs = [
             ...dbProductImgs.map(url => ({ url, role: 'product' })),
             ...avatarRefs,
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
+
+        // ── Fix: NEVER use storyboard poster as I2V first frame ─────────────────────
+        // imageUrl is the storyboard poster — it is a STYLE REFERENCE only.
+        // If no product/avatar image exists, pass null to Atlas → runs text-to-video.
+        // This prevents the opening frame from being the storyboard grid sheet.
 
         console.log(`[Storyboard Animate] ── Reference Routing ──`);
         console.log(`  firstFrameUrl (I2V): ${firstFrameUrl ? firstFrameUrl.substring(0, 80) : 'null (T2V)'}`);
@@ -8217,7 +8287,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 brandContext: dbBrandContext,
                 existingVideoPrompt: clientVideoPrompt || '',
                 firstFrameIsAvatar,
-                structuredPlan: dbStructuredPlan,  // 4-section plan for rich timed prompt
+                structuredPlan: dbStructuredPlan,
+                includeBranding: dbIncludeBranding,  // respect brand toggle
             });
             console.log(`[Storyboard Animate] Video prompt (first 120): ${finalVideoPrompt.substring(0, 120)}...`);
             if (projectId) {
@@ -8243,12 +8314,12 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 projectId: projectId || null,
                 userId: req.user._id,
                 imageUrl,           // storyboard poster → style ref injected per-segment in storyboardLongForm.js
-                firstFrameUrl,      // product/avatar → segment 1 opening frame
+                firstFrameUrl: firstFrameUrl || null,  // ── FIX: NEVER fall back to poster URL
                 videoPrompt: finalVideoPrompt,
                 totalDuration: rawDuration,
                 format: dbFormat,
                 resolution,
-                referenceImages: longFormRefs,  // poster NOT included here — added per-segment in storyboardLongForm.js
+                referenceImages: longFormRefs,
                 model,
                 qualityMode,
                 voiceoverScript,
@@ -8258,6 +8329,10 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 avatarUrls:  dbAvatarUrls,
                 avatarNames: dbAvatarNames,
                 refImageUrls: dbRefImageUrls,
+                // ── Branding control ──
+                includeBranding: dbIncludeBranding,
+                // ── Character reference sheet ──
+                characterRefSheetUrl: dbCharRefSheetUrlSigned || null,
             });
 
             if (projectId) {
@@ -8293,7 +8368,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             let genResult;
             if (model === 'gemini-flash') {
                 genResult = await submitGeminiFlashVideoGeneration({
-                    imageUrl: firstFrameUrl || imageUrl, // product first; poster only if nothing else
+                    imageUrl: firstFrameUrl || null, // FIX: never use poster as first frame
                     prompt: finalVideoPrompt,
                     duration: duration || 10,
                     aspectRatio: dbFormat,
@@ -8302,7 +8377,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 });
             } else {
                 genResult = await submitAtlasCloudVideoGeneration({
-                    imageUrl: firstFrameUrl || imageUrl, // product first; poster only if nothing else
+                    imageUrl: firstFrameUrl || null, // FIX: never use poster as first frame
                     prompt: finalVideoPrompt,
                     duration: duration || 10,
                     aspectRatio: dbFormat,

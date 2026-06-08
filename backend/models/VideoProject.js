@@ -55,7 +55,10 @@ const videoProjectSchema = new mongoose.Schema({
         brief: { type: String, default: '' },
         productName: { type: String, default: '' },
         productFeatures: { type: String, default: '' },
-        avatarUrl: { type: String, default: '' },
+        avatarUrl: { type: String, default: '' },     // legacy single avatar (kept for compat)
+        avatarUrls: [{ type: String }],               // multi-avatar URLs
+        avatarNames: [{ type: String }],              // display names matching avatarUrls
+        refImageUrls: [{ type: String }],             // location/element reference image URLs
         inputType: { type: String, enum: ['text', 'image', 'both'], default: 'text' },
         images: [{
             url: { type: String },
@@ -218,6 +221,14 @@ const videoProjectSchema = new mongoose.Schema({
         // Contains: colorPalette, materialNotes, environmentFingerprint, cuts[],
         // moodKeywords, cinematographyRules, emotionalArc — used to build rich video prompts
         structuredPlan: { type: mongoose.Schema.Types.Mixed, default: null },
+
+        // ── Branding control (set at create time, read at animate time) ──
+        includeBranding: { type: Boolean, default: true },
+
+        // ── Character Reference Sheet (generated at create time if avatars present) ──
+        // Single consolidated image showing all characters in labelled panels.
+        // Injected as the stable @imageN face anchor in every video segment.
+        characterRefSheetUrl: { type: String, default: '' },
     },
 
     // ── Analytics counters ──
