@@ -294,7 +294,7 @@ export default function UserDashboard() {
           )}
         </div>
         <div className="grid grid-cols-12 gap-5">
-          <Card className="col-span-12 md:col-span-6 lg:col-span-4 p-5">
+          <Card className="col-span-12 md:col-span-6 lg:col-span-6 p-5">
             <Label icon="monitoring">Brand Pulse</Label>
             {loadingEnhanced ? (
               <div className="grid grid-cols-2 gap-3">{[0,1,2,3].map(i=><Skel key={i} className="h-20"/>)}</div>
@@ -304,8 +304,8 @@ export default function UserDashboard() {
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface-2)] border border-[var(--sys-border)]">
                     <Ring score={health[m.key]||0} color={m.color} size={44} stroke={4}/>
                     <div>
-                      <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{m.label}</p>
-                      <p className="text-xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] leading-tight">{Math.round(health[m.key]||0)}<span className="text-xs text-[var(--sys-text-muted)]">/100</span></p>
+                       <p className="text-[10px] text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{m.label}</p>
+                       <p className="text-xl font-['Space_Grotesk'] font-bold text-[var(--sys-text)] leading-tight">{Math.round(health[m.key]||0)}<span className="text-xs text-[var(--sys-text-muted)]">/100</span></p>
                     </div>
                   </div>
                 ))}
@@ -321,7 +321,7 @@ export default function UserDashboard() {
               <button onClick={()=>navigate('/d2c-analytics')} className="mt-4 w-full py-2 rounded-xl bg-[var(--sys-surface-2)] border border-[var(--sys-border)] text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text-muted)] transition-colors font-bold cursor-pointer">Connect Shopify →</button>
             )}
           </Card>
-          <Card className="col-span-12 md:col-span-6 lg:col-span-4 p-5">
+          <Card className="col-span-12 md:col-span-6 lg:col-span-6 p-5">
             <Label icon="calendar_today" action="View Calendar" onAction={()=>navigate('/brand-calendar')}>Today&apos;s Queue</Label>
             {(todaySchedule.today.length + todaySchedule.tomorrow.length) === 0 ? (
               <div className="text-center py-8">
@@ -350,27 +350,6 @@ export default function UserDashboard() {
                     {e.scheduledFor && <span className="text-[10px] text-[var(--sys-text-muted)]">{new Date(e.scheduledFor).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
                   </div>
                 ))}
-              </div>
-            )}
-          </Card>
-          <Card className="col-span-12 md:col-span-6 lg:col-span-4 p-5">
-            <Label icon="finance" action="Deep Dive" onAction={()=>navigate('/performance-marketing')}>Performance Vector</Label>
-            {loadingAnalytics ? (
-              <div className="space-y-3">{[0,1,2,3].map(i=><Skel key={i} className="h-12"/>)}</div>
-            ) : (perfData||funnelData||blendedRoas) ? (
-              <div className="space-y-2">
-                {[['Total Spend','₹'+String((perfData?.stats?.totalSpend||0).toLocaleString()),'#ff4d00'],['Blended ROAS',String(blendedRoas?.mer||perfData?.stats?.avgRoas||'—')+'x','#0891b2'],['Funnel CVR',String(funnelData?.analytics?.overview?.conversionRate||0)+'%','#059669'],['Live Campaigns',String(perfData?.stats?.activeCampaigns||0),'#7c3aed']].map(([l,v,c])=>(
-                  <div key={l} className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface-2)] border border-[var(--sys-border)]">
-                    <p className="text-xs text-[var(--sys-text-muted)] font-bold uppercase tracking-wider">{l}</p>
-                    <p className="text-lg font-['Space_Grotesk'] font-bold" style={{color:c}}>{v}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] block mb-3">campaign</span>
-                <p className="text-xs text-[var(--sys-text-muted)] mb-4">No ad campaigns yet</p>
-                <button onClick={()=>navigate('/performance-marketing')} className="px-4 py-2 rounded-xl bg-[#f43f5e]/10 border border-[#f43f5e]/20 text-[#f43f5e] text-xs font-bold hover:bg-[#f43f5e]/20 cursor-pointer">Connect Ads →</button>
               </div>
             )}
           </Card>
@@ -475,7 +454,7 @@ export default function UserDashboard() {
           </Card>
         )}
         <div className="grid grid-cols-12 gap-5">
-          <Card className="col-span-12 md:col-span-6 lg:col-span-5 p-5">
+          <Card className="col-span-12 md:col-span-6 lg:col-span-6 p-5">
             <Label icon="hub" action="Manage" onAction={()=>navigate('/integrations')}>Social Pipeline</Label>
             <div className="space-y-2">
               {['instagram','facebook','linkedin','twitter'].map(pl=>{
@@ -506,7 +485,7 @@ export default function UserDashboard() {
               </div>
             )}
           </Card>
-          <Card className="col-span-12 md:col-span-6 lg:col-span-4 p-5">
+          <Card className="col-span-12 md:col-span-6 lg:col-span-6 p-5">
             <Label icon="apps">Studio Launcher</Label>
             <div className="grid grid-cols-4 gap-2">
               {studios.map((s,i)=>(
@@ -517,25 +496,6 @@ export default function UserDashboard() {
                 </button>
               ))}
             </div>
-          </Card>
-          <Card className="col-span-12 md:col-span-6 lg:col-span-3 p-5">
-            <Label icon="radar" action="New +" onAction={()=>navigate('/seo-studio?tab=intel')}>Intel Missions</Label>
-            {intelMissions.length === 0 ? (
-              <div className="text-center py-6">
-                <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] block mb-2">satellite_alt</span>
-                <p className="text-xs text-[var(--sys-text-muted)] mb-3">No active missions</p>
-                <button onClick={()=>navigate('/seo-studio?tab=intel')} className="px-3 py-1.5 rounded-xl bg-[#06b6d4]/10 border border-[#06b6d4]/20 text-[#06b6d4] text-xs font-bold hover:bg-[#06b6d4]/20 cursor-pointer">Launch Mission</button>
-              </div>
-            ) : intelMissions.map((m,i)=>(
-              <div key={i} onClick={()=>openIntelReport(m)} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[var(--sys-surface-2)] border border-[var(--sys-border)] mb-2 hover:border-[#06b6d4]/20 cursor-pointer transition-all group">
-                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${m.status==='active'?'bg-emerald-400 animate-pulse':'bg-[var(--sys-border)]'}`}/>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-[var(--sys-text)] group-hover:text-[#06b6d4] transition-colors truncate">{m.title}</p>
-                  <p className="text-[10px] text-[var(--sys-text-muted)]">{m.target?.name} · {m.type}</p>
-                </div>
-                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] group-hover:text-[#06b6d4] transition-colors">chevron_right</span>
-              </div>
-            ))}
           </Card>
         </div>
 
