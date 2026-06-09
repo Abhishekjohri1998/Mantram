@@ -149,8 +149,21 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     // Strategy 5: youtube-dl-exec with cookies (if available on EC2)
     if (!resolvedUrl) {
         try {
-            const cookiePath = process.env.YOUTUBE_COOKIES_PATH || path.join(process.cwd(), 'youtube-cookies.txt');
-            if (fs.existsSync(cookiePath)) {
+            let cookiePath = null;
+            const possiblePaths = [
+                process.env.YOUTUBE_COOKIES_PATH,
+                path.join(process.cwd(), 'youtube-cookies.txt'),
+                '/home/ec2-user/secrets/youtube-cookies.txt'
+            ];
+            
+            for (const p of possiblePaths) {
+                if (p && fs.existsSync(p)) {
+                    cookiePath = p;
+                    break;
+                }
+            }
+
+            if (cookiePath) {
                 console.log(`   ➡️ Strategy 5: youtube-dl-exec (cookies)`);
                 const output = await youtubedl(url, {
                     getUrl: true,
