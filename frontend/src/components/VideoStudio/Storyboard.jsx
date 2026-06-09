@@ -54,15 +54,17 @@ const FORMATS = [
     { value: '4:3', label: '4:3 Classic' }
 ];
 
-const DURATIONS = [
-    { value: 5,   label: '5s (Short)' },
-    { value: 10,  label: '10s (Bumper)' },
-    { value: 15,  label: '15s (Standard)' },
-    { value: 30,  label: '30s (Hero)' },
-    { value: 60,  label: '60s (Long)' },
-    { value: 90,  label: '90s (Extended) ★' },
-    { value: 120, label: '2 min (Epic) ★' },
-];
+// Duration slider: 5s to 120s in 5s steps
+const MIN_DURATION = 5;
+const MAX_DURATION = 120;
+const DURATION_STEP = 5;
+
+function getDurationLabel(d) {
+    if (d <= 15) return 'Short';
+    if (d <= 30) return 'Standard';
+    if (d <= 90) return 'Long-Form';
+    return 'Epic';
+}
 
 const MODELS = [
     { value: 'seedance-2.0-fast', label: 'Seedance Fast' },
@@ -147,7 +149,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [includeBranding, setIncludeBranding] = useState(true);
     const [defaultStyle, setDefaultStyle] = useState('hyperrealistic');
     const [format, setFormat] = useState('9:16');
-    const [duration, setDuration] = useState(5);
+    const [duration, setDuration] = useState(10);
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('480p');
     const [directorModel, setDirectorModel] = useState('claude');
@@ -176,6 +178,13 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [phaseLabel, setPhaseLabel] = useState('');
     const [phaseDetail, setPhaseDetail] = useState('');
     const [segmentInfo, setSegmentInfo] = useState(null); // { completed, total }
+    // Manual mode — generation mode toggle
+    const [generateMode, setGenerateMode] = useState('automatic'); // 'automatic' | 'manual'
+    // Manual mode — per-segment items for the gallery
+    const [segmentItems, setSegmentItems] = useState([]); // [{index, status, videoUrl, prompt, duration, error}]
+    const [regenSegIdx, setRegenSegIdx] = useState(null); // which segment is being regen'd
+    const [editedPrompts, setEditedPrompts] = useState({}); // {segIdx: editedPrompt}
+    const [isCompiling, setIsCompiling] = useState(false);
     
     const pollRef = useRef(null);
     const projectIdRef = useRef(null);
@@ -487,6 +496,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         setPhaseLabel('Writing video prompt...');
         setPhaseDetail('Claude is composing the cinematic animation prompt');
         setSegmentInfo(null);
+        setSegmentItems([]);
         setGeneratedVideoPrompt('');
 
         try {
@@ -511,6 +521,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                         : undefined,
                     model,
                     brandId: activeBrand?._id,
+                    generateMode, // 'automatic' | 'manual'
                 }),
             });
 
@@ -559,6 +570,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                     if (data.phaseLabel) setPhaseLabel(data.phaseLabel);
                     if (data.detail)     setPhaseDetail(data.detail);
                     if (data.segments)   setSegmentInfo(data.segments);
+                    // Manual mode: update segment gallery cards with per-segment data
+                    if (data.segments?.items?.length > 0) {
+                        setSegmentItems(data.segments.items);
+                    }
                 }
 
                 if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
@@ -579,6 +594,63 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     }, [projectId, onVideoComplete]);
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+    // ── Manual mode: Regenerate one segment (async — backend responds immediately) ──
+    const handleRegenSegment = useCallback(async (segIdx) => {
+        if (!projectIdRef.current) return;
+        setRegenSegIdx(segIdx);
+        // Optimistically mark card as generating so user gets instant feedback
+        setSegmentItems(prev => prev.map((item, i) =>
+            i === segIdx ? { ...item, status: 'generating', videoUrl: null, progress: 0 } : item
+        ));
+        try {
+            const prompt = editedPrompts[segIdx] !== undefined
+                ? editedPrompts[segIdx]
+                : (segmentItems[segIdx]?.prompt || '');
+            const res = await fetch(`${API}/storyboard/regenerate-segment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
+                body: JSON.stringify({ projectId: projectIdRef.current, segmentIndex: segIdx, prompt }),
+            });
+            const data = await safeJson(res);
+            if (!data.success) throw new Error(data.error || 'Regeneration failed to start');
+            // Backend is now polling Atlas in the background.
+            // Our existing polling loop (startPolling) will call /storyboard/status every 10s
+            // and update segmentItems via segments.items[] when the segment completes.
+            // Nothing more to do here except clear the local "regen in progress" flag.
+        } catch (e) {
+            setError(e.message);
+            // Restore previous status on error
+            setSegmentItems(prev => prev.map((item, i) =>
+                i === segIdx ? { ...item, status: 'failed', error: e.message } : item
+            ));
+        } finally {
+            setRegenSegIdx(null);
+        }
+    }, [projectIdRef, segmentItems, editedPrompts]);
+
+    // ── Manual mode: Compile all ready segments into final video ──
+    const handleCompile = useCallback(async () => {
+        if (!projectIdRef.current) return;
+        setIsCompiling(true);
+        setError('');
+        try {
+            const res = await fetch(`${API}/storyboard/compile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
+                body: JSON.stringify({ projectId: projectIdRef.current }),
+            });
+            const data = await safeJson(res);
+            if (!data.success) throw new Error(data.error || 'Compile failed');
+            setFinalVideoUrl(data.finalVideoUrl);
+            setPhase('complete');
+            onVideoComplete?.();
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setIsCompiling(false);
+        }
+    }, [projectIdRef, onVideoComplete]);
 
     // ── Render helpers ──
     const isLoading = phase === 'directing' || phase === 'storyboarding';
@@ -644,7 +716,24 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                             
                             <CfgMenu value={format} onChange={setFormat} options={FORMATS} icon="crop" />
                             <CfgMenu value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="hd" />
-                            <CfgMenu value={duration} onChange={setDuration} options={DURATIONS} icon="timer" />
+
+                            {/* Duration Slider */}
+                            <div className="sb-dur-slider-wrap">
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)' }}>timer</span>
+                                <div className="sb-dur-slider-inner">
+                                    <input
+                                        type="range"
+                                        className="sb-dur-slider"
+                                        min={MIN_DURATION}
+                                        max={MAX_DURATION}
+                                        step={DURATION_STEP}
+                                        value={duration}
+                                        onChange={e => setDuration(Number(e.target.value))}
+                                        disabled={isLoading}
+                                    />
+                                    <span className="sb-dur-value">{duration}s <span className="sb-dur-label">{getDurationLabel(duration)}</span></span>
+                                </div>
+                            </div>
                             
                             <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                             
@@ -780,6 +869,26 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                     <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#6b7280', zIndex: 3 }} />
                                 )}
                             </button>
+
+                            {/* Generate mode toggle */}
+                            <div className="sb-mode-toggle" title="Automatic: full video generated at once. Manual: review each segment before compiling.">
+                                <button
+                                    type="button"
+                                    className={`sb-mode-btn ${generateMode === 'automatic' ? 'active' : ''}`}
+                                    onClick={() => setGenerateMode('automatic')}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>auto_mode</span>
+                                    Auto
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`sb-mode-btn ${generateMode === 'manual' ? 'active' : ''}`}
+                                    onClick={() => setGenerateMode('manual')}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>tune</span>
+                                    Manual
+                                </button>
+                            </div>
 
                             {/* Generate */}
                             <button className="scott-generate" onClick={handleGenerate} disabled={isLoading}>
@@ -1035,7 +1144,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 {phaseDetail && !isLongForm && (
                                     <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{phaseDetail}</p>
                                 )}
-                                {isLongForm && (
+                                {isLongForm && generateMode === 'automatic' && (
                                     <div className="sb-lf-progress-detail">
                                         {segmentInfo && segmentInfo.total > 0 && (
                                             <div className="sb-lf-segments">
@@ -1063,6 +1172,112 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                         </p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* ── Manual Mode: Segment Gallery ─────────────────────────────────── */}
+                        {isLongForm && generateMode === 'manual' && (phase === 'animating' || phase === 'complete') && segmentItems.length > 0 && (
+                            <div className="sb-segment-gallery">
+                                <div className="sb-seg-gallery-header">
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(139,92,246,0.8)' }}>view_module</span>
+                                    <span>Segment Review</span>
+                                    <span className="sb-seg-gallery-count">
+                                        {segmentItems.filter(s => s.status === 'completed').length}/{segmentItems.length} ready
+                                    </span>
+                                </div>
+
+                                <div className="sb-seg-grid">
+                                    {segmentItems.map((seg, i) => {
+                                        const isRegen = regenSegIdx === i;
+                                        const isDone  = seg.status === 'completed';
+                                        const isFail  = seg.status === 'failed';
+                                        const isGen   = seg.status === 'generating' || seg.status === 'pending';
+                                        const editP   = editedPrompts[i] !== undefined ? editedPrompts[i] : (seg.prompt || '');
+                                        return (
+                                            <div key={i} className={`sb-seg-card ${isDone ? 'done' : isFail ? 'failed' : ''}`}>
+                                                {/* Video / placeholder */}
+                                                <div className="sb-seg-card__media">
+                                                    {isDone && seg.videoUrl ? (
+                                                        <video
+                                                            src={seg.videoUrl}
+                                                            autoPlay muted loop playsInline
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
+                                                        />
+                                                    ) : isRegen ? (
+                                                        <div className="sb-seg-card__spin">
+                                                            <span className="material-symbols-outlined spin" style={{ fontSize: 28, color: 'rgba(139,92,246,0.7)' }}>sync</span>
+                                                            <span>Regenerating…</span>
+                                                        </div>
+                                                    ) : isGen ? (
+                                                        <div className="sb-seg-card__spin">
+                                                            <span className="material-symbols-outlined spin" style={{ fontSize: 28, color: 'rgba(255,255,255,0.3)' }}>autorenew</span>
+                                                            <span>{seg.progress > 0 ? `${seg.progress}%` : 'Queued'}</span>
+                                                        </div>
+                                                    ) : isFail ? (
+                                                        <div className="sb-seg-card__spin">
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'rgba(239,68,68,0.7)' }}>error</span>
+                                                            <span>Failed</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="sb-seg-card__spin">
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'rgba(255,255,255,0.15)' }}>videocam</span>
+                                                            <span>Pending</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Badge */}
+                                                    <div className="sb-seg-card__badge">
+                                                        Seg {i + 1}{seg.duration ? ` · ${seg.duration}s` : ''}
+                                                    </div>
+                                                </div>
+
+                                                {/* Prompt editor */}
+                                                <div className="sb-seg-card__prompt-wrap">
+                                                    <textarea
+                                                        className="sb-seg-card__prompt"
+                                                        rows={3}
+                                                        value={editP}
+                                                        onChange={e => setEditedPrompts(prev => ({ ...prev, [i]: e.target.value }))}
+                                                        placeholder="Edit prompt before regenerating…"
+                                                        disabled={isRegen}
+                                                    />
+                                                </div>
+
+                                                {/* Actions */}
+                                                <div className="sb-seg-card__actions">
+                                                    <button
+                                                        className="sb-seg-regen-btn"
+                                                        onClick={() => handleRegenSegment(i)}
+                                                        disabled={isRegen || isCompiling}
+                                                        title="Regenerate this segment"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>
+                                                        {isRegen ? 'Regenerating…' : 'Regenerate'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Compile bar */}
+                                <div className="sb-compile-bar">
+                                    <span className="sb-compile-info">
+                                        {segmentItems.filter(s => s.status === 'completed').length < segmentItems.length
+                                            ? `${segmentItems.filter(s => s.status === 'completed').length}/${segmentItems.length} segments ready`
+                                            : 'All segments ready ✓'}
+                                    </span>
+                                    <button
+                                        className="sb-compile-btn"
+                                        onClick={handleCompile}
+                                        disabled={isCompiling || segmentItems.filter(s => s.status === 'completed').length === 0}
+                                    >
+                                        {isCompiling ? (
+                                            <><span className="material-symbols-outlined spin" style={{ fontSize: 14 }}>autorenew</span> Compiling…</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>merge</span> Compile Final Film</>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
