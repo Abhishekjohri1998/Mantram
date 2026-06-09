@@ -238,7 +238,8 @@ export default function ResearchStudio() {
             if (event.data) {
               setResult(event.data)
               setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
-              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+              fetchHistory()
             } else if (event.raw) {
               setError('Research completed but response had a formatting issue. Raw output available below.')
               const rawResult = { raw: event.raw }
@@ -281,7 +282,8 @@ export default function ResearchStudio() {
           if (res?.success && res?.data) {
             setResult(res.data)
             setLastModuleResults(prev => ({ ...prev, [activeModule.id]: res.data }))
-            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+            fetchHistory()
           } else {
             setError(res?.error || 'Research failed. Please try again.')
           }
@@ -408,8 +410,9 @@ export default function ResearchStudio() {
               {MODULES.map(mod => (
                 <button
                   key={mod.id}
-                  className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}`}
+                  className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}${loading ? ' rs-module-card--disabled' : ''}`}
                   onClick={() => handleModuleSelect(mod)}
+                  disabled={loading}
                 >
                   <div className="rs-module-icon">
                     <span className="material-symbols-outlined">{mod.icon}</span>
@@ -448,7 +451,7 @@ export default function ResearchStudio() {
             )}
 
             {/* Input panel */}
-            {activeModule && !result && !loading && (
+            {activeModule && !result && !loading && !error && (
               <div className="rs-input-panel">
                 <div className="rs-input-header">
                   <div className="rs-input-icon">
@@ -543,9 +546,12 @@ export default function ResearchStudio() {
             {/* Error */}
             {error && !loading && (
               <div className="rs-error">
-                <span className="material-symbols-outlined">error_outline</span>
+                <span className="material-symbols-outlined" style={{ color: 'var(--sys-primary)', fontSize: '2.5rem' }}>error_outline</span>
                 <p>{error}</p>
-                <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
+                  <button className="rs-retry-btn" style={{ background: 'transparent' }} onClick={() => setError(null)}>Edit Query</button>
+                </div>
               </div>
             )}
 
@@ -562,7 +568,7 @@ export default function ResearchStudio() {
                     <h2>{activeModule.label} — {result.brand || activeBrand?.name}</h2>
                     <span className="rs-result-time">
                       {result.generatedAt
-                        ? new Date(result.generatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                        ? new Date(result.generatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                         : 'Just now'}
                     </span>
                   </div>

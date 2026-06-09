@@ -37,6 +37,25 @@ function resultCacheKey(module, brandId, query) {
     return `rs:${module}:${brandId || 'nobrand'}:${qHash}`;
 }
 
+// ── Auto-save helper ──────────────────────────────────────────────────────────
+async function autoSaveReport(userId, brandId, moduleName, brandName, parsedData) {
+    try {
+        await BrandStrategy.create({
+            user: userId,
+            brand: brandId || undefined,
+            title: `${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)} Research — ${brandName}`,
+            type: 'research',
+            status: 'active',
+            researchModule: moduleName,
+            researchData: parsedData,
+            generatedAt: parsedData.generatedAt || new Date().toISOString(),
+            aiMeta: { source: 'research-studio', module: moduleName, autoSaved: true },
+        });
+    } catch (saveErr) {
+        console.error('Auto-save failed:', saveErr);
+    }
+}
+
 // ── Shared AI call helper ─────────────────────────────────────────────────────
 // ⚡ Research Studio analysis is structured/analytical — Gemini 2.5 Flash is fast and accurate.
 // Claude is only needed for highly creative tasks (copywriting, long-form prose).
@@ -238,6 +257,8 @@ Identify and analyse the top 4-6 competing BRANDS (not retailers). Return specif
             { label: 'Create Competitor-Beating Ad', studio: 'brainstorm', mode: 'meta-google-ads' },
         ];
 
+        await autoSaveReport(req.user._id, brandId, 'competitor', brandName, result);
+
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
         res.json(response);
@@ -303,6 +324,8 @@ Return the most actionable, cited trends right now.`;
             { label: 'Plan Trend-Led Campaign', studio: 'brainstorm', mode: 'new-product-launch' },
             { label: 'Build Festive Campaign', studio: 'brainstorm', mode: 'festive-seasonal' },
         ];
+
+        await autoSaveReport(req.user._id, brandId, 'trends', brandName, result);
 
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
@@ -370,6 +393,8 @@ Find the most valuable keyword opportunities to capture right now.`;
             { label: 'Build Marketplace Growth Plan', studio: 'brainstorm', mode: 'marketplace-growth' },
         ];
 
+        await autoSaveReport(req.user._id, brandId, 'keywords', brandName, result);
+
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
         res.json(response);
@@ -435,6 +460,8 @@ Find winning ad strategies and hooks to adapt right now.`;
             { label: 'Build Meta & Google Ads Brief', studio: 'brainstorm', mode: 'meta-google-ads' },
             { label: 'Generate Ad Creative', studio: 'creative', mode: null },
         ];
+
+        await autoSaveReport(req.user._id, brandId, 'ads', brandName, result);
 
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
@@ -502,6 +529,8 @@ Mine real customer language, pain points, desires from online communities, revie
             { label: 'Build Brand Awareness Campaign', studio: 'brainstorm', mode: 'brand-awareness' },
             { label: 'Plan Influencer Campaign', studio: 'brainstorm', mode: 'influencer-campaign' },
         ];
+
+        await autoSaveReport(req.user._id, brandId, 'audience', brandName, result);
 
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
@@ -593,6 +622,8 @@ Do NOT compare with retailers — only with brand owners/manufacturers.`;
         result.brand = brandName;
         result.generatedAt = new Date().toISOString();
         if (!result.sources?.length && citations.length) result.sources = citations.slice(0, 8).map(c => c.url || c);
+
+        await autoSaveReport(req.user._id, brandId, 'synthesis', brandName, result);
 
         const response = { success: true, data: result };
         await setCachedResult(cacheKey, response);
@@ -768,6 +799,9 @@ router.post('/stream', protect, requireStudio('researchStudio'), async (req, res
             if (!parsed.sources?.length && streamCitations?.length) {
                 parsed.sources = streamCitations.slice(0, 6).map(c => c.url || c);
             }
+            // Auto-save to DB
+            await autoSaveReport(req.user._id, brandId, moduleName, brandName, parsed);
+
             // Cache the result for 5 minutes
             await setCachedResult(cacheKey, { success: true, data: parsed });
             emit('done', { data: parsed });
