@@ -115,8 +115,8 @@ const SOCIAL_PLATFORMS = [
     { id: 'instagram', name: 'Instagram', color: '#E1306C', desc: 'Photos, reels & stories' },
     { id: 'facebook', name: 'Facebook', color: '#1877F2', desc: 'Pages, groups & marketplace' },
     { id: 'linkedin', name: 'LinkedIn', color: '#0A66C2', desc: 'Professional posts & articles' },
-    { id: 'twitter', name: 'X (Twitter)', color: '#14171A', desc: 'Tweets & threads' },
-    { id: 'tiktok', name: 'TikTok', color: '#010101', desc: 'Short-form video content' },
+    { id: 'twitter', name: 'X (Twitter)', color: '#E7E9EA', desc: 'Tweets & threads' },
+    { id: 'tiktok', name: 'TikTok', color: '#00F2EA', desc: 'Short-form video content' },
     { id: 'youtube', name: 'YouTube', color: '#FF0000', desc: 'Long-form video & shorts', comingSoon: true },
 ]
 
@@ -413,7 +413,7 @@ export default function Integrations() {
                 syncChannel.postMessage(msg)
                 syncChannel.close()
                 window.close()
-            } else if (socialStatus === 'denied' || socialStatus === 'processing_failed' || socialStatus === 'invalid_request') {
+            } else if (socialStatus) {
                 const msg = { type: 'SOCIAL_PLATFORM_DENIED', platform, reason: socialStatus }
                 if (window.opener) window.opener.postMessage(msg, window.location.origin)
                 syncChannel.postMessage(msg)
