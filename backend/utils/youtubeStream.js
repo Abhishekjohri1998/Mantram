@@ -5,8 +5,19 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
 
-// Flag to ensure we only try to update yt-dlp once per process lifetime
 let ytDlpUpdateAttempted = false;
+
+export function getCookiesPath() {
+    const possiblePaths = [
+        process.env.YOUTUBE_COOKIES_PATH,
+        path.join(process.cwd(), 'youtube-cookies.txt'),
+        '/home/ec2-user/secrets/youtube-cookies.txt'
+    ];
+    for (const p of possiblePaths) {
+        if (p && fs.existsSync(p)) return p;
+    }
+    return null;
+}
 
 /**
  * Ensures the yt-dlp binary is up-to-date.
@@ -70,11 +81,16 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     await ensureYtDlpUpdated();
 
     let resolvedUrl = null;
+    const cookiePath = getCookiesPath();
 
     // Strategy 1: @distube/ytdl-core (Standard — fast, no binary needed)
     try {
         console.log(`   ➡️ Strategy 1: @distube/ytdl-core`);
-        const info = await ytdl.getInfo(url);
+        const info = await ytdl.getInfo(url, {
+            requestOptions: {
+                headers: cookiePath ? { cookie: fs.readFileSync(cookiePath, 'utf8') } : {}
+            }
+        });
         const format = ytdl.chooseFormat(info.formats, { quality: 'highestvideo' });
         if (format && format.url) {
             console.log(`   ✅ Strategy 1 success (${format.container} ${format.qualityLabel || ''})`);
@@ -84,17 +100,20 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         console.log(`   ⚠️ Strategy 1 failed: ${err.message}`);
     }
 
+    // Common options for yt-dlp
+    const commonOptions = {
+        getUrl: true,
+        format: 'worst',
+        noWarnings: true,
+        noCheckCertificates: true,
+        ...(cookiePath ? { cookies: cookiePath } : {})
+    };
+
     // Strategy 2: youtube-dl-exec with android client (best for bot bypass)
     if (!resolvedUrl) {
         try {
-            console.log(`   ➡️ Strategy 2: youtube-dl-exec (android)`);
-            const output = await youtubedl(url, {
-                getUrl: true,
-                format: 'worst', // Use worst format to make downloading incredibly fast for frame extraction
-                extractorArgs: 'youtube:player_client=android',
-                noWarnings: true,
-                noCheckCertificates: true,
-            });
+            console.log(`   ➡️ Strategy 2: youtube-dl-exec (android) ${cookiePath ? '[with cookies]' : ''}`);
+            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=android' });
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 2 success`);
@@ -108,14 +127,8 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     // Strategy 3: youtube-dl-exec with web_safari client
     if (!resolvedUrl) {
         try {
-            console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari)`);
-            const output = await youtubedl(url, {
-                getUrl: true,
-                format: 'worst',
-                extractorArgs: 'youtube:player_client=web_safari',
-                noWarnings: true,
-                noCheckCertificates: true,
-            });
+            console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari) ${cookiePath ? '[with cookies]' : ''}`);
+            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=web_safari' });
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 3 success`);
@@ -129,13 +142,8 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     // Strategy 4: youtube-dl-exec with default client (no extractor args)
     if (!resolvedUrl) {
         try {
-            console.log(`   ➡️ Strategy 4: youtube-dl-exec (default)`);
-            const output = await youtubedl(url, {
-                getUrl: true,
-                format: 'worst',
-                noWarnings: true,
-                noCheckCertificates: true,
-            });
+            console.log(`   ➡️ Strategy 4: youtube-dl-exec (default) ${cookiePath ? '[with cookies]' : ''}`);
+            const output = await youtubedl(url, commonOptions);
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 4 success`);
@@ -143,43 +151,6 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
             }
         } catch (err) {
             console.log(`   ⚠️ Strategy 4 (default) failed: ${err.message.trim().split('\n')[0]}`);
-        }
-    }
-
-    // Strategy 5: youtube-dl-exec with cookies (if available on EC2)
-    if (!resolvedUrl) {
-        try {
-            let cookiePath = null;
-            const possiblePaths = [
-                process.env.YOUTUBE_COOKIES_PATH,
-                path.join(process.cwd(), 'youtube-cookies.txt'),
-                '/home/ec2-user/secrets/youtube-cookies.txt'
-            ];
-            
-            for (const p of possiblePaths) {
-                if (p && fs.existsSync(p)) {
-                    cookiePath = p;
-                    break;
-                }
-            }
-
-            if (cookiePath) {
-                console.log(`   ➡️ Strategy 5: youtube-dl-exec (cookies)`);
-                const output = await youtubedl(url, {
-                    getUrl: true,
-                    format: 'worst',
-                    cookies: cookiePath,
-                    noWarnings: true,
-                    noCheckCertificates: true,
-                });
-                const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
-                if (streamUrl.startsWith('http')) {
-                    console.log(`   ✅ Strategy 5 success`);
-                    resolvedUrl = streamUrl;
-                }
-            }
-        } catch (err) {
-            console.log(`   ⚠️ Strategy 5 failed: ${err.message.trim().split('\n')[0]}`);
         }
     }
 

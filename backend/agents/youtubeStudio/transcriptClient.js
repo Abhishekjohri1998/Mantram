@@ -156,8 +156,44 @@ export async function fetchVideoMetadata(videoId) {
                 };
             }
         } catch (err) {
-            console.warn(`⚠️ [metadata] YouTube Data API failed: ${err.message} — falling back to oEmbed`);
+            console.warn(`⚠️ [metadata] YouTube Data API failed: ${err.message} — falling back to yt-dlp`);
         }
+    }
+
+    // ── Strategy 1.5: yt-dlp (full metadata via scraping, bypasses API key) ──────
+    try {
+        const { getCookiesPath } = await import('../../utils/youtubeStream.js');
+        const cookiePath = getCookiesPath();
+        const cookieArg = cookiePath ? `--cookies "${cookiePath}"` : '';
+        const ytdlpBin = (await import('youtube-dl-exec')).default.raw;
+        const { execSync } = await import('child_process');
+        
+        const raw = execSync(
+            `${ytdlpBin || 'yt-dlp'} --dump-json --no-download --no-warnings ${cookieArg} "https://www.youtube.com/watch?v=${videoId}"`,
+            { timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 10 * 1024 * 1024 }
+        ).toString();
+        
+        const meta = JSON.parse(raw);
+        console.log(`✅ [metadata] yt-dlp: "${meta.title}" (Duration: ${meta.duration}s)`);
+        
+        return {
+            id: videoId,
+            url: `https://www.youtube.com/watch?v=${videoId}`,
+            title: meta.title || null,
+            description: meta.description || null,
+            channelTitle: meta.channel || meta.uploader || null,
+            channelId: meta.channel_id || null,
+            publishedAt: meta.upload_date ? `${meta.upload_date.substring(0,4)}-${meta.upload_date.substring(4,6)}-${meta.upload_date.substring(6,8)}T00:00:00Z` : null,
+            thumbnailUrl: meta.thumbnail || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            tags: meta.tags || [],
+            categoryId: null,
+            duration: meta.duration ? `PT${meta.duration}S` : null, // Convert to ISO 8601 for parseIsoDuration
+            viewCount: meta.view_count || 0,
+            likeCount: meta.like_count || 0,
+            commentCount: meta.comment_count || 0,
+        };
+    } catch (err) {
+        console.warn(`⚠️ [metadata] yt-dlp fallback failed: ${err.message?.split('\n')[0]} — falling back to oEmbed`);
     }
 
     // ── Strategy 2: oEmbed (free, no API key, no quota) ─────────────────────

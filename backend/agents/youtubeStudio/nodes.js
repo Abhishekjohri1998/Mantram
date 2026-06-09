@@ -1646,8 +1646,12 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
             console.log(`   🔧 Strategy: yt-dlp --dump-json for storyboard metadata...`);
             const { execSync } = await import('child_process');
             const ytdlpBin = (await import('youtube-dl-exec')).default.raw;
+            const { getCookiesPath } = await import('../../utils/youtubeStream.js');
+            const cookiePath = getCookiesPath();
+            const cookieArg = cookiePath ? `--cookies "${cookiePath}"` : '';
+            
             const raw = execSync(
-                `${ytdlpBin || 'yt-dlp'} --dump-json --no-download --no-warnings "https://www.youtube.com/watch?v=${videoId}"`,
+                `${ytdlpBin || 'yt-dlp'} --dump-json --no-download --no-warnings ${cookieArg} "https://www.youtube.com/watch?v=${videoId}"`,
                 { timeout: 20000, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 10 * 1024 * 1024 }
             ).toString();
             
