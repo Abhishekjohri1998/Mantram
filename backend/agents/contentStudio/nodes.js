@@ -501,8 +501,10 @@ export async function qualityCriticNode(state) {
             humanizationApplied: false,
         };
 
-        // Re-run Writer → Quality Critic
-        const rewrittenState = await writerNode(newState);
+        // Re-run Writer → Humanization → Quality Critic
+        // IMPORTANT: humanizationNode must run on the rewritten content BEFORE re-scoring
+        let rewrittenState = await writerNode(newState);
+        rewrittenState = await humanizationNode(rewrittenState);
         return await qualityCriticNode(rewrittenState);
     }
 
@@ -831,12 +833,21 @@ export async function blogWriterNode(state) {
 
     console.log(`📝 Blog Agent: Generated ${blogData.sections?.length || 0} sections, title: "${blogData.title}"`);
 
+    // Flatten blog sections into draft.content so humanizationNode can find it
+    // humanizationNode reads state.draft?.content as its final fallback
+    const flatContent = (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n');
+
     return {
         ...state,
         blogData,
+        draft: {
+            title: blogData.title || state.topic || 'Blog Article',
+            content: flatContent,
+        },
         status: 'blog_written',
     };
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MCoT: CONTENT VISUAL GROUNDING NODE (Phase 4)

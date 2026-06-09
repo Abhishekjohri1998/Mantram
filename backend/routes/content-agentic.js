@@ -476,13 +476,19 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
         // Step 3: Writer (enriched with real data + visual grounding + strategy)
         state = await writerNode(state);
 
+        // Step 3.5: Humanization for deep content (blog, YouTube, long-form, press_release)
+        // /start is the initial draft endpoint — runs humanization before saving
+        if (!isSocialFastPath) {
+            state = await humanizationNode(state);
+        }
+
         // Save initial content
         const content = await Content.create({
             user: req.user._id,
             brand: brandId || undefined,
             type: contentType || 'social',
-            title: state.draft?.title || '',
-            content: state.draft?.content || '',
+            title: state.finalTitle || state.draft?.title || '',
+            content: state.finalContent || state.draft?.content || '',
             prompt: brief,
             platform: platform || 'instagram',
             originalContent: state.draft?.content || '',
@@ -494,8 +500,10 @@ router.post('/start', protect, requireCredits('content'), async (req, res) => {
                 research: state.research,
                 researchDepth: researchDepth || 'quick',
                 brandAlignmentScore: 70,
+                humanizationApplied: state.humanizationApplied || false,
             },
         });
+
 
         await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
 
@@ -967,8 +975,21 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
         // Step 3: Humanization pass (blog content — most critical for AI detection)
         state = await humanizationNode(state);
 
-        const blogData = state.blogData || {};
-        const fullContent = (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n') || `Blog article about: ${topic}`;
+        // If humanization ran and replaced content, try to update blogData sections
+        // humanizationNode sets state.finalContent = the humanized flat content
+        let finalBlogData = state.blogData || {};
+        if (state.humanizationApplied && state.finalContent) {
+            // Humanization rewrote the flat content — the sections JSON is still in blogData
+            // Best we can do: store the humanized flat version as the canonical content
+            // The section structure remains from original blogData (for UI rendering)
+            console.log('🧠 Blog humanization applied — using humanized flat content');
+        }
+
+        const blogData = finalBlogData;
+        // Use humanized flat content if available, otherwise reconstruct from sections
+        const fullContent = state.humanizationApplied && state.finalContent
+            ? state.finalContent
+            : (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n') || `Blog article about: ${topic}`;
 
         // Save to Content model
         const content = await Content.create({
@@ -979,7 +1000,7 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
             content: fullContent,
             prompt: topic,
             platform: 'website',
-            originalContent: fullContent,
+            originalContent: (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n') || fullContent,
             blogMeta: {
                 slug: blogData.slug || topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
                 metaTitle: blogData.metaTitle || blogData.title || '',
@@ -1001,6 +1022,7 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
                 model: 'auto',
                 agenticPipeline: true,
                 pipelineStep: 'blog_draft',
+                humanizationApplied: state.humanizationApplied || false,
                 research: state.research,
                 researchDepth: 'quick',
             },
