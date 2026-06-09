@@ -50,6 +50,10 @@ async function ensureYtDlpUpdated() {
     }
 }
 
+import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
+
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
  * Implements a multi-strategy fallback to bypass bot detection.
@@ -67,6 +71,8 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     // Ensure yt-dlp is up-to-date before trying any strategy
     await ensureYtDlpUpdated();
 
+    let resolvedUrl = null;
+
     // Strategy 1: @distube/ytdl-core (Standard — fast, no binary needed)
     try {
         console.log(`   ➡️ Strategy 1: @distube/ytdl-core`);
@@ -74,91 +80,131 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         const format = ytdl.chooseFormat(info.formats, { quality: 'highestvideo' });
         if (format && format.url) {
             console.log(`   ✅ Strategy 1 success (${format.container} ${format.qualityLabel || ''})`);
-            return format.url;
+            resolvedUrl = format.url;
         }
     } catch (err) {
         console.log(`   ⚠️ Strategy 1 failed: ${err.message}`);
     }
 
     // Strategy 2: youtube-dl-exec with android client (best for bot bypass)
-    try {
-        console.log(`   ➡️ Strategy 2: youtube-dl-exec (android)`);
-        const output = await youtubedl(url, {
-            getUrl: true,
-            format: 'best',
-            extractorArgs: 'youtube:player_client=android',
-            noWarnings: true,
-            noCheckCertificates: true,
-        });
-        const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
-        if (streamUrl.startsWith('http')) {
-            console.log(`   ✅ Strategy 2 success`);
-            return streamUrl;
-        }
-    } catch (err) {
-        console.log(`   ⚠️ Strategy 2 (android) failed: ${err.message.trim().split('\n')[0]}`);
-    }
-
-    // Strategy 3: youtube-dl-exec with web_safari client
-    try {
-        console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari)`);
-        const output = await youtubedl(url, {
-            getUrl: true,
-            format: 'best',
-            extractorArgs: 'youtube:player_client=web_safari',
-            noWarnings: true,
-            noCheckCertificates: true,
-        });
-        const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
-        if (streamUrl.startsWith('http')) {
-            console.log(`   ✅ Strategy 3 success`);
-            return streamUrl;
-        }
-    } catch (err) {
-        console.log(`   ⚠️ Strategy 3 (web_safari) failed: ${err.message.trim().split('\n')[0]}`);
-    }
-
-    // Strategy 4: youtube-dl-exec with default client (no extractor args)
-    try {
-        console.log(`   ➡️ Strategy 4: youtube-dl-exec (default)`);
-        const output = await youtubedl(url, {
-            getUrl: true,
-            format: 'best',
-            noWarnings: true,
-            noCheckCertificates: true,
-        });
-        const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
-        if (streamUrl.startsWith('http')) {
-            console.log(`   ✅ Strategy 4 success`);
-            return streamUrl;
-        }
-    } catch (err) {
-        console.log(`   ⚠️ Strategy 4 (default) failed: ${err.message.trim().split('\n')[0]}`);
-    }
-
-    // Strategy 5: youtube-dl-exec with cookies (if available on EC2)
-    try {
-        const cookiePath = '/home/ec2-user/secrets/youtube-cookies.txt';
-        if (fs.existsSync(cookiePath)) {
-            console.log(`   ➡️ Strategy 5: youtube-dl-exec (cookies)`);
+    if (!resolvedUrl) {
+        try {
+            console.log(`   ➡️ Strategy 2: youtube-dl-exec (android)`);
             const output = await youtubedl(url, {
                 getUrl: true,
-                format: 'best',
-                cookies: cookiePath,
+                format: 'worst', // Use worst format to make downloading incredibly fast for frame extraction
+                extractorArgs: 'youtube:player_client=android',
                 noWarnings: true,
                 noCheckCertificates: true,
             });
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
-                console.log(`   ✅ Strategy 5 success`);
-                return streamUrl;
+                console.log(`   ✅ Strategy 2 success`);
+                resolvedUrl = streamUrl;
             }
+        } catch (err) {
+            console.log(`   ⚠️ Strategy 2 (android) failed: ${err.message.trim().split('\n')[0]}`);
         }
-    } catch (err) {
-        console.log(`   ⚠️ Strategy 5 failed: ${err.message.trim().split('\n')[0]}`);
     }
 
-    // All streaming strategies failed.
-    console.error(`❌ [youtubeStream] All stream resolution strategies failed for ${url}`);
-    return null;
+    // Strategy 3: youtube-dl-exec with web_safari client
+    if (!resolvedUrl) {
+        try {
+            console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari)`);
+            const output = await youtubedl(url, {
+                getUrl: true,
+                format: 'worst',
+                extractorArgs: 'youtube:player_client=web_safari',
+                noWarnings: true,
+                noCheckCertificates: true,
+            });
+            const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
+            if (streamUrl.startsWith('http')) {
+                console.log(`   ✅ Strategy 3 success`);
+                resolvedUrl = streamUrl;
+            }
+        } catch (err) {
+            console.log(`   ⚠️ Strategy 3 (web_safari) failed: ${err.message.trim().split('\n')[0]}`);
+        }
+    }
+
+    // Strategy 4: youtube-dl-exec with default client (no extractor args)
+    if (!resolvedUrl) {
+        try {
+            console.log(`   ➡️ Strategy 4: youtube-dl-exec (default)`);
+            const output = await youtubedl(url, {
+                getUrl: true,
+                format: 'worst',
+                noWarnings: true,
+                noCheckCertificates: true,
+            });
+            const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
+            if (streamUrl.startsWith('http')) {
+                console.log(`   ✅ Strategy 4 success`);
+                resolvedUrl = streamUrl;
+            }
+        } catch (err) {
+            console.log(`   ⚠️ Strategy 4 (default) failed: ${err.message.trim().split('\n')[0]}`);
+        }
+    }
+
+    // Strategy 5: youtube-dl-exec with cookies (if available on EC2)
+    if (!resolvedUrl) {
+        try {
+            const cookiePath = '/home/ec2-user/secrets/youtube-cookies.txt';
+            if (fs.existsSync(cookiePath)) {
+                console.log(`   ➡️ Strategy 5: youtube-dl-exec (cookies)`);
+                const output = await youtubedl(url, {
+                    getUrl: true,
+                    format: 'worst',
+                    cookies: cookiePath,
+                    noWarnings: true,
+                    noCheckCertificates: true,
+                });
+                const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
+                if (streamUrl.startsWith('http')) {
+                    console.log(`   ✅ Strategy 5 success`);
+                    resolvedUrl = streamUrl;
+                }
+            }
+        } catch (err) {
+            console.log(`   ⚠️ Strategy 5 failed: ${err.message.trim().split('\n')[0]}`);
+        }
+    }
+
+    if (!resolvedUrl) {
+        // All streaming strategies failed.
+        console.error(`❌ [youtubeStream] All stream resolution strategies failed for ${url}`);
+        return null;
+    }
+
+    // === DOWNLOAD TO LOCAL CACHE ===
+    // This perfectly bypasses YouTube's HTTP Range-request blocking and guarantees accurate frame extraction.
+    try {
+        const safeId = crypto.createHash('md5').update(url).digest('hex');
+        const localVideoPath = path.join(os.tmpdir(), `mantram_vid_${safeId}.mp4`);
+        
+        if (fs.existsSync(localVideoPath)) {
+            console.log(`   📦 Using locally cached video: ${localVideoPath}`);
+            return localVideoPath;
+        }
+
+        console.log(`   📥 Downloading video stream to local cache for fast seeking...`);
+        const res = await fetch(resolvedUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const dest = fs.createWriteStream(localVideoPath);
+        const { Readable } = await import('stream');
+        await new Promise((resolve, reject) => {
+            Readable.fromWeb(res.body).pipe(dest)
+                .on('finish', resolve)
+                .on('error', reject);
+        });
+        
+        console.log(`   ✅ Video downloaded to cache. Size: ${fs.statSync(localVideoPath).size} bytes`);
+        return localVideoPath;
+    } catch (e) {
+        console.error(`   ⚠️ Failed to cache video locally, falling back to HTTP stream:`, e.message);
+        return resolvedUrl;
+    }
 }
