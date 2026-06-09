@@ -5014,9 +5014,12 @@ export default function ContentStudio() {
             return
         }
         // Social content → bridge to existing handleGenerate
+        // IMPORTANT: Pass context DIRECTLY (not via setContext state) to avoid React async race condition
+        // where buildPrompt() reads stale context before setState has applied.
+        const directContext = { details: data.details || data.rawInput, url: data.url }
         setGoal(data.goal || 'promote')
         setChannel(data.channel)
-        setContext({ details: data.details || data.rawInput, url: data.url })
+        setContext(directContext) // still update state for other consumers (visual prompt, etc.)
         handleGenerate({
             tone: data.tone || 'bold',
             length: data.length || 'medium',
@@ -5025,13 +5028,16 @@ export default function ContentStudio() {
             langStyle: data.langStyle || 'pure',
             scriptType: data.scriptType || 'regional',
             researchDepth: data.researchDepth || 'quick',
-        })
+        }, directContext) // pass context directly to bypass stale state
     }
 
     // Build the full prompt from all selections
-    const buildPrompt = (settings) => {
+    // contextOverride: pass context explicitly to avoid React setState async race conditions
+    const buildPrompt = (settings, contextOverride) => {
         // Use passed settings directly (React setState is async, can't rely on toneSettings state here)
         const ts = settings || toneSettings || {}
+        // Use contextOverride if provided — avoids race with setContext()/setState being async
+        const effectiveContext = contextOverride !== undefined ? contextOverride : context
         const goalData = GOALS.find(g => g.id === goal)
         const subTypeData = goalData?.subTypes.find(s => s.id === subType)
         const channelName = Array.isArray(channel)
@@ -5070,8 +5076,8 @@ export default function ContentStudio() {
             prompt += `SELLING APPROACH: ${sellLabel}\n`
         }
 
-        if (context?.details) prompt += `\nCONTEXT: ${context.details}\n`
-        if (context?.url) prompt += `REFERENCE URL: ${context.url}\n`
+        if (effectiveContext?.details) prompt += `\nCONTEXT: ${effectiveContext.details}\n`
+        if (effectiveContext?.url) prompt += `REFERENCE URL: ${effectiveContext.url}\n`
 
         // Product context injection for product_content goal
         if (goal === 'product_content' && selectedProduct) {
@@ -5109,7 +5115,7 @@ export default function ContentStudio() {
         return prompt
     }
 
-    const handleGenerate = async (settings) => {
+    const handleGenerate = async (settings, contextOverride) => {
         setToneSettings(settings)
         if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
@@ -5117,7 +5123,7 @@ export default function ContentStudio() {
         setPipelineSteps([])
         setGeneratingStartedAt(Date.now())
 
-        const prompt = buildPrompt(settings)
+        const prompt = buildPrompt(settings, contextOverride)
         const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
         try {
             // ── Phase 3: SSE streaming pipeline ──
