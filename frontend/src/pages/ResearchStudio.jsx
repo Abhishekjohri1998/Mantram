@@ -211,6 +211,47 @@ export default function ResearchStudio() {
       let buffer = ''
       let localTokens = 0
 
+      const processLine = (line) => {
+        if (!line.startsWith('data: ')) return
+        try {
+          const event = JSON.parse(line.slice(6))
+
+          if (event.type === 'status') {
+            setStreamStatus(event.message)
+            setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
+          } else if (event.type === 'tool_progress') {
+            setToolProgress(prev => [
+              ...prev.filter(t => t.label !== event.label),
+              { label: event.label, done: true },
+            ])
+            setStreamStatus(`✅ ${event.label}`)
+          } else if (event.type === 'token') {
+            localTokens += (event.chunk || '').length
+            setTokenCount(localTokens)
+            setStreamStatus('✍️ Generating insights...')
+          } else if (event.type === 'cached') {
+            setResult(event.data)
+            setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+            setStreamStatus('⚡ Served from cache')
+          } else if (event.type === 'done') {
+            if (event.data) {
+              setResult(event.data)
+              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+            } else if (event.raw) {
+              setError('Research completed but response had a formatting issue. Raw output available below.')
+              const rawResult = { raw: event.raw }
+              setResult(rawResult)
+              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: rawResult }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+            }
+          } else if (event.type === 'error') {
+            setError(event.message || 'Research failed. Please try again.')
+          }
+        } catch { /* skip malformed events */ }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -220,44 +261,16 @@ export default function ResearchStudio() {
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6))
+          processLine(line)
+        }
+      }
 
-            if (event.type === 'status') {
-              setStreamStatus(event.message)
-              setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
-            } else if (event.type === 'tool_progress') {
-              setToolProgress(prev => [
-                ...prev.filter(t => t.label !== event.label),
-                { label: event.label, done: true },
-              ])
-              setStreamStatus(`✅ ${event.label}`)
-            } else if (event.type === 'token') {
-              localTokens += (event.chunk || '').length
-              setTokenCount(localTokens)
-              setStreamStatus('✍️ Generating insights...')
-            } else if (event.type === 'cached') {
-              setResult(event.data)
-              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
-              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
-              setStreamStatus('⚡ Served from cache')
-            } else if (event.type === 'done') {
-              if (event.data) {
-                setResult(event.data)
-                setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
-                setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
-              } else if (event.raw) {
-                setError('Research completed but response had a formatting issue. Raw output available below.')
-                const rawResult = { raw: event.raw }
-                setResult(rawResult)
-                setLastModuleResults(prev => ({ ...prev, [activeModule.id]: rawResult }))
-                setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
-              }
-            } else if (event.type === 'error') {
-              setError(event.message || 'Research failed. Please try again.')
-            }
-          } catch { /* skip malformed events */ }
+      // Flush remaining buffer
+      buffer += decoder.decode()
+      if (buffer.trim()) {
+        const lines = buffer.split('\n')
+        for (const line of lines) {
+          processLine(line)
         }
       }
     } catch (e) {

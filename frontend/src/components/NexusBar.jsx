@@ -393,17 +393,10 @@ export default function NexusBar() {
             let buffer = ''
             let accumulatedText = ''
             let pendingAction = null
+            let currentEvent = null
 
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-                const parts = buffer.split('\n')
-                buffer = parts.pop() || ''
-
-                let currentEvent = null
-                for (const line of parts) {
+            const processParts = (partsList) => {
+                for (const line of partsList) {
                     const trimmed = line.trim()
                     if (!trimmed) { currentEvent = null; continue }
                     if (trimmed.startsWith('event:')) {
@@ -527,6 +520,24 @@ export default function NexusBar() {
                         currentEvent = null
                     }
                 }
+            }
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const parts = buffer.split('\n')
+                buffer = parts.pop() || ''
+
+                processParts(parts)
+            }
+
+            // Flush remaining buffer
+            buffer += decoder.decode()
+            if (buffer.trim()) {
+                const parts = buffer.split('\n')
+                processParts(parts)
             }
 
         } catch (err) {

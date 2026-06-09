@@ -5155,6 +5155,38 @@ export default function ContentStudio() {
             const decoder = new TextDecoder()
             let buffer = ''
 
+            const processLine = (line) => {
+                if (!line.startsWith('data: ')) return
+                try {
+                    const event = JSON.parse(line.slice(6))
+
+                    if (event.type === 'pipeline_step') {
+                        // Feed GlobalLoader — deduplicate by agent key
+                        setPipelineSteps(prev => {
+                            const next = prev.filter(s => s.agent !== event.agent)
+                            return [...next, { agent: event.agent, message: event.message, status: event.status, durationMs: event.durationMs }]
+                        })
+                    } else if (event.type === 'done') {
+                        const agenticContent = event.content
+                        setResult({
+                            _id: agenticContent._id,
+                            content: agenticContent.agenticData?.draft?.content || agenticContent.content,
+                            title: agenticContent.agenticData?.draft?.title || agenticContent.title,
+                            hookLine: agenticContent.agenticData?.draft?.hookLine || '',
+                            cta: agenticContent.agenticData?.draft?.cta || '',
+                            hashtags: agenticContent.agenticData?.draft?.hashtags || [],
+                            agenticData: agenticContent.agenticData,
+                        })
+                        setStep(5)
+                    } else if (event.type === 'error') {
+                        throw new Error(event.message || 'Generation failed')
+                    }
+                } catch (parseErr) {
+                    if (parseErr.message?.includes('Generation failed') || parseErr.message?.includes('failed')) throw parseErr
+                    // else skip malformed SSE line
+                }
+            }
+
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
@@ -5163,35 +5195,16 @@ export default function ContentStudio() {
                 buffer = lines.pop() || ''
 
                 for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue
-                    try {
-                        const event = JSON.parse(line.slice(6))
+                    processLine(line)
+                }
+            }
 
-                        if (event.type === 'pipeline_step') {
-                            // Feed GlobalLoader — deduplicate by agent key
-                            setPipelineSteps(prev => {
-                                const next = prev.filter(s => s.agent !== event.agent)
-                                return [...next, { agent: event.agent, message: event.message, status: event.status, durationMs: event.durationMs }]
-                            })
-                        } else if (event.type === 'done') {
-                            const agenticContent = event.content
-                            setResult({
-                                _id: agenticContent._id,
-                                content: agenticContent.agenticData?.draft?.content || agenticContent.content,
-                                title: agenticContent.agenticData?.draft?.title || agenticContent.title,
-                                hookLine: agenticContent.agenticData?.draft?.hookLine || '',
-                                cta: agenticContent.agenticData?.draft?.cta || '',
-                                hashtags: agenticContent.agenticData?.draft?.hashtags || [],
-                                agenticData: agenticContent.agenticData,
-                            })
-                            setStep(5)
-                        } else if (event.type === 'error') {
-                            throw new Error(event.message || 'Generation failed')
-                        }
-                    } catch (parseErr) {
-                        if (parseErr.message?.includes('Generation failed') || parseErr.message?.includes('failed')) throw parseErr
-                        // else skip malformed SSE line
-                    }
+            // Flush remaining buffer
+            buffer += decoder.decode()
+            if (buffer.trim()) {
+                const lines = buffer.split('\n')
+                for (const line of lines) {
+                    processLine(line)
                 }
             }
         } catch (streamErr) {

@@ -1163,6 +1163,39 @@ export default function BrainstormStudio() {
       const decoder = new TextDecoder()
       let buffer = ''
 
+      const processLine = (line) => {
+        if (!line.startsWith('data: ')) return
+        try {
+          const event = JSON.parse(line.slice(6))
+
+          if (event.type === 'tool_progress') {
+            // Update research chip list — dedupe by tool key
+            setSmStreamTools(prev => {
+              const filtered = prev.filter(t => t.tool !== event.tool)
+              return [...filtered, { tool: event.tool, label: event.label, status: event.status }]
+            })
+            // Switch phase label
+            if (event.tool === 'ai_synthesis' && event.status === 'working') {
+              setSmStreamPhase('writing')
+            }
+          } else if (event.type === 'text_delta') {
+            // Accumulate token count (chars / ~5 = approx words)
+            setSmTokenCount(Math.round((event.tokenCount || 0) / 5))
+          } else if (event.type === 'done') {
+            setSmResult(event.data)
+            setSmStreamPhase('')
+            if (event.sessionId) {
+              setActiveSessionId(event.sessionId)
+              fetchSessionsList()
+            }
+          } else if (event.type === 'error') {
+            throw new Error(event.message || 'Strategy generation failed')
+          }
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
+        }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -1171,36 +1204,16 @@ export default function BrainstormStudio() {
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6))
+          processLine(line)
+        }
+      }
 
-            if (event.type === 'tool_progress') {
-              // Update research chip list — dedupe by tool key
-              setSmStreamTools(prev => {
-                const filtered = prev.filter(t => t.tool !== event.tool)
-                return [...filtered, { tool: event.tool, label: event.label, status: event.status }]
-              })
-              // Switch phase label
-              if (event.tool === 'ai_synthesis' && event.status === 'working') {
-                setSmStreamPhase('writing')
-              }
-            } else if (event.type === 'text_delta') {
-              // Accumulate token count (chars / ~5 = approx words)
-              setSmTokenCount(Math.round((event.tokenCount || 0) / 5))
-            } else if (event.type === 'done') {
-              setSmResult(event.data)
-              setSmStreamPhase('')
-              if (event.sessionId) {
-                setActiveSessionId(event.sessionId)
-                fetchSessionsList()
-              }
-            } else if (event.type === 'error') {
-              throw new Error(event.message || 'Strategy generation failed')
-            }
-          } catch (parseErr) {
-            if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
-          }
+      // Flush remaining buffer
+      buffer += decoder.decode()
+      if (buffer.trim()) {
+        const lines = buffer.split('\n')
+        for (const line of lines) {
+          processLine(line)
         }
       }
     } catch (streamErr) {

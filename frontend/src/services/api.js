@@ -957,6 +957,27 @@ export const brainstormStudio = {
         const decoder = new TextDecoder();
         let buffer = '';
 
+        const processLine = (line) => {
+            if (!line.startsWith('data: ')) return;
+            const raw = line.slice(6).trim();
+            if (!raw || raw === '[DONE]') return;
+            try {
+                const evt = JSON.parse(raw);
+                if (evt.type === 'token') onToken?.(evt.text);
+                else if (evt.type === 'thinking') onThinking?.();
+                else if (evt.type === 'reasoning_step') onReasoningStep?.(evt.step, evt.icon);
+                else if (evt.type === 'citations') onCitations?.(evt.citations);
+                else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
+                else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
+                else if (evt.type === 'strategy') onStrategy?.(evt.payload);
+                else if (evt.type === 'deep_dive') onDeepDive?.(evt.payload);
+                else if (evt.type === 'calendar') onCalendar?.(evt.payload);
+                else if (evt.type === 'session_id') onSessionId?.(evt.sessionId);
+                else if (evt.type === 'done') onDone?.(evt.sessionState, evt.questionOptions || null);
+                else if (evt.type === 'error') onError?.(evt.message);
+            } catch { /* ignore malformed SSE */ }
+        };
+
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -964,24 +985,16 @@ export const brainstormStudio = {
             const lines = buffer.split('\n');
             buffer = lines.pop() || '';
             for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const raw = line.slice(6).trim();
-                if (!raw || raw === '[DONE]') continue;
-                try {
-                    const evt = JSON.parse(raw);
-                    if (evt.type === 'token') onToken?.(evt.text);
-                    else if (evt.type === 'thinking') onThinking?.();
-                    else if (evt.type === 'reasoning_step') onReasoningStep?.(evt.step, evt.icon);
-                    else if (evt.type === 'citations') onCitations?.(evt.citations);
-                    else if (evt.type === 'ideas') onIdeas?.(evt.payload, evt.intent);
-                    else if (evt.type === 'screenplay') onScreenplay?.(evt.payload, evt.conceptTitle);
-                    else if (evt.type === 'strategy') onStrategy?.(evt.payload);
-                    else if (evt.type === 'deep_dive') onDeepDive?.(evt.payload);
-                    else if (evt.type === 'calendar') onCalendar?.(evt.payload);
-                    else if (evt.type === 'session_id') onSessionId?.(evt.sessionId);
-                    else if (evt.type === 'done') onDone?.(evt.sessionState, evt.questionOptions || null);
-                    else if (evt.type === 'error') onError?.(evt.message);
-                } catch { /* ignore malformed SSE */ }
+                processLine(line);
+            }
+        }
+
+        // Flush remaining buffer
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+                processLine(line);
             }
         }
     },
