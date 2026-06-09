@@ -20,19 +20,27 @@ const activityLogSchema = new mongoose.Schema({
         required: true,
         enum: [
             // Content Studio
-            'content.created', 'content.edited', 'content.deleted',
+            'content.created', 'content.edited', 'content.deleted', 'content.generated',
             // Creative Studio
             'creative.generated', 'creative.downloaded', 'creative.saved',
             // Brainstorm Studio
             'brainstorm.generated',
+            // Research Studio
+            'research.generated',
             // Video Studio
             'video.generated', 'video.downloaded',
             // Social Media
-            'social.posted', 'social.scheduled',
+            'social.posted', 'social.scheduled', 'social.generated',
+            // Performance Studio
+            'performance.generated',
+            // Voice Studio
+            'voice.generated',
+            // Virality Studio
+            'virality.generated',
             // Brand
             'brand.created', 'brand.updated', 'brand.dna_updated', 'brand.rescanned', 'brand.deleted',
             // SEO
-            'seo.audit_run', 'seo.report_generated',
+            'seo.audit_run', 'seo.report_generated', 'seo.generated',
             // Team
             'team.member_invited', 'team.member_removed', 'team.role_changed',
             // Credits
@@ -40,7 +48,7 @@ const activityLogSchema = new mongoose.Schema({
             // Auth
             'auth.login', 'auth.password_changed',
             // Other
-            'other',
+            'unknown.generated', 'other',
         ],
     },
 
