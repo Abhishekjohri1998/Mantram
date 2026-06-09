@@ -1838,7 +1838,12 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 // NanoBanana 2 is the default. Other models are strictly opt-in.
 // If any model is busy/unavailable, returns a clear error — no silent model switching.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null, timeoutMs = null) {
-    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
+    // NanoBanana 2 = gemini-3.1-flash-image-preview via LaoZhang proxy.
+    // NOTE: 'gemini-3.1-flash-image-preview' does NOT exist on the direct Gemini API
+    // (generativelanguage.googleapis.com). It ONLY works via the LaoZhang proxy.
+    // Using router.generateImage() would route it to nativeGemini → 404 → misclassified as busy.
+    const LZ_IMAGE_MODEL = 'gemini-3.1-flash-image-preview'; // LaoZhang alias for NanoBanana 2
+    const NATIVE_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-preview-05-20'; // Valid on direct Gemini API
     const router = getRouter();
     const modelKey = selectedModel; // normalize: selectedModel IS the routing key
     console.log(`🎯 Image Generation: model=${modelKey}`);
@@ -2172,17 +2177,37 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             console.log(`📌 [RefLabels] Injected ${refCount} image role label(s) into prompt preamble`);
         }
 
-        // ── Generate via native Gemini router ──
-        console.log(`🚀 Generating image via native ${GEMINI_MODEL}... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
-        const routerResult = await router.generateImage({
-            prompt: finalPromptForModel,
-            aspectRatio: nativeAspectRatio,
-            model: GEMINI_MODEL,
-            imageParts: finalImageParts,
-            size: imageSize
-        }, {
-            provider: 'gemini'
-        });
+        // ── Generate via LaoZhang (NanoBanana 2) or native Gemini fallback ──
+        // LaoZhang MUST be used when model is 'gemini-3.1-flash-image-preview' — that model
+        // doesn't exist on the direct Gemini API. Native router gets a 404 → misclassified as busy.
+        const { laozhangImageGenerate: lzImageGen, laozhangMultimodalImageGenerate: lzMultimodalGen, isLaozhangAvailable: lzAvailable } = await import('../agents/videoStudio/laozhangClient.js');
+        const useLaoZhang = lzAvailable();
+        const lzSize = (() => {
+            // Map aspectRatio to a pixel size string for LaoZhang
+            const sizeMap = { '1:1': '1024x1024', '16:9': '1344x768', '9:16': '768x1344', '4:5': '896x1120', '3:4': '896x1184', '4:3': '1184x896', '3:2': '1248x832', '2:3': '832x1248' };
+            return sizeMap[nativeAspectRatio] || '1024x1024';
+        })();
+
+        console.log(`🚀 Generating image via ${useLaoZhang ? `LaoZhang (${LZ_IMAGE_MODEL})` : `Native Gemini (${NATIVE_GEMINI_IMAGE_MODEL})`}... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
+
+        let routerResult;
+        if (useLaoZhang) {
+            // LaoZhang path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
+            const lzResult = refCount > 0
+                ? await lzMultimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: lzSize })
+                : await lzImageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: lzSize });
+            routerResult = { imageUrl: lzResult.imageUrl };
+        } else {
+            // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
+            const result = await router.generateImage({
+                prompt: finalPromptForModel,
+                aspectRatio: nativeAspectRatio,
+                model: NATIVE_GEMINI_IMAGE_MODEL,
+                imageParts: finalImageParts,
+                size: imageSize
+            }, { provider: 'gemini' });
+            routerResult = result;
+        }
 
         return {
             imageUrl: routerResult.imageUrl,
