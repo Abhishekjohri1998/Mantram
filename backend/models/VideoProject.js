@@ -229,6 +229,17 @@ const videoProjectSchema = new mongoose.Schema({
         // Single consolidated image showing all characters in labelled panels.
         // Injected as the stable @imageN face anchor in every video segment.
         characterRefSheetUrl: { type: String, default: '' },
+
+        // ── Manual Mode — Per-Segment Persistence ──────────────────────────────
+        // segmentUrls["0"] = "https://..." — written immediately after each segment
+        // completes so that compile endpoint and server-restart recovery both work.
+        segmentUrls:    { type: Map, of: String, default: {} },
+        // segmentPrompts["0"] = "scene visual prompt..." — the exact Atlas prompt used
+        segmentPrompts: { type: Map, of: String, default: {} },
+        // scenes[] — full planStoryboardScenes output, persisted after planning phase
+        scenes: { type: mongoose.Schema.Types.Mixed, default: null },
+        // generateMode — 'automatic' | 'manual' (set by client at animate time)
+        generateMode: { type: String, enum: ['automatic', 'manual'], default: 'automatic' },
     },
 
     // ── Analytics counters ──

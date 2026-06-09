@@ -67,7 +67,7 @@ import redis from '../utils/redisClient.js';
 import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
 import { runStoryboardDirector, recreateVideoPrompt } from '../agents/videoStudio/storyboardDirector.js';
 import { generateStoryboardPoster } from '../agents/videoStudio/storyboardFrames.js';
-import { startStoryboardLongForm, getStoryboardLongFormJobStatus, estimateStoryboardLongFormCredits } from '../agents/videoStudio/storyboardLongForm.js';
+import { startStoryboardLongForm, getStoryboardLongFormJobStatus, estimateStoryboardLongFormCredits, stitchSegments } from '../agents/videoStudio/storyboardLongForm.js';
 import { stitchVideoClips } from '../utils/videoStitcher.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -8112,6 +8112,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             avatarUrls: bodyAvatarUrls,
             avatarUrl,
             model = 'seedance-2.0-fast',
+            // Generation mode: 'automatic' (default) | 'manual'
+            generateMode = 'automatic',
         } = req.body;
 
         // Mutable — may be re-signed or overridden by DB copy below
@@ -8347,6 +8349,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 characterRefSheetUrl: dbCharRefSheetUrlSigned || null,
                 // ── Structured plan: director's cuts[] for exact per-segment timing ──
                 structuredPlan: dbStructuredPlan || null,
+                // ── Generation mode (automatic | manual) ──
+                generateMode,
             });
 
             if (projectId) {
@@ -8507,8 +8511,20 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
 
             } else {
                 // IN_PROGRESS — return rich phase info for the frontend progress bar
-                const completedSegs = (jobStatus.segmentStatuses || []).filter(s => s.status === 'completed').length;
-                const totalSegs = (jobStatus.segmentStatuses || []).length;
+                const segStatuses = jobStatus.segmentStatuses || [];
+                const completedSegs = segStatuses.filter(s => s.status === 'completed').length;
+                const totalSegs = segStatuses.length;
+
+                // Build per-segment items with signed URLs for Manual mode gallery
+                const items = await Promise.all(segStatuses.map(async (s, i) => ({
+                    index:    i,
+                    status:   s.status,
+                    progress: s.progress || 0,
+                    videoUrl: s.videoUrl ? await getSignedUrlIfNeeded(s.videoUrl) : null,
+                    prompt:   s.prompt   || '',
+                    duration: s.duration || null,
+                    error:    s.error    || null,
+                })));
 
                 return res.json({
                     success: true, projectId: project._id, allDone: false,
@@ -8516,7 +8532,7 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                     overallProgress: jobStatus.progress || 10,
                     phaseLabel: jobStatus.phaseLabel || 'Generating...',
                     detail: jobStatus.detail || '',
-                    segments: { completed: completedSegs, total: totalSegs },
+                    segments: { completed: completedSegs, total: totalSegs, items },
                     isLongForm: true,
                 });
             }
@@ -8599,6 +8615,208 @@ router.get('/storyboard/history', protect, async (req, res) => {
         res.json({ success: true, projects: signedProjects });
     } catch (err) {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/storyboard/regenerate-segment ──────────────────────
+// Manual mode: re-generate one specific segment with an (optionally edited) prompt.
+// Credits cost = same as storyboardAnimate (one I2V segment).
+router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
+    try {
+        await new Promise((resolve, reject) =>
+            requireCredits('storyboardAnimate')(req, res, (err) => err ? reject(err) : resolve())
+        );
+        if (res.headersSent) return;
+
+        const { projectId, segmentIndex, prompt: userPrompt } = req.body;
+        if (!projectId) return res.status(400).json({ success: false, error: 'projectId required' });
+        const segIdx = parseInt(segmentIndex);
+        if (isNaN(segIdx) || segIdx < 0) return res.status(400).json({ success: false, error: 'Valid segmentIndex required' });
+
+        // Load project
+        const project = await VideoProject.findOne({ _id: projectId, user: req.user._id })
+            .populate('brand', 'name dna').lean();
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        const sb = project.storyboard || {};
+
+        // Resolve the prompt to use
+        const storedPrompts = sb.segmentPrompts || {};
+        const storedScenes  = sb.scenes || [];
+        const basePrompt = userPrompt
+            || storedPrompts[String(segIdx)]
+            || storedScenes[segIdx]?.visualPrompt
+            || sb.videoPrompt
+            || 'Continue the cinematic storyboard sequence.';
+
+        // Determine first frame: for segment 0 use product/avatar, for N>0 use last frame of N-1
+        const storedUrls = sb.segmentUrls || {};
+        let firstFrameUrl = null;
+        if (segIdx === 0) {
+            const productImgs = (project.input?.images || []).map(img => img.url).filter(Boolean);
+            const avatarUrls  = project.input?.avatarUrls || (project.input?.avatarUrl ? [project.input.avatarUrl] : []);
+            firstFrameUrl = productImgs[0] || avatarUrls[0] || null;
+            if (firstFrameUrl) firstFrameUrl = await getSignedUrlIfNeeded(firstFrameUrl);
+        } else {
+            const prevUrl = storedUrls[String(segIdx - 1)];
+            if (prevUrl) {
+                try {
+                    const { extractLastFrameToS3 } = await import('../utils/ffmpegUtils.js');
+                    firstFrameUrl = await extractLastFrameToS3(await getSignedUrlIfNeeded(prevUrl));
+                } catch {
+                    firstFrameUrl = null;
+                }
+            }
+        }
+
+        // Build references (poster + char ref sheet)
+        const posterUrl = sb.imageUrl ? await getSignedUrlIfNeeded(sb.imageUrl) : null;
+        const charRefUrl = sb.characterRefSheetUrl ? await getSignedUrlIfNeeded(sb.characterRefSheetUrl) : null;
+        const references = [
+            ...(posterUrl  ? [{ url: posterUrl,  role: 'style_reference'      }] : []),
+            ...(charRefUrl ? [{ url: charRefUrl, role: 'character_reference'   }] : []),
+        ];
+
+        const duration = storedScenes[segIdx]?.duration || 10;
+        const format   = sb.format || '9:16';
+        const resolution = project.routing?.resolution || '480p';
+        const model = project.routing?.selectedModel || 'seedance-2.0-fast';
+        const qualityMode = model === 'seedance-2.0' ? 'quality' : 'fast';
+
+        console.log(`[SB RegenSeg] Project=${projectId} seg=${segIdx} dur=${duration}s`);
+
+        // Submit to Atlas
+        const { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } = await import('../agents/videoStudio/atlasClient.js');
+        const genResult = await submitAtlasCloudVideoGeneration({
+            prompt:          basePrompt,
+            imageUrl:        firstFrameUrl || null,
+            duration,
+            aspectRatio:     format,
+            generateAudio:   true,
+            referenceImages: references.slice(0, 6),
+            qualityMode,
+            resolution,
+            imageRole: 'mixed',
+        });
+
+        const taskId = genResult.taskId || genResult.requestId;
+
+        // Poll to completion (max 12 min)
+        const maxMs = 12 * 60 * 1000;
+        const start = Date.now();
+        let newVideoUrl = null;
+        while (Date.now() - start < maxMs) {
+            await new Promise(r => setTimeout(r, 6000));
+            const status = await getAtlasCloudGenerationStatus(taskId);
+            if (status.status === 'COMPLETED' && status.videoUrl) {
+                newVideoUrl = status.videoUrl;
+                break;
+            }
+            if (status.status === 'FAILED') {
+                throw new Error(`Segment ${segIdx + 1} regeneration failed: ${status.error || 'unknown'}`);
+            }
+        }
+        if (!newVideoUrl) throw new Error(`Segment ${segIdx + 1} regeneration timed out`);
+
+        // Persist new URL + prompt
+        await VideoProject.findByIdAndUpdate(projectId, {
+            [`storyboard.segmentUrls.${segIdx}`]:    newVideoUrl,
+            [`storyboard.segmentPrompts.${segIdx}`]: basePrompt,
+        });
+
+        // Also update in-memory job if still alive
+        if (sb.longFormJobId) {
+            const jobStatus = getStoryboardLongFormJobStatus(sb.longFormJobId);
+            if (jobStatus?.segmentStatuses?.[segIdx]) {
+                jobStatus.segmentStatuses[segIdx] = {
+                    status: 'completed', progress: 100,
+                    videoUrl: newVideoUrl, prompt: basePrompt, duration,
+                };
+            }
+        }
+
+        const signedUrl = await getSignedUrlIfNeeded(newVideoUrl);
+        console.log(`[SB RegenSeg] ✅ Seg ${segIdx + 1} regenerated: ${signedUrl.substring(0, 80)}`);
+        res.json({ success: true, segmentIndex: segIdx, videoUrl: signedUrl, prompt: basePrompt });
+
+    } catch (err) {
+        console.error('[SB RegenSeg] Error:', err.message);
+        if (!res.headersSent) {
+            if (req.creditsDeducted > 0) {
+                await refundCredits(req.user._id, req.creditsDeducted, 'storyboardRegenRefund', `Regen seg failed: ${safeErrorMessage(err)}`, 'video').catch(() => {});
+            }
+            res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        }
+    }
+});
+
+// ── POST /api/video-studio/storyboard/compile ─────────────────────────────────
+// Manual mode: stitch all ready segment URLs from MongoDB into a final MP4.
+// Does NOT require any credits — stitching is free (segments already paid for).
+// Allows partial compile (skips null slots, warns user).
+router.post('/storyboard/compile', protect, async (req, res) => {
+    const fs = (await import('fs')).default;
+    let tmpDir = null;
+    try {
+        const { projectId } = req.body;
+        if (!projectId) return res.status(400).json({ success: false, error: 'projectId required' });
+
+        const project = await VideoProject.findOne({ _id: projectId, user: req.user._id }).lean();
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+
+        const sb = project.storyboard || {};
+        const segmentUrls = sb.segmentUrls || {};
+
+        // Build ordered list of available segment URLs
+        const indices = Object.keys(segmentUrls).map(Number).sort((a, b) => a - b);
+        if (indices.length === 0) {
+            return res.status(400).json({ success: false, error: 'No completed segments to compile' });
+        }
+
+        // Sign all segment URLs
+        const orderedUrls = await Promise.all(
+            indices.map(i => getSignedUrlIfNeeded(segmentUrls[String(i)]))
+        );
+
+        const format = sb.format || '9:16';
+        console.log(`[SB Compile] Project=${projectId} | ${orderedUrls.length} segments | format=${format}`);
+
+        // Download + stitch
+        const { filePath, tmpDir: dir } = await stitchSegments(orderedUrls, format, String(projectId).slice(-6));
+        tmpDir = dir;
+
+        // Upload to S3
+        const { uploadToS3 } = await import('../utils/s3.js');
+        const finalBuffer = fs.readFileSync(filePath);
+        const s3Key = `storyboard/longform/${projectId}/manual-compile-${Date.now()}.mp4`;
+        const finalVideoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
+
+        // Persist to DB
+        await VideoProject.findByIdAndUpdate(projectId, {
+            'storyboard.finalVideoUrl': finalVideoUrl,
+            'storyboard.status': 'done',
+            'storyboard.progress': 100,
+            status: 'done',
+            finalVideoUrl,
+        });
+
+        const signedFinal = await getSignedUrlIfNeeded(finalVideoUrl);
+        console.log(`[SB Compile] ✅ Done — ${signedFinal.substring(0, 80)}`);
+
+        res.json({
+            success: true,
+            projectId,
+            finalVideoUrl: signedFinal,
+            segmentsCompiled: orderedUrls.length,
+        });
+
+    } catch (err) {
+        console.error('[SB Compile] Error:', err.message);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    } finally {
+        if (tmpDir) {
+            try { (await import('fs')).default.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+        }
     }
 });
 

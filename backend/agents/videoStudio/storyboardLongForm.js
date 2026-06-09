@@ -147,6 +147,8 @@ export function startStoryboardLongForm({
     characterRefSheetUrl = null,
     // Structured 4-section plan from storyboardDirector (contains cuts[] with exact timings)
     structuredPlan = null,
+    // Generation mode — 'automatic' | 'manual'
+    generateMode = 'automatic',
 }) {
     const jobId = `sb-lf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -176,7 +178,7 @@ export function startStoryboardLongForm({
         voiceoverScript, voiceoverLanguage, bgmPreset,
         avatarUrls, avatarNames, refImageUrls,
         includeBranding, characterRefSheetUrl,
-        structuredPlan,
+        structuredPlan, generateMode,
     }).catch(err => {
         const j = activeJobs.get(jobId);
         if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
@@ -381,6 +383,18 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         _setProgress(jobId, 'PLANNING', `${actualSegCount} segments planned`, 100);
         console.log(`[SB LongForm ${jobId}] 📋 Segment plan: ${sceneDurations.map((d, i) => `#${i+1}(${d}s)`).join(' → ')}`);
 
+        // Persist scenes[] to MongoDB so compile/regen endpoints work after server restart
+        if (params.projectId) {
+            try {
+                const mongoose = (await import('mongoose')).default;
+                const VideoProject = mongoose.model('VideoProject');
+                await VideoProject.findByIdAndUpdate(params.projectId, {
+                    'storyboard.scenes': scenes,
+                    'storyboard.generateMode': params.generateMode || 'automatic',
+                });
+            } catch (e) { console.warn(`[SB LongForm ${jobId}] ⚠️ Failed to persist scenes to DB: ${e.message}`); }
+        }
+
         if (job.cancelled) throw new Error('Cancelled by user');
 
         // ═══ Phase 2: Sequential I2V Generation ══════════════════════════════
@@ -461,14 +475,32 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
                 const videoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
 
+                const segPromptUsed = scenes[i]?.visualPrompt || params.videoPrompt || '';
                 segmentVideoUrls[i] = videoUrl;
-                job.segmentStatuses[i] = { status: 'completed', progress: 100, videoUrl };
+                job.segmentStatuses[i] = {
+                    status: 'completed', progress: 100, videoUrl,
+                    prompt: segPromptUsed,
+                    duration: sceneDurations[i],
+                };
                 completedCount++;
 
                 _setProgress(jobId, 'GENERATING',
                     `${completedCount}/${actualSegCount} segments done`,
                     (completedCount / actualSegCount) * 100,
                 );
+
+                // ── Gap 5 fix: persist segment URL + prompt immediately to MongoDB ──
+                // This allows compile endpoint and regen to work even after server restart.
+                if (params.projectId) {
+                    try {
+                        const mongoose = (await import('mongoose')).default;
+                        const VideoProject = mongoose.model('VideoProject');
+                        await VideoProject.findByIdAndUpdate(params.projectId, {
+                            [`storyboard.segmentUrls.${i}`]: videoUrl,
+                            [`storyboard.segmentPrompts.${i}`]: segPromptUsed,
+                        });
+                    } catch (e) { console.warn(`[SB LongForm ${jobId}] ⚠️ Failed to persist seg ${i+1} to DB: ${e.message}`); }
+                }
 
                 if (i < actualSegCount - 1) {
                     try {
@@ -510,9 +542,26 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         });
                     }
                     const retryUrl = await _pollSegment(retryResult, jobId, i, actualSegCount);
+                    const segPromptUsedRetry = scenes[i]?.visualPrompt || params.videoPrompt || '';
                     segmentVideoUrls[i] = retryUrl;
-                    job.segmentStatuses[i] = { status: 'completed', progress: 100, videoUrl: retryUrl };
+                    job.segmentStatuses[i] = {
+                        status: 'completed', progress: 100, videoUrl: retryUrl,
+                        prompt: segPromptUsedRetry,
+                        duration: sceneDurations[i],
+                    };
                     completedCount++;
+
+                    // Persist retry success to MongoDB immediately
+                    if (params.projectId) {
+                        try {
+                            const mongoose = (await import('mongoose')).default;
+                            const VideoProject = mongoose.model('VideoProject');
+                            await VideoProject.findByIdAndUpdate(params.projectId, {
+                                [`storyboard.segmentUrls.${i}`]: retryUrl,
+                                [`storyboard.segmentPrompts.${i}`]: segPromptUsedRetry,
+                            });
+                        } catch (e) { console.warn(`[SB LongForm ${jobId}] ⚠️ Failed to persist retry seg ${i+1}: ${e.message}`); }
+                    }
 
                     if (i < actualSegCount - 1) {
                         try { lastFrameUrl = await extractLastFrameToS3(retryUrl); }
@@ -745,4 +794,36 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
 
     console.log(`[SB LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
     return outputPath;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public: stitchSegments
+// Used by POST /storyboard/compile to manually stitch already-generated segments
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Download + FFmpeg-stitch an ordered list of segment video URLs into one MP4.
+ * Returns the path to the stitched file in a temp directory.
+ * Caller is responsible for cleanup.
+ *
+ * @param {string[]} segmentUrls   — ordered list of video URLs to stitch
+ * @param {string}   format        — '9:16' | '16:9' | '1:1'
+ * @param {string}   [label]       — label for log lines (e.g. projectId)
+ * @returns {Promise<{ filePath: string, tmpDir: string }>}
+ */
+export async function stitchSegments(segmentUrls, format = '9:16', label = 'manual-compile') {
+    const tmpDir = path.join(os.tmpdir(), `sb-compile-${label}-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    // Download all segments
+    const segPaths = [];
+    for (let i = 0; i < segmentUrls.length; i++) {
+        const segPath = path.join(tmpDir, `seg-${i + 1}.mp4`);
+        const resp = await fetch(segmentUrls[i], { signal: AbortSignal.timeout(120000) });
+        if (!resp.ok) throw new Error(`Failed to download segment ${i + 1}: ${resp.status}`);
+        fs.writeFileSync(segPath, Buffer.from(await resp.arrayBuffer()));
+        segPaths.push(segPath);
+    }
+
+    const stitchedPath = await _stitchWithCrossfade(tmpDir, segPaths, format, [], label);
+    return { filePath: stitchedPath, tmpDir };
 }
