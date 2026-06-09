@@ -309,7 +309,8 @@ export const requireCredits = (actionOrCost = 1) => {
                     },
                 }).catch(err => console.warn('Credit usage log (bypass) failed:', err.message));
 
-                req.creditsDeducted = cost;
+                req.creditsDeducted = 0;
+                req.creditsBypassed = cost;
                 return next();
             }
 
@@ -660,13 +661,25 @@ export { MODEL_COSTS };
 export const refundCredits = async (userId, amount, actionName, description, studio = 'unknown', metadata = {}) => {
     if (!userId || !amount || amount <= 0) return;
     try {
+        // Query the user to verify roles and activeSubscription
+        const user = await User.findById(userId).select('activeSubscription credits role plan email');
+        if (!user) {
+            console.warn(`❌ [REFUND] User ${userId} not found, skipping refund.`);
+            return;
+        }
+
+        // Bypass checks for exempt users: never refund since they never paid credits
+        const isCreditExempt = user.role === 'superadmin' || user.plan === 'enterprise';
+        if (isCreditExempt) {
+            console.log(`🛡️ [REFUND] Skipping refund for credit-exempt user ${user.email || userId} (Role: ${user.role}, Plan: ${user.plan})`);
+            return;
+        }
+
         const updateOps = [
             User.findByIdAndUpdate(userId, { $inc: { 'credits.used': -amount } }, { returnDocument: 'after' })
         ];
 
-        // We need the user to check activeSubscription
-        const user = await User.findById(userId).select('activeSubscription credits');
-        if (user?.activeSubscription) {
+        if (user.activeSubscription) {
             const Subscription = (await import('../models/Subscription.js')).default;
             updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': -amount } }));
         }
