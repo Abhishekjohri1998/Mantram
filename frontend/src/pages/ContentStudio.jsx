@@ -4055,7 +4055,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 // ============================================================================
 
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, inlineVisualError, brandId }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, abTestError, copiedVariant, expandedVariants, publishVariant, onCopyVariant, onToggleVariantExpand, onUseVariantAsMain, onSetPublishVariant, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, inlineVisualError, brandId }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -4270,16 +4270,16 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                         abTestData={abTestData}
                         copiedVariant={copiedVariant}
                         expandedVariants={expandedVariants}
-                        onCopy={handleCopyVariant}
-                        onToggleExpand={toggleVariantExpand}
-                        onUseAsMain={handleUseVariantAsMain}
-                        onPublish={(content) => setPublishVariant(content)}
+                        onCopy={onCopyVariant}
+                        onToggleExpand={onToggleVariantExpand}
+                        onUseAsMain={onUseVariantAsMain}
+                        onPublish={(content) => onSetPublishVariant(content)}
                     />
                 )}
                 {publishVariant && (
                     <PublishModal
                         isOpen={!!publishVariant}
-                        onClose={() => setPublishVariant(null)}
+                        onClose={() => onSetPublishVariant(null)}
                         defaultText={publishVariant}
                         defaultImage={null}
                         brandId={activeBrand?._id}
@@ -4530,16 +4530,16 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     abTestData={abTestData}
                     copiedVariant={copiedVariant}
                     expandedVariants={expandedVariants}
-                    onCopy={handleCopyVariant}
-                    onToggleExpand={toggleVariantExpand}
-                    onUseAsMain={handleUseVariantAsMain}
-                    onPublish={(content) => setPublishVariant(content)}
+                    onCopy={onCopyVariant}
+                    onToggleExpand={onToggleVariantExpand}
+                    onUseAsMain={onUseVariantAsMain}
+                    onPublish={(content) => onSetPublishVariant(content)}
                 />
             )}
             {publishVariant && (
                 <PublishModal
                     isOpen={!!publishVariant}
-                    onClose={() => setPublishVariant(null)}
+                    onClose={() => onSetPublishVariant(null)}
                     defaultText={publishVariant}
                     defaultImage={null}
                     brandId={activeBrand?._id}
@@ -6139,6 +6139,14 @@ SPOKESPERSON QUOTES:`
                         onABTest={handleABTest}
                         abTestData={abTestData}
                         abTestLoading={abTestLoading}
+                        abTestError={abTestError}
+                        copiedVariant={copiedVariant}
+                        expandedVariants={expandedVariants}
+                        publishVariant={publishVariant}
+                        onCopyVariant={handleCopyVariant}
+                        onToggleVariantExpand={toggleVariantExpand}
+                        onUseVariantAsMain={handleUseVariantAsMain}
+                        onSetPublishVariant={setPublishVariant}
                         inlineVisualUrl={inlineVisualUrl}
                         inlineVisualActive={inlineVisualActive}
                         inlineVisualProgress={inlineVisualProgress}
