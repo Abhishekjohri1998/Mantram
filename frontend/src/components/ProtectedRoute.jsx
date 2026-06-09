@@ -1,11 +1,14 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useBrand } from '../context/BrandContext'
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-    const { user, isAuthenticated, loading } = useAuth()
+    const { user, isAuthenticated, loading: authLoading } = useAuth()
+    const { activeBrand, initialized: brandInitialized, isBrandOnboarded } = useBrand()
     const location = useLocation()
 
-    if (loading) {
+    // 1. If auth is loading, show spinner
+    if (authLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c16' }}>
                 <div className="text-center space-y-4">
@@ -16,20 +19,32 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         )
     }
 
+    // 2. If not authenticated, redirect to login page immediately
     if (!isAuthenticated) {
         const redirectPath = location.pathname + location.search
         return <Navigate to={`/auth?redirect=${encodeURIComponent(redirectPath)}`} replace />
     }
 
-    // Check role if allowedRoles is provided
+    // 3. If authenticated, wait for brand context to load
+    if (!brandInitialized) {
+        return (
+            <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c16' }}>
+                <div className="text-center space-y-4">
+                    <span className="material-symbols-outlined text-primary text-5xl animate-spin">progress_activity</span>
+                    <p className="text-[var(--sys-text-muted)] text-sm">Loading brand context...</p>
+                </div>
+            </div>
+        )
+    }
+
+    // 4. Check role if allowedRoles is provided
     if (allowedRoles && !allowedRoles.includes(user?.role)) {
         return <Navigate to="/templates" replace />
     }
 
-    // --- Onboarding Enforcement ---
-    // If user has NO brands, they MUST go through onboarding before accessing any other tool.
-    // Exclude certain paths to prevent infinite loops or allow basic account management.
-    const hasBrand = (user?.brandCount ?? 0) > 0;
+    // 5. Onboarding Enforcement
+    // Check if the user has an active brand and if it is fully onboarded (contains DNA/Knowledge)
+    const hasOnboardedBrand = activeBrand && isBrandOnboarded(activeBrand);
     const isWhitelisted = [
         '/onboarding',
         '/settings',
@@ -43,8 +58,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         '/privacy-policy'
     ].some(path => location.pathname.startsWith(path));
 
-    if (!hasBrand && !isWhitelisted) {
-        console.log('🔄 No brands found, redirecting to onboarding...');
+    if (!hasOnboardedBrand && !isWhitelisted) {
+        console.log('🔄 Active brand not onboarded, redirecting to onboarding...');
         return <Navigate to="/onboarding" replace />;
     }
 

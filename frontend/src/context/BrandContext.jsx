@@ -7,6 +7,20 @@ import { useBrandSession } from '../hooks/useBrandSession.js';
 const BrandContext = createContext(null);
 const STORAGE_KEY = 'mantram_active_brand';
 
+export function isBrandOnboarded(brand) {
+    if (!brand) return false;
+    const hasDna = brand.dna && (
+        (brand.dna.colors && brand.dna.colors.length > 0) ||
+        (brand.dna.voice && brand.dna.voice.personality) ||
+        brand.dna.photographyStyle ||
+        brand.dna.companyOverview
+    );
+    const hasKnowledge = brand.knowledge &&
+                         brand.knowledge.entries &&
+                         brand.knowledge.entries.length > 0;
+    return !!(hasDna || hasKnowledge);
+}
+
 export function BrandProvider({ children }) {
     const { isAuthenticated, user, refreshUser } = useAuth();
     const navigate = useNavigate();
@@ -14,6 +28,7 @@ export function BrandProvider({ children }) {
     const [brands, setBrands] = useState([]);
     const [activeBrand, setActiveBrandState] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [initialized, setInitialized] = useState(false);
     const initializedRef = useRef(false);
     const prevBrandIdRef = useRef(null);
 
@@ -151,10 +166,19 @@ export function BrandProvider({ children }) {
             console.error('Failed to fetch brands:', err);
         } finally {
             setLoading(false);
+            setInitialized(true);
         }
     }, [isAuthenticated, setActiveBrand, restoreSession, navigate, refreshUser]);
 
-    useEffect(() => { fetchBrands(); }, [fetchBrands]);
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setInitialized(false);
+            setBrands([]);
+            setActiveBrandState(null);
+        } else {
+            fetchBrands();
+        }
+    }, [fetchBrands, isAuthenticated]);
 
     /**
      * selectBrand — called from Header when user picks a brand
@@ -231,7 +255,7 @@ export function BrandProvider({ children }) {
 
     return (
         <BrandContext.Provider value={{
-            brands, activeBrand, loading,
+            brands, activeBrand, loading, initialized, isBrandOnboarded,
             hasBrands: brands.length > 0,
             selectBrand, addBrand, updateBrand, updateBrandDNA, deleteBrand, fetchBrands,
             // Session helpers — exposed so Video Studio / other modules can save jobs
