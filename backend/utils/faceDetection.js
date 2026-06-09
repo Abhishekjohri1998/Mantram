@@ -1,12 +1,11 @@
 import * as faceapi from '@vladmandic/face-api';
-import canvas from 'canvas';
+import { Canvas, Image, ImageData, loadImage, createCanvas } from '@napi-rs/canvas';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { uploadToS3 } from './s3.js';
 
 // Setup canvas for Node environment
-const { Canvas, Image, ImageData } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,7 +59,7 @@ export async function detectAndClusterFaces(frames, videoId) {
             const frame = frames[i];
             if (!frame.localBuffer) continue;
 
-            const img = await canvas.loadImage(frame.localBuffer);
+            const img = await loadImage(frame.localBuffer);
             
             // Detect all faces in the image
             const detections = await faceapi.detectAllFaces(img)
@@ -81,7 +80,7 @@ export async function detectAndClusterFaces(frames, videoId) {
                 const w = Math.min(img.width - x, box.width + pad * 2);
                 const h = Math.min(img.height - y, box.height + pad * 2);
 
-                const faceCanvas = canvas.createCanvas(w, h);
+                const faceCanvas = createCanvas(w, h);
                 const ctx = faceCanvas.getContext('2d');
                 ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
                 
