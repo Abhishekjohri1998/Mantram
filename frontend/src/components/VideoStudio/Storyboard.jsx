@@ -149,7 +149,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const [includeBranding, setIncludeBranding] = useState(true);
     const [defaultStyle, setDefaultStyle] = useState('hyperrealistic');
     const [format, setFormat] = useState('9:16');
-    const [duration, setDuration] = useState(5);
+    const [duration, setDuration] = useState(10);
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('480p');
     const [directorModel, setDirectorModel] = useState('claude');
@@ -595,25 +595,35 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-    // ── Manual mode: Regenerate one segment ──
+    // ── Manual mode: Regenerate one segment (async — backend responds immediately) ──
     const handleRegenSegment = useCallback(async (segIdx) => {
         if (!projectIdRef.current) return;
         setRegenSegIdx(segIdx);
+        // Optimistically mark card as generating so user gets instant feedback
+        setSegmentItems(prev => prev.map((item, i) =>
+            i === segIdx ? { ...item, status: 'generating', videoUrl: null, progress: 0 } : item
+        ));
         try {
-            const prompt = editedPrompts[segIdx] || segmentItems[segIdx]?.prompt || '';
+            const prompt = editedPrompts[segIdx] !== undefined
+                ? editedPrompts[segIdx]
+                : (segmentItems[segIdx]?.prompt || '');
             const res = await fetch(`${API}/storyboard/regenerate-segment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
                 body: JSON.stringify({ projectId: projectIdRef.current, segmentIndex: segIdx, prompt }),
             });
             const data = await safeJson(res);
-            if (!data.success) throw new Error(data.error || 'Regeneration failed');
-            // Update the local segment item
-            setSegmentItems(prev => prev.map((item, i) =>
-                i === segIdx ? { ...item, videoUrl: data.videoUrl, prompt: data.prompt, status: 'completed' } : item
-            ));
+            if (!data.success) throw new Error(data.error || 'Regeneration failed to start');
+            // Backend is now polling Atlas in the background.
+            // Our existing polling loop (startPolling) will call /storyboard/status every 10s
+            // and update segmentItems via segments.items[] when the segment completes.
+            // Nothing more to do here except clear the local "regen in progress" flag.
         } catch (e) {
             setError(e.message);
+            // Restore previous status on error
+            setSegmentItems(prev => prev.map((item, i) =>
+                i === segIdx ? { ...item, status: 'failed', error: e.message } : item
+            ));
         } finally {
             setRegenSegIdx(null);
         }

@@ -8619,8 +8619,9 @@ router.get('/storyboard/history', protect, async (req, res) => {
 });
 
 // ── POST /api/video-studio/storyboard/regenerate-segment ──────────────────────
-// Manual mode: re-generate one specific segment with an (optionally edited) prompt.
-// Credits cost = same as storyboardAnimate (one I2V segment).
+// Manual mode: re-generate one segment with an (optionally edited) prompt.
+// ASYNC — responds immediately; background job persists result to MongoDB.
+// Frontend polls /storyboard/status/:id to pick up the updated segmentUrls.
 router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
     try {
         await new Promise((resolve, reject) =>
@@ -8683,10 +8684,9 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
         const model = project.routing?.selectedModel || 'seedance-2.0-fast';
         const qualityMode = model === 'seedance-2.0' ? 'quality' : 'fast';
 
-        console.log(`[SB RegenSeg] Project=${projectId} seg=${segIdx} dur=${duration}s`);
+        console.log(`[SB RegenSeg] Project=${projectId} seg=${segIdx} dur=${duration}s — submitting async`);
 
-        // Submit to Atlas
-        const { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus } = await import('../agents/videoStudio/atlasClient.js');
+        // Submit to Atlas — uses statically imported submitAtlasCloudVideoGeneration
         const genResult = await submitAtlasCloudVideoGeneration({
             prompt:          basePrompt,
             imageUrl:        firstFrameUrl || null,
@@ -8701,50 +8701,61 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
 
         const taskId = genResult.taskId || genResult.requestId;
 
-        // Poll to completion (max 12 min)
-        const maxMs = 12 * 60 * 1000;
-        const start = Date.now();
-        let newVideoUrl = null;
-        while (Date.now() - start < maxMs) {
-            await new Promise(r => setTimeout(r, 6000));
-            const status = await getAtlasCloudGenerationStatus(taskId);
-            if (status.status === 'COMPLETED' && status.videoUrl) {
-                newVideoUrl = status.videoUrl;
-                break;
-            }
-            if (status.status === 'FAILED') {
-                throw new Error(`Segment ${segIdx + 1} regeneration failed: ${status.error || 'unknown'}`);
-            }
-        }
-        if (!newVideoUrl) throw new Error(`Segment ${segIdx + 1} regeneration timed out`);
-
-        // Persist new URL + prompt
+        // Mark segment as 'regenerating' in MongoDB immediately
+        const longFormJobId = sb.longFormJobId;
         await VideoProject.findByIdAndUpdate(projectId, {
-            [`storyboard.segmentUrls.${segIdx}`]:    newVideoUrl,
+            [`storyboard.segmentUrls.${segIdx}`]:    null,
             [`storyboard.segmentPrompts.${segIdx}`]: basePrompt,
         });
 
-        // Also update in-memory job if still alive
-        if (sb.longFormJobId) {
-            const jobStatus = getStoryboardLongFormJobStatus(sb.longFormJobId);
+        // Update in-memory job if still alive
+        if (longFormJobId) {
+            const jobStatus = getStoryboardLongFormJobStatus(longFormJobId);
             if (jobStatus?.segmentStatuses?.[segIdx]) {
-                jobStatus.segmentStatuses[segIdx] = {
-                    status: 'completed', progress: 100,
-                    videoUrl: newVideoUrl, prompt: basePrompt, duration,
-                };
+                jobStatus.segmentStatuses[segIdx] = { status: 'generating', progress: 0, prompt: basePrompt, duration };
             }
         }
 
-        const signedUrl = await getSignedUrlIfNeeded(newVideoUrl);
-        console.log(`[SB RegenSeg] ✅ Seg ${segIdx + 1} regenerated: ${signedUrl.substring(0, 80)}`);
-        res.json({ success: true, segmentIndex: segIdx, videoUrl: signedUrl, prompt: basePrompt });
+        // Respond immediately — client polls /storyboard/status/:id
+        res.json({ success: true, segmentIndex: segIdx, taskId, status: 'regenerating', prompt: basePrompt });
+
+        // Background: poll Atlas → persist → update in-memory
+        ;(async () => {
+            const maxMs = 12 * 60 * 1000;
+            const start = Date.now();
+            let newVideoUrl = null;
+            try {
+                while (Date.now() - start < maxMs) {
+                    await new Promise(r => setTimeout(r, 6000));
+                    const status = await pollAtlasCloudStatus(taskId);
+                    if (status.status === 'COMPLETED' && status.videoUrl) { newVideoUrl = status.videoUrl; break; }
+                    if (status.status === 'FAILED') throw new Error(status.error || 'unknown');
+                }
+                if (!newVideoUrl) throw new Error('timed out');
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    [`storyboard.segmentUrls.${segIdx}`]: newVideoUrl,
+                });
+                if (longFormJobId) {
+                    const jb = getStoryboardLongFormJobStatus(longFormJobId);
+                    if (jb?.segmentStatuses?.[segIdx]) {
+                        jb.segmentStatuses[segIdx] = { status: 'completed', progress: 100, videoUrl: newVideoUrl, prompt: basePrompt, duration };
+                    }
+                }
+                console.log(`[SB RegenSeg] ✅ Seg ${segIdx + 1} done`);
+            } catch (bgErr) {
+                console.error(`[SB RegenSeg] ❌ Seg ${segIdx + 1} bg failed: ${bgErr.message}`);
+                if (longFormJobId) {
+                    const jb = getStoryboardLongFormJobStatus(longFormJobId);
+                    if (jb?.segmentStatuses?.[segIdx]) jb.segmentStatuses[segIdx] = { status: 'failed', error: bgErr.message, prompt: basePrompt, duration };
+                }
+                refundCredits(req.user._id, req.creditsDeducted || 0, 'storyboardRegenRefund', `Regen seg ${segIdx + 1} failed: ${bgErr.message}`, 'video').catch(() => {});
+            }
+        })();
 
     } catch (err) {
         console.error('[SB RegenSeg] Error:', err.message);
         if (!res.headersSent) {
-            if (req.creditsDeducted > 0) {
-                await refundCredits(req.user._id, req.creditsDeducted, 'storyboardRegenRefund', `Regen seg failed: ${safeErrorMessage(err)}`, 'video').catch(() => {});
-            }
+            if (req.creditsDeducted > 0) await refundCredits(req.user._id, req.creditsDeducted, 'storyboardRegenRefund', `Regen seg setup failed`, 'video').catch(() => {});
             res.status(500).json({ success: false, error: safeErrorMessage(err) });
         }
     }
@@ -8752,10 +8763,8 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
 
 // ── POST /api/video-studio/storyboard/compile ─────────────────────────────────
 // Manual mode: stitch all ready segment URLs from MongoDB into a final MP4.
-// Does NOT require any credits — stitching is free (segments already paid for).
-// Allows partial compile (skips null slots, warns user).
+// Free of credits — segments are already paid for. Skips null/empty slots.
 router.post('/storyboard/compile', protect, async (req, res) => {
-    const fs = (await import('fs')).default;
     let tmpDir = null;
     try {
         const { projectId } = req.body;
@@ -8767,8 +8776,11 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         const sb = project.storyboard || {};
         const segmentUrls = sb.segmentUrls || {};
 
-        // Build ordered list of available segment URLs
-        const indices = Object.keys(segmentUrls).map(Number).sort((a, b) => a - b);
+        // Build ordered list of available segment URLs (skip null/empty slots)
+        const indices = Object.keys(segmentUrls)
+            .map(Number)
+            .filter(i => !!segmentUrls[String(i)])
+            .sort((a, b) => a - b);
         if (indices.length === 0) {
             return res.status(400).json({ success: false, error: 'No completed segments to compile' });
         }
@@ -8785,8 +8797,7 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         const { filePath, tmpDir: dir } = await stitchSegments(orderedUrls, format, String(projectId).slice(-6));
         tmpDir = dir;
 
-        // Upload to S3
-        const { uploadToS3 } = await import('../utils/s3.js');
+        // Upload to S3 (statically imported at top of file)
         const finalBuffer = fs.readFileSync(filePath);
         const s3Key = `storyboard/longform/${projectId}/manual-compile-${Date.now()}.mp4`;
         const finalVideoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
@@ -8815,7 +8826,7 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
     } finally {
         if (tmpDir) {
-            try { (await import('fs')).default.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+            try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
         }
     }
 });
