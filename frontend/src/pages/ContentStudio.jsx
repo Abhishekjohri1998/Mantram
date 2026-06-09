@@ -5028,21 +5028,24 @@ export default function ContentStudio() {
             langStyle: data.langStyle || 'pure',
             scriptType: data.scriptType || 'regional',
             researchDepth: data.researchDepth || 'quick',
-        }, directContext) // pass context directly to bypass stale state
+        }, directContext, data.channel) // pass context and channel directly to bypass stale state
     }
 
     // Build the full prompt from all selections
     // contextOverride: pass context explicitly to avoid React setState async race conditions
-    const buildPrompt = (settings, contextOverride) => {
+    // channelOverride: pass channel explicitly to avoid React setState async race conditions
+    const buildPrompt = (settings, contextOverride, channelOverride) => {
         // Use passed settings directly (React setState is async, can't rely on toneSettings state here)
         const ts = settings || toneSettings || {}
         // Use contextOverride if provided — avoids race with setContext()/setState being async
         const effectiveContext = contextOverride !== undefined ? contextOverride : context
+        // Use channelOverride if provided — avoids race with setChannel()/setState being async
+        const effectiveChannel = channelOverride !== undefined ? channelOverride : channel
         const goalData = GOALS.find(g => g.id === goal)
         const subTypeData = goalData?.subTypes.find(s => s.id === subType)
-        const channelName = Array.isArray(channel)
-            ? channel.map(c => CHANNELS.find(ch => ch.id === c)?.label).join(', ')
-            : CHANNELS.find(c => c.id === channel)?.label || channel
+        const channelName = Array.isArray(effectiveChannel)
+            ? effectiveChannel.map(c => CHANNELS.find(ch => ch.id === c)?.label).join(', ')
+            : CHANNELS.find(c => c.id === effectiveChannel)?.label || effectiveChannel
         const toneLabel = TONES.find(t => t.id === ts.tone)?.label || ''
         const lengthLabel = LENGTHS.find(l => l.id === ts.length)?.label || ''
 
@@ -5096,26 +5099,26 @@ export default function ContentStudio() {
         }
 
         // Platform-specific auto-optimization
-        if (channel === 'instagram' || (Array.isArray(channel) && channel.includes('instagram'))) {
+        if (effectiveChannel === 'instagram' || (Array.isArray(effectiveChannel) && effectiveChannel.includes('instagram'))) {
             prompt += '\nAuto-include: caption, relevant hashtags (5-8), CTA, emoji styling appropriate for Instagram.'
         }
-        if (channel === 'linkedin' || (Array.isArray(channel) && channel.includes('linkedin'))) {
+        if (effectiveChannel === 'linkedin' || (Array.isArray(effectiveChannel) && effectiveChannel.includes('linkedin'))) {
             prompt += '\nAuto-include: professional hook, thought leadership angle, professional CTA.'
         }
-        if (channel === 'twitter' || (Array.isArray(channel) && channel.includes('twitter'))) {
+        if (effectiveChannel === 'twitter' || (Array.isArray(effectiveChannel) && effectiveChannel.includes('twitter'))) {
             prompt += '\nAuto-include: concise text under 280 chars, relevant hashtags (2-3), punchy hook.'
         }
-        if (channel === 'email' || (Array.isArray(channel) && channel.includes('email'))) {
+        if (effectiveChannel === 'email' || (Array.isArray(effectiveChannel) && effectiveChannel.includes('email'))) {
             prompt += '\nAuto-include: subject line, preview text, body copy, CTA button text.'
         }
-        if (channel === 'ecommerce' || (Array.isArray(channel) && channel.includes('ecommerce'))) {
+        if (effectiveChannel === 'ecommerce' || (Array.isArray(effectiveChannel) && effectiveChannel.includes('ecommerce'))) {
             prompt += '\nAuto-include: product title, bullet features, SEO description, key specs.'
         }
 
         return prompt
     }
 
-    const handleGenerate = async (settings, contextOverride) => {
+    const handleGenerate = async (settings, contextOverride, channelOverride) => {
         setToneSettings(settings)
         if (!activeBrand) { setError({ message: 'Please select a brand first.', isProviderError: false }); return }
         setGenerating(true)
@@ -5123,7 +5126,8 @@ export default function ContentStudio() {
         setPipelineSteps([])
         setGeneratingStartedAt(Date.now())
 
-        const prompt = buildPrompt(settings, contextOverride)
+        const effectiveChannel = channelOverride !== undefined ? channelOverride : channel
+        const prompt = buildPrompt(settings, contextOverride, channelOverride)
         const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
         try {
             // ── Phase 3: SSE streaming pipeline ──
@@ -5137,7 +5141,7 @@ export default function ContentStudio() {
                     brandId: activeBrand._id,
                     brief: prompt,
                     contentType: goal,
-                    platform: Array.isArray(channel) ? channel.join(',') : channel,
+                    platform: Array.isArray(effectiveChannel) ? effectiveChannel.join(',') : effectiveChannel,
                     tone: settings.tone || 'bold',
                     language: settings.language || 'english',
                     targetAudience: activeBrand?.dna?.targetAudience || '',

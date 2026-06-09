@@ -218,12 +218,32 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
-    const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
-        signal: AbortSignal.timeout(timeoutMs),
+    let response;
+    let tryB64 = true;
+    
+    try {
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
+            signal: AbortSignal.timeout(timeoutMs),
         }));
+        if (!response.ok) {
+            tryB64 = false;
+        }
+    } catch (err) {
+        tryB64 = false;
+    }
+
+    if (!tryB64) {
+        console.log(`⚠️  [LaoZhang] b64_json image generation failed or unsupported, retrying with response_format='url'...`);
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
+            signal: AbortSignal.timeout(timeoutMs),
+        }));
+    }
 
     if (!response.ok) {
         const errText = await response.text();
@@ -241,6 +261,10 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     // Auto-upload base64 to S3 to avoid massive strings in frontend/DB
     const finalUrl = await ensureS3Url(rawUrl, 'studio/laozhang');
     
+    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
+        throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
+    }
+
     console.log(`✅ [LaoZhang] Image generated via ${model} (${imageUrl ? 'URL' : 'base64'})${finalUrl !== rawUrl ? ' -> Uploaded to S3' : ''}`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }
@@ -335,6 +359,10 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
     // Auto-upload base64 to S3
     const finalUrl = await ensureS3Url(imageUrl, 'studio/laozhang-multimodal');
     
+    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
+        throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
+    }
+
     console.log(`✅ [LaoZhang-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }

@@ -2192,11 +2192,24 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 
         let routerResult;
         if (useLaoZhang) {
-            // LaoZhang path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
-            const lzResult = refCount > 0
-                ? await lzMultimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: lzSize })
-                : await lzImageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: lzSize });
-            routerResult = { imageUrl: lzResult.imageUrl };
+            try {
+                // LaoZhang path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
+                const lzResult = refCount > 0
+                    ? await lzMultimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: lzSize })
+                    : await lzImageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: lzSize });
+                routerResult = { imageUrl: lzResult.imageUrl };
+            } catch (lzErr) {
+                console.warn(`⚠️ LaoZhang image generation failed, falling back to Native Gemini: ${lzErr.message}`);
+                // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
+                const result = await router.generateImage({
+                    prompt: finalPromptForModel,
+                    aspectRatio: nativeAspectRatio,
+                    model: NATIVE_GEMINI_IMAGE_MODEL,
+                    imageParts: finalImageParts,
+                    size: imageSize
+                }, { provider: 'gemini' });
+                routerResult = result;
+            }
         } else {
             // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
             const result = await router.generateImage({

@@ -82,6 +82,16 @@ export const mirrorUrlToS3 = async (url, targetKey, defaultMimeType = "image/png
         const buffer = Buffer.from(arrayBuffer);
         const contentType = response.headers.get("content-type") || defaultMimeType;
 
+        // Check if the content is actually JSON or HTML error instead of image/video
+        if (
+            contentType.includes("json") || 
+            contentType.includes("text/html") || 
+            (buffer.length < 500 && buffer.toString().trim().startsWith("{"))
+        ) {
+            console.error(`❌ mirrorUrlToS3 failed: Content from ${url} is not a valid file. Content-Type: ${contentType}. Body: ${buffer.toString().substring(0, 200)}`);
+            return null;
+        }
+
         return await uploadToS3(buffer, targetKey, contentType);
     } catch (error) {
         console.error("Mirror URL to S3 Error:", error);
