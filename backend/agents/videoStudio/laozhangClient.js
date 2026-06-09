@@ -221,7 +221,9 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
+        // Use b64_json (not url) — LaoZhang CDN URLs expire within seconds.
+        // ensureS3Url can't reliably mirror them. b64_json gives raw data → direct S3 upload.
+        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
         signal: AbortSignal.timeout(timeoutMs),
         }));
 
@@ -233,15 +235,21 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
     const data = await response.json();
     const imgData = data.data?.[0];
-    const imageUrl = imgData?.url || '';
     const b64 = imgData?.b64_json || '';
-    if (!imageUrl && !b64) throw new Error('LaoZhang returned empty image response');
-    const rawUrl = imageUrl || `data:image/png;base64,${b64}`;
+    const imageUrl = imgData?.url || ''; // fallback if API ignores b64_json request
+    if (!b64 && !imageUrl) throw new Error('LaoZhang returned empty image response');
+    // Prefer base64 (stable) over URL (ephemeral CDN)
+    const rawData = b64 ? `data:image/png;base64,${b64}` : imageUrl;
     
-    // Auto-upload base64 to S3 to avoid massive strings in frontend/DB
-    const finalUrl = await ensureS3Url(rawUrl, 'studio/laozhang');
+    // Upload to S3 — base64 → direct upload (no CDN expiry risk)
+    const finalUrl = await ensureS3Url(rawData, 'studio/laozhang');
     
-    console.log(`✅ [LaoZhang] Image generated via ${model} (${imageUrl ? 'URL' : 'base64'})${finalUrl !== rawUrl ? ' -> Uploaded to S3' : ''}`);
+    // Warn if S3 upload failed and we're returning raw b64 or expired CDN URL
+    if (finalUrl === rawData && !finalUrl.includes('amazonaws.com')) {
+        console.warn(`⚠️ [LaoZhang] ensureS3Url did not upload to S3 — returning raw data (${finalUrl.substring(0, 60)})`);
+    }
+    
+    console.log(`✅ [LaoZhang] Image generated via ${model} (b64_json → S3): ${(finalUrl || '').substring(0, 80)}`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }
 
