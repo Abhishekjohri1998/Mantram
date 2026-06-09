@@ -4055,7 +4055,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 // ============================================================================
 
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, brandId }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, inlineVisualError, brandId }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -4146,6 +4146,19 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
 
                 {/* Generated Visual Result / Progress */}
+                {inlineVisualError && !inlineVisualActive && !inlineVisualUrl && (
+                    <div className="mb-4 p-4 rounded-2xl bg-amber-400/8 border border-amber-400/20 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-400 text-base mt-0.5 shrink-0">warning</span>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-amber-300 font-medium">Visual generation failed</p>
+                            <p className="text-[11px] text-amber-300/70 mt-0.5">{inlineVisualError}</p>
+                        </div>
+                        <button onClick={onGenerateVisual}
+                            className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 border border-amber-400/20 transition-all cursor-pointer">
+                            Try Again
+                        </button>
+                    </div>
+                )}
                 {(inlineVisualActive || inlineVisualUrl) && (
                     <div className="mb-6 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                         {inlineVisualUrl ? (
@@ -4388,6 +4401,19 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             )}
 
             {/* Generated Visual Result / Progress (Unaccepted View) */}
+            {inlineVisualError && !inlineVisualActive && !inlineVisualUrl && (
+                <div className="mt-4 mb-2 p-4 rounded-2xl bg-amber-400/8 border border-amber-400/20 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-400 text-base mt-0.5 shrink-0">warning</span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm text-amber-300 font-medium">Visual generation failed</p>
+                        <p className="text-[11px] text-amber-300/70 mt-0.5">{inlineVisualError}</p>
+                    </div>
+                    <button onClick={onGenerateVisual}
+                        className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 border border-amber-400/20 transition-all cursor-pointer">
+                        Try Again
+                    </button>
+                </div>
+            )}
             {(inlineVisualActive || inlineVisualUrl) && (
                 <div className="mb-6 mt-4 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                     {inlineVisualUrl ? (
@@ -5511,119 +5537,172 @@ export default function ContentStudio() {
         }
     }
 
+    const _visualPollRef = React.useRef(null)
+    const [inlineVisualError, setInlineVisualError] = useState(null)
+
     const handleCreateVisual = async () => {
-        if (!result?.content) return;
-        setGeneratingVisualPrompt(true);
-        setInlineVisualActive(true);
-        setInlineVisualUrl(null);
-        setInlineVisualProgress(10);
-        
+        if (!result?.content) return
+        // Clear any previous error and start fresh
+        setInlineVisualError(null)
+        setGeneratingVisualPrompt(true)
+        setInlineVisualActive(true)
+        setInlineVisualUrl(null)
+        setInlineVisualProgress(5)
+
+        // Clear any lingering poll interval from a previous run
+        if (_visualPollRef.current) {
+            clearInterval(_visualPollRef.current)
+            _visualPollRef.current = null
+        }
+
         try {
             // STEP 1: Generate Visual Prompt via Agentic Engine
-            const brandIdentityStr = activeBrand ? `Brand Name: ${activeBrand.name}. Target Audience: ${activeBrand.dna?.audience?.demographic || ''} ${activeBrand.dna?.audience?.psychographic || ''}` : '';
+            // This is fast (Grok mini / Gemini flash) — should take < 3s
+            const brandIdentityStr = activeBrand
+                ? `Brand Name: ${activeBrand.name}. Target Audience: ${activeBrand.dna?.audience?.demographic || ''} ${activeBrand.dna?.audience?.psychographic || ''}`
+                : ''
+            setInlineVisualProgress(15)
             const data = await contentAPI.generateVisualPrompt({
                 brief: context?.details || '',
                 content: result.content,
                 type: goal || 'social',
-                brandContext: brandIdentityStr
-            });
-            let visualPrompt = data.prompt || result.content.substring(0, 200);
-            
-            // INJECT BRAND DNA
-            const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
-            const brandName = activeBrand?.name || ''
-            const personality = activeBrand?.dna?.voice?.personality || ''
+                brandContext: brandIdentityStr,
+            })
+            let visualPrompt = data.prompt || result.content.substring(0, 200)
 
-            if (brandName) visualPrompt += `. Brand: ${brandName}.`
-            if (personality) visualPrompt += ` Style: ${personality}.`
-            if (brandColors) visualPrompt += ` Use brand colors: ${brandColors}.`
+            // Inject brand DNA into prompt
+            const brandColors  = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
+            const brandName    = activeBrand?.name || ''
+            const personality  = activeBrand?.dna?.voice?.personality || ''
+            if (brandName)    visualPrompt += `. Brand: ${brandName}.`
+            if (personality)  visualPrompt += ` Style: ${personality}.`
+            if (brandColors)  visualPrompt += ` Use brand colors: ${brandColors}.`
+            setInlineVisualProgress(30)
 
-            setInlineVisualProgress(30);
-
-            // STEP 2: Trigger Generation directly using creativesAPI
+            // STEP 2: Queue the generation job
             const jobData = await creativesAPI.createJob({
                 brandId: activeBrand?._id,
-                type: 'instagram-post', // Valid enum type
+                type: 'instagram-post',
                 prompt: visualPrompt,
-                options: {
-                    dimensions: '1080x1080',
-                    model: 'nanobanana-2',
-                }
-            });
+                options: { dimensions: '1080x1080', model: 'nanobanana-2' },
+            })
 
-            if (jobData?.success && jobData?.jobId) {
-                const localJobId = jobData.jobId;
-                
-                // STEP 3: Poll until completion
-                const pollInterval = setInterval(async () => {
-                    try {
-                        const pollData = await creativesAPI.pollJob(localJobId);
-                        if (!pollData?.success) return;
-                        const job = pollData.job;
-                        
-                        setInlineVisualProgress(Math.max(40, job.progress || 0));
-                        
-                        if (job.status === 'completed') {
-                            clearInterval(pollInterval);
-                            const finalUrl = job.result?.creative?.imageUrl || job.imageUrl;
-                            const creativeId = job.result?.creative?._id;
-                            
-                            if (finalUrl) {
-                                setInlineVisualUrl(finalUrl);
-                                setInlineVisualProgress(100);
-                                setGeneratingVisualPrompt(false);
-                                setInlineVisualActive(false);
-                            } else if (creativeId) {
-                                // S3 Upload pending — wait explicitly just like Creative Studio
-                                let retries = 0;
-                                const waitForS3 = setInterval(async () => {
-                                    retries++;
-                                    if (retries > 12) {
-                                        clearInterval(waitForS3);
-                                        setGeneratingVisualPrompt(false);
-                                        setInlineVisualActive(false);
-                                        return;
-                                    }
-                                    try {
-                                        const repoll = await creativesAPI.pollJob(localJobId);
-                                        const freshJob = repoll?.job;
-                                        const freshUrl = freshJob?.result?.creative?.imageUrl || freshJob?.imageUrl;
-                                        if (freshUrl) {
-                                            clearInterval(waitForS3);
-                                            setInlineVisualUrl(freshUrl);
-                                            setInlineVisualProgress(100);
-                                            setGeneratingVisualPrompt(false);
-                                            setInlineVisualActive(false);
-                                        }
-                                    } catch (err) { /* ignore single poll failure */ }
-                                }, 5000);
-                            } else {
-                                setGeneratingVisualPrompt(false);
-                                setInlineVisualActive(false);
-                            }
-                        } else if (job.status === 'failed') {
-                            clearInterval(pollInterval);
-                            console.error('Inline visual job failed');
-                            setGeneratingVisualPrompt(false);
-                            setInlineVisualActive(false);
-                            setError({ message: job.errorMessage || 'Visual generation failed. The AI provider may be busy. Please try again.', isProviderError: true });
-                        }
-                    } catch (e) {
-                         console.error('Inline Visual Poll error:', e);
-                    }
-                }, 3000);
-            } else {
-                setGeneratingVisualPrompt(false);
-                setInlineVisualActive(false);
-                setError({ message: jobData?.error || 'Failed to start visual generation.', isProviderError: true });
+            if (!jobData?.success || !jobData?.jobId) {
+                throw new Error(jobData?.error || 'Failed to queue visual generation job.')
             }
+
+            const localJobId = jobData.jobId
+            setInlineVisualProgress(40)
+
+            // STEP 3: Poll until completed / failed
+            let pollCount = 0
+            const MAX_POLLS = 60 // 3 min at 3s intervals
+            _visualPollRef.current = setInterval(async () => {
+                pollCount++
+                try {
+                    const pollData = await creativesAPI.pollJob(localJobId)
+                    if (!pollData?.success) return
+                    const job = pollData.job
+
+                    // Smooth progress simulation while job is running
+                    const simProgress = Math.min(90, 40 + Math.floor((pollCount / MAX_POLLS) * 50))
+                    setInlineVisualProgress(Math.max(simProgress, job.progress || 0))
+
+                    if (job.status === 'completed') {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+
+                        const finalUrl  = job.result?.creative?.imageUrl || job.imageUrl
+                        const creativeId = job.result?.creative?._id || job.creativeId
+
+                        if (finalUrl) {
+                            setInlineVisualUrl(finalUrl)
+                            setInlineVisualProgress(100)
+                            setGeneratingVisualPrompt(false)
+                            setInlineVisualActive(false)
+                            return
+                        }
+
+                        if (creativeId) {
+                            // S3 upload is still in progress — wait up to 60s more
+                            let s3Retries = 0
+                            const waitForS3 = setInterval(async () => {
+                                s3Retries++
+                                if (s3Retries > 12) {
+                                    clearInterval(waitForS3)
+                                    setGeneratingVisualPrompt(false)
+                                    setInlineVisualActive(false)
+                                    setInlineVisualError('Visual was generated but upload timed out. Try clicking Create Visual again.')
+                                    return
+                                }
+                                try {
+                                    const repoll   = await creativesAPI.pollJob(localJobId)
+                                    const freshUrl = repoll?.job?.result?.creative?.imageUrl || repoll?.job?.imageUrl
+                                    if (freshUrl) {
+                                        clearInterval(waitForS3)
+                                        setInlineVisualUrl(freshUrl)
+                                        setInlineVisualProgress(100)
+                                        setGeneratingVisualPrompt(false)
+                                        setInlineVisualActive(false)
+                                    }
+                                } catch { /* ignore individual poll errors */ }
+                            }, 5000)
+                        } else {
+                            // Job completed but has no imageUrl and no creativeId — shouldn't happen
+                            setGeneratingVisualPrompt(false)
+                            setInlineVisualActive(false)
+                            setInlineVisualError('Visual generation completed but no image was returned. Please try again.')
+                        }
+
+                    } else if (job.status === 'failed') {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        const errMsg = job.errorMessage || ''
+                        const isBusy = errMsg.includes('overload') || errMsg.includes('busy') || errMsg.includes('503') || errMsg.includes('quota')
+                        setInlineVisualError(
+                            isBusy
+                                ? 'The image AI is currently busy. Please wait 30 seconds and try again.'
+                                : (errMsg || 'Visual generation failed. Please try again.')
+                        )
+                    } else if (pollCount >= MAX_POLLS) {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        setInlineVisualError('Visual generation timed out after 3 minutes. Please try again.')
+                    }
+                } catch (pollErr) {
+                    // Individual poll failure is non-fatal — keep retrying unless we've exceeded limit
+                    if (pollCount >= MAX_POLLS) {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        setInlineVisualError('Lost connection while waiting for visual. Please try again.')
+                    }
+                }
+            }, 3000)
+
         } catch (err) {
-            console.error('Failed to generate visual inline:', err);
-            setGeneratingVisualPrompt(false);
-            setInlineVisualActive(false);
-            setError({ message: err.message || 'Failed to generate visual inline.', isProviderError: true });
+            console.error('handleCreateVisual error:', err)
+            setGeneratingVisualPrompt(false)
+            setInlineVisualActive(false)
+            if (_visualPollRef.current) {
+                clearInterval(_visualPollRef.current)
+                _visualPollRef.current = null
+            }
+            const msg = err.message || ''
+            const isBusy = msg.includes('overload') || msg.includes('busy') || msg.includes('503') || msg.includes('quota') || msg.includes('429')
+            setInlineVisualError(
+                isBusy
+                    ? 'The AI provider is currently busy. Please wait 30 seconds and try again.'
+                    : (msg || 'Failed to generate visual. Please try again.')
+            )
         }
     }
+
 
 
 
@@ -6063,6 +6142,7 @@ SPOKESPERSON QUOTES:`
                         inlineVisualUrl={inlineVisualUrl}
                         inlineVisualActive={inlineVisualActive}
                         inlineVisualProgress={inlineVisualProgress}
+                        inlineVisualError={inlineVisualError}
                         brandId={activeBrand?._id}
                     />
                     {error && (
