@@ -290,6 +290,10 @@ export function buildBrandContext(brand, products = []) {
     if (dna.targetAudience) parts.push(`Target Audience: ${dna.targetAudience}`);
     if (dna.brandDescription) parts.push(`Description: ${dna.brandDescription}`);
     if (dna.country) parts.push(`Origin: ${dna.country}${dna.region ? ` (${dna.region})` : ''}`);
+    if (dna.city) parts.push(`Primary City: ${dna.city}`);
+    if (dna.serviceAreas?.length) parts.push(`Service Areas: ${dna.serviceAreas.join(', ')}`);
+    if (dna.physicalLocations) parts.push(`Physical Presence: ${dna.physicalLocations} location(s)`);
+    if (dna.hasGBP) parts.push(`Google Business Profile: Active`);
 
     // ── Target Markets & Global Intelligence ──
     const targetMarkets = resolveTargetMarkets(brand);

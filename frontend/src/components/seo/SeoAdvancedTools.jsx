@@ -19,6 +19,7 @@ import { useSeoTasks } from '../../context/SeoTaskContext';
 import StudioReportButton from '../reports/StudioReportButton';
 import FormattedText from '../FormattedText';
 import GlobalLoader from '../GlobalLoader';
+import GeoPanel from './GeoPanel';
 
 const TABS = [
     { id: 'overview', icon: 'space_dashboard', label: 'Overview' },
@@ -1026,136 +1027,22 @@ export default function SeoAdvancedTools({ advPage, setAdvPage, onBack, brand, w
 
             // ── GEO — AI SEARCH ──
             case 'geo': {
-                if (!hasData) return (
-                    <EmptyState icon="travel_explore" title="GEO — Generative Engine Optimization" desc="See how your brand appears in AI-generated answers across ChatGPT, Gemini, Perplexity, and more. Discover prompts where you should be cited.">
-                        <div className="flex gap-3 justify-center flex-wrap">
-                            <RunButton onClick={() => runAnalysis('geo', seoAPI.aiVisibility, buildPayload(), 'Analyzing AI visibility...', 'geo-visibility')} label="AI Visibility Scan" icon="smart_toy" actionId="geo-visibility" />
-                            <RunButton onClick={() => runAnalysis('geo', seoAPI.llmProbe, buildPayload(), 'Probing AI models...', 'geo-probe')} label="LLM Brand Probe" icon="psychology" actionId="geo-probe" />
-                        </div>
-                    </EmptyState>
-                );
+                // Determine the live probe result from context if available
+                const geoProbeResult = contextTask?.results || tabData['geo'] || null;
+                const isProbeRunning = !!loadingAction;
+
+                const runGeoProbe = () => {
+                    // Use the richer llmProbe (v3 engine) as the primary GEO probe
+                    runAnalysis('geo', seoAPI.llmProbe, buildPayload(), 'Probing AI models (v3)…', 'geo-probe');
+                };
+
                 return (
-                    <div className="space-y-5 animate-fade-in">
-                        {data.summary && <SectionCard><FormattedText text={data.summary} /></SectionCard>}
-
-                        {/* AI Visibility Scores */}
-                        {data.aiVisibilityScore != null && (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <SectionCard><ScoreRing score={data.aiVisibilityScore} label="AI Visibility" color="#a78bfa" /></SectionCard>
-                                <SectionCard><ScoreRing score={data.schemaScore || data.technicalScore} label="Schema & Data" color="#60a5fa" /></SectionCard>
-                                <SectionCard><ScoreRing score={data.contentScore} label="Content" color="#fbbf24" /></SectionCard>
-                                <SectionCard><ScoreRing score={data.authorityScore} label="Authority" color="#34d399" /></SectionCard>
-                            </div>
-                        )}
-
-                        {/* LLM Probe Results */}
-                        {data.probeResults?.length > 0 && (
-                            <SectionCard title="LLM Brand Mentions" icon="psychology">
-                                <div className="space-y-3">{data.probeResults.map((pr, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-bold text-[var(--sys-text)]">{pr.model || pr.llm}</span>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${pr.mentioned ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[var(--sys-surface)] text-[var(--sys-primary)]'}`}>
-                                                {pr.mentioned ? '✓ Mentioned' : '✗ Not Found'}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-[var(--sys-text-muted)]">{pr.prompt || pr.query}</p>
-                                        {pr.response && <p className="text-xs text-[var(--sys-text-muted)] mt-1 line-clamp-3">{pr.response}</p>}
-                                    </div>
-                                ))}</div>
-                            </SectionCard>
-                        )}
-                        {/* Prompt Mining Categories */}
-                        {data.promptCategories?.length > 0 && (
-                            <SectionCard title="AI Citation by Category" icon="category">
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    {data.promptCategories.map((cat, i) => (
-                                        <div key={`cat-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
-                                            <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1">{cat.category}</p>
-                                            <p className="text-xl font-bold text-[var(--sys-text)] mb-1">{cat.currentCitationRate}</p>
-                                            <p className="text-xs text-[var(--sys-text-muted)]">{cat.totalPrompts} prompts analyzed</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </SectionCard>
-                        )}
-
-                        {/* Mined Prompts */}
-                        {data.minedPrompts?.length > 0 && (
-                            <SectionCard title="Mined Prompt Opportunities" icon="troubleshoot">
-                                <div className="space-y-3">{data.minedPrompts.map((mp, i) => (
-                                    <div key={`mp-${i}`} className="rounded-xl p-4 bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {mp.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${mp.priority === 'critical' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : mp.priority === 'high' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{mp.priority}</span>}
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-white/10 text-[var(--sys-text-muted)]">{mp.category}</span>
-                                            {mp.currentlyCited && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-[var(--sys-surface)] text-[var(--sys-primary)]">Cited</span>}
-                                        </div>
-                                        <p className="text-sm font-bold text-[var(--sys-text)] mb-2">"{mp.prompt}"</p>
-                                        
-                                        {!mp.currentlyCited && mp.competitorsCited?.length > 0 && (
-                                            <div className="mb-3">
-                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold mb-1">Competitors Cited Instead:</p>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {mp.competitorsCited.map((comp, cIdx) => (
-                                                        <span key={`comp-${cIdx}`} className="text-xs px-2 py-1 rounded bg-[var(--sys-surface)] text-[var(--sys-primary)]">{comp}</span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        
-                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                            <div className="rounded-lg p-2 bg-white/[0.02]">
-                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Why not cited</p>
-                                                <p className="text-xs text-[var(--sys-text-muted)]">{mp.whyNotCited || 'N/A'}</p>
-                                            </div>
-                                            <div className="rounded-lg p-2 bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                                                <p className="text-[10px] text-[var(--sys-primary)] uppercase font-bold">Content Needed</p>
-                                                <p className="text-xs text-[var(--sys-primary)]">{mp.contentNeeded}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <FixWithAI fixKey={`prompt-mining-${i}`} issueTitle={`Missing Citation for: "${mp.prompt}"`} issueDescription={mp.whyNotCited || ''}
-                                            fixType={mp.contentFormat || 'new-content'} targetKeyword={mp.prompt} label="Generate Content to Rank" />
-                                    </div>
-                                ))}</div>
-                            </SectionCard>
-                        )}
-
-                        {/* Optimization tips */}
-                        {(data.optimizations || data.recommendations)?.length > 0 && (
-                            <SectionCard title="GEO Optimization Actions" icon="tips_and_updates">
-                                <div className="space-y-3">{(data.optimizations || data.recommendations || []).map((opt, i) => (
-                                    <div key={i} className="rounded-xl p-4 bg-[#FF4D00]/5 border border-[#FF4D00]/10">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {opt.priority && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${opt.priority === 'critical' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : opt.priority === 'high' ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'bg-[#FF4D00]/15 text-[#FF4D00]'}`}>{opt.priority}</span>}
-                                            <p className="text-sm font-bold text-[var(--sys-text)]">{opt.title || opt.action || opt}</p>
-                                        </div>
-                                        {opt.description && <p className="text-xs text-[var(--sys-text-muted)] mb-3">{opt.description}</p>}
-                                        {(opt.kpi || opt.baseline || opt.target) && (
-                                            <div className="grid grid-cols-3 gap-2 mb-2">
-                                                {opt.kpi && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">KPI</p><p className="text-xs text-[var(--sys-text-muted)]">{opt.kpi}</p></div>}
-                                                {opt.baseline && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Baseline</p><p className="text-xs text-[var(--sys-primary)]">{opt.baseline}</p></div>}
-                                                {opt.target && <div className="rounded-lg p-2 bg-white/[0.02]"><p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Target</p><p className="text-xs text-[var(--sys-primary)]">{opt.target}</p></div>}
-                                            </div>
-                                        )}
-                                        <div className="flex flex-wrap gap-3 text-[11px]">
-                                            {opt.timeline && <span className="text-[var(--sys-text-muted)]">⏱ {opt.timeline}</span>}
-                                            {opt.proofMethod && <span className="text-[var(--sys-text-muted)]">✓ {opt.proofMethod}</span>}
-                                        </div>
-                                        {opt.expectedROI && <p className="text-xs text-[var(--sys-primary)] mt-2 font-medium mb-3">📈 {opt.expectedROI}</p>}
-                                        <FixWithAI fixKey={`geo-opt-${i}`} issueTitle={opt.title || opt.action || opt} issueDescription={opt.description || ''}
-                                            fixType="geo-optimization" label="Generate SEO Fix" />
-                                    </div>
-                                ))}</div>
-                            </SectionCard>
-                        )}
-
-                        <div className="flex gap-3 flex-wrap">
-                            <RunButton onClick={() => runAnalysis('geo', seoAPI.aiVisibility, buildPayload(), 'AI Visibility...', 'geo-visibility')} label="AI Visibility" icon="smart_toy" actionId="geo-visibility" />
-                            <RunButton onClick={() => runAnalysis('geo', seoAPI.llmProbe, buildPayload(), 'Probing LLMs...', 'geo-probe')} label="LLM Probe" icon="psychology" actionId="geo-probe" />
-                            <RunButton onClick={() => runAnalysis('geo', seoAPI.promptMining, buildPayload(), 'Mining prompts...', 'geo-mining')} label="Prompt Mining" icon="chat_bubble" actionId="geo-mining" />
-                        </div>
-                    </div>
+                    <GeoPanel
+                        brand={brand || brandPayload}
+                        onRunProbe={runGeoProbe}
+                        loading={isProbeRunning}
+                        probeResult={geoProbeResult}
+                    />
                 );
             }
 

@@ -1101,7 +1101,11 @@ export const seoStudio = {
     jsCrawl: (data) => apiFetch('/seo-studio/js-crawl', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     contentScore: (data) => apiFetch('/seo-studio/content-score', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
     competitorMonitor: (data) => apiFetch('/seo-studio/competitor-monitor', { method: 'POST', body: JSON.stringify(data), timeout: 3600000 }),
+    // GEO Intelligence
+    geoHistory: (brandId, limit = 30) => apiFetch(`/seo-studio/geo-history?brandId=${brandId}&limit=${limit}`),
+    generateLlmsTxt: (data) => apiFetch('/seo-studio/generate-llms-txt', { method: 'POST', body: JSON.stringify(data) }),
 };
+
 
 // ============ Skills System API ============
 export const skills = {

@@ -22,11 +22,12 @@ const SAMPLES_PER_PROMPT = 2; // Reduced from 3 to ensure we stay within the 180
 // PROMPT GENERATION (with intent tagging)
 // ============================================================================
 
-function generateIndustryPrompts(brandName, industry, location, website, customPrompts = []) {
+function generateIndustryPrompts(brandName, industry, location, website, customPrompts = [], serviceAreas = [], languages = []) {
     let domain = '';
     try { domain = website ? new URL(website).hostname.replace(/^www\./, '') : ''; } catch (_) { /* ignore */ }
 
     const effectiveIndustry = industry || domain?.split('.')[0] || brandName;
+    const primaryLocation = location || '';
 
     const seen = new Set();
     const prompts = [];
@@ -40,21 +41,47 @@ function generateIndustryPrompts(brandName, industry, location, website, customP
         if (cp && cp.trim()) add(cp.trim(), 'purchase');
     }
 
-    // Purchase intent (weight: 3x)
+    // ── Purchase intent (weight: 3x) ──
     add(`What are the best ${effectiveIndustry} companies or services?`, 'purchase');
     add(`Recommend a good ${effectiveIndustry} provider. What are my options?`, 'purchase');
     add(`I need help with ${effectiveIndustry}. What companies do you recommend and why?`, 'purchase');
+    add(`Where can I find reliable ${effectiveIndustry} services online?`, 'purchase');
 
-    // Comparison intent (weight: 2x)
-    add(`Who are the top ${effectiveIndustry} brands${location ? ` in ${location}` : ''}?`, 'comparison');
+    // ── Comparison intent (weight: 2x) ──
+    add(`Who are the top ${effectiveIndustry} brands${primaryLocation ? ` in ${primaryLocation}` : ''}?`, 'comparison');
     add(`Is ${brandName} a good choice for ${effectiveIndustry}? What are the alternatives?`, 'comparison');
     add(`Compare the best ${effectiveIndustry} solutions available right now.`, 'comparison');
+    add(`${brandName} vs competitors — which ${effectiveIndustry} brand is better?`, 'comparison');
 
-    // Informational intent (weight: 1x)
+    // ── Informational intent (weight: 1x) ──
     add(`Tell me about ${brandName}. What do they do and are they any good?`, 'informational');
     add(`What should I look for when choosing a ${effectiveIndustry} provider?`, 'informational');
+    add(`What are people saying about ${brandName}? Is it trustworthy?`, 'informational');
 
-    return prompts.slice(0, 10);
+    // ── Location-specific prompts (high-intent for local/regional brands) ──
+    if (primaryLocation) {
+        add(`Best ${effectiveIndustry} in ${primaryLocation}?`, 'purchase');
+        add(`Top-rated ${effectiveIndustry} services near ${primaryLocation}`, 'purchase');
+        add(`Which ${effectiveIndustry} brand is most popular in ${primaryLocation}?`, 'comparison');
+    }
+    // Additional service areas (first 2 to avoid prompt explosion)
+    for (const area of serviceAreas.slice(0, 2)) {
+        add(`Best ${effectiveIndustry} in ${area}?`, 'purchase');
+    }
+
+    // ── Voice / conversational queries (AI Overviews & Copilot weight these) ──
+    add(`Hey, what's a good ${effectiveIndustry} company I should try?`, 'purchase');
+    add(`I'm looking for ${effectiveIndustry} help — any recommendations?`, 'informational');
+    add(`Can you suggest a trusted ${effectiveIndustry} brand?`, 'purchase');
+
+    // ── Shopping / transactional intent ──
+    add(`Where can I buy or use ${effectiveIndustry} services online?`, 'purchase');
+    add(`Best ${effectiveIndustry} deals and services right now`, 'purchase');
+
+    // ── Review / trust signals ──
+    add(`${brandName} reviews — is it legit and worth it?`, 'comparison');
+
+    return prompts.slice(0, 14); // Increased cap from 10 → 14 for better coverage
 }
 
 // Intent weights for score calculation
@@ -163,7 +190,7 @@ async function probeClaude(prompt, signal = null) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
             body: JSON.stringify({
-                model: 'claude-3-opus-20240229', max_tokens: 1024,
+                model: 'claude-3-5-haiku-20241022', max_tokens: 1024,
                 messages: [{ role: 'user', content: prompt }], temperature: 0.4,
             }),
             signal: controller.signal,
@@ -440,10 +467,11 @@ function computeConfidence(samples) {
 // MAIN PROBE FUNCTION
 // ============================================================================
 
-async function probeAIVisibility(brandName, industry, location, website, competitors = [], customPrompts = [], previousProbe = null, signal = null) {
+async function probeAIVisibility(brandName, industry, location, website, competitors = [], customPrompts = [], previousProbe = null, signal = null, serviceAreas = []) {
     console.log(`🔮 GEO Probe v3: Starting multi-sample probing for "${brandName}" (${SAMPLES_PER_PROMPT}x per prompt)...`);
 
-    const prompts = generateIndustryPrompts(brandName, industry, location, website, customPrompts);
+    const prompts = generateIndustryPrompts(brandName, industry, location, website, customPrompts, serviceAreas);
+
     
     // Increase listener limit for the shared signal to avoid MaxListenersExceededWarning
     if (signal) {

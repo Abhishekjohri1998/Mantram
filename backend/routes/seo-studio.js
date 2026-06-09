@@ -1638,9 +1638,12 @@ Respond in JSON:
     { "pattern": "Content pattern name", "description": "How to implement", "example": "Brief example", "aiAdvantage": "Why AI models prefer content formatted this way" }
   ],
   "llmSpecificInsights": {
-    "googleAIOverviews": "Specific advice for being cited in Google AI Overviews based on crawl findings",
-    "chatGPT": "Specific advice for ChatGPT/Bing citations",
-    "perplexity": "Specific advice for Perplexity citations"
+    "googleAIOverviews": "Specific advice for being cited in Google AI Overviews (informational queries) based on crawl findings",
+    "googleAIMode": "Advice for Google AI Mode (search.google.com/search-labs) — conversational + multi-step queries, HowTo schema priority",
+    "chatGPT": "Specific advice for ChatGPT Search citations — OAI-SearchBot allow-list, entity presence, freshness signals",
+    "microsoftCopilot": "Advice for Microsoft Copilot / Bing AI — structured data, Bingbot crawl status, Office 365 integration queries",
+    "perplexity": "Specific advice for Perplexity citations — citation-first design, authoritative sourcing, PerplexityBot allow-list",
+    "appleIntelligence": "Advice for Apple Intelligence / Siri — Speakable schema, Applebot-Extended allow-list, short answer-first content"
   },
   "crawlFindings": "Summary of what the crawl revealed about AI readiness"
 }
@@ -1655,11 +1658,12 @@ STRATEGIC RULES (MANDATORY):
     const userPrompt = `AI Visibility audit for: ${website}`;
     // Run AI on-page analysis AND real LLM probing in parallel
     const brandName = brand?.name || brandPayload?.name || brand?.dna?.brandName || new URL(website).hostname.replace(/^www\./, '').replace(/\.[^.]+$/, '');
-    const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || '';
-    const location = brand?.location || brandPayload?.location || '';
-    const competitors = brand?.competitors?.map(c => c.name || c) || [];
+    const industry = brand?.industry || brand?.businessCategory || brandPayload?.industry || brand?.dna?.industry || '';
+    const location = brand?.dna?.city || brand?.dna?.region || brand?.location || brandPayload?.location || brand?.dna?.targetMarket || brand?.dna?.country || '';
+    const serviceAreas = brand?.dna?.serviceAreas || brandPayload?.dna?.serviceAreas || [];
+    const competitors = brand?.competitors?.map(c => c.name || c.url || c) || [];
 
-    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}"`);
+    console.log(`🔮 Starting parallel: AI analysis + GEO probe v3 for "${brandName}" in "${industry}" @ "${location}"`);
 
     // Fetch previous probe for citation drift detection
     let previousProbe = null;
@@ -1673,7 +1677,7 @@ STRATEGIC RULES (MANDATORY):
 
     const [result, geoProbeResult] = await Promise.all([
       aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget }),
-      probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe).catch(err => {
+      probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe, null, serviceAreas).catch(err => {
         console.warn('GEO Probe failed (non-blocking):', err.message);
         return null;
       }),
@@ -1765,7 +1769,7 @@ STRATEGIC RULES (MANDATORY):
   }
 });
 
-// ── GEO History / Trends ──
+// ── GEO History / Trends (v2 — includes per-model breakdown for trend charts) ──
 router.get('/geo-history', protect, async (req, res, next) => {
   try {
     const { brandId, limit } = req.query;
@@ -1776,21 +1780,177 @@ router.get('/geo-history', protect, async (req, res, next) => {
       .limit(Math.min(parseInt(limit) || 30, 100))
       .lean();
 
-    // Compute trend deltas
+    // Compute trend deltas (latest vs previous)
     const latest = history[0];
     const previous = history[1];
     let trend = null;
     if (latest && previous) {
+      // Per-model deltas
+      const perModelDelta = {};
+      const latestModels = latest.modelBreakdown || {};
+      const prevModels = previous.modelBreakdown || {};
+      for (const modelName of Object.keys(latestModels)) {
+        const curr = latestModels[modelName]?.mentionRate ?? null;
+        const prev = prevModels[modelName]?.mentionRate ?? null;
+        if (curr !== null && prev !== null) {
+          perModelDelta[modelName] = { current: curr, previous: prev, delta: curr - prev };
+        }
+      }
+
       trend = {
         scoreDelta: latest.score - previous.score,
         mentionRateDelta: latest.mentionRate - previous.mentionRate,
         positionChange: latest.competitivePosition !== previous.competitivePosition
           ? `${previous.competitivePosition} → ${latest.competitivePosition}` : null,
         daysBetween: Math.round((new Date(latest.createdAt) - new Date(previous.createdAt)) / 86400000),
+        perModelDelta,
+        sentimentDelta: {
+          positive: (latest.sentimentDistribution?.positive || 0) - (previous.sentimentDistribution?.positive || 0),
+          neutral: (latest.sentimentDistribution?.neutral || 0) - (previous.sentimentDistribution?.neutral || 0),
+          negative: (latest.sentimentDistribution?.negative || 0) - (previous.sentimentDistribution?.negative || 0),
+        },
       };
     }
 
-    res.json({ success: true, history, trend, total: history.length });
+    // Build per-model timeline for charting (each entry: { date, model, mentionRate })
+    const modelTimeline = {};
+    for (const entry of history) {
+      const date = new Date(entry.createdAt).toISOString().split('T')[0];
+      const breakdown = entry.modelBreakdown || {};
+      for (const [modelName, data] of Object.entries(breakdown)) {
+        if (!modelTimeline[modelName]) modelTimeline[modelName] = [];
+        modelTimeline[modelName].push({ date, mentionRate: data.mentionRate || 0, score: entry.score });
+      }
+    }
+
+    // Also build overall score timeline (for the main trend chart)
+    const scoreTimeline = history.map(h => ({
+      date: new Date(h.createdAt).toISOString().split('T')[0],
+      score: h.score,
+      mentionRate: h.mentionRate,
+      competitivePosition: h.competitivePosition,
+      modelsUsed: h.modelsUsed?.length || 0,
+    })).reverse(); // chronological order for charts
+
+    res.json({ success: true, history, trend, total: history.length, modelTimeline, scoreTimeline });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ── Generate llms.txt — Brand-specific AI-readable fact file ──
+router.post('/generate-llms-txt', protect, async (req, res, next) => {
+  try {
+    const { brandId, url } = req.body;
+
+    const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
+    const website = brand?.website || url;
+    if (!website) return res.status(400).json({ success: false, error: 'Website URL or brand required' });
+
+    const brandName = brand?.name || 'Brand';
+    const dna = brand?.dna || {};
+
+    // Build structured llms.txt content
+    const lines = [];
+    lines.push(`# ${brandName}`);
+    lines.push('');
+
+    if (dna.brandDescription || dna.missionStatement) {
+      lines.push(`> ${dna.brandDescription || dna.missionStatement}`);
+      lines.push('');
+    }
+
+    if (website) {
+      lines.push(`## Website`);
+      lines.push(`- ${website}`);
+      lines.push('');
+    }
+
+    if (dna.industry) {
+      lines.push(`## Industry`);
+      lines.push(`${dna.industry}`);
+      lines.push('');
+    }
+
+    if (dna.uniqueSellingPoints?.length) {
+      lines.push(`## What We Do`);
+      for (const usp of dna.uniqueSellingPoints) {
+        lines.push(`- ${usp}`);
+      }
+      lines.push('');
+    }
+
+    if (dna.targetAudience) {
+      lines.push(`## Who We Serve`);
+      lines.push(`${dna.targetAudience}`);
+      lines.push('');
+    }
+
+    if (dna.country || dna.region || dna.city) {
+      lines.push(`## Location`);
+      const loc = [dna.city, dna.region, dna.country].filter(Boolean).join(', ');
+      lines.push(`${loc}`);
+      lines.push('');
+    }
+
+    if (dna.tagline) {
+      lines.push(`## Tagline`);
+      lines.push(`"${dna.tagline}"`);
+      lines.push('');
+    }
+
+    if (dna.competitiveIntel?.marketPosition) {
+      lines.push(`## Market Position`);
+      lines.push(`${dna.competitiveIntel.marketPosition}`);
+      lines.push('');
+    }
+
+    // Products
+    const { default: Product } = await import('../models/Product.js');
+    let products = [];
+    try {
+      products = await Product.find({ brand: brandId, status: 'active' })
+        .select('title shortDescription description price category').limit(15).lean();
+    } catch (_) {}
+
+    if (products.length > 0) {
+      lines.push(`## Products & Services`);
+      for (const p of products) {
+        const desc = p.shortDescription || p.description?.substring(0, 150) || '';
+        lines.push(`- ${p.title}${desc ? `: ${desc}` : ''}${p.price?.amount ? ` (${p.price.currency || 'INR'} ${p.price.amount})` : ''}`);
+      }
+      lines.push('');
+    }
+
+    // Knowledge bank entries
+    const knowledgeEntries = brand?.knowledge?.entries || [];
+    const factEntries = knowledgeEntries.filter(e => e.sourceType === 'text' && e.content?.trim()).slice(0, 5);
+    if (factEntries.length > 0) {
+      lines.push(`## Key Facts`);
+      for (const e of factEntries) {
+        lines.push(`- ${(e.content || '').substring(0, 200)}`);
+      }
+      lines.push('');
+    }
+
+    lines.push(`## Last Updated`);
+    lines.push(`${new Date().toISOString().split('T')[0]}`);
+
+    const llmsTxt = lines.join('\n');
+    const charCount = llmsTxt.length;
+    const lineCount = lines.length;
+
+    res.json({
+      success: true,
+      llmsTxt,
+      filename: 'llms.txt',
+      path: '/llms.txt',
+      charCount,
+      lineCount,
+      instructions: `Upload this file to your website root so it's accessible at ${website.replace(/\/$/, '')}/llms.txt`,
+      tip: 'AI engines like ChatGPT, Perplexity, and Anthropic Claude check for llms.txt when crawling your site. This file tells them exactly who you are, what you do, and what products/services you offer — in a clean format they can reliably ingest.',
+    });
   } catch (error) {
     next(error);
   }
@@ -2332,12 +2492,12 @@ Respond in STRICT JSON:
 
 
 // ============================================================================
-// LLM PROBE — Multi-model brand mention check
+// LLM PROBE — Multi-model brand mention check (v3 — unified with geoProbe v3 engine)
 // ============================================================================
 
 router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('seoLlmProbe'), async (req, res, next) => {
   try {
-    const { url, brand: brandPayload, brandId } = req.body;
+    const { url, brand: brandPayload, brandId, customPrompts } = req.body;
 
     const brand = brandId ? await loadBrand(brandId, req.user?._id) : null;
     const website = brand?.website || url || brandPayload?.website;
@@ -2346,113 +2506,136 @@ router.post('/llm-probe', protect, requireStudio('seoStudio'), requireCredits('s
     const brandContext = buildBrandContext(brand || brandPayload);
     const brandName = brand?.name || brandPayload?.name || website;
     const dna = brand?.dna || brandPayload?.dna || {};
-    const competitors = brand?.competitors || [];
+    const industry = dna.industry || brand?.industry || brandPayload?.industry || '';
+    const location = dna.city || dna.region || brand?.location || brandPayload?.location || dna.targetMarket || dna.country || '';
+    const serviceAreas = dna.serviceAreas || [];
+    const competitors = (brand?.competitors || []).map(c => c.name || c.url || c);
 
-    // STEP 1: Generate probe prompts
-    const probePrompts = generateProbePrompts(
-      brandName,
-      dna.industry || '',
-      dna.targetAudience || '',
-      website
+    console.log(`\n\ud83d\udd2c === LLM PROBE v3: ${brandName} — 5-model multi-sample engine ===`);
+
+    // Fetch previous probe for citation drift detection
+    let previousProbe = null;
+    if (req.user && brand?._id) {
+      try {
+        const prev = await GeoProbeHistory.findOne({ brand: brand._id, user: req.user._id })
+          .sort({ createdAt: -1 }).lean();
+        if (prev) previousProbe = { citations: prev.citations || [] };
+      } catch (_) {}
+    }
+
+    // Run full v3 probe — 5 models, multi-sample, confidence intervals
+    const probeResult = await probeAIVisibility(
+      brandName, industry, location, website, competitors,
+      customPrompts || [], previousProbe, null, serviceAreas
     );
 
-    // Timing Safeguard: LLM Probe involves real external calls, so we must budget strictly
-    const startElapsed = Date.now() - (req.startTime || Date.now());
-    const probeBudget = 3600000 - startElapsed;
-    // STEP 2: Run REAL probe — actually query ChatGPT, Gemini, Grok
-    console.log(`\n🔬 === REAL LLM PROBE: ${brandName} (${probePrompts.length} prompts × 3 models). Budget: ${probeBudget}ms ===`);
-    const probeData = await runRealLLMProbe(probePrompts, brandName, website, competitors);
-    // Final Timing Check for Analysis AI
-    const finalElapsed = Date.now() - (req.startTime || Date.now());
-    const remainingBudget = Math.max(300000, 600000 - finalElapsed);
-    console.log(`⏱️ LLM Probe real queries took ${finalElapsed}ms. Remaining budget for AI analysis: ${remainingBudget}ms`);
-
-    // STEP 3: Feed real probe results to AI for strategic analysis
-    let probeResultsText = `\n=== REAL LLM PROBE RESULTS (verified by actually querying each model) ===\n`;
-    probeResultsText += `Total probes: ${probeData.aggregate.totalProbes}\n`;
-    probeResultsText += `Brand mentioned: ${probeData.aggregate.mentionCount}/${probeData.aggregate.totalProbes} (${probeData.aggregate.mentionRate}%)\n\n`;
-
-    for (const [model, data] of Object.entries(probeData.byModel)) {
-      probeResultsText += `${model}: ${data.mentioned}/${data.total} mentions (${data.score}%) — ${data.status}\n`;
+    if (!probeResult) {
+      return res.status(503).json({ success: false, error: 'All LLM probe models unavailable. Check API keys.' });
     }
 
-    probeResultsText += `\nDetailed Results:\n`;
-    for (const r of probeData.results) {
-      if (!r.success) { probeResultsText += `- [${r.model}] "${r.prompt}" → ERROR: ${r.error}\n`; continue; }
-      probeResultsText += `- [${r.model}] "${r.prompt}" → ${r.mentioned ? `MENTIONED (${r.mentionType})` : 'NOT MENTIONED'}`;
-      if (r.competitorsMentioned.length > 0) probeResultsText += ` | Competitors: ${r.competitorsMentioned.join(', ')}`;
-      probeResultsText += `\n  Snippet: ${r.responseSnippet.substring(0, 150)}\n`;
+    // Build per-model summary text for AI analysis
+    let probeResultsText = `\n=== LLM PROBE RESULTS (v3 — ${probeResult.samplesPerPrompt}x multi-sample, ${probeResult.modelsUsed.length} models) ===\n`;
+    probeResultsText += `Models used: ${probeResult.modelsUsed.join(', ')}\n`;
+    probeResultsText += `Total probes: ${probeResult.totalProbes} | Mentions: ${probeResult.totalMentions} (${probeResult.mentionRate}% raw, ${probeResult.weightedMentionRate}% weighted)\n`;
+    probeResultsText += `Competitive position: ${probeResult.competitivePosition}\n\n`;
+
+    for (const [modelName, data] of Object.entries(probeResult.modelBreakdown)) {
+      probeResultsText += `${modelName}: ${data.mentioned}/${data.probed} mentions (${data.mentionRate}%) — sentiment: ${Object.entries(data.sentiment).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'n/a'}\n`;
     }
 
-    const systemPrompt = `You are an AI VISIBILITY STRATEGIST. You have REAL probe data — we ACTUALLY queried ChatGPT, Gemini, and Grok with real prompts and checked if they mention this brand. This is NOT simulated — this is ground truth.
+    if (probeResult.contentGaps?.length > 0) {
+      probeResultsText += `\nContent Gaps (brand missing, competitors found):\n`;
+      for (const gap of probeResult.contentGaps.slice(0, 5)) {
+        probeResultsText += `- Prompt: "${gap.prompt}" | Competitors cited: ${gap.competitorsFound.join(', ')} | Missing on: ${gap.models.join(', ')}\n`;
+      }
+    }
+
+    if (probeResult.topSnippets?.length > 0) {
+      probeResultsText += `\nTop Snippets Where Brand IS Mentioned:\n`;
+      for (const s of probeResult.topSnippets.slice(0, 3)) {
+        probeResultsText += `- [${s.model}] "${s.snippet.substring(0, 150)}"\n`;
+      }
+    }
+
+    const systemPrompt = `You are an AI VISIBILITY STRATEGIST. You have REAL v3 multi-sample probe data — we queried ${probeResult.modelsUsed.length} AI models (${probeResult.modelsUsed.join(', ')}) multiple times with purchase, comparison, and informational prompts. This is ground truth.
 
 ${brandContext ? `BRAND CONTEXT:\n${brandContext}\n` : ''}
 
 ${probeResultsText}
 
-Analyze the REAL probe results above and provide strategic recommendations.
+Analyze these REAL probe results and provide strategic recommendations.
 
 Respond in STRICT JSON:
 {
-  "summary": "3-4 sentence strategic summary based on REAL probe data — mention actual mention rate and which models mention/don't mention the brand",
-  "overallVisibilityScore": ${probeData.aggregate.mentionRate},
+  "summary": "3-4 sentence strategic summary — mention actual mention rate per model, confidence level, and top gap",
+  "overallVisibilityScore": ${probeResult.mentionRate},
+  "competitivePosition": "${probeResult.competitivePosition}",
   "visibilityByModel": {
-    "ChatGPT": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
-    "Gemini": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" },
-    "Grok": { "score": 0-100, "status": "visible|partially-visible|invisible", "topIssue": "Based on actual probe responses" }
+    ${probeResult.modelsUsed.map(m => `"${m}": { "score": ${probeResult.modelBreakdown[m]?.mentionRate || 0}, "status": "${(probeResult.modelBreakdown[m]?.mentionRate || 0) >= 50 ? 'visible' : (probeResult.modelBreakdown[m]?.mentionRate || 0) >= 20 ? 'partially-visible' : 'invisible'}", "topIssue": "Based on actual probe responses", "priority_action": "What to do specifically for this model" }`).join(',\n    ')}
   },
   "brandPerception": {
-    "sentiment": "positive|neutral|negative|unknown",
-    "authorityLevel": "high|medium|low|unknown",
-    "primaryAssociations": ["What models associate with this brand — from REAL responses"],
-    "missingAssociations": ["What SHOULD be associated but isn't"]
+    "sentiment": "${Object.entries(probeResult.sentimentDistribution).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'neutral'}",
+    "authorityLevel": "high|medium|low",
+    "primaryAssociations": ["What models associate with this brand"],
+    "missingAssociations": ["What SHOULD be associated but isn't — from content gaps"]
   },
   "optimizations": [
     {
-      "title": "Specific action tied to REAL probe results",
+      "title": "Specific action tied to REAL probe gaps",
       "description": "Reference specific prompts where brand was NOT mentioned",
       "priority": "critical|high|medium",
+      "targetModels": ["Which models this fixes"],
       "kpi": "Brand mention rate in re-probe",
-      "baseline": "Current state from real data (e.g., 'Mentioned in X of Y probes')",
-      "target": "Specific target",
+      "baseline": "Current: X%",
+      "target": "Target: Y% in 60 days",
       "timeline": "Implementation timeline",
-      "proofMethod": "Re-run LLM Probe",
-      "expectedROI": "Business impact"
+      "proofMethod": "Re-run LLM Probe after implementation"
     }
   ],
   "contentToCreate": [
-    { "title": "Content piece", "purpose": "Why this helps", "format": "blog|faq|guide|case-study", "targetPrompts": ["Which prompts this content targets"], "measurableGoal": "Expected re-probe result" }
+    { "title": "Content piece title", "purpose": "Why this improves LLM citation", "format": "blog|faq|guide|case-study", "targetPrompts": ["Exact gap prompts this addresses"], "targetModels": ["Which models will start citing this"], "estimatedImpact": "Expected mention rate improvement" }
+  ],
+  "quickWins": [
+    { "action": "Quick win to improve LLM visibility fast", "effort": "1 day|1 week", "targetModel": "ChatGPT|Gemini|All", "expectedLift": "+X% mention rate" }
   ]
 }
 
-CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the overall visibility score. Reference ACTUAL probe results. Every recommendation must tie back to specific prompts where the brand was NOT mentioned.`;
+CRITICAL: Base ALL analysis on the real probe data above. Every optimization must cite specific prompts and models. Do not hallucinate mention rates — use the exact numbers provided.`;
 
-    const userPrompt = `Analyze real LLM probe results for: ${brandName} (${website})`;
-    const currentElapsed = Date.now() - (req.startTime || Date.now());
-    const finalBudget = Math.max(300000, 600000 - currentElapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: finalBudget });
+    const userPrompt = `Analyze v3 LLM probe results for: ${brandName} (${website})`;
+    const elapsed = Date.now() - (req.startTime || Date.now());
+    const budget = Math.max(300000, 600000 - elapsed);
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 6144, timeout: budget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoLlmProbe', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
-    // Merge real probe data into response
-    parsed.realProbeData = {
-      probeResults: probeData.results.map(r => ({
-        prompt: r.prompt,
-        model: r.model,
-        mentioned: r.mentioned,
-        mentionType: r.mentionType,
-        confidence: r.confidence,
-        responseSnippet: r.responseSnippet,
-        competitorsMentioned: r.competitorsMentioned,
-        success: r.success,
-      })),
-      aggregate: probeData.aggregate,
-      byModel: probeData.byModel,
+    // Attach full v3 probe data to response
+    parsed.geoProbe = {
+      realScore: probeResult.score,
+      scoreCI: probeResult.scoreCI,
+      mentionRate: probeResult.mentionRate,
+      weightedMentionRate: probeResult.weightedMentionRate,
+      totalProbes: probeResult.totalProbes,
+      totalMentions: probeResult.totalMentions,
+      samplesPerPrompt: probeResult.samplesPerPrompt,
+      sentimentDistribution: probeResult.sentimentDistribution,
+      shareOfVoice: probeResult.shareOfVoice,
+      competitivePosition: probeResult.competitivePosition,
+      modelBreakdown: probeResult.modelBreakdown,
+      topSnippets: probeResult.topSnippets,
+      contentGaps: probeResult.contentGaps,
+      entityConfidence: probeResult.entityConfidence,
+      citations: probeResult.citations,
+      citationDrift: probeResult.citationDrift,
+      promptsUsed: probeResult.promptsUsed,
+      modelsUsed: probeResult.modelsUsed,
+      modelCoverage: probeResult.modelCoverage,
     };
-    parsed.overallVisibilityScore = probeData.aggregate.mentionRate;
-    parsed.dataSource = 'real-queries';
+    parsed.overallVisibilityScore = probeResult.mentionRate;
+    parsed.dataSource = 'real-queries-v3';
     parsed.researchSources = [website];
 
+    // Persist
     if (req.user && brand?._id) {
       try {
         await SeoAudit.findOneAndUpdate(
@@ -2460,12 +2643,31 @@ CRITICAL: Use the REAL mention rate (${probeData.aggregate.mentionRate}%) as the
           { url: website, results: parsed, status: 'completed' },
           { upsert: true, returnDocument: 'after' }
         );
+        // Also save to GeoProbeHistory for trend tracking
+        await GeoProbeHistory.create({
+          user: req.user._id, brand: brand._id, website,
+          score: probeResult.score, mentionRate: probeResult.mentionRate,
+          totalProbes: probeResult.totalProbes, totalMentions: probeResult.totalMentions,
+          competitivePosition: probeResult.competitivePosition,
+          modelBreakdown: probeResult.modelBreakdown,
+          sentimentDistribution: probeResult.sentimentDistribution,
+          shareOfVoice: probeResult.shareOfVoice,
+          entityConfidence: probeResult.entityConfidence,
+          modelsUsed: probeResult.modelsUsed,
+          modelCoverage: probeResult.modelCoverage,
+          contentGapsCount: probeResult.contentGaps?.length || 0,
+          citationsCount: probeResult.citations?.length || 0,
+          citations: probeResult.citations || [],
+          samplesPerPrompt: probeResult.samplesPerPrompt || 2,
+          onPageScore: 0,
+          blendedScore: probeResult.score,
+        });
       } catch (dbErr) { console.warn('Could not save LLM probe:', dbErr.message); }
     }
 
     res.json({ success: true, ...parsed });
   } catch (error) {
-    console.error('LLM Probe error:', error);
+    console.error('LLM Probe v3 error:', error);
     res.status(500).json({ success: false, error: safeErrorMessage(error) });
   }
 });
