@@ -1409,7 +1409,7 @@ export default function BrainstormStudio() {
     // Add empty Fidato message (will stream into it)
     const fidId = `f-${Date.now()}`
     currentMsgIdRef.current = fidId
-    addMessage({ id: fidId, role: 'fidato', content: '', thinking: false, reasoningSteps: [], citations: [], thinkingStartTime: Date.now(), timestamp: Date.now() })
+    addMessage({ id: fidId, role: 'fidato', content: '', thinking: true, reasoningSteps: [], citations: [], thinkingStartTime: Date.now(), timestamp: Date.now() })
 
     // Build history for backend (last 12 messages, exclude current Fidato placeholder)
     const history = messages
@@ -1433,7 +1433,7 @@ export default function BrainstormStudio() {
 
     setStreaming(true)
     setCitations([])
-    let thinkingShown = false
+    let thinkingShown = true
 
     try {
       await bsAPI.fidatoChat(
