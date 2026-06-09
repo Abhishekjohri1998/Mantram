@@ -668,10 +668,22 @@ Content themes: ${themes || 'Use brand-appropriate themes'}
 Generate a calendar with specific post ideas for each day starting from ${monthName} ${startingDate}, ${targetYear} to the end of the month.
 🚨 CRITICAL RULE: DO NOT generate any posts or schedules for dates prior to ${monthName} ${startingDate}, ${targetYear}.
 
-🚨 COPY & WRITING RULES (FOR HIGHLY HUMANIZED CONTENT):
-- captionAngle MUST be a complete, highly humanized, scroll-stopping social media caption draft (up to 400 characters). 
-- Captions must be engaging, conversational, and platform-native (use natural emoji pacing, an engaging hook, a relatable storytelling tone, and a clear call-to-action). Avoid dry corporate copy, simple sales pitches, or placeholder summaries.
+🚨 COPY & WRITING RULES (ZERO AI DETECTION — CRITICAL):
+- captionAngle MUST be a complete, highly humanized, scroll-stopping social media caption draft (up to 400 characters).
+- Captions must be engaging, conversational, and platform-native. Emojis should be placed mid-sentence naturally, not appended at the end as decoration.
 - Relate content to the festivals, trending events, and competitor gaps identified in the context. At least 30% of posts must actively address competitor gaps or leverage upcoming cultural moments/sales events.
+
+AI DETECTION PREVENTION — APPLY TO EVERY CAPTION:
+1. FORBIDDEN OPENERS (never start a caption with these): "We are excited to..." / "Introducing..." / "Are you looking for..." / "Did you know that..." / "Elevate your..." / "Unlock the..."
+2. REQUIRED OPENERS (use these instead): A bold claim, a surprising stat, a scene, a contradiction, a direct question NOT starting with "Did you know", or an emotion-first hook.
+3. FORBIDDEN PHRASES: "game-changer" / "seamlessly" / "leverage" / "robust" / "cutting-edge" / "revolutionize" / "unlock" / "elevate" / "supercharge" / "holistic" / "synergy" / "curated" (overused)
+4. FORBIDDEN CTAs: "Drop your thoughts in the comments below!" / "Let us know what you think!" / "Tag a friend!" (too generic)
+5. REQUIRED CTAs: Specific, brand-relevant, personality-driven CTAs like "Save this if you've been looking for X" or "Tag someone who needs to see this" or "What's your take on this?"
+6. SENTENCE RHYTHM: Mix ultra-short sentences (3-5 words) with medium ones (10-15 words). Real brand managers don't write in perfectly uniform sentences.
+7. OPINION MOMENT: At least 20% of captions should include a genuine brand take or perspective — not just an announcement.
+8. PLATFORM NATIVE: Instagram captions = warm, personal, slight imperfection is OK. LinkedIn = confident insight, less casual. Twitter/X = punchy takes, strong opinions.
+9. NO CORPORATE VOICE: Write as if a real, passionate person who loves this brand typed it — not a marketing department.
+10. SPECIFICITY: Replace "many people" with a specific demographic. Replace "great results" with a specific benefit. Replace "amazing product" with WHY it's different.
 
 🚨 AESTHETIC VISUAL DIRECTION RULES (FOR PREMIUM VISUALS):
 - Generate a highly descriptive, premium art-director prompt in the "visualDirection" field that image generators (like NanoBanana 2 or Flux) can execute perfectly to create a stunning visual.

@@ -1,10 +1,11 @@
 /**
- * Content Studio — Agentic Pipeline Node Functions (v3)
+ * Content Studio — Agentic Pipeline Node Functions (v4)
  * 
  * TRULY AGENTIC: Each agent uses real data via 5 tools (web search, SEO, trends, history, competitors)
  * 
- * 7-agent chain: Research → Strategist → Writer → SEO → ToneMatcher → PlatformOptimizer → QualityCritic
- * Quality Critic auto-loops to Writer if score < 8 (max 2 loops)
+ * 8-agent chain: Research → Strategist → Writer → SEO → ToneMatcher → PlatformOptimizer → Humanizer → QualityCritic
+ * Humanizer: Post-processes deep content (blog/YouTube/long-form) with Claude for zero AI detection
+ * Quality Critic auto-loops to Writer if score < 7, humanLikeness < 8, or aiPatternScore < 7 (max 2 loops)
  * Each node: (state) → updatedState
  */
 
@@ -14,6 +15,7 @@ import Brand from '../../models/Brand.js';
 import Product from '../../models/Product.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 import { resolveTargetMarkets, getRelevantFestivals } from '../../utils/globalCalendar.js';
+import { humanizationNode, humanizeBlogSection, quickHumanizationCheck } from './humanization.js';
 import {
     RESEARCH_PROMPT,
     WRITER_PROMPT,
@@ -29,6 +31,10 @@ import {
     BLOG_STRUCTURED_PROMPT,
     CONTENT_VISUAL_GROUNDING_PROMPT,
 } from './prompts.js';
+
+// Re-export humanizationNode so content-agentic.js can call it directly
+export { humanizationNode };
+
 
 // ────────────────────────────────────────────────────────────────────────────
 // HELPER: Get language directive from state (passed from researchNode)
@@ -407,7 +413,7 @@ export async function platformOptimizerNode(state) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NODE 7: QUALITY CRITIC — Final assessment with AUTO-LOOP
+// NODE 7: QUALITY CRITIC — Final assessment with AUTO-LOOP (v2 — AI detection aware)
 // ══════════════════════════════════════════════════════════════════════════════
 export async function qualityCriticNode(state) {
     console.log(`⭐ Content Agent: Quality Critic — scoring... (attempt ${(state.rewriteCount || 0) + 1})`);
@@ -417,13 +423,28 @@ export async function qualityCriticNode(state) {
         : await agentUtils.loadBrandContext(state.brandId);
     const { langInfo, languageDirective } = await getLangDirective(state);
 
+    // Use humanized content if available (from humanizationNode), otherwise fall back to platform-optimized
+    const contentToScore =
+        state.finalContent ||       // set by humanizationNode if it ran
+        state.platformOptimized?.optimizedContent ||
+        state.toneMatched?.matchedContent ||
+        state.seoOptimized?.optimizedContent ||
+        state.draft?.content || '';
+
+    const titleToScore =
+        state.finalTitle ||
+        state.platformOptimized?.optimizedTitle ||
+        state.seoOptimized?.optimizedTitle ||
+        state.draft?.title || '';
+
     const userPrompt = [
-        `ASSESS THIS FINAL CONTENT:`,
-        `Title: ${state.seoOptimized?.optimizedTitle || state.draft?.title || ''}`,
-        `Content: ${state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || ''}`,
+        `ASSESS THIS FINAL CONTENT FOR QUALITY AND AI DETECTION:`,
+        `Title: ${titleToScore}`,
+        `Content: ${contentToScore}`,
         `Platform: ${state.platform || 'instagram'}`,
         `Content Type: ${state.contentType || 'social'}`,
         `Brief: ${state.brief}`,
+        state.humanizationApplied ? `NOTE: Content has been through a humanization pass. Score humanLikeness, burstinessScore, and aiPatternScore rigorously — the bar is higher now.` : '',
         langInfo.isRegional ? `LANGUAGE CHECK: Verify all creative copy is in ${langInfo.displayName}. Deduct points if English is used instead.` : '',
         state.rewriteCount > 0 ? `\nThis is rewrite attempt #${state.rewriteCount}. Be fair but watch for improvement.` : '',
     ].filter(Boolean).join('\n');
@@ -436,24 +457,37 @@ export async function qualityCriticNode(state) {
     const result = await agentUtils.callAgent(systemPrompt, userPrompt, 0.3, 4096, { preferFast: true });
 
     const overallScore = result?.scores?.overall || result?.overallScore || 10;
+    const humanLikeness = result?.scores?.humanLikeness || 10;
+    const aiPatternScore = result?.scores?.aiPatternScore || 10;
+    const burstinessScore = result?.scores?.burstinessScore || 10;
     const rewriteCount = state.rewriteCount || 0;
 
-    // ── AUTO-LOOP: If score < 8 and we haven't hit the rewrite cap, send back to Writer ──
-    // maxRewriteLoops defaults to 2 (full quality mode), but callers can set it to 1 for
-    // fast-path social content to prevent double-rewrite latency spikes.
-    // Default cap: 1 rewrite loop (was 2). One rewrite is sufficient quality improvement;
-    // a second loop adds 25-40s latency with diminishing returns on most content types.
+    // ── AUTO-LOOP: Multiple rewrite triggers — not just overall score ──
+    // Triggers: overall < 7 OR humanLikeness < 8 OR aiPatternScore < 7 OR burstinessScore < 6
+    // maxRewriteLoops defaults to 2 (full quality mode), callers can set 1 for fast-path social.
     const maxLoops = state.maxRewriteLoops ?? 1;
-    // Threshold lowered 8→7: Most first-pass content is good quality. Only catastrophically bad
-    // content (score ≤6) justifies a full rewrite loop which adds 20-30s latency.
-    if (overallScore < 7 && rewriteCount < maxLoops) {
-        console.log(`   ⚠️ Score ${overallScore}/10 — below threshold. Sending back to Writer (loop ${rewriteCount + 1}/${maxLoops})...`);
+    const needsRewrite = (overallScore < 7 || humanLikeness < 8 || aiPatternScore < 7 || burstinessScore < 6);
+
+    if (needsRewrite && rewriteCount < maxLoops) {
+        const triggerReason = overallScore < 7
+            ? `Overall score ${overallScore}/10`
+            : humanLikeness < 8
+            ? `HumanLikeness score ${humanLikeness}/10 (requires 8+)`
+            : aiPatternScore < 7
+            ? `AI Pattern score ${aiPatternScore}/10 (requires 7+)`
+            : `Burstiness score ${burstinessScore}/10 (requires 6+)`;
+
+        console.log(`   ⚠️ ${triggerReason} — Rewrite triggered (loop ${rewriteCount + 1}/${maxLoops})...`);
 
         const fixInstructions = [
+            result?.humannessFeedback ? `HUMANNESS FIX: ${result.humannessFeedback}` : '',
+            result?.burstinessFeedback ? `BURSTINESS FIX: ${result.burstinessFeedback}` : '',
+            result?.aiPatternsFound?.length ? `REMOVE THESE AI PATTERNS: ${result.aiPatternsFound.slice(0, 5).join(', ')}` : '',
             result?.improvements?.[0] || '',
             result?.improvements?.[1] || '',
             result?.mainIssue || '',
-            `The critic scored this ${overallScore}/10. Key issues: ${result?.summary || 'Needs more engagement and brand alignment.'}`,
+            `TRIGGER: ${triggerReason}. Scores: humanLikeness=${humanLikeness}/10, aiPattern=${aiPatternScore}/10, burstiness=${burstinessScore}/10, overall=${overallScore}/10.`,
+            `KEY INSTRUCTION: Vary sentence lengths dramatically (3-word sentences mixed with 25-word sentences), remove all AI-tell phrases, add one genuine expert opinion, start at least one sentence with 'And' or 'But'.`,
         ].filter(Boolean).join('\n');
 
         const newState = {
@@ -461,6 +495,10 @@ export async function qualityCriticNode(state) {
             rewriteCount: rewriteCount + 1,
             rewriteInstructions: fixInstructions,
             critique: result,
+            // Clear humanized content so the re-writer starts fresh
+            finalContent: undefined,
+            finalTitle: undefined,
+            humanizationApplied: false,
         };
 
         // Re-run Writer → Quality Critic
@@ -468,20 +506,29 @@ export async function qualityCriticNode(state) {
         return await qualityCriticNode(rewrittenState);
     }
 
-    console.log(`   ✅ Quality score: ${overallScore}/10 ${overallScore >= 8 ? '— PASSED' : '— accepted (max loops reached)'}`);
+    const passedReason = needsRewrite
+        ? '(accepted — max loops reached)'
+        : overallScore >= 8
+        ? '— PASSED (★★★)'
+        : '— accepted';
+    console.log(`   ✅ Quality: overall=${overallScore}/10, human=${humanLikeness}/10, aiPattern=${aiPatternScore}/10, burstiness=${burstinessScore}/10 ${passedReason}`);
 
     return {
         ...state,
         critique: result,
         qualityScore: overallScore,
+        humanLikenessScore: humanLikeness,
+        aiPatternScore,
+        burstinessScore,
         rewriteCount,
-        finalContent: state.platformOptimized?.optimizedContent || state.toneMatched?.matchedContent || state.seoOptimized?.optimizedContent || state.draft?.content || '',
-        finalTitle: state.platformOptimized?.optimizedTitle || state.seoOptimized?.optimizedTitle || state.draft?.title || '',
+        finalContent: contentToScore,
+        finalTitle: titleToScore,
         platformMeta: state.platformOptimized?.platformMeta || null,
         engagementHooks: state.platformOptimized?.engagementHooks || null,
         status: 'critique',
     };
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NODE 8: CONTENT A/B TEST — Generate variants for split testing

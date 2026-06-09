@@ -31,7 +31,9 @@ import {
     youtubeSeoNode,
     blogWriterNode,
     contentVisualGroundingNode,
+    humanizationNode,
 } from '../agents/contentStudio/nodes.js';
+
 
 const router = Router();
 
@@ -113,13 +115,35 @@ router.post('/stream', protect, requireCredits('content'), async (req, res) => {
         // Step 3: Writer (main generation)
         state = await tracked('copywriter', 'Writing your content with brand voice', () => writerNode(state));
 
+        // Step 4: SEO + Tone (parallel, conditional on deep content)
+        if (!isSocialFastPath) {
+            const t2 = Date.now();
+            emit({ type: 'pipeline_step', agent: 'seo-optimizer', message: 'Optimizing for search engines', status: 'working' });
+            emit({ type: 'pipeline_step', agent: 'tone-matcher', message: 'Aligning to brand voice & removing AI patterns', status: 'working' });
+            const [seoResult, toneResult] = await Promise.allSettled([
+                seoNode(state),
+                toneMatcherNode(state),
+            ]);
+            const elapsed2 = Date.now() - t2;
+            emit({ type: 'pipeline_step', agent: 'seo-optimizer', message: 'SEO optimization complete', status: 'done', durationMs: elapsed2 });
+            emit({ type: 'pipeline_step', agent: 'tone-matcher', message: 'Brand voice aligned, AI patterns removed', status: 'done', durationMs: elapsed2 });
+            if (seoResult.status === 'fulfilled') state = { ...state, ...seoResult.value };
+            if (toneResult.status === 'fulfilled') state = { ...state, ...toneResult.value };
+
+            // Step 5: Platform Optimizer
+            state = await tracked('platform-optimizer', `Optimizing for ${platform || 'instagram'} algorithm`, () => platformOptimizerNode(state));
+
+            // Step 5.5: Humanization (deep content only — blog, YouTube, long-form, press release)
+            state = await tracked('humanizer', 'Humanizing content for zero AI detection', () => humanizationNode(state));
+        }
+
         // Save to DB
         const content = await Content.create({
             user: req.user._id,
             brand: brandId || undefined,
             type: contentType || 'social',
-            title: state.draft?.title || '',
-            content: state.draft?.content || '',
+            title: state.finalTitle || state.draft?.title || '',
+            content: state.finalContent || state.draft?.content || '',
             prompt: brief,
             platform: platform || 'instagram',
             originalContent: state.draft?.content || '',
@@ -131,6 +155,7 @@ router.post('/stream', protect, requireCredits('content'), async (req, res) => {
                 research: state.research,
                 researchDepth: researchDepth || 'quick',
                 brandAlignmentScore: 70,
+                humanizationApplied: state.humanizationApplied || false,
             },
         });
 
@@ -153,6 +178,7 @@ router.post('/stream', protect, requireCredits('content'), async (req, res) => {
                         ].filter(Boolean),
                         researchDepth: state.researchDepth,
                     },
+                    humanizationApplied: state.humanizationApplied || false,
                     pipelineProgress: 100,
                     nextStep: 'refine',
                 },
@@ -169,6 +195,7 @@ router.post('/stream', protect, requireCredits('content'), async (req, res) => {
         if (!res.writableEnded) res.end();
     }
 });
+
 
 // ════════════════════════════════════════════════════════════════════════════════
 // POST /api/content/agentic/assist — Smart writing assist for Custom Blog Writer
@@ -557,6 +584,11 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
         // Step 6: Platform Optimizer
         state = await platformOptimizerNode(state);
 
+        // Step 6.5: Humanization (deep content only — ensures zero AI detection)
+        if (!isSocialFastPath) {
+            state = await humanizationNode(state);
+        }
+
         // Step 7: Quality Critic — cap auto-rewrite to 1 iteration for social fast-path
         if (isSocialFastPath) state.maxRewriteLoops = 1;
         state = await qualityCriticNode(state);
@@ -568,9 +600,11 @@ router.post('/:id/refine', protect, requireCredits('contentRefine'), async (req,
             ...content.aiMeta,
             agenticPipeline: true,
             pipelineStep: 'refined',
+            humanizationApplied: state.humanizationApplied || false,
             seoOptimized: state.seoOptimized,
             toneMatched: state.toneMatched,
             platformOptimized: state.platformOptimized ? { platformScore: state.platformOptimized.platformScore, optimizationChanges: state.platformOptimized.optimizationChanges } : null,
+
             critique: state.critique,
             brandAlignmentScore: state.critique?.scores?.brandAlignment || 85,
         };
@@ -929,6 +963,9 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
 
         // Step 2: Blog Writer (structured JSON output)
         state = await blogWriterNode(state);
+
+        // Step 3: Humanization pass (blog content — most critical for AI detection)
+        state = await humanizationNode(state);
 
         const blogData = state.blogData || {};
         const fullContent = (blogData.sections || []).map(s => `## ${s.heading}\n\n${s.body}`).join('\n\n') || `Blog article about: ${topic}`;
