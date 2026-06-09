@@ -52,8 +52,6 @@ async function ensureYtDlpUpdated() {
 
 import crypto from 'crypto';
 import os from 'os';
-import path from 'path';
-
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
  * Implements a multi-strategy fallback to bypass bot detection.
