@@ -346,6 +346,40 @@ function LocalBusinessScan({ onComplete, onBack }) {
             let finalBrand = null
             let currentEventType = null  // Persists across read chunks — critical for large payloads
 
+            const processLine = (line) => {
+                if (line.startsWith('event: ')) {
+                    currentEventType = line.slice(7).trim()
+                    return
+                }
+                if (!line.startsWith('data: ')) return
+                const raw = line.slice(6).trim()
+                if (!raw) return
+
+                try {
+                    const evt = JSON.parse(raw)
+
+                    if (currentEventType === 'progress') {
+                        setCurrentStep(evt.message)
+                        if (evt.percent != null) setProgress(evt.percent)
+                        // Track completed major steps for the log
+                        if (evt.step && (evt.step.endsWith('-done') || evt.step === 'merge' || evt.step === 'saving')) {
+                            setCompletedSteps(prev => {
+                                const exists = prev.some(s => s.step === evt.step)
+                                return exists ? prev : [...prev, { step: evt.step, message: evt.message, time: new Date() }]
+                            })
+                        }
+                    } else if (currentEventType === 'discovery') {
+                        setDiscoveryData(evt)
+                    } else if (currentEventType === 'complete') {
+                        finalBrand = evt.brand
+                    } else if (currentEventType === 'error') {
+                        throw new Error(evt.error)
+                    }
+                } catch (parseErr) {
+                    if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
+                }
+            }
+
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
@@ -353,37 +387,16 @@ function LocalBusinessScan({ onComplete, onBack }) {
                 const lines = buffer.split('\n')
                 buffer = lines.pop() || ''
                 for (const line of lines) {
-                    if (line.startsWith('event: ')) {
-                        currentEventType = line.slice(7).trim()
-                        continue
-                    }
-                    if (!line.startsWith('data: ')) continue
-                    const raw = line.slice(6).trim()
-                    if (!raw) continue
+                    processLine(line)
+                }
+            }
 
-                    try {
-                        const evt = JSON.parse(raw)
-
-                        if (currentEventType === 'progress') {
-                            setCurrentStep(evt.message)
-                            if (evt.percent != null) setProgress(evt.percent)
-                            // Track completed major steps for the log
-                            if (evt.step && (evt.step.endsWith('-done') || evt.step === 'merge' || evt.step === 'saving')) {
-                                setCompletedSteps(prev => {
-                                    const exists = prev.some(s => s.step === evt.step)
-                                    return exists ? prev : [...prev, { step: evt.step, message: evt.message, time: new Date() }]
-                                })
-                            }
-                        } else if (currentEventType === 'discovery') {
-                            setDiscoveryData(evt)
-                        } else if (currentEventType === 'complete') {
-                            finalBrand = evt.brand
-                        } else if (currentEventType === 'error') {
-                            throw new Error(evt.error)
-                        }
-                    } catch (parseErr) {
-                        if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr
-                    }
+            // Flush remaining buffer
+            buffer += decoder.decode()
+            if (buffer.trim()) {
+                const lines = buffer.split('\n')
+                for (const line of lines) {
+                    processLine(line)
                 }
             }
 

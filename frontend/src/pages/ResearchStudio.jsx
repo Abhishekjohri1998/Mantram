@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
-import { researchStudio } from '../services/api'
+import { researchStudio, API_BASE } from '../services/api'
 import './ResearchStudio.css'
 
 // ── Module definitions ────────────────────────────────────────────────────────
@@ -88,9 +88,21 @@ export default function ResearchStudio() {
   const [streamStatus, setStreamStatus] = useState('')
   const [toolProgress, setToolProgress] = useState([]) // [{label, done}]
   const [tokenCount, setTokenCount] = useState(0)
+  const [lastModuleResults, setLastModuleResults] = useState({})
+  const [lastModuleSavedStates, setLastModuleSavedStates] = useState({})
 
   const inputRef = useRef(null)
   const abortRef = useRef(null)
+
+  const handleNewResearch = () => {
+    setResult(null)
+    setQuery('')
+    if (activeModule) {
+      setLastModuleResults(prev => ({ ...prev, [activeModule.id]: null }))
+      setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+    }
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
 
   // Fetch history when brand changes or history drawer is opened
   const fetchHistory = async () => {
@@ -107,6 +119,13 @@ export default function ResearchStudio() {
   }
 
   useEffect(() => {
+    setActiveModule(null)
+    setResult(null)
+    setError(null)
+    setSaved(false)
+    setQuery('')
+    setLastModuleResults({})
+    setLastModuleSavedStates({})
     fetchHistory()
   }, [activeBrand])
 
@@ -114,13 +133,44 @@ export default function ResearchStudio() {
     if (showHistory) fetchHistory()
   }, [showHistory])
 
-  const handleModuleSelect = (mod) => {
+  const handleModuleSelect = async (mod) => {
     setActiveModule(mod)
-    setResult(null)
     setError(null)
-    setQuery('')
     setSaved(false)
-    setTimeout(() => inputRef.current?.focus(), 100)
+    setQuery('')
+
+    // 1. Check if we have a result for this module in local state cache
+    if (lastModuleResults[mod.id]) {
+      setResult(lastModuleResults[mod.id])
+      setSaved(lastModuleSavedStates[mod.id] || false)
+      return
+    }
+
+    // 2. Otherwise, check if there is a saved report in history matching this module
+    const latestReport = history.find(r => r.researchModule === mod.id)
+    if (latestReport) {
+      setLoading(true)
+      try {
+        const res = await researchStudio.getReport(latestReport._id)
+        if (res?.success && res.report?.researchData) {
+          const data = res.report.researchData
+          setResult(data)
+          setSaved(true)
+          setLastModuleResults(prev => ({ ...prev, [mod.id]: data }))
+          setLastModuleSavedStates(prev => ({ ...prev, [mod.id]: true }))
+        } else {
+          setResult(null)
+        }
+      } catch (e) {
+        console.error('Failed to load last done research for module:', e)
+        setResult(null)
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      setResult(null)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
   }
 
   const handleRun = async () => {
@@ -136,10 +186,9 @@ export default function ResearchStudio() {
 
     // Get auth token for fetch (EventSource doesn't support headers)
     const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
     try {
-      const response = await fetch(`${API_BASE}/api/research-studio/stream`, {
+      const response = await fetch(`${API_BASE}/research-studio/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,6 +211,48 @@ export default function ResearchStudio() {
       let buffer = ''
       let localTokens = 0
 
+      const processLine = (line) => {
+        if (!line.startsWith('data: ')) return
+        try {
+          const event = JSON.parse(line.slice(6))
+
+          if (event.type === 'status') {
+            setStreamStatus(event.message)
+            setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
+          } else if (event.type === 'tool_progress') {
+            setToolProgress(prev => [
+              ...prev.filter(t => t.label !== event.label),
+              { label: event.label, done: true },
+            ])
+            setStreamStatus(`✅ ${event.label}`)
+          } else if (event.type === 'token') {
+            localTokens += (event.chunk || '').length
+            setTokenCount(localTokens)
+            setStreamStatus('✍️ Generating insights...')
+          } else if (event.type === 'cached') {
+            setResult(event.data)
+            setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+            setStreamStatus('⚡ Served from cache')
+          } else if (event.type === 'done') {
+            if (event.data) {
+              setResult(event.data)
+              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+              fetchHistory()
+            } else if (event.raw) {
+              setError('Research completed but response had a formatting issue. Raw output available below.')
+              const rawResult = { raw: event.raw }
+              setResult(rawResult)
+              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: rawResult }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+            }
+          } else if (event.type === 'error') {
+            setError(event.message || 'Research failed. Please try again.')
+          }
+        } catch { /* skip malformed events */ }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -171,37 +262,16 @@ export default function ResearchStudio() {
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const event = JSON.parse(line.slice(6))
+          processLine(line)
+        }
+      }
 
-            if (event.type === 'status') {
-              setStreamStatus(event.message)
-              setLoadingStep(s => Math.min(s + 1, LOADING_STEPS.length - 1))
-            } else if (event.type === 'tool_progress') {
-              setToolProgress(prev => [
-                ...prev.filter(t => t.label !== event.label),
-                { label: event.label, done: true },
-              ])
-              setStreamStatus(`✅ ${event.label}`)
-            } else if (event.type === 'token') {
-              localTokens += (event.chunk || '').length
-              setTokenCount(localTokens)
-              setStreamStatus('✍️ Generating insights...')
-            } else if (event.type === 'cached') {
-              setResult(event.data)
-              setStreamStatus('⚡ Served from cache')
-            } else if (event.type === 'done') {
-              if (event.data) {
-                setResult(event.data)
-              } else if (event.raw) {
-                setError('Research completed but response had a formatting issue. Raw output available below.')
-                setResult({ raw: event.raw })
-              }
-            } else if (event.type === 'error') {
-              setError(event.message || 'Research failed. Please try again.')
-            }
-          } catch { /* skip malformed events */ }
+      // Flush remaining buffer
+      buffer += decoder.decode()
+      if (buffer.trim()) {
+        const lines = buffer.split('\n')
+        for (const line of lines) {
+          processLine(line)
         }
       }
     } catch (e) {
@@ -211,6 +281,9 @@ export default function ResearchStudio() {
           const res = await researchStudio[activeModule.id]({ brand: activeBrand, query })
           if (res?.success && res?.data) {
             setResult(res.data)
+            setLastModuleResults(prev => ({ ...prev, [activeModule.id]: res.data }))
+            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+            fetchHistory()
           } else {
             setError(res?.error || 'Research failed. Please try again.')
           }
@@ -232,6 +305,8 @@ export default function ResearchStudio() {
       const res = await researchStudio.save({ brand: activeBrand, module: activeModule.id, data: result })
       if (res?.success) {
         setSaved(true)
+        setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+        fetchHistory()
       } else {
         setSaveError(res?.error || 'Save failed — please try again')
       }
@@ -335,8 +410,9 @@ export default function ResearchStudio() {
               {MODULES.map(mod => (
                 <button
                   key={mod.id}
-                  className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}`}
+                  className={`rs-module-card${activeModule?.id === mod.id ? ' rs-module-card--active' : ''}${loading ? ' rs-module-card--disabled' : ''}`}
                   onClick={() => handleModuleSelect(mod)}
+                  disabled={loading}
                 >
                   <div className="rs-module-icon">
                     <span className="material-symbols-outlined">{mod.icon}</span>
@@ -375,7 +451,7 @@ export default function ResearchStudio() {
             )}
 
             {/* Input panel */}
-            {activeModule && !result && !loading && (
+            {activeModule && !result && !loading && !error && (
               <div className="rs-input-panel">
                 <div className="rs-input-header">
                   <div className="rs-input-icon">
@@ -470,9 +546,12 @@ export default function ResearchStudio() {
             {/* Error */}
             {error && !loading && (
               <div className="rs-error">
-                <span className="material-symbols-outlined">error_outline</span>
+                <span className="material-symbols-outlined" style={{ color: 'var(--sys-primary)', fontSize: '2.5rem' }}>error_outline</span>
                 <p>{error}</p>
-                <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button className="rs-retry-btn" onClick={handleRun}>Retry</button>
+                  <button className="rs-retry-btn" style={{ background: 'transparent' }} onClick={() => setError(null)}>Edit Query</button>
+                </div>
               </div>
             )}
 
@@ -489,7 +568,7 @@ export default function ResearchStudio() {
                     <h2>{activeModule.label} — {result.brand || activeBrand?.name}</h2>
                     <span className="rs-result-time">
                       {result.generatedAt
-                        ? new Date(result.generatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                        ? new Date(result.generatedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                         : 'Just now'}
                     </span>
                   </div>
@@ -498,7 +577,7 @@ export default function ResearchStudio() {
                       <span className="material-symbols-outlined">{saved ? 'check' : 'bookmark'}</span>
                       {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button className="rs-new-btn" onClick={() => { setResult(null); setQuery('') }}>
+                    <button className="rs-new-btn" onClick={handleNewResearch}>
                       <span className="material-symbols-outlined">refresh</span>
                       New
                     </button>
