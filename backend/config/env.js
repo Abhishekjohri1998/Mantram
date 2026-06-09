@@ -35,11 +35,11 @@ export default {
     ai: {
         defaultTextProvider: process.env.DEFAULT_TEXT_PROVIDER || 'anthropic',
         defaultImageProvider: process.env.DEFAULT_IMAGE_PROVIDER || 'gemini',
-        defaultTextModel: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-6',
-        defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-3-flash-preview',
+        defaultTextModel: process.env.DEFAULT_TEXT_MODEL || 'claude-sonnet-4-20250514',
+        defaultGeminiModel: process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20',
         defaultOpenAIModel: process.env.DEFAULT_OPENAI_MODEL || 'gpt-4o-mini',
-        defaultAnthropicModel: process.env.DEFAULT_ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.5-flash',
+        defaultAnthropicModel: process.env.DEFAULT_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+        defaultImageModel: process.env.DEFAULT_IMAGE_MODEL || 'gemini-2.5-flash-preview-05-20',
         providers: {
             gemini: {
                 apiKey: process.env.GEMINI_API_KEY,

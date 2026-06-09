@@ -17,7 +17,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [], youtubeUrl = null, jsonMode = false }) {
-        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         // Native YouTube URL support — inject as fileData part so Gemini watches the video
@@ -132,7 +132,7 @@ export class GeminiProvider extends BaseProvider {
      * Returns text + grounding citations (URLs, titles, snippets).
      */
     async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
@@ -220,7 +220,7 @@ export class GeminiProvider extends BaseProvider {
      * @yields {string} Each chunk of text as it arrives from the API
      */
     async *generateTextStream({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-3-flash-preview';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
         const url = `${this.baseUrl}/models/${modelId}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
 
         const response = await fetch(url, fetchOptions({
@@ -284,7 +284,8 @@ export class GeminiProvider extends BaseProvider {
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [], size = "1K", temperature = 0.4 }) {
         const startTime = Date.now();
         const imageKey = this.imageApiKey;
-        const modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image-preview';
+        const modelId = model || this.config.defaultImageModel || 'gemini-2.5-flash-preview-05-20';
+
 
         console.log(`\n══════ GEMINI IMAGE GENERATION (${modelId}) ══════`);
         console.log(`📐 Aspect Ratio: ${aspectRatio}`);

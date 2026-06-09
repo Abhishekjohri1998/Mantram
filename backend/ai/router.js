@@ -29,8 +29,8 @@ class ModelRouter {
             this.nativeGemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
                 imageApiKey: providerConfigs.gemini.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-3-flash-preview',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
                 gcpProjectId: providerConfigs.gemini.gcpProjectId,
                 gcpLocation: providerConfigs.gemini.gcpLocation,
                 googleApplicationCredentials: providerConfigs.gemini.googleApplicationCredentials,
@@ -51,8 +51,8 @@ class ModelRouter {
             this.providers.gemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini?.apiKey,
                 imageApiKey: providerConfigs.gemini?.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-3-flash-preview',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
                 // GCP Vertex AI (Billed)
                 gcpProjectId: providerConfigs.gemini?.gcpProjectId,
                 gcpLocation: providerConfigs.gemini?.gcpLocation,
@@ -78,8 +78,9 @@ class ModelRouter {
         }
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
+            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-20250514',
         });
+
 
 
         // Log available providers

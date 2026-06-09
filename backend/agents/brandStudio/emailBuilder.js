@@ -1,7 +1,7 @@
 /**
  * Pulse Mail — Brand-native HTML email builder
  *
- * Intelligence: Claude Opus (claude-sonnet-4-6)
+ * Intelligence: Claude Opus (claude-sonnet-4-20250514)
  * Images: NanoBanana 2 via Lao Zhang
  * Rendering: MJML → bulletproof cross-client HTML
  * Gmail safe: output stays under 80KB
@@ -13,7 +13,7 @@ import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../video
 import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 
-const CLAUDE_OPUS = 'claude-sonnet-4-6';
+const CLAUDE_OPUS = 'claude-sonnet-4-20250514';
 
 const EMAIL_SYSTEM = (brandContext, urlContext) => `You are an expert email copywriter and conversion strategist.
 Your job is to write compelling, benefit-driven copy for an email campaign based on the brief.

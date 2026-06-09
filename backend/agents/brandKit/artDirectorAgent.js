@@ -16,7 +16,7 @@
 import { callAgent, loadBrandContext } from '../shared/agentUtils.js';
 import { getRouter } from '../../ai/router.js';
 
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STAGE 1: Brand Archetype + Design Movement + 2026 Trend Research

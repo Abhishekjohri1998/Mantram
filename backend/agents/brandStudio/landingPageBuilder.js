@@ -14,7 +14,7 @@ import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import fetch from 'node-fetch';
 
-const CLAUDE_OPUS = 'claude-sonnet-4-6';
+const CLAUDE_OPUS = 'claude-sonnet-4-20250514';
 
 // ── Fixed Sections Scaffold ────────────────────────────────────────
 

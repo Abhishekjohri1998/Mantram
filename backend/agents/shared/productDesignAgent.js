@@ -104,7 +104,7 @@ Make directions feel like they come from a REAL agency creative brief for this s
     try {
         const result = await callAgent(systemPrompt, userPrompt, 0.85, 2000, {
             provider: 'anthropic',
-            model: 'claude-sonnet-4-6',
+            model: 'claude-sonnet-4-20250514',
             timeoutMs: 30000,
         });
 
@@ -725,7 +725,7 @@ Return this JSON:
             copyUserPrompt,
             0.3,
             700,
-            { provider: 'anthropic', model: 'claude-sonnet-4-6' }
+            { provider: 'anthropic', model: 'claude-sonnet-4-20250514' }
         );
         copy = copyResult || {};
         console.log(`\u2705 QuickPost: Copy \u2192 heroSpec="${copy.heroSpec}" | f1="${copy.feature1}" | f2="${copy.feature2}" | f3="${copy.feature3}"`);
