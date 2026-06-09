@@ -206,8 +206,8 @@ export default function SuperAdminDashboard() {
     useEffect(() => { if (tab === 'users') loadUsers() }, [userSegment, userSort, userSortOrder])
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
-    const loadUsers = async () => {
-        setUsersLoading(true)
+    const loadUsers = async (silent = false) => {
+        if (!silent) setUsersLoading(true)
         try {
             const d = await API.getUserAnalytics({ page: userPage, limit: 25, search: debouncedSearch, plan: planFilter, segment: userSegment, sort: userSort, order: userSortOrder })
             setUsers(d.users || [])
@@ -215,7 +215,7 @@ export default function SuperAdminDashboard() {
         } catch (e) {
             // fallback to basic list if analytics endpoint not yet deployed
             try { const d = await API.getUsers({ page: userPage, limit: 25, search: debouncedSearch, plan: planFilter }); setUsers(d.users || []); setTotalUsers(d.total || 0) } catch {}
-        } finally { setUsersLoading(false) }
+        } finally { if (!silent) setUsersLoading(false) }
     }
     const loadSegmentCounts = async () => {
         try { const d = await API.getUserSegmentCounts(); setSegmentCounts(d.counts || {}) } catch {}
@@ -346,13 +346,51 @@ export default function SuperAdminDashboard() {
     const handleChangePlan = async (id, plan) => { try { await API.updateUser(id, { plan }); showToast(`Plan → ${plan}`); setPlanModal(null); loadUsers(); loadStats() } catch { showToast('Failed', 'error') } }
     const handleDeleteUser = async (id, name) => { 
         if (!confirm(`DELETE ${name} and ALL data?`)) return; 
+        
+        // Save the current state in case we need to roll back on error
+        const previousUsers = [...users];
+        const previousTotal = totalUsers;
+        const previousStats = stats;
+        const previousSegmentCounts = { ...segmentCounts };
+
+        // 1. Immediately remove the user from local state to refresh table instantly
+        setUsers(prev => prev.filter(u => u._id !== id));
+        setTotalUsers(prev => Math.max(0, prev - 1));
+        if (stats) {
+            setStats(prev => ({
+                ...prev,
+                totalUsers: Math.max(0, (prev.totalUsers || 1) - 1)
+            }));
+        }
+        if (segmentCounts) {
+            setSegmentCounts(prev => {
+                const next = { ...prev };
+                // Decrease the count for 'all' and the specific segments if present
+                if (next.all != null) next.all = Math.max(0, next.all - 1);
+                // Also decrement the count for the segment the user was in
+                const userObj = users.find(u => u._id === id);
+                const seg = userObj?.segment || 'active';
+                if (next[seg] != null) next[seg] = Math.max(0, next[seg] - 1);
+                return next;
+            });
+        }
+
         try { 
+            // 2. Perform server-side deletion
             await API.deleteUser(id); 
             showToast('User deleted'); 
-            loadUsers(); 
+            
+            // 3. Silently fetch fresh data to sync in the background
+            loadUsers(true); 
             loadStats();
+            loadSegmentCounts();
         } catch (e) { 
             showToast(e.message || 'Deletion failed', 'error');
+            // Roll back to previous state on failure
+            setUsers(previousUsers);
+            setTotalUsers(previousTotal);
+            setStats(previousStats);
+            setSegmentCounts(previousSegmentCounts);
         } 
     }
 
