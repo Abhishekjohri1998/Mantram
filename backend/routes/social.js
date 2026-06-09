@@ -77,7 +77,7 @@ function getSafeRedirectUrl(base64Origin) {
 router.get('/auth/:platform', protect, async (req, res) => {
     try {
         const { platform } = req.params;
-        if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin' && platform !== 'twitter') {
+        if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'linkedin' && platform !== 'twitter' && platform !== 'tiktok') {
             return res.status(400).json({ success: false, error: 'Invalid platform' });
         }
 
