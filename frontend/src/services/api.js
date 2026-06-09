@@ -206,6 +206,8 @@ export const auth = {
     changePassword: (currentPassword, newPassword) => apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
     verifyEmail: (token) => apiFetch(`/auth/verify-email?token=${token}`),
     completeWalkthrough: (studioId) => apiFetch('/auth/walkthrough', { method: 'PUT', body: JSON.stringify({ studioId }) }),
+    forgotPassword: (email) => apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    resetPassword: (token, password) => apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 };
 
 // ============ Brands API ============

@@ -23,6 +23,20 @@ class ModelRouter {
     _initProviders() {
         const providerConfigs = config.ai.providers;
 
+        // Always initialize a native Gemini provider if API key is present
+        // to handle native capabilities like search grounding and Imagen generation
+        if (providerConfigs.gemini?.apiKey) {
+            this.nativeGemini = new GeminiProvider({
+                apiKey: providerConfigs.gemini.apiKey,
+                imageApiKey: providerConfigs.gemini.imageApiKey,
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-3-flash-preview',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
+                gcpProjectId: providerConfigs.gemini.gcpProjectId,
+                gcpLocation: providerConfigs.gemini.gcpLocation,
+                googleApplicationCredentials: providerConfigs.gemini.googleApplicationCredentials,
+            });
+        }
+
         // Register all providers — they self-check if API key exists
         if (providerConfigs.laozhang?.apiKey) {
             console.log('🔄 Routing Gemini through Laozhang (OpenAI format)');
@@ -132,6 +146,9 @@ class ModelRouter {
         ].filter(Boolean);
 
         for (const name of priority) {
+            if (name === 'gemini' && this.nativeGemini?.isAvailable()) {
+                return this.nativeGemini;
+            }
             if (this.providers[name]?.isAvailable()) {
                 return this.providers[name];
             }
@@ -219,8 +236,10 @@ class ModelRouter {
      */
     async generateTextWithSearch(params) {
         try {
-            const gemini = this.providers.gemini;
-            if (!gemini?.isAvailable()) throw new Error('Gemini not available for search');
+            const gemini = this.nativeGemini || this.providers.gemini;
+            if (!gemini || typeof gemini.generateTextWithSearch !== 'function' || !gemini.isAvailable()) {
+                throw new Error('Gemini provider is not available or does not support search grounding');
+            }
             const result = await gemini.generateTextWithSearch(params);
             this._logUsage('search', 'gemini', result.tokensUsed);
             return result;
@@ -242,8 +261,8 @@ class ModelRouter {
      */
     async *generateTextStream(params) {
         try {
-            const gemini = this.providers.gemini;
-            if (!gemini?.isAvailable() || typeof gemini.generateTextStream !== 'function') {
+            const gemini = this.nativeGemini || this.providers.gemini;
+            if (!gemini || !gemini.isAvailable() || typeof gemini.generateTextStream !== 'function') {
                 throw new Error('Gemini streaming not available');
             }
             this._logUsage('stream', 'gemini', 0);
