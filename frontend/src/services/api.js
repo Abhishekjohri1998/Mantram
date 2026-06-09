@@ -256,7 +256,9 @@ export const content = {
     // Agentic pipeline (v2 — with real intelligence gathering)
     agenticStart: (data) => apiFetch('/content/agentic/start', { method: 'POST', body: JSON.stringify(data) }),
     agenticEdit: (id, data) => apiFetch(`/content/agentic/${id}/edit`, { method: 'POST', body: JSON.stringify(data) }),
+    agenticGetABVariants: (id) => apiFetch(`/content/agentic/${id}/ab-variants`),
     agenticABVariants: (id) => apiFetch(`/content/agentic/${id}/ab-variants`, { method: 'POST' }),
+
     // Blog-specific agentic pipeline
     blogGenerate: (data) => apiFetch('/content/agentic/blog/generate', { method: 'POST', body: JSON.stringify(data) }),
     blogGenerateImage: (id, data) => apiFetch(`/content/agentic/blog/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data) }),

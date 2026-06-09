@@ -683,6 +683,44 @@ router.post('/:id/edit', protect, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GET /api/content/agentic/:id/ab-variants — Load existing A/B variants for a content doc
+// ══════════════════════════════════════════════════════════════════════════════
+router.get('/:id/ab-variants', protect, async (req, res) => {
+    try {
+        const content = await Content.findOne({ _id: req.params.id, user: req.user._id }).lean();
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        // No A/B test group yet → no variants exist
+        if (!content.abTestGroup) {
+            return res.json({ success: true, hasVariants: false, variants: [], testPlan: null });
+        }
+
+        // Find all content docs in this abTestGroup belonging to this user
+        const allVariants = await Content.find({
+            user: req.user._id,
+            abTestGroup: content.abTestGroup,
+        }).sort({ createdAt: 1 }).lean();
+
+        return res.json({
+            success: true,
+            hasVariants: allVariants.length > 0,
+            abTestGroup: content.abTestGroup,
+            testPlan: {
+                primaryMetric: 'engagement_rate',
+                testDuration: '7 days',
+                sampleSize: 'Minimum 500 impressions per variant',
+            },
+            variants: allVariants.map(v => ({
+                ...v,
+                isControl: v.abTestChangeType === 'control',
+            })),
+        });
+    } catch (error) {
+        console.error('GET ab-variants error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 // POST /api/content/agentic/:id/ab-variants — Generate A/B test variants
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/:id/ab-variants', protect, requireCredits('content'), async (req, res) => {

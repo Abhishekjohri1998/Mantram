@@ -4055,7 +4055,7 @@ function BlogEditorView({ content, activeBrand, onNewContent, onGenerateImage })
 // ============================================================================
 
 
-function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, brandId }) {
+function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating, activeBrand, onCreateVisual, accepted, onRefine, contentFeedback, imageUrl, onABTest, abTestData, abTestLoading, generatingVisualPrompt, onGenerateVisual, inlineVisualUrl, inlineVisualActive, inlineVisualProgress, inlineVisualError, brandId }) {
     const [copied, setCopied] = useState(false)
     const [editing, setEditing] = useState(false)
     const [editContent, setEditContent] = useState(result?.content || '')
@@ -4146,6 +4146,19 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </div>
 
                 {/* Generated Visual Result / Progress */}
+                {inlineVisualError && !inlineVisualActive && !inlineVisualUrl && (
+                    <div className="mb-4 p-4 rounded-2xl bg-amber-400/8 border border-amber-400/20 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-amber-400 text-base mt-0.5 shrink-0">warning</span>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm text-amber-300 font-medium">Visual generation failed</p>
+                            <p className="text-[11px] text-amber-300/70 mt-0.5">{inlineVisualError}</p>
+                        </div>
+                        <button onClick={onGenerateVisual}
+                            className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 border border-amber-400/20 transition-all cursor-pointer">
+                            Try Again
+                        </button>
+                    </div>
+                )}
                 {(inlineVisualActive || inlineVisualUrl) && (
                     <div className="mb-6 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                         {inlineVisualUrl ? (
@@ -4207,14 +4220,27 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     </button>
                     {result?._id && (
                         <button onClick={onABTest} disabled={abTestLoading}
-                            className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)] disabled:opacity-40">
-                            <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
-                                <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
+                            className={`glass-panel rounded-2xl p-5 transition-all cursor-pointer text-left group border disabled:opacity-40 ${
+                                abTestData?.variants?.length > 0
+                                    ? 'hover:bg-emerald-500/5 hover:border-emerald-500/30 border-emerald-500/20'
+                                    : 'hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 border-[var(--sys-border)]'
+                            }`}>
+                            <div className={`size-12 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${
+                                abTestData?.variants?.length > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-[#FF4D00]/10 text-[#FF4D00]'
+                            }`}>
+                                <span className={`material-symbols-outlined text-2xl ${abTestLoading ? 'animate-spin' : ''}`}>
+                                    {abTestLoading ? 'progress_activity' : abTestData?.variants?.length > 0 ? 'check_circle' : 'science'}
+                                </span>
                             </div>
-                            <h4 className="text-base font-bold text-[var(--sys-text)] mb-1 flex items-center gap-1">{abTestLoading ? 'Creating...' : <><span className="material-symbols-outlined text-sm">science</span> A/B Test</>}</h4>
-                            <p className="text-[11px] text-[var(--sys-text-muted)]">Generate 2-3 variants to test what performs best</p>
+                            <h4 className="text-base font-bold text-[var(--sys-text)] mb-1">
+                                {abTestLoading ? 'Creating variants...' : abTestData?.variants?.length > 0 ? `${abTestData.variants.length} Variants Ready` : 'A/B Test'}
+                            </h4>
+                            <p className="text-[11px] text-[var(--sys-text-muted)]">
+                                {abTestData?.variants?.length > 0 ? 'Scroll down to view and publish variants' : 'Generate 2-3 variants to test what performs best'}
+                            </p>
                         </button>
                     )}
+
                     <button onClick={() => setShowPublish(true)}
                         className="glass-panel rounded-2xl p-5 hover:bg-[var(--sys-surface)] hover:border-[#FF4D00]/30 transition-all cursor-pointer text-left group border border-[var(--sys-border)]">
                         <div className="size-12 rounded-xl bg-[#FF4D00]/10 flex items-center justify-center text-[#FF4D00] mb-3 group-hover:scale-110 transition-transform">
@@ -4232,39 +4258,32 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <p className="text-sm text-[var(--sys-text-muted)]">Future content will align closer to this style and tone</p>
                 </div>
 
-                {/* A/B Test Variants in accepted view */}
-                {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
-                    <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-[#FF4D00]">science</span>
-                            <h4 className="text-sm font-bold text-[var(--sys-text)]">A/B Test Variants</h4>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
-                                {abTestData.variants.length} variants generated
-                            </span>
-                        </div>
-                        <div className="space-y-3">
-                            {abTestData.variants.map((v, i) => (
-                                <div key={i} className={`rounded-xl p-4 border transition-all ${v.isControl ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)]'}`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
-                                            {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
-                                        </span>
-                                        {v.abTestChangeType && v.abTestChangeType !== 'control' && (
-                                            <span className="text-[10px] text-[var(--sys-text-muted)]">{v.abTestChangeType} change</span>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-line line-clamp-4">{v.content}</p>
-                                    {v.abTestHypothesis && (
-                                        <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic flex items-center gap-0.5"><span className="material-symbols-outlined text-[10px]">lightbulb</span> {v.abTestHypothesis}</p>
-                                    )}
-                                    <button onClick={() => { navigator.clipboard.writeText(v.content); }}
-                                        className="mt-2 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 transition-colors cursor-pointer">
-                                        <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                {/* A/B Test Variants — Accepted View */}
+                {abTestError && (
+                    <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {abTestError}
                     </div>
+                )}
+                {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
+                    <ABTestVariantPanel
+                        abTestData={abTestData}
+                        copiedVariant={copiedVariant}
+                        expandedVariants={expandedVariants}
+                        onCopy={handleCopyVariant}
+                        onToggleExpand={toggleVariantExpand}
+                        onUseAsMain={handleUseVariantAsMain}
+                        onPublish={(content) => setPublishVariant(content)}
+                    />
+                )}
+                {publishVariant && (
+                    <PublishModal
+                        isOpen={!!publishVariant}
+                        onClose={() => setPublishVariant(null)}
+                        defaultText={publishVariant}
+                        defaultImage={null}
+                        brandId={activeBrand?._id}
+                    />
                 )}
 
                 <PublishModal
@@ -4382,6 +4401,19 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
             )}
 
             {/* Generated Visual Result / Progress (Unaccepted View) */}
+            {inlineVisualError && !inlineVisualActive && !inlineVisualUrl && (
+                <div className="mt-4 mb-2 p-4 rounded-2xl bg-amber-400/8 border border-amber-400/20 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-400 text-base mt-0.5 shrink-0">warning</span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm text-amber-300 font-medium">Visual generation failed</p>
+                        <p className="text-[11px] text-amber-300/70 mt-0.5">{inlineVisualError}</p>
+                    </div>
+                    <button onClick={onGenerateVisual}
+                        className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 border border-amber-400/20 transition-all cursor-pointer">
+                        Try Again
+                    </button>
+                </div>
+            )}
             {(inlineVisualActive || inlineVisualUrl) && (
                 <div className="mb-6 mt-4 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                     {inlineVisualUrl ? (
@@ -4435,11 +4467,20 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <span className="material-symbols-outlined text-lg">share</span> Publish
                 </button>
                 {result?._id && (
-                    <button onClick={onABTest} disabled={abTestLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-[#FF4D00]/10 text-[#FF4D00] hover:bg-[#FF4D00]/20 transition-all cursor-pointer border border-[#FF4D00]/30 disabled:opacity-30">
-                        <span className={`material-symbols-outlined text-lg ${abTestLoading ? 'animate-spin' : ''}`}>{abTestLoading ? 'progress_activity' : 'science'}</span>
-                        {abTestLoading ? 'Creating...' : 'A/B Test'}
-                    </button>
+                    <CreditTooltipWrapper action="content">
+                        <button onClick={onABTest} disabled={abTestLoading}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all cursor-pointer border disabled:opacity-30 ${
+                                abTestData?.variants?.length > 0
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                                    : 'bg-[#FF4D00]/10 text-[#FF4D00] border-[#FF4D00]/30 hover:bg-[#FF4D00]/20'
+                            }`}>
+                            <span className={`material-symbols-outlined text-lg ${abTestLoading ? 'animate-spin' : ''}`}>
+                                {abTestLoading ? 'progress_activity' : abTestData?.variants?.length > 0 ? 'check_circle' : 'science'}
+                            </span>
+                            {abTestLoading ? 'Creating...' : abTestData?.variants?.length > 0 ? 'Variants Ready' : 'A/B Test'}
+                            {!abTestLoading && !abTestData && <CreditBadge action="content" />}
+                        </button>
+                    </CreditTooltipWrapper>
                 )}
             </div>
 
@@ -4475,41 +4516,34 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 </CreditTooltipWrapper>
             </div>
 
+            {/* A/B Test Error */}
+            {abTestError && (
+                <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {abTestError}
+                </div>
+            )}
+
             {/* A/B Test Variants */}
             {abTestData && abTestData.variants && abTestData.variants.length > 0 && (
-                <div className="mt-6 glass-panel rounded-2xl p-5 border border-[#FF4D00]/20">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="material-symbols-outlined text-[#FF4D00]">science</span>
-                        <h4 className="text-sm font-bold text-[var(--sys-text)]">A/B Test Variants</h4>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20">
-                            {abTestData.testPlan?.primaryMetric?.replace('_', ' ')} • {abTestData.testPlan?.testDuration}
-                        </span>
-                    </div>
-                    <div className="space-y-3">
-                        {abTestData.variants.map((v, i) => (
-                            <div key={i} className={`rounded-xl p-4 border transition-all ${
-                                v.isControl ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[#FF4D00]/30'
-                            }`}>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isControl ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[#FF4D00]/10 text-[#FF4D00]'}`}>
-                                        {v.variantLabel || `Variant ${String.fromCharCode(65 + i)}`}
-                                    </span>
-                                    {v.abTestChangeType && v.abTestChangeType !== 'control' && (
-                                        <span className="text-[10px] text-[var(--sys-text-muted)]">{v.abTestChangeType} change</span>
-                                    )}
-                                </div>
-                                <p className="text-sm text-[var(--sys-text-muted)] whitespace-pre-line line-clamp-4">{v.content}</p>
-                                {v.abTestHypothesis && (
-                                    <p className="text-xs text-[var(--sys-text-muted)] mt-2 italic">💡 {v.abTestHypothesis}</p>
-                                )}
-                                <button onClick={() => { navigator.clipboard.writeText(v.content); }}
-                                    className="mt-2 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] flex items-center gap-1 transition-colors cursor-pointer">
-                                    <span className="material-symbols-outlined text-xs">content_copy</span> Copy variant
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <ABTestVariantPanel
+                    abTestData={abTestData}
+                    copiedVariant={copiedVariant}
+                    expandedVariants={expandedVariants}
+                    onCopy={handleCopyVariant}
+                    onToggleExpand={toggleVariantExpand}
+                    onUseAsMain={handleUseVariantAsMain}
+                    onPublish={(content) => setPublishVariant(content)}
+                />
+            )}
+            {publishVariant && (
+                <PublishModal
+                    isOpen={!!publishVariant}
+                    onClose={() => setPublishVariant(null)}
+                    defaultText={publishVariant}
+                    defaultImage={null}
+                    brandId={activeBrand?._id}
+                />
             )}
 
             {/* Intelligence Sources */}
@@ -4534,9 +4568,147 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
 }
 
 // ============================================================
+// A/B TEST VARIANT PANEL
+// ============================================================
+const AB_CHANGE_TYPE_CONFIG = {
+    control:   { icon: 'flag',          color: 'text-primary',      bg: 'bg-[var(--sys-primary-dim)]' },
+    hook:      { icon: 'bolt',          color: 'text-amber-400',    bg: 'bg-amber-400/10' },
+    cta:       { icon: 'ads_click',     color: 'text-emerald-400',  bg: 'bg-emerald-400/10' },
+    tone:      { icon: 'mood',          color: 'text-violet-400',   bg: 'bg-violet-400/10' },
+    structure: { icon: 'view_agenda',   color: 'text-sky-400',      bg: 'bg-sky-400/10' },
+    length:    { icon: 'compress',      color: 'text-rose-400',     bg: 'bg-rose-400/10' },
+}
+
+function ABTestVariantPanel({ abTestData, copiedVariant, expandedVariants, onCopy, onToggleExpand, onUseAsMain, onPublish }) {
+    const variants = abTestData?.variants || []
+    const testPlan = abTestData?.testPlan || {}
+
+    const metricLabel = (testPlan.primaryMetric || 'engagement_rate').replace(/_/g, ' ')
+    const duration    = testPlan.testDuration || '7 days'
+    const sampleSize  = testPlan.sampleSize || 'Min 500 impressions per variant'
+
+    return (
+        <div className="mt-6 glass-panel rounded-2xl border border-[#FF4D00]/25 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--sys-border)]">
+                <div className="size-8 rounded-lg bg-[#FF4D00]/10 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-base text-[#FF4D00]">science</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-[var(--sys-text)]">A/B Test Variants</h4>
+                    <p className="text-[10px] text-[var(--sys-text-muted)]">{variants.length} variants • testing <span className="text-[var(--sys-text)] font-medium">{metricLabel}</span></p>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20 whitespace-nowrap">{duration}</span>
+            </div>
+
+            {/* Test plan info bar */}
+            <div className="flex items-center gap-4 px-5 py-3 bg-[var(--sys-surface)]/60 border-b border-[var(--sys-border)]">
+                <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[13px] text-amber-400">tips_and_updates</span>
+                    <span className="text-[10px] text-[var(--sys-text-muted)]">How to test: post each variant to a different audience segment</span>
+                </div>
+                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                    <span className="material-symbols-outlined text-[11px] text-[var(--sys-text-muted)]">group</span>
+                    <span className="text-[10px] text-[var(--sys-text-muted)]">{sampleSize}</span>
+                </div>
+            </div>
+
+            {/* Variant cards */}
+            <div className="p-4 space-y-3">
+                {variants.map((v, i) => {
+                    const cfg  = AB_CHANGE_TYPE_CONFIG[v.abTestChangeType] || AB_CHANGE_TYPE_CONFIG.hook
+                    const isCtrl = v.isControl || v.abTestChangeType === 'control'
+                    const isExpanded = expandedVariants[i]
+                    const isCopied  = copiedVariant === i
+                    const variantLetter = String.fromCharCode(65 + i)
+
+                    return (
+                        <div key={i} className={`rounded-xl border transition-all ${
+                            isCtrl
+                                ? 'bg-[var(--sys-primary-dim)]/40 border-[var(--sys-border)]'
+                                : 'bg-[var(--sys-surface)] border-[var(--sys-border)] hover:border-[#FF4D00]/25'
+                        }`}>
+                            {/* Variant header */}
+                            <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    isCtrl ? 'bg-[var(--sys-primary-dim)] text-primary border-primary/20' : `${cfg.bg} ${cfg.color} border-current/20`
+                                }`}>
+                                    {v.variantLabel || `Variant ${variantLetter}`}
+                                </span>
+                                {!isCtrl && v.abTestChangeType && (
+                                    <span className={`flex items-center gap-0.5 text-[10px] font-medium ${cfg.color}`}>
+                                        <span className="material-symbols-outlined text-[11px]">{cfg.icon}</span>
+                                        {v.abTestChangeType} test
+                                    </span>
+                                )}
+                                {isCtrl && <span className="text-[10px] text-[var(--sys-text-muted)]">Original — control baseline</span>}
+                            </div>
+
+                            {/* Content (expandable) */}
+                            <div className="px-4 pb-1">
+                                <p className={`text-sm text-[var(--sys-text)] leading-relaxed whitespace-pre-line transition-all ${isExpanded ? '' : 'line-clamp-3'}`}>
+                                    {v.content}
+                                </p>
+                                <button onClick={() => onToggleExpand(i)}
+                                    className="text-[10px] text-[var(--sys-text-muted)] hover:text-primary mt-1 transition-colors cursor-pointer flex items-center gap-0.5">
+                                    <span className="material-symbols-outlined text-[11px]">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                                    {isExpanded ? 'Show less' : 'Read full variant'}
+                                </button>
+                            </div>
+
+                            {/* Hypothesis */}
+                            {v.abTestHypothesis && (
+                                <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-amber-400/5 border border-amber-400/10">
+                                    <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                                        <span className="material-symbols-outlined text-[11px] align-middle mr-0.5">lightbulb</span>
+                                        {v.abTestHypothesis}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1.5 px-4 pb-3 pt-1">
+                                <button onClick={() => onCopy(v.content, i)}
+                                    className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                                        isCopied
+                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-[var(--sys-surface-2,var(--sys-surface))] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)]'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-[12px]">{isCopied ? 'check' : 'content_copy'}</span>
+                                    {isCopied ? 'Copied!' : 'Copy'}
+                                </button>
+                                {!isCtrl && (
+                                    <button onClick={() => onUseAsMain(v.content)}
+                                        className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-[var(--sys-surface-2,var(--sys-surface))] text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] transition-all cursor-pointer">
+                                        <span className="material-symbols-outlined text-[12px]">edit</span>
+                                        Use as Main
+                                    </button>
+                                )}
+                                <button onClick={() => onPublish(v.content)}
+                                    className="ml-auto flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 border border-[#1877F2]/20 transition-all cursor-pointer">
+                                    <span className="material-symbols-outlined text-[12px]">share</span>
+                                    Publish
+                                </button>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Footer guidance */}
+            <div className="px-5 py-3 border-t border-[var(--sys-border)] bg-[var(--sys-surface)]/40 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[13px] text-[var(--sys-text-muted)]">info</span>
+                <p className="text-[10px] text-[var(--sys-text-muted)]">Run each variant for {duration} with equal traffic split. Declare the winner based on <span className="text-[var(--sys-text)] font-medium">{metricLabel}</span>.</p>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
 // CONTENT HISTORY SIDEBAR
 // ============================================================
 function ContentHistory({ brandId, onSelect, visible, onToggle }) {
+
     const [items, setItems] = useState([])
     const [loading, setLoading] = useState(false)
 
@@ -5277,20 +5449,77 @@ export default function ContentStudio() {
     const [contentFeedback, setContentFeedback] = useState(null) // 'liked' | 'disliked'
     const [abTestData, setAbTestData] = useState(null)
     const [abTestLoading, setAbTestLoading] = useState(false)
+    const [abTestError, setAbTestError] = useState(null)
+    const [copiedVariant, setCopiedVariant] = useState(null) // index of variant just copied
+    const [expandedVariants, setExpandedVariants] = useState({}) // { index: true/false }
+    const [publishVariant, setPublishVariant] = useState(null) // variant content to publish
+
+    // Load existing A/B variants on mount if this content already has a test group
+    useEffect(() => {
+        if (!result?._id || abTestData) return
+        contentAPI.agenticGetABVariants(result._id)
+            .then(data => {
+                if (data?.success && data?.hasVariants && data?.variants?.length > 0) {
+                    setAbTestData(data)
+                }
+            })
+            .catch(() => {}) // silent — user hasn't run A/B test yet
+    }, [result?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleABTest = async () => {
-        if (!result?._id || abTestLoading) return
+        if (abTestLoading) return
+        if (!result?._id) {
+            setAbTestError('Please accept & save the content before creating A/B variants.')
+            return
+        }
+        // If variants already exist, confirm re-run
+        if (abTestData?.variants?.length > 0) {
+            if (!window.confirm('New A/B variants will be created. Continue?')) return
+        }
         setAbTestLoading(true)
+        setAbTestError(null)
         try {
             const data = await contentAPI.agenticABVariants(result._id)
             if (data.success) {
                 setAbTestData(data)
+                setExpandedVariants({})
+            } else {
+                setAbTestError(data.error || 'Failed to generate A/B variants. Please try again.')
             }
         } catch (err) {
             console.error('A/B test error:', err)
+            setAbTestError(err.message || 'Failed to generate A/B variants. Please try again.')
         } finally {
             setAbTestLoading(false)
         }
+    }
+
+    const handleCopyVariant = async (content, idx) => {
+        try {
+            await navigator.clipboard.writeText(content)
+            setCopiedVariant(idx)
+            setTimeout(() => setCopiedVariant(null), 2000)
+        } catch {
+            // Fallback for HTTP environments
+            const ta = document.createElement('textarea')
+            ta.value = content
+            document.body.appendChild(ta)
+            ta.select()
+            document.execCommand('copy')
+            document.body.removeChild(ta)
+            setCopiedVariant(idx)
+            setTimeout(() => setCopiedVariant(null), 2000)
+        }
+    }
+
+    const toggleVariantExpand = (idx) => {
+        setExpandedVariants(prev => ({ ...prev, [idx]: !prev[idx] }))
+    }
+
+    const handleUseVariantAsMain = (variantContent) => {
+        setEditContent(variantContent)
+        setEditing(true)
+        setTimeout(() => refineRef.current?.focus(), 100)
     }
 
     const handleFeedback = async (signalType, extra = {}) => {
@@ -5312,119 +5541,172 @@ export default function ContentStudio() {
         }
     }
 
+    const _visualPollRef = React.useRef(null)
+    const [inlineVisualError, setInlineVisualError] = useState(null)
+
     const handleCreateVisual = async () => {
-        if (!result?.content) return;
-        setGeneratingVisualPrompt(true);
-        setInlineVisualActive(true);
-        setInlineVisualUrl(null);
-        setInlineVisualProgress(10);
-        
+        if (!result?.content) return
+        // Clear any previous error and start fresh
+        setInlineVisualError(null)
+        setGeneratingVisualPrompt(true)
+        setInlineVisualActive(true)
+        setInlineVisualUrl(null)
+        setInlineVisualProgress(5)
+
+        // Clear any lingering poll interval from a previous run
+        if (_visualPollRef.current) {
+            clearInterval(_visualPollRef.current)
+            _visualPollRef.current = null
+        }
+
         try {
             // STEP 1: Generate Visual Prompt via Agentic Engine
-            const brandIdentityStr = activeBrand ? `Brand Name: ${activeBrand.name}. Target Audience: ${activeBrand.dna?.audience?.demographic || ''} ${activeBrand.dna?.audience?.psychographic || ''}` : '';
+            // This is fast (Grok mini / Gemini flash) — should take < 3s
+            const brandIdentityStr = activeBrand
+                ? `Brand Name: ${activeBrand.name}. Target Audience: ${activeBrand.dna?.audience?.demographic || ''} ${activeBrand.dna?.audience?.psychographic || ''}`
+                : ''
+            setInlineVisualProgress(15)
             const data = await contentAPI.generateVisualPrompt({
                 brief: context?.details || '',
                 content: result.content,
                 type: goal || 'social',
-                brandContext: brandIdentityStr
-            });
-            let visualPrompt = data.prompt || result.content.substring(0, 200);
-            
-            // INJECT BRAND DNA
-            const brandColors = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
-            const brandName = activeBrand?.name || ''
-            const personality = activeBrand?.dna?.voice?.personality || ''
+                brandContext: brandIdentityStr,
+            })
+            let visualPrompt = data.prompt || result.content.substring(0, 200)
 
-            if (brandName) visualPrompt += `. Brand: ${brandName}.`
-            if (personality) visualPrompt += ` Style: ${personality}.`
-            if (brandColors) visualPrompt += ` Use brand colors: ${brandColors}.`
+            // Inject brand DNA into prompt
+            const brandColors  = activeBrand?.dna?.colors?.map(c => c.hex).join(', ') || ''
+            const brandName    = activeBrand?.name || ''
+            const personality  = activeBrand?.dna?.voice?.personality || ''
+            if (brandName)    visualPrompt += `. Brand: ${brandName}.`
+            if (personality)  visualPrompt += ` Style: ${personality}.`
+            if (brandColors)  visualPrompt += ` Use brand colors: ${brandColors}.`
+            setInlineVisualProgress(30)
 
-            setInlineVisualProgress(30);
-
-            // STEP 2: Trigger Generation directly using creativesAPI
+            // STEP 2: Queue the generation job
             const jobData = await creativesAPI.createJob({
                 brandId: activeBrand?._id,
-                type: 'instagram-post', // Valid enum type
+                type: 'instagram-post',
                 prompt: visualPrompt,
-                options: {
-                    dimensions: '1080x1080',
-                    model: 'nanobanana-2',
-                }
-            });
+                options: { dimensions: '1080x1080', model: 'nanobanana-2' },
+            })
 
-            if (jobData?.success && jobData?.jobId) {
-                const localJobId = jobData.jobId;
-                
-                // STEP 3: Poll until completion
-                const pollInterval = setInterval(async () => {
-                    try {
-                        const pollData = await creativesAPI.pollJob(localJobId);
-                        if (!pollData?.success) return;
-                        const job = pollData.job;
-                        
-                        setInlineVisualProgress(Math.max(40, job.progress || 0));
-                        
-                        if (job.status === 'completed') {
-                            clearInterval(pollInterval);
-                            const finalUrl = job.result?.creative?.imageUrl || job.imageUrl;
-                            const creativeId = job.result?.creative?._id;
-                            
-                            if (finalUrl) {
-                                setInlineVisualUrl(finalUrl);
-                                setInlineVisualProgress(100);
-                                setGeneratingVisualPrompt(false);
-                                setInlineVisualActive(false);
-                            } else if (creativeId) {
-                                // S3 Upload pending — wait explicitly just like Creative Studio
-                                let retries = 0;
-                                const waitForS3 = setInterval(async () => {
-                                    retries++;
-                                    if (retries > 12) {
-                                        clearInterval(waitForS3);
-                                        setGeneratingVisualPrompt(false);
-                                        setInlineVisualActive(false);
-                                        return;
-                                    }
-                                    try {
-                                        const repoll = await creativesAPI.pollJob(localJobId);
-                                        const freshJob = repoll?.job;
-                                        const freshUrl = freshJob?.result?.creative?.imageUrl || freshJob?.imageUrl;
-                                        if (freshUrl) {
-                                            clearInterval(waitForS3);
-                                            setInlineVisualUrl(freshUrl);
-                                            setInlineVisualProgress(100);
-                                            setGeneratingVisualPrompt(false);
-                                            setInlineVisualActive(false);
-                                        }
-                                    } catch (err) { /* ignore single poll failure */ }
-                                }, 5000);
-                            } else {
-                                setGeneratingVisualPrompt(false);
-                                setInlineVisualActive(false);
-                            }
-                        } else if (job.status === 'failed') {
-                            clearInterval(pollInterval);
-                            console.error('Inline visual job failed');
-                            setGeneratingVisualPrompt(false);
-                            setInlineVisualActive(false);
-                            setError({ message: job.errorMessage || 'Visual generation failed. The AI provider may be busy. Please try again.', isProviderError: true });
-                        }
-                    } catch (e) {
-                         console.error('Inline Visual Poll error:', e);
-                    }
-                }, 3000);
-            } else {
-                setGeneratingVisualPrompt(false);
-                setInlineVisualActive(false);
-                setError({ message: jobData?.error || 'Failed to start visual generation.', isProviderError: true });
+            if (!jobData?.success || !jobData?.jobId) {
+                throw new Error(jobData?.error || 'Failed to queue visual generation job.')
             }
+
+            const localJobId = jobData.jobId
+            setInlineVisualProgress(40)
+
+            // STEP 3: Poll until completed / failed
+            let pollCount = 0
+            const MAX_POLLS = 60 // 3 min at 3s intervals
+            _visualPollRef.current = setInterval(async () => {
+                pollCount++
+                try {
+                    const pollData = await creativesAPI.pollJob(localJobId)
+                    if (!pollData?.success) return
+                    const job = pollData.job
+
+                    // Smooth progress simulation while job is running
+                    const simProgress = Math.min(90, 40 + Math.floor((pollCount / MAX_POLLS) * 50))
+                    setInlineVisualProgress(Math.max(simProgress, job.progress || 0))
+
+                    if (job.status === 'completed') {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+
+                        const finalUrl  = job.result?.creative?.imageUrl || job.imageUrl
+                        const creativeId = job.result?.creative?._id || job.creativeId
+
+                        if (finalUrl) {
+                            setInlineVisualUrl(finalUrl)
+                            setInlineVisualProgress(100)
+                            setGeneratingVisualPrompt(false)
+                            setInlineVisualActive(false)
+                            return
+                        }
+
+                        if (creativeId) {
+                            // S3 upload is still in progress — wait up to 60s more
+                            let s3Retries = 0
+                            const waitForS3 = setInterval(async () => {
+                                s3Retries++
+                                if (s3Retries > 12) {
+                                    clearInterval(waitForS3)
+                                    setGeneratingVisualPrompt(false)
+                                    setInlineVisualActive(false)
+                                    setInlineVisualError('Visual was generated but upload timed out. Try clicking Create Visual again.')
+                                    return
+                                }
+                                try {
+                                    const repoll   = await creativesAPI.pollJob(localJobId)
+                                    const freshUrl = repoll?.job?.result?.creative?.imageUrl || repoll?.job?.imageUrl
+                                    if (freshUrl) {
+                                        clearInterval(waitForS3)
+                                        setInlineVisualUrl(freshUrl)
+                                        setInlineVisualProgress(100)
+                                        setGeneratingVisualPrompt(false)
+                                        setInlineVisualActive(false)
+                                    }
+                                } catch { /* ignore individual poll errors */ }
+                            }, 5000)
+                        } else {
+                            // Job completed but has no imageUrl and no creativeId — shouldn't happen
+                            setGeneratingVisualPrompt(false)
+                            setInlineVisualActive(false)
+                            setInlineVisualError('Visual generation completed but no image was returned. Please try again.')
+                        }
+
+                    } else if (job.status === 'failed') {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        const errMsg = job.errorMessage || ''
+                        const isBusy = errMsg.includes('overload') || errMsg.includes('busy') || errMsg.includes('503') || errMsg.includes('quota')
+                        setInlineVisualError(
+                            isBusy
+                                ? 'The image AI is currently busy. Please wait 30 seconds and try again.'
+                                : (errMsg || 'Visual generation failed. Please try again.')
+                        )
+                    } else if (pollCount >= MAX_POLLS) {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        setInlineVisualError('Visual generation timed out after 3 minutes. Please try again.')
+                    }
+                } catch (pollErr) {
+                    // Individual poll failure is non-fatal — keep retrying unless we've exceeded limit
+                    if (pollCount >= MAX_POLLS) {
+                        clearInterval(_visualPollRef.current)
+                        _visualPollRef.current = null
+                        setGeneratingVisualPrompt(false)
+                        setInlineVisualActive(false)
+                        setInlineVisualError('Lost connection while waiting for visual. Please try again.')
+                    }
+                }
+            }, 3000)
+
         } catch (err) {
-            console.error('Failed to generate visual inline:', err);
-            setGeneratingVisualPrompt(false);
-            setInlineVisualActive(false);
-            setError({ message: err.message || 'Failed to generate visual inline.', isProviderError: true });
+            console.error('handleCreateVisual error:', err)
+            setGeneratingVisualPrompt(false)
+            setInlineVisualActive(false)
+            if (_visualPollRef.current) {
+                clearInterval(_visualPollRef.current)
+                _visualPollRef.current = null
+            }
+            const msg = err.message || ''
+            const isBusy = msg.includes('overload') || msg.includes('busy') || msg.includes('503') || msg.includes('quota') || msg.includes('429')
+            setInlineVisualError(
+                isBusy
+                    ? 'The AI provider is currently busy. Please wait 30 seconds and try again.'
+                    : (msg || 'Failed to generate visual. Please try again.')
+            )
         }
     }
+
 
 
 
@@ -5864,6 +6146,7 @@ SPOKESPERSON QUOTES:`
                         inlineVisualUrl={inlineVisualUrl}
                         inlineVisualActive={inlineVisualActive}
                         inlineVisualProgress={inlineVisualProgress}
+                        inlineVisualError={inlineVisualError}
                         brandId={activeBrand?._id}
                     />
                     {error && (
