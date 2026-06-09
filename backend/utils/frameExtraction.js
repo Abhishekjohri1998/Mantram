@@ -5,6 +5,7 @@ import util from 'util';
 import crypto from 'crypto';
 import sharp from 'sharp';
 import { uploadToS3 } from './s3.js';
+import ffmpegPath from 'ffmpeg-static';
 
 const execPromise = util.promisify(exec);
 
@@ -101,7 +102,7 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             const ts = i * interval;
             try {
                 // -ss before -i is extremely fast for network streams
-                await execPromise(`ffmpeg -y -ss ${ts} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/interval_${ts}.jpg"`);
+                await execPromise(`"${ffmpegPath}" -y -ss ${ts} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/interval_${ts}.jpg"`);
             } catch (e) {
                 console.warn(`⚠️ FFmpeg interval extraction failed at ${ts}s:`, e.message);
             }
@@ -112,7 +113,7 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             const startSec = chapter.startTime || 0;
             if (startSec > 0) {
                 try {
-                    await execPromise(`ffmpeg -y -ss ${startSec} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/chapter_${startSec}.jpg"`);
+                    await execPromise(`"${ffmpegPath}" -y -ss ${startSec} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/chapter_${startSec}.jpg"`);
                 } catch (e) { /* ignore */ }
             }
         }
