@@ -538,7 +538,7 @@ export default function GeoPanel({ brand, onRunProbe, loading: probeLoading, pro
                                     <div className="glass-panel rounded-xl p-3 flex items-center gap-3" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
                                         <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-sm">info</span>
                                         <p className="text-xs text-[var(--sys-text-muted)]">
-                                            Drift score: <strong className="text-[var(--sys-text)]">{probeResult.geoProbe.citationDrift.driftScore || 0}%</strong> change.
+                                            Drift score: <strong className="text-[var(--sys-text)]">{probeResult.geoProbe.citationDrift.driftRate || probeResult.geoProbe.citationDrift.driftScore || 0}%</strong> change.
                                             Run probes weekly to track citation stability.
                                         </p>
                                     </div>
@@ -562,7 +562,7 @@ export default function GeoPanel({ brand, onRunProbe, loading: probeLoading, pro
                                     {/* Overall trend */}
                                     <div className="glass-panel rounded-xl p-4" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
                                         <p className="text-xs font-bold text-[var(--sys-text)] mb-3">Overall GEO Score</p>
-                                        <TrendLine data={scoreTimeline} color="#6366f1" height={60} width={Math.min(400, window.innerWidth - 100)} />
+                                        <TrendLine data={scoreTimeline} color="#6366f1" height={60} width={Math.min(400, (typeof window !== 'undefined' ? window.innerWidth : 500) - 100)} />
                                         <div className="flex justify-between text-[10px] text-[var(--sys-text-muted)] mt-2">
                                             <span>{scoreTimeline[0]?.date}</span>
                                             <span>{scoreTimeline.at(-1)?.date}</span>

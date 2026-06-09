@@ -84,6 +84,10 @@ const brandSchema = new mongoose.Schema({
         brandValues: [String],                                // Core values
         country: { type: String, default: 'India' },
         region: { type: String, default: '' },
+        city: { type: String, default: '' },
+        serviceAreas: { type: [String], default: [] },
+        physicalLocations: { type: Number, default: 0 },
+        hasGBP: { type: Boolean, default: false },
         // Target markets — ISO country codes, e.g. ['IN', 'US', 'UK', 'AE']
         // Used for market-aware festivals, content localization, and cultural context
         targetMarkets: { type: [String], default: [] },

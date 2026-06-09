@@ -36,6 +36,7 @@ import {
 import { jsRenderCrawl, formatJSCrawlForPrompt } from '../utils/js-crawler.js';
 import { scoreSiteContent, formatContentScoresForPrompt } from '../utils/content-scorer.js';
 import CompetitorSnapshot from '../models/CompetitorSnapshot.js';
+import Product from '../models/Product.js';
 import { getRouter } from '../ai/router.js';
 import { extractJSON } from '../utils/ai-parser.js';
 import { buildSeoHealthReport } from '../services/seoReportService.js';
@@ -1907,7 +1908,6 @@ router.post('/generate-llms-txt', protect, async (req, res, next) => {
     }
 
     // Products
-    const { default: Product } = await import('../models/Product.js');
     let products = [];
     try {
       products = await Product.find({ brand: brandId, status: 'active' })
