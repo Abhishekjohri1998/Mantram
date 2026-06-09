@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import { useBrand } from '../context/BrandContext'
-import { researchStudio } from '../services/api'
+import { researchStudio, API_BASE } from '../services/api'
 import './ResearchStudio.css'
 
 // ── Module definitions ────────────────────────────────────────────────────────
@@ -88,9 +88,21 @@ export default function ResearchStudio() {
   const [streamStatus, setStreamStatus] = useState('')
   const [toolProgress, setToolProgress] = useState([]) // [{label, done}]
   const [tokenCount, setTokenCount] = useState(0)
+  const [lastModuleResults, setLastModuleResults] = useState({})
+  const [lastModuleSavedStates, setLastModuleSavedStates] = useState({})
 
   const inputRef = useRef(null)
   const abortRef = useRef(null)
+
+  const handleNewResearch = () => {
+    setResult(null)
+    setQuery('')
+    if (activeModule) {
+      setLastModuleResults(prev => ({ ...prev, [activeModule.id]: null }))
+      setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
+    }
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
 
   // Fetch history when brand changes or history drawer is opened
   const fetchHistory = async () => {
@@ -107,6 +119,13 @@ export default function ResearchStudio() {
   }
 
   useEffect(() => {
+    setActiveModule(null)
+    setResult(null)
+    setError(null)
+    setSaved(false)
+    setQuery('')
+    setLastModuleResults({})
+    setLastModuleSavedStates({})
     fetchHistory()
   }, [activeBrand])
 
@@ -114,13 +133,44 @@ export default function ResearchStudio() {
     if (showHistory) fetchHistory()
   }, [showHistory])
 
-  const handleModuleSelect = (mod) => {
+  const handleModuleSelect = async (mod) => {
     setActiveModule(mod)
-    setResult(null)
     setError(null)
-    setQuery('')
     setSaved(false)
-    setTimeout(() => inputRef.current?.focus(), 100)
+    setQuery('')
+
+    // 1. Check if we have a result for this module in local state cache
+    if (lastModuleResults[mod.id]) {
+      setResult(lastModuleResults[mod.id])
+      setSaved(lastModuleSavedStates[mod.id] || false)
+      return
+    }
+
+    // 2. Otherwise, check if there is a saved report in history matching this module
+    const latestReport = history.find(r => r.researchModule === mod.id)
+    if (latestReport) {
+      setLoading(true)
+      try {
+        const res = await researchStudio.getReport(latestReport._id)
+        if (res?.success && res.report?.researchData) {
+          const data = res.report.researchData
+          setResult(data)
+          setSaved(true)
+          setLastModuleResults(prev => ({ ...prev, [mod.id]: data }))
+          setLastModuleSavedStates(prev => ({ ...prev, [mod.id]: true }))
+        } else {
+          setResult(null)
+        }
+      } catch (e) {
+        console.error('Failed to load last done research for module:', e)
+        setResult(null)
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      setResult(null)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
   }
 
   const handleRun = async () => {
@@ -136,10 +186,9 @@ export default function ResearchStudio() {
 
     // Get auth token for fetch (EventSource doesn't support headers)
     const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
     try {
-      const response = await fetch(`${API_BASE}/api/research-studio/stream`, {
+      const response = await fetch(`${API_BASE}/research-studio/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,13 +239,20 @@ export default function ResearchStudio() {
               setStreamStatus('✍️ Generating insights...')
             } else if (event.type === 'cached') {
               setResult(event.data)
+              setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+              setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
               setStreamStatus('⚡ Served from cache')
             } else if (event.type === 'done') {
               if (event.data) {
                 setResult(event.data)
+                setLastModuleResults(prev => ({ ...prev, [activeModule.id]: event.data }))
+                setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
               } else if (event.raw) {
                 setError('Research completed but response had a formatting issue. Raw output available below.')
-                setResult({ raw: event.raw })
+                const rawResult = { raw: event.raw }
+                setResult(rawResult)
+                setLastModuleResults(prev => ({ ...prev, [activeModule.id]: rawResult }))
+                setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
               }
             } else if (event.type === 'error') {
               setError(event.message || 'Research failed. Please try again.')
@@ -211,6 +267,8 @@ export default function ResearchStudio() {
           const res = await researchStudio[activeModule.id]({ brand: activeBrand, query })
           if (res?.success && res?.data) {
             setResult(res.data)
+            setLastModuleResults(prev => ({ ...prev, [activeModule.id]: res.data }))
+            setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: false }))
           } else {
             setError(res?.error || 'Research failed. Please try again.')
           }
@@ -232,6 +290,8 @@ export default function ResearchStudio() {
       const res = await researchStudio.save({ brand: activeBrand, module: activeModule.id, data: result })
       if (res?.success) {
         setSaved(true)
+        setLastModuleSavedStates(prev => ({ ...prev, [activeModule.id]: true }))
+        fetchHistory()
       } else {
         setSaveError(res?.error || 'Save failed — please try again')
       }
@@ -498,7 +558,7 @@ export default function ResearchStudio() {
                       <span className="material-symbols-outlined">{saved ? 'check' : 'bookmark'}</span>
                       {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button className="rs-new-btn" onClick={() => { setResult(null); setQuery('') }}>
+                    <button className="rs-new-btn" onClick={handleNewResearch}>
                       <span className="material-symbols-outlined">refresh</span>
                       New
                     </button>

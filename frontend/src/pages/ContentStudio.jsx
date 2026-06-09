@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
-import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI, monthlyStrategy as monthlyStrategyAPI } from '../services/api'
+import { content as contentAPI, agents as agentsAPI, creatives as creativesAPI, products as productsAPI, monthlyStrategy as monthlyStrategyAPI, API_BASE } from '../services/api'
 import { useBrand } from '../context/BrandContext'
 import { stripMarkdown } from '../utils/stripMarkdown'
 import VoiceInput from '../components/VoiceInput'
@@ -5128,11 +5128,9 @@ export default function ContentStudio() {
 
         const prompt = buildPrompt(settings)
         const token = localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')
-        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
-
         try {
             // ── Phase 3: SSE streaming pipeline ──
-            const response = await fetch(`${API_BASE}/api/content/agentic/stream`, {
+            const response = await fetch(`${API_BASE}/content/agentic/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
