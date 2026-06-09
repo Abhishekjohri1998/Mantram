@@ -24,16 +24,27 @@ class ModelRouter {
         const providerConfigs = config.ai.providers;
 
         // Register all providers — they self-check if API key exists
-        this.providers.gemini = new GeminiProvider({
-            apiKey: providerConfigs.gemini?.apiKey,
-            imageApiKey: providerConfigs.gemini?.imageApiKey,
-            defaultModel: config.ai.defaultGeminiModel || 'gemini-3-flash-preview',
-            defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
-            // GCP Vertex AI (Billed)
-            gcpProjectId: providerConfigs.gemini?.gcpProjectId,
-            gcpLocation: providerConfigs.gemini?.gcpLocation,
-            googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
-        });
+        if (providerConfigs.laozhang?.apiKey) {
+            console.log('🔄 Routing Gemini through Laozhang (OpenAI format)');
+            const geminiLzProvider = new OpenAIProvider({
+                apiKey: providerConfigs.laozhang.apiKey,
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-pro',
+            });
+            geminiLzProvider.name = 'gemini';
+            geminiLzProvider.baseUrl = providerConfigs.laozhang.baseUrl;
+            this.providers.gemini = geminiLzProvider;
+        } else {
+            this.providers.gemini = new GeminiProvider({
+                apiKey: providerConfigs.gemini?.apiKey,
+                imageApiKey: providerConfigs.gemini?.imageApiKey,
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-3-flash-preview',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-3.1-flash-image-preview',
+                // GCP Vertex AI (Billed)
+                gcpProjectId: providerConfigs.gemini?.gcpProjectId,
+                gcpLocation: providerConfigs.gemini?.gcpLocation,
+                googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
+            });
+        }
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,
             defaultModel: config.ai.defaultOpenAIModel || 'gpt-4o-mini',

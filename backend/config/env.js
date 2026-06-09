@@ -56,6 +56,10 @@ export default {
                 laozhangBaseUrl: process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1',
             },
             anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+            laozhang: {
+                apiKey: process.env.LAOZHANG_API_KEY,
+                baseUrl: process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1',
+            },
         },
     },
 
