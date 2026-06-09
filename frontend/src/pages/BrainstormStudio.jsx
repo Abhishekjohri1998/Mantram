@@ -1244,6 +1244,48 @@ export default function BrainstormStudio() {
     }).catch(() => {})
   }, [activeBrand?._id])
 
+  // ── Load a session by ID ────────────────────────────────────────────────────
+  const loadSession = useCallback(async (id) => {
+    try {
+      const r = await bsAPI.loadSession(id)
+      if (!r.success || !r.session) return
+      const s = r.session
+      setActiveSessionId(s._id)
+      setSessionState(s.sessionState || {})
+      
+      // Handle strategy-mode session
+      if (s.intent === 'strategy-mode' && s.sessionState?.lastStrategy) {
+         setSmResult(s.sessionState.lastStrategy)
+         const modeObj = STRATEGY_MODES_LIST.find(m => m.id === s.sessionState.lastStrategy.mode)
+         if (modeObj) setSmActiveMode(modeObj)
+         setMessages([])
+         setSidebarOpen(false)
+         return
+      } else {
+         setSmResult(null)
+      }
+
+      // Reconstruct messages from stored conversation
+      const msgs = s.messages.map((m, i) => ({
+        id: `loaded-${i}`,
+        role: m.role,
+        content: m.content || '',
+        timestamp: new Date(m.timestamp).getTime(),
+        ideasPayload: m.ideasPayload || null,
+        screenplayPayload: m.screenplayPayload || null,
+        strategyPayload: m.strategyPayload || null,
+        deepDivePayload: m.deepDivePayload || null,
+        calendarPayload: m.calendarPayload || null,
+        intent: m.intent || null,
+        questionOptions: m.questionOptions || null,
+      }))
+      setMessages(msgs)
+      setSidebarOpen(false)
+    } catch (e) {
+      console.warn('Failed to load session:', e.message)
+    }
+  }, [])
+
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const currentMsgIdRef = useRef(null)
@@ -1326,48 +1368,6 @@ export default function BrainstormStudio() {
     else if (sessionState.intent) setPhase('explore')
     else setPhase('explore')
   }, [sessionState])
-
-  // ── Load a session by ID ────────────────────────────────────────────────────
-  const loadSession = useCallback(async (id) => {
-    try {
-      const r = await bsAPI.loadSession(id)
-      if (!r.success || !r.session) return
-      const s = r.session
-      setActiveSessionId(s._id)
-      setSessionState(s.sessionState || {})
-      
-      // Handle strategy-mode session
-      if (s.intent === 'strategy-mode' && s.sessionState?.lastStrategy) {
-         setSmResult(s.sessionState.lastStrategy)
-         const modeObj = STRATEGY_MODES_LIST.find(m => m.id === s.sessionState.lastStrategy.mode)
-         if (modeObj) setSmActiveMode(modeObj)
-         setMessages([])
-         setSidebarOpen(false)
-         return
-      } else {
-         setSmResult(null)
-      }
-
-      // Reconstruct messages from stored conversation
-      const msgs = s.messages.map((m, i) => ({
-        id: `loaded-${i}`,
-        role: m.role,
-        content: m.content || '',
-        timestamp: new Date(m.timestamp).getTime(),
-        ideasPayload: m.ideasPayload || null,
-        screenplayPayload: m.screenplayPayload || null,
-        strategyPayload: m.strategyPayload || null,
-        deepDivePayload: m.deepDivePayload || null,
-        calendarPayload: m.calendarPayload || null,
-        intent: m.intent || null,
-        questionOptions: m.questionOptions || null,
-      }))
-      setMessages(msgs)
-      setSidebarOpen(false)
-    } catch (e) {
-      console.warn('Failed to load session:', e.message)
-    }
-  }, [])
 
   // ── Delete session ────────────────────────────────────────────────────────
   const deleteSession = useCallback(async (id) => {
