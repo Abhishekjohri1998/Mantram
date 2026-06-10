@@ -196,7 +196,6 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const avatarInputRef = useRef();
     const directAvatarInputRef = useRef();
     const refInputRef = useRef();
-    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
     // ── Reuse Project Settings ──
     const handleReuse = useCallback((project) => {
@@ -312,36 +311,27 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         });
     };
 
-    // ── Direct avatar upload from device (uploads to S3, then selects immediately) ──
-    const handleDirectAvatarUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        // Reset input so the same file can be re-uploaded
+    // ── Direct avatar upload from device ────────────────────────────────────────
+    // Stores the raw File object — sent as binary to storyboard/create (no S3 pre-upload).
+    // This avoids the S3 URL download round-trip which silently fails when filenames
+    // contain spaces/special characters (URL encoding key mismatch in presigning).
+    const handleDirectAvatarUpload = (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        // Reset input so the same file can be re-selected
         if (directAvatarInputRef.current) directAvatarInputRef.current.value = '';
-        setIsUploadingAvatar(true);
-        try {
-            const form = new FormData();
-            form.append('avatarImage', file);
-            form.append('name', file.name.split('.')[0] || 'Character');
-            if (activeBrand?._id) form.append('brandId', activeBrand._id);
-            const res = await fetch(`${API}/ugc-pro/avatars`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
-                body: form,
-            });
-            const data = await safeJson(res);
-            if (data.success && data.avatar) {
-                setAvatarImages(prev => {
-                    if (prev.length >= 4) return prev;
-                    return [...prev, { file: data.avatar.imageUrl, preview: data.avatar.imageUrl, name: data.avatar.name || '' }];
-                });
-            }
-        } catch (err) {
-            console.error('[Storyboard] Direct avatar upload failed:', err.message);
-            setError('Avatar upload failed: ' + err.message);
-        } finally {
-            setIsUploadingAvatar(false);
-        }
+        setAvatarImages(prev => {
+            const remaining = 4 - prev.length;
+            if (remaining <= 0) return prev;
+            return [
+                ...prev,
+                ...files.slice(0, remaining).map(f => ({
+                    file: f,                           // raw File object → sent as avatarImages binary
+                    preview: URL.createObjectURL(f),  // local blob for thumbnail
+                    name: f.name.split('.')[0] || 'Character',
+                }))
+            ];
+        });
     };
 
     // ── Ref image upload (location/element) ──
@@ -903,11 +893,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                 {/* Cast / Avatars */}
                                 <div className="scott-media-group">
                                     <div className="scott-media-label-row">
-                                        <span className="scott-media-type">
-                                            Cast {isUploadingAvatar && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>uploading…</span>}
-                                        </span>
+                                        <span className="scott-media-type">Cast</span>
                                         <div style={{ display: 'flex', gap: 3 }}>
-                                            <button className="scott-media-add-btn" onClick={() => directAvatarInputRef.current?.click()} title="Upload photo from device" disabled={isUploadingAvatar}>
+                                            <button className="scott-media-add-btn" onClick={() => directAvatarInputRef.current?.click()} title="Upload photo from device">
                                                 <span className="material-symbols-outlined">upload</span>
                                             </button>
                                             <button className="scott-media-add-btn" onClick={handleAddAvatar} title="Pick from avatar library">
