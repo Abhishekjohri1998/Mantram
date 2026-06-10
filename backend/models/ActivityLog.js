@@ -59,7 +59,7 @@ const activityLogSchema = new mongoose.Schema({
             'creative', 'content', 'video', 'youtube', 'brainstorm', 'research',
             'social', 'seo', 'performance', 'funnel', 'retention', 'd2c',
             'canvas', 'pulse', 'conversation', 'skills', 'brand', 'settings',
-            'auth', 'other',
+            'auth', 'virality', 'other',
         ],
     },
 

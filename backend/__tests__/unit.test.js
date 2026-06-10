@@ -186,6 +186,12 @@ describe('ActivityLog Schema', () => {
         assert.ok(actionEnum.includes('auth.login'));
     });
 
+    it('should have virality in studio enum list', async () => {
+        const { default: ActivityLog } = await import('../models/ActivityLog.js');
+        const studioEnum = ActivityLog.schema.paths.studio.options.enum;
+        assert.ok(studioEnum.includes('virality'), 'virality should be a valid studio');
+    });
+
     it('should have static log method', async () => {
         const { default: ActivityLog } = await import('../models/ActivityLog.js');
         assert.equal(typeof ActivityLog.log, 'function');

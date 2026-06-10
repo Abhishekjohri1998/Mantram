@@ -218,14 +218,34 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
-    const response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-        // Use b64_json (not url) — LaoZhang CDN URLs expire within seconds.
-        // ensureS3Url can't reliably mirror them. b64_json gives raw data → direct S3 upload.
-        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
-        signal: AbortSignal.timeout(timeoutMs),
+    let response;
+    let tryB64 = true;
+    
+    try {
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            // Use b64_json (not url) — LaoZhang CDN URLs expire within seconds.
+            // ensureS3Url can't reliably mirror them. b64_json gives raw data → direct S3 upload.
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
+            signal: AbortSignal.timeout(timeoutMs),
         }));
+        if (!response.ok) {
+            tryB64 = false;
+        }
+    } catch (err) {
+        tryB64 = false;
+    }
+
+    if (!tryB64) {
+        console.log(`⚠️  [LaoZhang] b64_json image generation failed or unsupported, retrying with response_format='url'...`);
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
+            signal: AbortSignal.timeout(timeoutMs),
+        }));
+    }
 
     if (!response.ok) {
         const errText = await response.text();
@@ -244,6 +264,10 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     // Upload to S3 — base64 → direct upload (no CDN expiry risk)
     const finalUrl = await ensureS3Url(rawData, 'studio/laozhang');
     
+    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
+        throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
+    }
+
     // Warn if S3 upload failed and we're returning raw b64 or expired CDN URL
     if (finalUrl === rawData && !finalUrl.includes('amazonaws.com')) {
         console.warn(`⚠️ [LaoZhang] ensureS3Url did not upload to S3 — returning raw data (${finalUrl.substring(0, 60)})`);
@@ -343,6 +367,10 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
     // Auto-upload base64 to S3
     const finalUrl = await ensureS3Url(imageUrl, 'studio/laozhang-multimodal');
     
+    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
+        throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
+    }
+
     console.log(`✅ [LaoZhang-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
 }
