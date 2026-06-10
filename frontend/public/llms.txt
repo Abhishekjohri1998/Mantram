@@ -1,15 +1,25 @@
 # Mantram AI
 
-> Agentic AI marketing operating system. 14 specialised studios share one Brand DNA. Model-agnostic routing across the leading frontier AI models. Built for D2C brands and marketing agencies — Indian-first, globally compliant.
+> Mantram AI is an agentic AI marketing operating system built around the concept of Brand DNA — a captured understanding of a brand's identity that powers every piece of content it creates. The platform features 14 specialized AI studios that plan, create, distribute, and optimize marketing output using a model-agnostic fleet of frontier AI including Claude, Gemini, GPT Image 2, Veo, Sora, and more. Unlike generic AI tools that produce undifferentiated output, Mantram's core differentiator is that it learns your brand once and applies that intelligence everywhere — from social content to AI search optimization. Its flagship agent, Fidato, operates as a full team of agents rather than a single tool, enabling agentic pipelines that replace manual marketing workflows. Mantram is purpose-built for the AI search era, delivering AEO-ready content and live MCP integrations that keep brands visible and competitive.
 
-Last updated: 2026-05-02
-Status: Early access (waitlist only — no public free tier as of May 2026)
+Last updated: 2026-06-10
+Status: Early access (waitlist only — no public free tier as of June 2026)
 URL: https://mantram.ai
 Sitemap: https://mantram.ai/sitemap.xml
+Industry: AI Marketing Technology / Agentic Marketing Automation
+Tagline: "AI that knows your brand, not just the internet."
+
+## What We Do
+
+- Brand DNA is captured once in 90 seconds and applied across all 14 studios — ensuring every output sounds like the brand, not generic AI
+- Model-agnostic fleet avoids single-vendor lock-in by leveraging the best frontier models simultaneously
+- Built-in AEO (Answer Engine Optimization) readiness makes brands visible in the AI search era
+- Agentic pipelines replace entire marketing teams — not just individual tools
+- Fidato operates as a coordinated team of agents, not a single assistant
 
 ## What Mantram is — and what it isn't
 
-By May 2026, every marketing tool has AI. The differentiator isn't "we have AI" — it's HOW AI is structured around your brand. Mantram is built on three principles that distinguish it from generic AI marketing tools:
+By June 2026, every marketing tool has AI. The differentiator isn't "we have AI" — it's HOW AI is structured around your brand. Mantram is built on three principles that distinguish it from generic AI marketing tools:
 
 1. **Brand DNA as the single source of truth** — onboarding scans your website, social, competitors and reviews to build a structured profile (voice, visual identity, audience, language preference, content rules). Every one of the 14 studios reads from this same source. No re-prompting. No drift. Output sounds like your brand, not generic AI slop.
 
@@ -45,7 +55,7 @@ By May 2026, every marketing tool has AI. The differentiator isn't "we have AI" 
 
 Fidato (Italian for "trusted") is Mantram's always-on AI branding expert. Conversational agent across the platform. Knows Brand DNA cold; answers strategy, copy, campaign and brand-health questions in the user's language (English, Hindi, Marathi, Hinglish). Powered by Claude Sonnet 4.6 reasoning + the user's full brand context. Voice profile: senior-CMO expertise with a GenZ-friendly tone — terse, opinionated, useful.
 
-## AI models in production (May 2026)
+## AI models in production (June 2026)
 
 Mantram is **model-agnostic** — these are routed per task, not picked once.
 
@@ -127,8 +137,11 @@ Currently in early access. Pricing is **credit-pack based** — one-time purchas
 
 There is no free tier. Early access is granted via the waitlist at https://mantram.ai. Indicative credit cost: 1 caption ≈ 0.2 credits, 1 ad creative ≈ 1 credit, 1 long-form blog ≈ 2 credits, 60-second Veo 3.1 video ≈ 5 credits, 30-day Monthly Strategy ≈ 10 credits.
 
-## Who Mantram is for
+## Who We Serve
 
+Marketing leaders, brand managers, and growth teams at mid-to-large consumer brands and agencies who are frustrated with generic AI output and want a system that maintains brand integrity at scale — particularly those operating in fast-moving retail, fashion, or DTC categories who need speed without sacrificing brand identity.
+
+### Specifically:
 - **D2C founders and solopreneurs** running their own brand on Shopify/Etsy/WooCommerce, looking for one platform instead of a stack of 8 tools
 - **Marketing agencies** managing 10–50 brands, needing per-brand voice fidelity (Brand DNA stays scoped per client, never bleeds across accounts)
 - **In-house marketing teams** at growth-stage brands replacing ChatGPT + Canva + Buffer + SEMrush + Klaviyo
@@ -140,7 +153,7 @@ Particularly strong for **Indian D2C brands** because of:
 - INR pricing, UPI auto-pay, no forex friction
 - DPDP Act-compliant data handling for Indian users
 
-## What "agentic" means here (May 2026 definition)
+## What "agentic" means here (June 2026 definition)
 
 By 2026, single-prompt AI is table stakes. Agentic in Mantram's stack means an agent fleet:
 
@@ -160,6 +173,9 @@ By 2026, single-prompt AI is table stakes. Agentic in Mantram's stack means an a
 - **TRAI DLT-registered** for India SMS deliveries
 - **Your data, your model** — user content never trains shared models
 - User-initiated data deletion: https://mantram.ai/data-deletion
+
+## Location
+India
 
 ## Contact
 

@@ -1,5 +1,5 @@
 # Mantram AI — robots.txt
-# Last updated: 2026-05-02
+# Last updated: 2026-06-10
 #
 # Public surface area: homepage, /studio/<slug> SEO sub-pages, legal pages,
 # llms.txt and sitemap. Everything authenticated is disallowed.
