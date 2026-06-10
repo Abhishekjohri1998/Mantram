@@ -115,7 +115,7 @@ export default function VideoStudio() {
     // Plan gate: only Professional, Agency, Enterprise, or admin/superadmin can create videos
     const userPlan = balance?.plan || 'free'
     const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
-    const canCreateVideo = isAdmin || VIDEO_ALLOWED_PLANS.includes(userPlan)
+    const canCreateVideo = isAdmin || VIDEO_ALLOWED_PLANS.includes(userPlan) || user?.studioAccess?.videoStudio === true
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
     // ── State ──
