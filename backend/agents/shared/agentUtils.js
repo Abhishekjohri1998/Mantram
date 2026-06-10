@@ -470,9 +470,13 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
     const startMs = Date.now();
 
     // Filter valid image URLs — skip empties, nulls, broken refs
-    const validImages = (imageUrls || []).filter(url => 
+    const rawImages = (imageUrls || []).filter(url => 
         url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:'))
     ).slice(0, 5); // Max 5 images to avoid context overflow
+
+    // Automatically sign S3 URLs before executing LLM vision call
+    const { getSignedUrlIfNeeded } = await import('../../utils/s3.js');
+    const validImages = await Promise.all(rawImages.map(url => getSignedUrlIfNeeded(url)));
 
     console.log(`🧠 MCoT: Multimodal Agent — ${validImages.length} images, prompt: ${userPrompt.substring(0, 80)}...`);
 

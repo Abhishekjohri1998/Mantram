@@ -37,7 +37,7 @@ import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus, submitG
 import {
     extractLastFrameToS3,
 } from '../../utils/ffmpegUtils.js';
-import { uploadToS3 } from '../../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../../utils/s3.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -286,29 +286,51 @@ async function _runPipeline(jobId, params) {
         const includeBranding = params.includeBranding !== false; // default true
         const characterRefSheetUrl = params.characterRefSheetUrl || null;
 
-        // Build the char ref sheet ref entry (stable face anchor)
-        const charSheetRef = characterRefSheetUrl ? [{ url: characterRefSheetUrl, role: 'character_reference' }] : [];
+        // Sign main URL parameters on-the-fly
+        const signedImageUrl = params.imageUrl ? await getSignedUrlIfNeeded(params.imageUrl) : null;
+        const signedFirstFrameUrl = params.firstFrameUrl ? await getSignedUrlIfNeeded(params.firstFrameUrl) : null;
+        const signedCharacterRefSheetUrl = characterRefSheetUrl ? await getSignedUrlIfNeeded(characterRefSheetUrl) : null;
 
-        // Individual avatar refs (used only if no char ref sheet was generated)
+        // Build the char ref sheet ref entry (stable face anchor)
+        const charSheetRef = signedCharacterRefSheetUrl ? [{ url: signedCharacterRefSheetUrl, role: 'character_reference' }] : [];
+
+        // Sign and build individual avatar refs (used only if no char ref sheet was generated)
+        const signedAvatarUrls = await Promise.all(avatarUrls.map(url => getSignedUrlIfNeeded(url)));
         const avatarRefs = charSheetRef.length === 0
-            ? avatarUrls.map((url, i) => ({
+            ? signedAvatarUrls.map((url, i) => ({
                 url,
                 role: 'character_reference',
                 name: avatarNames[i] || `Character ${i + 1}`,
               }))
             : [];
 
-        const refImgRefs = refImageUrls.map((url, i) => ({
+        // Sign and build location/element refs
+        const signedRefImageUrls = await Promise.all(refImageUrls.map(url => getSignedUrlIfNeeded(url)));
+        const refImgRefs = signedRefImageUrls.map((url, i) => ({
             url,
             role: 'location_reference',
             name: `ref_${i + 1}`,
         }));
 
+        // Sign and process existing/incoming params.referenceImages
+        const signedReferenceImages = await Promise.all((params.referenceImages || []).map(async r => {
+            if (r && typeof r === 'object') {
+                return {
+                    ...r,
+                    url: await getSignedUrlIfNeeded(r.url)
+                };
+            }
+            if (typeof r === 'string') {
+                return await getSignedUrlIfNeeded(r);
+            }
+            return r;
+        }));
+
         // Deduplicate and build enrichedReferenceImages
         // Order: char ref sheet first → product/other existing refs → avatar fallbacks → location refs
-        const existingUrls = new Set((params.referenceImages || []).map(r => r.url || r));
+        const existingUrls = new Set(signedReferenceImages.map(r => r.url || r));
         const extraRefs = [...charSheetRef, ...avatarRefs, ...refImgRefs].filter(r => !existingUrls.has(r.url));
-        const enrichedReferenceImages = [...(params.referenceImages || []), ...extraRefs];
+        const enrichedReferenceImages = [...signedReferenceImages, ...extraRefs];
 
         // If branding is OFF, strip any logo reference from enrichedReferenceImages
         const finalReferenceImages = includeBranding
@@ -349,7 +371,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
             const structuredPlan = params.structuredPlan || null;
             scenes = await planStoryboardScenes({
                 videoPrompt: params.videoPrompt,
-                imageUrl: params.imageUrl,
+                imageUrl: signedImageUrl,
                 targetDuration: params.totalDuration,
                 model: params.model,
                 language: dialogueLanguage,
@@ -405,7 +427,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         // Initialize lastFrameUrl for segment chaining.
         // Segment 1 uses params.firstFrameUrl (product/avatar image) as its opening frame.
         // Subsequent segments chain from the last frame of the previous segment.
-        let lastFrameUrl = params.firstFrameUrl || null;
+        let lastFrameUrl = signedFirstFrameUrl;
         let completedCount = 0;
 
         for (let i = 0; i < actualSegCount; i++) {
@@ -421,10 +443,11 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
             // If no product/avatar image → text-to-video (imageUrl=null is fine for Atlas).
             // Subsequent segments: use last frame of previous segment for continuity.
             // NEVER use the storyboard poster as a first frame — it's a style reference only.
-            const segmentFirstFrameUrl = i === 0 ? (params.firstFrameUrl || null) : lastFrameUrl;
+            const segmentFirstFrameUrlRaw = i === 0 ? signedFirstFrameUrl : lastFrameUrl;
+            const segmentFirstFrameUrl = segmentFirstFrameUrlRaw ? await getSignedUrlIfNeeded(segmentFirstFrameUrlRaw) : null;
 
             // Build references: always inject storyboard poster as style guide for EVERY segment.
-            const posterStyleRef = params.imageUrl ? [{ url: params.imageUrl, role: 'style_reference' }] : [];
+            const posterStyleRef = signedImageUrl ? [{ url: signedImageUrl, role: 'style_reference' }] : [];
             const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
 
             // Build per-segment prompt — enrich with position context

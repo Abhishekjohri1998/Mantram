@@ -8673,9 +8673,46 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
         // Build references (poster + char ref sheet)
         const posterUrl = sb.imageUrl ? await getSignedUrlIfNeeded(sb.imageUrl) : null;
         const charRefUrl = sb.characterRefSheetUrl ? await getSignedUrlIfNeeded(sb.characterRefSheetUrl) : null;
+
+        const characterRefs = [];
+        if (charRefUrl) {
+            characterRefs.push({ url: charRefUrl, role: 'character_reference' });
+        } else {
+            // Fall back to individual avatar URLs
+            const avatarUrls = project.input?.avatarUrls || (project.input?.avatarUrl ? [project.input.avatarUrl] : []);
+            const avatarNames = project.input?.avatarNames || [];
+            for (let i = 0; i < avatarUrls.length; i++) {
+                const url = avatarUrls[i];
+                if (url) {
+                    const signedUrl = await getSignedUrlIfNeeded(url);
+                    characterRefs.push({
+                        url: signedUrl,
+                        role: 'character_reference',
+                        name: avatarNames[i] || `Character ${i + 1}`
+                    });
+                }
+            }
+        }
+
+        // Location/element refs
+        const refImageUrls = project.input?.refImageUrls || [];
+        const locationRefs = [];
+        for (let i = 0; i < refImageUrls.length; i++) {
+            const url = refImageUrls[i];
+            if (url) {
+                const signedUrl = await getSignedUrlIfNeeded(url);
+                locationRefs.push({
+                    url: signedUrl,
+                    role: 'location_reference',
+                    name: `ref_${i + 1}`
+                });
+            }
+        }
+
         const references = [
-            ...(posterUrl  ? [{ url: posterUrl,  role: 'style_reference'      }] : []),
-            ...(charRefUrl ? [{ url: charRefUrl, role: 'character_reference'   }] : []),
+            ...(posterUrl ? [{ url: posterUrl, role: 'style_reference' }] : []),
+            ...characterRefs,
+            ...locationRefs,
         ];
 
         const duration = storedScenes[segIdx]?.duration || 10;
