@@ -50,8 +50,10 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
         await upload.done();
 
         // Construct the public URL
-        // Using path-style URL to avoid SSL issues with buckets containing dots (e.g. mantram.ai)
-        return `https://s3.${config.aws.region}.amazonaws.com/${config.aws.bucket}/${key}`;
+        // Using path-style URL. URL-encode each key segment so filenames with spaces/special chars
+        // produce valid URLs and round-trip cleanly through getSignedUrlForPath's URL parsing.
+        const encodedKey = key.split('/').map(seg => encodeURIComponent(seg)).join('/');
+        return `https://s3.${config.aws.region}.amazonaws.com/${config.aws.bucket}/${encodedKey}`;
     } catch (error) {
         console.error("S3 Upload Error:", error);
         throw new Error(`S3 Upload failed: ${error.message}`);
@@ -240,6 +242,11 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => { // SE
 
                 // Strip query params just in case they were passed as part of the "key"
                 key = key.split('?')[0];
+
+                // Decode URI components: URL has %20 etc. but the actual S3 key has raw chars.
+                // encodeURIComponent was applied per-segment in uploadToS3, so decoding restores
+                // the true key (e.g. "ugc-pro/avatars/userId/My Photo.jpg" not "My%20Photo.jpg").
+                try { key = decodeURIComponent(key); } catch { /* keep as-is if malformed */ }
             } catch (e) {
                 console.warn("Failed to parse S3 URL for signing, using as raw key:", urlOrKey);
             }
