@@ -194,7 +194,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
     const productInputRef = useRef();
     const avatarInputRef = useRef();
+    const directAvatarInputRef = useRef();
     const refInputRef = useRef();
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
     // ── Reuse Project Settings ──
     const handleReuse = useCallback((project) => {
@@ -308,6 +310,38 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             if (entry?.preview?.startsWith('blob:')) URL.revokeObjectURL(entry.preview);
             return prev.filter((_, i) => i !== idx);
         });
+    };
+
+    // ── Direct avatar upload from device (uploads to S3, then selects immediately) ──
+    const handleDirectAvatarUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        // Reset input so the same file can be re-uploaded
+        if (directAvatarInputRef.current) directAvatarInputRef.current.value = '';
+        setIsUploadingAvatar(true);
+        try {
+            const form = new FormData();
+            form.append('avatarImage', file);
+            form.append('name', file.name.split('.')[0] || 'Character');
+            if (activeBrand?._id) form.append('brandId', activeBrand._id);
+            const res = await fetch(`${API}/ugc-pro/avatars`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
+                body: form,
+            });
+            const data = await safeJson(res);
+            if (data.success && data.avatar) {
+                setAvatarImages(prev => {
+                    if (prev.length >= 4) return prev;
+                    return [...prev, { file: data.avatar.imageUrl, preview: data.avatar.imageUrl, name: data.avatar.name || '' }];
+                });
+            }
+        } catch (err) {
+            console.error('[Storyboard] Direct avatar upload failed:', err.message);
+            setError('Avatar upload failed: ' + err.message);
+        } finally {
+            setIsUploadingAvatar(false);
+        }
     };
 
     // ── Ref image upload (location/element) ──
@@ -811,11 +845,11 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
             {(phase === 'input' || phase === 'directing' || phase === 'storyboarding') && (
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '24px', zIndex: 10 }}>
-                    <div className="scott-panel" style={{ flexDirection: 'column', gap: 8, padding: '12px 16px', maxWidth: '1050px' }}>
-                        
-                        {/* Row 1: Brief input */}
-                        <div className="scott-input-wrapper" style={{ width: '100%' }}>
-                            <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', marginRight: 10, fontSize: 18 }}>edit</span>
+                    <div className="scott-panel">
+
+                        {/* ── Row 1: Brief Input (full width) ── */}
+                        <div className="scott-brief-row">
+                            <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>edit</span>
                             <DebouncedInput
                                 className="scott-input"
                                 placeholder="Describe your ad film... e.g. 'Create a 30s emotional ad for our protein powder targeting young fitness enthusiasts...'"
@@ -825,16 +859,163 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                             />
                         </div>
 
-                        {/* Row 2: Config + blocks + generate */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap' }}>
-                            
-                            <CfgMenu value={format} onChange={setFormat} options={FORMATS} icon="crop" />
-                            <CfgMenu value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="hd" />
+                        {/* ── Row 2: 3-column settings grid ── */}
+                        <div className="scott-main-grid">
 
-                            {/* Duration Slider */}
-                            <div className="sb-dur-slider-wrap">
-                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)' }}>timer</span>
-                                <div className="sb-dur-slider-inner">
+                            {/* ════ MEDIA COLUMN ════ */}
+                            <div className="scott-section">
+                                <div className="scott-section-header">
+                                    <span className="material-symbols-outlined">photo_library</span>
+                                    MEDIA
+                                </div>
+
+                                {/* Product Images */}
+                                <div className="scott-media-group">
+                                    <div className="scott-media-label-row">
+                                        <span className="scott-media-type">Product</span>
+                                        <button className="scott-media-add-btn" onClick={() => productInputRef.current?.click()} title="Upload product image">
+                                            <span className="material-symbols-outlined">add_photo_alternate</span>
+                                        </button>
+                                    </div>
+                                    <div className="scott-media-strip">
+                                        {productImages.length === 0 ? (
+                                            <div className="scott-media-empty" onClick={() => productInputRef.current?.click()}>
+                                                <span className="material-symbols-outlined">inventory_2</span>
+                                            </div>
+                                        ) : productImages.map((pi, idx) => (
+                                            <div key={idx} className="scott-thumb-wrap">
+                                                <img src={pi.preview} alt={`product-${idx+1}`} className="scott-media-thumb" />
+                                                <button className="scott-thumb-remove" onClick={() => {
+                                                    const removed = productImages[idx];
+                                                    if (removed?.preview?.startsWith('blob:')) URL.revokeObjectURL(removed.preview);
+                                                    setProductImages(prev => prev.filter((_, i) => i !== idx));
+                                                }}>✕</button>
+                                            </div>
+                                        ))}
+                                        {productImages.length > 0 && (
+                                            <button className="scott-media-add-btn" onClick={() => productInputRef.current?.click()} title="Add more">
+                                                <span className="material-symbols-outlined">add</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Cast / Avatars */}
+                                <div className="scott-media-group">
+                                    <div className="scott-media-label-row">
+                                        <span className="scott-media-type">
+                                            Cast {isUploadingAvatar && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>uploading…</span>}
+                                        </span>
+                                        <div style={{ display: 'flex', gap: 3 }}>
+                                            <button className="scott-media-add-btn" onClick={() => directAvatarInputRef.current?.click()} title="Upload photo from device" disabled={isUploadingAvatar}>
+                                                <span className="material-symbols-outlined">upload</span>
+                                            </button>
+                                            <button className="scott-media-add-btn" onClick={handleAddAvatar} title="Pick from avatar library">
+                                                <span className="material-symbols-outlined">person_search</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="scott-media-strip">
+                                        {avatarImages.length === 0 ? (
+                                            <div className="scott-media-empty" onClick={handleAddAvatar}>
+                                                <span className="material-symbols-outlined">person</span>
+                                            </div>
+                                        ) : avatarImages.map((ai, idx) => (
+                                            <div key={idx} className="scott-thumb-wrap">
+                                                <img
+                                                    src={ai.preview}
+                                                    alt={`avatar-${idx+1}`}
+                                                    title={ai.name || `Character ${idx+1}`}
+                                                    className="scott-media-thumb scott-media-thumb-avatar"
+                                                    onClick={() => { setAvatarPickerTargetIdx(idx); setShowAvatarPicker(true); }}
+                                                />
+                                                {ai.name && <span className="scott-avatar-name">{ai.name.slice(0, 7)}</span>}
+                                                <button className="scott-thumb-remove" onClick={() => handleRemoveAvatar(idx)}>✕</button>
+                                            </div>
+                                        ))}
+                                        {avatarImages.length > 0 && avatarImages.length < 4 && (
+                                            <button className="scott-media-add-btn" onClick={() => { setAvatarPickerTargetIdx(null); setShowAvatarPicker(true); }} title="Add another character">
+                                                <span className="material-symbols-outlined">add</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Location / Ref Images */}
+                                <div className="scott-media-group">
+                                    <div className="scott-media-label-row">
+                                        <span className="scott-media-type">Location</span>
+                                        {refImages.length < 3 && (
+                                            <button className="scott-media-add-btn" onClick={() => refInputRef.current?.click()} title="Upload location reference">
+                                                <span className="material-symbols-outlined">add_location_alt</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="scott-media-strip">
+                                        {refImages.length === 0 ? (
+                                            <div className="scott-media-empty" onClick={() => refInputRef.current?.click()}>
+                                                <span className="material-symbols-outlined">landscape</span>
+                                            </div>
+                                        ) : refImages.map((ri, idx) => (
+                                            <div key={idx} className="scott-thumb-wrap">
+                                                <img src={ri.preview} alt={`ref-${idx+1}`} className="scott-media-thumb" style={{ border: '2px solid rgba(234,179,8,0.45)' }} />
+                                                <button className="scott-thumb-remove" onClick={() => handleRemoveRef(idx)}>✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* URL scraper */}
+                                <div className="scott-url-row">
+                                    <span className="material-symbols-outlined">link</span>
+                                    <input
+                                        type="text"
+                                        className="scott-url-input"
+                                        placeholder="Paste product URL…"
+                                        value={productUrlInput}
+                                        onChange={e => setProductUrlInput(e.target.value)}
+                                        disabled={isScrapingUrl}
+                                        onKeyDown={e => { if (e.key === 'Enter' && productUrlInput) handleProductUrlAdd(); }}
+                                    />
+                                    {productUrlInput && (
+                                        <button className="scott-url-btn" onClick={handleProductUrlAdd} disabled={isScrapingUrl}>
+                                            {isScrapingUrl ? '…' : 'Add'}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Hidden file inputs */}
+                                <input ref={productInputRef} type="file" accept="image/*" multiple hidden onChange={handleProductImages} />
+                                <input ref={directAvatarInputRef} type="file" accept="image/*" hidden onChange={handleDirectAvatarUpload} />
+                                <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={(e) => handleAvatarFileUpload(e)} />
+                                <input ref={refInputRef} type="file" accept="image/*" multiple hidden onChange={handleRefImages} />
+                            </div>
+
+                            {/* ════ OUTPUT COLUMN ════ */}
+                            <div className="scott-section">
+                                <div className="scott-section-header">
+                                    <span className="material-symbols-outlined">movie</span>
+                                    OUTPUT
+                                </div>
+
+                                <div className="scott-output-pair">
+                                    <div className="scott-labeled-control">
+                                        <span className="scott-ctrl-label">Format</span>
+                                        <CfgMenu value={format} onChange={setFormat} options={FORMATS} icon="crop" />
+                                    </div>
+                                    <div className="scott-labeled-control">
+                                        <span className="scott-ctrl-label">Resolution</span>
+                                        <CfgMenu value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="hd" />
+                                    </div>
+                                </div>
+
+                                <div className="scott-duration-block">
+                                    <div className="scott-duration-header">
+                                        <span className="scott-ctrl-label">Duration</span>
+                                        <span className="scott-duration-value">
+                                            {duration}s<span className="scott-duration-tag">{getDurationLabel(duration)}</span>
+                                        </span>
+                                    </div>
                                     <input
                                         type="range"
                                         className="sb-dur-slider"
@@ -845,197 +1026,98 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                                         onChange={e => setDuration(Number(e.target.value))}
                                         disabled={isLoading}
                                     />
-                                    <span className="sb-dur-value">{duration}s <span className="sb-dur-label">{getDurationLabel(duration)}</span></span>
+                                    <div className="scott-duration-range">
+                                        <span>5s</span><span>120s</span>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
-                            
-                            <CfgMenu value={model} onChange={setModel} options={MODELS} icon="smart_toy" />
-                            <CfgMenu value={directorModel} onChange={setDirectorModel} options={DIRECTOR_MODELS} icon="movie_filter" />
-                            <CfgMenu value={imageModel} onChange={setImageModel} options={IMAGE_MODELS} icon="image" />
-                            <CfgMenu value={dialogueLanguage} onChange={setDialogueLanguage} options={LANGUAGES} icon="translate" />
 
-                            <div style={{ flex: 1 }} />
-                            
-                            {/* Product Block */}
-                            {productImages.length === 0 ? (
-                                <button className="scott-block-btn" onClick={() => productInputRef.current?.click()}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 18, zIndex: 2 }}>inventory_2</span>
-                                    <span style={{ zIndex: 2, fontSize: 9, letterSpacing: 0.5 }}>PRODUCT</span>
-                                </button>
-                            ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '3px 6px 3px 4px', maxWidth: 240, overflowX: 'auto', flexShrink: 0 }}>
-                                    {productImages.map((pi, idx) => (
-                                        <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
-                                            <img
-                                                src={pi.preview}
-                                                alt={`product-${idx + 1}`}
-                                                style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 5, display: 'block', border: '1px solid rgba(255,255,255,0.1)' }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                e.stopPropagation();
-                                                const removed = productImages[idx];
-                                                if (removed?.preview?.startsWith('blob:')) URL.revokeObjectURL(removed.preview);
-                                                setProductImages(prev => prev.filter((_, i) => i !== idx));
-                                            }}
-                                                style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
-                                            >✕</button>
-                                        </div>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        onClick={() => productInputRef.current?.click()}
-                                        style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 5, background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                                        title="Add more images"
-                                    >+</button>
+                            {/* ════ AI MODELS COLUMN ════ */}
+                            <div className="scott-section">
+                                <div className="scott-section-header">
+                                    <span className="material-symbols-outlined">smart_toy</span>
+                                    AI MODELS
                                 </div>
-                            )}
-                            <input ref={productInputRef} type="file" accept="image/*" multiple hidden onChange={handleProductImages} />
 
-                            {/* Avatar Block — Multi-character strip (up to 4) */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {avatarImages.map((ai, idx) => (
-                                    <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
-                                        <img
-                                            src={ai.preview}
-                                            alt={`avatar-${idx + 1}`}
-                                            title={ai.name || `Character ${idx + 1}`}
-                                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: '50%', display: 'block', border: '2px solid rgba(99,102,241,0.6)', cursor: 'pointer' }}
-                                            onClick={() => { setAvatarPickerTargetIdx(idx); setShowAvatarPicker(true); }}
-                                        />
-                                        {/* Name badge */}
-                                        {ai.name && (
-                                            <span style={{ position: 'absolute', bottom: -9, left: '50%', transform: 'translateX(-50%)', fontSize: 7, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', background: 'rgba(0,0,0,0.5)', borderRadius: 3, padding: '0 2px', letterSpacing: 0.3 }}>{ai.name.slice(0, 6)}</span>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveAvatar(idx)}
-                                            style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
-                                        >✕</button>
-                                    </div>
-                                ))}
-                                {/* Add avatar button — shows if < 4 */}
-                                {avatarImages.length < 4 && (
+                                <div className="scott-model-row">
+                                    <span className="scott-ctrl-label">Video</span>
+                                    <CfgMenu value={model} onChange={setModel} options={MODELS} icon="play_circle" />
+                                </div>
+                                <div className="scott-model-row">
+                                    <span className="scott-ctrl-label">Director</span>
+                                    <CfgMenu value={directorModel} onChange={setDirectorModel} options={DIRECTOR_MODELS} icon="movie_filter" />
+                                </div>
+                                <div className="scott-model-row">
+                                    <span className="scott-ctrl-label">Language</span>
+                                    <CfgMenu value={dialogueLanguage} onChange={setDialogueLanguage} options={LANGUAGES} icon="translate" />
+                                </div>
+                                <div className="scott-model-row">
+                                    <span className="scott-ctrl-label">Image</span>
+                                    <CfgMenu value={imageModel} onChange={setImageModel} options={IMAGE_MODELS} icon="image" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Row 3: Footer — Style / Brand / Mode / Generate ── */}
+                        <div className="scott-footer-row">
+                            {/* Visual style pills */}
+                            <div className="scott-style-pills">
+                                {STYLES.map(s => (
                                     <button
-                                        className={`scott-block-btn ${avatarImages.length === 0 ? '' : 'active'}`}
-                                        title={avatarImages.length === 0 ? 'Add character' : 'Add another character'}
-                                        style={{ width: 36, height: 36, borderRadius: '50%', padding: 0 }}
-                                        onClick={handleAddAvatar}
+                                        key={s.id}
+                                        className={`scott-style-pill ${defaultStyle === s.id ? 'active' : ''}`}
+                                        onClick={() => setDefaultStyle(s.id)}
+                                        title={s.desc}
                                     >
-                                        {avatarImages.length === 0 ? (
-                                            <>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2 }}>person_add</span>
-                                                <span style={{ zIndex: 2, fontSize: 7, letterSpacing: 0.5 }}>CAST</span>
-                                            </>
-                                        ) : (
-                                            <span className="material-symbols-outlined" style={{ fontSize: 16, zIndex: 2 }}>add</span>
-                                        )}
+                                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{s.icon}</span>
+                                        {s.label}
                                     </button>
-                                )}
-                                <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={(e) => handleAvatarFileUpload(e)} />
+                                ))}
                             </div>
 
-                            {/* Ref image Block (location / element) */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {refImages.map((ri, idx) => (
-                                    <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
-                                        <img
-                                            src={ri.preview}
-                                            alt={`ref-${idx + 1}`}
-                                            title={ri.label || `Location/Ref ${idx + 1}`}
-                                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '2px solid rgba(234,179,8,0.5)', display: 'block' }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveRef(idx)}
-                                            style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1, padding: 0, zIndex: 3 }}
-                                        >✕</button>
-                                    </div>
-                                ))}
-                                {refImages.length < 3 && (
-                                    <button
-                                        className="scott-block-btn"
-                                        title="Upload location/element reference"
-                                        style={{ width: 36, height: 36, borderRadius: 6, padding: 0 }}
-                                        onClick={() => refInputRef.current?.click()}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2 }}>add_location_alt</span>
-                                        <span style={{ zIndex: 2, fontSize: 7, letterSpacing: 0.5 }}>PLACE</span>
-                                    </button>
-                                )}
-                                <input ref={refInputRef} type="file" accept="image/*" multiple hidden onChange={handleRefImages} />
-                            </div>
-
-                            {/* Branding toggle */}
+                            {/* Brand DNA toggle */}
                             <button
-                                type="button"
-                                className={`scott-block-btn ${includeBranding ? 'active' : ''}`}
-                                title={includeBranding ? 'Brand DNA included — click to disable' : 'Brand DNA excluded — click to enable'}
-                                style={{ gap: 2, padding: '4px 8px', borderColor: includeBranding ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)', position: 'relative' }}
+                                className={`scott-brand-toggle ${includeBranding ? 'active' : ''}`}
                                 onClick={() => setIncludeBranding(v => !v)}
+                                title={includeBranding ? 'Brand DNA ON — click to disable' : 'Brand DNA OFF — click to enable'}
                             >
-                                <span className="material-symbols-outlined" style={{ fontSize: 14, zIndex: 2, color: includeBranding ? '#a5b4fc' : 'rgba(255,255,255,0.3)' }}>verified</span>
-                                <span style={{ zIndex: 2, fontSize: 8, letterSpacing: 0.5, color: includeBranding ? '#a5b4fc' : 'rgba(255,255,255,0.3)' }}>BRAND</span>
-                                {!includeBranding && (
-                                    <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: '#6b7280', zIndex: 3 }} />
-                                )}
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>verified</span>
+                                BRAND
                             </button>
 
-                            {/* Generate mode toggle */}
-                            <div className="sb-mode-toggle" title="Automatic: full video generated at once. Manual: review each segment before compiling.">
+                            <div style={{ flex: 1 }} />
+
+                            {/* Generation mode toggle */}
+                            <div className="sb-mode-toggle" title="Auto: full video at once. Manual: review each segment.">
                                 <button
                                     type="button"
                                     className={`sb-mode-btn ${generateMode === 'automatic' ? 'active' : ''}`}
                                     onClick={() => setGenerateMode('automatic')}
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>auto_mode</span>
-                                    Auto
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>auto_mode</span> Auto
                                 </button>
                                 <button
                                     type="button"
                                     className={`sb-mode-btn ${generateMode === 'manual' ? 'active' : ''}`}
                                     onClick={() => setGenerateMode('manual')}
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>tune</span>
-                                    Manual
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>tune</span> Manual
                                 </button>
                             </div>
 
-                            {/* Generate */}
+                            {/* Generate CTA */}
                             <button className="scott-generate" onClick={handleGenerate} disabled={isLoading}>
                                 {isLoading ? (
-                                    <><span className="material-symbols-outlined spin" style={{ fontSize: 16 }}>autorenew</span> Writing...</>
+                                    <><span className="material-symbols-outlined spin" style={{ fontSize: 15 }}>autorenew</span> Writing…</>
                                 ) : (
-                                    <>GET STORYBOARD <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span></>
+                                    <>GET STORYBOARD <span className="material-symbols-outlined" style={{ fontSize: 15 }}>auto_awesome</span></>
                                 )}
                             </button>
                         </div>
-                        
-                        {/* URL input row for product */}
-                        <div style={{ display: 'flex', width: '100%', gap: '8px', alignItems: 'center', padding: '4px 8px 0', borderTop: '1px dashed rgba(255,255,255,0.05)', marginTop: 4 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>link</span>
-                            <input 
-                                type="text"
-                                className="scott-input" 
-                                style={{ padding: '4px 0', fontSize: 12, flex: 1 }}
-                                placeholder="Paste product URL (optional)..." 
-                                value={productUrlInput}
-                                onChange={e => setProductUrlInput(e.target.value)}
-                                disabled={isScrapingUrl}
-                            />
-                            {productUrlInput && (
-                                <button className="sb-url-add-btn" onClick={handleProductUrlAdd} disabled={isScrapingUrl}>
-                                    {isScrapingUrl ? 'Scraping...' : 'Add URL'}
-                                </button>
-                            )}
-                        </div>
+
                     </div>
                 </div>
             )}
-
             {/* ════════════ STORYBOARD POSTER ════════════ */}
             {(phase === 'review' || phase === 'animating' || phase === 'complete') && (
                 <div className="sb-board">
