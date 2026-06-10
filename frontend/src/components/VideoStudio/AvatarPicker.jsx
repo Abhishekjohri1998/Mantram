@@ -272,11 +272,17 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
             form.append('avatarImage', file)
             form.append('name', nameToUse)
             if (activeBrand?._id) form.append('brandId', activeBrand._id)
-            await api('/video-studio/ugc-pro/avatars', { method:'POST', body:form, headers:{} })
-            await loadAvatars(); resetCreate()
+            const d = await api('/video-studio/ugc-pro/avatars', { method:'POST', body:form, headers:{} })
+            // ✅ FIX: Auto-select the uploaded avatar immediately — don't make the user find it in the gallery
+            if (d?.avatar) {
+                onSelect({ _id: d.avatar._id, name: d.avatar.name || nameToUse, imageUrl: d.avatar.imageUrl })
+                handleClose()
+            } else {
+                await loadAvatars(); resetCreate()
+            }
         } catch { }
         setUploadBusy(false)
-    }, [avatarName, activeBrand, loadAvatars])
+    }, [avatarName, activeBrand, loadAvatars, onSelect, handleClose])
 
     // ── Generate ────────────────────────────────────────────────────────────────
     const handleGenerate = useCallback(async () => {
