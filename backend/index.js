@@ -637,8 +637,20 @@ server.timeout = 60000000;
 // ══════════════════════════════════════════════════════════════
 import { getInFlightJobs, hasInFlightJobs } from './utils/jobRegistry.js';
 
+let shutdownInProgress = false;
+
 const gracefulShutdown = (signal) => {
+    // Guard: prevent double-shutdown from PM2 sending SIGINT to both cluster workers
+    if (shutdownInProgress) {
+        console.log(`⚠️ ${signal} received but shutdown already in progress — ignoring.`);
+        return;
+    }
+    shutdownInProgress = true;
+
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+
+    // Mark DB as shutting down EARLY — prevents auto-reconnect in db.js from firing
+    if (mongoose.connection) mongoose.connection.isShuttingDown = true;
     
     server.close(async () => {
         console.log('HTTP server closed. No longer accepting new connections.');
@@ -656,7 +668,6 @@ const gracefulShutdown = (signal) => {
                 console.warn(`⚠️ Forcing shutdown with ${getInFlightJobs().length} jobs still running.`);
             }
 
-            if (mongoose.connection) mongoose.connection.isShuttingDown = true;
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
             process.exit(0);

@@ -25,10 +25,12 @@ module.exports = {
         max_restarts: 10,
         restart_delay: 1000,
 
-        // Graceful shutdown
-        kill_timeout: 5000,
-        listen_timeout: 10000,
-        wait_ready: false,
+        // Graceful shutdown & ready signal
+        // wait_ready: true → PM2 waits for process.send('ready') before routing traffic
+        // This ensures MongoDB is connected before the worker receives requests
+        wait_ready: true,
+        listen_timeout: 30000,   // 30s max to wait for ready signal (DB connect can take 5-10s on cold start)
+        kill_timeout: 10000,     // 10s for graceful shutdown (drain in-flight jobs + close DB)
 
         // Disable PM2 APM (PMX) — suppresses pidusage TypeError noise in logs
         // pidusage crashes when monitoring PIDs that exit during cluster restarts
