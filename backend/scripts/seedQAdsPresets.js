@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 // Load env
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import QAdsCategory from '../models/QAdsCategory.js';
 import QAdsPreset from '../models/QAdsPreset.js';
@@ -89,6 +89,8 @@ const runSeed = async () => {
                 description: p.description,
                 isMantramExclusive: p.group === 'mantram-exclusive',
                 isActive: true,
+                isPublished: true,
+                showOnHomeScreen: false,
                 sortOrder: presetsToInsert.length * 10,
                 createdBy: admin._id,
                 promptRules: {
@@ -111,6 +113,8 @@ const runSeed = async () => {
                 description: 'A luxurious, silent reveal of the product with macro details and dramatic lighting.',
                 isMantramExclusive: true,
                 isActive: true,
+                isPublished: true,
+                showOnHomeScreen: false,
                 sortOrder: presetsToInsert.length * 10,
                 createdBy: admin._id,
                 promptRules: {

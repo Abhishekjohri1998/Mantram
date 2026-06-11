@@ -258,7 +258,9 @@ const QAdsManager = () => {
             tagline: fd.get('tagline'),
             description: fd.get('description'),
             isMantramExclusive: fd.get('isMantramExclusive') === 'on',
+            showOnHomeScreen: fd.get('showOnHomeScreen') === 'on',
             isActive: fd.get('isActive') === 'on',
+            isPublished: fd.get('isPublished') === 'on',
             promptRules: rules
         };
         
@@ -380,8 +382,10 @@ const QAdsManager = () => {
                                             <th style={{ width: 40 }}></th>
                                             <th style={{ width: 60 }}>Preview</th>
                                             <th>Preset</th>
-                                            <th>Badges</th>
-                                            <th>Status</th>
+                                            <th>Exclusive</th>
+                                            <th>Homescreen</th>
+                                            <th>Active</th>
+                                            <th>Published</th>
                                             <th style={{ textAlign: 'right' }}>Actions</th>
                                         </tr>
                                     </thead>
@@ -411,8 +415,18 @@ const QAdsManager = () => {
                                                             </button>
                                                         </td>
                                                         <td>
+                                                            <button onClick={() => togglePresetField(p, 'showOnHomeScreen')} style={toggleBtnStyle(p.showOnHomeScreen, '#10b981')}>
+                                                                {p.showOnHomeScreen ? 'Shown' : 'Hidden'}
+                                                            </button>
+                                                        </td>
+                                                        <td>
                                                             <button onClick={() => togglePresetField(p, 'isActive')} style={toggleBtnStyle(p.isActive)}>
                                                                 {p.isActive ? 'Active' : 'Inactive'}
+                                                            </button>
+                                                        </td>
+                                                        <td>
+                                                            <button onClick={() => togglePresetField(p, 'isPublished')} style={toggleBtnStyle(p.isPublished, '#E84118')}>
+                                                                {p.isPublished ? 'Published' : 'Draft'}
                                                             </button>
                                                         </td>
                                                         <td style={{ textAlign: 'right' }}>
@@ -504,14 +518,22 @@ const QAdsManager = () => {
                             <textarea name="description" defaultValue={presetModal.data?.description} required rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                         </label>
 
-                        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
                                 <input type="checkbox" name="isMantramExclusive" defaultChecked={presetModal.data?.isMantramExclusive ?? false} />
                                 Mantram Exclusive
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                                <input type="checkbox" name="showOnHomeScreen" defaultChecked={presetModal.data?.showOnHomeScreen ?? false} />
+                                Show on Homescreen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
                                 <input type="checkbox" name="isActive" defaultChecked={presetModal.data?.isActive ?? true} />
                                 Active
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                                <input type="checkbox" name="isPublished" defaultChecked={presetModal.data?.isPublished ?? false} />
+                                Published
                             </label>
                         </div>
 
