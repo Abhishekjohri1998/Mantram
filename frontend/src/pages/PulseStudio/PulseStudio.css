@@ -328,44 +328,108 @@
     animation: ps-slide-up 0.4s ease-out;
 }
 
-.ps-product-gallery {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    grid-template-rows: 120px 120px;
-    gap: 3px;
+/* ── Product Image Slider (replaces old full-screen gallery grid) ── */
+.ps-img-slider {
+    background: var(--sys-bg);
+    border-bottom: 1px solid var(--sys-border);
+}
+
+.ps-img-slider-main {
+    position: relative;
+    height: 180px;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+
+.ps-img-slider-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: opacity 0.25s;
+}
+
+.ps-img-slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    transition: background 0.15s;
+    padding: 0;
+}
+
+.ps-img-slider-arrow:hover {
+    background: rgba(0,0,0,0.8);
+}
+
+.ps-img-slider-arrow.left  { left: 8px; }
+.ps-img-slider-arrow.right { right: 8px; }
+
+.ps-img-slider-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    color: rgba(255,255,255,0.85);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+}
+
+.ps-img-slider-thumbs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ps-img-slider-thumbs::-webkit-scrollbar { display: none; }
+
+.ps-img-slider-thumb {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
     background: var(--sys-bg);
 }
 
-.ps-gallery-main {
-    grid-row: 1 / 3;
-    overflow: hidden;
-}
-
-.ps-gallery-thumb {
-    overflow: hidden;
-}
-
-.ps-gallery-img {
+.ps-img-slider-thumb img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 0.3s;
 }
 
-.ps-gallery-img:hover {
-    transform: scale(1.04);
+.ps-img-slider-thumb.active {
+    border-color: var(--sys-primary);
 }
 
-.ps-gallery-more {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.4);
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
+.ps-img-slider-thumb:hover:not(.active) {
+    border-color: var(--sys-border);
+    opacity: 0.85;
 }
+
 
 .ps-product-meta {
     padding: 16px 18px;
@@ -1131,8 +1195,7 @@
     .ps-phase-label { display: none; }
     .ps-mood-hero-img { height: 280px; }
     .ps-mood-hero-placeholder { height: 280px; }
-    .ps-product-gallery { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
-    .ps-gallery-main { grid-row: auto; }
+    .ps-img-slider-main { height: 150px; }
 }
 
 /* ── Mood Board Loading & Action Buttons ── */

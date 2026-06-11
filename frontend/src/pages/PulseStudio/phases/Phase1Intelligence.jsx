@@ -31,7 +31,7 @@ const ANALYSIS_STEPS = [
     { icon: Sparkles,  text: 'Generating 4 custom mood directions…' },
 ]
 
-export default function Phase1Intelligence({ brandId, onContextReady, moodImages, setMoodImages, moodLoading, setMoodLoading }) {
+export default function Phase1Intelligence({ brandId, onContextReady, moodImages, setMoodImages, moodLoading, setMoodLoading, setMoodDirections }) {
     const [productUrl, setProductUrl]         = useState('')
     const [description, setDescription]       = useState('')
     const [step, setStep]                     = useState('input')   // input | analyzing | ready
@@ -40,6 +40,7 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
     const [uploadedFiles, setUploadedFiles]   = useState([])
     const [uploadPreviews, setUploadPreviews] = useState([])
     const [s3ImageUrls, setS3ImageUrls]       = useState([])
+    const [sliderIndex, setSliderIndex]       = useState(0)
 
     // Ready state
     const [analyzedProduct, setAnalyzedProduct]         = useState(null)
@@ -55,7 +56,8 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
         setSelectedMood(null); setDesignContext(null); setAnalyzedProduct(null)
         setProductImages([]); setActiveStep(0); setError('')
         setUploadedFiles([]); setUploadPreviews([]); setS3ImageUrls([])
-        setMoodLoading(false)
+        setMoodLoading(false); setSliderIndex(0)
+        if (setMoodDirections) setMoodDirections(null)
         setStep('input')
     }
 
@@ -85,27 +87,30 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ productDNA: data.productDNA, selectedMoodId: def }),
                 }).then(dc => { if (dc.success) setDesignContext(dc.designContext) }).catch(() => {})
-                // Kick off moodboard generation
+                // Kick off moodboard generation (fire-and-forget)
                 setMoodLoading(true)
                 apiFetch('/brand-studio/mood-board', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ productDNA: data.productDNA, productData: product, brandId }),
+                    timeout: 180000,   // 3 min — 4× AI image generations run in parallel (~60-90s total)
                 }).then(mb => {
                     setMoodLoading(false)
                     if (mb.success) {
-                        let newMoodDirs = productMoodDirections
+                        let newMoodDirs = null
                         if (mb.moodDirections && Object.keys(mb.moodDirections).length >= 2) {
                             newMoodDirs = mb.moodDirections
                             setProductMoodDirections(mb.moodDirections)
+                            // KEY FIX: lift to parent so Phase2 gets updated IDs
+                            if (setMoodDirections) setMoodDirections(mb.moodDirections)
                             setSelectedMood(Object.keys(mb.moodDirections)[0])
                         }
                         let newImgs = {}
                         if (mb.moods) {
                             mb.moods.forEach(m => { if (m.imageUrl) newImgs[m.id] = m.imageUrl })
-                            setMoodImages(newImgs)
+                            setMoodImages(newImgs)  // lifted to parent — Phase2 sees this reactively
                         }
 
-                        // Auto-save to database with the freshly generated moodboard images
+                        // Auto-save to database
                         if (brandId && data.productDNA) {
                             const pName = product?.title || data.productDNA?.productCategory || 'Product'
                             if (!/oops|something went wrong|access denied|captcha/i.test(pName)) {
@@ -119,7 +124,7 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
                                         productImages: (product?.persistedImages || images || []).slice(0, 4),
                                         palette: data.productDNA?.dominantColors || [],
                                         productDNA: data.productDNA || {},
-                                        selectedMoodId: selectedMood || data.productDNA.defaultMoodDirection || 'editorial',
+                                        selectedMoodId: def,
                                         moodDirections: newMoodDirs || {},
                                         moodImages: newImgs || {},
                                         designContext: designContext, autoSaved: true,
@@ -128,7 +133,7 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
                             }
                         }
                     }
-                }).catch(() => setMoodLoading(false))
+                }).catch(err => { console.error('❌ Mood board generation failed:', err.message); setMoodLoading(false) })
             }
         } catch (e) { console.warn('PDI failed:', e.message) }
         setActiveStep(ANALYSIS_STEPS.length - 1)
@@ -153,7 +158,11 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
             })
             if (data.success) {
                 setAnalyzedProduct(data.product)
-                const imgs = data.product.images || []
+                // Prefer S3-persisted images (already uploaded by backend) over raw CDN URLs
+                // CDN URLs get 403-blocked when passed as AI reference images → wrong generic image generated
+                const imgs = data.product.persistedImages?.length
+                    ? data.product.persistedImages
+                    : (data.product.images || [])
                 setProductImages(imgs)
                 await runPDI(imgs, data.product)
             } else { setError(data.error || 'Failed to analyze product'); setStep('input') }
@@ -393,21 +402,47 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
             {step === 'ready' && productDNA && (
                 <div>
                     <div className="ps-product-profile">
-                        {/* Gallery */}
+                        {/* Compact Image Slider */}
                         {productImages.length > 0 && (
-                            <div className="ps-product-gallery" style={{ maxHeight: 240 }}>
-                                {productImages.slice(0, 5).map((img, i) => (
-                                    <div key={i} className={`${i === 0 ? 'ps-gallery-main' : 'ps-gallery-thumb'}`}>
-                                        {i === 4 && productImages.length > 5 ? (
-                                            <div className="ps-gallery-more" style={{ height: '100%', background: 'rgba(0,0,0,0.5)' }}>
-                                                <img src={img} alt="" className="ps-gallery-img" style={{ position: 'absolute', inset: 0 }} onError={e => e.target.style.display='none'} />
-                                                <span style={{ position: 'relative', zIndex: 2, color: '#fff', fontWeight: 800, fontSize: 16 }}>+{productImages.length - 4}</span>
-                                            </div>
-                                        ) : (
-                                            <img src={img} alt="" className="ps-gallery-img" onError={e => e.target.style.display='none'} />
-                                        )}
+                            <div className="ps-img-slider">
+                                {/* Main image */}
+                                <div className="ps-img-slider-main">
+                                    <img
+                                        src={productImages[sliderIndex]}
+                                        alt=""
+                                        className="ps-img-slider-img"
+                                        onError={e => e.target.style.display='none'}
+                                    />
+                                    {productImages.length > 1 && (
+                                        <>
+                                            <button
+                                                className="ps-img-slider-arrow left"
+                                                onClick={() => setSliderIndex(i => (i - 1 + productImages.length) % productImages.length)}
+                                            >‹</button>
+                                            <button
+                                                className="ps-img-slider-arrow right"
+                                                onClick={() => setSliderIndex(i => (i + 1) % productImages.length)}
+                                            >›</button>
+                                        </>
+                                    )}
+                                    <div className="ps-img-slider-counter">
+                                        {sliderIndex + 1} / {productImages.length}
                                     </div>
-                                ))}
+                                </div>
+                                {/* Thumbnail strip */}
+                                {productImages.length > 1 && (
+                                    <div className="ps-img-slider-thumbs">
+                                        {productImages.slice(0, 8).map((img, i) => (
+                                            <div
+                                                key={i}
+                                                className={`ps-img-slider-thumb ${i === sliderIndex ? 'active' : ''}`}
+                                                onClick={() => setSliderIndex(i)}
+                                            >
+                                                <img src={img} alt="" onError={e => e.target.style.display='none'} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 

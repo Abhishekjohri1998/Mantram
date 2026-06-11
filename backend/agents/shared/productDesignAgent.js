@@ -131,7 +131,16 @@ Make directions feel like they come from a REAL agency creative brief for this s
  * Quick per-image Gemini vision call — identifies what each image shows
  * and which A+ module type it's best suited for. Runs in parallel.
  */
-async function classifyProductImageView(imageUrl) {
+async function classifyProductImageView(imageUrl, productData = {}) {
+    const title = productData?.title || '';
+    const category = productData?.category || '';
+    const description = productData?.description || '';
+
+    let contextStr = '';
+    if (title) contextStr += `Product Name: "${title}"\n`;
+    if (category) contextStr += `Listing Category: "${category}"\n`;
+    if (description) contextStr += `Description context: "${description.substring(0, 300)}"\n`;
+
     const systemPrompt = `You are a product photography expert and Amazon listing consultant.
 Analyze this SINGLE product image and classify it precisely.
 
@@ -147,7 +156,7 @@ Apply these rules before classifying. If you see ear-cups and a headband, it IS 
 
 Return ONLY a valid JSON object, no markdown, no extra text.`;
 
-    const userPrompt = `Classify this product image precisely:
+    const userPrompt = `${contextStr ? `PRODUCT CONTEXT:\n${contextStr}\n` : ''}Classify this product image precisely:
 {
   "viewType": "hero|front_face|back_panel|open_case|in_use|macro_detail|packaging|variant_color|lifestyle|flat_lay|group_shot|side_profile|angle_shot",
   "shortDescription": "1 sentence: exactly what is visible in this specific image",
@@ -272,7 +281,7 @@ export async function analyzeProductDesign(productImages = [], productData = {},
     // ── Stage 1: Classify each image individually (parallel) ──────────────────
     console.log(`   PDI Stage-1: Classifying ${productImages.length} images in parallel...`);
     const classifyResults = await Promise.allSettled(
-        productImages.map(url => classifyProductImageView(url))
+        productImages.map(url => classifyProductImageView(url, productData))
     );
 
     const roster = classifyResults.map((r, i) => {
@@ -408,13 +417,15 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
     const refImages = [...diversePick, ...fallbackPool].filter(Boolean).slice(0, 3);
     const hasRefImages = refImages.length > 0;
 
-    const modelSupportsRef = imageModel.includes('gemini') || imageModel.includes('nanobanana');
+    const modelSupportsRef = imageModel.includes('gemini') || imageModel.includes('nanobanana') || imageModel.includes('gpt-image');
     const useMultimodal = hasRefImages && modelSupportsRef;
 
     let laozhangMultimodalImageGenerate;
+    let laozhangGptImageWithRefs;
     if (useMultimodal) {
         const mod = await import('../videoStudio/laozhangClient.js');
         laozhangMultimodalImageGenerate = mod.laozhangMultimodalImageGenerate;
+        laozhangGptImageWithRefs = mod.laozhangGptImageWithRefs;
     }
 
     // ── Generate a mood board for each direction ───────────────────────────────
@@ -500,14 +511,21 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
 
         try {
             let result;
-            if (useMultimodal && laozhangMultimodalImageGenerate) {
+            if (useMultimodal && imageModel.includes('gpt-image') && laozhangGptImageWithRefs) {
+                // GPT Image 2 path: /images/edits with product ref image as multipart upload
+                result = await laozhangGptImageWithRefs(prompt, refImages, {
+                    model: imageModel,
+                    size: '1344x768',
+                });
+            } else if (useMultimodal && laozhangMultimodalImageGenerate) {
+                // Gemini/NanoBanana path: chat/completions multimodal
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
                     model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             } else {
                 result = await laozhangImageGenerate(prompt, {
-                    model: imageModel || 'gemini-3.1-flash-image-preview',
+                    model: imageModel || 'gpt-image-2',
                     size: '1344x768',
                 });
             }

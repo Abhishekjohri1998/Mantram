@@ -78,6 +78,8 @@ export default function PulseStudio() {
     const [selectedMoodId, setSelectedMoodId] = useState(null)
     const [moodImages, setMoodImages] = useState({})
     const [moodLoading, setMoodLoading] = useState(false)
+    // LIFTED: mood directions so Phase2 sees updated IDs when async API returns
+    const [moodDirections, setMoodDirections] = useState(null)
 
     const markDone = (p) => setCompleted(prev => prev.includes(p) ? prev : [...prev, p])
 
@@ -98,7 +100,10 @@ export default function PulseStudio() {
         if (p < phase || completedPhases.includes(p)) setPhase(p)
     }
 
-    const mergedContext = productContext ? { ...productContext, moodImages } : null
+    // mergedContext always includes latest moodImages + moodDirections so Phase2 re-renders reactively
+    const mergedContext = productContext
+        ? { ...productContext, moodImages, productMoodDirections: moodDirections || productContext.productMoodDirections }
+        : null
 
     return (
         <DashboardLayout title="Pulse Studio">
@@ -115,6 +120,7 @@ export default function PulseStudio() {
                         setMoodImages={setMoodImages}
                         moodLoading={moodLoading}
                         setMoodLoading={setMoodLoading}
+                        setMoodDirections={setMoodDirections}
                     />
                 )}
 

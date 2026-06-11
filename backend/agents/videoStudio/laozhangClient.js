@@ -268,13 +268,102 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
         throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
     }
 
-    // Warn if S3 upload failed and we're returning raw b64 or expired CDN URL
-    if (finalUrl === rawData && !finalUrl.includes('amazonaws.com')) {
-        console.warn(`⚠️ [LaoZhang] ensureS3Url did not upload to S3 — returning raw data (${finalUrl.substring(0, 60)})`);
-    }
-    
     console.log(`✅ [LaoZhang] Image generated via ${model} (b64_json → S3): ${(finalUrl || '').substring(0, 80)}`);
     return { imageUrl: finalUrl, model, provider: 'laozhang' };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GPT IMAGE 2 WITH REFERENCE IMAGES — via /v1/images/edits (multipart)
+// gpt-image-2 uses /images/edits to accept a product image + prompt.
+// Falls back to text-only laozhangImageGenerate if the ref image can't be fetched.
+// ══════════════════════════════════════════════════════════════════════════════
+
+export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model = 'gpt-image-2', size = '1344x768' } = {}) {
+    const apiKey = getApiKey();
+    const timeoutMs = getImageTimeout(model);
+
+    if (!imageUrls || imageUrls.length === 0) {
+        return laozhangImageGenerate(prompt, { model, size });
+    }
+
+    console.log(`🖼️  [GPT-Image-2+Refs] Fetching product ref images (${imageUrls.length} URLs)...`);
+
+    // Fetch the best available reference image as a buffer
+    let refBuffer = null;
+    let refMimeType = 'image/png';
+    for (const url of imageUrls) {
+        if (!url) continue;
+        try {
+            const r = await fetch(url, fetchOptions({
+                headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }
+            }));
+            if (r.ok) {
+                const ct = r.headers.get('content-type') || 'image/jpeg';
+                if (!ct.includes('text/html')) {
+                    refBuffer = Buffer.from(await r.arrayBuffer());
+                    refMimeType = ct.split(';')[0].trim();
+                    console.log(`   ✅ Got ref image: ${url.substring(0, 80)} (${Math.round(refBuffer.length / 1024)}KB)`);
+                    break;
+                }
+            } else {
+                console.warn(`   ⚠️ Ref image fetch failed (${r.status}): ${url.substring(0, 80)}`);
+            }
+        } catch (e) {
+            console.warn(`   ⚠️ Ref image error: ${e.message}`);
+        }
+    }
+
+    if (!refBuffer) {
+        console.warn(`   ⚠️ [GPT-Image-2+Refs] All ref fetches failed — falling back to Gemini multimodal with same ref URLs`);
+        return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
+    }
+
+    // Build multipart/form-data for /images/edits
+    const FormData = (await import('formdata-node')).FormData;
+    const { Blob } = await import('node:buffer');
+    const form = new FormData();
+    const ext = refMimeType.includes('png') ? 'png' : refMimeType.includes('webp') ? 'webp' : 'jpg';
+    form.set('image', new Blob([refBuffer], { type: refMimeType }), `product_ref.${ext}`);
+    form.set('prompt', prompt);
+    form.set('model', model);
+    form.set('n', '1');
+    form.set('size', size);
+    form.set('response_format', 'b64_json');
+
+    console.log(`🎨 [GPT-Image-2+Refs] Calling /images/edits — model=${model}, size=${size}, ref=${Math.round(refBuffer.length/1024)}KB`);
+
+    let editResponse;
+    try {
+        editResponse = await fetch(`${LAOZHANG_BASE_URL}/images/edits`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: form,
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+    } catch (e) {
+        console.warn(`   ⚠️ /images/edits failed: ${e.message} — falling back to text-only`);
+        return laozhangImageGenerate(prompt, { model, size });
+    }
+
+    if (!editResponse.ok) {
+        const errText = await editResponse.text();
+        console.warn(`   ⚠️ /images/edits HTTP ${editResponse.status}: ${errText.substring(0, 200)} — falling back to Gemini multimodal with same ref images`);
+        return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
+    }
+
+    const editData = await editResponse.json();
+    const editImgData = editData.data?.[0];
+    const editB64 = editImgData?.b64_json || '';
+    const editRawUrl = editImgData?.url || '';
+    if (!editB64 && !editRawUrl) {
+        console.warn(`   ⚠️ /images/edits returned no image — falling back to text-only`);
+        return laozhangImageGenerate(prompt, { model, size });
+    }
+
+    const editRaw = editB64 ? `data:image/png;base64,${editB64}` : editRawUrl;
+    const editFinalUrl = await ensureS3Url(editRaw, 'studio/laozhang-edit');
+    console.log(`✅ [GPT-Image-2+Refs] Image with product ref → S3: ${editFinalUrl.substring(0, 80)}...`);
+    return { imageUrl: editFinalUrl, model, provider: 'laozhang' };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -380,5 +469,6 @@ export default {
     submitLaozhangVideoGeneration,
     getLaozhangVideoStatus,
     laozhangImageGenerate,
+    laozhangGptImageWithRefs,
     laozhangMultimodalImageGenerate,
 };

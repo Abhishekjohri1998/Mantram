@@ -272,7 +272,8 @@ router.post('/quick-post', protect, async (req, res) => {
 router.post('/mood-board', protect, async (req, res) => {
     try {
         const { productDNA, productData, brandId } = req.body;
-        // Default to gpt-image-2 — superior product rendering & color accuracy
+        // MUST use gemini-3.1-flash-image-preview — it's the only model that supports multimodal
+        // reference images. gpt-image-2 ignores productRefImages entirely (useMultimodal=false).
         const imageModel = req.body.imageModel || 'gpt-image-2';
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
@@ -288,6 +289,30 @@ router.post('/mood-board', protect, async (req, res) => {
         }
 
         const customMoodDirections = await generateProductMoodDirections(productDNA, productData || {}, brandContext);
+
+        // ── Inject S3-persisted reference images ──────────────────────────────────
+        // CDN URLs (Amazon, Flipkart, etc.) get 403-blocked when LaoZhang fetches them.
+        // persistedImages are S3 copies, but the bucket has ACLs disabled (owner-enforced)
+        // so plain S3 URLs ALSO return 403. We must use pre-signed URLs.
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        const s3Refs = (productData?.persistedImages || []).filter(u => u?.includes('amazonaws'));
+        const fallbackRefs = s3Refs.length > 0
+            ? s3Refs
+            : (productData?.images || []).filter(u => u?.includes('amazonaws'));
+
+        if (fallbackRefs.length > 0) {
+            // Pre-sign each S3 URL so the AI model can actually fetch them (ACLs disabled on bucket)
+            const signedRefs = await Promise.all(fallbackRefs.slice(0, 4).map(u => getSignedUrlIfNeeded(u)));
+            productDNA.productRefImages = signedRefs.filter(Boolean);
+            if (!productDNA.heroImageUrl || productDNA.heroImageUrl.includes('amazonaws')) {
+                productDNA.heroImageUrl = signedRefs[0] || productDNA.heroImageUrl;
+            }
+            if ((!productDNA.lifestyleImageUrl || productDNA.lifestyleImageUrl.includes('amazonaws')) && signedRefs[1]) {
+                productDNA.lifestyleImageUrl = signedRefs[1];
+            }
+            console.log(`📸 Mood board: using ${signedRefs.length} pre-signed S3 ref images`);
+        }
+
         const result = await generateMoodBoardImages(productDNA, brandContext, customMoodDirections, imageModel);
         await deductCredits(req.user._id, MOOD_CREDITS, 'pulse-mood-board');
 
@@ -418,7 +443,10 @@ CRITICAL: Render NO readable text in the image. Design only.`;
 
             try {
                 let result;
-                if (refImages.length > 0) {
+                const useMultimodal = refImages.length > 0;
+                if (useMultimodal && model.includes('gpt-image') && laozhangGptImageWithRefs) {
+                    result = await laozhangGptImageWithRefs(imagePrompt, refImages, { model, size: cfg.size });
+                } else if (useMultimodal && laozhangMultimodalImageGenerate) {
                     result = await laozhangMultimodalImageGenerate(imagePrompt, refImages, { model, size: cfg.size });
                 } else {
                     result = await laozhangImageGenerate(imagePrompt, { model, size: cfg.size });
@@ -1025,10 +1053,32 @@ const FETCH_HEADERS = (ua = DESKTOP_UA) => ({
 function isProductImage(src) {
     if (!src || !src.startsWith('http')) return false;
     if (src.length < 10) return false;
-    // Skip common non-product images
-    if (/icon|logo|spinner|loader|arrow|badge|star|rating|payment|trust|sprite|pixel|spacer|captcha/i.test(src)) return false;
-    if (/\.svg$/i.test(src)) return false;
-    if (/data:image/i.test(src)) return false;
+    const lower = src.toLowerCase();
+
+    // ── URL keyword blocklist ──────────────────────────────────────────────────
+    // Non-product UI images — these words are unambiguous enough to match as substrings
+    if (/(?:^|[\/_-])(icon|logo|favicon|spinner|loader|arrow|badge|star|rating|payment|trust|sprite|pixel|spacer|captcha|watermark|placeholder|thumbnail|avatar|profile|banner|header|footer|background)(?:[\/_.-]|$)/i.test(lower)) return false;
+    // Additional branding/UI patterns
+    if (/(?:^|[\/_-])(branding|newsletter|popup|overlay|ribbon|stamp|seal|shield|checkmark|check[-_]mark)(?:[\/_.-]|$)/i.test(lower)) return false;
+
+    // ── Trust/Policy/Shipping image patterns (common in Indian D2C) ────────────
+    if (/\b(free[-_]?ship|shipping|delivery|dispatch|return|replacement|warranty|guarantee|refund|exchange|certified|authentic|genuine|original|policy|secure|safety|safe[-_]?payment|cod|cash[-_]?on|billing|gst|tax|invoice|receipt|certificate|trademark|registered|iso|bis|fda|fssai|quality[-_]check)\b/i.test(lower)) return false;
+
+    // ── Trust badge patterns from filenames (NOT brand domains) ──────────────
+    if (/\b(trust[-_]?badge|fast[-_]?delivery|easy[-_]?return|24hr[-_]|48hr[-_]|72hr[-_]|hrs[-_]replacement|days[-_]return|assured[-_]|verified[-_]|razorpay|paytm|upi[-_]logo|visa[-_]logo|mastercard[-_]logo|rupay[-_]logo)\b/i.test(lower)) return false;
+
+    // ── Size-based icon detection in URLs ────────────────────────────────────
+    // Skip tiny icon dimensions (e.g. 32x32, 16x16, 64x64, 100x100)
+    if (/[_-](\d{1,3})x\1[_.-]/i.test(lower)) return false;
+
+    // ── Site-icon patterns (WordPress, Squarespace, Apple touch icons) ───────
+    if (/site[-_]?icon|apple[-_]?touch|touch[-_]?icon|mstile|browserconfig|manifest/i.test(lower)) return false;
+
+    // ── Skip SVG, GIF and data URIs ──────────────────────────────────────────
+    if (/\.svg(\?|$)/i.test(lower)) return false;
+    if (/data:image/i.test(lower)) return false;
+    if (/\.gif(\?|$)/i.test(lower)) return false;
+
     return true;
 }
 
@@ -1295,25 +1345,25 @@ function scrapeNykaa($, html) {
         });
     }
 
-    const title = pp.name || jsonLdProduct?.name || $('h1').first().text().trim() || '';
-    const price = pp.offerPrice || pp.mrp || jsonLdProduct?.offers?.price || '';
+    const nykaaTitle = pp.name || jsonLdProduct?.name || $('h1').first().text().trim() || '';
+    const nykaaPrice = pp.offerPrice || pp.mrp || jsonLdProduct?.offers?.price || '';
 
-    const bullets = [];
-    if (pp.description) bullets.push(pp.description);
+    const nykaaBullets = [];
+    if (pp.description) nykaaBullets.push(pp.description);
     $('div[class*="product-description"] li, div[class*="product-keyFeature"] div').each((_, el) => {
         const txt = $(el).text().trim().replace(/\s+/g, ' ');
-        if (txt.length > 5 && txt.length < 300 && bullets.length < 8) bullets.push(txt);
+        if (txt.length > 5 && txt.length < 300 && nykaaBullets.length < 8) nykaaBullets.push(txt);
     });
 
-    console.log(`   💄 Nykaa scraper: "${title}" — ${imgUrls.length} images`);
+    console.log(`   💄 Nykaa scraper: "${nykaaTitle}" — ${imgUrls.length} images`);
 
     return {
-        title,
+        title: nykaaTitle,
         brand: pp.brandName || jsonLdProduct?.brand?.name || '',
         rating: pp.rating || '',
         reviewCount: pp.reviewCount || '',
-        price: typeof price === 'number' ? `₹${price}` : (price || ''),
-        bulletPoints: bullets,
+        price: typeof nykaaPrice === 'number' ? `₹${nykaaPrice}` : (nykaaPrice || ''),
+        bulletPoints: nykaaBullets,
         description: (pp.description || jsonLdProduct?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
         category: pp.categoryName || '',
         images: imgUrls.filter(isProductImage).slice(0, 8),
@@ -1327,11 +1377,87 @@ function scrapeGeneric($, url) {
         try { return JSON.parse($(el).html()); } catch (_) { return null; }
     }).get().filter(Boolean).find(d => d?.['@type'] === 'Product');
 
-    const jsonLdImages = jsonLd?.image ? [].concat(jsonLd.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean) : [];
-    const ogImages = $('meta[property="og:image"]').map((_, el) => $(el).attr('content')).get().filter(Boolean);
-    const shopifyImages = $('img[src*="cdn.shopify"]').map((_, el) => {
-        return ($(el).attr('src') || '').replace(/_\d+x(\d+)?\./, '_2048x2048.');
+    // JSON-LD images are the highest-quality signal — explicit product images from site metadata
+    const jsonLdImages = jsonLd?.image
+        ? [].concat(jsonLd.image).map(i => typeof i === 'string' ? i : i?.url).filter(Boolean)
+        : [];
+
+    // ── Shopify-specific: only grab images from PRODUCT GALLERY elements ──────
+    // Do NOT grab all 'img[src*="cdn.shopify"]' — that picks up trust badges, shipping icons etc.
+    // Shopify 2.0 Dawn + common themes product gallery selectors:
+    const shopifyGallerySelectors = [
+        // Dawn / Spotlight / Refresh (Shopify 2.0)
+        '.product__media img',
+        '.product-single__media img',
+        '.product-gallery__image img',
+        '.product__media-item img',
+        // Debut / Brooklyn / Minimal (legacy free themes)
+        '.product-single__photo img',
+        '.product__photo img',
+        '.product-images img',
+        // Empire / Prestige / Pipeline (premium themes)
+        '.product-thumbnails img',
+        '.product-slides img',
+        '.gallery__image img',
+        // Custom Shopify themes / acwo.com / Halo themes
+        '.productView-thumbnail-link img',
+        '.productView-thumbnail img',
+        '.productView-image img',
+        '.productView-img-container img',
+        '.product-image-container img',
+        '.product-gallery img',
+        // Generic reliable product image containers
+        '[data-product-media-type="image"] img',
+        '[data-media-type="image"] img',
+        '.product-image-main img',
+        'figure.product__media img',
+    ];
+
+    const shopifyGalleryImages = [];
+    for (const selector of shopifyGallerySelectors) {
+        $(selector).each((_, el) => {
+            const src = $(el).attr('data-src') || $(el).attr('data-zoom-image') ||
+                        $(el).attr('data-large_image') || $(el).attr('src') || '';
+            if (src) {
+                // Upscale Shopify thumbnails to full resolution
+                const fullRes = src
+                    .replace(/_\d+x(\d+)?\./g, '_2048x2048.')
+                    .replace(/\?width=\d+/, '?width=2048');
+                shopifyGalleryImages.push(fullRes.startsWith('//') ? `https:${fullRes}` : fullRes);
+            }
+        });
+        if (shopifyGalleryImages.length >= 4) break; // enough product images found
+    }
+
+    // ── If no gallery found, cautiously use CDN URLs but only from product-related alt text ──
+    if (shopifyGalleryImages.length === 0) {
+        $('img[src*="cdn.shopify"], img[data-src*="cdn.shopify"]').each((_, el) => {
+            if (shopifyGalleryImages.length >= 8) return;
+            const alt = ($(el).attr('alt') || '').toLowerCase();
+            const src = $(el).attr('data-src') || $(el).attr('src') || '';
+            // Only include if the alt text suggests it's a product image (not a badge/icon)
+            const isTrustBadge = /ship|deliver|return|replace|warrant|free|secure|cod|gst|certif|badge|policy|payment|visa|rupay|upi|paytm/i.test(alt);
+            const isTrustBadgeUrl = /ship|deliver|return|replace|warrant|badge|policy|gst|free[-_]|secure|cod[-_]|certif/i.test(src);
+            if (!isTrustBadge && !isTrustBadgeUrl && isProductImage(src)) {
+                const fullRes = src.replace(/_\d+x(\d+)?\./g, '_2048x2048.');
+                shopifyGalleryImages.push(fullRes.startsWith('//') ? `https:${fullRes}` : fullRes);
+            }
+        });
+    }
+
+    // WooCommerce / generic product image containers
+    const wcImages = $('img.wp-post-image, img.attachment-woocommerce_single, .product-image img, .product__image img, .product-hero img').map((_, el) => {
+        return $(el).attr('data-src') || $(el).attr('data-large_image') || $(el).attr('src') || '';
     }).get().filter(Boolean);
+
+    // og:image is LAST RESORT — often a brand logo/icon, not a product photo
+    const ogImages = $('meta[property="og:image"]').map((_, el) => $(el).attr('content')).get().filter(Boolean);
+
+    // Priority: JSON-LD > Shopify gallery > WooCommerce > og:image (only if nothing else)
+    const structured = [...new Set([...jsonLdImages, ...shopifyGalleryImages, ...wcImages])].filter(isProductImage);
+    const images = structured.length > 0 ? structured.slice(0, 8) : ogImages.filter(isProductImage).slice(0, 3);
+
+    console.log(`   🌐 Generic scraper: "${(jsonLd?.name || $('h1').first().text().trim()).substring(0, 50)}" — jsonLd:${jsonLdImages.length} shopifyGallery:${shopifyGalleryImages.length} wc:${wcImages.length} og:${ogImages.length} → ${images.length} kept`);
 
     return {
         title: jsonLd?.name || $('h1').first().text().trim(),
@@ -1339,7 +1465,7 @@ function scrapeGeneric($, url) {
         price: jsonLd?.offers?.[0]?.price || jsonLd?.offers?.price || $('[class*="price"]').first().text().trim(),
         description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
         bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 300).slice(0, 8),
-        images: [...new Set([...jsonLdImages, ...ogImages, ...shopifyImages])].filter(isProductImage).slice(0, 8),
+        images,
         category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
         platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web',
     };

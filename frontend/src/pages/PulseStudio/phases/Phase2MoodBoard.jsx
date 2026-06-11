@@ -30,9 +30,31 @@ export default function Phase2MoodBoard({ productContext, moodLoading, onMoodSel
     const activeImage = activeMood ? moodImages[activeMood.id] : null
     const palette = productDNA?.dominantColors || []
 
+    // Auto-select first mood with an actual image when moodImages arrives asynchronously
+    useEffect(() => {
+        const imageKeys = Object.keys(moodImages).filter(k => moodImages[k])
+        if (imageKeys.length > 0) {
+            // If the current active mood doesn't have an image, switch to the first one that does
+            if (!moodImages[activeMoodId]) {
+                setActiveMoodId(imageKeys[0])
+            }
+        }
+    }, [moodImages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // When mood directions update (AI-generated IDs arrive), auto-select the first one
+    useEffect(() => {
+        if (productMoodDirections) {
+            const ids = Object.keys(productMoodDirections)
+            if (ids.length > 0 && !productMoodDirections[activeMoodId]) {
+                setActiveMoodId(ids[0])
+            }
+        }
+    }, [productMoodDirections]) // eslint-disable-line react-hooks/exhaustive-deps
+
     useEffect(() => {
         setHeroLoaded(false)
     }, [activeMoodId])
+
 
     const handleDownloadImage = async (url, filename) => {
         try {
