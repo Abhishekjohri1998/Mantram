@@ -1014,13 +1014,27 @@ PAGE 1 — FRONT COVER: Make an emotional, scroll-stopping first impression.
   - One unexpected design element that breaks expectation
   - Do NOT center everything — use deliberate tension in layout
 
-PAGE 2 — INSIDE/BACK PANEL: Information design that sells.
-  - Product name at top as a typographic statement
-  - 2-sentence intro paragraph (you write it) — voice matches the mood
-  - All features from the brief above, each with a short benefit sentence you write
-  - Technical specs section (derive realistic specs from product category)
-  - CTA section at bottom
-  - Consistent with Page 1's mood and color, but different in layout rhythm
+PAGE 2 — BACK PANEL: A second creative canvas — NOT a spec sheet, NOT a Word document.
+  THIS IS THE MOST IMPORTANT INSTRUCTION: The back must FEEL exactly as creative and moodboard-driven as the front.
+  FORBIDDEN for the back page:
+    ✗ White or light grey background (unless moodboard is explicitly light)
+    ✗ Black text on white in plain rows (this is a Word doc, not a brochure)
+    ✗ Unformatted bullet point lists
+    ✗ Generic info-table look
+    ✗ Any layout that looks like a product manual
+
+  MANDATORY — use ONE of these creative layout archetypes:
+  ARCHETYPE A — DARK HERO SPLIT: Deep dark background (matching moodboard) + large product image filling top 40%. Below: 3 feature cards in a horizontal grid with bold icon shapes, feature name in large type, 1-line benefit. Bottom: bold colored CTA block spanning full width.
+  ARCHETYPE B — EDITORIAL GRID: Modular grid of bold color blocks — product fills one large block, features fill smaller adjacent blocks in moodboard accent colors. Typography oversized and clipped by block edges. Specs in a minimal styled table on a dark strip.
+  ARCHETYPE C — DIAGONAL SPLIT: Background split diagonally — product on dark side, features on accent-color panel. Features as large NUMBERED STATEMENTS, not bullets. Specs as 2-column minimal table with hairline dividers.
+  ARCHETYPE D — MAGAZINE SPREAD: Full-bleed background image (product in moodboard environment), text overlaid in white on dark scrim. 3 bold feature titles with descriptions below in different weights.
+
+  ALWAYS include:
+  - Product name as large typographic statement
+  - ALL features styled as VISUAL CARDS or TYPOGRAPHIC BLOCKS — not plain text
+  - Styled specs section (3-4 spec pairs, moodboard-consistent styling with dividers)
+  - CTA as colored button or contrasting banner strip
+  - DELIBERATE ASYMMETRY — not centered columns
 
 Return this JSON:
 {
@@ -1028,8 +1042,9 @@ Return this JSON:
   "subheadline": "One sentence. The #1 emotional transformation this product delivers.",
   "badge": "Short uppercase badge (NEW LAUNCH / AWARD WINNING / LIMITED EDITION / BEST SELLER / null)",
   "chosenAesthetic": "Name of the 2026 design aesthetic you chose and one sentence why it fits this moodboard",
+  "chosenBackArchetype": "Which back page archetype you chose (A/B/C/D) and one sentence why it works for this product+mood",
   "frontPagePrompt": "ULTRA-DETAILED A4 portrait brochure front cover prompt for GPT Image 2. 200+ words. Describe: the exact moodboard atmosphere (background color/texture, lighting quality and direction), the headline text in quotes with font description (weight, style, color, size), product placement and how it's lit, any human presence if requested, decorative elements (geometric shapes, texture overlays, color blocks), badge placement, overall visual tension. Front-load the most important visual element. End with quality anchors: high-resolution, print-ready, A4 portrait format.",
-  "backPagePrompt": "ULTRA-DETAILED A4 portrait brochure back/inside panel prompt for GPT Image 2. 200+ words. Describe: the information design layout (which zone has what content), the product name typography at top, the exact intro paragraph text in quotes, each feature name with its benefit sentence in quotes, the specs table structure and sample values, CTA text and button style, background treatment consistent with front page mood, typographic hierarchy (font sizes and weights for each level). End with quality anchors: high-resolution, print-ready, A4 portrait format."
+  "backPagePrompt": "ULTRA-DETAILED A4 portrait brochure back panel prompt for GPT Image 2. 250+ words. This is a GRAPHIC DESIGN prompt, NOT an information layout prompt. Describe: (1) the full background treatment matching the moodboard — dark/dramatic/textured/colored as appropriate, NOT white; (2) product image placement and dramatic moodboard lighting; (3) each feature as a STYLED VISUAL ELEMENT — card shape, icon area, bold feature name in oversized type, benefit sentence; (4) specs as a styled infographic strip with moodboard-colored dividers — NOT a plain grid; (5) CTA as a bold contrasting color banner spanning the width; (6) ALL typography in moodboard palette — white/cream/accent on dark, NEVER black on white. End with: high-resolution, print-ready, A4 portrait format, same visual atmosphere as the front page."
 }`;
 
         let artPlan = null;
@@ -1080,15 +1095,24 @@ RENDER REQUIREMENTS:
 
         const backEnhanced = `${moodReinforcement}
 
+THIS IS THE BACK PANEL OF A PREMIUM BROCHURE — IT MUST BE AS VISUALLY CREATIVE AS THE FRONT COVER.
+DO NOT render a white background with black text. DO NOT render a plain feature list or spec table on a light background.
+The back panel uses the SAME DARK/DRAMATIC/EDITORIAL atmosphere as the front — same color palette, same graphic energy.
+
+Chosen layout archetype: ${artPlan.chosenBackArchetype || 'Dark Hero Split — dark background, feature cards in moodboard colors, bold CTA strip'}
+
 ${artPlan.backPagePrompt}
 
-RENDER REQUIREMENTS:
-- Format: A4 portrait brochure back/inside panel (896x1120px)
-- Information hierarchy must be clear: product name largest, section headers medium, body copy readable
-- All feature text, spec values, and CTA must be real copy — NOT placeholder text
+GRAPHIC DESIGN REQUIREMENTS (non-negotiable):
+- Background: DARK / MOODBOARD-COLORED — matching the front cover's atmosphere. NOT white. NOT light grey.
+- Product image: prominently placed, lit with dramatic moodboard lighting matching the front cover
+- Features: STYLED VISUAL CARDS or TYPOGRAPHIC BLOCKS — each has a shape, bold feature name, benefit line. NOT a bullet list.
+- Specs: styled infographic strip or table with moodboard-colored dividers — NOT a plain white table
+- CTA: bold contrasting color banner spanning full width — clearly distinct from surrounding content
+- ALL text: moodboard palette colors — white, cream, or accent on dark. NEVER black text on white.
 - ${colorReinforcement}
-- Maintain the same moodboard atmosphere as the front cover — unified visual identity
-- Print-ready quality: ultra-sharp, magazine-grade production value`;
+- Typography CRISP and LEGIBLE — not blurry or aliased
+- Print-ready quality: ultra-sharp, magazine-grade production value, A4 portrait (896x1120px)`;
 
         console.log('🎨 Brochure: GPT Image 2 rendering both pages in parallel...');
         const [frontResult, backResult] = await Promise.allSettled([
