@@ -440,7 +440,7 @@ router.post('/social-kit/generate', protect, async (req, res) => {
 
         if (validSignedRefs.length > 0) {
             // Patch productDNA with signed URLs so all downstream prompt builders use them
-            productDNA.heroImageUrl    = validSignedRefs[0];
+            productDNA.heroImageUrl     = validSignedRefs[0];
             productDNA.productRefImages = validSignedRefs;
             console.log(`📸 Social Kit: pre-signed ${validSignedRefs.length} S3 ref images for AI model`);
         } else {
@@ -459,9 +459,10 @@ router.post('/social-kit/generate', protect, async (req, res) => {
             ? `${designContext.systemDirective}\n\n---\n`
             : '';
 
-        // ── Step 1: Pulse Creative Brain — per-platform art direction + copy ────
+        // ── Step 1: Pulse Creative Brain — per-platform art direction ─────────────
         // When usePulseCreativeBrain=true, runs the full 4-role creative engine
         // to get platform-specific art direction before image generation.
+        // NOTE: Caption generation is handled separately in the dedicated pass below.
         let perPlatformArtDirection = {};
         let captions = {};
         let creativeRationale = '';
@@ -499,15 +500,17 @@ router.post('/social-kit/generate', protect, async (req, res) => {
                 })
             );
 
-            // Map brain results to per-platform art direction and captions
+            // Map brain results to per-platform art direction (image prompts only)
+            // Captions are generated in a dedicated pass below with full algorithm knowledge
             for (const settled of brainResults) {
                 if (settled.status === 'fulfilled') {
                     const { platform, result } = settled.value;
                     perPlatformArtDirection[platform] = result;
+                    // Store brain's headline as imageText only — full caption comes from dedicated pass
                     if (result.copyHeadline) {
                         captions[platform] = {
                             imageText: result.copyHeadline,
-                            caption:   result.copySubtext || '',
+                            caption:   '',   // will be filled by dedicated caption pass
                             hashtags:  '',
                         };
                     }
@@ -517,53 +520,164 @@ router.post('/social-kit/generate', protect, async (req, res) => {
                     }
                 }
             }
+        }
 
-            // Fill in captions with full copywriting pass (hashtags + platform-specific copy)
-            // This secondary pass is lighter and focused only on captions (not image direction)
-            if (Object.keys(captions).length < targetPlatforms.length) {
-                const bullets = productData?.bulletPoints || [];
-                const copyPrompt = `You are a senior social media strategist.
-Product: "${productTitle}" | Mood: ${selectedMoodDir.label} | Post type: ${kitType}
-Key USPs: ${bullets.slice(0, 5).join(' | ')}
-Generate platform-optimized captions. Return ONLY valid JSON:
-${JSON.stringify(Object.fromEntries(targetPlatforms.map(p => [p, { caption: '', hashtags: '' }])))}`;
-                try {
-                    const fallbackCaptions = await callAgentText(
-                        'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
-                        copyPrompt, 0.6, 1200
-                    );
-                    const parsed = typeof fallbackCaptions === 'string' ? JSON.parse(fallbackCaptions) : fallbackCaptions;
-                    for (const [plat, cap] of Object.entries(parsed)) {
-                        if (!captions[plat]) captions[plat] = cap;
-                        else captions[plat] = { ...cap, ...captions[plat] }; // Brain copy takes priority
-                    }
-                } catch(e) { console.warn('Fallback caption gen failed:', e.message); }
-            }
-        } else {
-            // Legacy path: simple copy generation without Creative Brain
-            const bullets = productData?.bulletPoints || [];
-            const colorHex = (productDNA?.dominantColors || []).slice(0, 3).map(c => c.hex).filter(Boolean).join(', ');
-            const copyPrompt = `You are a senior social media strategist.
-Product: "${productTitle}" | Category: ${productDNA?.productCategory || 'consumer product'} | Mood: ${selectedMoodDir.label}
-Key USPs: ${bullets.slice(0, 5).join(' | ')}
-Post type: ${kitType}
+        // ── DEDICATED CAPTION GENERATION PASS (always runs) ──────────────────────
+        // Uses deep July 2026 platform algorithm knowledge to write captions that
+        // actually get reach — each platform has unique hook structure, length,
+        // hashtag strategy, and CTA mechanic. This is separate from image art direction.
+        {
+            const bullets       = productData?.bulletPoints || [];
+            const topUSPs       = bullets.slice(0, 5).join(' | ');
+            const moodVoice     = selectedMoodDir?.label || 'Professional';
+            const moodDesc      = selectedMoodDir?.description || '';
+            const targetPlatforms = (platforms && platforms.length) ? platforms : ['instagram_feed','instagram_story','facebook','twitter_x','linkedin','pinterest'];
+            const requestedPlatformsCopy = targetPlatforms.filter(p => !captions[p]?.caption || captions[p].caption.trim() === '');
 
-Generate platform-optimized captions and image-text overlays. For every platform, include an "imageText" field which is a 3-5 word high-impact creative headline to be rendered directly onto the visual graphic. Return ONLY valid JSON:
+            if (requestedPlatformsCopy.length > 0 || Object.keys(captions).length < targetPlatforms.length) {
+                const captionSystemPrompt = `You are a world-class Social Media Copywriter with deep expertise in each platform's July 2026 algorithm. You write copy that GETS REACH — not just looks good.
+
+JULY 2026 PLATFORM ALGORITHM INTELLIGENCE:
+
+INSTAGRAM FEED (July 2026):
+  Algorithm: Favors saves + shares over likes. Hook in line 1 (before "more"). 
+  Optimal length: 150-220 words. First line must stop the scroll in <3 words or with a question.
+  Hashtag strategy: 3-5 hyper-relevant hashtags only (Instagram 2026 de-ranks posts with 20+ tags).
+  Caption structure: Hook → Story/Problem → Solution (product) → Social proof/feature → CTA to save or share.
+  Tone: Conversational, authentic. No corporate language. Short punchy sentences.
+  CTA: "Save this for later", "Share with someone who needs this", "Drop a 🔥 if..."
+
+INSTAGRAM STORY (July 2026):
+  Algorithm: Engagement (poll/quiz/question sticker) drives story reach. Views alone don't.
+  Optimal: 1-3 very short lines + strong CTA sticker text.
+  Hook: Question or bold statement. "Did you know..." or "[Bold claim]"
+  CTA sticker: Action-oriented, max 4 words: "Shop Now", "Swipe Up", "Yes or No?"
+  Tone: Direct, urgent, personal.
+
+FACEBOOK (July 2026):
+  Algorithm: Prioritizes posts that spark MEANINGFUL COMMENTS (>5 word replies). 
+  Ask a question at the end to drive comments. Avoid engagement-bait.
+  Optimal length: 80-150 words. Facebook punishes >250 word posts with reduced reach.
+  Hashtags: 1-2 only (Facebook 2026 does NOT boost hashtagged content).
+  Structure: Relatable opening → Feature highlight → Social proof → Open question CTA.
+  Tone: Warm, community-focused. "We", "You", "Our family".
+
+TWITTER/X (July 2026):
+  Algorithm: Retweet velocity in first 30 min is everything. Must be quotable.
+  Character limit: 280 max. Optimal sweet spot: 140-200 chars.
+  Structure: Bold punchy statement OR provocative question → 1-2 product benefits → CTA or hook.
+  NO hashtags (X 2026 algorithm heavily de-ranks posts with hashtags — proven to reduce reach 40%).
+  Tone: Bold, confident, provocative. Threads perform — end with "Thread 🧵" if content warrants it.
+  CTA: "RT if you agree", "Reply with your take", link to product.
+
+LINKEDIN (July 2026):
+  Algorithm: Dwell time + saves drive reach. "Carousel" posts and text-heavy posts outperform images.
+  Optimal length: 200-300 words. Use line breaks aggressively (single sentences per line).
+  Structure: Bold contrarian opening line → Personal story or insight → Product as solution/tool → 
+             3 specific benefits as bullet points → Professional CTA.
+  Hashtags: 3 exactly (LinkedIn 2026 algorithm optimal is 3 — more hurts reach).
+  Tone: Professional but human. First person. Insight-driven, not salesy.
+  CTA: "Save this post", "What's your take?", "DM me for details".
+
+PINTEREST (July 2026):
+  Algorithm: Keywords in description drive organic discovery (Pinterest = visual search engine).
+  Optimal length: 100-150 words. Must be keyword-rich but readable.
+  Structure: Primary keyword in first sentence → Product description with search terms → 
+             Benefits list → Secondary keywords naturally woven → Board suggestion.
+  Hashtags: 5-10 keyword-style tags (Pinterest 2026 uses them as category signals).
+  Tone: Descriptive, aspirational, how-to friendly.
+  Board suggestion: Specific to product category and lifestyle.
+
+ABSOLUTE RULES:
+- Each platform must sound COMPLETELY DIFFERENT — not the same caption reformatted
+- No generic phrases: "Check it out!", "Buy now!", "Limited time only!" unless platform-appropriate
+- Captions must reference the SPECIFIC product features provided, not generic claims
+- Mood voice must match: ${moodVoice} — ${moodDesc}
+- Return ONLY valid JSON. No markdown, no code fences.`;
+
+                const captionUserPrompt = `Write platform-specific captions for this product using the July 2026 algorithm knowledge above.
+
+PRODUCT: "${productTitle}"
+CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
+POST TYPE: ${kitType} (promo / launch / feature highlight / lifestyle / festive)
+TOP USPs: ${topUSPs || 'Premium quality, innovative design, superior performance'}
+MOOD / VOICE: ${moodVoice} — ${moodDesc}
+TARGET PLATFORMS: ${requestedPlatformsCopy.join(', ')}
+
+Return this exact JSON structure (only for requested platforms: ${requestedPlatformsCopy.join(', ')}):
 {
-  "instagram_feed": { "imageText": "headline", "caption": "2-3 line", "hashtags": "20 hashtags" },
-  "instagram_story": { "imageText": "headline", "caption": "Short text", "sticker_text": "CTA" },
-  "facebook": { "imageText": "headline", "caption": "2-3 line post" },
-  "twitter_x": { "imageText": "headline", "caption": "Under 250 chars" },
-  "linkedin": { "imageText": "headline", "caption": "Professional 3-4 line" },
-  "pinterest": { "imageText": "headline", "caption": "Keyword-rich", "board_suggestion": "Board name" }
+  "instagram_feed": {
+    "imageText": "3-5 word bold headline for graphic overlay",
+    "hook": "First line only — scroll-stopper (<8 words)",
+    "caption": "Full 150-220 word caption with hook → story → product → CTA. Use line breaks.",
+    "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 (max 5, hyper-relevant only)"
+  },
+  "instagram_story": {
+    "imageText": "3-5 word bold headline",
+    "caption": "2-3 short punchy lines",
+    "sticker_text": "CTA sticker text (max 4 words)",
+    "poll_question": "Optional poll question if relevant"
+  },
+  "facebook": {
+    "imageText": "3-5 word bold headline",
+    "caption": "80-150 word post ending with a question to drive comments",
+    "hashtags": "#tag1 (1-2 only)"
+  },
+  "twitter_x": {
+    "imageText": "3-5 word bold headline",
+    "caption": "140-200 character tweet. NO hashtags. Punchy, quotable, ends with CTA."
+  },
+  "linkedin": {
+    "imageText": "3-5 word professional headline",
+    "hook": "Contrarian or surprising opening line",
+    "caption": "200-300 word post with line breaks. Include 3 bullet points of specific benefits. End with save/comment CTA.",
+    "hashtags": "#tag1 #tag2 #tag3 (exactly 3)"
+  },
+  "pinterest": {
+    "imageText": "3-5 word aspirational headline",
+    "caption": "100-150 keyword-rich description naturally woven with search terms",
+    "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 (keyword-style, 5-10)",
+    "board_suggestion": "Specific board name"
+  }
 }`;
-            try {
-                captions = await callAgentText(
-                    'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
-                    copyPrompt, 0.6, 1200
-                );
-                if (typeof captions === 'string') captions = JSON.parse(captions);
-            } catch(e) { console.warn('Caption generation failed:', e.message); }
+
+                try {
+                    const { callAgentText } = await import('../agents/shared/agentUtils.js');
+                    const captionResult = await callAgentText(
+                        captionSystemPrompt,
+                        captionUserPrompt,
+                        0.75,
+                        3000,
+                        { provider: 'anthropic', model: 'claude-haiku-4-20250514', timeoutMs: 60_000 }
+                    );
+                    const parsedCaptions = typeof captionResult === 'string' ? JSON.parse(captionResult) : captionResult;
+
+                    for (const [plat, cap] of Object.entries(parsedCaptions || {})) {
+                        if (!captions[plat]) {
+                            captions[plat] = cap;
+                        } else {
+                            // Merge: brain's imageText + headline take priority, but fill in full caption + hashtags
+                            captions[plat] = {
+                                ...cap,
+                                imageText: captions[plat].imageText || cap.imageText,
+                            };
+                        }
+                    }
+                    console.log(`✅ Platform captions written (July 2026 algo): ${Object.keys(parsedCaptions || {}).join(', ')}`);
+                } catch (captionErr) {
+                    // Gemini fallback if Claude Haiku fails
+                    console.warn('⚠️ Claude caption pass failed, falling back to Gemini:', captionErr.message);
+                    try {
+                        const { callAgentText } = await import('../agents/shared/agentUtils.js');
+                        const fallback = await callAgentText(captionSystemPrompt, captionUserPrompt, 0.75, 3000);
+                        const parsed = typeof fallback === 'string' ? JSON.parse(fallback) : fallback;
+                        for (const [plat, cap] of Object.entries(parsed || {})) {
+                            if (!captions[plat]) captions[plat] = cap;
+                            else captions[plat] = { ...cap, imageText: captions[plat].imageText || cap.imageText };
+                        }
+                    } catch (e) { console.warn('Caption fallback also failed:', e.message); }
+                }
+            }
         }
 
         // ── Step 2: Generate images for requested platforms in parallel ─────────
@@ -816,61 +930,136 @@ router.post('/brochure/generate', protect, async (req, res) => {
 
 
         // ── PHASE 1: Claude Art Director ──────────────────────────────────────────────────
-        // Claude understands the full product spec and writes ultra-precise image generation
-        // prompts — every design decision is deliberate: font choice, color usage, layout, hierarchy
+        // Claude acts as a real creative director who has studied the moodboard.
+        // It writes ultra-specific image generation prompts for GPT Image 2.
+        // Every design decision must trace back to the moodboard mood direction.
 
         const { callAgent } = await import('../agents/shared/agentUtils.js');
 
-        const artDirectorSystem = `You are a world-class Art Director with 20 years of experience in luxury product brochure design.
-You have the skills of:
-  - Saul Bass (bold, confident graphic composition)
-  - Paula Scher (expressive typography as a design element)
-  - David Carson (breaking the grid for impact)
-  - An Nueno (premium product photography direction)
+        // Extract full moodboard creative brief from designContext
+        const moodLabel       = moodDir.label;
+        const moodShoot       = designContext?.shootDirective || moodDir.shootDirective || '';
+        const moodBoardDir    = designContext?.moodBoardDirective || '';
+        const fullSystemDir   = designContext?.systemDirective || '';
+        const colorGuardBlock = designContext?.colorGuardBlock || '';
 
-Your job is to analyze a product's specifications and write two ultra-detailed IMAGE GENERATION PROMPTS for GPT Image 2 that will render complete, print-ready brochure pages as images.
+        const artDirectorSystem = `You are a world-class Creative Director who has just reviewed the client's MOODBOARD and now you are briefing your AI image generation tool (GPT Image 2) to produce two complete, print-ready brochure pages.
 
-CRITICAL RULES:
-1. The prompts must instruct GPT Image 2 to INCLUDE actual text in the image — headlines, specs, features, CTA, product name — all rendered as TYPOGRAPHIC DESIGN ELEMENTS.
-2. Every design decision must be product-specific — derived from the product's DNA, colors, mood, and category.
-3. Be extremely specific about: font choices, font sizes, font weights, layout grid, color usage, spacing, visual hierarchy, and product placement.
-4. Both prompts must result in COMPLETE, PRINT-READY designs — not sketches or concepts.
-5. Return ONLY valid JSON.`;
+You think like:
+  • Wieden+Kennedy (emotional storytelling + unexpected visual POV)
+  • Pentagram (obsessive craft + typographic precision)
+  • TBWA\\Media Arts Lab (product-as-icon aesthetic)
+  • David Carson (grid-breaking layouts that create tension)
 
-        const artDirectorPrompt = `Analyze this product and write two complete brochure page image prompts:
+YOUR MANDATE:
+The brochure must FEEL like the moodboard — same atmosphere, same color temperature, same energy.
+If the moodboard is DARK + DRAMATIC → the brochure is dark + dramatic. NOT clean + white.
+If the moodboard is EDITORIAL + MINIMAL → sparse layout, oversized type, breathing room.
+If the moodboard is BOLD + VIBRANT → saturated, energetic, high-contrast.
+The design must be COMPLETELY SPECIFIC to this product and mood. Zero generic decisions.
 
-${designContext?.systemDirective ? `\n=== DESIGN INTELLIGENCE BRIEF ===\n${designContext.systemDirective}\n=== END BRIEF ===\n` : ''}
-PRODUCT: "${productTitle}"
+WHAT YOU MUST DO:
+1. Study the MOODBOARD BRIEF below — let it dictate every design decision.
+2. Choose ONE dominant design aesthetic from: [Editorial Brutalism | Soft Luxury | Neon Noir | Coastal Maximalism | Analog Revival | Dark Academia | Tech Industrial | Warm Maximalism | India New Luxe]
+3. Write two image generation prompts so specific that GPT Image 2 produces COMPLETE, PRINT-READY brochure pages — not mood sketches.
+4. Every prompt must describe: background treatment, typography style+weight+color, product placement+lighting, layout zones, decorative elements, and exact copy text to render.
+5. Text on the brochure must be REAL copy — actual headlines, feature names, spec values — written by you based on the product brief.
+6. COLOR IS NON-NEGOTIABLE: Product colors from the color guard block must be EXACT in every prompt.
+
+FORBIDDEN:
+- Generic floating product on plain gradient
+- Generic grey/white studio look (unless moodboard explicitly demands it)
+- Centered symmetric layouts (use deliberate tension)
+- Lorem ipsum or placeholder text
+- Watermarks, logos, hex codes in prompts
+- Repeating the same composition twice
+
+Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON.`;
+
+        const artDirectorPrompt = `You are briefing GPT Image 2 to create two brochure pages. Read every line below before writing a single word of a prompt.
+
+══════════════════════════════════════════════
+MOODBOARD CREATIVE BRIEF (STUDIED — NOT SKIMMED)
+══════════════════════════════════════════════
+${fullSystemDir || `MOOD: ${moodLabel} — ${moodShoot}`}
+${moodBoardDir ? `\nMOODBOARD ART DIRECTION:\n${moodBoardDir}` : ''}
+${moodShoot ? `\nSHOOT STYLE: ${moodShoot}` : ''}
+
+══════════════════════════════════════════════
+PRODUCT BRIEF
+══════════════════════════════════════════════
+PRODUCT NAME: "${productTitle}"
 CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
-TAGLINE / BRIEF: ${brief || 'Premium product brochure for retail/distribution'}
-KEY FEATURES (use these verbatim in the design):
-${bullets.slice(0, 8).map((b, i) => `  ${i+1}. ${b}`).join('\n')}
-PRODUCT COLORS: ${colorDesc || 'Dark navy, Electric violet, White'}
-MOOD DIRECTION: ${moodDir.label} — ${moodDir.shootDirective || 'Clean, premium, editorial'}
-BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 300) : 'Premium consumer brand'}
-${avatarConfig?.enabled ? `HUMAN PRESENCE: Include a ${avatarConfig.gender || 'person'} using the product. ${avatarConfig.skin ? `Skin tone: ${avatarConfig.skin}.` : ''} ${avatarConfig.style ? `Style: ${avatarConfig.style}.` : ''}` : ''}
+BRIEF / CAMPAIGN ANGLE: ${brief || 'Premium product brochure for retail and distribution channels'}
+PRODUCT MATERIALS: ${productDNA?.materials || 'premium finish'}
+PRODUCT SHAPE: ${productDNA?.productShape || 'compact'}
+DESIGN DIRECTIVE: ${productDNA?.designDirective || ''}
+
+KEY FEATURES — use these verbatim as feature copy in the design:
+${bullets.slice(0, 8).map((b, i) => `  ${i+1}. ${b}`).join('\n') || '  Premium quality, distinctive design, superior performance'}
+
+BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 400) : 'Premium D2C consumer brand'}
+${avatarConfig?.enabled ? `\nHUMAN PRESENCE: Include a ${avatarConfig.gender || 'person'} ${avatarConfig.intent || 'using'} the product. Skin tone: ${avatarConfig.skin || 'natural'}. Style: ${avatarConfig.style || 'contemporary'}.` : '\nNO HUMAN: Product-focused design only.'}
+
+══════════════════════════════════════════════
+${colorGuardBlock || `PRODUCT COLORS (LOCKED — DO NOT CHANGE):\n${colorDesc || 'Derive from product context'}`}
+══════════════════════════════════════════════
+
+NOW WRITE THE BROCHURE:
+
+PAGE 1 — FRONT COVER: Make an emotional, scroll-stopping first impression.
+  - The moodboard mood MUST dominate the atmosphere
+  - Large, bold headline (3-6 words you write) as the typographic hero
+  - Product as the visual anchor — lit exactly as the moodboard dictates
+  - One unexpected design element that breaks expectation
+  - Do NOT center everything — use deliberate tension in layout
+
+PAGE 2 — BACK PANEL: A second creative canvas — NOT a spec sheet, NOT a Word document.
+  THIS IS THE MOST IMPORTANT INSTRUCTION: The back must FEEL exactly as creative and moodboard-driven as the front.
+  FORBIDDEN for the back page:
+    ✗ White or light grey background (unless moodboard is explicitly light)
+    ✗ Black text on white in plain rows (this is a Word doc, not a brochure)
+    ✗ Unformatted bullet point lists
+    ✗ Generic info-table look
+    ✗ Any layout that looks like a product manual
+
+  MANDATORY — use ONE of these creative layout archetypes:
+  ARCHETYPE A — DARK HERO SPLIT: Deep dark background (matching moodboard) + large product image filling top 40%. Below: 3 feature cards in a horizontal grid with bold icon shapes, feature name in large type, 1-line benefit. Bottom: bold colored CTA block spanning full width.
+  ARCHETYPE B — EDITORIAL GRID: Modular grid of bold color blocks — product fills one large block, features fill smaller adjacent blocks in moodboard accent colors. Typography oversized and clipped by block edges. Specs in a minimal styled table on a dark strip.
+  ARCHETYPE C — DIAGONAL SPLIT: Background split diagonally — product on dark side, features on accent-color panel. Features as large NUMBERED STATEMENTS, not bullets. Specs as 2-column minimal table with hairline dividers.
+  ARCHETYPE D — MAGAZINE SPREAD: Full-bleed background image (product in moodboard environment), text overlaid in white on dark scrim. 3 bold feature titles with descriptions below in different weights.
+
+  ALWAYS include:
+  - Product name as large typographic statement
+  - ALL features styled as VISUAL CARDS or TYPOGRAPHIC BLOCKS — not plain text
+  - Styled specs section (3-4 spec pairs, moodboard-consistent styling with dividers)
+  - CTA as colored button or contrasting banner strip
+  - DELIBERATE ASYMMETRY — not centered columns
 
 Return this JSON:
 {
-  "headline": "3-6 word bold benefit headline (not product name) that will appear large on the front cover",
-  "subheadline": "One compelling sentence — the #1 transformation this product delivers",
-  "badge": "Short uppercase badge text e.g. 'NEW LAUNCH' / 'AWARD WINNING' / 'LIMITED EDITION' — or null",
-  "frontPagePrompt": "ULTRA-DETAILED image generation prompt for the FRONT COVER page. Must be a complete A4 portrait brochure design rendered as a single image. Include: exact headline text in quotes, font style description, layout positioning, product image placement, color palette usage, background treatment, decorative elements, badge/label if any. Be obsessively specific — describe every visual element.",
-  "backPagePrompt": "ULTRA-DETAILED image generation prompt for the BACK/INSIDE page. Must be a complete A4 landscape or portrait brochure design. Include: product name at top, intro paragraph text (1-2 sentences — write the actual copy), all feature titles with one-line benefits (write actual copy from the bullet points), technical specs table (label: value pairs — invent realistic specs from the product category), CTA section at bottom. Lay out as a professional info-design page with icons, dividers, typographic hierarchy. Be obsessively specific."
+  "headline": "3-6 word bold benefit headline for front cover — NOT the product name",
+  "subheadline": "One sentence. The #1 emotional transformation this product delivers.",
+  "badge": "Short uppercase badge (NEW LAUNCH / AWARD WINNING / LIMITED EDITION / BEST SELLER / null)",
+  "chosenAesthetic": "Name of the 2026 design aesthetic you chose and one sentence why it fits this moodboard",
+  "chosenBackArchetype": "Which back page archetype you chose (A/B/C/D) and one sentence why it works for this product+mood",
+  "frontPagePrompt": "ULTRA-DETAILED A4 portrait brochure front cover prompt for GPT Image 2. 200+ words. Describe: the exact moodboard atmosphere (background color/texture, lighting quality and direction), the headline text in quotes with font description (weight, style, color, size), product placement and how it's lit, any human presence if requested, decorative elements (geometric shapes, texture overlays, color blocks), badge placement, overall visual tension. Front-load the most important visual element. End with quality anchors: high-resolution, print-ready, A4 portrait format.",
+  "backPagePrompt": "ULTRA-DETAILED A4 portrait brochure back panel prompt for GPT Image 2. 250+ words. This is a GRAPHIC DESIGN prompt, NOT an information layout prompt. Describe: (1) the full background treatment matching the moodboard — dark/dramatic/textured/colored as appropriate, NOT white; (2) product image placement and dramatic moodboard lighting; (3) each feature as a STYLED VISUAL ELEMENT — card shape, icon area, bold feature name in oversized type, benefit sentence; (4) specs as a styled infographic strip with moodboard-colored dividers — NOT a plain grid; (5) CTA as a bold contrasting color banner spanning the width; (6) ALL typography in moodboard palette — white/cream/accent on dark, NEVER black on white. End with: high-resolution, print-ready, A4 portrait format, same visual atmosphere as the front page."
 }`;
 
         let artPlan = null;
         try {
-            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.85, 6000, {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4-20250514',
-                timeoutMs: 90_000,
+                timeoutMs: 120_000,
             });
+            console.log(`✅ Claude Art Director: aesthetic="${artPlan?.chosenAesthetic?.split(' ')[0] || '?'}" | headline="${artPlan?.headline || '?'}"`);
         } catch (claudeErr) {
             console.warn('⚠️ Claude art director failed, using Gemini fallback:', claudeErr.message);
-            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.85, 6000, {
                 preferFast: true,
-                timeoutMs: 90_000,
+                timeoutMs: 120_000,
             });
         }
 
@@ -879,6 +1068,7 @@ Return this JSON:
         const headline    = artPlan.headline || productTitle;
         const subheadline = artPlan.subheadline || bullets[0] || '';
         const badge       = artPlan.badge || null;
+        console.log(`🎨 Brochure Art Direction: "${artPlan.chosenAesthetic || moodLabel}" | badge: ${badge || 'none'}`);
 
         // ── PHASE 2: GPT Image 2 renders both pages as full images ────────────────────────
         // GPT Image 2 is used via /images/edits with the product reference image.
@@ -886,29 +1076,43 @@ Return this JSON:
 
         const { laozhangGptImageWithRefs, laozhangImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
 
-        // Enhance prompts with hard technical constraints for print-quality output
-        const frontEnhanced = `${artPlan.frontPagePrompt}
+        // Enhance prompts with moodboard-reinforced technical constraints
+        // The moodboard mood is front-loaded so GPT Image 2 respects the creative direction
+        const moodReinforcement = `MOODBOARD MOOD: ${moodDir.label} — ${moodDir.shootDirective || moodBoardDir || ''}. This is the governing aesthetic. Every pixel must serve this mood.`;
+        const colorReinforcement = `PRODUCT COLORS ARE LOCKED: ${colorDesc || 'as specified in the design'}. Do NOT reinterpret, warm, cool, or stylize these colors.`;
 
-TECHNICAL REQUIREMENTS FOR IMAGE GENERATION:
-- Format: A4 portrait brochure page (3:4 aspect ratio)
-- Style: Print-ready, photorealistic product photography composited with bold graphic design
-- Typography: All text must be clearly readable — crisp, anti-aliased, professional typeface
-- Product colors strictly: ${colorDesc}
-- No lorem ipsum. All text in the design must be real, meaningful copy.
-- Ultra high quality, magazine-grade production value
-- Aspect ratio: 896x1120 (portrait A4)`;
+        const frontEnhanced = `${moodReinforcement}
 
-        const backEnhanced = `${artPlan.backPagePrompt}
+${artPlan.frontPagePrompt}
 
-TECHNICAL REQUIREMENTS:
-- Format: A4 portrait brochure back/inside page (3:4 aspect ratio)  
-- Style: Clean editorial layout — information design meets premium brand design
-- Include a proper specs table with borders/dividers, feature icons (use elegant emoji or geometric shapes), and a colored CTA block at the bottom
-- All typography must be legible and hierarchically organized: product name (largest), section headers, body copy, fine print
-- Background: ${secondaryColor === '#f5f5f5' ? 'white or very light grey' : `light tint of ${secondaryColor}`} for readability
-- Accent color for headers and CTA block: ${accentColor}
-- Ultra high quality, print-ready
-- Aspect ratio: 896x1120 (portrait A4)`;
+RENDER REQUIREMENTS:
+- Format: A4 portrait brochure front cover (896x1120px)
+- All typography must be CRISP and LEGIBLE — not blurry or aliased
+- Product must look EXACTLY like the reference image provided — same form, same colors
+- ${colorReinforcement}
+- NO lorem ipsum — all text in the image must be real, meaningful copy as specified
+- Print-ready quality: ultra-sharp, magazine-grade production value`;
+
+        const backEnhanced = `${moodReinforcement}
+
+THIS IS THE BACK PANEL OF A PREMIUM BROCHURE — IT MUST BE AS VISUALLY CREATIVE AS THE FRONT COVER.
+DO NOT render a white background with black text. DO NOT render a plain feature list or spec table on a light background.
+The back panel uses the SAME DARK/DRAMATIC/EDITORIAL atmosphere as the front — same color palette, same graphic energy.
+
+Chosen layout archetype: ${artPlan.chosenBackArchetype || 'Dark Hero Split — dark background, feature cards in moodboard colors, bold CTA strip'}
+
+${artPlan.backPagePrompt}
+
+GRAPHIC DESIGN REQUIREMENTS (non-negotiable):
+- Background: DARK / MOODBOARD-COLORED — matching the front cover's atmosphere. NOT white. NOT light grey.
+- Product image: prominently placed, lit with dramatic moodboard lighting matching the front cover
+- Features: STYLED VISUAL CARDS or TYPOGRAPHIC BLOCKS — each has a shape, bold feature name, benefit line. NOT a bullet list.
+- Specs: styled infographic strip or table with moodboard-colored dividers — NOT a plain white table
+- CTA: bold contrasting color banner spanning full width — clearly distinct from surrounding content
+- ALL text: moodboard palette colors — white, cream, or accent on dark. NEVER black text on white.
+- ${colorReinforcement}
+- Typography CRISP and LEGIBLE — not blurry or aliased
+- Print-ready quality: ultra-sharp, magazine-grade production value, A4 portrait (896x1120px)`;
 
         console.log('🎨 Brochure: GPT Image 2 rendering both pages in parallel...');
         const [frontResult, backResult] = await Promise.allSettled([
