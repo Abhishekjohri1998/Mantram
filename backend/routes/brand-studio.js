@@ -816,61 +816,121 @@ router.post('/brochure/generate', protect, async (req, res) => {
 
 
         // ── PHASE 1: Claude Art Director ──────────────────────────────────────────────────
-        // Claude understands the full product spec and writes ultra-precise image generation
-        // prompts — every design decision is deliberate: font choice, color usage, layout, hierarchy
+        // Claude acts as a real creative director who has studied the moodboard.
+        // It writes ultra-specific image generation prompts for GPT Image 2.
+        // Every design decision must trace back to the moodboard mood direction.
 
         const { callAgent } = await import('../agents/shared/agentUtils.js');
 
-        const artDirectorSystem = `You are a world-class Art Director with 20 years of experience in luxury product brochure design.
-You have the skills of:
-  - Saul Bass (bold, confident graphic composition)
-  - Paula Scher (expressive typography as a design element)
-  - David Carson (breaking the grid for impact)
-  - An Nueno (premium product photography direction)
+        // Extract full moodboard creative brief from designContext
+        const moodLabel       = moodDir.label;
+        const moodShoot       = designContext?.shootDirective || moodDir.shootDirective || '';
+        const moodBoardDir    = designContext?.moodBoardDirective || '';
+        const fullSystemDir   = designContext?.systemDirective || '';
+        const colorGuardBlock = designContext?.colorGuardBlock || '';
 
-Your job is to analyze a product's specifications and write two ultra-detailed IMAGE GENERATION PROMPTS for GPT Image 2 that will render complete, print-ready brochure pages as images.
+        const artDirectorSystem = `You are a world-class Creative Director who has just reviewed the client's MOODBOARD and now you are briefing your AI image generation tool (GPT Image 2) to produce two complete, print-ready brochure pages.
 
-CRITICAL RULES:
-1. The prompts must instruct GPT Image 2 to INCLUDE actual text in the image — headlines, specs, features, CTA, product name — all rendered as TYPOGRAPHIC DESIGN ELEMENTS.
-2. Every design decision must be product-specific — derived from the product's DNA, colors, mood, and category.
-3. Be extremely specific about: font choices, font sizes, font weights, layout grid, color usage, spacing, visual hierarchy, and product placement.
-4. Both prompts must result in COMPLETE, PRINT-READY designs — not sketches or concepts.
-5. Return ONLY valid JSON.`;
+You think like:
+  • Wieden+Kennedy (emotional storytelling + unexpected visual POV)
+  • Pentagram (obsessive craft + typographic precision)
+  • TBWA\\Media Arts Lab (product-as-icon aesthetic)
+  • David Carson (grid-breaking layouts that create tension)
 
-        const artDirectorPrompt = `Analyze this product and write two complete brochure page image prompts:
+YOUR MANDATE:
+The brochure must FEEL like the moodboard — same atmosphere, same color temperature, same energy.
+If the moodboard is DARK + DRAMATIC → the brochure is dark + dramatic. NOT clean + white.
+If the moodboard is EDITORIAL + MINIMAL → sparse layout, oversized type, breathing room.
+If the moodboard is BOLD + VIBRANT → saturated, energetic, high-contrast.
+The design must be COMPLETELY SPECIFIC to this product and mood. Zero generic decisions.
 
-${designContext?.systemDirective ? `\n=== DESIGN INTELLIGENCE BRIEF ===\n${designContext.systemDirective}\n=== END BRIEF ===\n` : ''}
-PRODUCT: "${productTitle}"
+WHAT YOU MUST DO:
+1. Study the MOODBOARD BRIEF below — let it dictate every design decision.
+2. Choose ONE dominant design aesthetic from: [Editorial Brutalism | Soft Luxury | Neon Noir | Coastal Maximalism | Analog Revival | Dark Academia | Tech Industrial | Warm Maximalism | India New Luxe]
+3. Write two image generation prompts so specific that GPT Image 2 produces COMPLETE, PRINT-READY brochure pages — not mood sketches.
+4. Every prompt must describe: background treatment, typography style+weight+color, product placement+lighting, layout zones, decorative elements, and exact copy text to render.
+5. Text on the brochure must be REAL copy — actual headlines, feature names, spec values — written by you based on the product brief.
+6. COLOR IS NON-NEGOTIABLE: Product colors from the color guard block must be EXACT in every prompt.
+
+FORBIDDEN:
+- Generic floating product on plain gradient
+- Generic grey/white studio look (unless moodboard explicitly demands it)
+- Centered symmetric layouts (use deliberate tension)
+- Lorem ipsum or placeholder text
+- Watermarks, logos, hex codes in prompts
+- Repeating the same composition twice
+
+Return ONLY valid JSON. No markdown, no code fences, no explanation outside the JSON.`;
+
+        const artDirectorPrompt = `You are briefing GPT Image 2 to create two brochure pages. Read every line below before writing a single word of a prompt.
+
+══════════════════════════════════════════════
+MOODBOARD CREATIVE BRIEF (STUDIED — NOT SKIMMED)
+══════════════════════════════════════════════
+${fullSystemDir || `MOOD: ${moodLabel} — ${moodShoot}`}
+${moodBoardDir ? `\nMOODBOARD ART DIRECTION:\n${moodBoardDir}` : ''}
+${moodShoot ? `\nSHOOT STYLE: ${moodShoot}` : ''}
+
+══════════════════════════════════════════════
+PRODUCT BRIEF
+══════════════════════════════════════════════
+PRODUCT NAME: "${productTitle}"
 CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
-TAGLINE / BRIEF: ${brief || 'Premium product brochure for retail/distribution'}
-KEY FEATURES (use these verbatim in the design):
-${bullets.slice(0, 8).map((b, i) => `  ${i+1}. ${b}`).join('\n')}
-PRODUCT COLORS: ${colorDesc || 'Dark navy, Electric violet, White'}
-MOOD DIRECTION: ${moodDir.label} — ${moodDir.shootDirective || 'Clean, premium, editorial'}
-BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 300) : 'Premium consumer brand'}
-${avatarConfig?.enabled ? `HUMAN PRESENCE: Include a ${avatarConfig.gender || 'person'} using the product. ${avatarConfig.skin ? `Skin tone: ${avatarConfig.skin}.` : ''} ${avatarConfig.style ? `Style: ${avatarConfig.style}.` : ''}` : ''}
+BRIEF / CAMPAIGN ANGLE: ${brief || 'Premium product brochure for retail and distribution channels'}
+PRODUCT MATERIALS: ${productDNA?.materials || 'premium finish'}
+PRODUCT SHAPE: ${productDNA?.productShape || 'compact'}
+DESIGN DIRECTIVE: ${productDNA?.designDirective || ''}
+
+KEY FEATURES — use these verbatim as feature copy in the design:
+${bullets.slice(0, 8).map((b, i) => `  ${i+1}. ${b}`).join('\n') || '  Premium quality, distinctive design, superior performance'}
+
+BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 400) : 'Premium D2C consumer brand'}
+${avatarConfig?.enabled ? `\nHUMAN PRESENCE: Include a ${avatarConfig.gender || 'person'} ${avatarConfig.intent || 'using'} the product. Skin tone: ${avatarConfig.skin || 'natural'}. Style: ${avatarConfig.style || 'contemporary'}.` : '\nNO HUMAN: Product-focused design only.'}
+
+══════════════════════════════════════════════
+${colorGuardBlock || `PRODUCT COLORS (LOCKED — DO NOT CHANGE):\n${colorDesc || 'Derive from product context'}`}
+══════════════════════════════════════════════
+
+NOW WRITE THE BROCHURE:
+
+PAGE 1 — FRONT COVER: Make an emotional, scroll-stopping first impression.
+  - The moodboard mood MUST dominate the atmosphere
+  - Large, bold headline (3-6 words you write) as the typographic hero
+  - Product as the visual anchor — lit exactly as the moodboard dictates
+  - One unexpected design element that breaks expectation
+  - Do NOT center everything — use deliberate tension in layout
+
+PAGE 2 — INSIDE/BACK PANEL: Information design that sells.
+  - Product name at top as a typographic statement
+  - 2-sentence intro paragraph (you write it) — voice matches the mood
+  - All features from the brief above, each with a short benefit sentence you write
+  - Technical specs section (derive realistic specs from product category)
+  - CTA section at bottom
+  - Consistent with Page 1's mood and color, but different in layout rhythm
 
 Return this JSON:
 {
-  "headline": "3-6 word bold benefit headline (not product name) that will appear large on the front cover",
-  "subheadline": "One compelling sentence — the #1 transformation this product delivers",
-  "badge": "Short uppercase badge text e.g. 'NEW LAUNCH' / 'AWARD WINNING' / 'LIMITED EDITION' — or null",
-  "frontPagePrompt": "ULTRA-DETAILED image generation prompt for the FRONT COVER page. Must be a complete A4 portrait brochure design rendered as a single image. Include: exact headline text in quotes, font style description, layout positioning, product image placement, color palette usage, background treatment, decorative elements, badge/label if any. Be obsessively specific — describe every visual element.",
-  "backPagePrompt": "ULTRA-DETAILED image generation prompt for the BACK/INSIDE page. Must be a complete A4 landscape or portrait brochure design. Include: product name at top, intro paragraph text (1-2 sentences — write the actual copy), all feature titles with one-line benefits (write actual copy from the bullet points), technical specs table (label: value pairs — invent realistic specs from the product category), CTA section at bottom. Lay out as a professional info-design page with icons, dividers, typographic hierarchy. Be obsessively specific."
+  "headline": "3-6 word bold benefit headline for front cover — NOT the product name",
+  "subheadline": "One sentence. The #1 emotional transformation this product delivers.",
+  "badge": "Short uppercase badge (NEW LAUNCH / AWARD WINNING / LIMITED EDITION / BEST SELLER / null)",
+  "chosenAesthetic": "Name of the 2026 design aesthetic you chose and one sentence why it fits this moodboard",
+  "frontPagePrompt": "ULTRA-DETAILED A4 portrait brochure front cover prompt for GPT Image 2. 200+ words. Describe: the exact moodboard atmosphere (background color/texture, lighting quality and direction), the headline text in quotes with font description (weight, style, color, size), product placement and how it's lit, any human presence if requested, decorative elements (geometric shapes, texture overlays, color blocks), badge placement, overall visual tension. Front-load the most important visual element. End with quality anchors: high-resolution, print-ready, A4 portrait format.",
+  "backPagePrompt": "ULTRA-DETAILED A4 portrait brochure back/inside panel prompt for GPT Image 2. 200+ words. Describe: the information design layout (which zone has what content), the product name typography at top, the exact intro paragraph text in quotes, each feature name with its benefit sentence in quotes, the specs table structure and sample values, CTA text and button style, background treatment consistent with front page mood, typographic hierarchy (font sizes and weights for each level). End with quality anchors: high-resolution, print-ready, A4 portrait format."
 }`;
 
         let artPlan = null;
         try {
-            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.85, 6000, {
                 provider: 'anthropic',
                 model: 'claude-sonnet-4-20250514',
-                timeoutMs: 90_000,
+                timeoutMs: 120_000,
             });
+            console.log(`✅ Claude Art Director: aesthetic="${artPlan?.chosenAesthetic?.split(' ')[0] || '?'}" | headline="${artPlan?.headline || '?'}"`);
         } catch (claudeErr) {
             console.warn('⚠️ Claude art director failed, using Gemini fallback:', claudeErr.message);
-            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.85, 6000, {
                 preferFast: true,
-                timeoutMs: 90_000,
+                timeoutMs: 120_000,
             });
         }
 
@@ -879,6 +939,7 @@ Return this JSON:
         const headline    = artPlan.headline || productTitle;
         const subheadline = artPlan.subheadline || bullets[0] || '';
         const badge       = artPlan.badge || null;
+        console.log(`🎨 Brochure Art Direction: "${artPlan.chosenAesthetic || moodLabel}" | badge: ${badge || 'none'}`);
 
         // ── PHASE 2: GPT Image 2 renders both pages as full images ────────────────────────
         // GPT Image 2 is used via /images/edits with the product reference image.
@@ -886,29 +947,34 @@ Return this JSON:
 
         const { laozhangGptImageWithRefs, laozhangImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
 
-        // Enhance prompts with hard technical constraints for print-quality output
-        const frontEnhanced = `${artPlan.frontPagePrompt}
+        // Enhance prompts with moodboard-reinforced technical constraints
+        // The moodboard mood is front-loaded so GPT Image 2 respects the creative direction
+        const moodReinforcement = `MOODBOARD MOOD: ${moodDir.label} — ${moodDir.shootDirective || moodBoardDir || ''}. This is the governing aesthetic. Every pixel must serve this mood.`;
+        const colorReinforcement = `PRODUCT COLORS ARE LOCKED: ${colorDesc || 'as specified in the design'}. Do NOT reinterpret, warm, cool, or stylize these colors.`;
 
-TECHNICAL REQUIREMENTS FOR IMAGE GENERATION:
-- Format: A4 portrait brochure page (3:4 aspect ratio)
-- Style: Print-ready, photorealistic product photography composited with bold graphic design
-- Typography: All text must be clearly readable — crisp, anti-aliased, professional typeface
-- Product colors strictly: ${colorDesc}
-- No lorem ipsum. All text in the design must be real, meaningful copy.
-- Ultra high quality, magazine-grade production value
-- Aspect ratio: 896x1120 (portrait A4)`;
+        const frontEnhanced = `${moodReinforcement}
 
-        const backEnhanced = `${artPlan.backPagePrompt}
+${artPlan.frontPagePrompt}
 
-TECHNICAL REQUIREMENTS:
-- Format: A4 portrait brochure back/inside page (3:4 aspect ratio)  
-- Style: Clean editorial layout — information design meets premium brand design
-- Include a proper specs table with borders/dividers, feature icons (use elegant emoji or geometric shapes), and a colored CTA block at the bottom
-- All typography must be legible and hierarchically organized: product name (largest), section headers, body copy, fine print
-- Background: ${secondaryColor === '#f5f5f5' ? 'white or very light grey' : `light tint of ${secondaryColor}`} for readability
-- Accent color for headers and CTA block: ${accentColor}
-- Ultra high quality, print-ready
-- Aspect ratio: 896x1120 (portrait A4)`;
+RENDER REQUIREMENTS:
+- Format: A4 portrait brochure front cover (896x1120px)
+- All typography must be CRISP and LEGIBLE — not blurry or aliased
+- Product must look EXACTLY like the reference image provided — same form, same colors
+- ${colorReinforcement}
+- NO lorem ipsum — all text in the image must be real, meaningful copy as specified
+- Print-ready quality: ultra-sharp, magazine-grade production value`;
+
+        const backEnhanced = `${moodReinforcement}
+
+${artPlan.backPagePrompt}
+
+RENDER REQUIREMENTS:
+- Format: A4 portrait brochure back/inside panel (896x1120px)
+- Information hierarchy must be clear: product name largest, section headers medium, body copy readable
+- All feature text, spec values, and CTA must be real copy — NOT placeholder text
+- ${colorReinforcement}
+- Maintain the same moodboard atmosphere as the front cover — unified visual identity
+- Print-ready quality: ultra-sharp, magazine-grade production value`;
 
         console.log('🎨 Brochure: GPT Image 2 rendering both pages in parallel...');
         const [frontResult, backResult] = await Promise.allSettled([
