@@ -420,10 +420,39 @@ router.post('/social-kit/generate', protect, async (req, res) => {
         }
 
         const productTitle = productData?.title || productDNA?.productCategory || 'Product';
-        const refImages = [
+
+        // ── Pre-sign S3 reference images ──────────────────────────────────────────
+        // S3 bucket has owner-enforced ACLs — plain amazonaws URLs return 403 when
+        // AI image models fetch them. Pre-sign them so the model can actually load
+        // the product reference images. Without this, the model hallucinates a product
+        // from the text prompt alone (often headphones from its training data).
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        const rawS3Refs = [
             productDNA?.heroImageUrl,
-            ...(productDNA?.productRefImages || []).slice(0, 2),
-        ].filter(Boolean);
+            ...(productDNA?.productRefImages || []).slice(0, 3),
+            ...(productData?.persistedImages || []).slice(0, 4),
+        ].filter(Boolean).filter((u, i, arr) => arr.indexOf(u) === i);  // dedupe
+
+        const signedRefs = rawS3Refs.length > 0
+            ? await Promise.all(rawS3Refs.slice(0, 4).map(u => getSignedUrlIfNeeded(u)))
+            : [];
+        const validSignedRefs = signedRefs.filter(Boolean);
+
+        if (validSignedRefs.length > 0) {
+            // Patch productDNA with signed URLs so all downstream prompt builders use them
+            productDNA.heroImageUrl    = validSignedRefs[0];
+            productDNA.productRefImages = validSignedRefs;
+            console.log(`📸 Social Kit: pre-signed ${validSignedRefs.length} S3 ref images for AI model`);
+        } else {
+            console.warn(`⚠️  Social Kit: no S3 ref images to pre-sign — model will generate without product reference`);
+        }
+
+        const refImages = validSignedRefs.length > 0
+            ? validSignedRefs
+            : [
+                productDNA?.heroImageUrl,
+                ...(productDNA?.productRefImages || []).slice(0, 2),
+            ].filter(Boolean);
 
         // Design context prefix — injected into every image prompt
         const designPrefix = designContext?.systemDirective
@@ -758,9 +787,33 @@ router.post('/brochure/generate', protect, async (req, res) => {
         const primaryColor   = dominantColors[0]?.hex || '#1a1a2e';
         const accentColor    = dominantColors[1]?.hex || '#7c3aed';
         const secondaryColor = dominantColors[2]?.hex || '#f5f5f5';
-        const refImages      = [productDNA?.heroImageUrl, ...(productDNA?.productRefImages || []).slice(0, 2)].filter(Boolean);
         const moodDir        = designContext ? { label: designContext.moodLabel, shootDirective: designContext.shootDirective } : { label: 'Premium Minimal', shootDirective: 'Clean studio, elegant' };
         const colorDesc      = dominantColors.slice(0, 3).map(c => `${c.name} (${c.hex})`).join(', ');
+
+        // ── Pre-sign S3 reference images for brochure (same root cause as social-kit) ──
+        const { getSignedUrlIfNeeded: getSignedBrochure } = await import('../utils/s3.js');
+        const rawBrochureRefs = [
+            productDNA?.heroImageUrl,
+            ...(productDNA?.productRefImages || []).slice(0, 3),
+            ...(productData?.persistedImages || []).slice(0, 4),
+        ].filter(Boolean).filter((u, i, arr) => arr.indexOf(u) === i);
+
+        const signedBrochureRefs = rawBrochureRefs.length > 0
+            ? (await Promise.all(rawBrochureRefs.slice(0, 4).map(u => getSignedBrochure(u)))).filter(Boolean)
+            : [];
+
+        if (signedBrochureRefs.length > 0) {
+            productDNA.heroImageUrl     = signedBrochureRefs[0];
+            productDNA.productRefImages = signedBrochureRefs;
+            console.log(`📸 Brochure: pre-signed ${signedBrochureRefs.length} S3 ref images for AI model`);
+        } else {
+            console.warn(`⚠️  Brochure: no S3 ref images — model will generate without product reference`);
+        }
+
+        const refImages = signedBrochureRefs.length > 0
+            ? signedBrochureRefs
+            : [productDNA?.heroImageUrl, ...(productDNA?.productRefImages || []).slice(0, 2)].filter(Boolean);
+
 
         // ── PHASE 1: Claude Art Director ──────────────────────────────────────────────────
         // Claude understands the full product spec and writes ultra-precise image generation
@@ -1163,8 +1216,29 @@ router.post('/landing-page/generate', protect, async (req, res) => {
         const resolvedUrlContext = urlContext
             || (productDNA ? `Product: ${productData?.title || productDNA?.productCategory || 'Unknown'}\nBullet Points: ${(productData?.bulletPoints || []).join(', ')}\nDescription: ${productData?.description || ''}` : undefined);
 
-        // Reference image from product
-        const resolvedRefImage = referenceImage || productDNA?.heroImageUrl || null;
+        // Reference image from product — must be pre-signed if it's an S3 URL
+        // (same 403 issue as social-kit and brochure — bucket ACLs block raw S3 URLs)
+        const rawRefImage = referenceImage || productDNA?.heroImageUrl || null;
+        let resolvedRefImage = rawRefImage;
+        if (rawRefImage?.includes('amazonaws')) {
+            const { getSignedUrlIfNeeded: getSignedLanding } = await import('../utils/s3.js');
+            resolvedRefImage = await getSignedLanding(rawRefImage) || rawRefImage;
+            console.log(`📸 Landing Page: pre-signed hero image for AI model`);
+        }
+
+        // Also pre-sign productDNA ref images so lifestyle image generation works correctly
+        if (productDNA) {
+            const { getSignedUrlIfNeeded: getSignedLandingRefs } = await import('../utils/s3.js');
+            const rawRefs = (productDNA.productRefImages || []).filter(u => u?.includes('amazonaws'));
+            if (rawRefs.length > 0) {
+                const signedLandingRefs = (await Promise.all(rawRefs.slice(0, 4).map(u => getSignedLandingRefs(u)))).filter(Boolean);
+                if (signedLandingRefs.length > 0) {
+                    productDNA.productRefImages = signedLandingRefs;
+                    if (!resolvedRefImage) resolvedRefImage = signedLandingRefs[0];
+                    console.log(`📸 Landing Page: pre-signed ${signedLandingRefs.length} product ref images`);
+                }
+            }
+        }
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.landing) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.landing });
