@@ -51,6 +51,7 @@ export default function LandingPageTool({ sharedContext, brandId, avatarConfig, 
                     usePulseCreativeBrain: true,
                 }),
             })
+            console.log('✅ Landing page result:', { success: data.success, hostedUrl: data.hostedUrl, pageName: data.pageName, hasHtml: !!data.html, sectionCount: data.sectionCount })
             if (data.success) setResult(data)
             else setError(data.error || 'Generation failed')
         } catch (e) { setError(e.message) }
@@ -112,23 +113,33 @@ export default function LandingPageTool({ sharedContext, brandId, avatarConfig, 
             {result && (
                 <div className="ps-fade-in">
                     {/* Page meta */}
-                    {result.pageName && (
+                    {(result.pageName || result.metaTitle) && (
                         <div style={{ background: 'var(--sys-surface)', border: '1px solid var(--sys-border)', borderRadius: 9, padding: '10px 14px', marginBottom: 12, fontSize: 12 }}>
-                            <div style={{ fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2 }}>{result.pageName}</div>
+                            <div style={{ fontWeight: 700, color: 'var(--sys-text)', marginBottom: 2 }}>{result.pageName || result.metaTitle}</div>
                             {result.metaDescription && <div style={{ color: 'var(--sys-text-muted)', fontSize: 11 }}>{result.metaDescription}</div>}
-                            {result.sectionCount && <div style={{ color: 'var(--sys-primary)', fontSize: 10, marginTop: 4 }}>{result.sectionCount} sections · GSAP animated</div>}
+                            {result.sectionCount && <div style={{ color: 'var(--sys-primary)', fontSize: 10, marginTop: 4 }}>{result.sectionCount} sections · GSAP animated · {result.creditsUsed || 12} credits used</div>}
                         </div>
                     )}
 
-                    {/* Iframe preview — hostedUrl is the S3 URL */}
-                    {result.hostedUrl ? (
+                    {/* Live preview — prefer srcdoc (always works) over iframe src (can be blocked by S3 X-Frame-Options) */}
+                    {result.html ? (
                         <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
                             <div style={{ background: 'var(--sys-surface)', borderBottom: '1px solid var(--sys-border)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--sys-text-muted)' }}>
                                 <div style={{ display: 'flex', gap: 4 }}>
                                     {['#ef4444','#f59e0b','#10b981'].map(c => <div key={c} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />)}
                                 </div>
-                                <div style={{ flex: 1, background: 'var(--sys-bg)', borderRadius: 4, padding: '2px 8px', fontSize: 9 }}>{result.hostedUrl}</div>
+                                <div style={{ flex: 1, background: 'var(--sys-bg)', borderRadius: 4, padding: '2px 8px', fontSize: 9 }}>{result.hostedUrl || result.slug || 'preview'}</div>
                             </div>
+                            <iframe
+                                srcDoc={result.html}
+                                style={{ width: '100%', height: 460, border: 'none', display: 'block' }}
+                                title="Landing Page Preview"
+                                sandbox="allow-scripts allow-same-origin"
+                            />
+                        </div>
+                    ) : result.hostedUrl ? (
+                        /* Fallback: iframe src if no html body but hosted URL exists */
+                        <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
                             <iframe
                                 src={result.hostedUrl}
                                 style={{ width: '100%', height: 460, border: 'none', display: 'block' }}
@@ -136,17 +147,22 @@ export default function LandingPageTool({ sharedContext, brandId, avatarConfig, 
                                 sandbox="allow-scripts allow-same-origin"
                             />
                         </div>
-                    ) : result.html ? (
-                        /* Fallback: render HTML inline via srcdoc if no hosted URL */
+                    ) : result.thumbnailUrl ? (
+                        /* Last fallback: thumbnail image */
                         <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
-                            <iframe
-                                srcDoc={result.html}
-                                style={{ width: '100%', height: 460, border: 'none', display: 'block' }}
-                                title="Landing Page Preview"
-                                sandbox="allow-scripts"
-                            />
+                            <img src={result.thumbnailUrl} alt="Landing page preview" style={{ width: '100%', display: 'block', maxHeight: 300, objectFit: 'cover' }} />
                         </div>
                     ) : null}
+
+                    {/* Embed code (copyable) */}
+                    {result.embedCode && (
+                        <details style={{ marginBottom: 12 }}>
+                            <summary style={{ cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--sys-text-muted)', padding: '6px 0' }}>📋 Embed Code</summary>
+                            <pre style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 8, padding: 12, fontSize: 10, color: 'var(--sys-text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', marginTop: 6 }}
+                                onClick={e => { navigator.clipboard.writeText(result.embedCode); e.target.style.borderColor = 'var(--sys-primary)'; setTimeout(() => e.target.style.borderColor = '', 1000) }}
+                            >{result.embedCode}</pre>
+                        </details>
+                    )}
 
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button className="ps-btn-secondary" onClick={handleGenerate} disabled={loading} style={{ gap: 5, fontSize: 11 }}><RefreshCw size={11} /> Regenerate</button>
