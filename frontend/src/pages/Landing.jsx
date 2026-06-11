@@ -19,6 +19,7 @@ import FAQ from '../components/landing/FAQ'
 import FinalCTA from '../components/landing/FinalCTA'
 import Footer from '../components/landing/Footer'
 import CursorGlow from '../components/landing/CursorGlow'
+import GlowThread from '../components/landing/GlowThread'
 
 import { BRAND } from '../data/studios'
 
@@ -58,12 +59,57 @@ export default function Landing() {
                     <div id="templates"><ActionDemo /></div>
                     <TrustLogos />
                     <IntelligenceLayer />
+
+                    {/* ── GlowThread divider: IntelligenceLayer → Metrics ── */}
+                    <div className="relative overflow-hidden" style={{ height: 60, marginTop: -1 }} aria-hidden="true">
+                        <GlowThread
+                            d="M 2080 30 C 1300 55, 700 8, -100 45"
+                            height={60}
+                            speed={3}
+                            dashLen={6}
+                            gap={40}
+                            opacity={0.4}
+                            strokeW={2}
+                            reverse={true}
+                        />
+                    </div>
+
                     <Metrics />
                     <Comparison />
+
+                    {/* ── GlowThread divider: Comparison → Studios ── */}
+                    <div className="relative overflow-hidden" style={{ height: 60, marginTop: -1 }} aria-hidden="true">
+                        <GlowThread
+                            d="M -100 20 C 560 50, 1360 5, 2080 38"
+                            height={60}
+                            speed={3.4}
+                            dashLen={5}
+                            gap={46}
+                            opacity={0.35}
+                            strokeW={1.8}
+                            nodes={[{ x: 960, y: 28, r: 3, delay: 0 }]}
+                        />
+                    </div>
+
                     <div id="studios"><StudiosShowcase /></div>
                     <FeaturedStudios />
                     <div id="how-it-works"><HowItWorks /></div>
                     <Testimonial />
+
+                    {/* ── GlowThread divider: Testimonial → Pricing ── */}
+                    <div className="relative overflow-hidden" style={{ height: 60, marginTop: -1 }} aria-hidden="true">
+                        <GlowThread
+                            d="M 2080 42 C 1440 18, 480 62, -100 22"
+                            height={60}
+                            speed={4.5}
+                            dashLen={4}
+                            gap={54}
+                            opacity={0.3}
+                            strokeW={1.5}
+                            reverse={true}
+                        />
+                    </div>
+
                     <div id="pricing"><Pricing /></div>
                     <FAQ />
                     <div id="agencies"><FinalCTA /></div>

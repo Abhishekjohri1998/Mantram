@@ -3,6 +3,7 @@ import { Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { BRAND } from '../../data/studios';
+import GlowThread from './GlowThread';
 
 export default function Hero({ onAgencyDemo }) {
     const containerRef = useRef(null);
@@ -40,6 +41,37 @@ export default function Hero({ onAgencyDemo }) {
                     style={{ background: 'radial-gradient(circle, #FF5A1F 0%, rgba(255,90,31,0) 70%)' }}
                 />
             </motion.div>
+
+            {/* ── GlowThread: sweeping diagonal arc behind headline ── */}
+            <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }} aria-hidden="true">
+                <GlowThread
+                    d="M -120 620 C 380 380, 1240 780, 2080 260"
+                    height={900}
+                    speed={3.2}
+                    dashLen={8}
+                    gap={38}
+                    opacity={0.35}
+                    strokeW={2}
+                    nodes={[
+                        { x: 640,  y: 510, delay: 0 },
+                        { x: 1280, y: 480, delay: 1.1 },
+                    ]}
+                    style={{ position: 'absolute', top: 0, left: 0, height: '100%' }}
+                />
+            </div>
+
+            {/* ── GlowThread: bottom section divider ── */}
+            <div className="absolute bottom-0 left-0 right-0 pointer-events-none" aria-hidden="true">
+                <GlowThread
+                    d="M -80 40 C 520 10, 1400 70, 2000 25"
+                    height={80}
+                    speed={4}
+                    dashLen={4}
+                    gap={48}
+                    opacity={0.3}
+                    strokeW={1.5}
+                />
+            </div>
 
             <motion.div
                 className="max-w-4xl mx-auto px-4 md:px-6 flex flex-col items-center"
