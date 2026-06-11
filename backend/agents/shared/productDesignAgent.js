@@ -408,8 +408,11 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
     const refImages = [...diversePick, ...fallbackPool].filter(Boolean).slice(0, 3);
     const hasRefImages = refImages.length > 0;
 
+    const modelSupportsRef = imageModel.includes('gemini') || imageModel.includes('nanobanana');
+    const useMultimodal = hasRefImages && modelSupportsRef;
+
     let laozhangMultimodalImageGenerate;
-    if (hasRefImages) {
+    if (useMultimodal) {
         const mod = await import('../videoStudio/laozhangClient.js');
         laozhangMultimodalImageGenerate = mod.laozhangMultimodalImageGenerate;
     }
@@ -421,12 +424,13 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
         const prompt = [
 
             // [1] Contextual framing for the AI
-            hasRefImages
+            useMultimodal
                 ? `REFERENCE IMAGES PROVIDED: The attached images show the ACTUAL PRODUCT (${productDNA.productCategory || 'consumer product'}).
 Your task: Use these product images as the VISUAL SOURCE to render the product naturally WITHIN the mood board scene.
 Do NOT paste the product as a cutout. Render it AS PART of the scene — as if it belongs there.
 The product's proportions, form factor, and colors must remain accurate to what you see in the reference images.`
-                : `You are creating a designer mood board. There are no product reference images — suggest where the product would appear using a realistic placeholder.`,
+                : `You are creating a designer mood board. Render a realistic mockup of the ${productDNA.productCategory || 'product'} naturally placed inside the scene.`,
+
 
             '',
 
@@ -496,7 +500,7 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
 
         try {
             let result;
-            if (hasRefImages && laozhangMultimodalImageGenerate) {
+            if (useMultimodal && laozhangMultimodalImageGenerate) {
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
                     model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
