@@ -1,0 +1,1283 @@
+/* ── Pulse Studio Design System ────────────────────────────────────────────── */
+
+/* Phase Progress Bar */
+.ps-phase-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 32px;
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 12px;
+    padding: 4px;
+    overflow: hidden;
+}
+
+.ps-phase-step {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    position: relative;
+}
+
+.ps-phase-step.active {
+    background: var(--sys-primary-dim);
+}
+
+.ps-phase-step.done {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.ps-phase-step.locked {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.ps-phase-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1.5px solid var(--sys-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sys-text-muted);
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.ps-phase-step.active .ps-phase-num {
+    background: var(--sys-primary);
+    border-color: var(--sys-primary);
+    color: #fff;
+}
+
+.ps-phase-step.done .ps-phase-num {
+    background: var(--sys-success, #10b981);
+    border-color: var(--sys-success, #10b981);
+    color: #fff;
+}
+
+.ps-phase-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sys-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ps-phase-step.active .ps-phase-label {
+    color: var(--sys-primary);
+}
+
+.ps-phase-sep {
+    width: 20px;
+    height: 1px;
+    background: var(--sys-border);
+    flex-shrink: 0;
+}
+
+/* ── Section Headers ── */
+.ps-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.ps-section-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--sys-primary-dim);
+    border: 1px solid var(--sys-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--sys-primary);
+}
+
+.ps-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--sys-text);
+    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+}
+
+.ps-section-sub {
+    font-size: 11.5px;
+    color: var(--sys-text-muted);
+    margin-top: 2px;
+}
+
+/* ── Product Input ── */
+.ps-input-card {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.ps-url-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.ps-url-input {
+    flex: 1;
+    padding: 12px 14px 12px 38px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--sys-text);
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+}
+
+.ps-url-input:focus {
+    border-color: var(--sys-primary);
+}
+
+.ps-url-input::placeholder {
+    color: var(--sys-text-muted);
+}
+
+.ps-url-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.ps-url-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--sys-text-muted);
+    pointer-events: none;
+}
+
+.ps-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0;
+}
+
+.ps-divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--sys-border);
+}
+
+.ps-divider-text {
+    font-size: 11px;
+    color: var(--sys-text-muted);
+    white-space: nowrap;
+}
+
+.ps-upload-zone {
+    border: 1.5px dashed var(--sys-border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+}
+
+.ps-upload-zone:hover {
+    border-color: var(--sys-primary);
+    background: var(--sys-primary-dim);
+}
+
+.ps-upload-zone.has-files {
+    border-color: var(--sys-primary);
+    background: var(--sys-primary-dim);
+}
+
+.ps-upload-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ps-upload-thumb {
+    aspect-ratio: 1;
+    border-radius: 7px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--sys-border);
+}
+
+.ps-upload-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ps-textarea {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--sys-text);
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-top: 12px;
+}
+
+.ps-textarea:focus {
+    border-color: var(--sys-primary);
+}
+
+.ps-textarea::placeholder {
+    color: var(--sys-text-muted);
+}
+
+/* ── Analysis Progress ── */
+.ps-analysis-card {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.ps-analysis-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sys-border);
+}
+
+.ps-analysis-step:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.ps-step-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--sys-text-muted);
+    transition: color 0.2s;
+}
+
+.ps-analysis-step.done .ps-step-icon { color: var(--sys-success, #10b981); }
+.ps-analysis-step.active .ps-step-icon { color: var(--sys-primary); }
+.ps-analysis-step.pending .ps-step-icon { color: var(--sys-text-muted); opacity: 0.5; }
+
+.ps-spin {
+    animation: ps-spin 1s linear infinite;
+}
+
+@keyframes ps-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes ps-slide-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ps-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.ps-slide-up {
+    animation: ps-slide-up 0.35s ease-out;
+}
+
+.ps-fade-in {
+    animation: ps-fade-in 0.3s ease;
+}
+
+/* ── Product Profile Card ── */
+.ps-product-profile {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    animation: ps-slide-up 0.4s ease-out;
+}
+
+/* ── Product Image Slider (replaces old full-screen gallery grid) ── */
+.ps-img-slider {
+    background: var(--sys-bg);
+    border-bottom: 1px solid var(--sys-border);
+}
+
+.ps-img-slider-main {
+    position: relative;
+    height: 180px;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+
+.ps-img-slider-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: opacity 0.25s;
+}
+
+.ps-img-slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    transition: background 0.15s;
+    padding: 0;
+}
+
+.ps-img-slider-arrow:hover {
+    background: rgba(0,0,0,0.8);
+}
+
+.ps-img-slider-arrow.left  { left: 8px; }
+.ps-img-slider-arrow.right { right: 8px; }
+
+.ps-img-slider-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    color: rgba(255,255,255,0.85);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+}
+
+.ps-img-slider-thumbs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ps-img-slider-thumbs::-webkit-scrollbar { display: none; }
+
+.ps-img-slider-thumb {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--sys-bg);
+}
+
+.ps-img-slider-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ps-img-slider-thumb.active {
+    border-color: var(--sys-primary);
+}
+
+.ps-img-slider-thumb:hover:not(.active) {
+    border-color: var(--sys-border);
+    opacity: 0.85;
+}
+
+
+.ps-product-meta {
+    padding: 16px 18px;
+}
+
+.ps-product-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--sys-text);
+    font-family: var(--font-display);
+    margin-bottom: 4px;
+}
+
+.ps-product-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 8px 0 12px;
+}
+
+.ps-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 10.5px;
+    font-weight: 600;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    color: var(--sys-text-muted);
+}
+
+.ps-palette-strip {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ps-palette-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: transform 0.15s;
+    cursor: pointer;
+}
+
+.ps-palette-swatch:hover {
+    transform: scale(1.2);
+}
+
+.ps-palette-label {
+    font-size: 10px;
+    color: var(--sys-primary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+}
+
+/* ── Mood Board Studio ── */
+.ps-mood-hero {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    margin-bottom: 12px;
+}
+
+.ps-mood-hero-img {
+    width: 100%;
+    height: 420px;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.4s;
+}
+
+.ps-mood-hero-placeholder {
+    width: 100%;
+    height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sys-bg);
+}
+
+.ps-mood-hero-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 24px 24px 20px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+}
+
+.ps-mood-name {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    font-family: var(--font-display);
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+}
+
+.ps-mood-desc {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.5;
+    max-width: 500px;
+}
+
+.ps-mood-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.ps-mood-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+}
+
+.ps-mood-filmstrip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.ps-mood-thumb {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: var(--sys-surface);
+}
+
+.ps-mood-thumb.selected {
+    border-color: var(--sys-primary);
+}
+
+.ps-mood-thumb:hover {
+    transform: translateY(-2px);
+    border-color: var(--sys-border);
+}
+
+.ps-mood-thumb.selected:hover {
+    border-color: var(--sys-primary);
+}
+
+.ps-mood-thumb-img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    display: block;
+}
+
+.ps-mood-thumb-placeholder {
+    width: 100%;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sys-bg);
+}
+
+.ps-mood-thumb-label {
+    padding: 7px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sys-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ps-mood-thumb.selected .ps-mood-thumb-label {
+    color: var(--sys-primary);
+}
+
+.ps-mood-check {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--sys-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.ps-mood-generating {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Creation Hub ── */
+.ps-active-bar {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.ps-active-product {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.ps-active-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--sys-border);
+    flex-shrink: 0;
+}
+
+.ps-active-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--sys-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ps-active-mood {
+    font-size: 10.5px;
+    color: var(--sys-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 1px;
+}
+
+.ps-active-mood-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.ps-category-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ps-category-tabs::-webkit-scrollbar { display: none; }
+
+.ps-cat-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sys-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+}
+
+.ps-cat-tab:hover {
+    background: var(--sys-surface);
+    color: var(--sys-text);
+}
+
+.ps-cat-tab.active {
+    background: var(--sys-surface);
+    color: var(--sys-primary);
+    border: 1px solid var(--sys-border);
+}
+
+.ps-tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.ps-tool-card {
+    background: var(--sys-surface);
+    border: 1.5px solid var(--sys-border);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.18s;
+    position: relative;
+}
+
+.ps-tool-card:hover {
+    border-color: color-mix(in srgb, var(--sys-primary) 40%, var(--sys-border));
+    background: var(--sys-primary-dim);
+}
+
+.ps-tool-card.active {
+    border-color: var(--sys-primary);
+    background: var(--sys-primary-dim);
+}
+
+.ps-tool-card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--sys-primary-dim);
+    border: 1px solid var(--sys-border);
+    color: var(--sys-primary);
+}
+
+.ps-tool-icon-wrap {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    transition: all 0.18s;
+    color: var(--sys-text-muted);
+}
+
+.ps-tool-card.active .ps-tool-icon-wrap,
+.ps-tool-card:hover .ps-tool-icon-wrap {
+    background: var(--sys-primary-dim);
+    border-color: var(--sys-primary);
+    color: var(--sys-primary);
+}
+
+.ps-tool-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--sys-text);
+    margin-bottom: 3px;
+    font-family: var(--font-display);
+}
+
+.ps-tool-card.active .ps-tool-label {
+    color: var(--sys-primary);
+}
+
+.ps-tool-meta {
+    font-size: 10px;
+    color: var(--sys-text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 5px;
+}
+
+.ps-tool-desc {
+    font-size: 11px;
+    color: var(--sys-text-muted);
+    line-height: 1.5;
+}
+
+/* ── Expanded Tool Panel ── */
+.ps-tool-panel {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 14px;
+    overflow: hidden;
+    animation: ps-slide-up 0.28s ease-out;
+    margin-bottom: 16px;
+}
+
+.ps-tool-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--sys-border);
+    background: var(--sys-bg);
+}
+
+.ps-tool-panel-body {
+    padding: 20px;
+}
+
+/* ── Social Kit Tool ── */
+.ps-platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.ps-platform-card {
+    background: var(--sys-bg);
+    border: 1.5px solid var(--sys-border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+
+.ps-platform-card.selected {
+    border-color: var(--sys-primary);
+}
+
+.ps-platform-card:hover {
+    border-color: color-mix(in srgb, var(--sys-primary) 40%, var(--sys-border));
+}
+
+.ps-platform-img-wrap {
+    position: relative;
+    overflow: hidden;
+    background: var(--sys-surface);
+}
+
+.ps-platform-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.3s;
+}
+
+.ps-platform-result {
+    border-top: 1px solid var(--sys-border);
+    padding: 10px 12px;
+}
+
+.ps-platform-result-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sys-text);
+    margin-bottom: 4px;
+}
+
+.ps-platform-caption {
+    font-size: 10.5px;
+    color: var(--sys-text-muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ps-caption-box {
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    padding: 14px;
+    margin-top: 12px;
+}
+
+.ps-caption-platform-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sys-primary);
+    margin-bottom: 6px;
+}
+
+.ps-caption-text {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--sys-text);
+    white-space: pre-wrap;
+}
+
+.ps-hashtags {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--sys-primary);
+    opacity: 0.8;
+    line-height: 1.6;
+}
+
+/* ── Brochure Tool ── */
+.ps-brochure-preview {
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.ps-brochure-pages {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+}
+
+.ps-brochure-page-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sys-text-muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--sys-border);
+    background: var(--sys-surface);
+}
+
+.ps-brochure-page-img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── Button Styles ── */
+.ps-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 12px 22px;
+    background: var(--sys-primary);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.18s, transform 0.15s;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.ps-btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.ps-btn-primary:active {
+    transform: translateY(0);
+}
+
+.ps-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.ps-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 16px;
+    background: var(--sys-bg);
+    color: var(--sys-text);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+
+.ps-btn-secondary:hover {
+    background: var(--sys-surface);
+    border-color: color-mix(in srgb, var(--sys-primary) 40%, var(--sys-border));
+}
+
+.ps-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--sys-text-muted);
+    border: 1px solid var(--sys-border);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ps-btn-ghost:hover {
+    background: var(--sys-surface);
+    color: var(--sys-text);
+}
+
+.ps-btn-success {
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: default;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+}
+
+/* ── Info/Warning Bars ── */
+.ps-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px;
+    background: var(--sys-primary-dim);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    font-size: 11.5px;
+    color: var(--sys-text-muted);
+    margin-top: 12px;
+}
+
+.ps-info-bar svg {
+    flex-shrink: 0;
+    color: var(--sys-primary);
+}
+
+.ps-error-bar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 9px;
+    font-size: 11.5px;
+    color: #ef4444;
+    margin-top: 10px;
+}
+
+/* ── Library ── */
+.ps-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.ps-library-card {
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.18s;
+}
+
+.ps-library-card:hover {
+    border-color: color-mix(in srgb, var(--sys-primary) 40%, var(--sys-border));
+    transform: translateY(-2px);
+}
+
+.ps-library-thumb {
+    height: 130px;
+    overflow: hidden;
+    background: var(--sys-bg);
+}
+
+.ps-library-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ps-library-body {
+    padding: 12px;
+}
+
+.ps-library-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sys-text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ps-library-meta {
+    font-size: 10.5px;
+    color: var(--sys-text-muted);
+}
+
+/* ── Model Selector ── */
+.ps-model-select {
+    padding: 8px 12px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 8px;
+    font-size: 11.5px;
+    color: var(--sys-text);
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+}
+
+/* ── Loading Skeleton ── */
+.ps-skeleton {
+    background: linear-gradient(90deg, var(--sys-surface) 25%, var(--sys-bg) 50%, var(--sys-surface) 75%);
+    background-size: 200% 100%;
+    animation: ps-shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+@keyframes ps-shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .ps-mood-filmstrip { grid-template-columns: repeat(2, 1fr); }
+    .ps-platform-grid { grid-template-columns: repeat(2, 1fr); }
+    .ps-tool-grid { grid-template-columns: repeat(2, 1fr); }
+    .ps-phase-label { display: none; }
+    .ps-mood-hero-img { height: 280px; }
+    .ps-mood-hero-placeholder { height: 280px; }
+    .ps-img-slider-main { height: 150px; }
+}
+
+/* ── Mood Board Loading & Action Buttons ── */
+.ps-mood-loading-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    animation: ps-fade-in 0.3s ease;
+}
+
+.ps-mood-hero-actions {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+
+.ps-mood-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(18, 18, 18, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ps-mood-action-btn:hover {
+    background: rgba(18, 18, 18, 0.85);
+    border-color: rgba(255, 255, 255, 0.30);
+    transform: translateY(-1px);
+}
+
+.ps-mood-action-btn:active {
+    transform: scale(0.97);
+}
+
+.ps-mood-thumb-download-btn {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(18, 18, 18, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 8;
+}
+
+.ps-mood-thumb:hover .ps-mood-thumb-download-btn {
+    opacity: 1;
+}
+
+.ps-mood-thumb-download-btn:hover {
+    background: rgba(18, 18, 18, 0.9);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+@keyframes ps-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

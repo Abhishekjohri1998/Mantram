@@ -56,6 +56,9 @@ export async function generateProductMoodDirections(productDNA, productData = {}
 
     const productSummary = [
         `Product: ${productDNA.productCategory || productData?.title || 'consumer product'}`,
+        productDNA.dominantColors?.length
+            ? `Product Colors (MUST BE PRESERVED): ${productDNA.dominantColors.map(c => `${c.name} (${c.hex})`).join(', ')}`
+            : '',
         `Materials: ${productDNA.materials || 'premium finish'}`,
         `Form factor: ${productDNA.productShape || 'compact'}`,
         `Surface finish: ${productDNA.surfaceFinish || 'refined'}`,
@@ -70,10 +73,10 @@ export async function generateProductMoodDirections(productDNA, productData = {}
 You create product mood boards for a living. You NEVER use the same creative territories for every product.
 You invent evocative, SPECIFIC creative directions that feel native to each product's world.
 
-Rules for mood direction naming:
+Rules for mood direction naming and palettes:
 - Names must be evocative and specific to THIS product (NOT generic like "Bold Ambient" or "Editorial Clean")
-- Think of names like a photographer or art director would: "Golden Hour Glow", "Urban Kinetic", "Brutal Minimal", "Sunday Morning Ritual"
 - Each direction must feel like a completely different WORLD that this specific product could live in
+- The colorPalette and art direction MUST be derived from and harmonize with the actual Product Colors. The mood board is designed to support and showcase the product's natural color scheme, NOT to clash with, recolor, or override it.
 - The description should describe the emotional territory and consumer moment, not just visual adjectives
 
 Return ONLY valid JSON, no markdown.`;
@@ -93,7 +96,7 @@ Return this exact JSON structure:
       "targetMoment": "The specific human moment / use context: where, when, who. Max 15 words.",
       "shootDirective": "Precise photography/image direction for this territory. What background, lighting, environment, atmosphere? Reference real brands or photographers.",
       "moodBoardDirective": "Detailed art direction for the mood board collage for this territory. What specific scenes, textures, colors, environments should appear?",
-      "colorPalette": ["a suggested hex code for the mood tone (background/accent, NOT the product itself)", "second hex"],
+      "colorPalette": ["a suggested hex code for the mood tone (background/accent that complements and showcases the product's colors, NOT the product itself)", "second hex"],
       "icon": "a single material-symbols icon name that represents this mood"
     }
   ]
@@ -131,7 +134,16 @@ Make directions feel like they come from a REAL agency creative brief for this s
  * Quick per-image Gemini vision call — identifies what each image shows
  * and which A+ module type it's best suited for. Runs in parallel.
  */
-async function classifyProductImageView(imageUrl) {
+async function classifyProductImageView(imageUrl, productData = {}) {
+    const title = productData?.title || '';
+    const category = productData?.category || '';
+    const description = productData?.description || '';
+
+    let contextStr = '';
+    if (title) contextStr += `Product Name: "${title}"\n`;
+    if (category) contextStr += `Listing Category: "${category}"\n`;
+    if (description) contextStr += `Description context: "${description.substring(0, 300)}"\n`;
+
     const systemPrompt = `You are a product photography expert and Amazon listing consultant.
 Analyze this SINGLE product image and classify it precisely.
 
@@ -147,12 +159,12 @@ Apply these rules before classifying. If you see ear-cups and a headband, it IS 
 
 Return ONLY a valid JSON object, no markdown, no extra text.`;
 
-    const userPrompt = `Classify this product image precisely:
+    const userPrompt = `${contextStr ? `PRODUCT CONTEXT:\n${contextStr}\n` : ''}Classify this product image precisely:
 {
   "viewType": "hero|front_face|back_panel|open_case|in_use|macro_detail|packaging|variant_color|lifestyle|flat_lay|group_shot|side_profile|angle_shot",
   "shortDescription": "1 sentence: exactly what is visible in this specific image",
   "exactFormFactor": "CRITICAL: Identify EXACT product type and scale (e.g., 'over-ear headphone' vs 'in-ear earphone', 'mug' vs 'tumbler', 'laptop' vs 'tablet'). Apply the disambiguation rules from system prompt. DO NOT generalize.",
-  "primaryColors": ["#hexcode of 2-3 most prominent colors actually visible in this image"],
+  "primaryColors": ["#hexcode of 2-3 colors of the PHYSICAL PRODUCT ITSELF, strictly ignoring background, environment, lighting glare/reflections, text banners, and labels"],
   "materialsVisible": ["specific materials visible e.g. soft-touch matte plastic, brushed aluminum, silicone eartip"],
   "lightingStyle": "studio_clean|lifestyle_ambient|dark_dramatic|bright_airy|natural_outdoor",
   "usageFor": "hero_banner|feature_closeup|lifestyle_usage|comparison|brand_story|texture_detail",
@@ -272,7 +284,7 @@ export async function analyzeProductDesign(productImages = [], productData = {},
     // ── Stage 1: Classify each image individually (parallel) ──────────────────
     console.log(`   PDI Stage-1: Classifying ${productImages.length} images in parallel...`);
     const classifyResults = await Promise.allSettled(
-        productImages.map(url => classifyProductImageView(url))
+        productImages.map(url => classifyProductImageView(url, productData))
     );
 
     const roster = classifyResults.map((r, i) => {
@@ -408,11 +420,18 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
     const refImages = [...diversePick, ...fallbackPool].filter(Boolean).slice(0, 3);
     const hasRefImages = refImages.length > 0;
 
+    const modelSupportsRef = imageModel.includes('gemini') || imageModel.includes('nanobanana') || imageModel.includes('gpt-image');
+    const useMultimodal = hasRefImages && modelSupportsRef;
+
     let laozhangMultimodalImageGenerate;
-    if (hasRefImages) {
+    let laozhangGptImageWithRefs;
+    if (useMultimodal) {
         const mod = await import('../videoStudio/laozhangClient.js');
         laozhangMultimodalImageGenerate = mod.laozhangMultimodalImageGenerate;
+        laozhangGptImageWithRefs = mod.laozhangGptImageWithRefs;
     }
+
+    const colorGuardBlock = buildColorGuardInstruction(productDNA);
 
     // ── Generate a mood board for each direction ───────────────────────────────
     const moodImageJobs = Object.values(moodDirections).map(async (mood) => {
@@ -421,12 +440,14 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
         const prompt = [
 
             // [1] Contextual framing for the AI
-            hasRefImages
+            useMultimodal
                 ? `REFERENCE IMAGES PROVIDED: The attached images show the ACTUAL PRODUCT (${productDNA.productCategory || 'consumer product'}).
 Your task: Use these product images as the VISUAL SOURCE to render the product naturally WITHIN the mood board scene.
 Do NOT paste the product as a cutout. Render it AS PART of the scene — as if it belongs there.
 The product's proportions, form factor, and colors must remain accurate to what you see in the reference images.`
-                : `You are creating a designer mood board. There are no product reference images — suggest where the product would appear using a realistic placeholder.`,
+                : `You are creating a designer mood board. Render a realistic mockup of the ${productDNA.productCategory || 'product'} naturally placed inside the scene.`,
+
+            colorGuardBlock,
 
             '',
 
@@ -496,14 +517,21 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
 
         try {
             let result;
-            if (hasRefImages && laozhangMultimodalImageGenerate) {
+            if (useMultimodal && imageModel.includes('gpt-image') && laozhangGptImageWithRefs) {
+                // GPT Image 2 path: /images/edits with product ref image as multipart upload
+                result = await laozhangGptImageWithRefs(prompt, refImages, {
+                    model: imageModel,
+                    size: '1344x768',
+                });
+            } else if (useMultimodal && laozhangMultimodalImageGenerate) {
+                // Gemini/NanoBanana path: chat/completions multimodal
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
                     model: imageModel || 'gemini-3.1-flash-image-preview',
                     size: '1344x768',
                 });
             } else {
                 result = await laozhangImageGenerate(prompt, {
-                    model: imageModel || 'gemini-3.1-flash-image-preview',
+                    model: imageModel || 'gpt-image-2',
                     size: '1344x768',
                 });
             }

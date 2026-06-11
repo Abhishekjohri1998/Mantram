@@ -30,3 +30,15 @@
 - **Gotchas / Learnings**:
   - Standardizing relative to absolute URL resolution in `web-research.js` is critical to prevent broken image references from reaching the vision LLM.
   - Capping the total images in visual grounding to 5 (prioritized: user ref images > matched product images > competitor references > brand DNA) ensures API call stability and cost-efficiency.
+
+### Pulse Studio & Product Intelligence (Sprint 6/7)
+- **Feature**: Context-Aware Product Intelligence (PDI) & Robust Scraper.
+- **Goal**: Prevent vision LLMs from misidentifying device form-factors in a vacuum and avoid scraping trust badges/icons.
+- **Workflow**:
+  - `classifyProductImageView` accepts scraped `productData` (title, category, shortDescription) and prepends it as a context string to the multimodal prompt.
+  - This prevents the vision LLM from misidentifying abstract folding device structures (like the FlexiPod stand) as headphones.
+  - Expanded `shopifyGallerySelectors` in `brand-studio.js` with custom theme selectors (`.productView-thumbnail-link img`, `.productView-thumbnail img`, `.productView-image img`, etc.) to scrape only true product photos.
+- **Learnings**:
+  - Vision AI models analyzing product images in a vacuum are prone to form-factor hallucinations (e.g. geometric stands resembling headphones). Surrounding them with product title/listing metadata locks in high-confidence correct classifications.
+  - Custom Shopify themes (like Halo) don't use standard Dawn selectors. Explicitly targeting thumbnails and containers is required to filter out policy and trust icons.
+

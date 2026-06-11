@@ -299,6 +299,8 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.get('/robots.txt', (req, res) => res.status(204).end());
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'Mantram AI API' }));
 
+
+
 const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 Mantram AI Server FAST-START on port ${config.port}`);
 
