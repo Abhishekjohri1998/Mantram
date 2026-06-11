@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react'
 import {
-    Layout, FileText, Globe, Mail, BarChart2,
+    FileText, Globe, Mail, BarChart2,
     Share2, Layers, Package, ChevronLeft,
     Sparkles, Loader2, CheckCircle2, Image as ImageIcon
 } from 'lucide-react'
@@ -183,7 +183,7 @@ export default function Phase3Creation({ productContext, selectedMoodId, onBack 
                             >
                                 <ChevronLeft size={13} /> All Tools
                             </button>
-                            <div style={{ display: 'flex', align: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div className="ps-tool-icon-wrap" style={{ marginBottom: 0 }}>
                                     <activeToolMeta.icon size={15} />
                                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { FileText, Download, ExternalLink, Loader2, Sparkles, RefreshCw, Printer } from 'lucide-react'
+import { FileText, Download, ExternalLink, Loader2, Sparkles, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../../../services/api'
 
 export default function BrochureTool({ sharedContext, brandId }) {

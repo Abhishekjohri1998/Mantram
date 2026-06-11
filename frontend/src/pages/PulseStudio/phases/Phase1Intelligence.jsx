@@ -14,7 +14,7 @@ async function uploadProductImages(files) {
             formData.append('file', file)
             const res = await fetch('/api/media/image-reference', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
                 body: formData,
             })
             const data = await res.json()
@@ -116,6 +116,12 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
         reset()
         setStep('analyzing')
         runProgressAnimation()
+        // BUG3 FIX: if user uploaded images but no URL, skip URL scan, go straight to PDI
+        if (!productUrl && s3ImageUrls.length > 0) {
+            setProductImages(s3ImageUrls)
+            await runPDI(s3ImageUrls, { title: '', description: description || '' })
+            return
+        }
         try {
             const data = await apiFetch('/brand-studio/aplus/analyze-product', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -133,17 +139,18 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
     const handleFileChange = async (e) => {
         const files = Array.from(e.target.files || [])
         if (!files.length) return
+        // BUG2 FIX: reset BEFORE setting previews so reset() doesn't wipe them
+        reset()
         setUploadedFiles(files)
-        // Show local previews immediately
+        setStep('analyzing')
+        runProgressAnimation()
+        // Show local previews immediately (for UX while S3 upload runs)
         const previews = await Promise.all(
             files.map(f => new Promise(res => {
                 const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f)
             }))
         )
         setUploadPreviews(previews)
-        reset()
-        setStep('analyzing')
-        runProgressAnimation()
         // Upload to S3
         const urls = await uploadProductImages(files)
         setS3ImageUrls(urls)
@@ -151,7 +158,14 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
         await runPDI(urls, { title: '', description: description || '' })
     }
 
-    const handleSelectMood = async (moodId) => {
+    // BUG4 FIX: Clicking mood card only selects — does NOT advance to Phase 2
+    const handleMoodCardClick = (moodId) => {
+        setSelectedMood(moodId)
+    }
+
+    // Called ONLY by the "Continue to Mood Board" button — advances to Phase 2
+    const handleContinue = async (moodId) => {
+        if (!moodId) return
         setSelectedMood(moodId)
         let dc = designContext
         try {
@@ -415,7 +429,8 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
                                 const aiImg = moodImages[mood.id]
                                 const isSelected = selectedMood === mood.id
                                 return (
-                                    <div key={mood.id} className={`ps-mood-thumb ${isSelected ? 'selected' : ''}`} onClick={() => handleSelectMood(mood.id)}>
+                                    // BUG4 FIX: Click only selects mood, does NOT advance phase
+                                    <div key={mood.id} className={`ps-mood-thumb ${isSelected ? 'selected' : ''}`} onClick={() => handleMoodCardClick(mood.id)}>
                                         {aiImg ? (
                                             <img src={aiImg} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
                                         ) : moodLoading ? (
@@ -449,7 +464,8 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
 
                     {selectedMood && (
                         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
-                            <button className="ps-btn-primary" onClick={() => handleSelectMood(selectedMood)} style={{ gap: 8 }}>
+                            {/* BUG4 FIX: Only this button advances to Phase 2 */}
+                            <button className="ps-btn-primary" onClick={() => handleContinue(selectedMood)} style={{ gap: 8 }}>
                                 <ChevronRight size={16} />
                                 Continue to Mood Board
                             </button>

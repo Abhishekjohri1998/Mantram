@@ -277,9 +277,20 @@
     padding-bottom: 0;
 }
 
+.ps-step-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--sys-text-muted);
+    transition: color 0.2s;
+}
+
 .ps-analysis-step.done .ps-step-icon { color: var(--sys-success, #10b981); }
 .ps-analysis-step.active .ps-step-icon { color: var(--sys-primary); }
-.ps-analysis-step.pending .ps-step-icon { color: var(--sys-text-muted); }
+.ps-analysis-step.pending .ps-step-icon { color: var(--sys-text-muted); opacity: 0.5; }
 
 .ps-spin {
     animation: ps-spin 1s linear infinite;
