@@ -22,8 +22,8 @@ export default function Footer() {
                                 Mantram <span style={{ color: BRAND.primary }}>AI</span>
                             </span>
                         </Link>
-                        <p className="text-sm leading-relaxed mb-5" style={{ color: BRAND.textMuted }}>
-                            Agentic AI marketing OS. Brand DNA learned once. 14 studios run the rest.
+                        <p className="text-xs leading-relaxed mb-5" style={{ color: BRAND.textMuted }}>
+                            Mantram (Sanskrit: <em>mantra</em> — a phrase repeated until it becomes truth). Teach the machine your brand once. Let it repeat you, perfectly, everywhere.
                         </p>
                         <div className="flex gap-2">
                             <a href="https://twitter.com/mantramai" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="size-9 rounded-lg flex items-center justify-center transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>

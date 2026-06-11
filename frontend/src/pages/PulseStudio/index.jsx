@@ -16,6 +16,7 @@ import { CheckCircle2, Lock, Sparkles, Search, Palette, Layers } from 'lucide-re
 import Phase1Intelligence from './phases/Phase1Intelligence'
 import Phase2MoodBoard    from './phases/Phase2MoodBoard'
 import Phase3Creation     from './phases/Phase3Creation'
+import { DEFAULT_CONFIG } from './tools/AvatarConfigPanel'
 
 import './PulseStudio.css'
 
@@ -80,6 +81,8 @@ export default function PulseStudio() {
     const [moodLoading, setMoodLoading] = useState(false)
     // LIFTED: mood directions so Phase2 sees updated IDs when async API returns
     const [moodDirections, setMoodDirections] = useState(null)
+    // LIFTED: avatar config — session-persistent, inherited by all Phase 3 tools
+    const [avatarConfig, setAvatarConfig] = useState(DEFAULT_CONFIG)
 
     const markDone = (p) => setCompleted(prev => prev.includes(p) ? prev : [...prev, p])
 
@@ -141,6 +144,8 @@ export default function PulseStudio() {
                         selectedMoodId={selectedMoodId}
                         onBack={() => setPhase(2)}
                         brandId={brandId}
+                        avatarConfig={avatarConfig}
+                        onAvatarConfigChange={setAvatarConfig}
                     />
                 )}
             </div>

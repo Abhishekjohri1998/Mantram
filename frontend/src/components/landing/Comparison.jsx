@@ -136,7 +136,7 @@ export default function Comparison() {
                         <div className="grid grid-cols-3 gap-4 border-t pt-8" style={{ borderColor: `${BRAND.primary}20` }}>
                             <div>
                                 <span className="block text-[10px] text-[#a1a1aa] mb-1">Cost</span>
-                                <span className="text-xl md:text-2xl font-serif tracking-tight" style={{ color: BRAND.primary }}>₹40K/mo</span>
+                                <span className="text-xl md:text-2xl font-serif tracking-tight" style={{ color: BRAND.primary }}>₹149+</span>
                             </div>
                             <div>
                                 <span className="block text-[10px] text-[#a1a1aa] mb-1">Output</span>

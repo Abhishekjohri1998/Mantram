@@ -43,11 +43,11 @@ export default function About() {
     return (
         <div className="min-h-screen bg-[#08080c] text-[var(--sys-text)] overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
             <SEOHead
-                title="About Mantram AI — The Operating System for Modern Brands"
-                description="Mantram AI is an AI-powered Brand Operating System. 8 AI Studios, 20+ models, built by founders with 18+ years of branding experience."
+                title="About Mantram AI — Built by Creators Who Shipped 1,000+ AI Campaigns"
+                description="Founded by a creative director and author of Prompt DOT AI, Mantram turns 18 years of brand craft into an agentic marketing OS for India and beyond."
                 canonical="/about"
                 ogTitle="About Mantram AI"
-                ogDescription="The Operating System for Modern Brands — where human creativity meets intelligent systems."
+                ogDescription="Founded by a creative director and author of Prompt DOT AI, Mantram turns 18 years of brand craft into an agentic marketing OS for India and beyond."
                 jsonLd={{
                     "@context": "https://schema.org",
                     "@graph": [

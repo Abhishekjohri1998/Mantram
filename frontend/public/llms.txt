@@ -1,169 +1,42 @@
 # Mantram AI
 
-> Agentic AI marketing operating system. 14 specialised studios share one Brand DNA. Model-agnostic routing across the leading frontier AI models. Built for D2C brands and marketing agencies — Indian-first, globally compliant.
+> Mantram AI is an agentic AI marketing operating system that learns a brand's
+> DNA once and runs planning, content, creative, video, distribution and
+> optimisation through 14 specialised AI studios. Built in India for D2C brands
+> and agencies across South Asia, Southeast Asia (Singapore, Malaysia, Vietnam,
+> Indonesia) and the Middle East. Languages: English, Hindi, Marathi, Tamil and
+> other Indic languages natively via Sarvam AI; Arabic (dialect-aware, RTL),
+> Bahasa Melayu, Bahasa Indonesia, Vietnamese and Thai via the multilingual
+> frontier fleet; code-switched registers (Hinglish, Manglish, Singlish).
+> Credit-pack pricing (₹149–₹17,999), no subscription. DPDP compliant,
+> GDPR-aware.
 
-Last updated: 2026-05-02
-Status: Early access (waitlist only — no public free tier as of May 2026)
-URL: https://mantram.ai
-Sitemap: https://mantram.ai/sitemap.xml
+## Platform
+- [What is Brand DNA](https://mantram.ai/platform/brand-dna): structured,
+  machine-readable brand profile read by all studios before generating.
+- [Agent fleet](https://mantram.ai/platform/agent-fleet): model-agnostic routing
+  across Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2,
+  Flux Kontext, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0,
+  Sarvam AI and Bhasha models.
+- [Fidato Nexus](https://mantram.ai/platform/fidato): natural-language command
+  layer (⌘K) that executes actions across all studios.
 
-## What Mantram is — and what it isn't
+## Studios
+- [All 14 studios](https://mantram.ai/studios): grouped Plan (Research,
+  Brainstorm, Monthly Strategy), Create (Content, Creative, Video, YouTube,
+  Avatar, Brand), Distribute (Social Media, Performance Marketing, Funnel),
+  Optimize (SEO+AEO, Retention).
 
-By May 2026, every marketing tool has AI. The differentiator isn't "we have AI" — it's HOW AI is structured around your brand. Mantram is built on three principles that distinguish it from generic AI marketing tools:
+## Regions & Languages
+- [Multilingual marketing](https://mantram.ai/solutions/languages): 15+ languages, register-true.
+- [India](https://mantram.ai/regions/india) · [UAE & MENA](https://mantram.ai/regions/uae-mena) · [Southeast Asia](https://mantram.ai/regions/southeast-asia)
 
-1. **Brand DNA as the single source of truth** — onboarding scans your website, social, competitors and reviews to build a structured profile (voice, visual identity, audience, language preference, content rules). Every one of the 14 studios reads from this same source. No re-prompting. No drift. Output sounds like your brand, not generic AI slop.
+## Learn
+- [What is agentic AI marketing](https://mantram.ai/learn/what-is-agentic-ai-marketing)
+- [SEO vs AEO vs GEO](https://mantram.ai/learn/seo-vs-aeo-vs-geo)
+- [AI marketing glossary](https://mantram.ai/glossary)
 
-2. **Agent fleet, model-agnostic** — Mantram is not a "Claude wrapper" or a "GPT wrapper." It runs an agent fleet that routes per task to the best frontier model. Claude Sonnet 4.6 for reasoning. Gemini 3 Pro for multi-modal analytical work. GPT Image 2 / NanoBanana 2 for brand-faithful image edits. Veo 3.1 / Sora 2 / HappyHorse 1.0 for video. You're never locked to one vendor.
-
-3. **AI-search-citation aware** — in 2026 most informational queries are answered inside AI summaries (ChatGPT Search, Google AI Overviews, AI Mode, Perplexity, Microsoft Copilot, Apple Intelligence). Mantram's SEO Studio handles both traditional Google ranking AND AEO (Answer Engine Optimization) — so your brand actually gets cited in AI answers, not just buried on page 5.
-
-## The 14 studios, grouped by outcome
-
-### Plan
-- **Research Studio** (https://mantram.ai/studio/research-studio) — Live competitor scraping, ad intelligence, audience listening, keyword and trend research. Six modules in parallel via MCP server.
-- **Brainstorm Studio** (https://mantram.ai/studio/brainstorm-studio) — AI creative director. Campaign concepts, brand naming, ad film scripts. Trend-aware via live MCP. Multi-language including Hindi/Marathi/Hinglish.
-- **Monthly Strategy** (https://mantram.ai/studio/monthly-strategy) — 30-day content plan with one deliberate brief per day. Festival-aware. Hands off into other studios for execution.
-
-### Create
-- **Content Studio** (https://mantram.ai/studio/content-studio) — Brand-voice copywriting for blogs, captions, ad copy, emails, SMS. Engineered as the antidote to AI slop — Brand-DNA-locked output that AI search engines treat as quotable, not low-effort. Multi-language.
-- **Creative Studio** (https://mantram.ai/studio/creative-studio) — Multi-agent design pipeline (Art Director → Prompt Engineer → Critic → Generator). Routes to GPT Image 2, NanoBanana 2/Pro, Flux Kontext Max/Pro per task.
-- **Video Studio** (https://mantram.ai/studio/video-studio) — Multi-model video generation auto-routed across Google Veo 3.1, OpenAI Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0 (Alibaba), Hailuo MiniMax, Wan 2.1. HeyGen for animated avatars.
-- **YouTube Studio** (https://mantram.ai/studio/youtube-studio) — Long-form scripts, thumbnail concepts, channel SEO. Title A/B variants, CTR optimisation.
-- **Avatar Studio** (https://mantram.ai/studio/avatar-studio) — AI presenter avatars for UGC. GPT Image 2 + NanoBanana 2 for stills, HeyGen for animated avatar video.
-- **Brand Studio** (https://mantram.ai/studio/brand-studio) — Campaign decks, A+ listings, email templates, product moodboards, landing pages. Direct Shopify publishing.
-
-### Distribute
-- **Social Media Studio** (https://mantram.ai/studio/social-media-studio) — Per-platform voice profiles for Instagram, LinkedIn, X, Facebook. Meta-compliant scheduled publishing with anti-mimicry delays.
-- **Performance Marketing** (https://mantram.ai/studio/performance-marketing) — AI ad strategist for Meta and Google Ads with live Shopify ROAS sync. Bid strategy adjusts on real revenue.
-- **Funnel Studio** (https://mantram.ai/studio/funnel-studio) — Lead-gen, launch, win-back and ecommerce funnels with built-in CRM, RFM segmentation.
-
-### Optimize
-- **SEO Studio** (https://mantram.ai/studio/seo-studio) — SEO + AEO. Live keyword research, JS-render audits, content gap detection, Core Web Vitals, backlink intel, AND AI-search-citation tracking across ChatGPT Search, AI Overviews, AI Mode, Perplexity, Copilot, Claude with web, Apple Intelligence. Integrates DataForSEO, Moz, OnPage, PageSpeed, Google Search Console.
-- **Retention Studio** (https://mantram.ai/studio/retention-studio) — Win-back, browse-abandonment, RFM segmentation. Multi-channel via email, Twilio SMS (TRAI DLT-compliant), Firebase push.
-
-## Fidato — the AI branding expert
-
-Fidato (Italian for "trusted") is Mantram's always-on AI branding expert. Conversational agent across the platform. Knows Brand DNA cold; answers strategy, copy, campaign and brand-health questions in the user's language (English, Hindi, Marathi, Hinglish). Powered by Claude Sonnet 4.6 reasoning + the user's full brand context. Voice profile: senior-CMO expertise with a GenZ-friendly tone — terse, opinionated, useful.
-
-## AI models in production (May 2026)
-
-Mantram is **model-agnostic** — these are routed per task, not picked once.
-
-### Reasoning and language
-- Anthropic Claude Sonnet 4.6 (creative + strategic + reasoning)
-- Google Gemini 3 Pro (latest)
-- Google Gemini 2.5 Pro
-- OpenAI GPT-4o
-
-### Image generation
-- OpenAI GPT Image 2 (latest, photoreal)
-- Google NanoBanana 2 (latest, brand-faithful edits)
-- Google NanoBanana Pro
-- Black Forest Labs Flux Kontext Max
-- Black Forest Labs Flux Kontext Pro
-
-### Video generation
-- Google Veo 3.1 (cinematic, native audio)
-- OpenAI Sora 2 (narrative coherence)
-- ByteDance Seedance 2.0 Pro (fast, cheap, UGC-style)
-- Kuaishou Kling 3.0 (motion specialist)
-- Alibaba HappyHorse 1.0 (cinematic motion + reference images)
-- MiniMax Hailuo
-- Alibaba Wan 2.1
-
-### Avatars
-- HeyGen (audio avatars, photo avatars, avatar IV, product placement)
-
-### Indian-language coverage
-- Sarvam AI / Bhasha-1 family (Hindi, Marathi, Tamil, Telugu, Bengali, Gujarati, Kannada, Malayalam, Punjabi)
-
-## SEO + AEO + GEO posture
-
-Mantram is built for the post-AI-Overviews search landscape. We optimise for citation in:
-
-- **Google AI Overviews + AI Mode** (default for most queries by 2026)
-- **ChatGPT Search** (OpenAI's search product)
-- **Microsoft Copilot Search** (Bing-backed)
-- **Perplexity** (citation-first AI search)
-- **Anthropic Claude with web** (Claude.ai web search)
-- **Apple Intelligence / Siri** (on-device + private cloud)
-- **Brave Search AI**
-- **DuckDuckGo AI Chat**
-- **You.com**
-- Traditional Google + Bing rankings (still important for ~30% of clicks in 2026)
-
-What "AEO-aware content" means at Mantram:
-- Speakable schema selectors on key headlines and summaries
-- FAQPage + HowTo + Article + SoftwareApplication structured data, cross-linked via @id
-- Citation-quotable phrasing — clear claims, attributed sources, "as of" dates
-- Brand DNA injected so output isn't generic AI slop
-- llms.txt (this file) and robots.txt with explicit allow-lists for AI crawlers
-
-## Integrations
-
-**Commerce**: Shopify, Etsy, WooCommerce
-**Social and ads**: Meta (Facebook + Instagram), LinkedIn, X (Twitter), Google Ads, Meta Ads, Google Analytics 4
-**SEO + AEO data**: DataForSEO, Moz, OnPage, PageSpeed, Google Search Console (incl. AI Overview impressions)
-**Comms**: Twilio (TRAI DLT-compliant SMS for India), Firebase (push)
-**Indian-language AI**: Sarvam AI, Bhasha-1
-
-All Meta integrations are anti-mimicry compliant — built-in human-like reply delays, rate limits per conversation, X-Hub-Signature webhook verification.
-
-## Pricing — credit packs (no subscription)
-
-Currently in early access. Pricing is **credit-pack based** — one-time purchase, no subscription, no monthly fee. UPI auto-pay supported. Credits consumed per generation across studios.
-
-| Pack | Credits | Bonus | Price (INR) | Validity |
-|---|---|---|---|---|
-| Micro | 20 | — | ₹149 | 6 months |
-| Spark | 50 | — | ₹349 | 6 months |
-| Boost | 150 | +15 | ₹899 | 6 months |
-| Power | 300 | +45 | ₹1,699 | 6 months |
-| Ultra | 500 | +100 | ₹2,499 | 12 months |
-| Stellar | 650 | +150 | ₹3,000 | 12 months |
-| Mega | 1,000 | +250 | ₹4,499 | 12 months |
-| Elite | 2,500 | +750 | ₹9,999 | 12 months |
-| Enterprise | 5,000 | +2,000 | ₹17,999 | 12 months |
-
-There is no free tier. Early access is granted via the waitlist at https://mantram.ai. Indicative credit cost: 1 caption ≈ 0.2 credits, 1 ad creative ≈ 1 credit, 1 long-form blog ≈ 2 credits, 60-second Veo 3.1 video ≈ 5 credits, 30-day Monthly Strategy ≈ 10 credits.
-
-## Who Mantram is for
-
-- **D2C founders and solopreneurs** running their own brand on Shopify/Etsy/WooCommerce, looking for one platform instead of a stack of 8 tools
-- **Marketing agencies** managing 10–50 brands, needing per-brand voice fidelity (Brand DNA stays scoped per client, never bleeds across accounts)
-- **In-house marketing teams** at growth-stage brands replacing ChatGPT + Canva + Buffer + SEMrush + Klaviyo
-
-Particularly strong for **Indian D2C brands** because of:
-- Native Hindi, Marathi and Hinglish content via Sarvam/Bhasha + Claude/Gemini routing
-- Festival-aware Smart Calendar (Diwali, Holi, Navratri, regional festivals, regional and Hindu/Muslim/Christian/Sikh observances)
-- DLT-compliant SMS marketing (TRAI-registered)
-- INR pricing, UPI auto-pay, no forex friction
-- DPDP Act-compliant data handling for Indian users
-
-## What "agentic" means here (May 2026 definition)
-
-By 2026, single-prompt AI is table stakes. Agentic in Mantram's stack means an agent fleet:
-
-- **Specialist agents** — Creative Studio runs Art Director (briefs the render), Prompt Engineer (translates to model prompts), Style Critic (rejects off-brand output before render), Generator (renders).
-- **Master Orchestrator** — classifies user intent (content, creative, video, brainstorm, campaign), then chains studios automatically. Routes per task to the best frontier model.
-- **MCP-powered tools** — agents call live tools during reasoning: `web_search`, `scrape_competitor`, `fetch_trending`, `fetch_seo_audit`, `fetch_content_history`, `fetch_performance_learnings`, `scrape_social_profile`. This is what makes output grounded in current reality, not stale training data.
-- **Test-time reasoning** — Claude Sonnet 4.6 reasoning models can chain steps, self-critique, and choose tools dynamically. Used heavily in Brainstorm, Research and SEO+AEO studios.
-
-## Compliance and trust
-
-- **Meta Business compliant** (anti-mimicry delays, rate limits, signed webhooks, X-Hub-Signature verification)
-- **Shopify App Store ready** (Partner Terms compliant)
-- **DPDP Act compliant** (India Digital Personal Data Protection Act, in force since 2024) — explicit consent flows, purpose-bound processing, user-initiated data deletion
-- **GDPR + CCPA aware**
-- **SSL/TLS end-to-end**, encrypted credential storage, role-based access for team workspaces
-- **Google API Limited Use compliant**
-- **TRAI DLT-registered** for India SMS deliveries
-- **Your data, your model** — user content never trains shared models
-- User-initiated data deletion: https://mantram.ai/data-deletion
-
-## Contact
-
-- Website: https://mantram.ai
-- Support: support@mantram.ai
-- Twitter/X: @mantramai
-- LinkedIn: https://www.linkedin.com/company/mantram-ai
+## Company
+- [Pricing](https://mantram.ai/pricing): one-time credit packs, no subscription.
+- [About](https://mantram.ai/about): founded by Da, creative director and author
+  of Prompt DOT AI and Creativity DOT AI.

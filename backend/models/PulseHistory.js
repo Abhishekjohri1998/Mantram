@@ -9,7 +9,11 @@ const pulseHistorySchema = new mongoose.Schema({
     brand:      { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
 
     // Which Pulse sub-tool generated this
-    tool:       { type: String, enum: ['deck', 'email', 'page', 'aplus'], required: true },
+    tool: {
+        type: String,
+        enum: ['deck', 'email', 'page', 'aplus', 'social-kit', 'quick-post', 'brochure'],
+        required: true,
+    },
 
     // User brief
     brief:      { type: String, required: true },
@@ -56,6 +60,36 @@ const pulseHistorySchema = new mongoose.Schema({
     aplusDesignContext: { type: mongoose.Schema.Types.Mixed, default: null }, // PDI locked design directive
     aplusPlan:        { type: mongoose.Schema.Types.Mixed, default: null },
     aplusTier:        { type: String, enum: ['standard', 'premium'], default: 'standard' }, // A+ vs A++
+
+    // ── Social Kit fields ──────────────────────────────────────────────────────
+    // Each kit image: { platform, label, ratio, size, imageUrl, success }
+    kitImages:    { type: mongoose.Schema.Types.Mixed, default: null },
+    captions:     { type: mongoose.Schema.Types.Mixed, default: null },   // per-platform captions
+    kitType:      { type: String, default: null },    // promo | feature | launch | emotion
+    kitMoodLabel: { type: String, default: null },
+    kitPlatforms: [{ type: String }],                  // which platforms were generated
+    // Creative Brain meta
+    creativeRationale: { type: String, default: null },
+    designTrend:  { type: String, default: null },
+    humanPresence:{ type: Boolean, default: false },
+
+    // ── Quick Post fields ──────────────────────────────────────────────────────
+    quickPostImageUrl: { type: String, default: null },
+    quickPostCaption:  { type: String, default: null },
+    quickPostPlatform: { type: String, default: null },
+    quickPostCopy:     { type: mongoose.Schema.Types.Mixed, default: null },
+
+    // ── Brochure fields ───────────────────────────────────────────────────────
+    brochureFrontUrl:  { type: String, default: null },
+    brochureBackUrl:   { type: String, default: null },
+    brochureHostedUrl: { type: String, default: null },
+    brochureContent:   { type: mongoose.Schema.Types.Mixed, default: null }, // Claude-generated copy
+    brochureProductName: { type: String, default: null },
+
+    // ── Shared: Product context (for all Pulse tools) ─────────────────────────
+    productName:   { type: String, default: null },   // product title for display
+    productUrl:    { type: String, default: null },   // source URL
+    productThumbUrl: { type: String, default: null }, // hero image for history card
 
     // Credits used
     creditsUsed:  { type: Number, default: 0 },

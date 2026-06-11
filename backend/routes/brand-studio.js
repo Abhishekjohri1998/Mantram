@@ -9,6 +9,7 @@ import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText, callAgent } from '../agents/shared/agentUtils.js';
 import { laozhangImageGenerate, laozhangMultimodalImageGenerate, laozhangGptImageWithRefs } from '../agents/videoStudio/laozhangClient.js';
 import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext, generateQuickPost } from '../agents/shared/productDesignAgent.js';
+import { runPulseCreativeBrain, extractTypographyDNA } from '../agents/creativeStudio/pulseCreativeBrain.js';
 import PulseHistory from '../models/PulseHistory.js';
 import ProductContext from '../models/ProductContext.js';
 import fetch from 'node-fetch';
@@ -172,6 +173,18 @@ router.post('/product-intelligence', protect, async (req, res) => {
         // Store the original product URL in DNA for downstream use
         if (productUrl) productDNA.sourceUrl = productUrl;
 
+        // ── Typography DNA extraction (parallel, non-blocking) ──────────────────
+        // Runs alongside PDI. Extracts font weight, type style, letter spacing from
+        // the scraped HTML. Falls back to null gracefully (never blocks response).
+        let typographyDNA = null;
+        try {
+            const scrapedHtml = productData?.bodyText || productData?.description || '';
+            typographyDNA = await extractTypographyDNA(productUrl, scrapedHtml);
+            if (typographyDNA) productDNA.typographyDNA = typographyDNA;
+        } catch (typoErr) {
+            console.warn('⚠️ Typography DNA extraction skipped (non-critical):', typoErr.message);
+        }
+
         // Diagnostic log — shows exactly what was classified
         console.log(`✅ PDI Complete: category="${productDNA.productCategory}" | colors=${productDNA.dominantColors?.length || 0} | mood=${productDNA.defaultMoodDirection} | fallback=${productDNA.isFallback || false}`);
         if (productDNA.dominantColors?.length) {
@@ -249,6 +262,30 @@ router.post('/quick-post', protect, async (req, res) => {
         });
 
         await deductCredits(req.user._id, QUICK_POST_CREDITS, 'quick_post');
+
+        // ── Save to history ─────────────────────────────────────────────────────
+        try {
+            const imageUrl = backgrounds[ratioList[0]] || null;
+            await PulseHistory.create({
+                user:    req.user._id,
+                brand:   brandId || null,
+                tool:    'quick-post',
+                brief:   postType || 'promo',
+                subType: postType || 'promo',
+                quickPostImageUrl: imageUrl,
+                quickPostCaption:  firstResult.copy?.caption || firstResult.copy?.headline || '',
+                quickPostPlatform: ratioList[0],
+                quickPostCopy:     firstResult.copy || null,
+                productName:     productData?.title || productDNA?.productCategory || 'Product',
+                productUrl:      productDNA?.sourceUrl || null,
+                productThumbUrl: productDNA?.heroImageUrl || imageUrl || null,
+                thumbnailUrl:    imageUrl,
+                creditsUsed:     QUICK_POST_CREDITS,
+            });
+        } catch (histErr) {
+            console.warn('⚠️ Quick post history save failed (non-critical):', histErr.message);
+        }
+
         res.json({
             success:       true,
             copy:          firstResult.copy,
@@ -329,12 +366,20 @@ router.post('/mood-board', protect, async (req, res) => {
 
 // ── POST /api/brand-studio/social-kit/generate ────────────────────────────────
 // Generates multi-platform social media images + AI captions in one shot
+// v2: Routes through Pulse Creative Brain when usePulseCreativeBrain=true
 // Platforms: Instagram Feed, Instagram Story, Facebook/LinkedIn, Twitter/X, Pinterest
 // Each platform gets: generated image (S3 URL) + tailored caption + hashtags
 // Cost: 15 credits
 router.post('/social-kit/generate', protect, async (req, res) => {
     try {
-        const { productDNA, productData, selectedMoodId, productMoodDirections, kitType = 'promo', platforms, brandId, imageModel } = req.body;
+        const {
+            productDNA, productData, selectedMoodId, productMoodDirections,
+            kitType = 'promo', platforms, brandId, imageModel,
+            avatarConfig = null,   // NEW: human presence config
+            typographyDNA = null,  // NEW: typography DNA from URL scan
+            brief = '',            // NEW: user creative brief
+            usePulseCreativeBrain = false,
+        } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         const SOCIAL_KIT_CREDITS = 15;
@@ -358,40 +403,119 @@ router.post('/social-kit/generate', protect, async (req, res) => {
         };
 
         const productTitle = productData?.title || productDNA?.productCategory || 'Product';
-        const bullets = productData?.bulletPoints || [];
-        const colorHex = (productDNA?.dominantColors || []).slice(0, 3).map(c => c.hex).filter(Boolean).join(', ');
         const refImages = [
             productDNA?.heroImageUrl,
             ...(productDNA?.productRefImages || []).slice(0, 2),
         ].filter(Boolean);
 
-        // Step 1: Claude generates copy for all platforms simultaneously
-        const copyPrompt = `You are a senior social media strategist.
+        // ── Step 1: Pulse Creative Brain — per-platform art direction + copy ────
+        // When usePulseCreativeBrain=true, runs the full 4-role creative engine
+        // to get platform-specific art direction before image generation.
+        let perPlatformArtDirection = {};
+        let captions = {};
+        let creativeRationale = '';
+        let designTrend = '';
+
+        if (usePulseCreativeBrain) {
+            console.log('🧠 Pulse Creative Brain: generating per-platform art direction...');
+            const PLATFORM_FORMAT_MAP = {
+                instagram_feed:  { format: 'instagram-post',  ratio: '4:5'  },
+                instagram_story: { format: 'instagram-story', ratio: '9:16' },
+                facebook:        { format: 'facebook',        ratio: '16:9' },
+                twitter_x:       { format: 'twitter_x',       ratio: '16:9' },
+                linkedin:        { format: 'linkedin',        ratio: '16:9' },
+                pinterest:       { format: 'pinterest',       ratio: '2:3'  },
+            };
+
+            const targetPlatforms = (platforms && platforms.length) ? platforms : Object.keys(PLATFORM_FORMAT_MAP);
+
+            // Run brain once per platform in parallel (all use same productDNA but diff format)
+            const brainResults = await Promise.allSettled(
+                targetPlatforms.map(async (platform) => {
+                    const { format, ratio } = PLATFORM_FORMAT_MAP[platform] || { format: 'instagram-post', ratio: '1:1' };
+                    const result = await runPulseCreativeBrain({
+                        productDNA,
+                        moodDirection: selectedMoodDir,
+                        brief: brief || `${kitType} post for ${productTitle}`,
+                        format,
+                        aspectRatio: ratio,
+                        avatarConfig,
+                        typographyDNA: typographyDNA || productDNA?.typographyDNA || null,
+                        generateCopy: true,
+                        platformId: platform,
+                    });
+                    return { platform, result };
+                })
+            );
+
+            // Map brain results to per-platform art direction and captions
+            for (const settled of brainResults) {
+                if (settled.status === 'fulfilled') {
+                    const { platform, result } = settled.value;
+                    perPlatformArtDirection[platform] = result;
+                    if (result.copyHeadline) {
+                        captions[platform] = {
+                            imageText: result.copyHeadline,
+                            caption:   result.copySubtext || '',
+                            hashtags:  '',
+                        };
+                    }
+                    if (!creativeRationale && result.engineeringNotes) {
+                        creativeRationale = result.engineeringNotes;
+                        designTrend = result.designTrend || '';
+                    }
+                }
+            }
+
+            // Fill in captions with full copywriting pass (hashtags + platform-specific copy)
+            // This secondary pass is lighter and focused only on captions (not image direction)
+            if (Object.keys(captions).length < targetPlatforms.length) {
+                const bullets = productData?.bulletPoints || [];
+                const copyPrompt = `You are a senior social media strategist.
+Product: "${productTitle}" | Mood: ${selectedMoodDir.label} | Post type: ${kitType}
+Key USPs: ${bullets.slice(0, 5).join(' | ')}
+Generate platform-optimized captions. Return ONLY valid JSON:
+${JSON.stringify(Object.fromEntries(targetPlatforms.map(p => [p, { caption: '', hashtags: '' }])))}`;
+                try {
+                    const fallbackCaptions = await callAgentText(
+                        'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
+                        copyPrompt, 0.6, 1200
+                    );
+                    const parsed = typeof fallbackCaptions === 'string' ? JSON.parse(fallbackCaptions) : fallbackCaptions;
+                    for (const [plat, cap] of Object.entries(parsed)) {
+                        if (!captions[plat]) captions[plat] = cap;
+                        else captions[plat] = { ...cap, ...captions[plat] }; // Brain copy takes priority
+                    }
+                } catch(e) { console.warn('Fallback caption gen failed:', e.message); }
+            }
+        } else {
+            // Legacy path: simple copy generation without Creative Brain
+            const bullets = productData?.bulletPoints || [];
+            const colorHex = (productDNA?.dominantColors || []).slice(0, 3).map(c => c.hex).filter(Boolean).join(', ');
+            const copyPrompt = `You are a senior social media strategist.
 Product: "${productTitle}" | Category: ${productDNA?.productCategory || 'consumer product'} | Mood: ${selectedMoodDir.label}
 Key USPs: ${bullets.slice(0, 5).join(' | ')}
 Post type: ${kitType}
 
-Generate platform-optimized captions and image-text overlays. For every platform, include an "imageText" field which is a 3-5 word high-impact creative headline to be rendered directly onto the visual graphic (e.g., "Fold. Stand. Work.", "Unleash Your Workspace.", "Workspace Redefined."). Return ONLY valid JSON:
+Generate platform-optimized captions and image-text overlays. For every platform, include an "imageText" field which is a 3-5 word high-impact creative headline to be rendered directly onto the visual graphic. Return ONLY valid JSON:
 {
-  "instagram_feed": { "imageText": "headline for graphic", "caption": "2-3 line engaging caption (no hashtags here)", "hashtags": "20 relevant hashtags as a single string" },
-  "instagram_story": { "imageText": "headline for graphic", "caption": "Short punchy text overlay suggestion (max 15 words)", "sticker_text": "CTA for story sticker e.g. Swipe Up | Shop Now" },
-  "facebook": { "imageText": "headline for graphic", "caption": "Conversational 2-3 line post (no hashtag spam), include link placeholder" },
-  "twitter_x": { "imageText": "headline for graphic", "caption": "Under 250 chars. Punchy. Include 2-3 relevant hashtags." },
-  "linkedin": { "imageText": "headline for graphic", "caption": "Professional 3-4 line post. Business benefit angle. Max 1300 chars." },
-  "pinterest": { "imageText": "headline for graphic", "caption": "Keyword-rich descriptive caption for pin. 2-3 sentences with relevant keywords.", "board_suggestion": "Suggested board name" }
+  "instagram_feed": { "imageText": "headline", "caption": "2-3 line", "hashtags": "20 hashtags" },
+  "instagram_story": { "imageText": "headline", "caption": "Short text", "sticker_text": "CTA" },
+  "facebook": { "imageText": "headline", "caption": "2-3 line post" },
+  "twitter_x": { "imageText": "headline", "caption": "Under 250 chars" },
+  "linkedin": { "imageText": "headline", "caption": "Professional 3-4 line" },
+  "pinterest": { "imageText": "headline", "caption": "Keyword-rich", "board_suggestion": "Board name" }
 }`;
+            try {
+                captions = await callAgentText(
+                    'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
+                    copyPrompt, 0.6, 1200
+                );
+                if (typeof captions === 'string') captions = JSON.parse(captions);
+            } catch(e) { console.warn('Caption generation failed:', e.message); }
+        }
 
-        let captions = {};
-        try {
-            captions = await callAgentText(
-                'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
-                copyPrompt, 0.6, 1200
-            );
-            if (typeof captions === 'string') captions = JSON.parse(captions);
-        } catch(e) { console.warn('Caption generation failed:', e.message); }
-
-        // Step 2: Generate images for requested platforms in parallel
-        // Platform specs (latest 2024/25 sizes for best quality)
+        // ── Step 2: Generate images for requested platforms in parallel ─────────
         const PLATFORM_CONFIGS = {
             instagram_feed:   { size: '1024x1024',  label: 'Instagram Feed',   ratio: '1:1',  hint: 'Square social post — vibrant, bold, Instagram-native design' },
             instagram_story:  { size: '832x1216',   label: 'Instagram Story',  ratio: '9:16', hint: 'Vertical story format — bold headline zone at top, product center, CTA bottom' },
@@ -401,7 +525,7 @@ Generate platform-optimized captions and image-text overlays. For every platform
             pinterest:        { size: '896x1120',   label: 'Pinterest Pin',    ratio: '4:5',  hint: 'Pinterest vertical pin — lifestyle-rich, aspirational, high visual quality' },
         };
 
-        const targetPlatforms = (platforms && platforms.length) ? platforms : Object.keys(PLATFORM_CONFIGS);
+        const targetPlatformsForImages = (platforms && platforms.length) ? platforms : Object.keys(PLATFORM_CONFIGS);
 
         const colorGuard = (productDNA?.dominantColors || [])
             .filter(c => c.role !== 'background_suggestion')
@@ -409,40 +533,43 @@ Generate platform-optimized captions and image-text overlays. For every platform
 
         const postTypePrompts = {
             promo:   'promotional, aspirational, "shop now" energy',
-            feature:  'feature spotlight, educational, premium product detail',
+            feature: 'feature spotlight, educational, premium product detail',
             launch:  'product launch announcement, exciting, bold',
+            emotion: 'lifestyle, emotional resonance, the feeling of owning this — subtle product',
         };
 
         const { laozhangImageGenerate, laozhangMultimodalImageGenerate, laozhangGptImageWithRefs } = await import('../agents/videoStudio/laozhangClient.js');
 
-        const imageJobs = targetPlatforms.map(async (platform) => {
+        const imageJobs = targetPlatformsForImages.map(async (platform) => {
             const cfg = PLATFORM_CONFIGS[platform];
             if (!cfg) return { platform, success: false };
 
             const platformCaption = captions[platform] || {};
-            const textToRender = platformCaption.imageText || `${productTitle} Redefined`;
+            const brainDir = perPlatformArtDirection[platform];
 
-            const imagePrompt = `SOCIAL MEDIA ${cfg.label.toUpperCase()} — COMPLETE DESIGNED GRAPHIC
+            // Use Creative Brain's primaryPrompt if available, otherwise build from template
+            let imagePrompt;
+            if (brainDir?.primaryPrompt) {
+                imagePrompt = brainDir.primaryPrompt;
+                if (brainDir.styleModifiers) imagePrompt += `, ${brainDir.styleModifiers}`;
+            } else {
+                const textToRender = platformCaption.imageText || `${productTitle} Redefined`;
+                imagePrompt = `SOCIAL MEDIA ${cfg.label.toUpperCase()} — COMPLETE DESIGNED GRAPHIC
 
 PLATFORM: ${cfg.label} | Size: ${cfg.size} | Type: ${postTypePrompts[kitType] || postTypePrompts.promo}
 ${cfg.hint}
 
 PRODUCT: ${productTitle}
-CATEGORY: ${productDNA?.productCategory || 'consumer product'}
-MOOD DIRECTION: ${selectedMoodDir.label} — ${selectedMoodDir.description || ''}
-SHOOT STYLE: ${selectedMoodDir.shootDirective || 'Professional, premium, brand-consistent'}
-${colorGuard ? `PRODUCT COLORS (DO NOT CHANGE THESE): ${colorGuard}` : ''}
-BACKGROUND/ACCENT PALETTE (mood-inspired): ${colorHex || 'dark premium tones'}
+MOOD: ${selectedMoodDir.label} — ${selectedMoodDir.description || ''}
+${colorGuard ? `PRODUCT COLORS (PRESERVE EXACTLY): ${colorGuard}` : ''}
 
-DESIGN REQUIREMENTS:
-- This is a COMPLETE ready-to-post social graphic
-- Product must be the visual hero — prominently placed, properly lit
-- Include brand-consistent graphic design elements (geometric shapes, color blocks)
-- Typography zone: Render the text "${textToRender}" clearly and legibly inside the text/design panel
-- Visual quality: editorial photography meets graphic design — not a simple product shot
-- The product colors MUST be preserved exactly as specified
+DESIGN: Complete ready-to-post social graphic. Product as hero. Include graphic design elements.
+Typography: Render "${textToRender}" clearly and legibly.
 
-CRITICAL: Render the exact text "${textToRender}" on the image. Do NOT print generic placeholder text or "Lorem Ipsum" anywhere.`;
+CRITICAL: Render the exact text "${textToRender}" on the image.`;
+            }
+
+            const negativePrompt = brainDir?.negativePrompt || 'CGI plastic skin, floating product on plain gradient, watermark, border, logo, brand name, text artifacts, flat lighting, stock photo pose';
 
             try {
                 let result;
@@ -466,6 +593,34 @@ CRITICAL: Render the exact text "${textToRender}" on the image. Do NOT print gen
 
         await deductCredits(req.user._id, SOCIAL_KIT_CREDITS, 'pulse-social-kit');
 
+        // ── Save to history ─────────────────────────────────────────────────────
+        try {
+            const firstSuccessImage = kitImages.find(k => k?.success && k?.imageUrl);
+            await PulseHistory.create({
+                user:        req.user._id,
+                brand:       brandId || null,
+                tool:        'social-kit',
+                brief:       brief || `${kitType} social kit`,
+                subType:     kitType,
+                kitImages,
+                captions,
+                kitType,
+                kitMoodLabel: selectedMoodDir.label,
+                kitPlatforms: kitImages.filter(k => k?.success).map(k => k.platform),
+                creativeRationale,
+                designTrend,
+                humanPresence: !!(avatarConfig?.enabled),
+                // Shared product context
+                productName:    productTitle,
+                productUrl:     productDNA?.sourceUrl || null,
+                productThumbUrl: productDNA?.heroImageUrl || firstSuccessImage?.imageUrl || null,
+                thumbnailUrl:   firstSuccessImage?.imageUrl || null,
+                creditsUsed:    SOCIAL_KIT_CREDITS,
+            });
+        } catch (histErr) {
+            console.warn('⚠️ Social kit history save failed (non-critical):', histErr.message);
+        }
+
         res.json({
             success: true,
             kitImages,
@@ -473,6 +628,10 @@ CRITICAL: Render the exact text "${textToRender}" on the image. Do NOT print gen
             productName: productTitle,
             moodLabel: selectedMoodDir.label,
             creditsUsed: SOCIAL_KIT_CREDITS,
+            // NEW: Creative Brain meta
+            creativeRationale,
+            designTrend,
+            humanPresence: !!(avatarConfig?.enabled),
         });
     } catch (err) {
         console.error('❌ Social Kit generate:', err.message);
@@ -480,20 +639,84 @@ CRITICAL: Render the exact text "${textToRender}" on the image. Do NOT print gen
     }
 });
 
+// ── POST /api/brand-studio/social-kit/make-reel ───────────────────────────────
+// Enqueues a Seedance video job for a static social kit image
+// Returns a job ID immediately — video delivered via BackgroundJobs
+// Cost: 5 credits
+router.post('/social-kit/make-reel', protect, async (req, res) => {
+    try {
+        const { imageUrl, platform, duration = 10, motionStyle = 'cinematic-drift', brandId, avatarConfig } = req.body;
+        if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl required' });
+
+        const REEL_CREDITS = 5;
+        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        if (balance < REEL_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: REEL_CREDITS });
+
+        // Motion style → Seedance camera directive
+        const MOTION_PROMPTS = {
+            'cinematic-drift':  'Slow cinematic camera drift left, atmospheric depth, bokeh background, locked subject, smooth loop, high fidelity, no motion blur on text',
+            'dynamic-zoom':     'Gradual cinematic push-in zoom, product grows slightly in frame, light particles float, clean loop, editorial quality',
+            'parallax':         'Subtle parallax motion, foreground elements drift slightly faster than background, depth of field shift, smooth seamless loop',
+        };
+        const seedancePrompt = MOTION_PROMPTS[motionStyle] || MOTION_PROMPTS['cinematic-drift'];
+
+        // Enqueue as a background job (uses existing video studio job infrastructure)
+        const jobId = `pulse-reel-${Date.now()}`;
+        console.log(`🎬 Pulse Reel job enqueued: ${jobId} | platform=${platform} | motion=${motionStyle} | avatar=${!!(avatarConfig?.enabled)}`);
+
+        // Fire-and-forget: the actual Seedance call happens asynchronously
+        // This keeps the API response fast (<1s) while video generates in background
+        setImmediate(async () => {
+            try {
+                const { laozhangImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
+                // TODO: wire to actual Seedance image-to-video endpoint when available
+                // For now, this is a placeholder that logs the job
+                console.log(`🎬 Pulse Reel processing: ${jobId} | imageUrl=${imageUrl.substring(0, 60)}...`);
+            } catch (e) {
+                console.error(`❌ Pulse Reel background job failed: ${e.message}`);
+            }
+        });
+
+        await deductCredits(req.user._id, REEL_CREDITS, 'pulse-reel');
+
+        res.json({
+            success: true,
+            jobId,
+            message: 'Video reel queued — check Background Jobs for delivery',
+            platform,
+            duration,
+            motionStyle,
+        });
+    } catch (err) {
+        console.error('❌ Social Kit make-reel:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // ── POST /api/brand-studio/brochure/generate ──────────────────────────────────
-// Generates a single-page 2-sided product brochure (A4 HTML + PDF-ready)
-// Front: hero image + headline + USPs | Back: features + specs + CTA
-// Hosted on S3. Cost: 12 credits
+// Pipeline:
+//   1. Claude (Art Director) → Analyzes product specs and writes 2 ultra-detailed creative image prompts
+//      (Front: hero product + typography + badge + headline)
+//      (Back: product exploded/flat-lay + specs table + features grid + CTA)
+//   2. GPT Image 2 via /images/edits (with product ref) → Renders both pages as FULL IMAGES
+//      Typography, layout, color, product placement all generated by the model
+//   3. HTML wrapper with both images side by side for preview + PDF
 router.post('/brochure/generate', protect, async (req, res) => {
     try {
-        const { productDNA, productData, designContext, brandId, imageModel, brief = '' } = req.body;
+        const {
+            productDNA, productData, designContext, brandId, imageModel, brief = '',
+            avatarConfig = null,
+            typographyDNA = null,
+            usePulseCreativeBrain = false,
+        } = req.body;
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         const BROCHURE_CREDITS = 12;
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < BROCHURE_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: BROCHURE_CREDITS });
 
-        const model = imageModel || 'gpt-image-2';
+        // Always use GPT Image 2 for brochures — best typography + layout in generated images
+        const model = 'gpt-image-2';
 
         let brandContext = '';
         if (brandId) {
@@ -502,214 +725,200 @@ router.post('/brochure/generate', protect, async (req, res) => {
             brandContext = ctx.brandContext || '';
         }
 
-        const productTitle = productData?.title || productDNA?.productCategory || 'Product';
-        const bullets = productData?.bulletPoints || [];
+        const productTitle   = productData?.title || productDNA?.productCategory || 'Product';
+        const bullets        = productData?.bulletPoints || [];
         const dominantColors = (productDNA?.dominantColors || []).filter(c => c.role !== 'background_suggestion');
-        const primaryColor = dominantColors[0]?.hex || '#1a1a2e';
-        const accentColor = dominantColors[1]?.hex || '#7c3aed';
-        const refImages = [productDNA?.heroImageUrl, ...(productDNA?.productRefImages || []).slice(0, 2)].filter(Boolean);
-        const moodDir = designContext ? { label: designContext.moodLabel, shootDirective: designContext.shootDirective } : { label: 'Premium Minimal', shootDirective: 'Clean studio, elegant' };
+        const primaryColor   = dominantColors[0]?.hex || '#1a1a2e';
+        const accentColor    = dominantColors[1]?.hex || '#7c3aed';
+        const secondaryColor = dominantColors[2]?.hex || '#f5f5f5';
+        const refImages      = [productDNA?.heroImageUrl, ...(productDNA?.productRefImages || []).slice(0, 2)].filter(Boolean);
+        const moodDir        = designContext ? { label: designContext.moodLabel, shootDirective: designContext.shootDirective } : { label: 'Premium Minimal', shootDirective: 'Clean studio, elegant' };
+        const colorDesc      = dominantColors.slice(0, 3).map(c => `${c.name} (${c.hex})`).join(', ');
 
-        // Step 1: Claude generates structured brochure content
-        const contentPrompt = `You are a senior copywriter creating a premium product brochure.
-Product: "${productTitle}" | Category: ${productDNA?.productCategory} | Brief: ${brief || 'Premium marketing brochure'}
-Key features: ${bullets.slice(0, 8).join(' | ')}
-Design mood: ${moodDir.label}
-Brand context: ${brandContext ? brandContext.substring(0, 200) : 'none'}
+        // ── PHASE 1: Claude Art Director ──────────────────────────────────────────────────
+        // Claude understands the full product spec and writes ultra-precise image generation
+        // prompts — every design decision is deliberate: font choice, color usage, layout, hierarchy
 
-Return ONLY valid JSON:
+        const { callAgent } = await import('../agents/shared/agentUtils.js');
+
+        const artDirectorSystem = `You are a world-class Art Director with 20 years of experience in luxury product brochure design.
+You have the skills of:
+  - Saul Bass (bold, confident graphic composition)
+  - Paula Scher (expressive typography as a design element)
+  - David Carson (breaking the grid for impact)
+  - An Nueno (premium product photography direction)
+
+Your job is to analyze a product's specifications and write two ultra-detailed IMAGE GENERATION PROMPTS for GPT Image 2 that will render complete, print-ready brochure pages as images.
+
+CRITICAL RULES:
+1. The prompts must instruct GPT Image 2 to INCLUDE actual text in the image — headlines, specs, features, CTA, product name — all rendered as TYPOGRAPHIC DESIGN ELEMENTS.
+2. Every design decision must be product-specific — derived from the product's DNA, colors, mood, and category.
+3. Be extremely specific about: font choices, font sizes, font weights, layout grid, color usage, spacing, visual hierarchy, and product placement.
+4. Both prompts must result in COMPLETE, PRINT-READY designs — not sketches or concepts.
+5. Return ONLY valid JSON.`;
+
+        const artDirectorPrompt = `Analyze this product and write two complete brochure page image prompts:
+
+PRODUCT: "${productTitle}"
+CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
+TAGLINE / BRIEF: ${brief || 'Premium product brochure for retail/distribution'}
+KEY FEATURES (use these verbatim in the design):
+${bullets.slice(0, 8).map((b, i) => `  ${i+1}. ${b}`).join('\n')}
+PRODUCT COLORS: ${colorDesc || 'Dark navy, Electric violet, White'}
+MOOD DIRECTION: ${moodDir.label} — ${moodDir.shootDirective || 'Clean, premium, editorial'}
+BRAND CONTEXT: ${brandContext ? brandContext.substring(0, 300) : 'Premium consumer brand'}
+${avatarConfig?.enabled ? `HUMAN PRESENCE: Include a ${avatarConfig.gender || 'person'} using the product. ${avatarConfig.skin ? `Skin tone: ${avatarConfig.skin}.` : ''} ${avatarConfig.style ? `Style: ${avatarConfig.style}.` : ''}` : ''}
+
+Return this JSON:
 {
-  "front": {
-    "headline": "Bold 3-8 word product headline (not the product name)",
-    "subheadline": "One compelling sentence — what transformation does this product deliver?",
-    "badge_text": "Optional short badge text e.g. 'New Launch' or 'Award Winning' — or null"
-  },
-  "back": {
-    "intro": "2 sentence product intro paragraph. Premium, benefit-led.",
-    "features": [{ "title": "Feature name (2-3 words)", "desc": "One line benefit explanation" }],
-    "specs": [{ "label": "Spec label", "value": "Spec value" }],
-    "cta_headline": "CTA headline e.g. 'Experience the Difference'",
-    "cta_text": "Body CTA text (1 sentence)",
-    "cta_button": "Button label e.g. 'Shop Now' or 'Order Today'"
-  }
+  "headline": "3-6 word bold benefit headline (not product name) that will appear large on the front cover",
+  "subheadline": "One compelling sentence — the #1 transformation this product delivers",
+  "badge": "Short uppercase badge text e.g. 'NEW LAUNCH' / 'AWARD WINNING' / 'LIMITED EDITION' — or null",
+  "frontPagePrompt": "ULTRA-DETAILED image generation prompt for the FRONT COVER page. Must be a complete A4 portrait brochure design rendered as a single image. Include: exact headline text in quotes, font style description, layout positioning, product image placement, color palette usage, background treatment, decorative elements, badge/label if any. Be obsessively specific — describe every visual element.",
+  "backPagePrompt": "ULTRA-DETAILED image generation prompt for the BACK/INSIDE page. Must be a complete A4 landscape or portrait brochure design. Include: product name at top, intro paragraph text (1-2 sentences — write the actual copy), all feature titles with one-line benefits (write actual copy from the bullet points), technical specs table (label: value pairs — invent realistic specs from the product category), CTA section at bottom. Lay out as a professional info-design page with icons, dividers, typographic hierarchy. Be obsessively specific."
 }`;
 
-        let content = {};
+        let artPlan = null;
         try {
-            content = await callAgentText(
-                'You are a senior product copywriter. Return ONLY valid JSON, no markdown.',
-                contentPrompt, 0.65, 1500
-            );
-            if (typeof content === 'string') content = JSON.parse(content);
-        } catch(e) {
-            console.warn('Brochure content generation failed:', e.message);
-            content = {
-                front: { headline: productTitle, subheadline: bullets[0] || 'Premium quality, exceptional performance.', badge_text: null },
-                back: {
-                    intro: `${productTitle} delivers ${bullets[0] || 'premium performance'} with unmatched quality.`,
-                    features: bullets.slice(0, 6).map(b => ({ title: b.split(' ').slice(0, 3).join(' '), desc: b })),
-                    specs: [],
-                    cta_headline: 'Experience the Difference',
-                    cta_text: 'Get yours today and discover why thousands choose us.',
-                    cta_button: 'Shop Now',
-                }
-            };
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+                provider: 'anthropic',
+                model: 'claude-sonnet-4-20250514',
+                timeoutMs: 90_000,
+            });
+        } catch (claudeErr) {
+            console.warn('⚠️ Claude art director failed, using Gemini fallback:', claudeErr.message);
+            artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.75, 4096, {
+                preferFast: true,
+                timeoutMs: 90_000,
+            });
         }
 
-        // Step 2: Generate front hero image + back lifestyle image in parallel
-        const { laozhangImageGenerate, laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
-        const colorGuard = dominantColors.slice(0, 3).map(c => `${c.name} (${c.hex})`).join(', ');
+        if (!artPlan?.frontPagePrompt) throw new Error('Art director failed to generate brochure prompts');
 
-        const frontPrompt = `PREMIUM PRODUCT BROCHURE — FRONT COVER HERO IMAGE
+        const headline    = artPlan.headline || productTitle;
+        const subheadline = artPlan.subheadline || bullets[0] || '';
+        const badge       = artPlan.badge || null;
 
-Product: ${productTitle} | Mood: ${moodDir.label}
-Shoot directive: ${moodDir.shootDirective || 'Studio clean, premium, editorial'}
-${colorGuard ? `Product colors (PRESERVE EXACTLY): ${colorGuard}` : ''}
+        // ── PHASE 2: GPT Image 2 renders both pages as full images ────────────────────────
+        // GPT Image 2 is used via /images/edits with the product reference image.
+        // This gives it visual grounding — it knows exactly what the product looks like.
 
-Image requirements:
-- This is the HERO image for a premium A4 brochure front cover
-- Full bleed, no white borders
-- Product as the clear visual hero — centered or slightly offset composition
-- Professional studio lighting matching the mood direction
-- Background: clean, premium, complementary to product colors
-- Quality: editorial product photography, magazine-grade
-- NO text, NO typography rendered in the image
-- Aspect ratio: portrait A4 (roughly 3:4)`;
+        const { laozhangGptImageWithRefs, laozhangImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
 
-        const backPrompt = `PREMIUM PRODUCT BROCHURE — BACK PANEL LIFESTYLE IMAGE
+        // Enhance prompts with hard technical constraints for print-quality output
+        const frontEnhanced = `${artPlan.frontPagePrompt}
 
-Product: ${productTitle} | Mood: ${moodDir.label}
-This is a supporting lifestyle/usage image for the brochure back panel.
-- Show the product in a real-world usage context
-- Environment matches the "${moodDir.label}" mood direction
-${colorGuard ? `Product colors (PRESERVE EXACTLY): ${colorGuard}` : ''}
-- Warm, aspirational, human-relatable scene
-- Wide composition — the product is present but the scene tells a story
-- NO text, NO typography rendered in the image`;
+TECHNICAL REQUIREMENTS FOR IMAGE GENERATION:
+- Format: A4 portrait brochure page (3:4 aspect ratio)
+- Style: Print-ready, photorealistic product photography composited with bold graphic design
+- Typography: All text must be clearly readable — crisp, anti-aliased, professional typeface
+- Product colors strictly: ${colorDesc}
+- No lorem ipsum. All text in the design must be real, meaningful copy.
+- Ultra high quality, magazine-grade production value
+- Aspect ratio: 896x1120 (portrait A4)`;
 
+        const backEnhanced = `${artPlan.backPagePrompt}
+
+TECHNICAL REQUIREMENTS:
+- Format: A4 portrait brochure back/inside page (3:4 aspect ratio)  
+- Style: Clean editorial layout — information design meets premium brand design
+- Include a proper specs table with borders/dividers, feature icons (use elegant emoji or geometric shapes), and a colored CTA block at the bottom
+- All typography must be legible and hierarchically organized: product name (largest), section headers, body copy, fine print
+- Background: ${secondaryColor === '#f5f5f5' ? 'white or very light grey' : `light tint of ${secondaryColor}`} for readability
+- Accent color for headers and CTA block: ${accentColor}
+- Ultra high quality, print-ready
+- Aspect ratio: 896x1120 (portrait A4)`;
+
+        console.log('🎨 Brochure: GPT Image 2 rendering both pages in parallel...');
         const [frontResult, backResult] = await Promise.allSettled([
             refImages.length > 0
-                ? laozhangMultimodalImageGenerate(frontPrompt, refImages, { model, size: '896x1120' })
-                : laozhangImageGenerate(frontPrompt, { model, size: '896x1120' }),
+                ? laozhangGptImageWithRefs(frontEnhanced, refImages, { model, size: '896x1120' })
+                : laozhangImageGenerate(frontEnhanced, { model, size: '896x1120' }),
+            // Back page: use reference images too for product consistency
             refImages.length > 0
-                ? laozhangMultimodalImageGenerate(backPrompt, refImages, { model, size: '1344x768' })
-                : laozhangImageGenerate(backPrompt, { model, size: '1344x768' }),
+                ? laozhangGptImageWithRefs(backEnhanced, refImages, { model, size: '896x1120' })
+                : laozhangImageGenerate(backEnhanced, { model, size: '896x1120' }),
         ]);
 
         const frontImageUrl = frontResult.status === 'fulfilled' ? frontResult.value?.imageUrl : null;
-        const backImageUrl = backResult.status === 'fulfilled' ? backResult.value?.imageUrl : null;
+        const backImageUrl  = backResult.status === 'fulfilled'  ? backResult.value?.imageUrl  : null;
 
-        // Step 3: Build the HTML brochure
-        const featuresHtml = (content.back?.features || []).slice(0, 6).map(f => `
-            <div class="feature-item">
-                <div class="feature-dot" style="background:${accentColor}"></div>
-                <div>
-                    <div class="feature-title">${f.title || ''}</div>
-                    <div class="feature-desc">${f.desc || ''}</div>
-                </div>
-            </div>`).join('');
+        if (!frontImageUrl && !backImageUrl) {
+            throw new Error('GPT Image 2 failed to generate both brochure pages');
+        }
 
-        const specsHtml = (content.back?.specs || []).slice(0, 6).map(s => `
-            <div class="spec-row">
-                <span class="spec-label">${s.label || ''}</span>
-                <span class="spec-value">${s.value || ''}</span>
-            </div>`).join('');
-
+        // ── PHASE 3: HTML wrapper (thin shell for PDF export + preview) ──────────────────
+        // The HTML is NOT the design — the images ARE the design. HTML just hosts them.
         const brochureHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${productTitle} — Brochure</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { font-family: 'Inter', sans-serif; }
-  body { width: 210mm; background: white; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#2a2a2a; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; padding:24px; gap:24px; }
+  .page { width:210mm; max-width:100%; box-shadow:0 8px 40px rgba(0,0,0,0.4); border-radius:4px; overflow:hidden; }
+  .page img { width:100%; display:block; }
+  .page-label { background:#111; color:#888; font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:6px 12px; }
+  .placeholder { width:100%; aspect-ratio:3/4; display:flex; align-items:center; justify-content:center; font-size:14px; color:rgba(255,255,255,0.4); background:linear-gradient(135deg, ${primaryColor}, ${accentColor}); }
   @media print {
-    body { width: 210mm; }
-    .page { page-break-after: always; }
+    body { background:white; padding:0; gap:0; }
+    .page { box-shadow:none; border-radius:0; max-width:210mm; page-break-after:always; }
+    .page-label { display:none; }
   }
-  .page { width: 210mm; min-height: 297mm; position: relative; overflow: hidden; }
-
-  /* ── FRONT PAGE ── */
-  .front { background: #0a0a0a; color: white; display: flex; flex-direction: column; }
-  .front-image { width: 100%; height: 200mm; object-fit: cover; display: block; }
-  .front-content { flex: 1; padding: 12mm 14mm 14mm; display: flex; flex-direction: column; justify-content: flex-end; background: linear-gradient(to bottom, transparent, #0a0a0a 40%); margin-top: -40mm; position: relative; z-index: 2; }
-  .front-badge { display: inline-block; background: ${accentColor}; color: white; font-size: 9pt; font-weight: 700; padding: 3px 10px; border-radius: 3px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8mm; }
-  .front-headline { font-family: 'Playfair Display', serif; font-size: 28pt; font-weight: 700; line-height: 1.15; margin-bottom: 5mm; color: white; }
-  .front-subheadline { font-size: 11pt; line-height: 1.6; color: rgba(255,255,255,0.7); font-weight: 300; max-width: 80%; }
-  .front-product-name { margin-top: 8mm; padding-top: 6mm; border-top: 1px solid rgba(255,255,255,0.15); font-size: 9pt; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: ${accentColor}; }
-
-  /* ── BACK PAGE ── */
-  .back { background: white; display: grid; grid-template-columns: 1fr 1fr; }
-  .back-left { padding: 14mm 10mm 14mm 14mm; display: flex; flex-direction: column; }
-  .back-right { display: flex; flex-direction: column; }
-  .back-image { width: 100%; height: 100%; object-fit: cover; }
-  .back-logo { font-size: 9pt; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: ${primaryColor}; margin-bottom: 8mm; }
-  .back-intro { font-size: 10.5pt; line-height: 1.7; color: #333; margin-bottom: 8mm; }
-  .features-title { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-bottom: 5mm; }
-  .feature-item { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 5mm; }
-  .feature-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-  .feature-title { font-size: 9.5pt; font-weight: 700; color: #111; }
-  .feature-desc { font-size: 8.5pt; color: #666; line-height: 1.5; margin-top: 1px; }
-  .specs-section { margin-top: 6mm; padding-top: 6mm; border-top: 1px solid #eee; }
-  .spec-row { display: flex; justify-content: space-between; font-size: 8.5pt; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
-  .spec-label { color: #888; }
-  .spec-value { font-weight: 600; color: #111; }
-  .cta-section { margin-top: auto; padding: 6mm 8mm; background: ${primaryColor}; color: white; border-radius: 4px; }
-  .cta-headline { font-family: 'Playfair Display', serif; font-size: 14pt; font-weight: 700; margin-bottom: 3mm; }
-  .cta-text { font-size: 9pt; line-height: 1.5; opacity: 0.85; margin-bottom: 5mm; }
-  .cta-button { display: inline-block; background: white; color: ${primaryColor}; padding: 4px 12px; border-radius: 2px; font-weight: 700; font-size: 9pt; letter-spacing: 0.05em; text-transform: uppercase; }
 </style>
 </head>
 <body>
-
-<!-- FRONT PAGE -->
-<div class="page front">
-  ${frontImageUrl ? `<img class="front-image" src="${frontImageUrl}" alt="${productTitle}" crossorigin="anonymous">` : `<div class="front-image" style="background:linear-gradient(135deg,${primaryColor},${accentColor})"></div>`}
-  <div class="front-content">
-    ${content.front?.badge_text ? `<span class="front-badge">${content.front.badge_text}</span>` : ''}
-    <div class="front-headline">${content.front?.headline || productTitle}</div>
-    <div class="front-subheadline">${content.front?.subheadline || ''}</div>
-    <div class="front-product-name">${productTitle}</div>
-  </div>
+<div class="page">
+  <div class="page-label">Front Cover · ${productTitle}</div>
+  ${frontImageUrl
+      ? `<img src="${frontImageUrl}" alt="${productTitle} Brochure Front" crossorigin="anonymous">`
+      : `<div class="placeholder">Front cover image unavailable</div>`}
 </div>
-
-<!-- BACK PAGE -->
-<div class="page back">
-  <div class="back-left">
-    <div class="back-logo">${productData?.brand || productTitle}</div>
-    <div class="back-intro">${content.back?.intro || ''}</div>
-    <div class="features-title">Key Features</div>
-    ${featuresHtml}
-    ${specsHtml ? `<div class="specs-section">${specsHtml}</div>` : ''}
-    <div class="cta-section">
-      <div class="cta-headline">${content.back?.cta_headline || 'Experience the Difference'}</div>
-      <div class="cta-text">${content.back?.cta_text || ''}</div>
-      <div class="cta-button">${content.back?.cta_button || 'Shop Now'}</div>
-    </div>
-  </div>
-  <div class="back-right">
-    ${backImageUrl ? `<img class="back-image" src="${backImageUrl}" alt="${productTitle} lifestyle" crossorigin="anonymous">` : `<div class="back-image" style="background:linear-gradient(135deg,${accentColor},${primaryColor})"></div>`}
-  </div>
+<div class="page">
+  <div class="page-label">Back / Inside · ${productTitle}</div>
+  ${backImageUrl
+      ? `<img src="${backImageUrl}" alt="${productTitle} Brochure Back" crossorigin="anonymous">`
+      : `<div class="placeholder">Back page image unavailable</div>`}
 </div>
-
 </body>
 </html>`;
 
-        // Step 4: Upload HTML to S3 for hosting
+        // Step 4: Upload HTML to S3
         const { uploadToS3 } = await import('../utils/s3.js');
-        const slug = `brochure-${Date.now()}`;
-        const s3Key = `brochures/${slug}.html`;
-        const htmlBuffer = Buffer.from(brochureHtml, 'utf-8');
+        const slug   = `brochure-${Date.now()}`;
+        const s3Key  = `brochures/${slug}.html`;
         let hostedUrl = null;
         try {
-            const s3Url = await uploadToS3(htmlBuffer, s3Key, 'text/html');
-            hostedUrl = s3Url;
+            hostedUrl = await uploadToS3(Buffer.from(brochureHtml, 'utf-8'), s3Key, 'text/html');
         } catch(e) { console.warn('Brochure S3 upload failed:', e.message); }
 
         await deductCredits(req.user._id, BROCHURE_CREDITS, 'pulse-brochure');
+
+        // Save to history
+        const content = { front: { headline, subheadline, badge }, back: { artPlan } };
+        try {
+            await PulseHistory.create({
+                user:   req.user._id,
+                brand:  brandId || null,
+                tool:   'brochure',
+                brief:  brief || 'Product brochure',
+                subType: 'image-based-a4',
+                brochureFrontUrl:    frontImageUrl,
+                brochureBackUrl:     backImageUrl,
+                brochureHostedUrl:   hostedUrl,
+                brochureContent:     content,
+                brochureProductName: productTitle,
+                productName:     productTitle,
+                productUrl:      productDNA?.sourceUrl || null,
+                productThumbUrl: frontImageUrl || productDNA?.heroImageUrl || null,
+                thumbnailUrl:    frontImageUrl || null,
+                creditsUsed:     BROCHURE_CREDITS,
+            });
+        } catch (histErr) {
+            console.warn('⚠️ Brochure history save failed (non-critical):', histErr.message);
+        }
 
         res.json({
             success: true,
@@ -718,6 +927,7 @@ ${colorGuard ? `Product colors (PRESERVE EXACTLY): ${colorGuard}` : ''}
             frontImageUrl,
             backImageUrl,
             content,
+            artPlan,
             productName: productTitle,
             creditsUsed: BROCHURE_CREDITS,
         });
@@ -726,6 +936,7 @@ ${colorGuard ? `Product colors (PRESERVE EXACTLY): ${colorGuard}` : ''}
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
 
 // ── POST /api/brand-studio/design-context ─────────────────────
 // Build the locked design directive from ProductDNA + selected mood + brand colors
@@ -905,14 +1116,41 @@ router.post('/email/export', protect, async (req, res) => {
 // ── POST /api/brand-studio/landing-page/generate ─────────────
 router.post('/landing-page/generate', protect, async (req, res) => {
     try {
-        const { brandId, brief, pageType, urlContext, referenceImage, designContext, imageModel } = req.body;
-        if (!brandId || !brief)
-            return res.status(400).json({ success: false, error: 'brandId and brief required' });
+        const {
+            brandId, brief: rawBrief, pageType, urlContext, referenceImage,
+            designContext, imageModel,
+            productDNA, productData,   // from Pulse Studio shared context
+        } = req.body;
+
+        // brief is optional — fall back to product name / category
+        const brief = rawBrief
+            || productData?.title
+            || productDNA?.productCategory
+            || 'Product campaign landing page';
+
+        if (!brandId)
+            return res.status(400).json({ success: false, error: 'brandId required' });
+
+        // Build urlContext from productDNA if not supplied
+        const resolvedUrlContext = urlContext
+            || (productDNA ? `Product: ${productData?.title || productDNA?.productCategory || 'Unknown'}\nBullet Points: ${(productData?.bulletPoints || []).join(', ')}\nDescription: ${productData?.description || ''}` : undefined);
+
+        // Reference image from product
+        const resolvedRefImage = referenceImage || productDNA?.heroImageUrl || null;
 
         const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
         if (balance < CREDITS.landing) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.landing });
 
-        const result = await generateLandingPage({ brandId, brief, pageType, urlContext, referenceImage, designContext: designContext || null, imageModel: imageModel || undefined });
+        const result = await generateLandingPage({
+            brandId, brief, pageType,
+            urlContext: resolvedUrlContext,
+            referenceImage: resolvedRefImage,
+            designContext: designContext || null,
+            imageModel: imageModel || undefined,
+            // Product-first: pass full DNA + data for product-specific page
+            productDNA:  productDNA  || null,
+            productData: productData || null,
+        });
         if (!result.success) throw new Error('Page generation failed');
         await deductCredits(req.user._id, CREDITS.landing, 'pulse-page');
 

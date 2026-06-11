@@ -37,12 +37,12 @@ export default function Landing() {
         <>
             <SEOHead
                 title="Mantram AI — Agentic AI Marketing OS for D2C Brands & Agencies"
-                description="Mantram AI is an agentic AI marketing operating system. 14 studios learn your Brand DNA once, then plan, create, distribute and optimise — powered by Claude 4.6, Gemini 3, GPT Image 2, Veo 3.1, Sora 2, NanoBanana 2 and more."
+                description="Mantram AI is an agentic marketing OS: 14 AI studios sharing one Brand DNA. Multilingual — English, Hindi, Arabic, Bahasa, Vietnamese. Credits from ₹149."
                 canonical="/"
                 ogTitle="Mantram AI — Agentic AI Marketing OS"
-                ogDescription="14 AI studios. One Brand DNA. Agentic pipelines that plan, create, distribute and optimise — powered by frontier AI models."
+                ogDescription="Mantram AI is an agentic marketing OS: 14 AI studios sharing one Brand DNA. Multilingual — English, Hindi, Arabic, Bahasa, Vietnamese. Credits from ₹149."
                 ogImage="https://mantram.ai/mantram-logo.png"
-                aiSummary="Mantram AI is an agentic AI marketing operating system with 14 studios — Research, Brainstorm, Monthly Strategy, Content, Creative, Video, YouTube, Avatar, Brand, Social Media, Performance Marketing, Funnel, SEO, Retention. Brand DNA captured from a website scan is shared across all studios. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, HeyGen Avatars. Currently in early access (no free tier, credit-pack pricing from ₹149)."
+                aiSummary="Mantram AI is an agentic AI marketing operating system that learns a brand's DNA once and runs planning, content, creative, video, distribution and optimisation through 14 specialised AI studios — built in India for D2C brands and agencies across South Asia, Southeast Asia and the Middle East. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Flux Kontext Max, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, Hailuo, Wan 2.1, HeyGen. Credit-pack pricing from ₹149, no subscription. DPDP compliant, GDPR-aware."
             />
 
             <div className="relative" style={{ background: '#0b0b0c', color: 'white' }}>

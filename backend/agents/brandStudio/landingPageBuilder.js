@@ -1,11 +1,23 @@
 /**
- * Pulse Page — Interactive Campaign Landing Page Builder
+ * Pulse Landing Page Builder v3 — Product-First Edition
  *
- * Intelligence Stack:
- *   MCP market research → Claude Opus creative director
- *   → NanoBanana 2 images → GSAP + Lenis + Chart.js HTML
- *   → S3 host + Shopify publish + embed code
+ * Produces a premium, interactive, parallax product landing page from ProductDNA.
+ *
+ * Pipeline:
+ *   1. Build rich product context from productDNA + productData (NOT brand-generic)
+ *   2. Gemini 2.5 Flash writes the structured JSON plan (cheap + fast, great at JSON)
+ *   3. Generate 2 AI lifestyle images using product colors + mood directive
+ *   4. Assemble interactive HTML: parallax hero with actual product image,
+ *      GSAP scroll reveals, animated counters, sticky nav, FAQ accordion, CTA
+ *   5. Upload to S3 and return hosted URL
+ *
+ * Design philosophy:
+ *   - Hero always shows the REAL product image (from productDNA.heroImageUrl)
+ *   - Generated AI images are LIFESTYLE/CONTEXT images (not product duplicates)
+ *   - All colors come from productDNA.dominantColors (the actual product palette)
+ *   - Typography from brandColorEngine personality detection
  */
+
 import { v4 as uuidv4 } from 'uuid';
 import { callAgent, loadBrandContext } from '../shared/agentUtils.js';
 import { callMcpToolsParallel } from '../../mcp/registry.js';
@@ -14,556 +26,978 @@ import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import fetch from 'node-fetch';
 
-const CLAUDE_OPUS = 'claude-sonnet-4-20250514';
+// ── Model routing: Gemini 2.5 Flash for copy (cheap, fast, excellent JSON), Gemini for images
+const COPY_MODEL_OPTS = { preferFast: true, timeoutMs: 120_000 };
 
-// ── Fixed Sections Scaffold ────────────────────────────────────────
+// ── Build rich product context block from PDI output ──────────────────
+function buildProductContext(productDNA = {}, productData = {}, designContext = {}) {
+    const lines = [];
 
-const SECTION_TEMPLATE = [
-    { id: 'sec_hero', type: 'hero' },
-    { id: 'sec_problem', type: 'problem' },
-    { id: 'sec_solution', type: 'solution' },
-    { id: 'sec_features', type: 'features' },
-    { id: 'sec_stats', type: 'stats' },
-    { id: 'sec_proof', type: 'social_proof' },
-    { id: 'sec_how', type: 'how_it_works' },
-    { id: 'sec_faq', type: 'faq' },
-    { id: 'sec_cta', type: 'cta_final' },
-];
+    const name = productData?.title || productDNA?.productCategory || 'This Product';
+    lines.push(`PRODUCT NAME: ${name}`);
 
-// ── Phase 1: MCP Market Intelligence ──────────────────────────
-async function gatherIntelligence(brief, brandId) {
+    if (productDNA?.productCategory) lines.push(`CATEGORY: ${productDNA.productCategory}`);
+    if (productData?.description)    lines.push(`DESCRIPTION: ${productData.description?.substring(0, 400)}`);
+
+    const bullets = productData?.bulletPoints || [];
+    if (bullets.length) {
+        lines.push(`KEY FEATURES & BENEFITS:`);
+        bullets.slice(0, 10).forEach(b => lines.push(`  • ${b}`));
+    }
+
+    const colors = (productDNA?.dominantColors || [])
+        .filter(c => c.role !== 'background_suggestion')
+        .slice(0, 4);
+    if (colors.length) {
+        lines.push(`PRODUCT COLORS: ${colors.map(c => `${c.name} (${c.hex})`).join(', ')}`);
+    }
+
+    if (designContext?.moodLabel)      lines.push(`VISUAL MOOD: ${designContext.moodLabel}`);
+    if (designContext?.shootDirective) lines.push(`SHOOT DIRECTIVE: ${designContext.shootDirective}`);
+
+    if (productData?.price) lines.push(`PRICE: ${productData.price}`);
+    if (productData?.brand) lines.push(`BRAND: ${productData.brand}`);
+
+    const extras = productData?.additionalInfo || productDNA?.usageMoments;
+    if (extras) lines.push(`USAGE CONTEXT: ${JSON.stringify(extras).substring(0, 200)}`);
+
+    return lines.join('\n');
+}
+
+// ── Phase 1: Quick trend scan (non-blocking) ──────────────────────────
+async function gatherIntelligence(productName, brandId) {
     try {
         const results = await callMcpToolsParallel([
-            { tool: 'web_search', args: { query: `${brief} market trends 2026`, mode: 'quick' } },
-            { tool: 'fetch_trending', args: { brandId } },
+            { tool: 'web_search', args: { query: `${productName} best product landing page trends 2026`, mode: 'quick' } },
         ]);
         const snippets = results['web_search']?.data?.results
-            ?.slice(0, 3).map(r => `• ${r.title}: ${r.snippet}`).join('\n') || '';
-        const trending = results['fetch_trending']?.data?.trending
-            ?.slice(0, 3).map(t => `• ${t.topic}: ${t.description}`).join('\n') || '';
-        return { marketContext: snippets, trending, hasIntel: !!(snippets || trending) };
+            ?.slice(0, 2).map(r => `• ${r.title}: ${r.snippet}`).join('\n') || '';
+        return snippets;
     } catch {
-        return { marketContext: '', trending: '', hasIntel: false };
+        return '';
     }
 }
 
-// ── Phase 2: Claude Creative Director ─────────────────────────
-const PAGE_SYSTEM = (brandContext, intel, urlContext) => `You are a world-class strategic copywriter.
-Your job is to write compelling, conversion-focused copy for a campaign landing page.
+// ── Phase 2: Gemini 2.5 Flash content planner ─────────────────────────
+const PAGE_SYSTEM = (productCtx, brandContext, trendSnippets) =>
+`You are an elite product copywriter and conversion strategist. You write for e-commerce and D2C brands.
+
+MISSION: Write a high-converting, benefit-led product landing page in JSON. Every word must be about THIS SPECIFIC PRODUCT — not the brand, not generic values.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRODUCT CONTEXT (use every detail):
+${productCtx}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BRAND CONTEXT (style/voice reference only):
+${brandContext?.substring(0, 600) || 'Use premium, professional style.'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${trendSnippets ? `LIVE TRENDS:\n${trendSnippets}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 CRITICAL RULES:
-1. You will receive predefined section IDs. You must fill each ID with real content.
-2. NEVER output colors, fonts, layouts, animations, or any visual CSS/style parameters. We have a strict design system for that.
-3. Every "headline" MUST be max 8 words, action-first.
-4. Every "body" MUST be max 50 words, benefit-led.
-5. Provide realistic content for stats, testimonials, features, and faqs.
-6. The "imagePrompt" describes the exact visual. Be highly creative based on the product! For tech, describe macro circuits or UI interfaces; for supplements, infographics; for consumers, lifestyle setups. It is OK to request text or charts in the visual.
+1. ALL copy must be PRODUCT-specific — reference actual features, benefits, use cases.
+2. Hero headline MUST name a concrete benefit (not the brand name).
+3. Features must come from the product's actual bullet points.
+4. Stats must be realistic and product-specific.
+5. Testimonials must reference the product's specific use case.
+6. imagePrompt: Describe a lifestyle scene showing the product in use. Be VERY specific about the product's appearance, color, and the user/scene. This is sent to an image generator.
+7. Return ONLY valid JSON — no markdown, no comments.
 
-BRAND CONTEXT:
-${brandContext}
-${intel.hasIntel ? `\nLIVE MARKET INTELLIGENCE:\n${intel.marketContext}\nTrending: ${intel.trending}` : ''}
-${urlContext ? `\nPRODUCT/CAMPAIGN DATA:\n${urlContext}` : ''}
-
-JSON SCHEMA (Return exactly this structure with filled content):
+JSON SCHEMA (fill every field with real, product-specific content):
 {
-  "pageStrategy": {
-    "coreMessage": "Core message",
-    "emotionalJourney": "Emotion A to B",
-    "conversionGoal": "Desired action",
-    "uniqueAngle": "Differentiator"
-  },
   "seo": {
-    "title": "Page title — 50-60 chars",
-    "description": "Meta description — 120-160 chars",
-    "slug": "url-friendly-slug-for-this-page"
+    "title": "Product name — 5-word benefit headline | Brand",
+    "description": "120-char meta description about the product",
+    "slug": "product-name-slug"
   },
-  "sections": [
-    {
-      "id": "sec_hero",
-      "headline": "Real headline",
-      "body": "Real body",
-      "ctaPrimary": "Primary CTA text",
-      "ctaSecondary": "Secondary CTA text",
-      "imagePosition": "right", // left, right, background, or none
-      "imagePrompt": "Commercial photography prompt..."
-    },
-    {
-      "id": "sec_problem",
-      "headline": "...",
-      "body": "..."
-    },
-    {
-      "id": "sec_solution",
-      "headline": "...",
-      "body": "...",
-      "items": [
-         { "icon": "✓", "title": "...", "description": "..." } // max 3
-      ],
-      "cta": "...",
-      "imagePrompt": "..."
-    },
-    {
-      "id": "sec_features",
-      "headline": "...",
-      "body": "...",
-      "items": [
-         { "icon": "emoji", "title": "...", "description": "..." } // exactly 3
-      ]
-    },
-    {
-      "id": "sec_stats",
-      "headline": "...",
-      "stats": [
-         { "number": "10000", "label": "Label", "prefix": "", "suffix": "+" } // 3 to 4
-      ],
-      "hasChart": false
-    },
-    {
-      "id": "sec_proof",
-      "headline": "...",
-      "testimonials": [
-         { "quote": "...", "author": "Name", "role": "Title", "rating": 5 } // 2 to 3
-      ]
-    },
-    {
-      "id": "sec_how",
-      "headline": "...",
-      "body": "...",
-      "items": [
-         { "title": "Step 1", "description": "..." } // 3 to 4
-      ]
-    },
-    {
-      "id": "sec_faq",
-      "headline": "...",
-      "faqs": [
-         { "question": "...", "answer": "..." } // 3 to 4
-      ]
-    },
-    {
-      "id": "sec_cta",
-      "headline": "...",
-      "body": "...",
-      "cta": "..."
-    }
-  ]
+  "hero": {
+    "eyebrow": "Short category label (e.g. 'Premium Wireless Audio')",
+    "headline": "Powerful 6-8 word benefit headline",
+    "subheadline": "One compelling sentence — the #1 transformation this product delivers",
+    "ctaPrimary": "Buy Now / Shop Now / Get Yours",
+    "ctaSecondary": "Learn More / See How It Works",
+    "socialProofLine": "e.g. '10,000+ happy customers · Free delivery · 30-day returns'"
+  },
+  "problemSection": {
+    "headline": "The problem this product solves (6-8 words)",
+    "body": "2-sentence empathy statement about the customer's pain point",
+    "painPoints": ["Pain 1", "Pain 2", "Pain 3"]
+  },
+  "featuresSection": {
+    "headline": "Why [Product] is different",
+    "features": [
+      { "icon": "🎯", "title": "Feature name", "body": "1-sentence benefit explanation" }
+    ]
+  },
+  "statsSection": {
+    "headline": "The numbers speak for themselves",
+    "stats": [
+      { "number": "10000", "suffix": "+", "label": "Happy Customers" },
+      { "number": "4.9", "suffix": "★", "label": "Average Rating" },
+      { "number": "30", "suffix": " Days", "label": "Money-Back Guarantee" }
+    ]
+  },
+  "howItWorks": {
+    "headline": "How [Product] works",
+    "steps": [
+      { "title": "Step name", "body": "What happens in this step" }
+    ]
+  },
+  "testimonials": [
+    { "quote": "Specific quote about using the product", "author": "First Name L.", "role": "Verified Buyer", "rating": 5, "highlight": "Key phrase to bold" }
+  ],
+  "faq": [
+    { "question": "Product-specific question", "answer": "Clear, specific answer" }
+  ],
+  "cta": {
+    "headline": "Final benefit-led CTA headline",
+    "body": "1-sentence urgency or value statement",
+    "button": "CTA button text",
+    "guarantee": "e.g. '30-day money-back guarantee · Free shipping'"
+  },
+  "lifestyleImagePrompt": "Detailed scene: a [person description] using [describe the product's color, shape, material] in [specific environment]. [Lighting]. [Mood]. Editorial product photography, cinematic, 8K.",
+  "contextImagePrompt": "Close-up detail shot of [product specific feature/texture/detail], [lighting], macro photography, studio quality."
 }`;
 
-// ── Phase 3: Image Generation ──────────────────────────────────
-function buildBrandImagePrompt(basePrompt, type, brandContext, tokens, designContext) {
-    if (!basePrompt) return null;
-    let style = "contemporary premium aesthetic.";
-    if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout.";
-    if (brandContext.toLowerCase().match(/bold|energetic|sport|fitness/)) style = "high energy, bold graphic, Nike campaign.";
-    if (tokens?.colors?.primary) style += ` Use a prominent color accent matching the hex code ${tokens.colors.primary} in the composition.`;
-    
-    // Add explicitly calculated style DNA
-    style += ` Strictly follow this brand ethos: ${brandContext.substring(0, 150).replace(/\n/g, ' ')}`;
-    
-    // PDI Color Guard & Mood injection
-    if (designContext?.colorGuardHex?.length) {
-        style += ` STRICT COLOR GUARD: Preserve exactly these product hex colors: ${designContext.colorGuardHex.join(', ')}. Do NOT alter product color under any circumstances.`;
-    }
-    if (designContext?.moodLabel) {
-        style += ` Visual mood directive: ${designContext.moodLabel}. ${designContext.shootDirective || ''}`;
-    }
-
-    if (type === 'hero' || type === 'background') {
-        return `${basePrompt}, cinematic lighting, photorealistic, 8k resolution. ${style}`;
-    } else {
-        return `${basePrompt}, clean three-point studio lighting, commercial grade product quality, ultra sharp. ${style}`;
-    }
-}
-
-async function generatePageImages(plan, brandContext, referenceImage, tokens, designContext, imageModel) {
+// ── Phase 3: Generate only LIFESTYLE images (hero uses real product image) ──
+async function generateLifestyleImages(plan, productDNA, designContext, imageModel) {
     const model = imageModel || 'gemini-3.1-flash-image-preview';
-    const tasks = [];
-    for (const s of (plan.sections || [])) {
-        if (!s.imagePrompt) continue;
-        const size = s.id === 'sec_hero' ? '1792x1024' : '1024x768';
-        const finalPrompt = buildBrandImagePrompt(s.imagePrompt, s.id === 'sec_hero' ? 'hero' : 'product', brandContext, tokens, designContext);
-        
-        tasks.push({
-            key: s.id,
-            prompt: finalPrompt,
-            size,
-        });
-    }
+    const refImages = [
+        productDNA?.heroImageUrl,
+        ...(productDNA?.productRefImages || []).slice(0, 2)
+    ].filter(Boolean);
 
-    console.log(`🌐 Generating ${tasks.length} images via NanoBanana 2...`);
+    const colorGuard = (productDNA?.dominantColors || [])
+        .filter(c => c.role !== 'background_suggestion')
+        .slice(0, 3)
+        .map(c => `${c.name} (${c.hex})`).join(', ');
+
+    const moodEnhancer = designContext?.moodLabel
+        ? `. Visual mood: ${designContext.moodLabel}. ${designContext.shootDirective || ''}`
+        : '';
+
+    const prompts = [
+        {
+            key: 'lifestyle',
+            prompt: `${plan.lifestyleImagePrompt || 'Person enjoying the product in a premium lifestyle setting'}${moodEnhancer}${colorGuard ? `. Product colors visible: ${colorGuard}` : ''}. Editorial photography, cinematic lighting, ultra-realistic, 8K. NO text overlays.`,
+            size: '1792x1024',
+        },
+        {
+            key: 'context',
+            prompt: `${plan.contextImagePrompt || 'Premium product detail shot on elegant surface'}${moodEnhancer}${colorGuard ? `. Product colors: ${colorGuard}` : ''}. Studio lighting, macro photography, magazine quality. NO text overlays.`,
+            size: '1024x1024',
+        },
+    ];
+
+    console.log(`🎨 Landing Page: generating ${prompts.length} lifestyle images...`);
     const results = await Promise.allSettled(
-        tasks.map(async ({ key, prompt, size }) => {
-            if (referenceImage) {
-                const r = await laozhangMultimodalImageGenerate(prompt, [referenceImage], { model, size });
+        prompts.map(async ({ key, prompt, size }) => {
+            try {
+                const r = refImages.length > 0
+                    ? await laozhangMultimodalImageGenerate(prompt, refImages, { model, size })
+                    : await laozhangImageGenerate(prompt, { model, size });
                 return { key, url: r?.imageUrl || null };
-            } else {
-                const r = await laozhangImageGenerate(prompt, { model, size });
-                return { key, url: r?.imageUrl || null };
+            } catch (e) {
+                console.warn(`⚠️ Image gen failed for ${key}:`, e.message);
+                return { key, url: null };
             }
         })
     );
 
     const images = {};
     for (const r of results) {
-        if (r.status === 'fulfilled' && r.value.url) images[r.value.key] = r.value.url;
+        if (r.status === 'fulfilled' && r.value?.url) {
+            images[r.value.key] = r.value.url;
+        }
     }
     return images;
 }
 
-// ── Phase 4: HTML Assembly (Agency Grade Design) ────────────────
+// ── Phase 4: Premium Product HTML Builder ─────────────────────────────
+function buildProductHTML(plan, productDNA, productData, images, tokens, slug) {
+    const { colors, fonts, radius, shadows } = tokens;
+    const productName = productData?.title || productDNA?.productCategory || 'Product';
+    const productHeroImage = productDNA?.heroImageUrl || null;
 
-function buildInteractiveHTML(plan, images, tokens, brandId, slug) {
-    const { colors, fonts, spacing, radius, shadows } = tokens;
+    // Product gallery images (all PDI-extracted images)
+    const productGallery = [
+        productDNA?.heroImageUrl,
+        ...(productDNA?.productRefImages || []).slice(0, 4),
+    ].filter(Boolean);
 
-    const buildHero = (s) => `
-    <section id="${s.id}" class="hero-section" style="background:${colors.heroBackground};min-height:100vh;position:relative;overflow:hidden">
-      ${images[s.id] && s.imagePosition === 'background' ? `
-        <div style="position:absolute;inset:0;z-index:0;overflow:hidden">
-          <img id="hero-bg-img" src="${images[s.id]}" style="width:100%;height:120%;object-fit:cover;opacity:0.35" data-parallax="0.3"/>
-        </div>
-        <div style="position:absolute;inset:0;z-index:1;background:linear-gradient(135deg, ${colors.heroBackground} 40%, transparent 100%)"></div>` : ''}
-      
-      <div class="container" style="position:relative;z-index:2;display:grid;grid-template-columns:${images[s.id] && s.imagePosition === 'right' ? '1fr 1fr' : '1fr'};gap:64px;align-items:center;min-height:100vh">
-        <div class="reveal">
-          <div style="display:inline-flex;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:${radius.pill};padding:6px 18px;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${colors.heroText};margin-bottom:28px">
-            ✦ INTRODUCING
-          </div>
-          <h1 id="hero-headline" style="color:${colors.heroText}">${s.headline || ''}</h1>
-          <p id="hero-body" style="color:${colors.heroText};opacity:0.85;max-width:540px">${s.body || ''}</p>
-          <div id="hero-ctas" style="display:flex;gap:16px;flex-wrap:wrap">
-            <a href="#cta" class="btn btn-primary" style="background:${colors.heroCta};color:${colors.heroCtaText}">${s.ctaPrimary || 'Get Started'}</a>
-            ${s.ctaSecondary ? `<a href="#features" class="btn btn-ghost" style="border:2px solid rgba(255,255,255,0.35);color:${colors.heroText}">${s.ctaSecondary}</a>` : ''}
-          </div>
-        </div>
-        ${images[s.id] && s.imagePosition === 'right' ? `
-        <div class="reveal-right" style="position:relative">
-          <img src="${images[s.id]}" style="width:100%;border-radius:${radius.image};box-shadow:${shadows.image};object-fit:cover" />
-          <div style="position:absolute;bottom:-24px;left:-24px;background:#FFFFFF;border-radius:${radius.card};padding:16px 24px;box-shadow:${shadows.card};display:flex;gap:12px;align-items:center">
-             <div style="font-size:28px;font-weight:800;color:${colors.accent}">1.0</div>
-             <div style="font-size:13px;color:${colors.textLight}">Launch<br/>Edition</div>
-          </div>
-        </div>` : ''}
-      </div>
-      
-      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;opacity:0.6">
-         <span style="font-size:11px;letter-spacing:3px;color:${colors.heroText};text-transform:uppercase">SCROLL</span>
-         <div id="scroll-dot" style="width:6px;height:32px;border-radius:3px;background:${colors.heroText}"></div>
-      </div>
-    </section>`;
+    const features = (plan.featuresSection?.features || []).slice(0, 6);
+    const stats = plan.statsSection?.stats || [];
+    const steps = plan.howItWorks?.steps || [];
+    const testimonials = plan.testimonials || [];
+    const faqs = plan.faq || [];
+    const painPoints = plan.problemSection?.painPoints || [];
 
-    const buildProblem = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.primaryDark};padding:${spacing.sectionPad} 24px">
-      <div class="container reveal" style="max-width:900px;text-align:center">
-        <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${colors.accent};margin-bottom:20px">THE PROBLEM</div>
-        <h2 style="color:#FFFFFF;max-width:800px;margin:0 auto 28px">${s.headline || ''}</h2>
-        <p style="font-size:18px;color:rgba(255,255,255,0.75);max-width:680px;margin:0 auto">${s.body || ''}</p>
-      </div>
-    </section>`;
-
-    const buildSolution = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.background};padding:${spacing.sectionPad} 24px">
-      <div class="container reveal">
-        <div class="split">
-          ${images[s.id] ? `
-          <div style="position:relative">
-            <img src="${images[s.id]}" style="width:100%;border-radius:24px;box-shadow:${shadows.image}" data-parallax="-0.15" />
-            <div style="position:absolute;bottom:-20px;left:-20px;width:200px;height:200px;border-radius:24px;background:${colors.accent};opacity:0.15;z-index:-1"></div>
-          </div>
-          ` : '<div></div>'}
-          <div>
-            <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${colors.accent};margin-bottom:16px">THE SOLUTION</div>
-            <h2>${s.headline || ''}</h2>
-            <p style="color:${colors.textLight};margin-bottom:32px">${s.body || ''}</p>
-            <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:32px">
-              ${(s.items || []).map(i => `
-                <div style="display:flex;gap:12px;align-items:center">
-                  <div style="width:28px;height:28px;border-radius:50%;background:${colors.featureIconBg};color:${colors.featureIcon};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">✓</div>
-                  <div style="font-size:15px;font-weight:500;color:${colors.text}">${i.title || ''}</div>
-                </div>
-              `).join('')}
-            </div>
-            ${s.cta ? `<a href="#cta" style="color:${colors.accent};font-weight:700;font-size:16px;text-decoration:none">${s.cta} →</a>` : ''}
-          </div>
-        </div>
-      </div>
-    </section>`;
-
-    const buildFeatures = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.surfaceAlt};padding:${spacing.sectionPad} 24px">
-      <div class="container">
-        <div class="reveal" style="text-align:center;max-width:700px;margin:0 auto 64px">
-          <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${colors.accent};margin-bottom:16px">FEATURES</div>
-          <h2 style="color:${colors.text}">${s.headline || ''}</h2>
-          <p style="color:${colors.textLight};margin-top:16px">${s.body || ''}</p>
-        </div>
-        <div class="grid-3 stagger-grid">
-          ${(s.items || []).slice(0,3).map(i => `
-            <div class="feature-card" style="background:#FFFFFF;border-radius:${radius.card};padding:${spacing.cardPad};box-shadow:${shadows.card};border:1px solid rgba(0,0,0,0.06)">
-              <div style="width:56px;height:56px;border-radius:14px;background:${colors.featureIconBg};display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:20px">${i.icon || '✦'}</div>
-              <h4 style="color:${colors.text};margin-bottom:10px">${i.title || ''}</h4>
-              <p style="color:${colors.textLight};font-size:15px">${i.description || ''}</p>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </section>`;
-
-    const buildStats = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.statBackground};padding:${spacing.sectionPad} 24px;position:relative;overflow:hidden">
-      <!-- Decorative -->
-      <div style="position:absolute;top:-100px;right:-100px;width:400px;height:400px;border-radius:50%;background:${colors.accent};opacity:0.08"></div>
-      <div style="position:absolute;bottom:-80px;left:-80px;width:300px;height:300px;border-radius:50%;background:${colors.primaryLight};opacity:0.15"></div>
-      
-      <div class="container position-relative z-2">
-        <div class="reveal" style="text-align:center;margin-bottom:64px">
-          <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${colors.accent};margin-bottom:16px">BY THE NUMBERS</div>
-          <h2 style="color:${colors.text}">${s.headline || ''}</h2>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(s.stats?.length || 3, 4)}, 1fr);gap:24px" class="stagger-grid">
-          ${(s.stats || []).map(stat => `
-            <div style="text-align:center;padding:40px 24px">
-              <div class="stat-counter" data-target="${parseFloat(stat.number?.replace(/[^0-9.]/g, '') || 0)}" data-prefix="${stat.prefix || ''}" data-suffix="${stat.suffix || ''}" style="font-size:clamp(52px,7vw,88px);font-weight:800;color:${colors.statNumber};font-family:${fonts.heading};line-height:1">0</div>
-              <div style="font-size:15px;font-weight:500;color:${colors.statLabel};margin-top:8px;text-transform:uppercase;letter-spacing:0.05em">${stat.label || ''}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </section>`;
-
-    const buildProof = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.background};padding:${spacing.sectionPad} 24px">
-      <div class="container reveal">
-        <div style="text-align:center;margin-bottom:64px">
-           <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:${colors.accent};margin-bottom:16px">WHAT CUSTOMERS SAY</div>
-           <h2 style="color:${colors.text}">${s.headline || ''}</h2>
-        </div>
-        <div style="column-count: 3; column-gap: 24px" class="stagger-grid">
-          ${(s.testimonials || []).map(t => `
-            <div style="background:${colors.surface};border-radius:${radius.card};padding:28px 24px;border:1px solid rgba(0,0,0,0.06);box-shadow:${shadows.card};break-inside:avoid;margin-bottom:24px;display:inline-block;width:100%">
-              <div style="color:${colors.testimonialStars};font-size:18px;margin-bottom:14px">${'★'.repeat(t.rating || 5)}</div>
-              <p style="font-size:15px;color:${colors.testimonialText};font-style:italic;margin-bottom:20px;line-height:1.75">"${t.quote || ''}"</p>
-              <div style="display:flex;gap:12px;align-items:center">
-                 <div style="width:44px;height:44px;border-radius:50%;background:${colors.accent};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">${(t.author || 'A').charAt(0)}</div>
-                 <div>
-                    <div style="font-weight:700;font-size:14px;color:${colors.text}">${t.author || ''}</div>
-                    <div style="font-size:13px;color:${colors.textLight}">${t.role || ''}</div>
-                 </div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </section>`;
-
-    const buildHow = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.surfaceAlt};padding:${spacing.sectionPad} 24px">
-      <div class="container reveal">
-        <div style="text-align:center;margin-bottom:64px">
-           <h2 style="color:${colors.text}">${s.headline || ''}</h2>
-           <p style="color:${colors.textLight};margin-top:16px">${s.body || ''}</p>
-        </div>
-        <div style="max-width:760px;margin:0 auto" class="stagger-grid">
-          ${(s.items || []).map((item, i) => `
-            <div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:40px;position:relative">
-              ${i < s.items.length - 1 ? `<div style="position:absolute;left:23px;top:52px;width:2px;height:calc(100% - 52px + 40px);background:linear-gradient(${colors.accent}40, ${colors.accent}10)"></div>` : ''}
-              <div style="width:48px;height:48px;border-radius:50%;background:${colors.accent};color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;box-shadow:0 4px 12px ${colors.accent}40;flex-shrink:0">${i + 1}</div>
-              <div>
-                <h4 style="font-size:19px;color:${colors.text};margin-bottom:8px">${item.title || ''}</h4>
-                <p style="font-size:15px;color:${colors.textLight};line-height:1.7">${item.description || ''}</p>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </section>`;
-
-    const buildFaq = (s) => `
-    <section id="${s.id}" class="section" style="background:${colors.background};padding:${spacing.sectionPad} 24px">
-      <div class="container reveal" style="max-width:800px">
-        <h2 style="text-align:center;color:${colors.text};margin-bottom:64px">${s.headline || ''}</h2>
-        <div>
-          ${(s.faqs || []).map(f => `
-            <details style="border-bottom:1px solid rgba(0,0,0,0.08)">
-              <summary style="display:flex;justify-content:space-between;align-items:center;padding:22px 0;font-size:17px;font-weight:600;color:${colors.text};cursor:pointer;list-style:none">
-                ${f.question || ''}
-                <div class="icon-toggle" style="width:28px;height:28px;border-radius:50%;background:${colors.featureIconBg};color:${colors.accent};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;transition:transform 0.3s ease">+</div>
-              </summary>
-              <p style="font-size:15px;line-height:1.8;color:${colors.textLight};padding-bottom:22px;max-width:680px">${f.answer || ''}</p>
-            </details>
-          `).join('')}
-        </div>
-      </div>
-    </section>`;
-
-    const buildCta = (s) => `
-    <section id="${s.id}" class="section" style="background:linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%);padding:100px 24px;text-align:center;position:relative;overflow:hidden">
-      <!-- Decorative -->
-      <div style="position:absolute;top:-50px;right:-50px;width:400px;height:400px;border-radius:50%;background:#FFFFFF;opacity:0.08"></div>
-      <div style="position:absolute;bottom:-50px;left:-50px;width:300px;height:300px;border-radius:50%;background:${colors.accentDark};opacity:0.2"></div>
-      
-      <div class="container reveal" style="max-width:800px;position:relative;z-index:2">
-        <div style="font-size:13px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.75);margin-bottom:20px">READY TO START?</div>
-        <h2 style="color:#FFFFFF;margin-bottom:24px">${s.headline || ''}</h2>
-        <p style="font-size:19px;color:rgba(255,255,255,0.85);max-width:600px;margin:0 auto 40px">${s.body || ''}</p>
-        <a href="#" class="btn btn-primary" style="background:#FFFFFF;color:${colors.accent};padding:20px 56px;border-radius:${radius.button};font-size:18px;font-weight:700;box-shadow:0 16px 48px rgba(0,0,0,0.2)">${s.cta || 'Get Started Now'}</a>
-      </div>
-    </section>`;
-
-    const sectionsHTML = (plan.sections || []).map((s) => {
-        if (s.id === 'sec_hero') return buildHero(s);
-        if (s.id === 'sec_problem') return buildProblem(s);
-        if (s.id === 'sec_solution') return buildSolution(s);
-        if (s.id === 'sec_features') return buildFeatures(s);
-        if (s.id === 'sec_stats') return buildStats(s);
-        if (s.id === 'sec_proof') return buildProof(s);
-        if (s.id === 'sec_how') return buildHow(s);
-        if (s.id === 'sec_faq') return buildFaq(s);
-        if (s.id === 'sec_cta') return buildCta(s);
-        return '';
-    }).join('\n');
+    // Pick 2-3 dominant product colors for accent gradient
+    const productColors = (productDNA?.dominantColors || [])
+        .filter(c => c.role !== 'background_suggestion')
+        .slice(0, 3)
+        .map(c => c.hex);
+    const accentGradient = productColors.length >= 2
+        ? `linear-gradient(135deg, ${productColors[0]} 0%, ${productColors[1]} 100%)`
+        : `linear-gradient(135deg, ${colors.primary} 0%, ${colors.accent} 100%)`;
+    const heroAccent = productColors[0] || colors.primary;
+    const heroAccent2 = productColors[1] || colors.accent;
+    const heroText = '#FFFFFF'; // Always white on product color hero
 
     return `<!DOCTYPE html>
 <html lang="en">
-<!-- MANTRAM-PULSE-PAGE
-  brandId: ${brandId}
-  slug: ${slug}
-  generated: ${Date.now()}
-  canva-compatible: true
--->
+<!-- MANTRAM-PULSE-PAGE slug:${slug} generated:${Date.now()} -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>${plan.seo?.title || 'Campaign Page'}</title>
+  <title>${plan.seo?.title || productName + ' — Official Page'}</title>
   <meta name="description" content="${plan.seo?.description || ''}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=${fonts.heading.replace(/ /g,'+')}:wght@400;500;600;700;800&family=${fonts.body.replace(/ /g,'+')}:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=${fonts.heading.replace(/ /g,'+')}:wght@400;600;700;800;900&family=${fonts.body.replace(/ /g,'+')}:wght@400;500;600&display=swap" rel="stylesheet">
+
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root {
-      --text-xs: clamp(12px, 1vw, 14px);
-      --text-sm: clamp(14px, 1.2vw, 16px);
-      --text-base: clamp(16px, 1.5vw, 18px);
-      --text-lg: clamp(18px, 2vw, 22px);
-      --text-xl: clamp(22px, 2.5vw, 28px);
-      --text-2xl: clamp(28px, 3.5vw, 40px);
-      --text-3xl: clamp(36px, 5vw, 56px);
-      --text-4xl: clamp(48px, 6.5vw, 80px);
-      --text-display: clamp(60px, 8vw, ${fonts.displaySize}px);
+      --accent:       ${heroAccent};
+      --accent2:      ${heroAccent2};
+      --accent-grad:  ${accentGradient};
+      --text:         #0a0a0a;
+      --text-muted:   #6b7280;
+      --surface:      #f9f9fb;
+      --border:       rgba(0,0,0,0.08);
+      --radius-card:  ${radius.card};
+      --radius-btn:   ${radius.button};
+      --shadow-card:  ${shadows.card};
+      --shadow-hover: ${shadows.cardHover};
     }
-    html{scroll-behavior:smooth}
-    body{font-family:'${fonts.body}',sans-serif;background:${colors.background};color:${colors.text};overflow-x:hidden;line-height:1.7}
-    h1,h2,h3,h4,h5,h6{font-family:'${fonts.heading}',sans-serif;font-weight:${fonts.headingWeight}}
-    h1{font-size:var(--text-display);line-height:1.05;letter-spacing:-0.03em}
-    h2{font-size:var(--text-3xl);line-height:1.15;letter-spacing:-0.02em}
-    h3{font-size:var(--text-2xl)}
-    h4{font-size:var(--text-xl)}
-    p{font-size:var(--text-base)}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 32px;text-decoration:none;cursor:pointer;white-space:nowrap;transition:all 0.2s ease}
-    .btn-primary:hover{transform:translateY(-3px);filter:brightness(1.08)}
-    .container{max-width:1200px;margin:0 auto;padding:0 24px}
-    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
-    .split{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
-    @media(max-width:768px){.grid-3,.split{grid-template-columns:1fr}.hero-section{min-height:90vh;padding-top:100px!important}}
-    .nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;transition:all 0.3s ease;background:transparent}
-    .nav.scrolled{background:rgba(255,255,255,0.96);backdrop-filter:blur(24px);box-shadow:0 1px 24px rgba(0,0,0,0.08)}
-    details[open] .icon-toggle{transform:rotate(45deg)}
-    .feature-card:hover{transform:translateY(-6px);box-shadow:${shadows.cardHover}!important}
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: '${fonts.body}', sans-serif;
+      background: #ffffff;
+      color: var(--text);
+      overflow-x: hidden;
+      line-height: 1.7;
+    }
+    h1,h2,h3,h4,h5 { font-family:'${fonts.heading}',sans-serif; font-weight:${fonts.headingWeight}; line-height:1.1; letter-spacing:-0.02em; }
+    h1 { font-size: clamp(44px,7vw,92px); letter-spacing:-0.04em; }
+    h2 { font-size: clamp(32px,4vw,56px); }
+    h3 { font-size: clamp(20px,2.5vw,32px); }
+    p  { font-size: clamp(16px,1.5vw,18px); line-height:1.75; }
+
+    .container { max-width:1200px; margin:0 auto; padding:0 24px; }
+    .section    { padding: clamp(80px,10vw,140px) 24px; }
+
+    /* ── Sticky Nav ── */
+    .nav {
+      position:fixed; top:0; left:0; right:0; z-index:200;
+      padding:18px 32px;
+      display:flex; justify-content:space-between; align-items:center;
+      transition: background 0.4s, box-shadow 0.4s;
+      background: transparent;
+    }
+    .nav.scrolled {
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 1px 32px rgba(0,0,0,0.08);
+    }
+    .nav-logo {
+      font-family:'${fonts.heading}',sans-serif;
+      font-size:20px; font-weight:800;
+      color:#fff; transition:color 0.3s;
+      text-decoration:none;
+    }
+    .nav.scrolled .nav-logo { color:var(--accent); }
+    .nav-cta {
+      background:var(--accent-grad); color:#fff;
+      padding:10px 24px; border-radius:var(--radius-btn);
+      font-size:14px; font-weight:700; text-decoration:none;
+      transition: transform 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    .nav-cta:hover { transform:translateY(-2px); opacity:0.92; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      background: linear-gradient(160deg, ${heroAccent} 0%, ${heroAccent2} 60%, #0a0a0a 100%);
+      position: relative; overflow: hidden;
+      display: grid; align-items: center;
+      padding-top: 100px;
+    }
+    .hero::before {
+      content:''; position:absolute; inset:0;
+      background: radial-gradient(ellipse 80% 80% at 60% 50%, rgba(255,255,255,0.08) 0%, transparent 70%);
+    }
+    .hero-grid {
+      position:relative; z-index:2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px; align-items: center;
+      padding: 80px 24px 100px;
+      max-width: 1200px; margin: 0 auto;
+    }
+    .hero-eyebrow {
+      display:inline-flex; align-items:center; gap:8px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color:#fff; font-size:13px; font-weight:700;
+      letter-spacing:0.08em; text-transform:uppercase;
+      padding: 6px 16px; border-radius:100px;
+      margin-bottom:24px;
+    }
+    .hero h1 { color:#fff; margin-bottom:20px; }
+    .hero-sub {
+      font-size:clamp(17px,2vw,21px); color:rgba(255,255,255,0.85);
+      max-width:500px; line-height:1.65; margin-bottom:32px;
+    }
+    .hero-proof {
+      font-size:13px; color:rgba(255,255,255,0.6);
+      display:flex; align-items:center; gap:6px;
+      margin-top:20px;
+    }
+    .hero-proof-dot { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,0.4); }
+    .btn-primary {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      background:#fff; color:var(--accent);
+      padding:16px 40px; border-radius:var(--radius-btn);
+      font-size:16px; font-weight:800; text-decoration:none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary:hover { transform:translateY(-3px); box-shadow:0 16px 48px rgba(0,0,0,0.25); }
+    .btn-ghost {
+      display:inline-flex; align-items:center; gap:6px;
+      background:transparent; color:#fff;
+      border:2px solid rgba(255,255,255,0.4);
+      padding:14px 32px; border-radius:var(--radius-btn);
+      font-size:15px; font-weight:700; text-decoration:none;
+      transition:all 0.2s;
+    }
+    .btn-ghost:hover { border-color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.1); }
+    .hero-btns { display:flex; gap:14px; flex-wrap:wrap; }
+
+    /* Product image showcase in hero */
+    .hero-product-showcase {
+      position:relative;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .hero-product-card {
+      background:rgba(255,255,255,0.12);
+      backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.2);
+      border-radius:24px; padding:24px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+      position:relative;
+    }
+    .hero-product-img {
+      width:100%; max-width:420px;
+      border-radius:16px;
+      object-fit:contain;
+      display:block;
+      max-height:380px;
+    }
+    /* Gallery thumbnails */
+    .hero-thumbs {
+      display:flex; gap:8px; margin-top:12px;
+      justify-content:center; flex-wrap:wrap;
+    }
+    .hero-thumb {
+      width:52px; height:52px; border-radius:10px;
+      overflow:hidden; border:2px solid rgba(255,255,255,0.2);
+      cursor:pointer; transition:border-color 0.2s;
+    }
+    .hero-thumb.active { border-color:#fff; }
+    .hero-thumb img { width:100%; height:100%; object-fit:cover; }
+    /* Floating badges */
+    .hero-badge {
+      position:absolute; background:#fff;
+      border-radius:12px; padding:10px 16px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.15);
+      display:flex; align-items:center; gap:10px;
+      font-size:12px; font-weight:700;
+    }
+    .hero-badge-icon { font-size:20px; }
+    .hero-badge.badge-1 { top:-20px; right:-20px; }
+    .hero-badge.badge-2 { bottom:-20px; left:-20px; }
+
+    /* ── TRUST BAR ── */
+    .trust-bar {
+      background:#0a0a0a; padding:20px 24px;
+      display:flex; align-items:center; justify-content:center;
+      gap:40px; flex-wrap:wrap;
+    }
+    .trust-item {
+      display:flex; align-items:center; gap:10px;
+      color:rgba(255,255,255,0.7); font-size:14px; font-weight:600;
+    }
+    .trust-icon { font-size:18px; }
+
+    /* ── PROBLEM ── */
+    .problem-section { background:var(--surface); }
+    .problem-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:center;
+    }
+    .problem-label {
+      font-size:12px; letter-spacing:0.1em; text-transform:uppercase;
+      color:var(--accent); margin-bottom:16px; font-weight:700;
+    }
+    .pain-list { list-style:none; display:flex; flex-direction:column; gap:14px; margin-top:24px; }
+    .pain-item {
+      display:flex; align-items:flex-start; gap:12px;
+      background:#fff; border:1px solid var(--border);
+      border-radius:12px; padding:14px 18px;
+      font-size:15px; color:var(--text);
+    }
+    .pain-x { color:#ef4444; font-size:18px; font-weight:800; flex-shrink:0; }
+    .lifestyle-img {
+      width:100%; border-radius:${radius.image};
+      box-shadow:${shadows.image};
+      object-fit:cover; display:block;
+    }
+
+    /* ── FEATURES ── */
+    .features-section { background:#fff; }
+    .features-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-top:64px;
+    }
+    .feature-card {
+      background:#fff; border:1px solid var(--border);
+      border-radius:var(--radius-card); padding:32px;
+      box-shadow:var(--shadow-card);
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .feature-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-hover); }
+    .feature-icon-wrap {
+      width:56px; height:56px; border-radius:14px;
+      background:linear-gradient(135deg, ${heroAccent}22 0%, ${heroAccent2}22 100%);
+      border:1px solid ${heroAccent}33;
+      display:flex; align-items:center; justify-content:center;
+      font-size:26px; margin-bottom:20px;
+    }
+    .feature-card h4 { font-size:17px; margin-bottom:8px; }
+    .feature-card p  { font-size:14px; color:var(--text-muted); line-height:1.65; }
+
+    /* ── STATS ── */
+    .stats-section {
+      background: linear-gradient(135deg, #0a0a0a 0%, ${heroAccent} 200%);
+      position:relative; overflow:hidden;
+    }
+    .stats-section::before {
+      content:''; position:absolute;
+      width:600px; height:600px; border-radius:50%;
+      background:rgba(255,255,255,0.03);
+      top:-200px; right:-200px;
+    }
+    .stats-grid {
+      display:grid; grid-template-columns:repeat(${Math.min(stats.length || 3, 4)},1fr);
+      gap:24px; position:relative; z-index:2;
+    }
+    .stat-item { text-align:center; padding:40px 16px; }
+    .stat-number {
+      font-family:'${fonts.heading}',sans-serif;
+      font-size:clamp(52px,8vw,88px); font-weight:900;
+      line-height:1; letter-spacing:-0.04em;
+      background:${accentGradient}; -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .stat-label { font-size:14px; color:rgba(255,255,255,0.55); margin-top:8px; letter-spacing:0.05em; text-transform:uppercase; }
+
+    /* ── HOW IT WORKS ── */
+    .how-section { background:var(--surface); }
+    .steps-list { max-width:760px; margin:64px auto 0; display:flex; flex-direction:column; gap:0; }
+    .step-item {
+      display:flex; gap:28px; align-items:flex-start;
+      padding:32px 0; border-bottom:1px solid var(--border);
+      position:relative;
+    }
+    .step-item:last-child { border-bottom:none; }
+    .step-num {
+      width:52px; height:52px; border-radius:50%; flex-shrink:0;
+      background:var(--accent-grad); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:900;
+      box-shadow:0 4px 20px rgba(0,0,0,0.15);
+    }
+    .step-content h4 { font-size:18px; margin-bottom:6px; }
+    .step-content p  { font-size:15px; color:var(--text-muted); }
+
+    /* ── CONTEXT IMAGE SECTION ── */
+    .context-img-section {
+      padding:0;
+      overflow:hidden; position:relative;
+    }
+    .context-img-full {
+      width:100%; height:520px; object-fit:cover; display:block;
+    }
+    .context-img-overlay {
+      position:absolute; inset:0;
+      background:linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%);
+      display:flex; align-items:center;
+    }
+    .context-overlay-text {
+      padding:0 80px; max-width:600px;
+    }
+    .context-overlay-text h2 { color:#fff; margin-bottom:16px; }
+    .context-overlay-text p  { color:rgba(255,255,255,0.8); font-size:18px; margin-bottom:28px; }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials-section { background:#fff; }
+    .testimonials-grid {
+      display:grid; grid-template-columns:repeat(${Math.min(testimonials.length || 2, 3)},1fr);
+      gap:24px; margin-top:64px;
+    }
+    .testimonial-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius-card); padding:28px;
+      position:relative; overflow:hidden;
+    }
+    .testimonial-card::before {
+      content:'"'; position:absolute; top:-10px; left:16px;
+      font-size:120px; font-family:Georgia,serif;
+      color:${heroAccent}15; line-height:1; pointer-events:none;
+    }
+    .t-stars { color:#f59e0b; font-size:16px; margin-bottom:14px; }
+    .t-quote { font-size:15px; line-height:1.75; color:var(--text); margin-bottom:20px; }
+    .t-highlight { font-weight:700; color:var(--accent); }
+    .t-author { display:flex; align-items:center; gap:12px; }
+    .t-avatar {
+      width:40px; height:40px; border-radius:50%;
+      background:var(--accent-grad); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px; font-weight:800;
+    }
+    .t-name { font-size:14px; font-weight:700; }
+    .t-role { font-size:12px; color:var(--text-muted); }
+
+    /* ── FAQ ── */
+    .faq-section { background:var(--surface); }
+    .faq-list { max-width:800px; margin:64px auto 0; }
+    details { border-bottom:1px solid var(--border); }
+    summary {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:22px 0; font-size:17px; font-weight:700;
+      cursor:pointer; list-style:none; color:var(--text);
+    }
+    summary::-webkit-details-marker { display:none; }
+    .faq-icon {
+      width:28px; height:28px; border-radius:50%;
+      background:${heroAccent}18; color:var(--accent);
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; font-weight:700; flex-shrink:0;
+      transition:transform 0.3s;
+    }
+    details[open] .faq-icon { transform:rotate(45deg); }
+    details p { font-size:15px; color:var(--text-muted); padding-bottom:22px; line-height:1.8; }
+
+    /* ── FINAL CTA ── */
+    .cta-section {
+      background:var(--accent-grad);
+      padding:120px 24px; text-align:center;
+      position:relative; overflow:hidden;
+    }
+    .cta-section::before {
+      content:''; position:absolute; inset:0;
+      background:radial-gradient(ellipse 60% 60% at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 70%);
+    }
+    .cta-section .container { position:relative; z-index:2; max-width:800px; }
+    .cta-section h2 { color:#fff; margin-bottom:20px; }
+    .cta-section p  { color:rgba(255,255,255,0.85); font-size:19px; margin-bottom:40px; }
+    .cta-guarantee { font-size:13px; color:rgba(255,255,255,0.65); margin-top:20px; }
+
+    /* ── FOOTER ── */
+    footer {
+      background:#0a0a0a; padding:32px 24px;
+      text-align:center; color:rgba(255,255,255,0.4); font-size:14px;
+    }
+
+    /* ── ANIMATIONS ── */
+    .reveal     { opacity:0; transform:translateY(40px); }
+    .reveal-l   { opacity:0; transform:translateX(-40px); }
+    .reveal-r   { opacity:0; transform:translateX(40px); }
+    .stagger    > * { opacity:0; transform:translateY(30px); }
+
+    @media(max-width:768px) {
+      .hero-grid, .problem-grid { grid-template-columns:1fr; }
+      .features-grid { grid-template-columns:repeat(2,1fr); }
+      .testimonials-grid { grid-template-columns:1fr; }
+      .stats-grid { grid-template-columns:repeat(2,1fr); }
+      .hero-badge.badge-1, .hero-badge.badge-2 { display:none; }
+      .context-overlay-text { padding:0 32px; }
+      .trust-bar { gap:20px; }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav" id="mainNav">
-    <a href="#" style="font-family:'${fonts.heading}',sans-serif;font-size:22px;font-weight:800;color:${colors.accent};text-decoration:none">${(plan.seo?.title || '').split('|')[0].trim()}</a>
-    <a href="#cta" class="btn btn-primary" style="background:${colors.accent};color:${colors.ctaText};padding:10px 24px;font-size:14px;border-radius:${radius.button};font-weight:700">Get Started</a>
+
+  <!-- ── STICKY NAV ── -->
+  <nav class="nav" id="nav">
+    <a href="#" class="nav-logo">${productName}</a>
+    <a href="#cta" class="nav-cta">Get Yours →</a>
   </nav>
-  ${sectionsHTML}
-  <footer style="background:${colors.footerBackground};padding:40px 24px;text-align:center">
-    <p style="color:${colors.footerText};font-size:14px">© ${new Date().getFullYear()} · Created with Mantram AI</p>
+
+  <!-- ── HERO ── -->
+  <section class="hero" id="hero">
+    <div class="hero-grid">
+      <!-- Left: Copy -->
+      <div>
+        <div class="hero-eyebrow">✦ ${plan.hero?.eyebrow || plan.seo?.title?.split('—')[0]?.trim() || 'New Arrival'}</div>
+        <h1 id="hero-h1">${plan.hero?.headline || productName}</h1>
+        <p class="hero-sub" id="hero-sub">${plan.hero?.subheadline || ''}</p>
+        <div class="hero-btns" id="hero-btns">
+          <a href="#cta" class="btn-primary">
+            ${plan.hero?.ctaPrimary || 'Buy Now'} →
+          </a>
+          ${plan.hero?.ctaSecondary ? `<a href="#features" class="btn-ghost">${plan.hero.ctaSecondary}</a>` : ''}
+        </div>
+        ${plan.hero?.socialProofLine ? `
+        <div class="hero-proof" id="hero-proof">
+          <span>⭐</span>
+          <span>${plan.hero.socialProofLine}</span>
+        </div>` : ''}
+      </div>
+
+      <!-- Right: Product Image -->
+      <div class="hero-product-showcase">
+        <div class="hero-product-card">
+          ${productHeroImage ? `
+          <img
+            src="${productHeroImage}"
+            class="hero-product-img"
+            id="heroMainImg"
+            alt="${productName}"
+            onerror="this.style.display='none'"
+          />` : `
+          <div style="width:380px;height:340px;border-radius:16px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:80px;">📦</div>
+          `}
+
+          ${productGallery.length > 1 ? `
+          <div class="hero-thumbs">
+            ${productGallery.slice(0, 5).map((img, i) => `
+            <div class="hero-thumb ${i === 0 ? 'active' : ''}" onclick="switchImg('${img}', this)">
+              <img src="${img}" alt="view ${i+1}" onerror="this.parentElement.style.display='none'">
+            </div>`).join('')}
+          </div>` : ''}
+
+          <!-- Floating social proof badges -->
+          ${stats[1] ? `
+          <div class="hero-badge badge-1">
+            <span class="hero-badge-icon">⭐</span>
+            <div>
+              <div style="font-size:15px;color:var(--accent);font-weight:900">${stats[1]?.number}${stats[1]?.suffix || ''}</div>
+              <div style="font-size:10px;color:#6b7280;">${stats[1]?.label}</div>
+            </div>
+          </div>` : ''}
+          ${stats[0] ? `
+          <div class="hero-badge badge-2">
+            <span class="hero-badge-icon">🏆</span>
+            <div>
+              <div style="font-size:15px;color:var(--accent);font-weight:900">${stats[0]?.number}${stats[0]?.suffix || ''}+</div>
+              <div style="font-size:10px;color:#6b7280;">${stats[0]?.label}</div>
+            </div>
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div style="position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;opacity:0.5">
+      <span style="font-size:10px;letter-spacing:3px;color:#fff;text-transform:uppercase">scroll</span>
+      <div id="scroll-dot" style="width:5px;height:28px;border-radius:3px;background:#fff"></div>
+    </div>
+  </section>
+
+  <!-- ── TRUST BAR ── -->
+  <div class="trust-bar">
+    <div class="trust-item"><span class="trust-icon">🚚</span> Free Delivery</div>
+    <div class="trust-item"><span class="trust-icon">🔄</span> 30-Day Returns</div>
+    <div class="trust-item"><span class="trust-icon">🛡️</span> Genuine Product</div>
+    <div class="trust-item"><span class="trust-icon">💳</span> Secure Payments</div>
+    <div class="trust-item"><span class="trust-icon">⭐</span> Verified Reviews</div>
+  </div>
+
+  <!-- ── PROBLEM ── -->
+  <section class="section problem-section" id="problem">
+    <div class="container">
+      <div class="problem-grid">
+        <div class="reveal-l">
+          <div class="problem-label">THE PROBLEM</div>
+          <h2>${plan.problemSection?.headline || 'The problem we solve'}</h2>
+          <p style="color:var(--text-muted);margin:16px 0 8px;">${plan.problemSection?.body || ''}</p>
+          <ul class="pain-list">
+            ${painPoints.map(p => `
+            <li class="pain-item">
+              <span class="pain-x">✗</span>
+              <span>${p}</span>
+            </li>`).join('')}
+          </ul>
+        </div>
+        ${images.lifestyle ? `
+        <div class="reveal-r">
+          <img src="${images.lifestyle}" alt="${productName} in use" class="lifestyle-img">
+        </div>` : `<div></div>`}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ── -->
+  <section class="section features-section" id="features">
+    <div class="container">
+      <div class="reveal" style="text-align:center;max-width:700px;margin:0 auto">
+        <div class="problem-label">FEATURES</div>
+        <h2>${plan.featuresSection?.headline || `Why ${productName} stands out`}</h2>
+      </div>
+      <div class="features-grid stagger">
+        ${features.map(f => `
+        <div class="feature-card">
+          <div class="feature-icon-wrap">${f.icon || '✦'}</div>
+          <h4>${f.title}</h4>
+          <p>${f.body}</p>
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── STATS ── -->
+  <section class="section stats-section" id="stats">
+    <div class="container">
+      <div class="reveal" style="text-align:center;margin-bottom:64px">
+        <h2 style="color:#fff">${plan.statsSection?.headline || 'The numbers'}</h2>
+      </div>
+      <div class="stats-grid stagger">
+        ${stats.map(s => `
+        <div class="stat-item">
+          <div class="stat-number" data-target="${parseFloat(s.number?.replace(/[^0-9.]/g,'') || 0)}" data-prefix="${s.prefix||''}" data-suffix="${s.suffix||''}">0</div>
+          <div class="stat-label">${s.label}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="section how-section" id="how">
+    <div class="container">
+      <div class="reveal" style="text-align:center;max-width:700px;margin:0 auto">
+        <div class="problem-label">HOW IT WORKS</div>
+        <h2>${plan.howItWorks?.headline || `Using ${productName}`}</h2>
+      </div>
+      <div class="steps-list">
+        ${steps.map((step, i) => `
+        <div class="step-item reveal">
+          <div class="step-num">${i + 1}</div>
+          <div class="step-content">
+            <h4>${step.title}</h4>
+            <p>${step.body}</p>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CONTEXT IMAGE (full-bleed) ── -->
+  ${images.context ? `
+  <div class="context-img-section" data-parallax-section>
+    <img src="${images.context}" class="context-img-full" data-parallax="-0.2" alt="${productName} context">
+    <div class="context-img-overlay">
+      <div class="context-overlay-text">
+        <h2>${plan.cta?.headline || `Ready to experience ${productName}?`}</h2>
+        <p>${plan.cta?.body || ''}</p>
+        <a href="#cta" class="btn-primary">${plan.cta?.button || 'Shop Now'} →</a>
+      </div>
+    </div>
+  </div>` : ''}
+
+  <!-- ── TESTIMONIALS ── -->
+  ${testimonials.length > 0 ? `
+  <section class="section testimonials-section" id="reviews">
+    <div class="container">
+      <div class="reveal" style="text-align:center;max-width:600px;margin:0 auto">
+        <div class="problem-label">WHAT CUSTOMERS SAY</div>
+        <h2>Real reviews. Real results.</h2>
+      </div>
+      <div class="testimonials-grid stagger">
+        ${testimonials.map(t => `
+        <div class="testimonial-card">
+          <div class="t-stars">${'★'.repeat(t.rating || 5)}</div>
+          <p class="t-quote">"${t.highlight ? t.quote.replace(t.highlight, `<span class="t-highlight">${t.highlight}</span>`) : t.quote}"</p>
+          <div class="t-author">
+            <div class="t-avatar">${(t.author||'A').charAt(0)}</div>
+            <div>
+              <div class="t-name">${t.author}</div>
+              <div class="t-role">${t.role}</div>
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>` : ''}
+
+  <!-- ── FAQ ── -->
+  ${faqs.length > 0 ? `
+  <section class="section faq-section" id="faq">
+    <div class="container">
+      <div class="reveal" style="text-align:center;margin-bottom:16px">
+        <div class="problem-label">FAQ</div>
+        <h2>Common questions</h2>
+      </div>
+      <div class="faq-list">
+        ${faqs.map(f => `
+        <details>
+          <summary>
+            ${f.question}
+            <span class="faq-icon">+</span>
+          </summary>
+          <p>${f.answer}</p>
+        </details>`).join('')}
+      </div>
+    </div>
+  </section>` : ''}
+
+  <!-- ── FINAL CTA ── -->
+  <section class="cta-section" id="cta">
+    <div class="container reveal">
+      <div class="problem-label" style="color:rgba(255,255,255,0.7);margin-bottom:16px">GET STARTED</div>
+      <h2>${plan.cta?.headline || `Try ${productName} today`}</h2>
+      <p>${plan.cta?.body || ''}</p>
+      <a href="#" class="btn-primary" style="background:#fff;color:var(--accent);font-size:18px;padding:20px 56px;box-shadow:0 16px 48px rgba(0,0,0,0.2)">
+        ${plan.cta?.button || 'Buy Now'} →
+      </a>
+      ${plan.cta?.guarantee ? `<p class="cta-guarantee">${plan.cta.guarantee}</p>` : ''}
+    </div>
+  </section>
+
+  <footer>
+    <p>© ${new Date().getFullYear()} ${productName} · Created with Mantram AI Pulse Studio</p>
   </footer>
 
+  <!-- ── SCRIPTS ── -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.45/bundled/lenis.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  
+
   <script>
-    // 1. Lenis Smooth Scroll
-    const lenis = new Lenis({ lerp: 0.08, wheelMultiplier: 1.2 });
+    // ── Lenis Smooth Scroll
+    const lenis = new Lenis({ lerp:0.09, wheelMultiplier:1.1 });
     lenis.on('scroll', ScrollTrigger.update);
-    gsap.ticker.add((t) => lenis.raf(t * 1000));
+    gsap.ticker.add(t => lenis.raf(t * 1000));
     gsap.ticker.lagSmoothing(0);
     gsap.registerPlugin(ScrollTrigger);
 
-    // 2. Nav effect
+    // ── Sticky nav
     window.addEventListener('scroll', () => {
-      document.getElementById('mainNav').classList.toggle('scrolled', window.scrollY > 60);
+      document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 60);
     });
 
-    // 3. Reveal elements
+    // ── Hero intro sequence
+    gsap.timeline({ delay:0.15 })
+      .fromTo('#hero-h1',    {opacity:0,y:50}, {opacity:1,y:0,duration:0.9,ease:'expo.out'})
+      .fromTo('#hero-sub',   {opacity:0,y:30}, {opacity:1,y:0,duration:0.7},'-=0.5')
+      .fromTo('#hero-btns',  {opacity:0,y:20}, {opacity:1,y:0,duration:0.6},'-=0.4')
+      .fromTo('#hero-proof', {opacity:0},      {opacity:1,duration:0.5},'-=0.3');
+
+    // ── Scroll dot bounce
+    const dot = document.getElementById('scroll-dot');
+    if(dot) gsap.to(dot, {y:10,repeat:-1,yoyo:true,duration:0.9,ease:'power1.inOut'});
+
+    // ── Reveal elements
     gsap.utils.toArray('.reveal').forEach(el => {
-      gsap.fromTo(el, { opacity:0, y:50 }, { opacity:1, y:0, duration:0.8, ease:'expo.out', scrollTrigger:{ trigger:el, start:'top 88%', once:true }});
+      gsap.fromTo(el,{opacity:0,y:50},{opacity:1,y:0,duration:0.85,ease:'expo.out',
+        scrollTrigger:{trigger:el,start:'top 88%',once:true}});
     });
-    gsap.utils.toArray('.reveal-right').forEach(el => {
-      gsap.fromTo(el, { opacity:0, x:50 }, { opacity:1, x:0, duration:0.8, ease:'expo.out', scrollTrigger:{ trigger:el, start:'top 88%', once:true }});
+    gsap.utils.toArray('.reveal-l').forEach(el => {
+      gsap.fromTo(el,{opacity:0,x:-60},{opacity:1,x:0,duration:0.9,ease:'expo.out',
+        scrollTrigger:{trigger:el,start:'top 85%',once:true}});
+    });
+    gsap.utils.toArray('.reveal-r').forEach(el => {
+      gsap.fromTo(el,{opacity:0,x:60},{opacity:1,x:0,duration:0.9,ease:'expo.out',
+        scrollTrigger:{trigger:el,start:'top 85%',once:true}});
     });
 
-    // 4. Stagger grids
-    gsap.utils.toArray('.stagger-grid').forEach(grid => {
-      gsap.fromTo(grid.children, { opacity:0, y:40 }, { opacity:1, y:0, duration:0.7, stagger:0.1, ease:'expo.out', scrollTrigger:{ trigger:grid, start:'top 82%', once:true }});
+    // ── Stagger grids
+    gsap.utils.toArray('.stagger').forEach(container => {
+      gsap.fromTo(container.children,
+        {opacity:0,y:40},
+        {opacity:1,y:0,duration:0.7,stagger:0.1,ease:'expo.out',
+          scrollTrigger:{trigger:container,start:'top 80%',once:true}}
+      );
     });
 
-    // 5. Parallax Image
+    // ── Parallax on context image
     gsap.utils.toArray('[data-parallax]').forEach(el => {
       const speed = parseFloat(el.dataset.parallax);
-      gsap.to(el, { yPercent: speed * 100, ease:'none', scrollTrigger:{ trigger:el.closest('section'), start:'top bottom', end:'bottom top', scrub:1 }});
+      gsap.to(el,{yPercent:speed*100,ease:'none',
+        scrollTrigger:{trigger:el.closest('[data-parallax-section]'),start:'top bottom',end:'bottom top',scrub:1.5}});
     });
 
-    // 6. Stat Counters
-    document.querySelectorAll('.stat-counter').forEach(el => {
+    // ── Animated stat counters
+    document.querySelectorAll('.stat-number').forEach(el => {
       const target = parseFloat(el.dataset.target);
       const prefix = el.dataset.prefix || '';
       const suffix = el.dataset.suffix || '';
+      const isFloat = !Number.isInteger(target) || suffix.includes('.');
       ScrollTrigger.create({
-        trigger: el, start: 'top 80%', once: true,
-        onEnter: () => {
-          gsap.fromTo({ val: 0 }, { val: target }, {
-            duration: 2.2, ease: 'power2.out',
-            onUpdate: function() {
+        trigger:el, start:'top 80%', once:true,
+        onEnter:() => {
+          gsap.fromTo({val:0},{val:target},{
+            duration:2.2,ease:'power2.out',
+            onUpdate:function(){
               const v = this.targets()[0].val;
-              el.textContent = prefix + (Number.isInteger(target) ? Math.round(v).toLocaleString() : v.toFixed(1)) + suffix;
+              el.textContent = prefix + (isFloat ? v.toFixed(1) : Math.round(v).toLocaleString()) + suffix;
             }
           });
         }
       });
     });
 
-    // Hero dots animate
-    const dot = document.getElementById('scroll-dot');
-    if (dot) gsap.to(dot, { y: 10, repeat:-1, yoyo:true, duration:0.8, ease:'power1.inOut' });
-    
-    // Magnetic primary buttons
+    // ── Magnetic buttons
     document.querySelectorAll('.btn-primary').forEach(btn => {
-      btn.addEventListener('mousemove', (e) => {
-        const rect = btn.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width/2;
-        const y = e.clientY - rect.top - rect.height/2;
-        gsap.to(btn, { x: x*0.25, y: y*0.25, duration:0.3, ease:'power2.out' });
+      btn.addEventListener('mousemove', e => {
+        const r = btn.getBoundingClientRect();
+        const x = (e.clientX - r.left - r.width/2) * 0.25;
+        const y = (e.clientY - r.top  - r.height/2) * 0.25;
+        gsap.to(btn,{x,y,duration:0.3,ease:'power2.out'});
       });
       btn.addEventListener('mouseleave', () => {
-        gsap.to(btn, { x:0, y:0, duration:0.5, ease:'elastic.out(1, 0.5)' });
+        gsap.to(btn,{x:0,y:0,duration:0.5,ease:'elastic.out(1,0.5)'});
       });
     });
 
-    // Hero Intro sequence
-    gsap.timeline({ delay: 0.1 })
-      .fromTo('#hero-headline', { opacity:0, y:40 }, { opacity:1, y:0, duration:0.8, ease:'expo.out' })
-      .fromTo('#hero-body', { opacity:0, y:20 }, { opacity:1, y:0, duration:0.6 }, '-=0.4')
-      .fromTo('#hero-ctas', { opacity:0, y:20 }, { opacity:1, y:0, duration:0.5 }, '-=0.3');
+    // ── Product gallery switcher
+    function switchImg(src, thumb) {
+      const mainImg = document.getElementById('heroMainImg');
+      if(mainImg) {
+        gsap.to(mainImg,{opacity:0,scale:0.97,duration:0.18,onComplete:()=>{
+          mainImg.src = src;
+          mainImg.onload = () => gsap.to(mainImg,{opacity:1,scale:1,duration:0.25});
+        }});
+      }
+      document.querySelectorAll('.hero-thumb').forEach(t => t.classList.remove('active'));
+      if(thumb) thumb.classList.add('active');
+    }
+
+    // ── Feature cards tilt on hover
+    document.querySelectorAll('.feature-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width - 0.5) * 10;
+        const y = ((e.clientY - r.top) / r.height - 0.5) * -10;
+        gsap.to(card,{rotateX:y,rotateY:x,duration:0.4,ease:'power2.out',transformPerspective:1000});
+      });
+      card.addEventListener('mouseleave', () => {
+        gsap.to(card,{rotateX:0,rotateY:0,duration:0.6,ease:'elastic.out(1,0.5)'});
+      });
+    });
   </script>
 </body>
 </html>`;
 }
 
-// ── Shopify Publisher ──────────────────────────────────────────
+// ── Utilities ──────────────────────────────────────────────────────────
+export function generateEmbedCode(hostedUrl) {
+    return `<div id="pulse-page-embed" style="width:100%;min-height:600px"></div>
+<script>
+(function(){var f=document.createElement('iframe');f.src='${hostedUrl}';f.style.cssText='width:100%;height:100vh;border:none;display:block';f.sandbox='allow-scripts allow-same-origin';document.getElementById('pulse-page-embed').appendChild(f);})();
+</script>`;
+}
+
 export async function publishToShopify({ title, html, slug, shopDomain, accessToken }) {
     const domain = shopDomain || process.env.SHOPIFY_STORE_DOMAIN;
     const token = accessToken || process.env.SHOPIFY_ADMIN_TOKEN;
@@ -575,65 +1009,63 @@ export async function publishToShopify({ title, html, slug, shopDomain, accessTo
             headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
             body: JSON.stringify({ page: { title, handle: slug, body_html: html, published: true } }),
         });
-        if (!res.ok) {
-            const e = await res.text();
-            return { success: false, error: `Shopify (${res.status}): ${e}` };
-        }
+        if (!res.ok) return { success: false, error: `Shopify (${res.status}): ${await res.text()}` };
         const data = await res.json();
-        return {
-            success: true, pageId: data.page.id, handle: data.page.handle,
-            shopifyUrl: `https://${domain}/pages/${data.page.handle}`
-        };
+        return { success: true, pageId: data.page.id, handle: data.page.handle, shopifyUrl: `https://${domain}/pages/${data.page.handle}` };
     } catch (err) {
         return { success: false, error: err.message };
     }
 }
 
-export function generateEmbedCode(hostedUrl) {
-    return `<div id="pulse-page-embed" style="width:100%;min-height:600px"></div>
-<script>
-(function(){var f=document.createElement('iframe');f.src='${hostedUrl}';f.style.cssText='width:100%;height:100vh;border:none;display:block';f.sandbox='allow-scripts allow-same-origin';document.getElementById('pulse-page-embed').appendChild(f);})();
-</script>`;
-}
+// ── Main Export ────────────────────────────────────────────────────────
+export async function generateLandingPage({ brandId, brief, pageType = 'product', urlContext, referenceImage, designContext, imageModel, productDNA, productData }) {
 
-// ── Main Export ────────────────────────────────────────────────
-export async function generateLandingPage({ brandId, brief, pageType = 'campaign', urlContext, referenceImage, designContext, imageModel }) {
     const { brandContext } = await loadBrandContext(brandId);
-    
-    // Brand Token System initialization
-    const primaryHex = designContext?.colorGuardHex?.[0] || '#6366F1';
+
+    // Extract primary product color for design tokens
+    const productColors = (productDNA?.dominantColors || []).filter(c => c.role !== 'background_suggestion');
+    const primaryHex = designContext?.colorGuardHex?.[0]
+        || productColors[0]?.hex
+        || '#6366F1';
+
     const tokens = generateBrandTokens(primaryHex, brandContext);
-    
-    // Override accent tokens with PDI palette if available
-    if (designContext?.colorGuardHex?.length > 1) {
-        tokens.colors.accent     = designContext.colorGuardHex[0];
-        tokens.colors.accentDark = designContext.colorGuardHex[1] || designContext.colorGuardHex[0];
+
+    // Override with actual product palette
+    if (productColors.length >= 2) {
+        tokens.colors.accent     = productColors[0].hex;
+        tokens.colors.accentDark = productColors[1]?.hex || productColors[0].hex;
+        tokens.colors.primary    = productColors[0].hex;
     }
 
-    console.log('Pulse Page: Gathering market intelligence...');
-    const intel = await gatherIntelligence(brief, brandId);
+    // Build the product context block
+    const productCtx = buildProductContext(productDNA || {}, productData || {}, designContext || {});
 
-    console.log('Pulse Page: Claude formatting content...');
+    console.log('🌐 Landing Page: Gathering market intelligence...');
+    const productName = productData?.title || productDNA?.productCategory || brief;
+    const trendSnippets = await gatherIntelligence(productName, brandId);
+
+    console.log('🧠 Landing Page: Gemini 2.5 Flash writing product copy...');
     const plan = await callAgent(
-        PAGE_SYSTEM(brandContext, intel, urlContext),
-        `BRIEF: ${brief}\nPAGE TYPE: ${pageType}`,
-        0.8, 8192,
-        { provider: 'anthropic', model: CLAUDE_OPUS, timeoutMs: 180_000 }
+        PAGE_SYSTEM(productCtx, brandContext, trendSnippets),
+        `PRODUCT: ${productName}\nBRIEF: ${brief || 'Create the best product landing page possible'}\nPAGE TYPE: ${pageType}`,
+        0.8, 8000,
+        COPY_MODEL_OPTS  // Gemini 2.5 Flash — cheaper + faster for structured JSON
     );
 
-    if (!plan?.sections?.length) throw new Error('Landing page generation failed — no sections returned');
-    
-    // Inject IDs matching our robust template set to avoid missing section bugs
-    plan.sections.forEach((s, idx) => { s.id = SECTION_TEMPLATE[idx]?.id || s.id; });
+    if (!plan?.hero?.headline) {
+        throw new Error('Landing page plan generation failed — no hero content returned');
+    }
 
-    const images = await generatePageImages(plan, brandContext, referenceImage, tokens, designContext, imageModel);
+    console.log('🎨 Landing Page: Generating lifestyle images...');
+    const images = await generateLifestyleImages(plan, productDNA || {}, designContext || {}, imageModel);
 
-    console.log('Assembling interactive robust page...');
-    const slug = plan.seo?.slug || uuidv4().substring(0,8);
-    const html = buildInteractiveHTML(plan, images, tokens, brandId, slug);
+    const slug = plan.seo?.slug || `${(productName || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${uuidv4().substring(0, 6)}`;
+
+    console.log('⚡ Landing Page: Assembling HTML...');
+    const html = buildProductHTML(plan, productDNA || {}, productData || {}, images, tokens, slug);
 
     const hostedUrl = await uploadToS3(
-        Buffer.from(html),
+        Buffer.from(html, 'utf-8'),
         `pulse-studio/pages/${brandId || 'anon'}/${slug}.html`,
         'text/html'
     );
@@ -643,12 +1075,12 @@ export async function generateLandingPage({ brandId, brief, pageType = 'campaign
         plan,
         html,
         hostedUrl,
-        thumbnailUrl: images['sec_hero'] || null,
-        pageName: plan.seo?.title || brief.substring(0, 60),
+        thumbnailUrl: productDNA?.heroImageUrl || images.lifestyle || null,
+        pageName: plan.seo?.title || productName,
         metaTitle: plan.seo?.title,
         metaDescription: plan.seo?.description,
         slug,
         embedCode: generateEmbedCode(hostedUrl),
-        sectionCount: plan.sections.length,
+        sectionCount: 7 + (plan.testimonials?.length ? 1 : 0) + (plan.faq?.length ? 1 : 0),
     };
 }
