@@ -56,6 +56,9 @@ export async function generateProductMoodDirections(productDNA, productData = {}
 
     const productSummary = [
         `Product: ${productDNA.productCategory || productData?.title || 'consumer product'}`,
+        productDNA.dominantColors?.length
+            ? `Product Colors (MUST BE PRESERVED): ${productDNA.dominantColors.map(c => `${c.name} (${c.hex})`).join(', ')}`
+            : '',
         `Materials: ${productDNA.materials || 'premium finish'}`,
         `Form factor: ${productDNA.productShape || 'compact'}`,
         `Surface finish: ${productDNA.surfaceFinish || 'refined'}`,
@@ -70,10 +73,10 @@ export async function generateProductMoodDirections(productDNA, productData = {}
 You create product mood boards for a living. You NEVER use the same creative territories for every product.
 You invent evocative, SPECIFIC creative directions that feel native to each product's world.
 
-Rules for mood direction naming:
+Rules for mood direction naming and palettes:
 - Names must be evocative and specific to THIS product (NOT generic like "Bold Ambient" or "Editorial Clean")
-- Think of names like a photographer or art director would: "Golden Hour Glow", "Urban Kinetic", "Brutal Minimal", "Sunday Morning Ritual"
 - Each direction must feel like a completely different WORLD that this specific product could live in
+- The colorPalette and art direction MUST be derived from and harmonize with the actual Product Colors. The mood board is designed to support and showcase the product's natural color scheme, NOT to clash with, recolor, or override it.
 - The description should describe the emotional territory and consumer moment, not just visual adjectives
 
 Return ONLY valid JSON, no markdown.`;
@@ -93,7 +96,7 @@ Return this exact JSON structure:
       "targetMoment": "The specific human moment / use context: where, when, who. Max 15 words.",
       "shootDirective": "Precise photography/image direction for this territory. What background, lighting, environment, atmosphere? Reference real brands or photographers.",
       "moodBoardDirective": "Detailed art direction for the mood board collage for this territory. What specific scenes, textures, colors, environments should appear?",
-      "colorPalette": ["a suggested hex code for the mood tone (background/accent, NOT the product itself)", "second hex"],
+      "colorPalette": ["a suggested hex code for the mood tone (background/accent that complements and showcases the product's colors, NOT the product itself)", "second hex"],
       "icon": "a single material-symbols icon name that represents this mood"
     }
   ]
@@ -161,7 +164,7 @@ Return ONLY a valid JSON object, no markdown, no extra text.`;
   "viewType": "hero|front_face|back_panel|open_case|in_use|macro_detail|packaging|variant_color|lifestyle|flat_lay|group_shot|side_profile|angle_shot",
   "shortDescription": "1 sentence: exactly what is visible in this specific image",
   "exactFormFactor": "CRITICAL: Identify EXACT product type and scale (e.g., 'over-ear headphone' vs 'in-ear earphone', 'mug' vs 'tumbler', 'laptop' vs 'tablet'). Apply the disambiguation rules from system prompt. DO NOT generalize.",
-  "primaryColors": ["#hexcode of 2-3 most prominent colors actually visible in this image"],
+  "primaryColors": ["#hexcode of 2-3 colors of the PHYSICAL PRODUCT ITSELF, strictly ignoring background, environment, lighting glare/reflections, text banners, and labels"],
   "materialsVisible": ["specific materials visible e.g. soft-touch matte plastic, brushed aluminum, silicone eartip"],
   "lightingStyle": "studio_clean|lifestyle_ambient|dark_dramatic|bright_airy|natural_outdoor",
   "usageFor": "hero_banner|feature_closeup|lifestyle_usage|comparison|brand_story|texture_detail",
@@ -428,6 +431,8 @@ export async function generateMoodBoardImages(productDNA, brandContext = '', cus
         laozhangGptImageWithRefs = mod.laozhangGptImageWithRefs;
     }
 
+    const colorGuardBlock = buildColorGuardInstruction(productDNA);
+
     // ── Generate a mood board for each direction ───────────────────────────────
     const moodImageJobs = Object.values(moodDirections).map(async (mood) => {
 
@@ -442,6 +447,7 @@ Do NOT paste the product as a cutout. Render it AS PART of the scene — as if i
 The product's proportions, form factor, and colors must remain accurate to what you see in the reference images.`
                 : `You are creating a designer mood board. Render a realistic mockup of the ${productDNA.productCategory || 'product'} naturally placed inside the scene.`,
 
+            colorGuardBlock,
 
             '',
 
