@@ -82,26 +82,26 @@ const SunoIcon = (props) => (
 
 const MODELS = [
   // Row 1
-  { name: 'GPT-5', vendor: 'OpenAI', domain: 'openai.com', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
-  { name: 'Claude 4.5', vendor: 'Anthropic', domain: 'anthropic.com', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
-  { name: 'Gemini 2.5', vendor: 'Google', domain: 'google.com', tag: 'MULTIMODAL', icon: GeminiIcon, color: '#6366f1' },
-  { name: 'Grok 4', vendor: 'xAI', domain: 'x.ai', tag: 'REASONING', icon: GrokIcon, color: '#a1a1aa' },
-  { name: 'Llama 4', vendor: 'Meta', domain: 'meta.com', tag: 'OPEN', icon: Infinity, color: '#f59e0b' },
-  { name: 'Mistral L', vendor: 'Mistral', domain: 'mistral.ai', tag: 'OPEN', icon: MistralIcon, color: '#f59e0b' },
+  { name: 'Claude Sonnet 4.6', vendor: 'Anthropic', domain: 'anthropic.com', tag: 'REASONING', icon: AnthropicIcon, color: '#a1a1aa' },
+  { name: 'Gemini 3 Pro', vendor: 'Google', domain: 'google.com', tag: 'REASONING', icon: GeminiIcon, color: '#6366f1' },
+  { name: 'GPT-4o', vendor: 'OpenAI', domain: 'openai.com', tag: 'REASONING', icon: OpenAIIcon, color: '#a1a1aa' },
+  { name: 'Grok 4', vendor: 'xAI', domain: 'x.ai', tag: 'REAL-TIME', icon: GrokIcon, color: '#a1a1aa' },
+  { name: 'Sarvam AI', vendor: 'Sarvam', domain: 'sarvam.ai', tag: 'VERNACULAR', icon: GeminiIcon, color: '#10b981' },
+  { name: 'Bhasha', vendor: 'Bhasha', domain: 'bhasha.ai', tag: 'VERNACULAR', icon: GeminiIcon, color: '#10b981' },
   // Row 2
   { name: 'Sora 2', vendor: 'OpenAI', domain: 'openai.com', tag: 'VIDEO', icon: OpenAIIcon, color: '#a1a1aa' },
-  { name: 'Veo 3', vendor: 'Google', domain: 'google.com', tag: 'VIDEO', icon: GoogleIcon, color: '#a1a1aa' },
-  { name: 'Kling 2.0', vendor: 'Kuaishou', domain: 'klingai.com', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
-  { name: 'Seedance', vendor: 'ByteDance', domain: 'bytedance.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
-  { name: 'Runway G4', vendor: 'Runway', domain: 'runwayml.com', tag: 'VIDEO', icon: RunwayIcon, color: '#a1a1aa' },
-  { name: 'Hailuo 02', vendor: 'MiniMax', domain: 'hailuo.ai', tag: 'VIDEO', icon: HailuoIcon, color: '#a1a1aa' },
+  { name: 'Veo 3.1', vendor: 'Google', domain: 'google.com', tag: 'VIDEO', icon: GoogleIcon, color: '#6366f1' },
+  { name: 'Kling 3.0', vendor: 'Kuaishou', domain: 'klingai.com', tag: 'VIDEO', icon: KlingIcon, color: '#a1a1aa' },
+  { name: 'Seedance 2.0 Pro', vendor: 'ByteDance', domain: 'bytedance.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
+  { name: 'HappyHorse 1.0', vendor: 'Alibaba', domain: 'alibaba.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
+  { name: 'Wan 2.1', vendor: 'Alibaba', domain: 'alibaba.com', tag: 'VIDEO', icon: SeedanceIcon, color: '#a1a1aa' },
   // Row 3
-  { name: 'Flux 1.1', vendor: 'BFL', domain: 'blackforestlabs.ai', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
-  { name: 'Imagen 4', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
-  { name: 'Ideogram', vendor: 'Ideogram', domain: 'ideogram.ai', tag: 'IMAGE', icon: IdeogramIcon, color: '#a1a1aa' },
-  { name: 'Recraft V3', vendor: 'Recraft', domain: 'recraft.ai', tag: 'IMAGE', icon: RecraftIcon, color: '#a1a1aa' },
+  { name: 'Flux Kontext Max', vendor: 'BFL', domain: 'blackforestlabs.ai', tag: 'IMAGE', icon: FluxIcon, color: '#a1a1aa' },
+  { name: 'GPT Image 2', vendor: 'OpenAI', domain: 'openai.com', tag: 'IMAGE', icon: OpenAIIcon, color: '#a1a1aa' },
+  { name: 'NanoBanana 2', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#6366f1' },
+  { name: 'NanoBanana Pro', vendor: 'Google', domain: 'google.com', tag: 'IMAGE', icon: GoogleIcon, color: '#a1a1aa' },
+  { name: 'HeyGen', vendor: 'HeyGen', domain: 'heygen.com', tag: 'AVATARS', icon: HailuoIcon, color: '#ec4899' },
   { name: 'ElevenLabs', vendor: 'ElevenLabs', domain: 'elevenlabs.io', tag: 'VOICE', icon: ElevenLabsIcon, color: '#a1a1aa' },
-  { name: 'Suno V4', vendor: 'Suno', domain: 'suno.com', tag: 'MUSIC', icon: SunoIcon, color: '#a1a1aa' },
 ];
 
 export default function IntelligenceLayer() {

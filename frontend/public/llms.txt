@@ -17,12 +17,20 @@ Tagline: "AI that knows your brand, not just the internet."
 - Agentic pipelines replace entire marketing teams — not just individual tools
 - Fidato operates as a coordinated team of agents, not a single assistant
 
-## What Mantram is — and what it isn't
+## Studios
+- [All 14 studios](https://mantram.ai/studios): grouped Plan (Research,
+  Brainstorm, Monthly Strategy), Create (Content, Creative, Video, YouTube,
+  Avatar, Brand), Distribute (Social Media, Performance Marketing, Funnel),
+  Optimize (SEO+AEO, Retention).
 
 By June 2026, every marketing tool has AI. The differentiator isn't "we have AI" — it's HOW AI is structured around your brand. Mantram is built on three principles that distinguish it from generic AI marketing tools:
 
-1. **Brand DNA as the single source of truth** — onboarding scans your website, social, competitors and reviews to build a structured profile (voice, visual identity, audience, language preference, content rules). Every one of the 14 studios reads from this same source. No re-prompting. No drift. Output sounds like your brand, not generic AI slop.
+## Learn
+- [What is agentic AI marketing](https://mantram.ai/learn/what-is-agentic-ai-marketing)
+- [SEO vs AEO vs GEO](https://mantram.ai/learn/seo-vs-aeo-vs-geo)
+- [AI marketing glossary](https://mantram.ai/glossary)
 
+<<<<<<< HEAD
 2. **Agent fleet, model-agnostic** — Mantram is not a "Claude wrapper" or a "GPT wrapper." It runs an agent fleet that routes per task to the best frontier model. Claude Sonnet 4.6 for reasoning. Gemini 3 Pro for multi-modal analytical work. GPT Image 2 / NanoBanana 2 for brand-faithful image edits. Veo 3.1 / Sora 2 / HappyHorse 1.0 for video. You're never locked to one vendor.
 
 3. **AI-search-citation aware** — in 2026 most informational queries are answered inside AI summaries (ChatGPT Search, Google AI Overviews, AI Mode, Perplexity, Microsoft Copilot, Apple Intelligence). Mantram's SEO Studio handles both traditional Google ranking AND AEO (Answer Engine Optimization) — so your brand actually gets cited in AI answers, not just buried on page 5.
@@ -183,3 +191,9 @@ India
 - Support: support@mantram.ai
 - Twitter/X: @mantramai
 - LinkedIn: https://www.linkedin.com/company/mantram-ai
+=======
+## Company
+- [Pricing](https://mantram.ai/pricing): one-time credit packs, no subscription.
+- [About](https://mantram.ai/about): founded by Da, creative director and author
+  of Prompt DOT AI and Creativity DOT AI.
+>>>>>>> 0e7eb50dae94015ae22f9f3cc9b7161a1b221cc8

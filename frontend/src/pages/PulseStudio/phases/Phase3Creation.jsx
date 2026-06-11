@@ -2,9 +2,11 @@ import React, { useState, lazy, Suspense } from 'react'
 import {
     FileText, Globe, Mail, BarChart2,
     Share2, Layers, Package, ChevronLeft,
-    Sparkles, Loader2, CheckCircle2, Image as ImageIcon
+    Sparkles, Loader2, CheckCircle2, Image as ImageIcon, User, Clock
 } from 'lucide-react'
 import { useBrand } from '../../../context/BrandContext'
+import AvatarConfigPanel from '../tools/AvatarConfigPanel'
+import PulseHistoryPanel from '../PulseHistoryPanel'
 
 // Lazy load tools — only mount when selected
 const AplusTool         = lazy(() => import('../tools/AplusTool'))
@@ -110,12 +112,13 @@ const TOOLS = [
     },
 ]
 
-export default function Phase3Creation({ productContext, selectedMoodId, onBack }) {
+export default function Phase3Creation({ productContext, selectedMoodId, onBack, avatarConfig, onAvatarConfigChange }) {
     const { activeBrand } = useBrand()
     const brandId = activeBrand?._id
 
     const [activeCategory, setActiveCategory] = useState('marketplace')
     const [activeTool, setActiveTool]         = useState(null)
+    const [activeView, setActiveView]         = useState('create') // 'create' | 'history'
 
     const filteredTools = TOOLS.filter(t => t.category === activeCategory)
     const activeToolMeta = TOOLS.find(t => t.id === activeTool)
@@ -143,6 +146,13 @@ export default function Phase3Creation({ productContext, selectedMoodId, onBack 
     const moodLabel      = sharedContext?.moodLabel || 'Mood Selected'
     const moodColor      = (productContext?.productDNA?.dominantColors || [])[0]?.hex || '#7c3aed'
 
+    // Handle history restore — switch to create view and pre-select the matching tool
+    const handleHistoryRestore = (historyItem) => {
+        const toolId = historyItem.tool === 'page' ? 'landing-page' : historyItem.tool
+        setActiveView('create')
+        setActiveTool(toolId)
+    }
+
     return (
         <div className="ps-slide-up">
             {/* Active product context bar */}
@@ -164,6 +174,15 @@ export default function Phase3Creation({ productContext, selectedMoodId, onBack 
                         </div>
                     </div>
 
+                    {/* Avatar config compact toggle — session-wide */}
+                    {onAvatarConfigChange && (
+                        <AvatarConfigPanel
+                            config={avatarConfig}
+                            onChange={onAvatarConfigChange}
+                            compact={true}
+                        />
+                    )}
+
                     {/* Back */}
                     <button className="ps-btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>
                         <ChevronLeft size={13} /> Change Mood
@@ -171,7 +190,29 @@ export default function Phase3Creation({ productContext, selectedMoodId, onBack 
                 </div>
             )}
 
-            {/* Tool expanded panel */}
+            {/* ── Create / History tab switcher ── */}
+            {!activeTool && (
+                <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--sys-border)', paddingBottom: 0 }}>
+                    {[{ id: 'create', label: 'Create', Icon: Sparkles }, { id: 'history', label: 'History', Icon: Clock }].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveView(tab.id)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                padding: '9px 16px', fontSize: 13, fontWeight: 700,
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                borderBottom: `2px solid ${activeView === tab.id ? 'var(--sys-primary)' : 'transparent'}`,
+                                color: activeView === tab.id ? 'var(--sys-primary)' : 'var(--sys-text-muted)',
+                                marginBottom: -1, transition: 'color 0.15s, border-color 0.15s',
+                            }}
+                        >
+                            <tab.Icon size={13} /> {tab.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Tool expanded panel or History Panel */}
             {activeTool && activeToolMeta ? (
                 <div>
                     <div className="ps-tool-panel">
@@ -205,11 +246,16 @@ export default function Phase3Creation({ productContext, selectedMoodId, onBack 
                                     sharedContext={sharedContext}
                                     brandId={brandId}
                                     variant={activeToolMeta.variant}
+                                    avatarConfig={avatarConfig}
+                                    onAvatarConfigChange={onAvatarConfigChange}
                                 />
                             </Suspense>
                         </div>
                     </div>
                 </div>
+            ) : activeView === 'history' ? (
+                /* History Panel */
+                <PulseHistoryPanel onRestore={handleHistoryRestore} />
             ) : (
                 /* Tool browser */
                 <div>

@@ -1,10 +1,28 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { BRAND } from '../../data/studios';
+import GlowThread from './GlowThread';
 
 export default function Comparison() {
     return (
-        <section className="py-24 md:py-32 relative bg-[#0b0b0c] border-b border-white/5 overflow-hidden">
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] overflow-hidden">
+            {/* ── GlowThread: top section divider entering Comparison ── */}
+            <div className="absolute top-0 left-0 right-0 pointer-events-none" aria-hidden="true">
+                <GlowThread
+                    d="M -80 55 C 600 20, 1200 90, 2080 35"
+                    height={110}
+                    speed={3.8}
+                    dashLen={6}
+                    gap={44}
+                    opacity={0.38}
+                    strokeW={1.8}
+                    nodes={[
+                        { x: 480,  y: 42, delay: 0.5 },
+                        { x: 960,  y: 62, delay: 1.2 },
+                        { x: 1440, y: 46, delay: 0.8 },
+                    ]}
+                />
+            </div>
             <div className="max-w-7xl mx-auto px-4 md:px-6">
 
                 {/* Section Header */}
@@ -136,7 +154,7 @@ export default function Comparison() {
                         <div className="grid grid-cols-3 gap-4 border-t pt-8" style={{ borderColor: `${BRAND.primary}20` }}>
                             <div>
                                 <span className="block text-[10px] text-[#a1a1aa] mb-1">Cost</span>
-                                <span className="text-xl md:text-2xl font-serif tracking-tight" style={{ color: BRAND.primary }}>₹40K/mo</span>
+                                <span className="text-xl md:text-2xl font-serif tracking-tight" style={{ color: BRAND.primary }}>₹149+</span>
                             </div>
                             <div>
                                 <span className="block text-[10px] text-[#a1a1aa] mb-1">Output</span>

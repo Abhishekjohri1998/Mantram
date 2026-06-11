@@ -778,53 +778,29 @@ export function studiosForGroup(group) {
  */
 export const LANDING_FAQS = [
     {
-        question: 'What is Mantram AI?',
-        answer: 'Mantram AI is an agentic AI marketing operating system with 14 specialised studios. It captures your Brand DNA once — voice, visuals, audience, competitors — then runs an agent fleet (research, ideation, content, creative, video, social, performance ads, SEO + AEO, retention) that all share the same brand brain. Built for D2C brands and marketing agencies in India and globally. Live since early 2026, in early access through May 2026.',
+        question: 'What is an agentic AI marketing platform?',
+        answer: 'An agentic AI marketing platform uses autonomous AI agents — not single prompts — to execute multi-step marketing work: researching, planning, creating, publishing and optimising with human approval checkpoints. Mantram AI coordinates a fleet of agents across 14 studios that all share one Brand DNA.'
     },
     {
-        question: 'In 2026 every tool has AI. What makes Mantram different?',
-        answer: 'Three things. First, Brand DNA — every studio reads from one structured profile of your brand, so output sounds like you, not like generic AI slop. Second, model-agnostic agent fleet — we route across Claude, Gemini, GPT, Veo, Sora, NanoBanana, Flux, HappyHorse and more, picking the best model per task. We\'re loyal to none. Third, Indian-first — Hindi/Marathi/Hinglish, Sarvam-Bhasha integrations, DLT-compliant SMS, INR pricing, DPDP-compliant data handling.',
+        question: 'How is Mantram different from ChatGPT or Canva?',
+        answer: 'ChatGPT and Canva are general tools that start from zero every session. Mantram starts from your Brand DNA — a persistent, structured profile of your voice, visuals, products and audience — and routes each task across multiple frontier models. It executes end-to-end pipelines, not one-off generations.'
     },
     {
-        question: 'Won\'t my AI-generated content get penalised as AI slop?',
-        answer: 'Only if it sounds like generic AI. Google\'s Helpful Content guidance and AI search engines (ChatGPT Search, AI Overviews, Perplexity) penalise low-effort AI output that lacks point of view. Mantram\'s Brand DNA + Critic-node pipelines force every piece to be brand-faithful, opinionated and source-cited — the opposite of slop. SEO Studio also rewrites output for AEO so AI search engines actually quote you.',
+        question: 'Which languages does Mantram support?',
+        answer: 'Indic languages natively — Hindi, Marathi, Tamil, Telugu, Bengali and more, plus code-switched Hinglish — via Sarvam AI and Bhasha models, with correct script rendering in creatives. Arabic (dialect-aware, RTL-correct), Bahasa Melayu, Bahasa Indonesia, Vietnamese, Thai and other market languages run through the multilingual frontier fleet. TRAI DLT-registered SMS for India.'
     },
     {
-        question: 'How do I get cited in ChatGPT Search, AI Overviews and Perplexity?',
-        answer: 'That\'s what AEO (Answer Engine Optimization) is for, and SEO Studio does it natively. We rewrite your content with clear claims, source attribution, structured data, FAQPage + HowTo + Speakable schema, and citation-worthy phrasing. Then we track your citation share across ChatGPT Search, Google AI Overviews, Google AI Mode, Microsoft Copilot Search, Perplexity, Claude with web, and Apple Intelligence — so you can see which engines quote you and on which queries.',
+        question: 'Which e-commerce platforms does Mantram integrate with?',
+        answer: 'Shopify, WooCommerce and Etsy via secure OAuth, plus Meta, LinkedIn, X, Google Ads, Meta Ads and Google Analytics 4.'
     },
     {
-        question: 'What does "Brand DNA" mean?',
-        answer: 'Brand DNA is Mantram\'s onboarding artefact: a structured profile of your brand built from a website scan, social audit, competitor research and review-sentiment analysis in about 90 seconds. It captures voice (witty, formal, warm), visual identity (palette, typography), platform-specific tone, content rules and a knowledge bank. Every studio reads from this single source so output stays on-brand without re-prompting.',
+        question: 'Is my brand data safe?',
+        answer: 'Mantram is DPDP Act compliant and GDPR-aware. Your Brand DNA, catalogue and campaign data are never used to train third-party models.'
     },
     {
-        question: 'Which AI models does Mantram use?',
-        answer: 'Mantram is model-agnostic and routes per task. Reasoning: Claude Sonnet 4.6, Gemini 3 Pro, Gemini 2.5 Pro, GPT-4o. Image: GPT Image 2, NanoBanana 2, NanoBanana Pro, Flux Kontext Max/Pro. Video: Google Veo 3.1, OpenAI Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, Hailuo MiniMax, Wan 2.1. Avatars: HeyGen. Indian-language: Sarvam AI / Bhasha models. We pick the best one for each job — quality, latency and cost-optimised — and you\'re never locked to one vendor.',
-    },
-    {
-        question: 'Is there a free tier?',
-        answer: 'Not currently. Mantram is in early access through May 2026 — request access via the waitlist. Pricing is credit-pack based starting from ₹149 (Micro, 20 credits) up to ₹17,999 (Enterprise, 5,000 + 2,000 bonus credits). No subscription, no monthly fee. Credits stay valid 6–12 months. UPI auto-pay supported for Indian customers.',
-    },
-    {
-        question: 'Who is Fidato?',
-        answer: 'Fidato (Italian for "trusted") is Mantram\'s always-on AI branding expert — a conversational agent that knows your Brand DNA cold and answers strategy, copy, campaign and brand-health questions in your language. Available across the platform via the floating chat panel. Powered by Claude Sonnet 4.6 reasoning + your full brand context.',
-    },
-    {
-        question: 'What is "agentic" about Mantram in 2026 terms?',
-        answer: 'Agentic means an agent fleet, not single AI calls. Creative Studio runs Art Director → Prompt Engineer → Style Critic → Generator as separate agents. Master Orchestrator routes user intent across 14 studios. The MCP server exposes live tools (web_search, scrape_competitor, fetch_trending, fetch_seo_audit) that agents call during reasoning. By 2026, single-prompt AI is table stakes — agentic orchestration with shared brand context is the difference.',
-    },
-    {
-        question: 'How does Mantram comply with India\'s DPDP Act?',
-        answer: 'Mantram is built DPDP-compliant from day one — explicit consent flows, purpose-bound processing, user-initiated data deletion (mantram.ai/data-deletion), data residency options for India, and no third-party model training on your data. Your brand content stays yours; we don\'t use it to train shared models. Same applies for GDPR (EU) and California CCPA — global compliance baked in.',
-    },
-    {
-        question: 'Does Mantram support Indian languages?',
-        answer: 'Yes — Hindi, Marathi, Hinglish, English, code-switched output, plus expanding regional support via Sarvam AI / Bhasha-1 models. The Smart Language Router auto-detects your brand\'s preferred language from Brand DNA and picks the optimal model per task. SMS deliveries via Twilio are TRAI DLT-registered.',
-    },
-    {
-        question: 'What does Mantram integrate with?',
-        answer: 'Commerce: Shopify, Etsy, WooCommerce. Social and ads: Meta (Facebook + Instagram), LinkedIn, X, Google Ads, Meta Ads, Google Analytics 4. SEO + AEO data: DataForSEO, Moz. Comms: Twilio (DLT-compliant SMS), Firebase (push). All integrations are Meta-compliance-aware with anti-mimicry delays and signed webhooks.',
-    },
+        question: 'Is there a free trial?',
+        answer: 'There\'s no free tier — credit packs start at ₹149, less than a coffee, so you can test every studio with real output instead of a crippled demo.'
+    }
 ];
 
 export default STUDIOS;

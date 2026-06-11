@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { BRAND } from '../../data/studios';
+import GlowThread from './GlowThread';
 
 const METRICS = [
     { value: '8.4×', label: 'Faster campaign turn-around', sub: 'VS TRADITIONAL CREATIVE CYCLE' },
@@ -44,7 +45,26 @@ function AnimatedNumber({ textValue }) {
 
 export default function Metrics() {
     return (
-        <section className="py-24 md:py-32 relative bg-[#0b0b0c]">
+        <section className="py-24 md:py-32 relative bg-[#0b0b0c] overflow-hidden">
+            {/* ── GlowThread: connector line across metric cards ── */}
+            {/* Nodes sit at the top of each metric column, thread links them all */}
+            <div className="absolute left-0 right-0 pointer-events-none" style={{ top: '36%' }} aria-hidden="true">
+                <GlowThread
+                    d="M -60 50 C 380 30, 900 70, 1980 45"
+                    height={100}
+                    speed={2.8}
+                    dashLen={10}
+                    gap={28}
+                    opacity={0.28}
+                    strokeW={1.5}
+                    nodes={[
+                        { x: 240,  y: 50, r: 4, delay: 0 },
+                        { x: 720,  y: 52, r: 4, delay: 0.6 },
+                        { x: 1200, y: 48, r: 4, delay: 1.2 },
+                        { x: 1680, y: 50, r: 4, delay: 1.8 },
+                    ]}
+                />
+            </div>
             <div className="max-w-7xl mx-auto px-4 md:px-6">
 
                 {/* Section Header */}

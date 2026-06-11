@@ -1,13 +1,16 @@
 import React, { useState, useRef } from 'react'
-import { FileText, Download, ExternalLink, Loader2, Sparkles, RefreshCw } from 'lucide-react'
+import { FileText, Download, ExternalLink, Loader2, Sparkles, RefreshCw, User } from 'lucide-react'
 import { apiFetch } from '../../../services/api'
+import AvatarConfigPanel from './AvatarConfigPanel'
 
-export default function BrochureTool({ sharedContext, brandId }) {
+export default function BrochureTool({ sharedContext, brandId, avatarConfig, onAvatarConfigChange }) {
     const [brief, setBrief]   = useState('')
     const [loading, setLoading] = useState(false)
     const [result, setResult]   = useState(null)
     const [error, setError]     = useState('')
     const [activeView, setActiveView] = useState('front') // front | back | html
+    // Spokesperson mode (default ON for brochures — human on cover)
+    const [spokespersonMode, setSpokespersonMode] = useState(true)
     const iframeRef = useRef()
 
     const handleGenerate = async () => {
@@ -21,6 +24,12 @@ export default function BrochureTool({ sharedContext, brandId }) {
                     productData:   sharedContext?.productData,
                     designContext: sharedContext?.designContext,
                     brandId, brief,
+                    // Creative Brain inputs
+                    avatarConfig:  (avatarConfig?.enabled || spokespersonMode)
+                        ? { ...(avatarConfig || {}), enabled: true, intent: spokespersonMode ? 'spokesperson' : (avatarConfig?.intent || 'lifestyle') }
+                        : null,
+                    typographyDNA: sharedContext?.productDNA?.typographyDNA || null,
+                    usePulseCreativeBrain: true,
                 }),
             })
             if (data.success) setResult(data)
@@ -63,6 +72,39 @@ export default function BrochureTool({ sharedContext, brandId }) {
                 />
             </div>
 
+            {/* Human mode toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--sys-text-muted)' }}>
+                    Cover Image
+                </div>
+                <button
+                    onClick={() => setSpokespersonMode(false)}
+                    className={`ps-btn-${!spokespersonMode ? 'primary' : 'ghost'}`}
+                    style={{ fontSize: 11, padding: '5px 11px', gap: 5 }}
+                    disabled={loading}
+                >
+                    Product hero
+                </button>
+                <button
+                    onClick={() => setSpokespersonMode(true)}
+                    className={`ps-btn-${spokespersonMode ? 'primary' : 'ghost'}`}
+                    style={{ fontSize: 11, padding: '5px 11px', gap: 5 }}
+                    disabled={loading}
+                >
+                    <User size={12} /> Spokesperson
+                </button>
+            </div>
+
+            {/* Avatar config (only shown when spokesperson mode is on) */}
+            {spokespersonMode && onAvatarConfigChange && (
+                <AvatarConfigPanel
+                    config={{ ...avatarConfig, enabled: true, intent: 'spokesperson' }}
+                    onChange={cfg => onAvatarConfigChange({ ...cfg, intent: 'spokesperson' })}
+                    compact={false}
+                    disabled={loading}
+                />
+            )}
+
             <button className="ps-btn-primary" onClick={handleGenerate} disabled={loading} style={{ width: '100%', marginBottom: 16 }}>
                 {loading ? (
                     <><Loader2 size={15} className="ps-spin" />Building A4 brochure + AI images…</>
@@ -76,10 +118,10 @@ export default function BrochureTool({ sharedContext, brandId }) {
             {loading && (
                 <div className="ps-analysis-card">
                     {[
-                        'Crafting brochure copy with Claude…',
-                        'Generating hero image with GPT Image 2…',
-                        'Generating lifestyle back image…',
-                        'Building print-ready HTML layout…',
+                        'Claude Art Director analyzing product specs…',
+                        'Writing ultra-detailed creative layout prompts…',
+                        'GPT Image 2: Rendering front cover with typography…',
+                        'GPT Image 2: Rendering back page with specs grid…',
                     ].map((s, i) => (
                         <div key={i} className="ps-analysis-step active">
                             <Loader2 size={13} className="ps-spin" style={{ color: 'var(--sys-primary)', flexShrink: 0 }} />

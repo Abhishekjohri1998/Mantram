@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { BRAND } from '../../data/studios'
 import useReveal from '../../hooks/useReveal'
+import GlowThread from './GlowThread'
 
 /**
  * Final CTA — repeats the hero offer with stronger framing, bigger visual
@@ -12,6 +13,37 @@ export default function FinalCTA() {
         <section ref={ref} className="reveal py-20 md:py-32 relative overflow-hidden" aria-labelledby="final-cta-title">
             <div className="absolute inset-0 -z-10">
                 <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, ${BRAND.primary}15 0%, transparent 70%)` }} />
+            </div>
+
+            {/* ── GlowThread: weaving line across the CTA — echoes hero, reversed ── */}
+            <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+                {/* Top weave */}
+                <GlowThread
+                    d="M 2100 80 C 1400 140, 600 30, -120 120"
+                    height={200}
+                    speed={3.6}
+                    dashLen={7}
+                    gap={36}
+                    opacity={0.32}
+                    strokeW={2}
+                    reverse={true}
+                    nodes={[
+                        { x: 480,  y: 100, delay: 0.3 },
+                        { x: 1440, y: 92,  delay: 1.4 },
+                    ]}
+                    style={{ position: 'absolute', top: 0, left: 0 }}
+                />
+                {/* Bottom weave — reverse direction, slightly different curve */}
+                <GlowThread
+                    d="M -120 60 C 500 110, 1300 20, 2100 85"
+                    height={150}
+                    speed={4.2}
+                    dashLen={5}
+                    gap={52}
+                    opacity={0.22}
+                    strokeW={1.5}
+                    style={{ position: 'absolute', bottom: 0, left: 0 }}
+                />
             </div>
 
             <div className="max-w-4xl mx-auto px-4 md:px-6 text-center">

@@ -255,6 +255,28 @@
     color: var(--sys-text-muted);
 }
 
+/* ps-input — single-line version of ps-textarea (used in history search) */
+.ps-input {
+    padding: 10px 14px;
+    background: var(--sys-bg);
+    border: 1px solid var(--sys-border);
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--sys-text);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ps-input:focus {
+    border-color: var(--sys-primary);
+}
+
+.ps-input::placeholder {
+    color: var(--sys-text-muted);
+}
+
+
 /* ── Analysis Progress ── */
 .ps-analysis-card {
     background: var(--sys-surface);

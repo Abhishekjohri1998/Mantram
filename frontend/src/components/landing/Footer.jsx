@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { BRAND, STUDIOS } from '../../data/studios'
+import GlowThread from './GlowThread'
 
 /**
  * Footer — also serves as a sitemap for crawlers, with internal links to
@@ -12,7 +13,22 @@ export default function Footer() {
     const optStudios = STUDIOS.filter(s => s.group === 'Optimize')
 
     return (
-        <footer className="border-t pt-16 pb-10" style={{ borderColor: 'rgba(255,255,255,0.06)' }} role="contentinfo">
+        <footer className="relative pt-16 pb-10 overflow-hidden" role="contentinfo">
+            {/* ── GlowThread: replaces the static top border ── */}
+            <div className="absolute top-0 left-0 right-0 pointer-events-none" aria-hidden="true">
+                <GlowThread
+                    d="M -100 38 C 640 12, 1280 64, 2100 28"
+                    height={76}
+                    speed={5.5}
+                    dashLen={4}
+                    gap={58}
+                    opacity={0.28}
+                    strokeW={1.5}
+                    nodes={[
+                        { x: 960, y: 38, r: 3.5, delay: 0 },
+                    ]}
+                />
+            </div>
             <div className="max-w-7xl mx-auto px-4 md:px-6">
                 <div className="grid md:grid-cols-7 gap-8 mb-12">
                     <div className="md:col-span-2">
@@ -22,8 +38,8 @@ export default function Footer() {
                                 Mantram <span style={{ color: BRAND.primary }}>AI</span>
                             </span>
                         </Link>
-                        <p className="text-sm leading-relaxed mb-5" style={{ color: BRAND.textMuted }}>
-                            Agentic AI marketing OS. Brand DNA learned once. 14 studios run the rest.
+                        <p className="text-xs leading-relaxed mb-5" style={{ color: BRAND.textMuted }}>
+                            Mantram (Sanskrit: <em>mantra</em> — a phrase repeated until it becomes truth). Teach the machine your brand once. Let it repeat you, perfectly, everywhere.
                         </p>
                         <div className="flex gap-2">
                             <a href="https://twitter.com/mantramai" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="size-9 rounded-lg flex items-center justify-center transition-colors hover:bg-white/5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
