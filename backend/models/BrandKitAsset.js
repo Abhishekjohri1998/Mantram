@@ -54,7 +54,7 @@ const brandKitAssetSchema = new mongoose.Schema({
 
     // Generation metadata
     imageModel:    { type: String, default: 'gpt-image-1' },
-    llmModel:      { type: String, default: 'claude-sonnet-4-20250514' },
+    llmModel:      { type: String, default: 'claude-3-5-sonnet-20241022' },
     creditsUsed:   { type: Number, default: 0 },
     status:        { type: String, enum: ['pending', 'generating', 'completed', 'failed'], default: 'completed' },
     errorMessage:  { type: String, default: '' },

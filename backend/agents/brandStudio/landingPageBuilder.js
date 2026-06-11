@@ -14,7 +14,7 @@ import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import fetch from 'node-fetch';
 
-const CLAUDE_OPUS = 'claude-sonnet-4-20250514';
+const CLAUDE_OPUS = 'claude-3-5-sonnet-20241022';
 
 // ── Fixed Sections Scaffold ────────────────────────────────────────
 
@@ -48,7 +48,7 @@ async function gatherIntelligence(brief, brandId) {
 }
 
 // ── Phase 2: Claude Creative Director ─────────────────────────
-const PAGE_SYSTEM = (brandContext, intel, urlContext) => `You are a world-class strategic copywriter.
+export const PAGE_SYSTEM = (brandContext, intel, urlContext) => `You are a world-class strategic copywriter.
 Your job is to write compelling, conversion-focused copy for a campaign landing page.
 
 CRITICAL RULES:

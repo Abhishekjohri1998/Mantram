@@ -19,7 +19,7 @@
  *   AUTOFIX_COOLDOWN_HOURS  — Hours before same error re-triggers (default: 6)
  *   AUTOFIX_MAX_DAILY_PRS   — Max PRs per 24h (default: 10)
  *   AUTOFIX_NOTIFY_EMAIL    — Email to send PR alerts to
- *   AUTOFIX_MODEL           — Claude model (default: claude-sonnet-4-20250514)
+ *   AUTOFIX_MODEL           — Claude model (default: claude-3-5-sonnet-20241022)
  */
 
 import { spawn } from 'child_process';
@@ -125,7 +125,7 @@ console.log(`   App Root:    ${CONFIG.appRoot}`);
 console.log(`   Cooldown:    ${CONFIG.cooldownMs / 3600000}h`);
 console.log(`   Max PRs/day: ${CONFIG.maxDailyPRs}`);
 console.log(`   Log Files:   ${CONFIG.logPaths.length > 0 ? CONFIG.logPaths.join(', ') : '(none found — will retry)'}`);
-console.log(`   Model:       ${process.env.AUTOFIX_MODEL || 'claude-sonnet-4-20250514'}`);
+console.log(`   Model:       ${process.env.AUTOFIX_MODEL || 'claude-3-5-sonnet-20241022'}`);
 console.log('═══════════════════════════════════════════════════');
 
 if (!CONFIG.enabled) {

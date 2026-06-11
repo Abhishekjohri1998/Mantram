@@ -443,7 +443,7 @@ Respond ONLY in this exact JSON schema:
             userPrompt,
             temperature: 0.65, // Increased for variance
             maxTokens: 4096,
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-3-5-sonnet-20241022',
             responseFormat: 'json',
         }, { provider: 'anthropic' });
 

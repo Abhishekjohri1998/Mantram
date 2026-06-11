@@ -24,7 +24,7 @@ import { mirrorUrlToS3 } from '../../utils/s3.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const GPT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
 
 const COLLECTION_ASSETS = [
     { subType: 'campaign-hero', name: 'Campaign Hero Banner', size: '1792x1024' },
