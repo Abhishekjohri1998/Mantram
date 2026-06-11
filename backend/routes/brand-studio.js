@@ -374,6 +374,7 @@ router.post('/social-kit/generate', protect, async (req, res) => {
     try {
         const {
             productDNA, productData, selectedMoodId, productMoodDirections,
+            designContext = null,    // ← NEW: full design context from Phase2 selection
             kitType = 'promo', platforms, brandId, imageModel,
             avatarConfig = null,   // NEW: human presence config
             typographyDNA = null,  // NEW: typography DNA from URL scan
@@ -395,18 +396,39 @@ router.post('/social-kit/generate', protect, async (req, res) => {
             brandContext = ctx.brandContext || '';
         }
 
-        // Resolve mood direction
+        // Resolve mood direction — prefer designContext (rebuilt from actual Phase2 selection)
+        // then fall back to productMoodDirections lookup
         const moodMap = productMoodDirections || {};
-        const selectedMoodDir = moodMap[selectedMoodId] || Object.values(moodMap)[0] || {
-            label: 'Professional', description: 'Clean professional aesthetic',
-            shootDirective: 'Studio quality, clean, well-lit',
-        };
+        let selectedMoodDir;
+        if (designContext?.moodLabel && designContext?.shootDirective) {
+            // Use the full mood direction from the locked designContext
+            selectedMoodDir = {
+                id:            designContext.moodId || selectedMoodId,
+                label:         designContext.moodLabel,
+                description:   designContext.moodSystemDirective || designContext.shootDirective,
+                shootDirective: designContext.shootDirective,
+                moodBoardDirective: designContext.moodBoardDirective || '',
+                systemDirective:    designContext.systemDirective || '',
+            };
+            console.log(`✅ Social Kit: using locked designContext mood — "${selectedMoodDir.label}"`);
+        } else {
+            selectedMoodDir = moodMap[selectedMoodId] || Object.values(moodMap)[0] || {
+                label: 'Professional', description: 'Clean professional aesthetic',
+                shootDirective: 'Studio quality, clean, well-lit',
+            };
+            console.log(`⚠️  Social Kit: designContext missing, using moodMap lookup — "${selectedMoodDir.label}"`);
+        }
 
         const productTitle = productData?.title || productDNA?.productCategory || 'Product';
         const refImages = [
             productDNA?.heroImageUrl,
             ...(productDNA?.productRefImages || []).slice(0, 2),
         ].filter(Boolean);
+
+        // Design context prefix — injected into every image prompt
+        const designPrefix = designContext?.systemDirective
+            ? `${designContext.systemDirective}\n\n---\n`
+            : '';
 
         // ── Step 1: Pulse Creative Brain — per-platform art direction + copy ────
         // When usePulseCreativeBrain=true, runs the full 4-role creative engine
@@ -548,19 +570,24 @@ Generate platform-optimized captions and image-text overlays. For every platform
             const brainDir = perPlatformArtDirection[platform];
 
             // Use Creative Brain's primaryPrompt if available, otherwise build from template
+            // Always prepend the full designContext systemDirective (shoot + color guard)
             let imagePrompt;
             if (brainDir?.primaryPrompt) {
-                imagePrompt = brainDir.primaryPrompt;
+                // Brain already incorporates mood direction — just prepend design guard
+                imagePrompt = designPrefix
+                    ? `${designPrefix}${brainDir.primaryPrompt}`
+                    : brainDir.primaryPrompt;
                 if (brainDir.styleModifiers) imagePrompt += `, ${brainDir.styleModifiers}`;
             } else {
                 const textToRender = platformCaption.imageText || `${productTitle} Redefined`;
-                imagePrompt = `SOCIAL MEDIA ${cfg.label.toUpperCase()} — COMPLETE DESIGNED GRAPHIC
+                const moodBlock = `MOOD: ${selectedMoodDir.label} — ${selectedMoodDir.shootDirective || selectedMoodDir.description || ''}`;
+                imagePrompt = `${designPrefix}SOCIAL MEDIA ${cfg.label.toUpperCase()} — COMPLETE DESIGNED GRAPHIC
 
 PLATFORM: ${cfg.label} | Size: ${cfg.size} | Type: ${postTypePrompts[kitType] || postTypePrompts.promo}
 ${cfg.hint}
 
 PRODUCT: ${productTitle}
-MOOD: ${selectedMoodDir.label} — ${selectedMoodDir.description || ''}
+${moodBlock}
 ${colorGuard ? `PRODUCT COLORS (PRESERVE EXACTLY): ${colorGuard}` : ''}
 
 DESIGN: Complete ready-to-post social graphic. Product as hero. Include graphic design elements.
@@ -759,6 +786,7 @@ CRITICAL RULES:
 
         const artDirectorPrompt = `Analyze this product and write two complete brochure page image prompts:
 
+${designContext?.systemDirective ? `\n=== DESIGN INTELLIGENCE BRIEF ===\n${designContext.systemDirective}\n=== END BRIEF ===\n` : ''}
 PRODUCT: "${productTitle}"
 CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
 TAGLINE / BRIEF: ${brief || 'Premium product brochure for retail/distribution'}

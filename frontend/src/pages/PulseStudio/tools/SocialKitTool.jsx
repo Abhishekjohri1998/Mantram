@@ -83,6 +83,7 @@ export default function SocialKitTool({ sharedContext, brandId, avatarConfig, on
                     productData:           sharedContext?.productData,
                     selectedMoodId:        sharedContext?.selectedMood || sharedContext?.moodLabel,
                     productMoodDirections: sharedContext?.productMoodDirections,
+                    designContext:         sharedContext?.designContext || null,   // ← FIX: pass full design context
                     kitType,
                     brief,
                     platforms:             Array.from(selectedPlatforms),
