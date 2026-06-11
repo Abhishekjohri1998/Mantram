@@ -92,9 +92,32 @@ export default function PulseStudio() {
         setPhase(2)
     }
 
-    const handleMoodSelected = (moodId) => {
+    const handleMoodSelected = async (moodId) => {
         setSelectedMoodId(moodId)
         markDone(2)
+        // Rebuild designContext for the newly selected mood immediately
+        // so Phase3 tools always get the correct mood's shoot directive
+        if (productContext?.productDNA) {
+            try {
+                const res = await fetch('/api/brand-studio/design-context', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
+                    body: JSON.stringify({
+                        productDNA: productContext.productDNA,
+                        selectedMoodId: moodId,
+                        customMoodDirections: moodDirections || productContext.productMoodDirections || null,
+                    }),
+                })
+                const dc = await res.json()
+                if (dc.success && dc.designContext) {
+                    // Patch productContext with fresh designContext for the selected mood
+                    setProductContext(prev => prev ? { ...prev, designContext: dc.designContext } : prev)
+                }
+            } catch (e) {
+                // Non-critical: tools still work via selectedMoodId fallback
+                console.warn('designContext rebuild failed:', e.message)
+            }
+        }
         setPhase(3)
     }
 
@@ -104,6 +127,7 @@ export default function PulseStudio() {
     }
 
     // mergedContext always includes latest moodImages + moodDirections so Phase2 re-renders reactively
+    // designContext is rebuilt on mood selection (handleMoodSelected) and patched into productContext
     const mergedContext = productContext
         ? { ...productContext, moodImages, productMoodDirections: moodDirections || productContext.productMoodDirections }
         : null
