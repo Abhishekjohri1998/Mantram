@@ -1,0 +1,462 @@
+import React, { useState, useRef } from 'react'
+import {
+    Link2, UploadCloud, Search, Palette, Cpu, Sparkles,
+    CheckCircle2, Loader2, X, RefreshCw, Lock, ChevronRight
+} from 'lucide-react'
+import { apiFetch } from '../../../services/api'
+
+// Upload product images via multipart → S3 (no base64 ever sent to generation)
+async function uploadProductImages(files) {
+    const uploaded = []
+    for (const file of files) {
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const res = await fetch('/api/media/image-reference', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                body: formData,
+            })
+            const data = await res.json()
+            if (data.success && data.url) uploaded.push(data.url)
+        } catch (e) { console.warn('Upload failed for', file.name, e.message) }
+    }
+    return uploaded
+}
+
+const ANALYSIS_STEPS = [
+    { icon: Search,    text: 'Scraping product data & images…' },
+    { icon: Palette,   text: 'AI vision extracting color palette…' },
+    { icon: Cpu,       text: 'Building product design DNA…' },
+    { icon: Sparkles,  text: 'Generating 4 custom mood directions…' },
+]
+
+export default function Phase1Intelligence({ brandId, onContextReady }) {
+    const [productUrl, setProductUrl]         = useState('')
+    const [description, setDescription]       = useState('')
+    const [step, setStep]                     = useState('input')   // input | analyzing | ready
+    const [error, setError]                   = useState('')
+    const [activeAnalysisStep, setActiveStep] = useState(0)
+    const [uploadedFiles, setUploadedFiles]   = useState([])
+    const [uploadPreviews, setUploadPreviews] = useState([])
+    const [s3ImageUrls, setS3ImageUrls]       = useState([])
+
+    // Ready state
+    const [analyzedProduct, setAnalyzedProduct]         = useState(null)
+    const [productImages, setProductImages]             = useState([])
+    const [productDNA, setProductDNA]                   = useState(null)
+    const [selectedMood, setSelectedMood]               = useState(null)
+    const [moodImages, setMoodImages]                   = useState({})
+    const [productMoodDirections, setProductMoodDirections] = useState(null)
+    const [designContext, setDesignContext]             = useState(null)
+    const [moodLoading, setMoodLoading]                 = useState(false)
+    const fileRef = useRef()
+
+    const reset = () => {
+        setProductDNA(null); setMoodImages({}); setProductMoodDirections(null)
+        setSelectedMood(null); setDesignContext(null); setAnalyzedProduct(null)
+        setProductImages([]); setActiveStep(0); setError('')
+        setUploadedFiles([]); setUploadPreviews([]); setS3ImageUrls([])
+        setStep('input')
+    }
+
+    // Simulate step-by-step progress during analysis
+    const runProgressAnimation = () => {
+        let i = 0
+        const tick = () => {
+            setActiveStep(i)
+            i++
+            if (i < ANALYSIS_STEPS.length) setTimeout(tick, 1800)
+        }
+        tick()
+    }
+
+    const runPDI = async (images, product) => {
+        try {
+            const data = await apiFetch('/brand-studio/product-intelligence', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productImages: images.slice(0, 8), productData: product, brandId, productUrl }),
+            })
+            if (data.success && data.productDNA) {
+                setProductDNA(data.productDNA)
+                const def = data.productDNA.defaultMoodDirection || 'editorial'
+                setSelectedMood(def)
+                // Build design context silently
+                apiFetch('/brand-studio/design-context', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productDNA: data.productDNA, selectedMoodId: def }),
+                }).then(dc => { if (dc.success) setDesignContext(dc.designContext) }).catch(() => {})
+                // Kick off moodboard generation
+                setMoodLoading(true)
+                apiFetch('/brand-studio/mood-board', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productDNA: data.productDNA, productData: product, brandId }),
+                }).then(mb => {
+                    setMoodLoading(false)
+                    if (mb.success) {
+                        if (mb.moodDirections && Object.keys(mb.moodDirections).length >= 2) {
+                            setProductMoodDirections(mb.moodDirections)
+                            setSelectedMood(Object.keys(mb.moodDirections)[0])
+                        }
+                        if (mb.moods) {
+                            const imgs = {}
+                            mb.moods.forEach(m => { if (m.imageUrl) imgs[m.id] = m.imageUrl })
+                            setMoodImages(imgs)
+                        }
+                    }
+                }).catch(() => setMoodLoading(false))
+            }
+        } catch (e) { console.warn('PDI failed:', e.message) }
+        setActiveStep(ANALYSIS_STEPS.length - 1)
+        setStep('ready')
+    }
+
+    const handleAnalyze = async () => {
+        if (!productUrl && s3ImageUrls.length === 0) return
+        reset()
+        setStep('analyzing')
+        runProgressAnimation()
+        try {
+            const data = await apiFetch('/brand-studio/aplus/analyze-product', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: productUrl }),
+            })
+            if (data.success) {
+                setAnalyzedProduct(data.product)
+                const imgs = data.product.images || []
+                setProductImages(imgs)
+                await runPDI(imgs, data.product)
+            } else { setError(data.error || 'Failed to analyze product'); setStep('input') }
+        } catch (e) { setError(e.message); setStep('input') }
+    }
+
+    const handleFileChange = async (e) => {
+        const files = Array.from(e.target.files || [])
+        if (!files.length) return
+        setUploadedFiles(files)
+        // Show local previews immediately
+        const previews = await Promise.all(
+            files.map(f => new Promise(res => {
+                const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f)
+            }))
+        )
+        setUploadPreviews(previews)
+        reset()
+        setStep('analyzing')
+        runProgressAnimation()
+        // Upload to S3
+        const urls = await uploadProductImages(files)
+        setS3ImageUrls(urls)
+        setProductImages(urls)
+        await runPDI(urls, { title: '', description: description || '' })
+    }
+
+    const handleSelectMood = async (moodId) => {
+        setSelectedMood(moodId)
+        let dc = designContext
+        try {
+            const res = await apiFetch('/brand-studio/design-context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productDNA, selectedMoodId: moodId, customMoodDirections: productMoodDirections || null }),
+            })
+            if (res.success) { dc = res.designContext; setDesignContext(dc) }
+        } catch (e) {}
+        onContextReady({
+            productData:           analyzedProduct,
+            productDNA,
+            productImages:         productImages.length ? productImages : s3ImageUrls,
+            productUrl,
+            selectedMood:          moodId,
+            productMoodDirections,
+            moodImages,
+            designContext:         dc,
+        })
+        // Background auto-save
+        if (brandId && productDNA) {
+            const pName = analyzedProduct?.title || productDNA?.productCategory || 'Product'
+            if (!/oops|something went wrong|access denied|captcha/i.test(pName)) {
+                apiFetch('/brand-studio/product-context', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        brandId, productName: pName,
+                        productCategory: productDNA?.productCategory || '',
+                        productBrand: analyzedProduct?.brand || '',
+                        productUrl: productUrl || '',
+                        productImages: (analyzedProduct?.persistedImages || productImages || []).slice(0, 4),
+                        palette: productDNA?.dominantColors || [],
+                        productDNA: productDNA || {},
+                        selectedMoodId: moodId,
+                        moodDirections: productMoodDirections || {},
+                        moodImages: moodImages || {},
+                        designContext: dc, autoSaved: true,
+                    }),
+                }).catch(() => {})
+            }
+        }
+    }
+
+    const activeMoods = productMoodDirections
+        ? Object.fromEntries(Object.values(productMoodDirections).map((m, i) => {
+            const bgs = ['linear-gradient(135deg,#0d0d1a,#1a0d2e)', 'linear-gradient(135deg,#1a0a0a,#2e0d0d)', 'linear-gradient(135deg,#fef3c7,#fde68a)', 'linear-gradient(135deg,#f5f5f0,#e8e4dc)']
+            const p = m.colorPalette || []
+            return [m.id, { ...m, icon: m.icon || 'sparkles', desc: m.description || '', bg: p.length >= 2 ? `linear-gradient(135deg,${p[0]},${p[1]})` : bgs[i % bgs.length] }]
+          }))
+        : {
+            editorial: { id:'editorial', label:'Editorial Clean',   desc:'Clean, precise, studio-perfect',  bg:'linear-gradient(135deg,#f0f0f0,#e8e8e8)' },
+            bold:      { id:'bold',      label:'Bold Ambient',      desc:'Dark, dramatic, cinematic',       bg:'linear-gradient(135deg,#0d0d1a,#1a0d2e)' },
+            lifestyle: { id:'lifestyle', label:'Lifestyle Vibrant', desc:'Real-world, warm, relatable',     bg:'linear-gradient(135deg,#fef3c7,#fde68a)' },
+            luxury:    { id:'luxury',    label:'Premium Minimal',   desc:'Luxury, spacious, refined',       bg:'linear-gradient(135deg,#f5f5f0,#e8e4dc)' },
+          }
+
+    return (
+        <div className="ps-slide-up">
+            {/* Section header */}
+            <div className="ps-section-header">
+                <div className="ps-section-icon">
+                    <Search size={17} />
+                </div>
+                <div>
+                    <div className="ps-section-title">Product Intelligence</div>
+                    <div className="ps-section-sub">AI extracts design DNA, color palette & mood — everything flows from this</div>
+                </div>
+            </div>
+
+            {/* Input card */}
+            {step !== 'ready' && (
+                <div className="ps-input-card">
+                    {/* URL Input Row */}
+                    <div className="ps-url-row">
+                        <div className="ps-url-wrapper" style={{ flex: 1 }}>
+                            <Link2 size={15} className="ps-url-icon" />
+                            <input
+                                className="ps-url-input"
+                                value={productUrl}
+                                onChange={e => setProductUrl(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
+                                placeholder="Paste Amazon, Flipkart, or any product URL…"
+                                disabled={step === 'analyzing'}
+                            />
+                        </div>
+                        <button
+                            className="ps-btn-primary"
+                            onClick={handleAnalyze}
+                            disabled={(!productUrl && s3ImageUrls.length === 0) || step === 'analyzing'}
+                            style={{ borderRadius: 9 }}
+                        >
+                            {step === 'analyzing' ? (
+                                <><Loader2 size={15} className="ps-spin" />Analyzing…</>
+                            ) : (
+                                <><Sparkles size={15} />Analyze Product</>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Description */}
+                    <textarea
+                        className="ps-textarea"
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        placeholder="Optional: Describe your product, target audience, and key USPs… (especially useful for services, tours, projects)"
+                        rows={2}
+                        disabled={step === 'analyzing'}
+                    />
+
+                    {/* Divider */}
+                    <div className="ps-divider">
+                        <div className="ps-divider-line" />
+                        <span className="ps-divider-text">or upload product images</span>
+                        <div className="ps-divider-line" />
+                    </div>
+
+                    {/* Upload zone */}
+                    <label
+                        className={`ps-upload-zone ${uploadPreviews.length ? 'has-files' : ''}`}
+                        style={{ opacity: step === 'analyzing' ? 0.6 : 1 }}
+                    >
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={handleFileChange}
+                            disabled={step === 'analyzing'}
+                        />
+                        {uploadPreviews.length === 0 ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', color: 'var(--sys-text-muted)' }}>
+                                <UploadCloud size={18} />
+                                <div>
+                                    <div style={{ fontSize: 13, fontWeight: 600 }}>Upload Product Images</div>
+                                    <div style={{ fontSize: 11, marginTop: 2 }}>JPG, PNG, WebP — up to 8 images</div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="ps-upload-grid">
+                                {uploadPreviews.slice(0, 8).map((src, i) => (
+                                    <div key={i} className="ps-upload-thumb">
+                                        <img src={src} alt="" />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </label>
+
+                    {error && (
+                        <div className="ps-error-bar" style={{ marginTop: 12 }}>
+                            <X size={14} /> {error}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Analysis progress */}
+            {step === 'analyzing' && (
+                <div className="ps-analysis-card">
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--sys-text-muted)', marginBottom: 12 }}>
+                        AI is understanding your product…
+                    </div>
+                    {ANALYSIS_STEPS.map((s, i) => {
+                        const Icon = s.icon
+                        const isDone = i < activeAnalysisStep
+                        const isActive = i === activeAnalysisStep
+                        return (
+                            <div key={i} className={`ps-analysis-step ${isDone ? 'done' : isActive ? 'active' : 'pending'}`}>
+                                <div className="ps-step-icon">
+                                    {isDone ? <CheckCircle2 size={14} /> : isActive ? <Loader2 size={14} className="ps-spin" /> : <Icon size={14} />}
+                                </div>
+                                <span style={{ fontSize: 12, color: isDone ? 'var(--sys-text-muted)' : isActive ? 'var(--sys-text)' : 'var(--sys-text-muted)' }}>
+                                    {s.text}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Product profile (ready state) */}
+            {step === 'ready' && productDNA && (
+                <div>
+                    <div className="ps-product-profile">
+                        {/* Gallery */}
+                        {productImages.length > 0 && (
+                            <div className="ps-product-gallery" style={{ maxHeight: 240 }}>
+                                {productImages.slice(0, 5).map((img, i) => (
+                                    <div key={i} className={`${i === 0 ? 'ps-gallery-main' : 'ps-gallery-thumb'}`}>
+                                        {i === 4 && productImages.length > 5 ? (
+                                            <div className="ps-gallery-more" style={{ height: '100%', background: 'rgba(0,0,0,0.5)' }}>
+                                                <img src={img} alt="" className="ps-gallery-img" style={{ position: 'absolute', inset: 0 }} onError={e => e.target.style.display='none'} />
+                                                <span style={{ position: 'relative', zIndex: 2, color: '#fff', fontWeight: 800, fontSize: 16 }}>+{productImages.length - 4}</span>
+                                            </div>
+                                        ) : (
+                                            <img src={img} alt="" className="ps-gallery-img" onError={e => e.target.style.display='none'} />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Meta */}
+                        <div className="ps-product-meta">
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                                <div style={{ flex: 1 }}>
+                                    <div className="ps-product-name">
+                                        {analyzedProduct?.title || productDNA.productCategory || 'Product Analyzed'}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginTop: 2 }}>
+                                        {productDNA.productCategory}{analyzedProduct?.brand ? ` · ${analyzedProduct.brand}` : ''} · {productImages.length} images
+                                    </div>
+                                </div>
+                                <button className="ps-btn-ghost" onClick={reset} style={{ flexShrink: 0 }}>
+                                    <RefreshCw size={12} /> Reset
+                                </button>
+                            </div>
+
+                            {/* Tags */}
+                            <div className="ps-product-tags">
+                                {(productDNA.moodTags || []).slice(0, 4).map((t, i) => (
+                                    <span key={i} className="ps-tag">{t}</span>
+                                ))}
+                                {productDNA.surfaceFinish && <span className="ps-tag">{productDNA.surfaceFinish}</span>}
+                                {productDNA.materials && <span className="ps-tag">{productDNA.materials.split(',')[0]?.trim()}</span>}
+                            </div>
+
+                            {/* Palette */}
+                            <div className="ps-palette-strip">
+                                {(productDNA.dominantColors || []).slice(0, 10).map((c, i) => (
+                                    <div key={i} className="ps-palette-swatch" title={`${c.name} ${c.hex}`} style={{ background: c.hex }} />
+                                ))}
+                                <span className="ps-palette-label">
+                                    <Lock size={10} /> Colors Locked
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Mood selection */}
+                    <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--sys-text-muted)' }}>
+                                Pick a Mood Direction
+                            </div>
+                            {moodLoading && (
+                                <span style={{ fontSize: 10, color: 'var(--sys-primary)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                    <Loader2 size={10} className="ps-spin" /> GPT Image 2 generating…
+                                </span>
+                            )}
+                            {!moodLoading && Object.keys(moodImages).length > 0 && (
+                                <span style={{ fontSize: 10, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                    <CheckCircle2 size={10} /> AI Moods Ready
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="ps-mood-filmstrip">
+                            {Object.values(activeMoods).map(mood => {
+                                const aiImg = moodImages[mood.id]
+                                const isSelected = selectedMood === mood.id
+                                return (
+                                    <div key={mood.id} className={`ps-mood-thumb ${isSelected ? 'selected' : ''}`} onClick={() => handleSelectMood(mood.id)}>
+                                        {aiImg ? (
+                                            <img src={aiImg} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
+                                        ) : moodLoading ? (
+                                            <div className="ps-mood-thumb-placeholder">
+                                                <Loader2 size={16} className="ps-spin" style={{ color: 'var(--sys-text-muted)' }} />
+                                            </div>
+                                        ) : (
+                                            <div className="ps-mood-thumb-placeholder" style={{ background: mood.bg }}>
+                                                <Sparkles size={18} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                                            </div>
+                                        )}
+                                        {moodLoading && !aiImg && (
+                                            <div className="ps-mood-generating">Rendering…</div>
+                                        )}
+                                        <div className="ps-mood-thumb-label">{mood.label}</div>
+                                        {isSelected && (
+                                            <div className="ps-mood-check">
+                                                <CheckCircle2 size={11} />
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        <div className="ps-info-bar">
+                            <Lock size={13} />
+                            Product colors are locked — AI will never shift the product's color in any generated asset.
+                        </div>
+                    </div>
+
+                    {selectedMood && (
+                        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
+                            <button className="ps-btn-primary" onClick={() => handleSelectMood(selectedMood)} style={{ gap: 8 }}>
+                                <ChevronRight size={16} />
+                                Continue to Mood Board
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
