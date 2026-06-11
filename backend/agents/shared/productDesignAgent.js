@@ -147,15 +147,34 @@ async function classifyProductImageView(imageUrl, productData = {}) {
     const systemPrompt = `You are a product photography expert and Amazon listing consultant.
 Analyze this SINGLE product image and classify it precisely.
 
-CRITICAL FORM-FACTOR DISAMBIGUATION RULES — APPLY THESE STRICTLY:
-- HEADPHONES: Has ear-cups, headband, goes OVER the ear. Correct term: "Over-ear headphones" or "On-ear headphones". NEVER call these earphones, earbuds, or in-ear.
-- EARPHONES/EARBUDS: Has ear-tips, goes IN the ear canal, no headband. Correct term: "In-ear earphones" or "True wireless earbuds". NEVER call these headphones.
-- IEM: In-ear monitor — larger ear-tip design. Still NOT headphones.
-- NECKBAND: Neckband wireless earphones — has a neck cable+ear-tips. NOT headphones.
-- LAPTOP vs TABLET: check hinge/keyboard. Laptop has keyboard attached. Tablet is standalone screen.
+CRITICAL FORM-FACTOR DISAMBIGUATION RULES — APPLY THESE STRICTLY IN ORDER:
+
+── AUDIO DEVICES (most commonly confused) ──
+- HEADPHONES: Has ear-cups (padded discs), headband arch OVER the top of the head connecting two sides. NEVER confuse with speakers.
+- EARPHONES/EARBUDS: Small, goes IN the ear canal. Tiny, often with a charging case. No headband. Correct term: "True wireless earbuds" or "In-ear earphones".
+- NECKBAND: Has a cable that hangs behind the neck + small ear-tips. NOT headphones.
+- IEM: In-ear monitor. Larger ear-tip, but still in-ear. NOT headphones.
+- BLUETOOTH SPEAKER: Cylindrical, pill-shaped, or boxy with fabric/grille mesh on the front. Sits on a surface. NO headband. NO ear-cups.
+- SOUNDBAR: Slim wide rectangular bar, sits in front of a TV. Has a grille/mesh front. It is a SPEAKER, not headphones.
+- SUBWOOFER: A cube or rectangular black box for bass. A SPEAKER — NOT headphones.
+- BOOKSHELF SPEAKER: Two rectangular boxes with grille fronts. SPEAKERS.
+- HOME THEATRE SYSTEM: Multiple speaker units (bar + satellite boxes + subwoofer). ALL SPEAKERS.
+
+── VISUAL TESTS — run these before classifying any audio device ──
+TEST 1: Can you see a curved ARCH or BAND going over the top of the object connecting two earpiece sides? → Headphones
+TEST 2: Can you see a MESH, GRILLE, PERFORATED SURFACE, or WOOFER CONE on the front of a box/cylinder that sits on a surface? → SPEAKER (soundbar/bluetooth speaker/home theatre)
+TEST 3: Does the object rest flat on a surface under its own weight without being worn? → NOT headphones
+
+── OTHER COMMON DISAMBIGUATIONS ──
+- LAPTOP vs TABLET: Laptop has keyboard attached. Tablet is a standalone screen.
 - MUG vs TUMBLER vs BOTTLE: Mug has handle. Tumbler is tall cylindrical no-handle. Bottle has cap.
 - WATCH vs FITNESS BAND: Watch has round/square dial face. Band is thin strip.
-Apply these rules before classifying. If you see ear-cups and a headband, it IS a headphone, period.
+- CAMERA vs WEBCAM: Camera has lens barrel + shutter button on a body. Webcam clips to a screen.
+- AIR PURIFIER vs HUMIDIFIER: Air purifier is cylindrical/box with fan grille. Humidifier has water tank + mist nozzle.
+- MONITOR vs TV: Monitor is thinner, no remote-holder/smart features. TV is larger.
+
+CRITICAL: If the object is a BOX or CYLINDER WITH A GRILLE/MESH sitting on a surface, it is a SPEAKER — NEVER headphones.
+CRITICAL: NEVER classify a product as headphones just because the brand is known for audio products.
 
 Return ONLY a valid JSON object, no markdown, no extra text.`;
 
@@ -211,14 +230,15 @@ ${rosterSummary}
 
 All ${allImages.length} product images are shown. Cross-reference them to identify TRUE product colors (consistent across views, not shadows/backgrounds).
 
-CLASSIFICATION GROUND RULES:
-1. The product title "${productTitle}" is the SINGLE MOST IMPORTANT signal for productCategory. Start there.
-2. Use the images to CONFIRM and REFINE the category — never override a clear title signal with image speculation.
-3. Only apply audio-device disambiguation if the title OR images explicitly show audio hardware:
-   - If the title says "headphone" or images show large over-ear cups + headband → "Over-ear Headphones"
-   - If the title says "earphone/earbud" or images show in-ear tips → "In-ear Earphones"
-   - For ALL other products: classify based on what the title and images actually show (skincare, footwear, furniture, phone, etc.)
-4. productCategory must be a specific, readable product name that a consumer would use (NOT a technical code or generic label like "consumer product").
+CLASSIFICATION GROUND RULES (apply in STRICT PRIORITY ORDER):
+1. PRODUCT TITLE IS GROUND TRUTH: "${productTitle}" — this is the name on the product listing. If the name contains any recognizable product keyword (speaker, soundbar, headphone, earbud, watch, etc.), that keyword WINS.
+2. BULLET POINTS ARE SECOND: Bullets describe what the product IS and DOES. Extract the product type from bullet point language before consulting image descriptions.
+3. PER-IMAGE "exactFormFactor" IS THIRD: Only use the image classification if title + bullets give no clear category signal.
+4. SPEAKER vs HEADPHONE FINAL ARBITER: Ask yourself — does the per-image roster describe a mesh/grille on a box/cylinder sitting on a surface? → SPEAKER. Does it describe ear-cups + a headband arch? → HEADPHONES. These are MUTUALLY EXCLUSIVE.
+5. NEVER ASSUME AUDIO = HEADPHONES: The brand "${productTitle}" might sell both headphones AND speakers. Classify the SPECIFIC PRODUCT shown in these images, not the brand's most famous product.
+6. NEVER override clear visual evidence of a SPEAKER (grille, woofer, standing/sitting form factor) with a headphone classification.
+7. productCategory must be a specific, consumer-readable product name (NOT "consumer product" or any technical code):
+   Examples: 'Soundbar with Subwoofer', 'Bluetooth Speaker', 'Home Theatre System', 'Over-ear Headphones', 'True Wireless Earbuds', 'Running Shoes', 'Face Serum', 'Coffee Table'
 
 Return the composite ProductDNA:
 {
@@ -319,6 +339,44 @@ export async function analyzeProductDesign(productImages = [], productData = {},
             .filter(r => !diverseSet.includes(r.url) && r.confidenceScore > 0.4)
             .map(r => r.url);
         dna.productRefImages = [...new Set([...diverseSet, ...remaining])].slice(0, 4);
+
+        // ── Post-classification sanity check ─────────────────────────────────────
+        // If bullet points or title clearly indicate a product type that contradicts
+        // the classified productCategory, correct it immediately.
+        // This prevents e.g. a speaker being classified as "Over-ear Headphones"
+        // because the AI saw a black box with grille and hallucinated audio category.
+        const titleLower = (productData?.title || '').toLowerCase();
+        const bulletsText = (productData?.bulletPoints || []).join(' ').toLowerCase();
+        const categoryLower = (dna.productCategory || '').toLowerCase();
+        const combinedContext = `${titleLower} ${bulletsText}`;
+
+        // Speaker/soundbar/home theatre was classified as headphones — common misclassification
+        const speakerKeywords = ['speaker', 'soundbar', 'subwoofer', 'woofer', 'tweeter', 'home theatre', 'home theater', 'bookshelf', '2.1', '5.1', 'satellite speaker', 'channel audio', 'rms output', 'watts output', 'passive radiator'];
+        const headphoneCategory = categoryLower.includes('headphone') || categoryLower.includes('over-ear') || categoryLower.includes('on-ear');
+        const isSpeakerProduct = speakerKeywords.some(kw => combinedContext.includes(kw));
+        if (headphoneCategory && isSpeakerProduct) {
+            const prevCat = dna.productCategory;
+            // Detect specific speaker type from title+bullets for precise correction
+            if (combinedContext.includes('soundbar') || combinedContext.includes('sound bar')) {
+                dna.productCategory = 'Soundbar';
+            } else if (combinedContext.includes('home theatre') || combinedContext.includes('home theater') || combinedContext.includes('2.1') || combinedContext.includes('5.1')) {
+                dna.productCategory = 'Home Theatre System';
+            } else if (combinedContext.includes('bluetooth') || combinedContext.includes('wireless speaker')) {
+                dna.productCategory = 'Bluetooth Speaker';
+            } else {
+                dna.productCategory = 'Speaker System';
+            }
+            console.warn(`   ⚠️  PDI Sanity: Corrected wrong category "${prevCat}" → "${dna.productCategory}" (title+bullets indicate speaker product)`);
+        }
+
+        // Earphones/earbuds classified as headphones — also common
+        const earbudKeywords = ['tws', 'true wireless', 'earbud', 'earphone', 'in-ear', 'charging case', 'ear tip'];
+        const earbudProduct = earbudKeywords.some(kw => combinedContext.includes(kw));
+        if (headphoneCategory && !isSpeakerProduct && earbudProduct) {
+            const prevCat = dna.productCategory;
+            dna.productCategory = 'True Wireless Earbuds';
+            console.warn(`   ⚠️  PDI Sanity: Corrected wrong category "${prevCat}" → "${dna.productCategory}" (title+bullets indicate earbuds)`);
+        }
 
         dna.analyzedAt = new Date().toISOString();
         dna.analysisStages = { imagesClassified: productImages.length, rosterSize: roster.length };
