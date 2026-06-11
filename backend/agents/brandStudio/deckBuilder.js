@@ -646,5 +646,6 @@ export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch D
         tokens,
         title: plan.title,
         slideCount: plan.slides.length || 8,
+        html,
     };
 }

@@ -24,6 +24,7 @@ export default function DeckTool({ sharedContext, brandId }) {
                     brief, brandId,
                 }),
             })
+            console.log('✅ Pitch deck result:', { success: data.success, hostedUrl: data.hostedUrl, hasHtml: !!data.html, slideCount: data.slideCount })
             if (data.success) setResult(data)
             else setError(data.error || 'Generation failed')
         } catch (e) { setError(e.message) }
@@ -58,6 +59,34 @@ export default function DeckTool({ sharedContext, brandId }) {
                             </div>
                         </div>
                     )}
+
+                    {/* Live preview — prefer srcdoc (always works) over iframe src (can be blocked by S3 X-Frame-Options) */}
+                    {result.html ? (
+                        <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+                            <div style={{ background: 'var(--sys-surface)', borderBottom: '1px solid var(--sys-border)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--sys-text-muted)' }}>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {['#ef4444','#f59e0b','#10b981'].map(c => <div key={c} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />)}
+                                </div>
+                                <div style={{ flex: 1, background: 'var(--sys-bg)', borderRadius: 4, padding: '2px 8px', fontSize: 9 }}>{hostedUrl || 'preview'}</div>
+                            </div>
+                            <iframe
+                                srcDoc={result.html}
+                                style={{ width: '100%', height: 360, border: 'none', display: 'block' }}
+                                title="Deck Preview"
+                                sandbox="allow-scripts allow-same-origin"
+                            />
+                        </div>
+                    ) : hostedUrl ? (
+                        /* Fallback: iframe src if no html body but hosted URL exists */
+                        <div style={{ background: 'var(--sys-bg)', border: '1px solid var(--sys-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+                            <iframe
+                                src={hostedUrl}
+                                style={{ width: '100%', height: 360, border: 'none', display: 'block' }}
+                                title="Deck Preview"
+                                sandbox="allow-scripts allow-same-origin"
+                            />
+                        </div>
+                    ) : null}
 
                     {/* Slide preview cards — show up to 3 */}
                     {slides.slice(0, 3).map((slide, i) => {
