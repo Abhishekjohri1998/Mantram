@@ -440,7 +440,7 @@ router.post('/social-kit/generate', protect, async (req, res) => {
 
         if (validSignedRefs.length > 0) {
             // Patch productDNA with signed URLs so all downstream prompt builders use them
-            productDNA.heroImageUrl    = validSignedRefs[0];
+            productDNA.heroImageUrl     = validSignedRefs[0];
             productDNA.productRefImages = validSignedRefs;
             console.log(`📸 Social Kit: pre-signed ${validSignedRefs.length} S3 ref images for AI model`);
         } else {
@@ -459,9 +459,10 @@ router.post('/social-kit/generate', protect, async (req, res) => {
             ? `${designContext.systemDirective}\n\n---\n`
             : '';
 
-        // ── Step 1: Pulse Creative Brain — per-platform art direction + copy ────
+        // ── Step 1: Pulse Creative Brain — per-platform art direction ─────────────
         // When usePulseCreativeBrain=true, runs the full 4-role creative engine
         // to get platform-specific art direction before image generation.
+        // NOTE: Caption generation is handled separately in the dedicated pass below.
         let perPlatformArtDirection = {};
         let captions = {};
         let creativeRationale = '';
@@ -499,15 +500,17 @@ router.post('/social-kit/generate', protect, async (req, res) => {
                 })
             );
 
-            // Map brain results to per-platform art direction and captions
+            // Map brain results to per-platform art direction (image prompts only)
+            // Captions are generated in a dedicated pass below with full algorithm knowledge
             for (const settled of brainResults) {
                 if (settled.status === 'fulfilled') {
                     const { platform, result } = settled.value;
                     perPlatformArtDirection[platform] = result;
+                    // Store brain's headline as imageText only — full caption comes from dedicated pass
                     if (result.copyHeadline) {
                         captions[platform] = {
                             imageText: result.copyHeadline,
-                            caption:   result.copySubtext || '',
+                            caption:   '',   // will be filled by dedicated caption pass
                             hashtags:  '',
                         };
                     }
@@ -517,53 +520,164 @@ router.post('/social-kit/generate', protect, async (req, res) => {
                     }
                 }
             }
+        }
 
-            // Fill in captions with full copywriting pass (hashtags + platform-specific copy)
-            // This secondary pass is lighter and focused only on captions (not image direction)
-            if (Object.keys(captions).length < targetPlatforms.length) {
-                const bullets = productData?.bulletPoints || [];
-                const copyPrompt = `You are a senior social media strategist.
-Product: "${productTitle}" | Mood: ${selectedMoodDir.label} | Post type: ${kitType}
-Key USPs: ${bullets.slice(0, 5).join(' | ')}
-Generate platform-optimized captions. Return ONLY valid JSON:
-${JSON.stringify(Object.fromEntries(targetPlatforms.map(p => [p, { caption: '', hashtags: '' }])))}`;
-                try {
-                    const fallbackCaptions = await callAgentText(
-                        'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
-                        copyPrompt, 0.6, 1200
-                    );
-                    const parsed = typeof fallbackCaptions === 'string' ? JSON.parse(fallbackCaptions) : fallbackCaptions;
-                    for (const [plat, cap] of Object.entries(parsed)) {
-                        if (!captions[plat]) captions[plat] = cap;
-                        else captions[plat] = { ...cap, ...captions[plat] }; // Brain copy takes priority
-                    }
-                } catch(e) { console.warn('Fallback caption gen failed:', e.message); }
-            }
-        } else {
-            // Legacy path: simple copy generation without Creative Brain
-            const bullets = productData?.bulletPoints || [];
-            const colorHex = (productDNA?.dominantColors || []).slice(0, 3).map(c => c.hex).filter(Boolean).join(', ');
-            const copyPrompt = `You are a senior social media strategist.
-Product: "${productTitle}" | Category: ${productDNA?.productCategory || 'consumer product'} | Mood: ${selectedMoodDir.label}
-Key USPs: ${bullets.slice(0, 5).join(' | ')}
-Post type: ${kitType}
+        // ── DEDICATED CAPTION GENERATION PASS (always runs) ──────────────────────
+        // Uses deep July 2026 platform algorithm knowledge to write captions that
+        // actually get reach — each platform has unique hook structure, length,
+        // hashtag strategy, and CTA mechanic. This is separate from image art direction.
+        {
+            const bullets       = productData?.bulletPoints || [];
+            const topUSPs       = bullets.slice(0, 5).join(' | ');
+            const moodVoice     = selectedMoodDir?.label || 'Professional';
+            const moodDesc      = selectedMoodDir?.description || '';
+            const targetPlatforms = (platforms && platforms.length) ? platforms : ['instagram_feed','instagram_story','facebook','twitter_x','linkedin','pinterest'];
+            const requestedPlatformsCopy = targetPlatforms.filter(p => !captions[p]?.caption || captions[p].caption.trim() === '');
 
-Generate platform-optimized captions and image-text overlays. For every platform, include an "imageText" field which is a 3-5 word high-impact creative headline to be rendered directly onto the visual graphic. Return ONLY valid JSON:
+            if (requestedPlatformsCopy.length > 0 || Object.keys(captions).length < targetPlatforms.length) {
+                const captionSystemPrompt = `You are a world-class Social Media Copywriter with deep expertise in each platform's July 2026 algorithm. You write copy that GETS REACH — not just looks good.
+
+JULY 2026 PLATFORM ALGORITHM INTELLIGENCE:
+
+INSTAGRAM FEED (July 2026):
+  Algorithm: Favors saves + shares over likes. Hook in line 1 (before "more"). 
+  Optimal length: 150-220 words. First line must stop the scroll in <3 words or with a question.
+  Hashtag strategy: 3-5 hyper-relevant hashtags only (Instagram 2026 de-ranks posts with 20+ tags).
+  Caption structure: Hook → Story/Problem → Solution (product) → Social proof/feature → CTA to save or share.
+  Tone: Conversational, authentic. No corporate language. Short punchy sentences.
+  CTA: "Save this for later", "Share with someone who needs this", "Drop a 🔥 if..."
+
+INSTAGRAM STORY (July 2026):
+  Algorithm: Engagement (poll/quiz/question sticker) drives story reach. Views alone don't.
+  Optimal: 1-3 very short lines + strong CTA sticker text.
+  Hook: Question or bold statement. "Did you know..." or "[Bold claim]"
+  CTA sticker: Action-oriented, max 4 words: "Shop Now", "Swipe Up", "Yes or No?"
+  Tone: Direct, urgent, personal.
+
+FACEBOOK (July 2026):
+  Algorithm: Prioritizes posts that spark MEANINGFUL COMMENTS (>5 word replies). 
+  Ask a question at the end to drive comments. Avoid engagement-bait.
+  Optimal length: 80-150 words. Facebook punishes >250 word posts with reduced reach.
+  Hashtags: 1-2 only (Facebook 2026 does NOT boost hashtagged content).
+  Structure: Relatable opening → Feature highlight → Social proof → Open question CTA.
+  Tone: Warm, community-focused. "We", "You", "Our family".
+
+TWITTER/X (July 2026):
+  Algorithm: Retweet velocity in first 30 min is everything. Must be quotable.
+  Character limit: 280 max. Optimal sweet spot: 140-200 chars.
+  Structure: Bold punchy statement OR provocative question → 1-2 product benefits → CTA or hook.
+  NO hashtags (X 2026 algorithm heavily de-ranks posts with hashtags — proven to reduce reach 40%).
+  Tone: Bold, confident, provocative. Threads perform — end with "Thread 🧵" if content warrants it.
+  CTA: "RT if you agree", "Reply with your take", link to product.
+
+LINKEDIN (July 2026):
+  Algorithm: Dwell time + saves drive reach. "Carousel" posts and text-heavy posts outperform images.
+  Optimal length: 200-300 words. Use line breaks aggressively (single sentences per line).
+  Structure: Bold contrarian opening line → Personal story or insight → Product as solution/tool → 
+             3 specific benefits as bullet points → Professional CTA.
+  Hashtags: 3 exactly (LinkedIn 2026 algorithm optimal is 3 — more hurts reach).
+  Tone: Professional but human. First person. Insight-driven, not salesy.
+  CTA: "Save this post", "What's your take?", "DM me for details".
+
+PINTEREST (July 2026):
+  Algorithm: Keywords in description drive organic discovery (Pinterest = visual search engine).
+  Optimal length: 100-150 words. Must be keyword-rich but readable.
+  Structure: Primary keyword in first sentence → Product description with search terms → 
+             Benefits list → Secondary keywords naturally woven → Board suggestion.
+  Hashtags: 5-10 keyword-style tags (Pinterest 2026 uses them as category signals).
+  Tone: Descriptive, aspirational, how-to friendly.
+  Board suggestion: Specific to product category and lifestyle.
+
+ABSOLUTE RULES:
+- Each platform must sound COMPLETELY DIFFERENT — not the same caption reformatted
+- No generic phrases: "Check it out!", "Buy now!", "Limited time only!" unless platform-appropriate
+- Captions must reference the SPECIFIC product features provided, not generic claims
+- Mood voice must match: ${moodVoice} — ${moodDesc}
+- Return ONLY valid JSON. No markdown, no code fences.`;
+
+                const captionUserPrompt = `Write platform-specific captions for this product using the July 2026 algorithm knowledge above.
+
+PRODUCT: "${productTitle}"
+CATEGORY: ${productDNA?.productCategory || 'Consumer Product'}
+POST TYPE: ${kitType} (promo / launch / feature highlight / lifestyle / festive)
+TOP USPs: ${topUSPs || 'Premium quality, innovative design, superior performance'}
+MOOD / VOICE: ${moodVoice} — ${moodDesc}
+TARGET PLATFORMS: ${requestedPlatformsCopy.join(', ')}
+
+Return this exact JSON structure (only for requested platforms: ${requestedPlatformsCopy.join(', ')}):
 {
-  "instagram_feed": { "imageText": "headline", "caption": "2-3 line", "hashtags": "20 hashtags" },
-  "instagram_story": { "imageText": "headline", "caption": "Short text", "sticker_text": "CTA" },
-  "facebook": { "imageText": "headline", "caption": "2-3 line post" },
-  "twitter_x": { "imageText": "headline", "caption": "Under 250 chars" },
-  "linkedin": { "imageText": "headline", "caption": "Professional 3-4 line" },
-  "pinterest": { "imageText": "headline", "caption": "Keyword-rich", "board_suggestion": "Board name" }
+  "instagram_feed": {
+    "imageText": "3-5 word bold headline for graphic overlay",
+    "hook": "First line only — scroll-stopper (<8 words)",
+    "caption": "Full 150-220 word caption with hook → story → product → CTA. Use line breaks.",
+    "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 (max 5, hyper-relevant only)"
+  },
+  "instagram_story": {
+    "imageText": "3-5 word bold headline",
+    "caption": "2-3 short punchy lines",
+    "sticker_text": "CTA sticker text (max 4 words)",
+    "poll_question": "Optional poll question if relevant"
+  },
+  "facebook": {
+    "imageText": "3-5 word bold headline",
+    "caption": "80-150 word post ending with a question to drive comments",
+    "hashtags": "#tag1 (1-2 only)"
+  },
+  "twitter_x": {
+    "imageText": "3-5 word bold headline",
+    "caption": "140-200 character tweet. NO hashtags. Punchy, quotable, ends with CTA."
+  },
+  "linkedin": {
+    "imageText": "3-5 word professional headline",
+    "hook": "Contrarian or surprising opening line",
+    "caption": "200-300 word post with line breaks. Include 3 bullet points of specific benefits. End with save/comment CTA.",
+    "hashtags": "#tag1 #tag2 #tag3 (exactly 3)"
+  },
+  "pinterest": {
+    "imageText": "3-5 word aspirational headline",
+    "caption": "100-150 keyword-rich description naturally woven with search terms",
+    "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 (keyword-style, 5-10)",
+    "board_suggestion": "Specific board name"
+  }
 }`;
-            try {
-                captions = await callAgentText(
-                    'You are a senior social media strategist. Return ONLY valid JSON, no markdown.',
-                    copyPrompt, 0.6, 1200
-                );
-                if (typeof captions === 'string') captions = JSON.parse(captions);
-            } catch(e) { console.warn('Caption generation failed:', e.message); }
+
+                try {
+                    const { callAgentText } = await import('../agents/shared/agentUtils.js');
+                    const captionResult = await callAgentText(
+                        captionSystemPrompt,
+                        captionUserPrompt,
+                        0.75,
+                        3000,
+                        { provider: 'anthropic', model: 'claude-haiku-4-20250514', timeoutMs: 60_000 }
+                    );
+                    const parsedCaptions = typeof captionResult === 'string' ? JSON.parse(captionResult) : captionResult;
+
+                    for (const [plat, cap] of Object.entries(parsedCaptions || {})) {
+                        if (!captions[plat]) {
+                            captions[plat] = cap;
+                        } else {
+                            // Merge: brain's imageText + headline take priority, but fill in full caption + hashtags
+                            captions[plat] = {
+                                ...cap,
+                                imageText: captions[plat].imageText || cap.imageText,
+                            };
+                        }
+                    }
+                    console.log(`✅ Platform captions written (July 2026 algo): ${Object.keys(parsedCaptions || {}).join(', ')}`);
+                } catch (captionErr) {
+                    // Gemini fallback if Claude Haiku fails
+                    console.warn('⚠️ Claude caption pass failed, falling back to Gemini:', captionErr.message);
+                    try {
+                        const { callAgentText } = await import('../agents/shared/agentUtils.js');
+                        const fallback = await callAgentText(captionSystemPrompt, captionUserPrompt, 0.75, 3000);
+                        const parsed = typeof fallback === 'string' ? JSON.parse(fallback) : fallback;
+                        for (const [plat, cap] of Object.entries(parsed || {})) {
+                            if (!captions[plat]) captions[plat] = cap;
+                            else captions[plat] = { ...cap, imageText: captions[plat].imageText || cap.imageText };
+                        }
+                    } catch (e) { console.warn('Caption fallback also failed:', e.message); }
+                }
+            }
         }
 
         // ── Step 2: Generate images for requested platforms in parallel ─────────
