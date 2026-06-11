@@ -154,6 +154,7 @@ export default function Phase1Intelligence({ brandId, onContextReady, moodImages
         try {
             const data = await apiFetch('/brand-studio/aplus/analyze-product', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 120000, // 2 min timeout for scraping & initial vision classification
                 body: JSON.stringify({ url: productUrl }),
             })
             if (data.success) {

@@ -17,6 +17,7 @@ export default function DeckTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/deck/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 240000, // 4 min timeout for deck generation
                 body: JSON.stringify({
                     productDNA: sharedContext?.productDNA, productData: sharedContext?.productData,
                     productImages: sharedContext?.productImages, designContext: sharedContext?.designContext,

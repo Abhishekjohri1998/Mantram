@@ -15,6 +15,7 @@ export default function BrochureTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/brochure/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 180000, // 3 min timeout for brochure content + layout gen
                 body: JSON.stringify({
                     productDNA:    sharedContext?.productDNA,
                     productData:   sharedContext?.productData,

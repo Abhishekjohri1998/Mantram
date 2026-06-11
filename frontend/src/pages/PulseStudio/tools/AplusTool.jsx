@@ -32,13 +32,15 @@ export default function AplusTool({ sharedContext, brandId, variant = 'premium' 
         try {
             const data = await apiFetch('/brand-studio/aplus/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 300000, // 5 min timeout for LLM strategy + parallel image gen
                 body: JSON.stringify({
                     productDNA:    sharedContext?.productDNA,
                     productData:   sharedContext?.productData,
                     productImages: sharedContext?.productImages,
                     designContext: sharedContext?.designContext,
                     brief, brandId,
-                    tier: variant === 'basic' ? 'A' : 'A+',
+                    listingTier:   variant === 'basic' ? 'standard' : 'premium',
+                    tier:          variant === 'basic' ? 'A' : 'A+',
                 }),
             })
             if (data.success) setResult(data)

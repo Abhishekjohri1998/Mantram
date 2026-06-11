@@ -249,6 +249,40 @@ async function scrapeProductUrl(url) {
             };
         }
 
+        const extractBullets = () => {
+            const bulletPoints = [];
+            const descriptionContainers = [
+                '[class*="product-description"]', '[class*="description"]', '[class*="product-info"]',
+                '[class*="product-meta"]', '[class*="product-details"]', '#product-description',
+                '#description', '[itemprop="description"]', '.productView-desc', '.productView-description',
+                '.product-description', '.product-single__description', '[data-product-description]'
+            ];
+            const excludeRegex = /₹|\$|price|sale|% off|mrp|discount|prepaid|checkout|add to cart|subscribe|back in stock|notify|pickup|availability|shipping|returns|coupon|code:|<link|<script|inherit/i;
+            
+            for (const container of descriptionContainers) {
+                $(container).find('p, strong, span, h2, h3, li').each((_, el) => {
+                    const txt = $(el).text().trim().replace(/\s+/g, ' ');
+                    if (txt.length > 20 && txt.length < 250 && !excludeRegex.test(txt) && !bulletPoints.includes(txt)) {
+                        bulletPoints.push(txt);
+                    }
+                });
+                if (bulletPoints.length >= 8) break;
+            }
+
+            if (bulletPoints.length < 4) {
+                $('li').each((_, el) => {
+                    const parentNav = $(el).closest('header, footer, nav, [class*="menu"], [class*="nav"], [class*="header"], [class*="footer"], [class*="sidebar"], [class*="aside"], [class*="dropdown"], [id*="menu"], [id*="nav"], [id*="header"], [id*="footer"]');
+                    if (parentNav.length === 0) {
+                        const txt = $(el).text().trim().replace(/\s+/g, ' ');
+                        if (txt.length > 20 && txt.length < 250 && !excludeRegex.test(txt) && !bulletPoints.includes(txt)) {
+                            bulletPoints.push(txt);
+                        }
+                    }
+                });
+            }
+            return bulletPoints.slice(0, 8);
+        };
+
         if (url.includes('myshopify.com') || url.includes('/products/')) {
             const jsonLd = $('script[type="application/ld+json"]').map((_, el) => {
                 try { return JSON.parse($(el).html()); } catch (_) { return null; }
@@ -257,7 +291,7 @@ async function scrapeProductUrl(url) {
                 title: jsonLd?.name || $('h1').first().text().trim(),
                 price: jsonLd?.offers?.[0]?.price || '',
                 description: jsonLd?.description || $('[class*="description"]').first().text().trim().substring(0, 1000),
-                bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 200).slice(0, 8),
+                bulletPoints: extractBullets(),
                 images: (jsonLd?.image || []).slice(0, 5),
                 category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
                 platform: 'shopify'
@@ -268,7 +302,7 @@ async function scrapeProductUrl(url) {
             title: $('h1').first().text().trim() || $('meta[property="og:title"]').attr('content'),
             description: $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || '',
             images: [$('meta[property="og:image"]').attr('content')].filter(Boolean),
-            bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 200).slice(0, 6),
+            bulletPoints: extractBullets(),
             price: $('[class*="price"]').first().text().trim(),
             platform: 'web'
         };
@@ -711,9 +745,30 @@ Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
     const elapsed = Math.round((Date.now() - t0) / 1000);
     console.log(`A+ Builder: Complete in ${elapsed}s — ${aplusPlan.modules.length} modules (${listingTier}), ${successCount} images`);
 
+    // Resolve image URLs within modules for frontend compatibility
+    const resolvedModules = (aplusPlan.modules || []).map(mod => {
+        let imageUrl = images[mod.id] || null;
+        let slides = mod.slides;
+        if (mod.type === 'carousel' && slides?.length) {
+            slides = slides.map((slide, idx) => ({
+                ...slide,
+                imageUrl: images[`${mod.id}_slide_${idx}`] || null
+            }));
+        }
+        return {
+            ...mod,
+            imageUrl,
+            slides
+        };
+    });
+
+    const finalHtml = buildAplusHTML(aplusPlan, images);
+
     return {
         aplusPlan,
+        modules: resolvedModules, // Added for frontend mapping
         images,
+        html: finalHtml,         // Added for frontend mapping
         exportText,
         productData: product,
         productDNA: activeProductDNA || null,
@@ -727,4 +782,235 @@ Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
         generatedAt: new Date().toISOString(),
         elapsedSeconds: elapsed,
     };
+}
+
+/**
+ * Compiles the A+ / A++ structural plan and generated image links into a single stand-alone HTML document.
+ */
+export function buildAplusHTML(aplusPlan, images) {
+    const isPremium = aplusPlan.isPremium || aplusPlan.listingTier === 'premium';
+    const width = isPremium ? 1464 : 970;
+    
+    let modulesHtml = '';
+    
+    (aplusPlan.modules || []).forEach((mod) => {
+        const imgUrl = images[mod.id] || '';
+        
+        switch (mod.type) {
+            case 'hero_banner':
+            case 'premium_hero':
+                modulesHtml += `
+                    <div class="aplus-module hero-module" style="position: relative; margin-bottom: 20px;">
+                        ${imgUrl ? `<img src="${imgUrl}" style="width: 100%; display: block; border-radius: 8px;" />` : ''}
+                        <div class="hero-text" style="padding: 15px 0;">
+                            <h2 style="margin: 0 0 8px 0; font-size: 24px; color: #111;">${mod.headline || ''}</h2>
+                            <p style="margin: 0; font-size: 16px; color: #555; line-height: 1.5;">${mod.subheadline || ''}</p>
+                            ${mod.body ? `<p style="margin: 10px 0 0 0; font-size: 14px; color: #666; line-height: 1.6;">${mod.body}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'image_text_left':
+            case 'premium_image_text':
+                modulesHtml += `
+                    <div class="aplus-module split-module" style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+                        <div style="flex: 1;">
+                            ${imgUrl ? `<img src="${imgUrl}" style="width: 100%; display: block; border-radius: 6px;" />` : ''}
+                        </div>
+                        <div style="flex: 1; padding: 10px;">
+                            <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${mod.headline || ''}</h3>
+                            <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.6;">${mod.body || ''}</p>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'image_text_right':
+                modulesHtml += `
+                    <div class="aplus-module split-module" style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px; flex-direction: row-reverse;">
+                        <div style="flex: 1;">
+                            ${imgUrl ? `<img src="${imgUrl}" style="width: 100%; display: block; border-radius: 6px;" />` : ''}
+                        </div>
+                        <div style="flex: 1; padding: 10px;">
+                            <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${mod.headline || ''}</h3>
+                            <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.6;">${mod.body || ''}</p>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'three_features':
+            case 'four_features':
+                const cols = mod.items || [];
+                let colsHtml = '';
+                cols.forEach((item, idx) => {
+                    const colImg = images[`${mod.id}_${idx}`] || images[mod.id] || '';
+                    colsHtml += `
+                        <div style="flex: 1; text-align: center; padding: 10px;">
+                            ${colImg ? `<img src="${colImg}" style="width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px;" />` : ''}
+                            <h4 style="margin: 0 0 6px 0; font-size: 16px; color: #111;">${item.title || ''}</h4>
+                            <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.5;">${item.description || ''}</p>
+                        </div>
+                    `;
+                });
+                modulesHtml += `
+                    <div class="aplus-module grid-module" style="margin-bottom: 20px;">
+                        <h3 style="text-align: center; margin-bottom: 15px; font-size: 20px; color: #111;">${mod.headline || ''}</h3>
+                        <div style="display: flex; gap: 15px;">
+                            ${colsHtml}
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'carousel':
+                let slidesHtml = '';
+                (mod.slides || []).forEach((slide, idx) => {
+                    const slideImg = images[`${mod.id}_slide_${idx}`] || '';
+                    slidesHtml += `
+                        <div style="margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px;">
+                            ${slideImg ? `<img src="${slideImg}" style="width: 100%; max-height: 400px; object-fit: cover; display: block; border-radius: 6px; margin-bottom: 8px;" />` : ''}
+                            <h4 style="margin: 0 0 4px 0; font-size: 16px; color: #111;">${slide.headline || ''}</h4>
+                            <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.5;">${slide.body || ''}</p>
+                        </div>
+                    `;
+                });
+                modulesHtml += `
+                    <div class="aplus-module carousel-module" style="margin-bottom: 20px; padding: 15px; background: #fafafa; border-radius: 8px;">
+                        <h3 style="margin: 0 0 15px 0; font-size: 20px; color: #111;">${mod.headline || ''} (Carousel Slides)</h3>
+                        ${slidesHtml}
+                    </div>
+                `;
+                break;
+                
+            case 'hotspot':
+                modulesHtml += `
+                    <div class="aplus-module hotspot-module" style="margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${mod.headline || ''} (Interactive Hotspots)</h3>
+                        <div style="position: relative;">
+                            ${imgUrl ? `<img src="${imgUrl}" style="width: 100%; display: block; border-radius: 8px;" />` : ''}
+                        </div>
+                        <ul style="margin: 15px 0 0 0; padding-left: 20px; font-size: 13px; color: #555; line-height: 1.6;">
+                            ${(mod.hotspots || []).map(h => `<li><strong>Point ${h.number}:</strong> ${h.title} - ${h.description}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                break;
+                
+            case 'qa_panel':
+                let qaListHtml = '';
+                (mod.questions || []).forEach(q => {
+                    qaListHtml += `
+                        <div style="margin-bottom: 12px;">
+                            <p style="margin: 0 0 4px 0; font-weight: bold; color: #333;">Q: ${q.question}</p>
+                            <p style="margin: 0; color: #666; line-height: 1.5;">A: ${q.answer}</p>
+                        </div>
+                    `;
+                });
+                modulesHtml += `
+                    <div class="aplus-module qa-module" style="margin-bottom: 20px; padding: 15px; background: #fdfdfd; border: 1px solid #eee; border-radius: 8px;">
+                        <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #111; border-bottom: 1px solid #eee; padding-bottom: 8px;">${mod.headline || 'Product Q&A'}</h3>
+                        ${qaListHtml}
+                    </div>
+                `;
+                break;
+                
+            case 'comparison_chart':
+            case 'enhanced_comparison':
+                let rowsHtml = '';
+                (mod.rows || []).forEach(row => {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px; font-weight: bold; color: #555;">${row.feature}</td>
+                            <td style="padding: 10px; text-align: center;">${row.model1Value}</td>
+                            <td style="padding: 10px; text-align: center;">${row.model2Value || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+                modulesHtml += `
+                    <div class="aplus-module comparison-module" style="margin-bottom: 20px; overflow-x: auto;">
+                        <h3 style="margin: 0 0 12px 0; font-size: 20px; color: #111;">${mod.headline || 'Product Comparison'}</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                    <th style="padding: 10px; text-align: left;">Feature</th>
+                                    <th style="padding: 10px; text-align: center;">This Product</th>
+                                    <th style="padding: 10px; text-align: center;">Alternative</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                break;
+                
+            default:
+                modulesHtml += `
+                    <div class="aplus-module standard-module" style="margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111;">${mod.headline || ''}</h3>
+                        ${imgUrl ? `<img src="${imgUrl}" style="width: 100%; display: block; border-radius: 6px; margin-bottom: 10px;" />` : ''}
+                        <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.6;">${mod.body || ''}</p>
+                    </div>
+                `;
+        }
+    });
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${aplusPlan.productName || 'Amazon A+ Content'}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background: #fafafa;
+        }
+        .aplus-container {
+            max-width: ${width}px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border: 1px solid #e1e1e1;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+        .aplus-header {
+            text-align: center;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .aplus-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #111;
+        }
+        .aplus-header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="aplus-container">
+        <div class="aplus-header">
+            <h1>${aplusPlan.productName || 'A+ Content Layout'}</h1>
+            <p>Target Audience: ${aplusPlan.targetAudience || 'General'}</p>
+            <p style="font-style: italic; color: #666; margin-top: 5px;">Strategy: ${aplusPlan.contentStrategy || ''}</p>
+        </div>
+        
+        <div class="aplus-modules-stack">
+            ${modulesHtml}
+        </div>
+    </div>
+</body>
+</html>`;
 }

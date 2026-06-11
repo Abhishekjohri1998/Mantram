@@ -20,6 +20,7 @@ export default function QuickPostTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/quick-post', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 120000, // 2 min timeout for quick post gen
                 body: JSON.stringify({
                     productDNA:    sharedContext?.productDNA,
                     productData:   sharedContext?.productData,

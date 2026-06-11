@@ -17,6 +17,7 @@ export default function LandingPageTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/landing-page/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 180000, // 3 min timeout for landing page copy, images + CDN deployment
                 body: JSON.stringify({
                     productDNA: sharedContext?.productDNA, productData: sharedContext?.productData,
                     productImages: sharedContext?.productImages, designContext: sharedContext?.designContext,

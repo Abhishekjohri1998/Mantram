@@ -54,6 +54,7 @@ export default function SocialKitTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/social-kit/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 300000, // 5 min timeout for multi-image + copy generation
                 body: JSON.stringify({
                     productDNA:            sharedContext?.productDNA,
                     productData:           sharedContext?.productData,

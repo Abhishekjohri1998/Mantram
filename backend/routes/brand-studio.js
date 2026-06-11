@@ -7,7 +7,7 @@ import { generateLandingPage, publishToShopify, generateEmbedCode } from '../age
 import { generateAplusListing } from '../agents/brandStudio/aplusBuilder.js';
 import { exportEmailToPlatform } from '../utils/emailIntegrations.js';
 import { callAgentText, callAgent } from '../agents/shared/agentUtils.js';
-import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../agents/videoStudio/laozhangClient.js';
+import { laozhangImageGenerate, laozhangMultimodalImageGenerate, laozhangGptImageWithRefs } from '../agents/videoStudio/laozhangClient.js';
 import { analyzeProductDesign, generateMoodBoardImages, generateProductMoodDirections, buildDesignContext, generateQuickPost } from '../agents/shared/productDesignAgent.js';
 import PulseHistory from '../models/PulseHistory.js';
 import ProductContext from '../models/ProductContext.js';
@@ -371,14 +371,14 @@ Product: "${productTitle}" | Category: ${productDNA?.productCategory || 'consume
 Key USPs: ${bullets.slice(0, 5).join(' | ')}
 Post type: ${kitType}
 
-Generate platform-optimized captions. Return ONLY valid JSON:
+Generate platform-optimized captions and image-text overlays. For every platform, include an "imageText" field which is a 3-5 word high-impact creative headline to be rendered directly onto the visual graphic (e.g., "Fold. Stand. Work.", "Unleash Your Workspace.", "Workspace Redefined."). Return ONLY valid JSON:
 {
-  "instagram_feed": { "caption": "2-3 line engaging caption (no hashtags here)", "hashtags": "20 relevant hashtags as a single string" },
-  "instagram_story": { "caption": "Short punchy text overlay suggestion (max 15 words)", "sticker_text": "CTA for story sticker e.g. Swipe Up | Shop Now" },
-  "facebook": { "caption": "Conversational 2-3 line post (no hashtag spam), include link placeholder" },
-  "twitter_x": { "caption": "Under 250 chars. Punchy. Include 2-3 relevant hashtags." },
-  "linkedin": { "caption": "Professional 3-4 line post. Business benefit angle. Max 1300 chars." },
-  "pinterest": { "caption": "Keyword-rich descriptive caption for pin. 2-3 sentences with relevant keywords.", "board_suggestion": "Suggested board name" }
+  "instagram_feed": { "imageText": "headline for graphic", "caption": "2-3 line engaging caption (no hashtags here)", "hashtags": "20 relevant hashtags as a single string" },
+  "instagram_story": { "imageText": "headline for graphic", "caption": "Short punchy text overlay suggestion (max 15 words)", "sticker_text": "CTA for story sticker e.g. Swipe Up | Shop Now" },
+  "facebook": { "imageText": "headline for graphic", "caption": "Conversational 2-3 line post (no hashtag spam), include link placeholder" },
+  "twitter_x": { "imageText": "headline for graphic", "caption": "Under 250 chars. Punchy. Include 2-3 relevant hashtags." },
+  "linkedin": { "imageText": "headline for graphic", "caption": "Professional 3-4 line post. Business benefit angle. Max 1300 chars." },
+  "pinterest": { "imageText": "headline for graphic", "caption": "Keyword-rich descriptive caption for pin. 2-3 sentences with relevant keywords.", "board_suggestion": "Suggested board name" }
 }`;
 
         let captions = {};
@@ -413,11 +413,14 @@ Generate platform-optimized captions. Return ONLY valid JSON:
             launch:  'product launch announcement, exciting, bold',
         };
 
-        const { laozhangImageGenerate, laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
+        const { laozhangImageGenerate, laozhangMultimodalImageGenerate, laozhangGptImageWithRefs } = await import('../agents/videoStudio/laozhangClient.js');
 
         const imageJobs = targetPlatforms.map(async (platform) => {
             const cfg = PLATFORM_CONFIGS[platform];
             if (!cfg) return { platform, success: false };
+
+            const platformCaption = captions[platform] || {};
+            const textToRender = platformCaption.imageText || `${productTitle} Redefined`;
 
             const imagePrompt = `SOCIAL MEDIA ${cfg.label.toUpperCase()} — COMPLETE DESIGNED GRAPHIC
 
@@ -435,11 +438,11 @@ DESIGN REQUIREMENTS:
 - This is a COMPLETE ready-to-post social graphic
 - Product must be the visual hero — prominently placed, properly lit
 - Include brand-consistent graphic design elements (geometric shapes, color blocks)
-- Typography zone: Leave clean space for ${captions[platform]?.caption ? 'the headline text' : 'CTA text'}
+- Typography zone: Render the text "${textToRender}" clearly and legibly inside the text/design panel
 - Visual quality: editorial photography meets graphic design — not a simple product shot
 - The product colors MUST be preserved exactly as specified
 
-CRITICAL: Render NO readable text in the image. Design only.`;
+CRITICAL: Render the exact text "${textToRender}" on the image. Do NOT print generic placeholder text or "Lorem Ipsum" anywhere.`;
 
             try {
                 let result;
@@ -1459,12 +1462,43 @@ function scrapeGeneric($, url) {
 
     console.log(`   🌐 Generic scraper: "${(jsonLd?.name || $('h1').first().text().trim()).substring(0, 50)}" — jsonLd:${jsonLdImages.length} shopifyGallery:${shopifyGalleryImages.length} wc:${wcImages.length} og:${ogImages.length} → ${images.length} kept`);
 
+    const bulletPoints = [];
+    const descriptionContainers = [
+        '[class*="product-description"]', '[class*="description"]', '[class*="product-info"]',
+        '[class*="product-meta"]', '[class*="product-details"]', '#product-description',
+        '#description', '[itemprop="description"]', '.productView-desc', '.productView-description',
+        '.product-description', '.product-single__description', '[data-product-description]'
+    ];
+    const excludeRegex = /₹|\$|price|sale|% off|mrp|discount|prepaid|checkout|add to cart|subscribe|back in stock|notify|pickup|availability|shipping|returns|coupon|code:|<link|<script|inherit/i;
+    
+    for (const container of descriptionContainers) {
+        $(container).find('p, strong, span, h2, h3, li').each((_, el) => {
+            const txt = $(el).text().trim().replace(/\s+/g, ' ');
+            if (txt.length > 20 && txt.length < 250 && !excludeRegex.test(txt) && !bulletPoints.includes(txt)) {
+                bulletPoints.push(txt);
+            }
+        });
+        if (bulletPoints.length >= 8) break;
+    }
+
+    if (bulletPoints.length < 4) {
+        $('li').each((_, el) => {
+            const parentNav = $(el).closest('header, footer, nav, [class*="menu"], [class*="nav"], [class*="header"], [class*="footer"], [class*="sidebar"], [class*="aside"], [class*="dropdown"], [id*="menu"], [id*="nav"], [id*="header"], [id*="footer"]');
+            if (parentNav.length === 0) {
+                const txt = $(el).text().trim().replace(/\s+/g, ' ');
+                if (txt.length > 20 && txt.length < 250 && !excludeRegex.test(txt) && !bulletPoints.includes(txt)) {
+                    bulletPoints.push(txt);
+                }
+            }
+        });
+    }
+
     return {
         title: jsonLd?.name || $('h1').first().text().trim(),
         brand: jsonLd?.brand?.name || '',
         price: jsonLd?.offers?.[0]?.price || jsonLd?.offers?.price || $('[class*="price"]').first().text().trim(),
         description: (jsonLd?.description || $('meta[name="description"]').attr('content') || '').substring(0, 1000),
-        bulletPoints: $('ul li').map((_, el) => $(el).text().trim()).get().filter(t => t.length > 10 && t.length < 300).slice(0, 8),
+        bulletPoints: bulletPoints.slice(0, 8),
         images,
         category: $('[class*="breadcrumb"] a').map((_, el) => $(el).text().trim()).get().join(' > '),
         platform: url.includes('myshopify') || url.includes('/products/') ? 'shopify' : 'web',
@@ -1682,12 +1716,22 @@ router.post('/aplus/generate', protect, async (req, res) => {
         const {
             brandId, productUrl, productData, referenceImages,
             brief, moduleCount = 7, designContext, productDNA,
-            listingTier = 'standard',  // 'standard' | 'premium'
+            listingTier: rawListingTier,
+            tier,
             imageModel,
         } = req.body;
 
         if (!brandId) return res.status(400).json({ success: false, error: 'brandId required' });
         if (!brief && !productUrl && !productData) return res.status(400).json({ success: false, error: 'Provide a product URL, product data, or brief' });
+
+        // Map frontend's 'tier' or 'listingTier' dynamically to prevent mismatches
+        let listingTier = rawListingTier;
+        if (!listingTier && tier) {
+            listingTier = tier === 'A+' ? 'premium' : 'standard';
+        }
+        if (!listingTier) {
+            listingTier = 'standard';
+        }
 
         const isPremium = listingTier === 'premium';
         const creditCost = isPremium ? CREDITS.aplusPlus : CREDITS.aplus;
@@ -1735,6 +1779,8 @@ router.post('/aplus/generate', protect, async (req, res) => {
         res.json({
             success: true,
             aplusPlan: result.aplusPlan,
+            modules: result.modules,     // Add mapped modules for frontend rendering
+            html: result.html,           // Add compiled HTML for preview/download
             images: result.images,
             exportText: result.exportText,
             productData: result.productData,

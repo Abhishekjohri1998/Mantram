@@ -24,6 +24,7 @@ export default function EmailTool({ sharedContext, brandId }) {
         try {
             const data = await apiFetch('/brand-studio/email/generate', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
+                timeout: 180000, // 3 min timeout for email copy + image gen
                 body: JSON.stringify({
                     productDNA: sharedContext?.productDNA, productData: sharedContext?.productData,
                     productImages: sharedContext?.productImages, designContext: sharedContext?.designContext,
