@@ -220,7 +220,7 @@ If you cannot fix it, return:
 export async function analyzeError(errorEvent, options = {}) {
     const {
         apiKey = process.env.ANTHROPIC_API_KEY,
-        model = process.env.AUTOFIX_MODEL || 'claude-3-5-sonnet-20241022',
+        model = process.env.AUTOFIX_MODEL || 'claude-sonnet-4-6',
         appRoot = process.env.AUTOFIX_APP_ROOT || '/home/ec2-user/Mantram',
     } = options;
 

@@ -654,7 +654,7 @@ Rating: ${product.rating || 'N/A'} (${product.reviewCount || 'N/A'} reviews)
         strategyPrompt,
         `Create ${isPremium ? 'Premium A++' : 'Standard A+'} content for: ${product?.title || brief}`,
         0.7, 8000,
-        { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', timeoutMs: 150_000 }
+        { provider: 'anthropic', model: 'claude-sonnet-4-6', timeoutMs: 150_000 }
     );
 
     if (!aplusPlan?.modules?.length) {

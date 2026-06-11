@@ -949,7 +949,7 @@ When calling create_script_block, use this structure:
                 toolHandlers: {}, // No server-side tools needed — research done pre-flight
                 temperature: 0.5,
                 maxTokens: 4096,
-                model: 'claude-3-5-sonnet-20241022',
+                model: 'claude-sonnet-4-6',
             });
 
             // Attach reference images to response
@@ -969,7 +969,7 @@ When calling create_script_block, use this structure:
                     tools: clientTools,
                     temperature: 0.2,
                     maxTokens: 2048,
-                    model: 'claude-3-5-sonnet-20241022'
+                    model: 'claude-sonnet-4-6'
                 });
                 req._referenceImages = referenceImages;
             } catch (claudeRetryErr) {

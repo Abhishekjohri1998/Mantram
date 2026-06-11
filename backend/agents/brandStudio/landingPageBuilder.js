@@ -78,11 +78,6 @@ async function gatherIntelligence(productName, brandId) {
     }
 }
 
-<<<<<<< HEAD
-// ── Phase 2: Claude Creative Director ─────────────────────────
-export const PAGE_SYSTEM = (brandContext, intel, urlContext) => `You are a world-class strategic copywriter.
-Your job is to write compelling, conversion-focused copy for a campaign landing page.
-=======
 // ── Phase 2: Gemini 2.5 Flash content planner ─────────────────────────
 const PAGE_SYSTEM = (productCtx, brandContext, trendSnippets) =>
 `You are an elite product copywriter and conversion strategist. You write for e-commerce and D2C brands.
@@ -97,7 +92,6 @@ BRAND CONTEXT (style/voice reference only):
 ${brandContext?.substring(0, 600) || 'Use premium, professional style.'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${trendSnippets ? `LIVE TRENDS:\n${trendSnippets}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
->>>>>>> 0e7eb50dae94015ae22f9f3cc9b7161a1b221cc8
 
 CRITICAL RULES:
 1. ALL copy must be PRODUCT-specific — reference actual features, benefits, use cases.

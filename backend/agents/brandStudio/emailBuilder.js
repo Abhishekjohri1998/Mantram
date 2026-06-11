@@ -13,7 +13,7 @@ import { laozhangImageGenerate, laozhangMultimodalImageGenerate } from '../video
 import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 
-const CLAUDE_OPUS = 'claude-3-5-sonnet-20241022';
+const CLAUDE_OPUS = 'claude-sonnet-4-6';
 
 const EMAIL_SYSTEM = (brandContext, urlContext) => `You are an expert email copywriter and conversion strategist.
 Your job is to write compelling, benefit-driven copy for an email campaign based on the brief.

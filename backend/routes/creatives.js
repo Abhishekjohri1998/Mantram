@@ -380,7 +380,7 @@ export async function internalGenerateCreative({ body, user, creditsDeducted, jo
 
                 // Call the Logo Art Director (Claude for precision reasoning)
                 const adResult = await aiRouter.generateText({
-                    model: 'claude-3-5-sonnet-20241022',
+                    model: 'claude-sonnet-4-6',
                     max_tokens: 800,
                     messages: [{ role: 'user', content: logoADPrompt }]
                 });
@@ -4178,7 +4178,7 @@ router.post('/analyse-logo-for-animation', protect, requireStudio('creativeStudi
                 const imgBuf = Buffer.from(await imgResp.arrayBuffer());
                 const mime = imgResp.headers.get('content-type') || 'image/png';
                 const visionResult = await aiRouter.generateText({
-                    model: 'claude-3-5-sonnet-20241022',
+                    model: 'claude-sonnet-4-6',
                     max_tokens: 300,
                     messages: [{
                         role: 'user',
@@ -4198,7 +4198,7 @@ router.post('/analyse-logo-for-animation', protect, requireStudio('creativeStudi
         // ── Step 2: Animation Director ──
         const animInput = LOGO_ANIMATION_DIRECTOR_PROMPT(logoDescription, logoText, '1:1');
         const animResult = await aiRouter.generateText({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-4-6',
             max_tokens: 600,
             messages: [{ role: 'user', content: animInput }]
         });
