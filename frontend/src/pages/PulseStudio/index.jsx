@@ -76,6 +76,8 @@ export default function PulseStudio() {
     const [completedPhases, setCompleted] = useState([])
     const [productContext, setProductContext] = useState(null)
     const [selectedMoodId, setSelectedMoodId] = useState(null)
+    const [moodImages, setMoodImages] = useState({})
+    const [moodLoading, setMoodLoading] = useState(false)
 
     const markDone = (p) => setCompleted(prev => prev.includes(p) ? prev : [...prev, p])
 
@@ -96,6 +98,8 @@ export default function PulseStudio() {
         if (p < phase || completedPhases.includes(p)) setPhase(p)
     }
 
+    const mergedContext = productContext ? { ...productContext, moodImages } : null
+
     return (
         <DashboardLayout title="Pulse Studio">
             <div style={{ maxWidth: 960, margin: '0 auto' }}>
@@ -107,13 +111,18 @@ export default function PulseStudio() {
                     <Phase1Intelligence
                         brandId={brandId}
                         onContextReady={handleProductReady}
+                        moodImages={moodImages}
+                        setMoodImages={setMoodImages}
+                        moodLoading={moodLoading}
+                        setMoodLoading={setMoodLoading}
                     />
                 )}
 
                 {/* Phase 2 — Mood Board */}
                 {phase === 2 && (
                     <Phase2MoodBoard
-                        productContext={productContext}
+                        productContext={mergedContext}
+                        moodLoading={moodLoading}
                         onMoodSelected={handleMoodSelected}
                         onBack={() => setPhase(1)}
                     />
@@ -122,7 +131,7 @@ export default function PulseStudio() {
                 {/* Phase 3 — Creation Hub */}
                 {phase === 3 && (
                     <Phase3Creation
-                        productContext={productContext}
+                        productContext={mergedContext}
                         selectedMoodId={selectedMoodId}
                         onBack={() => setPhase(2)}
                         brandId={brandId}

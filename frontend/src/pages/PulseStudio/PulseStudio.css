@@ -1134,3 +1134,87 @@
     .ps-product-gallery { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
     .ps-gallery-main { grid-row: auto; }
 }
+
+/* ── Mood Board Loading & Action Buttons ── */
+.ps-mood-loading-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--sys-surface);
+    border: 1px solid var(--sys-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    animation: ps-fade-in 0.3s ease;
+}
+
+.ps-mood-hero-actions {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+
+.ps-mood-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(18, 18, 18, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ps-mood-action-btn:hover {
+    background: rgba(18, 18, 18, 0.85);
+    border-color: rgba(255, 255, 255, 0.30);
+    transform: translateY(-1px);
+}
+
+.ps-mood-action-btn:active {
+    transform: scale(0.97);
+}
+
+.ps-mood-thumb-download-btn {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(18, 18, 18, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 8;
+}
+
+.ps-mood-thumb:hover .ps-mood-thumb-download-btn {
+    opacity: 1;
+}
+
+.ps-mood-thumb-download-btn:hover {
+    background: rgba(18, 18, 18, 0.9);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+@keyframes ps-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

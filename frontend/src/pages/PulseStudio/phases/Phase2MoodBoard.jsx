@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import {
     ChevronLeft, ChevronRight, Lock, Sparkles, Loader2,
-    CheckCircle2, Palette, Image as ImageIcon, RefreshCw
+    CheckCircle2, Palette, Image as ImageIcon, RefreshCw,
+    Download, Eye
 } from 'lucide-react'
 
-export default function Phase2MoodBoard({ productContext, onMoodSelected, onBack }) {
+export default function Phase2MoodBoard({ productContext, moodLoading, onMoodSelected, onBack }) {
     const {
         productDNA,
         productData,
@@ -32,6 +33,24 @@ export default function Phase2MoodBoard({ productContext, onMoodSelected, onBack
     useEffect(() => {
         setHeroLoaded(false)
     }, [activeMoodId])
+
+    const handleDownloadImage = async (url, filename) => {
+        try {
+            const response = await fetch(url, { mode: 'cors' })
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = blobUrl
+            link.download = filename || `moodboard-${Date.now()}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(blobUrl)
+        } catch (e) {
+            console.warn('Failed to download image directly:', e)
+            window.open(url, '_blank')
+        }
+    }
 
     // Background gradient from mood palette
     const gradientBg = (() => {
@@ -82,12 +101,37 @@ export default function Phase2MoodBoard({ productContext, onMoodSelected, onBack
                                 <Loader2 size={24} className="ps-spin" style={{ color: 'rgba(255,255,255,0.4)' }} />
                             </div>
                         )}
+                        
+                        {/* Floating Action Buttons */}
+                        <div className="ps-mood-hero-actions">
+                            <button className="ps-mood-action-btn" onClick={() => window.open(activeImage, '_blank')} title="View Fullscreen">
+                                <Eye size={13} />
+                                View Full
+                            </button>
+                            <button className="ps-mood-action-btn" onClick={() => handleDownloadImage(activeImage, `${activeMood?.label || 'moodboard'}.png`)} title="Download Image">
+                                <Download size={13} />
+                                Download
+                            </button>
+                        </div>
                     </>
+                ) : moodLoading ? (
+                    <div className="ps-mood-hero-placeholder" style={{ background: gradientBg }}>
+                        <div style={{ textAlign: 'center', color: '#fff' }}>
+                            <Loader2 size={36} className="ps-spin" style={{ marginBottom: 12, color: 'var(--sys-primary)' }} />
+                            <div style={{ fontSize: 14, fontWeight: 700 }}>Generating Mood Board Images</div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4, maxWidth: 300, margin: '4px auto 0', lineHeight: 1.5 }}>
+                                GPT Image 2 is rendering your design concepts (approx. 30-60 seconds)...
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     <div className="ps-mood-hero-placeholder" style={{ background: gradientBg }}>
-                        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
-                            <Loader2 size={28} className="ps-spin" style={{ marginBottom: 10 }} />
-                            <div style={{ fontSize: 12, fontWeight: 600 }}>GPT Image 2 generating…</div>
+                        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>
+                            <Sparkles size={32} style={{ marginBottom: 12, opacity: 0.5 }} />
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>No Mood Board Image Generated</div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                                Double check API configuration or retry the scan
+                            </div>
                         </div>
                     </div>
                 )}
@@ -145,10 +189,26 @@ export default function Phase2MoodBoard({ productContext, onMoodSelected, onBack
                             onClick={() => setActiveMoodId(mood.id)}
                         >
                             {img ? (
-                                <img src={img} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
+                                <>
+                                    <img src={img} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
+                                    <button
+                                        className="ps-mood-thumb-download-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDownloadImage(img, `${mood.label}.png`)
+                                        }}
+                                        title="Download Mood Board"
+                                    >
+                                        <Download size={10} />
+                                    </button>
+                                </>
+                            ) : moodLoading ? (
+                                <div className="ps-mood-thumb-placeholder" style={{ background: bg }}>
+                                    <Loader2 size={14} className="ps-spin" style={{ color: 'rgba(255,255,255,0.4)' }} />
+                                </div>
                             ) : (
                                 <div className="ps-mood-thumb-placeholder" style={{ background: bg }}>
-                                    <Loader2 size={14} className="ps-spin" style={{ color: 'rgba(255,255,255,0.3)' }} />
+                                    <Sparkles size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
                                 </div>
                             )}
                             <div className="ps-mood-thumb-label">

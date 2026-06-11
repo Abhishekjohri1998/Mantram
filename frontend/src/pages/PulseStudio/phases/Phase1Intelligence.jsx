@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import {
     Link2, UploadCloud, Search, Palette, Cpu, Sparkles,
-    CheckCircle2, Loader2, X, RefreshCw, Lock, ChevronRight
+    CheckCircle2, Loader2, X, RefreshCw, Lock, ChevronRight, Download
 } from 'lucide-react'
 import { apiFetch } from '../../../services/api'
 
@@ -31,7 +31,7 @@ const ANALYSIS_STEPS = [
     { icon: Sparkles,  text: 'Generating 4 custom mood directions…' },
 ]
 
-export default function Phase1Intelligence({ brandId, onContextReady }) {
+export default function Phase1Intelligence({ brandId, onContextReady, moodImages, setMoodImages, moodLoading, setMoodLoading }) {
     const [productUrl, setProductUrl]         = useState('')
     const [description, setDescription]       = useState('')
     const [step, setStep]                     = useState('input')   // input | analyzing | ready
@@ -46,10 +46,8 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
     const [productImages, setProductImages]             = useState([])
     const [productDNA, setProductDNA]                   = useState(null)
     const [selectedMood, setSelectedMood]               = useState(null)
-    const [moodImages, setMoodImages]                   = useState({})
     const [productMoodDirections, setProductMoodDirections] = useState(null)
     const [designContext, setDesignContext]             = useState(null)
-    const [moodLoading, setMoodLoading]                 = useState(false)
     const fileRef = useRef()
 
     const reset = () => {
@@ -57,6 +55,7 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
         setSelectedMood(null); setDesignContext(null); setAnalyzedProduct(null)
         setProductImages([]); setActiveStep(0); setError('')
         setUploadedFiles([]); setUploadPreviews([]); setS3ImageUrls([])
+        setMoodLoading(false)
         setStep('input')
     }
 
@@ -94,14 +93,39 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
                 }).then(mb => {
                     setMoodLoading(false)
                     if (mb.success) {
+                        let newMoodDirs = productMoodDirections
                         if (mb.moodDirections && Object.keys(mb.moodDirections).length >= 2) {
+                            newMoodDirs = mb.moodDirections
                             setProductMoodDirections(mb.moodDirections)
                             setSelectedMood(Object.keys(mb.moodDirections)[0])
                         }
+                        let newImgs = {}
                         if (mb.moods) {
-                            const imgs = {}
-                            mb.moods.forEach(m => { if (m.imageUrl) imgs[m.id] = m.imageUrl })
-                            setMoodImages(imgs)
+                            mb.moods.forEach(m => { if (m.imageUrl) newImgs[m.id] = m.imageUrl })
+                            setMoodImages(newImgs)
+                        }
+
+                        // Auto-save to database with the freshly generated moodboard images
+                        if (brandId && data.productDNA) {
+                            const pName = product?.title || data.productDNA?.productCategory || 'Product'
+                            if (!/oops|something went wrong|access denied|captcha/i.test(pName)) {
+                                apiFetch('/brand-studio/product-context', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        brandId, productName: pName,
+                                        productCategory: data.productDNA?.productCategory || '',
+                                        productBrand: product?.brand || '',
+                                        productUrl: productUrl || '',
+                                        productImages: (product?.persistedImages || images || []).slice(0, 4),
+                                        palette: data.productDNA?.dominantColors || [],
+                                        productDNA: data.productDNA || {},
+                                        selectedMoodId: selectedMood || data.productDNA.defaultMoodDirection || 'editorial',
+                                        moodDirections: newMoodDirs || {},
+                                        moodImages: newImgs || {},
+                                        designContext: designContext, autoSaved: true,
+                                    }),
+                                }).catch(() => {})
+                            }
                         }
                     }
                 }).catch(() => setMoodLoading(false))
@@ -156,6 +180,24 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
         setS3ImageUrls(urls)
         setProductImages(urls)
         await runPDI(urls, { title: '', description: description || '' })
+    }
+
+    const handleDownloadImage = async (url, filename) => {
+        try {
+            const response = await fetch(url, { mode: 'cors' })
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = blobUrl
+            link.download = filename || `moodboard-${Date.now()}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(blobUrl)
+        } catch (e) {
+            console.warn('Failed to download image directly:', e)
+            window.open(url, '_blank')
+        }
     }
 
     // BUG4 FIX: Clicking mood card only selects — does NOT advance to Phase 2
@@ -424,6 +466,18 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
                             )}
                         </div>
 
+                        {moodLoading && (
+                            <div className="ps-mood-loading-banner" style={{ marginBottom: 12 }}>
+                                <Loader2 size={16} className="ps-spin" style={{ color: 'var(--sys-primary)' }} />
+                                <div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sys-text)' }}>Generating Mood Board Options</div>
+                                    <div style={{ fontSize: 11, color: 'var(--sys-text-muted)', marginTop: 2 }}>
+                                        GPT Image 2 is creating 4 distinct visual territories using your Product DNA (takes ~30-60s). You can select a mood now and continue, or wait for the previews to render.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="ps-mood-filmstrip">
                             {Object.values(activeMoods).map(mood => {
                                 const aiImg = moodImages[mood.id]
@@ -432,7 +486,19 @@ export default function Phase1Intelligence({ brandId, onContextReady }) {
                                     // BUG4 FIX: Click only selects mood, does NOT advance phase
                                     <div key={mood.id} className={`ps-mood-thumb ${isSelected ? 'selected' : ''}`} onClick={() => handleMoodCardClick(mood.id)}>
                                         {aiImg ? (
-                                            <img src={aiImg} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
+                                            <>
+                                                <img src={aiImg} alt={mood.label} className="ps-mood-thumb-img" onError={e => e.target.style.display='none'} />
+                                                <button
+                                                    className="ps-mood-thumb-download-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleDownloadImage(aiImg, `${mood.label}.png`)
+                                                    }}
+                                                    title="Download Mood Board"
+                                                >
+                                                    <Download size={10} />
+                                                </button>
+                                            </>
                                         ) : moodLoading ? (
                                             <div className="ps-mood-thumb-placeholder">
                                                 <Loader2 size={16} className="ps-spin" style={{ color: 'var(--sys-text-muted)' }} />
