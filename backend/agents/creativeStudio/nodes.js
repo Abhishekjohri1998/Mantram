@@ -1637,8 +1637,6 @@ function buildCopyInjection(copy, aspectRatio = '1:1', brandTypographyStyle = nu
     parts.push(`COMPOSITION HIERARCHY: The IMAGE (product/scene/environment) is the primary visual element — the TEXT is a secondary design element layered on top. Never let text fill more than 35% of the canvas area total.`);
 
     // Precise safe-zone rules per aspect ratio (replaces vague 'don't go to edges')
-    const [w, h] = (aspectRatio || '1:1').split(':').map(Number);
-    const ratio = (w || 1) / (h || 1);
     const isUltraWide = ratio > 2.5; // 16:5 banner, 3:1, 21:9
     const isWide = ratio > 1.6 && !isUltraWide; // 16:9, 4:3
     const isTall = ratio < 0.7;  // 9:16, 2:3, 4:5
