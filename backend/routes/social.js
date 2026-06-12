@@ -658,10 +658,21 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
  * @access  Private
  */
 router.post('/publish', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, imageUrls, captions, videoUrl } = req.body;
+    let { accountIds, text, imageUrl, imageUrls, captions, videoUrl } = req.body;
 
     if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
         return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
+    }
+
+    // Auto-detect video URLs sent through imageUrl field (e.g. from Video Studio storyboard)
+    // Strip query params before checking extension so signed S3 URLs are handled correctly
+    if (!videoUrl && imageUrl) {
+        const cleanUrl = imageUrl.split('?')[0].toLowerCase();
+        if (/\.(mp4|mov|avi|webm|mkv)$/.test(cleanUrl)) {
+            console.log(`[SOCIAL] Auto-detected video URL in imageUrl field, promoting to videoUrl`);
+            videoUrl = imageUrl;
+            imageUrl = null;
+        }
     }
 
     // Determine if this is a carousel (multi-image) or single-image publish

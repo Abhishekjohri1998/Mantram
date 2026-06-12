@@ -173,6 +173,16 @@ async function publishScheduledPost(post) {
             return;
         }
 
+        // Auto-detect video URLs stored in imageUrl field (e.g. from Video Studio storyboard)
+        if (!post.videoUrl && post.imageUrl) {
+            const cleanUrl = post.imageUrl.split('?')[0].toLowerCase();
+            if (/\.(mp4|mov|avi|webm|mkv)$/.test(cleanUrl)) {
+                console.log(`[SCHEDULER] Auto-detected video URL in imageUrl field for post ${post._id}, promoting to videoUrl`);
+                post.videoUrl = post.imageUrl;
+                post.imageUrl = null;
+            }
+        }
+
         // Resolve media URLs
         let absoluteImageUrl = await resolveMediaUrl(post.imageUrl, post.user, 'png');
         const absoluteVideoUrl = await resolveMediaUrl(post.videoUrl, post.user, 'mp4');
