@@ -147,8 +147,11 @@ COMPOSITION FRAMEWORKS — CHOOSE ONE:
 • SPLIT COMPOSITION: Visual split or duality — two worlds, two moods, creative tension.
 
 RULES:
-- TEXT LENGTH LIMIT: If the aesthetic demands text, NEVER generate more than 1 to 3 short words. Long sentences WILL be cropped off the edges. Keep it punchy.
-- SAFE ZONES: Ensure extreme padding around the text. Never push text to the extreme edges of the canvas, especially in wide or odd aspect ratios, or it will be clipped.
+- TEXT LENGTH LIMIT: If the aesthetic demands text, NEVER generate more than 1-3 short words. Long sentences will be cropped off edges. Keep it punchy.
+- TEXT SIZE CONSTRAINT: Any text in the image must occupy 30-55% of canvas WIDTH at most, and a single line ≈ 8-13% of canvas HEIGHT. Text must NOT fill more than 35% of total canvas area.
+- TEXT IS SECONDARY: The product/subject/scene is the visual hero. Text is a design accent layer — it supports the composition, it does not replace it.
+- SAFE ZONES: Minimum 15% empty horizontal padding on both sides. Text centroid inside inner 70% of canvas dimensions.
+- WEIGHT VOCABULARY: For bold brands — use "Black/ExtraBlack weight (900)". For elegant brands — "fine weight (300-400), generous tracking". For tech brands — "Medium weight (500), clinical precision".
 1. Analyse brief → identify MARKETING JOB, then THEME/OCCASION/MOOD, then choose DESIGN AESTHETIC
 2. Decide PRODUCT INTEGRATION level from brief intent (hero / supporting / ambient / none)
 3. Choose a COMPOSITION FRAMEWORK that creates tension AND fits the canvas above
@@ -249,17 +252,32 @@ TYPOGRAPHY RULE — READ CAREFULLY (this is a precision rule, not a blanket ban)
    Atmospheric or thematic typography as a design element (editorial brutalism requires this).
    A bold headline word or short phrase that serves as visual composition.
    
-⚠️ STRICT TYPOGRAPHY CONSTRAINTS:
-1. TEXT LENGTH LIMIT: NEVER generate more than 1 to 3 short words. Long sentences WILL be cropped off the edges. Keep it punchy (e.g., "INNOVATION", "MASTERPIECE").
-2. SAFE ZONES: Ensure extreme padding around the text. Never push text to the extreme edges of the canvas, especially in wide or odd aspect ratios, or it will be clipped.
+⚠️ TYPOGRAPHY CONSTRAINTS — READ ALL, THEY PREVENT COMMON FAILURES:
 
-When typography appears in the image:
-→ Style it based on the brand's Typography Personality (from Brand DNA)
-→ bold-display-impact brand → oversized weight, high contrast, strong geometric structure
-→ serif-elegant brand → refined letterforms, fine weight, classical proportion
-→ geometric-tech brand → clean sans-serif, precision spacing, clinical precision
-→ handwritten-casual → organic, warm, intentionally imperfect energy
-→ NEVER render the actual brand name itself, or meta-words like "DNA", "Brand", or "Product". Use a thematic placeholder word relevant to the campaign (e.g. "LOVE", "SALE", "NOW"), or leave a clean space for the post-process overlay
+SIZE RULES (most important):
+1. HEADLINE: 1-3 words maximum. Occupies 30-55% of canvas width. One text line ≈ 8-13% of canvas height. Max 2 lines.
+2. COMPOSITION: Product/scene is the HERO — text is secondary. Text must NOT fill more than 35% of canvas area.
+3. SCALE RELATIONSHIP: If the canvas has a product, the product must be visually LARGER than any text.
+4. NEVER fill the canvas with text. A single oversized word that dominates the image = failed generation.
+
+PLACEMENT RULES:
+- Minimum 15% empty horizontal margin BOTH sides — first and last letters must not be near edges.
+- Square (1:1): text centroid inside inner 70% × 70%. Tall (9:16): 15% padding left/right. Wide (16:9): 20% padding top/bottom.
+
+TYPOGRAPHY PERSONALITY — translate brand DNA into specific visual instructions:
+→ bold-display-impact: Black/ExtraBlack weight (900), tight tracking, geometric, white or primary color on dark
+→ serif-elegant: High-contrast serif, fine strokes, SemiBold (600), cream or gold on deep dark background
+→ geometric-tech: Geometric sans-serif, Medium weight (500), clinical spacing, electric white or cyan on near-black
+→ handwritten-casual: Humanist sans or brush display, Bold (700) but warm, off-white or brand accent color
+→ luxury-minimal: Light or Thin weight (300), generous letter-spacing, featherweight on substantial negative space
+→ NEVER render brand name, logo, meta-words ("DNA", "Brand"). Use campaign-relevant words only.
+
+2026 TYPOGRAPHY TRENDS (pick ONE that fits the brand aesthetic):
+• Swiss International — tight leading, extreme weight contrast (900 headline / 300 subtext), rational grid
+• New Organic Grotesque — slightly imperfect humanist sans, warm distribution, medium weight
+• Brutalist Display — very heavy weight, low x-height, extremely tight tracking, raw contrast
+• New Luxury Serif — thin weight (300), high x-height, very generous tracking, champagne on deep navy
+• Tech Mono — geometric monospaced, cold precision, regular weight, electric blue-white on black
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VISUAL DNA GROUND TRUTH — YOUR ART DIRECTION ANCHOR
@@ -433,12 +451,19 @@ TYPOGRAPHY MUST MATCH THIS BRAND'S PERSONALITY (read from Brand DNA "Typography 
 → handwritten-casual brand → organic, warm, intentionally imperfect brush energy
 → luxury-minimal brand → extreme negative space, featherweight type, no CTA button needed
 
-TEXT SAFE ZONE (PRECISE — the image AI MUST honour this or it's a failed generation):
-- Text centroid must sit inside the inner 76% of canvas width AND 76% of canvas height
-- Minimum 12% empty padding from ALL four edges (left, right, top, bottom)
-- Wide ratio (16:9, 4:1): NEVER above 20% or below 80% vertical mark
-- Tall ratio (9:16): NEVER left of 15% or right of 85% horizontal mark
-- Square (1:1): Text lives in center 60% width × 60% height` 
+TEXT SIZE CONSTRAINTS (CRITICAL — these prevent full-screen text failure):
+- HEADLINE: occupies 30-55% of canvas WIDTH. One line of headline text ≈ 8-13% of canvas HEIGHT. Maximum 2 lines.
+- SUBTEXT: 45-55% of headline font size, lighter weight (400-500), same color family. Must NOT visually compete with headline.
+- CTA BUTTON: 55-65% of headline font size, bold weight (700), distinct accent color background.
+- COMPOSITION RULE: The product/visual scene is the HERO — text is a secondary layer. Total text area must NOT exceed 35% of canvas.
+- NEGATIVE RULE: NEVER fill the canvas with text. NEVER make text the dominant visual element. Text complements; image speaks.
+
+TEXT PLACEMENT SAFE ZONES:
+- Square (1:1): Text centroid inside inner 70% × 70% of canvas. 15% padding from all edges.
+- Wide (16:9): Text centroid between 20-80% height AND 15-85% width. 20% padding from top/bottom.
+- Tall (9:16): Text centroid between 15-85% height AND 10-90% width. 15% padding from left/right.
+- Ultra-wide (4:1+): Text sits in LEFT HALF (5-50% width), 30-70% of height. Subject fills RIGHT HALF.
+- CROP PREVENTION: First and last letters of every line must be ≥15% from canvas left/right edges.` 
 : `🚫 NO TEXT ON IMAGE — This image must be PURELY VISUAL. Do NOT render any words, phrases, single motivational words, or typographic elements anywhere on the image. No "EVOLVE", "RISE", "INNOVATE", "GREATNESS", or any other word. The image communicates entirely through composition, lighting, colour, texture, and subject. Copy will be added separately as a post-process overlay.
 
 Set copyHeadline, copySubtext, copyCta, and copyTextStyle to null.`}

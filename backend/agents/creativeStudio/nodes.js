@@ -535,9 +535,9 @@ export async function artDirectorNode(state) {
         state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
-    // Art Director: Claude Sonnet for deep brand-faithful creative reasoning
-    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.7, 3072, { provider: 'anthropic' });
-    console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms (Claude Sonnet)`);
+    // Art Director: Claude Sonnet — high temperature for genuinely creative, non-template outputs
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.82, 3500, { provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+    console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms (Claude Sonnet 4)`);
 
     return {
         ...state,
@@ -642,8 +642,9 @@ export async function fastCreativeDirectorNode(state) {
         state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
-    // ⚡ preferFast — Fast mode already implies speed priority: Gemini 2.5 Flash is ideal
-    const result = await agentUtils.callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.6, 2048, { preferFast: true });
+    // ⚡ Claude Haiku — same speed as Gemini Flash but dramatically better brand reasoning,
+    //    typography understanding, and creative specificity. Critical: fast path hits ALL social-kit generations.
+    const result = await agentUtils.callAgent(FAST_CREATIVE_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.82, 3000, { provider: 'anthropic', model: 'claude-haiku-4-20250514', timeoutMs: 60_000 });
     console.log(`⚡ Fast Creative Director done in ${Date.now() - startMs}ms`);
 
     return {
@@ -731,7 +732,8 @@ export async function promptEngineerNode(state) {
     ].filter(Boolean).join('\n');
 
     // Prompt Engineer: Claude Sonnet for precise, brand-faithful prompt construction
-    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.5, 3072, { provider: 'anthropic' });
+    // Prompt Engineer at 0.75 — low temp produces mechanical identical prompts every generation
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.75, 3200, { provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms (Claude Sonnet)`);
 
     return {
@@ -1066,13 +1068,13 @@ export async function unifiedCreativeEngineNode(state) {
         state.diversityDirective ? `\n━━━ DIVERSITY DIRECTIVE ━━━\n${state.diversityDirective}` : '',
     ].filter(Boolean).join('\n');
 
-    // ONE Claude call for all 4 roles
+    // ONE Claude Sonnet 4 call for all 4 roles — higher temp for creative variety
     const result = await agentUtils.callAgent(
         UNIFIED_CREATIVE_ENGINE_PROMPT(brandContext, state.aspectRatio, !!state.generateCopy, formatKey),
         userPrompt,
-        0.65,
-        3500,
-        { provider: 'anthropic', timeoutMs: 120_000 }
+        0.82,
+        4000,
+        { provider: 'anthropic', model: 'claude-sonnet-4-20250514', timeoutMs: 120_000 }
     );
     console.log(`⚡ Unified Creative Engine done in ${Date.now() - startMs}ms (Claude Sonnet) — trend: ${result.designTrend?.split(' ')[0] || '?'} | copy: ${result.copyHeadline || 'none'}`);
 
@@ -1571,25 +1573,68 @@ function buildCopyInjection(copy, aspectRatio = '1:1', brandTypographyStyle = nu
 
     const parts = [];
 
-    // Resolve typography style — brand-specific first, then copy.textStyle, then safe default
-    const typographyInstruction = brandTypographyStyle
-        ? `Use typography that matches this brand's personality: ${brandTypographyStyle}.`
-        : copy.textStyle
-            ? `TYPOGRAPHY STYLE: ${copy.textStyle}`
-            : `TYPOGRAPHY STYLE: bold, clean, high-contrast typography.`;
+    // ── Typography resolution — brand-specific → copy.textStyle → 2026 default ──
+    // Build a rich, specific typography instruction instead of a vague "bold, clean" fallback.
+    // Image models interpret "LARGE, BOLD, DOMINANT" as "fill the whole canvas" — so we
+    // must be explicit about proportions, weight vocabulary, and size relationships.
+    let typographyInstruction;
+    if (brandTypographyStyle) {
+        // Brand has a defined typography personality — translate it to visual instructions
+        const bt = brandTypographyStyle.toLowerCase();
+        if (bt.includes('bold') || bt.includes('impact') || bt.includes('display') || bt.includes('heavy')) {
+            typographyInstruction = `Typography: ultra-heavy weight (900/Black), tight tracking, geometric construction, maximum weight contrast. Font weight: Black/ExtraBlack. Color: white or brand primary on dark scrim.`;
+        } else if (bt.includes('serif') || bt.includes('elegant') || bt.includes('luxury') || bt.includes('editorial')) {
+            typographyInstruction = `Typography: refined high-contrast serif, fine strokes, classical proportions, generous letter-spacing. Font weight: Regular or SemiBold. Color: cream, gold, or ivory on deep dark background.`;
+        } else if (bt.includes('geometric') || bt.includes('tech') || bt.includes('minimal') || bt.includes('clean')) {
+            typographyInstruction = `Typography: precise geometric sans-serif, clinical spacing, medium weight, cold color. Font weight: Medium (500). Color: electric white or cyan on near-black.`;
+        } else if (bt.includes('handwritten') || bt.includes('casual') || bt.includes('organic') || bt.includes('warm')) {
+            typographyInstruction = `Typography: organic humanist sans or brushstroke display, slightly irregular baseline, warm weight distribution. Font weight: Bold but not mechanical. Color: warm off-white or brand accent.`;
+        } else {
+            typographyInstruction = `Typography matching brand personality "${brandTypographyStyle}": use appropriate font weight (600-800), clean rendering, color that contrasts with background.`;
+        }
+    } else if (copy.textStyle) {
+        typographyInstruction = `TYPOGRAPHY STYLE: ${copy.textStyle}`;
+    } else {
+        // 2026 safe default — specific enough to prevent generic AI output
+        typographyInstruction = `Typography: clean geometric sans-serif, Bold weight (700), white or near-white color on dark semi-transparent scrim behind the text for legibility.`;
+    }
 
-    // Primary headline — the dominant, LARGE text on the image
-    parts.push(`TEXT ON IMAGE — HEADLINE (PRIMARY TEXT): Render the text "${copy.headline}" as LARGE, BOLD, DOMINANT typography. This must be the most visually prominent text element on the image — the viewer reads this first. ${typographyInstruction}`);
+    // ── Size constraint vocabulary (the #1 fix for full-screen text) ──
+    // Image models MUST have explicit proportional constraints or they fill the canvas.
+    const [w, h] = (aspectRatio || '1:1').split(':').map(Number);
+    const ratio = (w || 1) / (h || 1);
+    let headlineSizeRule, safeZoneRule;
 
-    // Supporting subtext — smaller, below headline
+    if (ratio > 2.5) { // Ultra-wide banner
+        headlineSizeRule = `The headline occupies approximately 25-35% of canvas WIDTH and a single line of text is roughly 12-16% of canvas HEIGHT. Maximum 1 line of text.`;
+        safeZoneRule = `SAFE ZONE (ULTRA-WIDE BANNER): Text sits between 30-70% of canvas HEIGHT and 5-50% of canvas WIDTH (left half). Subject fills right half.`;
+    } else if (ratio > 1.3) { // 16:9 horizontal
+        headlineSizeRule = `The headline occupies approximately 40-55% of canvas WIDTH. A single line of text is roughly 10-14% of canvas HEIGHT. Maximum 2 lines.`;
+        safeZoneRule = `SAFE ZONE (WIDE FORMAT): Text centroid between 20-80% of canvas height AND 15-85% of canvas width. 20% minimum empty margin from all edges.`;
+    } else if (ratio < 0.7) { // 9:16 vertical
+        headlineSizeRule = `The headline occupies approximately 60-75% of canvas WIDTH. A single line of text is roughly 8-11% of canvas HEIGHT. Maximum 2-3 lines.`;
+        safeZoneRule = `SAFE ZONE (TALL FORMAT): Text centroid between 15-85% of canvas height AND 10-90% of canvas width. 15% minimum padding left/right.`;
+    } else { // Square 1:1
+        headlineSizeRule = `The headline occupies approximately 50-65% of canvas WIDTH. A single line of text is roughly 9-13% of canvas HEIGHT. Maximum 2 lines.`;
+        safeZoneRule = `SAFE ZONE (SQUARE FORMAT): Text centroid inside inner 70% of canvas width AND height. 15% minimum padding from all four edges.`;
+    }
+
+    // Primary headline — with explicit size constraints
+    parts.push(`TEXT ON IMAGE — HEADLINE: Render "${copy.headline}" as the primary typographic element. ${headlineSizeRule} ${typographyInstruction} The text must complement the visual composition — NOT fill or dominate the entire canvas. Leave the majority of the canvas for the product/visual scene.`);
+
+    // Supporting subtext — must be clearly smaller than headline
     if (copy.subtext) {
-        parts.push(`TEXT ON IMAGE — SUBTEXT: Below the headline, render "${copy.subtext}" in smaller complementary typography. It should support the headline without competing with it.`);
+        parts.push(`TEXT ON IMAGE — SUBTEXT: Below the headline, render "${copy.subtext}" at 45-55% of the headline's font size, lighter weight (400-500), same color family. It supports the headline; it must not compete visually with it.`);
     }
 
-    // CTA button / badge
+    // CTA — distinct from both headline and subtext
     if (copy.ctaText) {
-        parts.push(`TEXT ON IMAGE — CTA BUTTON: Include a button, badge or pill element with the text "${copy.ctaText}" in a high-contrast accent color. Position at bottom-third of the image.`);
+        parts.push(`TEXT ON IMAGE — CTA: A pill/button/badge with text "${copy.ctaText}" in a high-contrast accent color. Approximately 55-65% of headline font size, bold weight (700). Positioned at bottom-third, clearly separated from headline and subtext.`);
     }
+
+    parts.push(safeZoneRule);
+    parts.push(`HORIZONTAL CROP PREVENTION: Minimum 15% empty horizontal margin on BOTH left and right sides. First and last letters of each line must never be near canvas edges.`);
+    parts.push(`COMPOSITION HIERARCHY: The IMAGE (product/scene/environment) is the primary visual element — the TEXT is a secondary design element layered on top. Never let text fill more than 35% of the canvas area total.`);
 
     // Precise safe-zone rules per aspect ratio (replaces vague 'don't go to edges')
     const [w, h] = (aspectRatio || '1:1').split(':').map(Number);
