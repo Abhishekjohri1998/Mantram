@@ -28,7 +28,7 @@ import {
 import config from '../config/env.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
-import { publishVideoToTikTok, getAuthorizationUrl as getTikTokAuthUrl, getAccessToken as getTikTokAccessToken } from '../services/tiktokService.js';
+import { publishVideoToTikTok, publishPhotosToTikTok, getAuthorizationUrl as getTikTokAuthUrl, getAccessToken as getTikTokAccessToken } from '../services/tiktokService.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
@@ -760,6 +760,8 @@ router.post('/publish', protect, async (req, res) => {
                             accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
                         };
                         postId = await publishToTwitter(postText, carouselUrls[0], null, twCreds);
+                    } else if (account.platform === 'tiktok') {
+                        postId = await publishPhotosToTikTok(account.accessToken, carouselUrls, postText);
                     }
                 } else {
                     // Single image/video publish
@@ -778,8 +780,13 @@ router.post('/publish', protect, async (req, res) => {
                         };
                         postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl, twCreds);
                     } else if (account.platform === 'tiktok') {
-                        if (!videoUrl) throw new Error('TikTok requires a video URL');
-                        postId = await publishVideoToTikTok(account.accessToken, videoUrl, postText);
+                        if (videoUrl) {
+                            postId = await publishVideoToTikTok(account.accessToken, videoUrl, postText);
+                        } else if (absoluteImageUrl) {
+                            postId = await publishPhotosToTikTok(account.accessToken, [absoluteImageUrl], postText);
+                        } else {
+                            throw new Error('TikTok requires a video or photo URL');
+                        }
                     }
                 }
 

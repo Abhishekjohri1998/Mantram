@@ -53,4 +53,16 @@
   - If the grounding block lacks a trailing double-newline, the main prompt concatenates directly, corrupting the text and causing the `.indexOf('\n\n')` cleanup parser to fail and return an empty string (`""`).
   - Added a robust line-by-line fallback parser in `creatives.js` that splits on newlines and filters out any metadata prefix lines if double-newlines are missing.
 
+### TikTok Photo & Video Publishing (Sprint 7)
+- **Feature**: TikTok Direct Photo & Video Publishing.
+- **Goal**: Resolve publishing failures when users post non-video assets (single image or carousel) to connected TikTok accounts.
+- **Workflow**:
+  - TikTok Content Posting API v2 requires `/v2/post/publish/video/init/` for videos, and `/v2/post/publish/content/init/` with `media_type: "PHOTO"` and `post_mode: "DIRECT_POST"` for photo/carousel posts.
+  - S3-hosted assets are sent directly to TikTok to pull.
+  - Dynamically switches the API call depending on whether a `videoUrl` is present vs `imageUrl`/`imageUrls`.
+- **Learnings**:
+  - The API privacy level for v2 is `PUBLIC_TO_EVERYONE`, not `PUBLIC` (which was an older value and gets rejected).
+  - Verify account permissions and visibility settings dynamically via the creator info query endpoint (`/v2/post/publish/creator_info/query/`) to see supported configurations.
+
+
 

@@ -89,7 +89,7 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
     const payload = {
         post_info: {
             title: title || 'Created with Mantram AI',
-            privacy_level: 'PUBLIC',
+            privacy_level: 'PUBLIC_TO_EVERYONE',
             disable_duet: false,
             disable_comment: false,
             disable_stitch: false
@@ -117,3 +117,39 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
     // The video is now queued for posting. We return the publish_id.
     return data.data?.publish_id;
 }
+
+export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
+    // Using TikTok Content API v2 Direct Post for Photos (requires video.publish scope)
+    const url = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
+    const payload = {
+        post_mode: 'DIRECT_POST',
+        media_type: 'PHOTO',
+        post_info: {
+            title: title || 'Created with Mantram AI',
+            privacy_level: 'PUBLIC_TO_EVERYONE',
+            disable_comment: false
+        },
+        source_info: {
+            source: 'PULL_FROM_URL',
+            photo_images: imageUrls,
+            photo_cover_index: 0
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (data.error && data.error.code !== 'ok') {
+        throw new Error(`TikTok Publish Error: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+
+    return data.data?.publish_id;
+}
+

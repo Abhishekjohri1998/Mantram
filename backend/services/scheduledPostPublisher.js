@@ -25,7 +25,7 @@ import {
     publishCarouselToFacebook,
     publishCarouselToLinkedIn,
 } from './socialService.js';
-import { publishVideoToTikTok } from './tiktokService.js';
+import { publishVideoToTikTok, publishPhotosToTikTok } from './tiktokService.js';
 import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
 import { sendRetentionEmail } from '../agents/retention/mailer.js';
 import config from '../config/env.js';
@@ -226,6 +226,8 @@ async function publishScheduledPost(post) {
                     accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
                 };
                 postId = await publishToTwitter(caption, carouselUrls[0], null, twCreds);
+            } else if (post.platform === 'tiktok') {
+                postId = await publishPhotosToTikTok(account.accessToken, carouselUrls, caption);
             }
         } else {
             // ── Single image/video/text publish ──
@@ -245,8 +247,13 @@ async function publishScheduledPost(post) {
                 };
                 postId = await publishToTwitter(caption, absoluteImageUrl, absoluteVideoUrl, twCreds);
             } else if (post.platform === 'tiktok') {
-                if (!absoluteVideoUrl) throw new Error('TikTok requires a video URL');
-                postId = await publishVideoToTikTok(account.accessToken, absoluteVideoUrl, caption);
+                if (absoluteVideoUrl) {
+                    postId = await publishVideoToTikTok(account.accessToken, absoluteVideoUrl, caption);
+                } else if (absoluteImageUrl) {
+                    postId = await publishPhotosToTikTok(account.accessToken, [absoluteImageUrl], caption);
+                } else {
+                    throw new Error('TikTok requires a video or photo URL');
+                }
             } else {
                 post.status = 'failed';
                 post.error = `Unsupported platform: ${post.platform}`;
