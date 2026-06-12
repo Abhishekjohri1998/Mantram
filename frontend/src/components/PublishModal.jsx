@@ -323,39 +323,67 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             <span className="material-symbols-outlined text-xl">close</span>
                         </button>
                     </div>
-                </div>
-
                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-5">
 
                     {/* ═══ Published Results ═══ */}
                     {results ? (
                         <div className="space-y-4">
-                            <div className="text-center py-8">
-                                <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mx-auto mb-4 border border-[var(--sys-border)]">
-                                    <span className="material-symbols-outlined text-4xl text-primary">check_circle</span>
-                                </div>
-                                <h4 className="text-2xl font-bold text-[var(--sys-text)]">Published! 🎉</h4>
-                                <p className="text-[var(--sys-text-muted)] text-sm mt-1">Your content is now live.</p>
-                            </div>
+                            {(() => {
+                                const successCount = results.filter(r => r.status === 'success').length;
+                                const failedCount = results.filter(r => r.status === 'error' || r.status === 'failed').length;
+
+                                if (failedCount === 0) {
+                                    return (
+                                        <div className="text-center py-8">
+                                            <div className="w-20 h-20 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] flex items-center justify-center mx-auto mb-4">
+                                                <span className="material-symbols-outlined text-4xl text-primary">check_circle</span>
+                                            </div>
+                                            <h4 className="text-2xl font-bold text-[var(--sys-text)]">Published! 🎉</h4>
+                                            <p className="text-[var(--sys-text-muted)] text-sm mt-1">Your content is now live.</p>
+                                        </div>
+                                    );
+                                } else if (successCount === 0) {
+                                    return (
+                                        <div className="text-center py-8">
+                                            <div className="w-20 h-20 rounded-2xl bg-red-500/5 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                                                <span className="material-symbols-outlined text-4xl text-red-500">cancel</span>
+                                            </div>
+                                            <h4 className="text-2xl font-bold text-[var(--sys-text)]">Publish Failed ❌</h4>
+                                            <p className="text-[var(--sys-text-muted)] text-sm mt-1">All publishing attempts failed. See details below.</p>
+                                        </div>
+                                    );
+                                } else {
+                                    return (
+                                        <div className="text-center py-8">
+                                            <div className="w-20 h-20 rounded-2xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-center mx-auto mb-4">
+                                                <span className="material-symbols-outlined text-4xl text-amber-500">warning</span>
+                                            </div>
+                                            <h4 className="text-2xl font-bold text-[var(--sys-text)]">Partially Published ⚠️</h4>
+                                            <p className="text-[var(--sys-text-muted)] text-sm mt-1">Successfully posted to some accounts, but failed on others.</p>
+                                        </div>
+                                    );
+                                }
+                            })()}
                             <div className="space-y-2">
                                 {results.map((r, i) => (
-                                    <div key={i} className={`p-4 rounded-xl border flex items-center justify-between ${r.status === 'success' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]'}`}>
+                                    <div key={i} className={`p-4 rounded-xl border flex items-center justify-between ${r.status === 'success' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)]' : 'bg-red-500/5 border-red-500/10'}`}>
                                         <div className="flex items-center gap-3 min-w-0">
                                             <span className="text-xl">{PLATFORM_META[r.platform]?.icon || '📱'}</span>
-                                            <div>
-                                                <p className="font-semibold text-[var(--sys-text)] text-sm">{r.accountName}</p>
-                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase">{r.platform}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-semibold text-[var(--sys-text)] text-sm truncate">{r.accountName}</p>
+                                                <p className="text-[10px] text-[var(--sys-text-muted)] uppercase font-medium">{r.platform}</p>
+                                                {r.status !== 'success' && r.error && (
+                                                    <p className="text-xs text-red-400 mt-1 font-medium break-words">{r.error}</p>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1.5 rounded-lg text-xs font-bold ${r.status === 'success' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-primary-dim)] text-primary'}`}>
+                                        <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex-shrink-0 ${r.status === 'success' ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-red-500/10 text-red-400'}`}>
                                             {r.status === 'success' ? '✓ Live' : '✗ Failed'}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
-
-                        /* ═══ Schedule Results ═══ */
                     ) : scheduleResults ? (
                         <div className="space-y-4">
                             <div className="text-center py-8">
