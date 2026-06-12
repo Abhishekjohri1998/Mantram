@@ -6,6 +6,7 @@ import { superadmin as API } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import TemplateManager from './TemplateManager'
 import QAdsManager from './QAdsManager'
+import VideoStudioManager from './VideoStudioManager'
 import UsageAnalytics from './UsageAnalytics'
 import AvatarOptionsForm from '../components/AvatarOptionsForm'
 
@@ -172,6 +173,7 @@ export default function SuperAdminDashboard() {
             { id: 'templates', label: 'Template Manager', icon: 'style' },
             { id: 'avatars', label: 'Avatar Library', icon: 'face' },
             { id: 'qads', label: 'Q-Ads Manager', icon: 'movie' },
+            { id: 'videoStudio', label: 'Video Studio', icon: 'slow_motion_video' },
             { id: 'analytics', label: 'Analytics', icon: 'analytics' },
             { id: 'studios', label: 'Studio Management', icon: 'rocket_launch' },
             { id: 'content', label: 'Content & Brands', icon: 'article' },
@@ -4548,6 +4550,13 @@ export default function SuperAdminDashboard() {
                 {tab === 'qads' && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
                         <QAdsManager />
+                    </div>
+                )}
+
+                {/* ════════════ VIDEO STUDIO MANAGER ════════════ */}
+                {tab === 'videoStudio' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
+                        <VideoStudioManager />
                     </div>
                 )}
 
