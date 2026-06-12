@@ -627,7 +627,7 @@ export const social = {
     accounts: () => apiFetch('/social/accounts'),
     connect: (platform) => apiFetch(`/social/auth/${platform}`),
     disconnect: (accountId) => apiFetch(`/social/accounts/${accountId}`, { method: 'DELETE' }),
-    publish: (data) => apiFetch('/social/publish', { method: 'POST', body: JSON.stringify(data) }),
+    publish: (data) => apiFetch('/social/publish', { method: 'POST', body: JSON.stringify(data), timeout: 180000 }),
     schedule: (data) => apiFetch('/social/schedule', { method: 'POST', body: JSON.stringify(data) }),
     publishHistory: (params = {}) => {
         const query = new URLSearchParams(params).toString();
