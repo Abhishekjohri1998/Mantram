@@ -8,9 +8,10 @@ module.exports = {
         script: 'index.js',
         cwd: '/home/ec2-user/Mantram/backend',
 
-        // Cluster mode for zero-downtime reloads
-        instances: 2,
-        exec_mode: 'cluster',
+        // Single instance — saves memory on small EC2 and avoids
+        // duplicate scheduler execution edge-cases in cluster mode
+        instances: 1,
+        exec_mode: 'fork',
 
         // Environment
         env: {
@@ -20,7 +21,7 @@ module.exports = {
 
         // Auto-restart on crash
         autorestart: true,
-        max_memory_restart: '500M',
+        max_memory_restart: '1G',   // 500M was too aggressive for AI/video workloads
         exp_backoff_restart_delay: 100,
         max_restarts: 10,
         restart_delay: 1000,
@@ -30,7 +31,7 @@ module.exports = {
         // This ensures MongoDB is connected before the worker receives requests
         wait_ready: true,
         listen_timeout: 30000,   // 30s max to wait for ready signal (DB connect can take 5-10s on cold start)
-        kill_timeout: 10000,     // 10s for graceful shutdown (drain in-flight jobs + close DB)
+        kill_timeout: 35000,     // 35s for graceful shutdown — matches the 30s drain loop in index.js
 
         // Disable PM2 APM (PMX) — suppresses pidusage TypeError noise in logs
         // pidusage crashes when monitoring PIDs that exit during cluster restarts

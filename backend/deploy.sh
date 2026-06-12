@@ -33,7 +33,7 @@ if pm2 describe mantram-server > /dev/null 2>&1; then
     pm2 restart mantram-server --update-env
 else
     echo "▶️  Starting fresh..."
-    pm2 start "$APP_DIR/index.js" --name mantram-server -i max --max-memory-restart 512M --update-env
+    pm2 start "$APP_DIR/deploy/ecosystem.config.cjs" --update-env
 fi
 
 pm2 save
