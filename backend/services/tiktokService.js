@@ -99,34 +99,53 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
     // Step 2: Initialize upload with FILE_UPLOAD
     const initUrl = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
     const chunkSize = videoSize; // Single chunk (works for videos up to 64MB)
-    const initPayload = {
-        post_info: {
-            title: title || 'Created with Mantram AI',
-            privacy_level: 'PUBLIC_TO_EVERYONE',
-            disable_duet: false,
-            disable_comment: false,
-            disable_stitch: false
-        },
-        source_info: {
-            source: 'FILE_UPLOAD',
-            video_size: videoSize,
-            chunk_size: chunkSize,
-            total_chunk_count: 1
+    
+    let privacyLevel = 'PUBLIC_TO_EVERYONE';
+    let initData;
+
+    async function tryInit() {
+        const initPayload = {
+            post_info: {
+                title: title || 'Created with Mantram AI',
+                privacy_level: privacyLevel,
+                disable_duet: false,
+                disable_comment: false,
+                disable_stitch: false
+            },
+            source_info: {
+                source: 'FILE_UPLOAD',
+                video_size: videoSize,
+                chunk_size: chunkSize,
+                total_chunk_count: 1
+            }
+        };
+
+        const initResponse = await fetch(initUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json; charset=UTF-8'
+            },
+            body: JSON.stringify(initPayload)
+        });
+
+        const data = await initResponse.json();
+        if (data.error && data.error.code !== 'ok') {
+            throw new Error(`TikTok Init Error: ${data.error.message || JSON.stringify(data.error)}`);
         }
-    };
+        return data;
+    }
 
-    const initResponse = await fetch(initUrl, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json; charset=UTF-8'
-        },
-        body: JSON.stringify(initPayload)
-    });
-
-    const initData = await initResponse.json();
-    if (initData.error && initData.error.code !== 'ok') {
-        throw new Error(`TikTok Init Error: ${initData.error.message || JSON.stringify(initData.error)}`);
+    try {
+        initData = await tryInit();
+    } catch (err) {
+        if (err.message.toLowerCase().includes('guideline') || err.message.toLowerCase().includes('integration')) {
+            console.warn(`[TIKTOK] App not audited/approved yet. Retrying publish with SELF_ONLY privacy level...`);
+            privacyLevel = 'SELF_ONLY';
+            initData = await tryInit();
+        } else {
+            throw err;
+        }
     }
 
     const uploadUrl = initData.data?.upload_url;
@@ -177,33 +196,52 @@ export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
 
     // Step 2: Initialize upload with FILE_UPLOAD for photos
     const initUrl = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
-    const initPayload = {
-        post_mode: 'DIRECT_POST',
-        media_type: 'PHOTO',
-        post_info: {
-            title: title || 'Created with Mantram AI',
-            privacy_level: 'PUBLIC_TO_EVERYONE',
-            disable_comment: false
-        },
-        source_info: {
-            source: 'FILE_UPLOAD',
-            photo_cover_index: 0,
-            photo_images: imageUrls.map((_, i) => `image_${i}`)
+    
+    let privacyLevel = 'PUBLIC_TO_EVERYONE';
+    let initData;
+
+    async function tryInit() {
+        const initPayload = {
+            post_mode: 'DIRECT_POST',
+            media_type: 'PHOTO',
+            post_info: {
+                title: title || 'Created with Mantram AI',
+                privacy_level: privacyLevel,
+                disable_comment: false
+            },
+            source_info: {
+                source: 'FILE_UPLOAD',
+                photo_cover_index: 0,
+                photo_images: imageUrls.map((_, i) => `image_${i}`)
+            }
+        };
+
+        const initResponse = await fetch(initUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json; charset=UTF-8'
+            },
+            body: JSON.stringify(initPayload)
+        });
+
+        const data = await initResponse.json();
+        if (data.error && data.error.code !== 'ok') {
+            throw new Error(`TikTok Photo Init Error: ${data.error.message || JSON.stringify(data.error)}`);
         }
-    };
+        return data;
+    }
 
-    const initResponse = await fetch(initUrl, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json; charset=UTF-8'
-        },
-        body: JSON.stringify(initPayload)
-    });
-
-    const initData = await initResponse.json();
-    if (initData.error && initData.error.code !== 'ok') {
-        throw new Error(`TikTok Photo Init Error: ${initData.error.message || JSON.stringify(initData.error)}`);
+    try {
+        initData = await tryInit();
+    } catch (err) {
+        if (err.message.toLowerCase().includes('guideline') || err.message.toLowerCase().includes('integration')) {
+            console.warn(`[TIKTOK] App not audited/approved yet. Retrying photo publish with SELF_ONLY privacy level...`);
+            privacyLevel = 'SELF_ONLY';
+            initData = await tryInit();
+        } else {
+            throw err;
+        }
     }
 
     const publishId = initData.data?.publish_id;
