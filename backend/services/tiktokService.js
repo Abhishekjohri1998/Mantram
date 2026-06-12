@@ -96,14 +96,11 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
         throw new Error('TikTok: Video file is too small — may be corrupt or empty');
     }
 
-    // Step 2: Initialize upload with FILE_UPLOAD
-    const initUrl = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
     const chunkSize = videoSize; // Single chunk (works for videos up to 64MB)
-    
-    let privacyLevel = 'PUBLIC_TO_EVERYONE';
-    let initData;
 
-    async function tryInit() {
+    // Function to try Direct Post init
+    async function tryDirectInit(privacyLevel) {
+        const initUrl = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
         const initPayload = {
             post_info: {
                 title: title || 'Created with Mantram AI',
@@ -120,7 +117,7 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
             }
         };
 
-        const initResponse = await fetch(initUrl, {
+        const response = await fetch(initUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -129,22 +126,66 @@ export async function publishVideoToTikTok(accessToken, videoUrl, title) {
             body: JSON.stringify(initPayload)
         });
 
-        const data = await initResponse.json();
+        const data = await response.json();
         if (data.error && data.error.code !== 'ok') {
-            throw new Error(`TikTok Init Error: ${data.error.message || JSON.stringify(data.error)}`);
+            throw new Error(data.error.message || JSON.stringify(data.error));
         }
         return data;
     }
 
+    // Function to try Inbox Draft init (failsafe for sandbox)
+    async function tryInboxInit() {
+        const initUrl = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/';
+        const initPayload = {
+            source_info: {
+                source: 'FILE_UPLOAD',
+                video_size: videoSize,
+                chunk_size: chunkSize,
+                total_chunk_count: 1
+            }
+        };
+
+        const response = await fetch(initUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json; charset=UTF-8'
+            },
+            body: JSON.stringify(initPayload)
+        });
+
+        const data = await response.json();
+        if (data.error && data.error.code !== 'ok') {
+            throw new Error(data.error.message || JSON.stringify(data.error));
+        }
+        return data;
+    }
+
+    let initData;
     try {
-        initData = await tryInit();
-    } catch (err) {
-        if (err.message.toLowerCase().includes('guideline') || err.message.toLowerCase().includes('integration')) {
-            console.warn(`[TIKTOK] App not audited/approved yet. Retrying publish with SELF_ONLY privacy level...`);
-            privacyLevel = 'SELF_ONLY';
-            initData = await tryInit();
+        console.log(`[TIKTOK] Attempting Direct Post with PUBLIC_TO_EVERYONE...`);
+        initData = await tryDirectInit('PUBLIC_TO_EVERYONE');
+    } catch (err1) {
+        const msg = err1.message.toLowerCase();
+        if (msg.includes('guideline') || msg.includes('integration') || msg.includes('scope') || msg.includes('permission')) {
+            try {
+                console.warn(`[TIKTOK] Direct Public Post blocked. Retrying Direct Post with SELF_ONLY...`);
+                initData = await tryDirectInit('SELF_ONLY');
+            } catch (err2) {
+                const msg2 = err2.message.toLowerCase();
+                if (msg2.includes('guideline') || msg2.includes('integration') || msg2.includes('scope') || msg2.includes('permission')) {
+                    console.warn(`[TIKTOK] Direct Post completely blocked for unaudited app. Falling back to Inbox Draft...`);
+                    try {
+                        initData = await tryInboxInit();
+                    } catch (err3) {
+                        throw new Error(`TikTok Publish Failed (all methods rejected): ${err3.message}`);
+                    }
+                } else {
+                    throw err2;
+                }
+            }
         } else {
-            throw err;
+            throw err1;
         }
     }
 
@@ -194,19 +235,14 @@ export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
         console.log(`[TIKTOK] Photo ${imageBuffers.length}/${imageUrls.length} downloaded: ${(buf.length / 1024).toFixed(0)}KB`);
     }
 
-    // Step 2: Initialize upload with FILE_UPLOAD for photos
-    const initUrl = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
-    
-    let privacyLevel = 'PUBLIC_TO_EVERYONE';
-    let initData;
-
-    async function tryInit() {
+    // Function to try Photo Post init
+    async function tryPhotoInit(postMode, privacyLevel) {
+        const initUrl = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
         const initPayload = {
-            post_mode: 'DIRECT_POST',
+            post_mode: postMode,
             media_type: 'PHOTO',
             post_info: {
                 title: title || 'Created with Mantram AI',
-                privacy_level: privacyLevel,
                 disable_comment: false
             },
             source_info: {
@@ -216,7 +252,11 @@ export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
             }
         };
 
-        const initResponse = await fetch(initUrl, {
+        if (postMode === 'DIRECT_POST') {
+            initPayload.post_info.privacy_level = privacyLevel;
+        }
+
+        const response = await fetch(initUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -225,22 +265,38 @@ export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
             body: JSON.stringify(initPayload)
         });
 
-        const data = await initResponse.json();
+        const data = await response.json();
         if (data.error && data.error.code !== 'ok') {
-            throw new Error(`TikTok Photo Init Error: ${data.error.message || JSON.stringify(data.error)}`);
+            throw new Error(data.error.message || JSON.stringify(data.error));
         }
         return data;
     }
 
+    let initData;
     try {
-        initData = await tryInit();
-    } catch (err) {
-        if (err.message.toLowerCase().includes('guideline') || err.message.toLowerCase().includes('integration')) {
-            console.warn(`[TIKTOK] App not audited/approved yet. Retrying photo publish with SELF_ONLY privacy level...`);
-            privacyLevel = 'SELF_ONLY';
-            initData = await tryInit();
+        console.log(`[TIKTOK] Attempting Photo Direct Post with PUBLIC_TO_EVERYONE...`);
+        initData = await tryPhotoInit('DIRECT_POST', 'PUBLIC_TO_EVERYONE');
+    } catch (err1) {
+        const msg = err1.message.toLowerCase();
+        if (msg.includes('guideline') || msg.includes('integration') || msg.includes('scope') || msg.includes('permission')) {
+            try {
+                console.warn(`[TIKTOK] Photo Direct Public Post blocked. Retrying with SELF_ONLY...`);
+                initData = await tryPhotoInit('DIRECT_POST', 'SELF_ONLY');
+            } catch (err2) {
+                const msg2 = err2.message.toLowerCase();
+                if (msg2.includes('guideline') || msg2.includes('integration') || msg2.includes('scope') || msg2.includes('permission')) {
+                    console.warn(`[TIKTOK] Photo Direct Post completely blocked. Falling back to MEDIA_UPLOAD (Inbox Draft)...`);
+                    try {
+                        initData = await tryPhotoInit('MEDIA_UPLOAD', null);
+                    } catch (err3) {
+                        throw new Error(`TikTok Photo Publish Failed (all methods rejected): ${err3.message}`);
+                    }
+                } else {
+                    throw err2;
+                }
+            }
         } else {
-            throw err;
+            throw err1;
         }
     }
 
@@ -272,5 +328,6 @@ export async function publishPhotosToTikTok(accessToken, imageUrls, title) {
     console.log(`[TIKTOK] ✅ Photo upload complete — publish_id: ${publishId}`);
     return publishId;
 }
+
 
 
