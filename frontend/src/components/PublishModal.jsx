@@ -323,7 +323,10 @@ export default function PublishModal({ isOpen, onClose, defaultText = '', defaul
                             <span className="material-symbols-outlined text-xl">close</span>
                         </button>
                     </div>
+                </div>
+
                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-5">
+
 
                     {/* ═══ Published Results ═══ */}
                     {results ? (
