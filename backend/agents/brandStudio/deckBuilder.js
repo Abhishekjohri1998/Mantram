@@ -12,7 +12,7 @@ import { uploadToS3 } from '../../utils/s3.js';
 import { generateBrandTokens } from '../../utils/brandColorEngine.js';
 import { injectDesignContext } from '../shared/productDesignAgent.js';
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
 // ── Claude Creative Director System Prompt ─────────────────────────
@@ -646,5 +646,6 @@ export async function generateCampaignDeck({ brandId, brief, deckType = 'Pitch D
         tokens,
         title: plan.title,
         slideCount: plan.slides.length || 8,
+        html,
     };
 }

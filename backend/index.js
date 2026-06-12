@@ -82,6 +82,7 @@ import templatesRoutes from './routes/templates.js';
 import avatarStudioRoutes from './routes/avatar-studio.js';
 import superadminTemplatesRoutes from './routes/superadmin-templates.js';
 import superadminImagesRoutes from './routes/superadmin-images.js';
+import superadminVideoStudioRoutes from './routes/superadmin-video-studio.js';
 import commentRepliesRoutes from './routes/comment-replies.js';
 import viralityPredictorRoutes from './routes/virality-predictor.js';
 import activityLogRoutes from './routes/activity-log.js';
@@ -206,7 +207,7 @@ app.set('trust proxy', 1);
 // ── TOP-LEVEL DIAGNOSTICS & LOGGING ───────────────────────────
 // Bot scanner patterns — expanded to silence vulnerability scanners
 // PERF-014: Pre-compiled regexes to avoid per-request RegExp construction
-const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log'];
+const BOT_SCAN_EXTENSIONS = ['.php', '.xml', '.asp', '.aspx', '.jsp', '.cgi', '.py', '.rb', '.pl', '.bak', '.old', '.orig', '.swp', '.tmp', '.save', '.sql', '.gz', '.tar', '.zip', '.lz4', '.cfg', '.ini', '.conf', '.properties', '.yml', '.yaml', '.toml', '.pem', '.key', '.log', '.json', '.txt', '.htm', '.html', '.action', '.axd', '.jspa'];
 const BOT_EXT_REGEX = new RegExp(`(${BOT_SCAN_EXTENSIONS.map(e => e.replace('.', '\\.')).join('|')})$`, 'i');
 const BOT_SCAN_PATHS = [
     'wp-admin', 'wp-content', 'vendor', 'phpunit', '.env', '.git', '.ssh', '.ssl', '.well-known',
@@ -217,17 +218,48 @@ const BOT_SCAN_PATHS = [
     // NOTE: 'config', 'debug', 'scripts', '/admin/' removed — matched real API paths as substrings.
     // e.g. 'config' falsely blocked /api/yt-studio-settings/channel-configs → 444.
     // Use BOT_SCAN_SEGMENT_WORDS below for whole-segment matching instead.
+    // ── Common scanner probe paths (from real attack logs) ──
+    'graphql', 'swagger', 'openapi', 'actuator', '_profiler', '__debug__',
+    'telescope', 'composer', '.vscode', '.DS_Store', 'sftp.json',
+    'wp-json', 'solr/', 'rails/', 'rest/', 'xwiki/', 'ews/',
+    '@fs/', '@vite/', '_ping', '_status', '_debug', '_api/',
+    'MagicInfo', 'OA_HTML', '+CSCOE+', 'frontend_dev', 'backend_dev',
+    'app_dev', 'radar-probe', 'manage/account', 'customer/account',
+    'secure/', 'webpages/', 'remote/', 'server-status', 'server_info',
+    'trace.axd', 'Trace.axd', 'ApplicationStatus', 'login.action',
+    'state/v1/', 'v1/agent', 'v1/catalog', 'v1/info', 'v1/meta', 'v1/nodes',
+    'v2/api-docs', 'v3/api-docs', 'v2/', 'dump.txt', 'sql.txt',
+    'api/json', 'api/tags', 'api/version', 'api/status', 'api/install',
+    'api/contents/', 'api/kernels', 'api/nodes', 'api/topics', 'api/p2p',
+    'api/ray/', 'api/2.0/', 'api/v1.0/', 'api/v1.3/', 'api/v2.1/',
+    'ajax-api/', 'apiv2/', 'rest/applinks',
 ];
 const BOT_SCAN_SEGMENT_REGEXES = ['config', 'debug', 'scripts', 'phpinfo'].map(w => new RegExp('(^|/)' + w + '(/|$)'));
 const BOT_SUFFIX_REGEX = /\.(log|bak|old|orig|swp|tmp|save|copy|backup)[\.~]*$/i;
 const BOT_TILDE_REGEX = /~$/;
 const BOT_DOUBLE_SLASH_REGEX = /\/\/(index|test|db)\.\w+/;
 
+// ── ALLOWLIST: Only these path prefixes are valid ──────────────────────────
+// Everything else gets silently dropped (444) — massively reduces noise from scanners.
+const VALID_PATH_PREFIXES = ['/api/', '/mcp/', '/health'];
+const VALID_EXACT_PATHS = new Set(['/', '/health', '/favicon.ico', '/robots.txt']);
+
 app.use((req, res, next) => {
     const path = req.path.toLowerCase();
     const origin = req.headers.origin || '';
 
-    // Detect bot scans: matches known scanner patterns (pre-compiled regexes for perf)
+    // ── Fast-path: Allow known valid paths immediately ──────────────
+    const isValidPath = (
+        VALID_EXACT_PATHS.has(path) ||
+        VALID_PATH_PREFIXES.some(prefix => path.startsWith(prefix))
+    );
+
+    if (!isValidPath) {
+        // Non-API path with no origin = scanner probe — drop silently
+        return res.status(444).end();
+    }
+
+    // Detect bot scans on /api/ paths: matches known scanner patterns (pre-compiled regexes for perf)
     const isBotScan = (
         BOT_EXT_REGEX.test(path) ||
         BOT_SCAN_PATHS.some(p => path.includes(p)) ||
@@ -251,6 +283,7 @@ app.use((req, res, next) => {
     req.startTime = Date.now();
     next();
 });
+
 
 
 // Alias for health checks
@@ -574,6 +607,7 @@ app.use('/api/templates', templatesRoutes);
 app.use('/api/avatar-studio', avatarStudioRoutes);
 app.use('/api/superadmin/templates', superadminTemplatesRoutes);
 app.use('/api/superadmin/images', superadminImagesRoutes);
+app.use('/api/superadmin/video-studio', superadminVideoStudioRoutes);
 app.use('/api/comment-replies', commentRepliesRoutes);
 app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
@@ -639,8 +673,20 @@ server.timeout = 60000000;
 // ══════════════════════════════════════════════════════════════
 import { getInFlightJobs, hasInFlightJobs } from './utils/jobRegistry.js';
 
+let shutdownInProgress = false;
+
 const gracefulShutdown = (signal) => {
+    // Guard: prevent double-shutdown from PM2 sending SIGINT to both cluster workers
+    if (shutdownInProgress) {
+        console.log(`⚠️ ${signal} received but shutdown already in progress — ignoring.`);
+        return;
+    }
+    shutdownInProgress = true;
+
     console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+
+    // Mark DB as shutting down EARLY — prevents auto-reconnect in db.js from firing
+    if (mongoose.connection) mongoose.connection.isShuttingDown = true;
     
     server.close(async () => {
         console.log('HTTP server closed. No longer accepting new connections.');
@@ -658,7 +704,6 @@ const gracefulShutdown = (signal) => {
                 console.warn(`⚠️ Forcing shutdown with ${getInFlightJobs().length} jobs still running.`);
             }
 
-            if (mongoose.connection) mongoose.connection.isShuttingDown = true;
             await mongoose.connection.close();
             console.log('MongoDB connection closed.');
             process.exit(0);

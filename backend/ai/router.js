@@ -78,7 +78,7 @@ class ModelRouter {
         }
         this.providers.anthropic = new AnthropicProvider({
             apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-20250514',
+            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
         });
 
 

@@ -1277,6 +1277,7 @@ router.post('/deck/generate', protect, async (req, res) => {
 
         res.json({
             success: true,
+            html: result.html,
             hostedUrl: result.hostedUrl,
             slideCount: result.slideCount,
             deckPlan: result.deckPlan,

@@ -252,11 +252,18 @@ const videoProjectSchema = new mongoose.Schema({
     isDraft: { type: Boolean, default: true },                      // Draft=720p, Final=1080p
     abandonedAt: { type: Date },                                    // Lifecycle sweep marker
 
+    // ── Admin Visibility Controls (superadmin-only, mirrors Template/QAds pattern) ──
+    isActive: { type: Boolean, default: true },           // false = hidden from all views
+    isPublished: { type: Boolean, default: false },       // true = visible to users (when active)
+    showOnHomeScreen: { type: Boolean, default: false },  // true = featured on Video Studio home
+
 }, { timestamps: true });
 
 // Indexes — compound indexes for the listing endpoint's sort/filter patterns
 videoProjectSchema.index({ user: 1, status: 1, createdAt: -1 });
 videoProjectSchema.index({ user: 1, createdAt: -1 });              // listing without status filter
 videoProjectSchema.index({ user: 1, brand: 1, createdAt: -1 });    // brand-filtered listing
+videoProjectSchema.index({ isActive: 1, isPublished: 1 });         // admin visibility filtering
+videoProjectSchema.index({ showOnHomeScreen: 1 });                  // homescreen showcase query
 
 export default mongoose.model('VideoProject', videoProjectSchema);

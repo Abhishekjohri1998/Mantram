@@ -221,13 +221,8 @@ jobs:
             cd $RELEASE_DIR/backend
             PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund --loglevel=error
 
-            # 3.4 Stop old PM2 instances early to release MongoDB connections
-            echo "🛑 Stopping old PM2 instances to free DB connections..."
-            pm2 delete mantram-server mantram-autofix mantram-server-autofix || true
-            echo "⏳ Waiting 10 seconds for TCP connections to close..."
-            sleep 10
-
-            # 3.5 Cleanup & Seed (single connection instead of 3 separate scripts)
+            # 3.4 Run seed/cleanup scripts WHILE old server is still serving traffic
+            # This is safe because these scripts only do DB writes (no server restart needed)
             export SEED_MODE=true
             echo "🧹 Running deploy initialization (cleanup + seed)..."
             node scripts/deployInit.js
@@ -243,8 +238,10 @@ jobs:
             fi
             ln -sfn $RELEASE_DIR $CURRENT_LINK
 
-            # 5. Restart PM2
-            echo "🔄 Restarting backend..."
+            # 5. Zero-Downtime Reload
+            # PM2 startOrReload starts new workers, waits for process.send('ready'),
+            # then kills old workers — no gap in service.
+            echo "🔄 Reloading backend (zero-downtime)..."
             cd $CURRENT_LINK
 
             # Guard: Fail deploy if bare wildcard still exists (Express 5 Compatibility)
@@ -253,7 +250,10 @@ jobs:
               exit 1
             fi
 
-            NODE_OPTIONS="--max-old-space-size=2048" pm2 start backend/deploy/ecosystem.config.cjs --update-env
+            # Delete stale autofix processes (they don't need zero-downtime)
+            pm2 delete mantram-autofix mantram-server-autofix || true
+
+            NODE_OPTIONS="--max-old-space-size=2048" pm2 startOrReload backend/deploy/ecosystem.config.cjs --update-env
             pm2 save
 
             # 6. Health Check

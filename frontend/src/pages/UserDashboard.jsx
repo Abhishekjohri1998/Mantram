@@ -50,6 +50,7 @@ const PL = {
   facebook:  { icon: 'thumb_up',     color: '#1877F2', bg: 'rgba(24,119,242,0.12)' },
   linkedin:  { icon: 'work',         color: '#0A66C2', bg: 'rgba(10,102,194,0.12)' },
   twitter:   { icon: 'alternate_email', color: '#1DA1F2', bg: 'rgba(29,161,242,0.12)' },
+  tiktok:    { icon: 'music_note',   color: '#00F2EA', bg: 'rgba(0,242,234,0.12)' },
 }
 
 function PlatformIcon({ platform, size = 18 }) {
@@ -457,7 +458,7 @@ export default function UserDashboard() {
           <Card className="col-span-12 md:col-span-6 lg:col-span-6 p-5">
             <Label icon="hub" action="Manage" onAction={()=>navigate('/integrations')}>Social Pipeline</Label>
             <div className="space-y-2">
-              {['instagram','facebook','linkedin','twitter'].map(pl=>{
+              {['instagram','facebook','linkedin','twitter','tiktok'].map(pl=>{
                 const p = socialPlatforms[pl]||{connected:false}
                 const meta = PL[pl]||{icon:'share',color:'#888',bg:'rgba(136,136,136,0.1)'}
                 return (

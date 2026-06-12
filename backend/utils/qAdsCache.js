@@ -37,7 +37,7 @@ export async function invalidatePresetsCache() {
 
 export async function getPresetsFromDB() {
     const categories = await QAdsCategory.find({ isActive: true }).sort({ sortOrder: 1 }).lean();
-    const presets = await QAdsPreset.find({ isActive: true }).sort({ sortOrder: 1 }).lean();
+    const presets = await QAdsPreset.find({ isActive: true, isPublished: true }).sort({ sortOrder: 1 }).lean();
     
     const formattedPresets = [];
     
@@ -56,6 +56,9 @@ export async function getPresetsFromDB() {
                 previewMediaUrl: p.previewMediaUrl,
                 previewMediaType: p.previewMediaType,
                 isMantramExclusive: p.isMantramExclusive,
+                isActive: p.isActive,
+                isPublished: p.isPublished,
+                showOnHomeScreen: p.showOnHomeScreen,
                 group: cat.name,
                 color: cat.color,
                 

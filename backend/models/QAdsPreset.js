@@ -44,6 +44,14 @@ const qAdsPresetSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    isPublished: {
+        type: Boolean,
+        default: false
+    },
+    showOnHomeScreen: {
+        type: Boolean,
+        default: false
+    },
     sortOrder: {
         type: Number,
         default: 0
@@ -60,6 +68,8 @@ const qAdsPresetSchema = new mongoose.Schema({
 
 qAdsPresetSchema.index({ categoryId: 1 });
 qAdsPresetSchema.index({ isActive: 1 });
+qAdsPresetSchema.index({ isPublished: 1 });
+qAdsPresetSchema.index({ showOnHomeScreen: 1 });
 qAdsPresetSchema.index({ sortOrder: 1 });
 
 export default mongoose.model('QAdsPreset', qAdsPresetSchema);

@@ -47,7 +47,27 @@ export const clearToken = () => {
 
 export const getToken = () => authToken;
 
-// Base fetch wrapper
+// Base fetch wrapper with automatic retry for transient failures
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
+
+function isRetryable(method, status, error) {
+    // Only auto-retry GET requests (safe/idempotent)
+    // POST/PUT/DELETE could cause duplicate side effects
+    if (method && method.toUpperCase() !== 'GET') return false;
+    
+    // Retry on network errors (server unreachable, connection reset)
+    if (error) {
+        const msg = error.message || '';
+        return msg.includes('Failed to fetch') || msg.includes('Load failed') ||
+               msg.includes('NetworkError') || msg.includes('ECONNREFUSED') ||
+               msg.includes('ECONNRESET') || msg.includes('ERR_CONNECTION');
+    }
+    
+    // Retry on server-side transient errors (deploy restarts, overload)
+    return status === 502 || status === 503 || status === 504;
+}
+
 export async function apiFetch(endpoint, options = {}) {
     let token = authToken;
 
@@ -65,77 +85,101 @@ export async function apiFetch(endpoint, options = {}) {
 
     // PERF-029: Default 30s timeout — long operations (AI gen) pass custom longer timeouts
     const { timeout: timeoutMs = 30000, signal: externalSignal, ...fetchOptions } = options;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    // If caller provides an external signal (for stop buttons), wire it up
-    if (externalSignal) {
-        externalSignal.addEventListener('abort', () => controller.abort());
-    }
+    const method = fetchOptions.method || 'GET';
+    
+    let lastError = null;
 
-    let response;
-    try {
-        // Ensure endpoint starts with /
-        const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`; 
-        response = await fetch(`${API_BASE}${url}`, {
-            ...fetchOptions,
-            headers,
-            signal: controller.signal,
-        });
-    } catch (e) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        // If caller provides an external signal (for stop buttons), wire it up
+        if (externalSignal) {
+            externalSignal.addEventListener('abort', () => controller.abort());
+        }
+
+        let response;
+        try {
+            // Ensure endpoint starts with /
+            const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`; 
+            response = await fetch(`${API_BASE}${url}`, {
+                ...fetchOptions,
+                headers,
+                signal: controller.signal,
+            });
+        } catch (e) {
+            clearTimeout(timer);
+            if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
+            
+            // Check if this network error is retryable
+            if (attempt < MAX_RETRIES && isRetryable(method, null, e)) {
+                console.warn(`[API] Network error on ${method} ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+                lastError = e;
+                continue;
+            }
+
+            // Improved network error detection — 'Failed to fetch' / 'Load failed' covers many scenarios
+            const msg = e.message || '';
+            if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+                // Try to determine the likely cause
+                if (msg.includes('ERR_CONNECTION_REFUSED') || msg.includes('ECONNREFUSED')) {
+                    throw new Error('Server is not reachable — it may be restarting. Please wait a moment and try again.');
+                }
+                if (msg.includes('ERR_CONNECTION_RESET') || msg.includes('ECONNRESET')) {
+                    throw new Error('Connection was reset mid-request — the server may have restarted. Please try again.');
+                }
+                // Generic connectivity failure
+                throw new Error('Could not connect to the server. Please check your internet connection and try again. If the problem persists, the server may be restarting.');
+            }
+            throw new Error(msg || 'Unknown network error');
+        }
         clearTimeout(timer);
-        if (e.name === 'AbortError') throw new Error('Request timed out — the server is still processing. Please try again.');
-        
-        // Improved network error detection — 'Failed to fetch' / 'Load failed' covers many scenarios
-        const msg = e.message || '';
-        if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-            // Try to determine the likely cause
-            if (msg.includes('ERR_CONNECTION_REFUSED') || msg.includes('ECONNREFUSED')) {
-                throw new Error('Server is not reachable — it may be restarting. Please wait a moment and try again.');
-            }
-            if (msg.includes('ERR_CONNECTION_RESET') || msg.includes('ECONNRESET')) {
-                throw new Error('Connection was reset mid-request — the server may have restarted. Please try again.');
-            }
-            // Generic connectivity failure
-            throw new Error('Could not connect to the server. Please check your internet connection and try again. If the problem persists, the server may be restarting.');
-        }
-        throw new Error(msg || 'Unknown network error');
-    }
-    clearTimeout(timer);
 
-    // Handle non-JSON responses (e.g. HTML 404 pages from Vite proxy)
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
+        // Check if this HTTP status is retryable (502/503/504)
+        if (attempt < MAX_RETRIES && isRetryable(method, response.status, null)) {
+            console.warn(`[API] Server returned ${response.status} on ${method} ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${RETRY_DELAYS[attempt]}ms...`);
+            await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+            continue;
+        }
+
+        // Handle non-JSON responses (e.g. HTML 404 pages from Vite proxy)
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status} — ensure backend is running on port 3001`);
+            }
+            // Try to parse anyway for edge cases
+            const text = await response.text();
+            try { return JSON.parse(text); } catch { throw new Error(`Server returned non-JSON response (${response.status})`); }
+        }
+
+        const data = await response.json();
+
         if (!response.ok) {
-            throw new Error(`Server returned ${response.status} — ensure backend is running on port 3001`);
+            // Broadcast global unauthorized event if token is invalid or expired
+            if (response.status === 401 && token) {
+                window.dispatchEvent(new CustomEvent('mantram:unauthorized', { detail: { message: data.error || 'Session expired' } }));
+            }
+
+            const err = new Error(data.error || 'API request failed');
+            // Attach domain-specific metadata for specialized error UI (e.g. SEO Audit Guard)
+            if (data.diagnosis) err.diagnosis = data.diagnosis;
+            if (data.metrics) err.metrics = data.metrics;
+            if (data.strategyUsed) err.strategyUsed = data.strategyUsed;
+            if (data.attemptsMade) err.attemptsMade = data.attemptsMade;
+            
+            if (data.isProviderError) {
+                err.isProviderError = true;
+                err.provider = data.provider;
+            }
+            throw err;
         }
-        // Try to parse anyway for edge cases
-        const text = await response.text();
-        try { return JSON.parse(text); } catch { throw new Error(`Server returned non-JSON response (${response.status})`); }
+
+        return data;
     }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-        // Broadcast global unauthorized event if token is invalid or expired
-        if (response.status === 401 && token) {
-            window.dispatchEvent(new CustomEvent('mantram:unauthorized', { detail: { message: data.error || 'Session expired' } }));
-        }
-
-        const err = new Error(data.error || 'API request failed');
-        // Attach domain-specific metadata for specialized error UI (e.g. SEO Audit Guard)
-        if (data.diagnosis) err.diagnosis = data.diagnosis;
-        if (data.metrics) err.metrics = data.metrics;
-        if (data.strategyUsed) err.strategyUsed = data.strategyUsed;
-        if (data.attemptsMade) err.attemptsMade = data.attemptsMade;
-        
-        if (data.isProviderError) {
-            err.isProviderError = true;
-            err.provider = data.provider;
-        }
-        throw err;
-    }
-
-    return data;
+    // Should not reach here, but just in case
+    throw lastError || new Error('Request failed after retries');
 }
 
 // ══════════════════════════════════════════════════════════════

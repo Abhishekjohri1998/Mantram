@@ -179,13 +179,19 @@ export default function BrochureTool({ sharedContext, brandId, avatarConfig, onA
                         </div>
                     )}
 
-                    {activeView === 'full' && result.html && (
-                        <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', marginBottom: 14 }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--sys-text-muted)', padding: '6px 10px', background: 'var(--sys-surface)', borderBottom: '1px solid var(--sys-border)' }}>Full Brochure (A4)</div>
+                    {result.html && (
+                        <div style={
+                            activeView === 'full'
+                                ? { borderRadius: 10, overflow: 'hidden', border: '1px solid var(--sys-border)', marginBottom: 14 }
+                                : { position: 'absolute', left: -9999, top: -9999, width: 800, height: 1130, pointerEvents: 'none', opacity: 0 }
+                        }>
+                            {activeView === 'full' && (
+                                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--sys-text-muted)', padding: '6px 10px', background: 'var(--sys-surface)', borderBottom: '1px solid var(--sys-border)' }}>Full Brochure (A4)</div>
+                            )}
                             <iframe
                                 ref={iframeRef}
                                 srcDoc={result.html}
-                                style={{ width: '100%', height: 600, border: 'none', display: 'block' }}
+                                style={{ width: '100%', height: activeView === 'full' ? 600 : '100%', border: 'none', display: 'block' }}
                                 title="Brochure Preview"
                             />
                         </div>

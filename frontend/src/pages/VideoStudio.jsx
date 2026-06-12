@@ -1251,7 +1251,7 @@ export default function VideoStudio() {
                                 <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
                             </div>
                         }>
-                            <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} />
+                            <AdvancedMode activeBrand={activeBrand} initialData={advancedRefillData} projects={projects} projectsLoaded={projectsLoaded} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
                         </Suspense>
                     </div>
                 )}

@@ -189,6 +189,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     const pollRef = useRef(null);
     const projectIdRef = useRef(null);
 
+    const hasAttemptedReconnect = useRef(false);
+    const lastBrandId = useRef(activeBrand?._id);
+
     const productInputRef = useRef();
     const avatarInputRef = useRef();
     const directAvatarInputRef = useRef();
@@ -618,6 +621,117 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     }, [projectId, onVideoComplete]);
 
     useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+    // ── Reconnect to a running storyboard project ──
+    const reconnectToProject = useCallback(async (proj) => {
+        const id = proj._id;
+        console.log('🔄 Reconnecting to active storyboard project:', id);
+        setProjectId(id);
+        projectIdRef.current = id;
+        
+        // Restore plan & basic info
+        const sb = proj.storyboard || {};
+        setPlan(sb);
+        setImageUrl(sb.imageUrl || '');
+        setImagePrompt(sb.imagePrompt || '');
+        setGeneratedVideoPrompt(sb.videoPrompt || '');
+        if (sb.dialogueLanguage) setDialogueLanguage(sb.dialogueLanguage);
+        if (sb.format) setFormat(sb.format);
+        if (proj.routing?.selectedModel) setModel(proj.routing.selectedModel);
+        if (proj.routing?.resolution) setResolution(proj.routing.resolution);
+        if (proj.generation?.duration) setDuration(proj.generation.duration);
+        else if (sb.totalDuration) setDuration(sb.totalDuration);
+        if (sb.generateMode) setGenerateMode(sb.generateMode);
+        
+        // Restore structured plan if present
+        if (sb.structuredPlan) {
+            setStructuredPlan(sb.structuredPlan);
+        } else if (sb.cuts?.length || sb.colorPalette?.length) {
+            setStructuredPlan({
+                colorPalette:           sb.colorPalette || [],
+                paletteNames:           sb.paletteNames || [],
+                materialNotes:          sb.materialNotes || '',
+                environmentFingerprint: sb.environmentFingerprint || '',
+                cuts:                   sb.cuts || [],
+                moodKeywords:           sb.moodKeywords || [],
+                cinematographyRules:    sb.cinematographyRules || '',
+                emotionalArc:           sb.emotionalArc || '',
+                narrativeArc:           sb.narrativeArc || '',
+            });
+        }
+        
+        const isLf = !!sb.longFormJobId;
+        setIsLongForm(isLf);
+        
+        if (proj.status === 'storyboard-ready') {
+            setPhase('review');
+        } else {
+            // Animating phase
+            setPhase('animating');
+            if (isLf) {
+                setPhaseLabel('Planning segments...');
+                setPhaseDetail('Restoring active generation...');
+            } else {
+                setPhaseLabel('Animating film...');
+                setPhaseDetail('Restoring active generation...');
+            }
+            
+            // Perform one immediate check to update progress and segment gallery
+            try {
+                const res = await fetch(`${API}/storyboard/status/${id}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
+                });
+                const data = await safeJson(res);
+                if (data.success) {
+                    setOverallProgress(data.overallProgress || 0);
+                    if (data.isLongForm) {
+                        if (data.phaseLabel) setPhaseLabel(data.phaseLabel);
+                        if (data.detail)     setPhaseDetail(data.detail);
+                        if (data.segments)   setSegmentInfo(data.segments);
+                        if (data.segments?.items?.length > 0) {
+                            setSegmentItems(data.segments.items);
+                        }
+                    }
+                    if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
+                    if (data.allDone || data.status === 'COMPLETED') {
+                        setPhase('complete');
+                        onVideoComplete?.();
+                        return; // no need to start polling loop
+                    }
+                }
+            } catch (e) {
+                console.warn('Initial reconnect status check failed:', e.message);
+            }
+            
+            // Start the regular polling loop
+            startPolling(isLf);
+        }
+    }, [onVideoComplete, startPolling]);
+
+    // Reset reconnect trigger if brand changes
+    useEffect(() => {
+        if (activeBrand?._id !== lastBrandId.current) {
+            lastBrandId.current = activeBrand?._id;
+            hasAttemptedReconnect.current = false;
+        }
+    }, [activeBrand?._id]);
+
+    // Scan projects list for active project on load
+    useEffect(() => {
+        if (hasAttemptedReconnect.current || !projects || projects.length === 0) return;
+        
+        const activeProj = projects.find(p => 
+            p.brand === activeBrand?._id &&
+            p.studioMode === 'storyboard' &&
+            (p.status === 'storyboard-ready' || p.status === 'animating' || p.storyboard?.status === 'animating')
+        );
+        
+        hasAttemptedReconnect.current = true;
+        
+        if (activeProj) {
+            reconnectToProject(activeProj);
+        }
+    }, [projects, activeBrand?._id, reconnectToProject]);
 
     // ── Manual mode: Regenerate one segment (async — backend responds immediately) ──
     const handleRegenSegment = useCallback(async (segIdx) => {

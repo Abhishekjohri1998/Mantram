@@ -872,6 +872,7 @@ router.get('/enhanced', protect, async (req, res) => {
                 facebook: platformMap.facebook || { connected: false },
                 linkedin: platformMap.linkedin || { connected: false },
                 twitter: platformMap.twitter || { connected: false },
+                tiktok: platformMap.tiktok || { connected: false },
             },
             connectedPlatformCount: accounts.length,
             intelMissions: intelMissions.status === 'fulfilled' ? intelMissions.value : [],
