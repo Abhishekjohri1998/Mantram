@@ -2377,9 +2377,22 @@ router.post('/enhance-prompt', protect, requireCredits('promptEnhance'), async (
         if (groundingIdx !== -1) {
             // Find where the actual image prompt starts (after the grounding block)
             const promptStartIdx = cleanPrompt.indexOf('\n\n', groundingIdx);
-            cleanPrompt = promptStartIdx !== -1
-                ? cleanPrompt.substring(promptStartIdx).trim()
-                : cleanPrompt.substring(0, groundingIdx).trim();
+            if (promptStartIdx !== -1) {
+                cleanPrompt = cleanPrompt.substring(promptStartIdx).trim();
+            } else {
+                // Robust line-by-line fallback if double-newline is somehow missing
+                const lines = cleanPrompt.split('\n');
+                const nonGroundingLines = lines.filter(line => {
+                    const l = line.trim();
+                    return !l.startsWith('VISUAL GROUND TRUTH') &&
+                           !l.startsWith('Product appearance:') &&
+                           !l.startsWith('Accurate product colours:') &&
+                           !l.startsWith('Material / finish:') &&
+                           !l.startsWith('CRITICAL:') &&
+                           !l.startsWith('DO NOT SHOW:');
+                });
+                cleanPrompt = nonGroundingLines.join('\n').trim();
+            }
         }
 
         console.log(`✨ [EnhancePrompt] Done in ${pipelineResult.pipelineTimeMs}ms — enhanced from ${prompt.length} to ${cleanPrompt.length} chars`);

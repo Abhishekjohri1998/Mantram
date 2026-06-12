@@ -1525,8 +1525,7 @@ export async function runCreativePipeline(params) {
             vg.materialFinish ? `Material / finish: ${vg.materialFinish}` : '',
             vg.generationGuidance ? `CRITICAL: ${vg.generationGuidance}` : '',
             vg.avoidList?.length > 0 ? `DO NOT SHOW: ${vg.avoidList.join('; ')}` : '',
-            ``,
-        ].filter(Boolean).join('\n');
+        ].filter(Boolean).join('\n') + '\n\n';
         state.finalPrompt = groundingPrefix + mainPrompt;
         console.log(`🧠 MCoT: Visual grounding injected at START of final prompt`);
     } else {
