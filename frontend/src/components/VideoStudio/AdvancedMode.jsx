@@ -211,6 +211,16 @@ const css = `
 .vm-adfilm-meta-label { font-size: 9px; font-weight: 800; color: var(--sys-text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
 .vm-adfilm-meta-value { font-size: 11px; color: var(--sys-text); line-height: 1.4; }
 .vm-mcot-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: #7c3aed; background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2); border-radius: 6px; padding: 2px 7px; }
+
+/* Admin Visibility Controls */
+.vm-admin-controls { position: absolute; top: 6px; left: 6px; display: flex; gap: 3px; z-index: 10; pointer-events: auto; }
+.vm-admin-btn { display: flex; align-items: center; gap: 2px; padding: 3px 6px; border-radius: 6px; font-size: 9px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); color: rgba(255,255,255,0.5); transition: all 0.15s ease; text-transform: uppercase; letter-spacing: 0.3px; }
+.vm-admin-btn:hover { background: rgba(0,0,0,0.85); color: #fff; border-color: rgba(255,255,255,0.3); transform: translateY(-1px); }
+.vm-admin-btn.active { color: #10b981; border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.15); }
+.vm-admin-btn.active:hover { background: rgba(16,185,129,0.3); }
+.vm-admin-btn.active.green { color: #10b981; border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.15); }
+.vm-admin-btn.active.red { color: #ef4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.15); }
+.vm-admin-btn.active.red:hover { background: rgba(239,68,68,0.3); }
 `;
 
 function ConfigDropdown({ value, onChange, options, label }) {
@@ -358,12 +368,32 @@ const PosterThumbnail = ({ src, poster }) => {
 // Keep old name as alias for backward compatibility
 const LazyVideoThumbnail = PosterThumbnail
 
-export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false, canCreateVideo = true, onUpgradeRequired }) {
+export default function AdvancedMode({ activeBrand, initialData, projects = [], projectsLoaded = false, canCreateVideo = true, onUpgradeRequired, user }) {
     // ── Completed videos grid (local state, prepend new ones) ──
     const hasVideo = p => p.generation?.videoUrl || p.finalVideoUrl
     const isCompleted = p => (p.status === 'done' || p.status === 'critique' || p.status === 'completed') && hasVideo(p)
+    const isSuperAdmin = user?.role === 'superadmin'
     
     const [gridVideos, setGridVideos] = useState([])
+
+    // ── Admin toggle handler (superadmin only) ──
+    async function handleAdminToggle(e, projectId, field, currentValue) {
+        e.stopPropagation()
+        try {
+            const res = await api(`/superadmin/video-studio/${projectId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ [field]: !currentValue })
+            })
+            if (res.success && res.project) {
+                setGridVideos(prev => prev.map(p => p._id === projectId
+                    ? { ...p, [field]: res.project[field] }
+                    : p
+                ))
+            }
+        } catch (err) {
+            console.error(`Failed to update ${field}:`, err.message)
+        }
+    }
 
     // Sync if parent projects prop updates (on mount / history refresh / tab switch)
     // Always rebuilds from incoming projects as the source of truth,
@@ -1190,6 +1220,35 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                 onExtractFirstFrame={(url) => setFirstFrame({ url, source: 'extracted' })}
                                 onExtractLastFrame={(url) => setLastFrame({ url, source: 'extracted' })}
                             />
+                            {/* ── Admin Visibility Controls (superadmin only) ── */}
+                            {isSuperAdmin && p._id && (
+                                <div className="vm-admin-controls" onClick={e => e.stopPropagation()}>
+                                    <button
+                                        className={`vm-admin-btn ${p.showOnHomeScreen ? 'active green' : ''}`}
+                                        onClick={(e) => handleAdminToggle(e, p._id, 'showOnHomeScreen', p.showOnHomeScreen)}
+                                        title={p.showOnHomeScreen ? 'Remove from Homescreen' : 'Show on Homescreen'}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>home</span>
+                                        {p.showOnHomeScreen ? 'Home' : 'Home'}
+                                    </button>
+                                    <button
+                                        className={`vm-admin-btn ${p.isActive === false ? '' : 'active'}`}
+                                        onClick={(e) => handleAdminToggle(e, p._id, 'isActive', p.isActive !== false)}
+                                        title={p.isActive === false ? 'Activate' : 'Deactivate'}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{p.isActive === false ? 'visibility_off' : 'visibility'}</span>
+                                        {p.isActive === false ? 'Off' : 'On'}
+                                    </button>
+                                    <button
+                                        className={`vm-admin-btn ${p.isPublished ? 'active red' : ''}`}
+                                        onClick={(e) => handleAdminToggle(e, p._id, 'isPublished', p.isPublished)}
+                                        title={p.isPublished ? 'Unpublish' : 'Publish'}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{p.isPublished ? 'public' : 'public_off'}</span>
+                                        {p.isPublished ? 'Pub' : 'Draft'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )
                 })}
