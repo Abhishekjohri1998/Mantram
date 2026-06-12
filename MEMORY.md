@@ -42,3 +42,15 @@
   - Vision AI models analyzing product images in a vacuum are prone to form-factor hallucinations (e.g. geometric stands resembling headphones). Surrounding them with product title/listing metadata locks in high-confidence correct classifications.
   - Custom Shopify themes (like Halo) don't use standard Dawn selectors. Explicitly targeting thumbnails and containers is required to filter out policy and trust icons.
 
+### Creative Studio Prompt Enhance (Sprint 7)
+- **Feature**: MCoT Visual Grounding & Robust Prompt Enhancement.
+- **Goal**: Resolve silent prompt enhancement failures in Creative Studio's AI Create panel.
+- **Workflow**:
+  - The `/enhance-prompt` route calls the fast agentic pipeline (`runCreativePipeline`), which front-loads MCoT visual grounding context.
+  - Separates this grounding block from the engineered prompt with a double-newline `\n\n`.
+  - Backend route strips the grounding block before returning it to the user so they only see the styled text prompt.
+- **Learnings / Gotchas**:
+  - If the grounding block lacks a trailing double-newline, the main prompt concatenates directly, corrupting the text and causing the `.indexOf('\n\n')` cleanup parser to fail and return an empty string (`""`).
+  - Added a robust line-by-line fallback parser in `creatives.js` that splits on newlines and filters out any metadata prefix lines if double-newlines are missing.
+
+
