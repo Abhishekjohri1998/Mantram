@@ -929,6 +929,17 @@ export const superadmin = {
     },
     updateAvatar: (id, data) => apiFetch(`/superadmin/avatars/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteAvatar: (id) => apiFetch(`/superadmin/avatars/${id}`, { method: 'DELETE' }),
+
+    // Growth Content Engine
+    getGrowthContent: () => apiFetch('/superadmin/growth/today'),
+    getGrowthHistory: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return apiFetch(`/superadmin/growth/history?${query}`);
+    },
+    generateGrowthContent: (data = {}) => apiFetch('/superadmin/growth/generate', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    markGrowthPosted: (id, platform, index) => apiFetch(`/superadmin/growth/${id}/mark-posted`, { method: 'PUT', body: JSON.stringify({ platform, index }) }),
+    regenerateGrowthPost: (id, data) => apiFetch(`/superadmin/growth/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    getGrowthStats: () => apiFetch('/superadmin/growth/stats'),
 };
 
 // ============ Credits API ============

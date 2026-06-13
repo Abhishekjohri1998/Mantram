@@ -38,6 +38,7 @@ import VideoProject from '../models/VideoProject.js';
 import templateRoutes from './superadmin-templates.js';
 import qAdsRoutes from './superadmin-qads.js';
 import analyticsRoutes from './superadmin-analytics.js';
+import growthRoutes from './superadmin-growth.js';
 
 const router = Router();
 
@@ -63,6 +64,7 @@ router.use(protect, authorize('superadmin'), adminLimiter);
 router.use('/templates', templateRoutes);
 router.use('/qads', qAdsRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/growth', growthRoutes);
 
 // ══════════════════════════════════════════════════════════════
 // AVATAR LIBRARY — Super Admin template avatar management

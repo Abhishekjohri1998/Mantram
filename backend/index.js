@@ -427,6 +427,29 @@ connectDB().then(() => {
             console.log('📈 Daily Strategy Engine active');
         }).catch(err => console.error('❌ Failed to load dailyStrategyEngine.js:', err));
 
+        // Growth Content Engine — auto-generate daily social media content at 5:30 AM IST (midnight UTC)
+        import('./services/growthContentEngine.js').then(({ generateDailyContent }) => {
+            const scheduleGrowthContent = () => {
+                const now = new Date();
+                // Calculate ms until next midnight UTC (5:30 AM IST)
+                const tomorrow = new Date(now);
+                tomorrow.setUTCHours(0, 0, 0, 0);
+                if (now >= tomorrow) tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+                const msUntilMidnight = tomorrow - now;
+
+                setTimeout(() => {
+                    generateDailyContent().catch(err => console.warn('⚠️ Growth Content generation failed:', err.message));
+                    // Reschedule for next day
+                    setInterval(() => {
+                        generateDailyContent().catch(err => console.warn('⚠️ Growth Content generation failed:', err.message));
+                    }, 24 * 60 * 60 * 1000);
+                }, msUntilMidnight);
+
+                console.log(`🚀 Growth Content Engine scheduled — next run in ${Math.round(msUntilMidnight / 60000)} minutes`);
+            };
+            scheduleGrowthContent();
+        }).catch(err => console.warn('⚠️ Growth Content Engine failed to load:', err.message));
+
     } else {
         console.log(`👷 Secondary worker (instance ${instanceId}) — skipping background schedulers`);
     }

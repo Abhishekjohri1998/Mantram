@@ -140,6 +140,17 @@ export default function SuperAdminDashboard() {
     const [segmentCounts, setSegmentCounts] = useState({})
     const [userDrawer, setUserDrawer] = useState(null)
     const [usersLoading, setUsersLoading] = useState(false)
+    // Growth Content Engine state
+    const [growthContent, setGrowthContent] = useState(null)
+    const [growthStats, setGrowthStats] = useState(null)
+    const [growthHistory, setGrowthHistory] = useState([])
+    const [growthLoading, setGrowthLoading] = useState(false)
+    const [growthGenerating, setGrowthGenerating] = useState(false)
+    const [growthPlatformTab, setGrowthPlatformTab] = useState('linkedin')
+    const [growthCopied, setGrowthCopied] = useState(null)
+    const [growthRegenerating, setGrowthRegenerating] = useState(null)
+    const [growthHistoryPage, setGrowthHistoryPage] = useState(1)
+    const [showGrowthHistory, setShowGrowthHistory] = useState(false)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
@@ -150,6 +161,7 @@ export default function SuperAdminDashboard() {
     const navGroups = [
         { label: 'Command Center', icon: 'command_bar', items: [
             { id: 'overview', label: 'Overview', icon: 'dashboard' },
+            { id: 'growth', label: 'Growth Engine', icon: 'trending_up' },
         ]},
         { label: 'People', icon: 'group', items: [
             { id: 'approvals', label: 'Approvals', icon: 'how_to_reg', badge: pendingUsers?.length },
@@ -203,9 +215,70 @@ export default function SuperAdminDashboard() {
         if (tab === 'logs') loadLogs()
         if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice) }
         if (tab === 'creditPacks') loadCreditPacks()
+        if (tab === 'growth') loadGrowthData()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
     // Reload users when segment/sort changes while on users tab
     useEffect(() => { if (tab === 'users') loadUsers() }, [userSegment, userSort, userSortOrder])
+
+    const loadGrowthData = async () => {
+        setGrowthLoading(true)
+        try {
+            const [contentRes, statsRes] = await Promise.all([
+                API.getGrowthContent(),
+                API.getGrowthStats(),
+            ])
+            setGrowthContent(contentRes.content)
+            setGrowthStats(statsRes.stats)
+        } catch (e) { console.error('Growth data load failed:', e) }
+        finally { setGrowthLoading(false) }
+    }
+
+    const loadGrowthHistory = async (page = 1) => {
+        try {
+            const res = await API.getGrowthHistory({ page, limit: 7 })
+            setGrowthHistory(res.content || [])
+        } catch (e) { console.error(e) }
+    }
+
+    const handleGenerateGrowth = async () => {
+        setGrowthGenerating(true)
+        try {
+            const res = await API.generateGrowthContent()
+            if (res.success) {
+                setGrowthContent(res.content)
+                showToast('Content generated successfully!')
+                loadGrowthData()
+            }
+        } catch (e) { showToast(e.message || 'Generation failed', 'error') }
+        finally { setGrowthGenerating(false) }
+    }
+
+    const handleMarkPosted = async (platform, index = 0) => {
+        if (!growthContent?._id) return
+        try {
+            const res = await API.markGrowthPosted(growthContent._id, platform, index)
+            if (res.success) setGrowthContent(res.content)
+        } catch (e) { showToast('Failed to update', 'error') }
+    }
+
+    const handleRegeneratePost = async (platform, index = 0) => {
+        if (!growthContent?._id) return
+        setGrowthRegenerating(`${platform}-${index}`)
+        try {
+            const res = await API.regenerateGrowthPost(growthContent._id, { platform, index })
+            if (res.success) {
+                setGrowthContent(res.content)
+                showToast('Post regenerated!')
+            }
+        } catch (e) { showToast('Regeneration failed', 'error') }
+        finally { setGrowthRegenerating(null) }
+    }
+
+    const handleCopyContent = (text, key) => {
+        navigator.clipboard.writeText(text)
+        setGrowthCopied(key)
+        setTimeout(() => setGrowthCopied(null), 2000)
+    }
 
     const loadStats = async () => { try { const d = await API.getStats(); setStats(d.stats) } catch (e) { console.error(e) } finally { setLoading(false) } }
     const loadUsers = async (silent = false) => {
@@ -4537,6 +4610,357 @@ export default function SuperAdminDashboard() {
 
                 {tab === 'ugcStudio' && (
                     <UGCStudioSettings />
+                )}
+
+                {/* ════════════ GROWTH ENGINE ════════════ */}
+                {tab === 'growth' && (
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-emerald-500">trending_up</span>
+                                    Growth Engine
+                                </h2>
+                                <p className="text-xs text-[var(--sys-text-muted)] mt-1">Auto-generated daily content • Copy, post, grow</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {growthStats && (
+                                    <div className="flex items-center gap-4 mr-4">
+                                        <div className="text-center">
+                                            <p className="text-lg font-black text-emerald-500">{growthStats.streak}</p>
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider">Streak</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-lg font-black text-blue-500">{growthStats.postsPosted}/{growthStats.postsThisWeek}</p>
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider">This Week</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-lg font-black text-purple-500">{growthStats.coverage}%</p>
+                                            <p className="text-[9px] text-[var(--sys-text-muted)] uppercase tracking-wider">Coverage</p>
+                                        </div>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => { setShowGrowthHistory(!showGrowthHistory); if (!showGrowthHistory) loadGrowthHistory() }}
+                                    className="px-3 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-border)]"
+                                >
+                                    <span className="material-symbols-outlined text-sm mr-1" style={{ verticalAlign: 'middle' }}>history</span>
+                                    History
+                                </button>
+                                <button
+                                    onClick={handleGenerateGrowth}
+                                    disabled={growthGenerating}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {growthGenerating ? (
+                                        <><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>Generating...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-sm">auto_awesome</span>{growthContent ? 'Regenerate All' : 'Generate Today'}</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {growthLoading ? (
+                            <div className="flex items-center justify-center py-20">
+                                <span className="material-symbols-outlined text-4xl animate-spin text-[var(--sys-text-muted)]">progress_activity</span>
+                            </div>
+                        ) : !growthContent ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-center">
+                                <span className="material-symbols-outlined text-6xl text-[var(--sys-text-muted)] mb-4">rocket_launch</span>
+                                <h3 className="text-lg font-bold text-[var(--sys-text)] mb-2">No content generated for today</h3>
+                                <p className="text-sm text-[var(--sys-text-muted)] mb-6 max-w-md">Click "Generate Today" to create content for LinkedIn, Instagram, Twitter, and Reddit. Or wait until 5:30 AM IST for auto-generation.</p>
+                                <button onClick={handleGenerateGrowth} disabled={growthGenerating} className="px-6 py-3 rounded-2xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-all text-sm disabled:opacity-50">
+                                    {growthGenerating ? 'Generating...' : '🚀 Generate Now'}
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Meta info */}
+                                <div className="flex items-center gap-4 text-[10px] text-[var(--sys-text-muted)]">
+                                    <span>📅 {new Date(growthContent.date).toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                                    <span>🎯 {growthContent.theme?.replace(/_/g, ' ')?.toUpperCase()}</span>
+                                    <span>🤖 {growthContent.metadata?.model}</span>
+                                    {growthContent.metadata?.trendingTopics?.length > 0 && (
+                                        <span>📊 Trends: {growthContent.metadata.trendingTopics.slice(0, 3).join(', ')}</span>
+                                    )}
+                                </div>
+
+                                {/* Platform Tabs */}
+                                <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                    {[
+                                        { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
+                                        { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 2 },
+                                        { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
+                                        { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
+                                    ].map(p => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => setGrowthPlatformTab(p.id)}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
+                                                growthPlatformTab === p.id
+                                                    ? 'text-white shadow-lg'
+                                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
+                                            }`}
+                                            style={growthPlatformTab === p.id ? { background: p.color } : {}}
+                                        >
+                                            <span>{p.icon}</span> {p.label}
+                                            <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: growthPlatformTab === p.id ? 'rgba(255,255,255,0.2)' : 'var(--sys-border)' }}>{p.count}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* LINKEDIN POSTS */}
+                                {growthPlatformTab === 'linkedin' && (
+                                    <div className="space-y-4">
+                                        {(growthContent.linkedin || []).map((post, i) => (
+                                            <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #0A66C210, transparent)' }}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">💼</span>
+                                                        <span className="text-xs font-bold text-[var(--sys-text)]">LinkedIn Post {i + 1}</span>
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-500">{post.type?.replace(/_/g, ' ')}</span>
+                                                        {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleMarkPosted('linkedin', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleRegeneratePost('linkedin', i)}
+                                                            disabled={growthRegenerating === `linkedin-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50"
+                                                        >
+                                                            {growthRegenerating === `linkedin-${i}` ? '⏳' : '🔄'} Regen
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCopyContent(post.content + '\n\n' + (post.hashtags || []).join(' '), `li-${i}`)}
+                                                            className="px-3 py-1 rounded-lg text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-all"
+                                                        >
+                                                            {growthCopied === `li-${i}` ? '✓ Copied!' : '📋 Copy'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4">
+                                                    <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed">{post.content}</pre>
+                                                    {post.hashtags?.length > 0 && (
+                                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                                            {post.hashtags.map((h, j) => (
+                                                                <span key={j} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-500">{h}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* INSTAGRAM POSTS + STORY */}
+                                {growthPlatformTab === 'instagram' && (
+                                    <div className="space-y-4">
+                                        {/* Instagram Post */}
+                                        <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #E4405F10, #833AB410, transparent)' }}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">📸</span>
+                                                    <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Post</span>
+                                                    {growthContent.instagram?.post?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.post.bestTime}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleMarkPosted('instagram_post')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.post?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                        {growthContent.instagram?.post?.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                    </button>
+                                                    <button onClick={() => handleRegeneratePost('instagram_post')} disabled={growthRegenerating === 'instagram_post-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
+                                                        {growthRegenerating === 'instagram_post-0' ? '⏳' : '🔄'} Regen
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCopyContent(growthContent.instagram?.post?.caption + '\n\n' + (growthContent.instagram?.post?.hashtags || []).join(' '), 'ig-post')}
+                                                        className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all" style={{ background: 'linear-gradient(135deg, #E4405F, #833AB4)' }}
+                                                    >
+                                                        {growthCopied === 'ig-post' ? '✓ Copied!' : '📋 Copy Caption'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="p-4">
+                                                <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed mb-4">{growthContent.instagram?.post?.caption}</pre>
+                                                {growthContent.instagram?.post?.slides?.length > 0 && (
+                                                    <div className="mt-4">
+                                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {growthContent.instagram.post.slides.map((s, j) => (
+                                                                <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                                    <p className="text-[10px] font-bold text-pink-500 mb-1">Slide {s.slideNumber}</p>
+                                                                    <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
+                                                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {s.visualDescription}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {growthContent.instagram?.post?.hashtags?.length > 0 && (
+                                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                                        {growthContent.instagram.post.hashtags.map((h, j) => (
+                                                            <span key={j} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/10 text-pink-500">{h}</span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Instagram Story */}
+                                        <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">📱</span>
+                                                    <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Story Script</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleMarkPosted('instagram_story')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.story?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                        {growthContent.instagram?.story?.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                    </button>
+                                                    <button onClick={() => handleRegeneratePost('instagram_story')} disabled={growthRegenerating === 'instagram_story-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
+                                                        {growthRegenerating === 'instagram_story-0' ? '⏳' : '🔄'} Regen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="p-4">
+                                                <div className="flex gap-3 overflow-x-auto pb-2">
+                                                    {(growthContent.instagram?.story?.slides || []).map((s, j) => (
+                                                        <div key={j} className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                            <div className="flex items-center gap-1.5 mb-2">
+                                                                <span className="text-[10px] font-bold text-purple-500">Slide {s.slideNumber}</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/10 text-purple-500">{s.type}</span>
+                                                            </div>
+                                                            <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
+                                                            {s.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-1">🎨 {s.visualDescription}</p>}
+                                                            {s.ctaText && <p className="text-[10px] text-emerald-500 font-bold">👆 {s.ctaText}</p>}
+                                                            {s.stickerSuggestion && <p className="text-[10px] text-amber-500">🏷️ {s.stickerSuggestion}</p>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* TWITTER/X POSTS */}
+                                {growthPlatformTab === 'twitter' && (
+                                    <div className="space-y-4">
+                                        {(growthContent.twitter || []).map((post, i) => (
+                                            <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #1DA1F210, transparent)' }}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">🐦</span>
+                                                        <span className="text-xs font-bold text-[var(--sys-text)]">{post.type === 'thread' ? 'Twitter Thread' : 'Tweet'}</span>
+                                                        {post.type === 'thread' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/10 text-sky-500">{post.tweets?.length} tweets</span>}
+                                                        {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleMarkPosted('twitter', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                        </button>
+                                                        <button onClick={() => handleRegeneratePost('twitter', i)} disabled={growthRegenerating === `twitter-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
+                                                            {growthRegenerating === `twitter-${i}` ? '⏳' : '🔄'} Regen
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCopyContent(post.tweets?.join('\n\n---\n\n') || '', `tw-${i}`)}
+                                                            className="px-3 py-1 rounded-lg text-[10px] font-bold bg-sky-500 text-white hover:bg-sky-600 cursor-pointer transition-all"
+                                                        >
+                                                            {growthCopied === `tw-${i}` ? '✓ Copied!' : '📋 Copy'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4 space-y-3">
+                                                    {(post.tweets || []).map((tweet, j) => (
+                                                        <div key={j} className="flex gap-3">
+                                                            {post.type === 'thread' && (
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="w-6 h-6 rounded-full bg-sky-500/10 flex items-center justify-center text-[10px] font-bold text-sky-500">{j + 1}</div>
+                                                                    {j < post.tweets.length - 1 && <div className="w-px flex-1 bg-[var(--sys-border)] mt-1" />}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1">
+                                                                <p className="text-sm text-[var(--sys-text)] leading-relaxed">{tweet}</p>
+                                                                <p className="text-[10px] text-[var(--sys-text-muted)] mt-1">{tweet.length}/280</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* REDDIT POSTS */}
+                                {growthPlatformTab === 'reddit' && (
+                                    <div className="space-y-4">
+                                        {(growthContent.reddit || []).map((post, i) => (
+                                            <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF450010, transparent)' }}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">🟠</span>
+                                                        <span className="text-xs font-bold text-[var(--sys-text)]">{post.subreddit}</span>
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-500">{post.tone}</span>
+                                                        {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => handleMarkPosted('reddit', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                        </button>
+                                                        <button onClick={() => handleRegeneratePost('reddit', i)} disabled={growthRegenerating === `reddit-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
+                                                            {growthRegenerating === `reddit-${i}` ? '⏳' : '🔄'} Regen
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCopyContent(post.title + '\n\n' + post.body, `rd-${i}`)}
+                                                            className="px-3 py-1 rounded-lg text-[10px] font-bold bg-orange-600 text-white hover:bg-orange-700 cursor-pointer transition-all"
+                                                        >
+                                                            {growthCopied === `rd-${i}` ? '✓ Copied!' : '📋 Copy All'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <button onClick={() => handleCopyContent(post.title, `rd-title-${i}`)} className="text-[9px] text-[var(--sys-text-muted)] hover:text-orange-500 cursor-pointer">
+                                                            {growthCopied === `rd-title-${i}` ? '✓' : '📋'}
+                                                        </button>
+                                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">{post.title}</h4>
+                                                    </div>
+                                                    <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed">{post.body}</pre>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* History */}
+                        {showGrowthHistory && growthHistory.length > 0 && (
+                            <div className="mt-6">
+                                <h3 className="text-sm font-bold text-[var(--sys-text)] mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">history</span> Past Content
+                                </h3>
+                                <div className="space-y-2">
+                                    {growthHistory.map(day => (
+                                        <div key={day._id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">{new Date(day.date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{day.theme?.replace(/_/g, ' ')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${day.status === 'posted' ? 'bg-emerald-500/10 text-emerald-500' : day.status === 'partial' ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)]'}`}>
+                                                    {day.status === 'posted' ? '✅ All Posted' : day.status === 'partial' ? '🔶 Partial' : '○ Not Posted'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* ════════════ TEMPLATES ════════════ */}
