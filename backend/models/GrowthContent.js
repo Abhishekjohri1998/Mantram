@@ -24,6 +24,16 @@ const storySlideSchema = new mongoose.Schema({
     stickerSuggestion: String,
 }, { _id: false });
 
+const reelSceneSchema = new mongoose.Schema({
+    sceneNumber: Number,
+    duration: String,           // e.g. '0:00–0:03'
+    shotType: String,           // e.g. 'Close-up', 'Screen recording', 'Talking head', 'B-roll'
+    action: String,             // What to physically do/show
+    voiceover: String,          // What to say (narration)
+    textOverlay: String,        // On-screen text
+    visualDescription: String,  // How it should look
+}, { _id: false });
+
 const twitterPostSchema = new mongoose.Schema({
     type: { type: String, enum: ['standalone', 'thread'] },
     tweets: [String],
@@ -62,6 +72,18 @@ const growthContentSchema = new mongoose.Schema({
         },
         story: {
             slides: [storySlideSchema],
+            posted: { type: Boolean, default: false },
+            postedAt: Date,
+        },
+        reel: {
+            hook: String,               // First 3 seconds hook text
+            concept: String,            // What the reel is about
+            caption: String,
+            hashtags: [String],
+            audioSuggestion: String,    // Trending audio or original
+            scenes: [reelSceneSchema],
+            totalDuration: String,      // e.g. '30–45 seconds'
+            bestTime: String,
             posted: { type: Boolean, default: false },
             postedAt: Date,
         },

@@ -4691,7 +4691,7 @@ export default function SuperAdminDashboard() {
                                 <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
                                     {[
                                         { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
-                                        { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 2 },
+                                        { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
                                         { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
                                         { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
                                     ].map(p => (
@@ -4841,6 +4841,93 @@ export default function SuperAdminDashboard() {
                                                         </div>
                                                     ))}
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Instagram Reel */}
+                                        <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF006610, #FE350410, transparent)' }}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">🎬</span>
+                                                    <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Reel Script</span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-500">{growthContent.instagram?.reel?.scenes?.length || 0} scenes</span>
+                                                    {growthContent.instagram?.reel?.totalDuration && <span className="text-[10px] text-[var(--sys-text-muted)]">⏱️ {growthContent.instagram.reel.totalDuration}</span>}
+                                                    {growthContent.instagram?.reel?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.reel.bestTime}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleMarkPosted('instagram_reel')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.reel?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                        {growthContent.instagram?.reel?.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                    </button>
+                                                    <button onClick={() => handleRegeneratePost('instagram_reel')} disabled={growthRegenerating === 'instagram_reel-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
+                                                        {growthRegenerating === 'instagram_reel-0' ? '⏳' : '🔄'} Regen
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCopyContent(growthContent.instagram?.reel?.caption + '\n\n' + (growthContent.instagram?.reel?.hashtags || []).join(' '), 'ig-reel')}
+                                                        className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all" style={{ background: 'linear-gradient(135deg, #FF0066, #FE3504)' }}
+                                                    >
+                                                        {growthCopied === 'ig-reel' ? '✓ Copied!' : '📋 Copy Caption'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 space-y-4">
+                                                {/* Hook + Concept */}
+                                                {growthContent.instagram?.reel?.hook && (
+                                                    <div className="flex gap-3">
+                                                        <div className="flex-1 p-3 rounded-xl bg-red-500/5 border border-red-500/20">
+                                                            <p className="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1">🎯 Hook (First 3 Seconds)</p>
+                                                            <p className="text-sm text-[var(--sys-text)] font-bold">{growthContent.instagram.reel.hook}</p>
+                                                        </div>
+                                                        {growthContent.instagram?.reel?.audioSuggestion && (
+                                                            <div className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-1">🎵 Audio</p>
+                                                                <p className="text-xs text-[var(--sys-text)]">{growthContent.instagram.reel.audioSuggestion}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {growthContent.instagram?.reel?.concept && (
+                                                    <p className="text-xs text-[var(--sys-text-muted)] italic">💡 Concept: {growthContent.instagram.reel.concept}</p>
+                                                )}
+
+                                                {/* Scene-by-Scene Breakdown */}
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">🎬 Shooting Script</p>
+                                                    <div className="space-y-2">
+                                                        {(growthContent.instagram?.reel?.scenes || []).map((scene, j) => (
+                                                            <div key={j} className="flex gap-3 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                                <div className="flex flex-col items-center flex-shrink-0 w-12">
+                                                                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-[10px] font-black text-red-500">{scene.sceneNumber}</div>
+                                                                    {j < (growthContent.instagram.reel.scenes.length - 1) && <div className="w-px flex-1 bg-red-500/20 mt-1" />}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-500">{scene.duration}</span>
+                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-500/10 text-blue-500">{scene.shotType}</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-[var(--sys-text)] font-bold mb-1">📹 {scene.action}</p>
+                                                                    {scene.voiceover && <p className="text-[11px] text-[var(--sys-text)] mb-1">🎙️ <em>"{scene.voiceover}"</em></p>}
+                                                                    {scene.textOverlay && <p className="text-[10px] text-amber-500 font-bold mb-1">📝 {scene.textOverlay}</p>}
+                                                                    {scene.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {scene.visualDescription}</p>}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Caption */}
+                                                {growthContent.instagram?.reel?.caption && (
+                                                    <div className="pt-3 border-t border-[var(--sys-border)]">
+                                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📝 Caption</p>
+                                                        <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed">{growthContent.instagram.reel.caption}</pre>
+                                                        {growthContent.instagram?.reel?.hashtags?.length > 0 && (
+                                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                                {growthContent.instagram.reel.hashtags.map((h, k) => (
+                                                                    <span key={k} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-500">{h}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

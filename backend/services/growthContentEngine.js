@@ -212,6 +212,7 @@ CRITICAL WRITING RULES:
 6. End LinkedIn posts with a question to drive comments.
 7. Reddit posts should sound like a founder talking to peers, not a press release.
 8. Instagram story scripts must be actionable — describe exact visuals, text overlays, and stickers.
+9. Instagram Reel script must be a COMPLETE shooting guide — scene-by-scene with shot type, duration, action to perform, voiceover narration, and text overlay. Think like a director giving instructions to a one-person crew.
 
 REDDIT SUBREDDITS FOR TODAY:
 ${subreddits.map(s => `- ${s.name}: Tone = ${s.tone}`).join('\n')}
@@ -247,6 +248,19 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
       "slides": [
         {"slideNumber": 1, "type": "text", "text": "Story opening hook", "visualDescription": "Background visual", "ctaText": "", "stickerSuggestion": ""},
         {"slideNumber": 2, "type": "image", "text": "Text overlay", "visualDescription": "What to show", "ctaText": "Swipe up", "stickerSuggestion": "poll or question sticker"}
+      ]
+    },
+    "reel": {
+      "hook": "First 3 seconds — the line that stops the scroll",
+      "concept": "One sentence describing what this reel is about",
+      "caption": "Reel caption with CTA (max 2200 chars)",
+      "hashtags": ["#mantram", "#aimarketing", "#reels"],
+      "audioSuggestion": "Trending audio name OR 'original audio — voiceover'",
+      "totalDuration": "30–45 seconds",
+      "bestTime": "12:00 PM IST",
+      "scenes": [
+        {"sceneNumber": 1, "duration": "0:00–0:03", "shotType": "Close-up / Talking head / Screen recording / B-roll", "action": "What to physically do or show", "voiceover": "What to say out loud", "textOverlay": "On-screen text", "visualDescription": "How it should look"},
+        {"sceneNumber": 2, "duration": "0:03–0:08", "shotType": "Screen recording", "action": "Show the product doing X", "voiceover": "Narration for this part", "textOverlay": "Key stat or text", "visualDescription": "Description"}
       ]
     }
   },
@@ -410,6 +424,25 @@ export async function generateDailyContent(forceDate = null) {
                     })),
                     posted: false,
                 },
+                reel: {
+                    hook: content.instagram?.reel?.hook || '',
+                    concept: content.instagram?.reel?.concept || '',
+                    caption: content.instagram?.reel?.caption || '',
+                    hashtags: content.instagram?.reel?.hashtags || [],
+                    audioSuggestion: content.instagram?.reel?.audioSuggestion || 'original audio',
+                    totalDuration: content.instagram?.reel?.totalDuration || '30–45 seconds',
+                    bestTime: content.instagram?.reel?.bestTime || '12:00 PM IST',
+                    scenes: (content.instagram?.reel?.scenes || []).map(s => ({
+                        sceneNumber: s.sceneNumber,
+                        duration: s.duration,
+                        shotType: s.shotType,
+                        action: s.action,
+                        voiceover: s.voiceover || '',
+                        textOverlay: s.textOverlay || '',
+                        visualDescription: s.visualDescription || '',
+                    })),
+                    posted: false,
+                },
             },
 
             twitter: (content.twitter || []).map(t => ({
@@ -461,6 +494,7 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
         reddit: `Generate ONE Reddit post for ${existing.reddit?.[index]?.subreddit || 'r/Entrepreneur'}. Theme: ${existing.theme}. Raw, authentic, NO marketing speak, NO links. Return JSON: {"subreddit": "...", "title": "...", "body": "...", "tone": "...", "bestTime": "..."}`,
         instagram_post: `Generate ONE Instagram carousel post for Mantram AI. Theme: ${existing.theme}. Include caption, hashtags, and 5-7 slide descriptions. Return JSON: {"caption": "...", "hashtags": [...], "slides": [...], "bestTime": "..."}`,
         instagram_story: `Generate ONE Instagram Story script for Mantram AI (5-6 slides). Theme: ${existing.theme}. Include visual descriptions, text overlays, and sticker suggestions. Return JSON: {"slides": [{"slideNumber": 1, "type": "text", "text": "...", "visualDescription": "...", "ctaText": "...", "stickerSuggestion": "..."}]}`,
+        instagram_reel: `Generate ONE Instagram Reel shooting script for Mantram AI (30-45 seconds, 5-8 scenes). Theme: ${existing.theme}. Include a scroll-stopping hook, scene-by-scene breakdown with shot type, duration, action, voiceover narration, text overlay, and visual description. Also include caption, hashtags, and audio suggestion. Return JSON: {"hook": "...", "concept": "...", "caption": "...", "hashtags": [...], "audioSuggestion": "...", "totalDuration": "30-45 seconds", "bestTime": "12:00 PM IST", "scenes": [{"sceneNumber": 1, "duration": "0:00-0:03", "shotType": "...", "action": "...", "voiceover": "...", "textOverlay": "...", "visualDescription": "..."}]}`,
     };
 
     const systemPrompt = `You are a growth content writer for Mantram AI (AI marketing OS, 14 studios, Brand DNA, 20+ AI models, built by 2 people). Write naturally — no AI tells. Return ONLY raw JSON.`;
@@ -505,6 +539,26 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
     } else if (platform === 'instagram_story') {
         existing.instagram.story.slides = parsed.slides || [];
         existing.instagram.story.posted = false;
+    } else if (platform === 'instagram_reel') {
+        existing.instagram.reel = {
+            hook: parsed.hook || '',
+            concept: parsed.concept || '',
+            caption: parsed.caption || '',
+            hashtags: parsed.hashtags || [],
+            audioSuggestion: parsed.audioSuggestion || 'original audio',
+            totalDuration: parsed.totalDuration || '30-45 seconds',
+            bestTime: parsed.bestTime || '12:00 PM IST',
+            scenes: (parsed.scenes || []).map(s => ({
+                sceneNumber: s.sceneNumber,
+                duration: s.duration,
+                shotType: s.shotType,
+                action: s.action,
+                voiceover: s.voiceover || '',
+                textOverlay: s.textOverlay || '',
+                visualDescription: s.visualDescription || '',
+            })),
+            posted: false,
+        };
     }
 
     await existing.save();
