@@ -936,9 +936,9 @@ export const superadmin = {
         const query = new URLSearchParams(params).toString();
         return apiFetch(`/superadmin/growth/history?${query}`);
     },
-    generateGrowthContent: (data = {}) => apiFetch('/superadmin/growth/generate', { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    generateGrowthContent: (data = {}) => apiFetch('/superadmin/growth/generate', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     markGrowthPosted: (id, platform, index) => apiFetch(`/superadmin/growth/${id}/mark-posted`, { method: 'PUT', body: JSON.stringify({ platform, index }) }),
-    regenerateGrowthPost: (id, data) => apiFetch(`/superadmin/growth/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), timeout: 120000 }),
+    regenerateGrowthPost: (id, data) => apiFetch(`/superadmin/growth/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     getGrowthStats: () => apiFetch('/superadmin/growth/stats'),
 };
 

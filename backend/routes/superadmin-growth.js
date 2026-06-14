@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import GrowthContent from '../models/GrowthContent.js';
-import { generateDailyContent, regeneratePlatformContent } from '../services/growthContentEngine.js';
+import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 
 const router = Router();
@@ -15,7 +15,7 @@ const router = Router();
 // ══════════════════════════════════════════════════════════════
 router.get('/today', async (req, res) => {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getISTDateDetails().dateKey;
         const content = await GrowthContent.findOne({ dateKey: today }).lean();
 
         if (!content) {
@@ -68,7 +68,7 @@ router.post('/generate', async (req, res) => {
     try {
         const { date } = req.body; // Optional: generate for specific date
         const targetDate = date ? new Date(date) : new Date();
-        const dateKey = targetDate.toISOString().split('T')[0];
+        const dateKey = getISTDateDetails(targetDate).dateKey;
 
         // If content already exists, delete it first (force regeneration)
         await GrowthContent.deleteOne({ dateKey });

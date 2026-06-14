@@ -654,16 +654,45 @@ IMPORTANT: Return ONLY the JSON object. No markdown code fences. No explanation.
 }
 
 /**
+ * Helper to get date details in Asia/Kolkata timezone
+ */
+export function getISTDateDetails(dateInput = new Date()) {
+    const d = new Date(dateInput);
+
+    // Format to YYYY-MM-DD in IST
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const dateKey = formatter.format(d); // "YYYY-MM-DD"
+
+    // Day of week in IST
+    const dayOfWeekFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long'
+    });
+    const dayOfWeek = dayOfWeekFormatter.format(d).toLowerCase();
+
+    // Day of month in IST
+    const dayOfMonthFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric'
+    });
+    const dayOfMonth = parseInt(dayOfMonthFormatter.format(d), 10);
+
+    return { dateKey, dayOfWeek, dayOfMonth };
+}
+
+/**
  * Generate daily content for all platforms based on the 30-day fixed itinerary
  */
 export async function generateDailyContent(forceDate = null) {
     const now = forceDate ? new Date(forceDate) : new Date();
-    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayOfWeek = days[now.getDay()];
+    const { dateKey, dayOfWeek, dayOfMonth } = getISTDateDetails(now);
 
     // Calculate daily itinerary day from day of the month (1-31 -> 1-30 cycle)
-    const dayOfMonth = now.getDate();
     const itineraryIndex = (dayOfMonth - 1) % 30;
     const itineraryDay = ITINERARY[itineraryIndex];
     const theme = itineraryDay.theme;
@@ -692,11 +721,12 @@ export async function generateDailyContent(forceDate = null) {
         console.log(`✍️ [GrowthEngine] Generating content via Claude using Itinerary Day ${itineraryDay.day}...`);
         const router = getAIRouter();
         const prompt = buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, [sub1, sub2]);
+        const randomSeed = Math.random().toString(36).substring(7);
 
         const result = await router.generateText(
             {
                 systemPrompt: prompt,
-                userPrompt: `Generate today's growth marketing content for Mantram AI. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Return the JSON object.`,
+                userPrompt: `Generate today's growth marketing content for Mantram AI. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Random Seed: ${randomSeed}. Return the JSON object.`,
                 temperature: 0.85,
                 maxTokens: 16000,
                 model: 'claude-sonnet-4-6',
@@ -891,7 +921,7 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
     if (!existing) throw new Error('Content not found');
 
     const targetDate = new Date(existing.date);
-    const dayOfMonth = targetDate.getDate();
+    const { dayOfMonth } = getISTDateDetails(targetDate);
     const itineraryIndex = (dayOfMonth - 1) % 30;
     const itineraryDay = ITINERARY[itineraryIndex];
 
@@ -906,8 +936,9 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
     };
 
     const systemPrompt = `You are a growth content writer for Mantram AI (AI marketing OS, 14 studios, Brand DNA, 20+ AI models, built by 2 people). Write naturally — no AI tells. Return ONLY raw JSON.`;
-    const userPrompt = platformPrompts[platform];
-    if (!userPrompt) throw new Error(`Unknown platform: ${platform}`);
+    const randomSeed = Math.random().toString(36).substring(7);
+    const userPrompt = `${platformPrompts[platform]} [Random Seed: ${randomSeed}]`;
+    if (!platformPrompts[platform]) throw new Error(`Unknown platform: ${platform}`);
 
     const result = await router.generateText(
         { systemPrompt, userPrompt, temperature: 0.85, maxTokens: 3000, model: 'claude-sonnet-4-6' },
