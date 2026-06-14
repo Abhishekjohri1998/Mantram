@@ -704,21 +704,45 @@ export async function generateDailyContent(forceDate = null) {
             { provider: 'anthropic' }
         );
 
-        // 4. Parse the JSON response
+        // 4. Parse the JSON response (robust multi-step sanitization)
         let content;
-        try {
-            const cleaned = result.text
-                .replace(/```json\n?|\n?```/g, '')
+        const sanitizeJsonString = (raw) => {
+            let s = raw
+                // Strip markdown code fences
+                .replace(/```json\n?/g, '')
+                .replace(/\n?```/g, '')
                 .replace(/```\n?/g, '')
                 .trim();
-            content = JSON.parse(cleaned);
-        } catch (parseErr) {
-            // Try to extract JSON from the response
-            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                content = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error(`Failed to parse AI response: ${parseErr.message}`);
+            // Fix control characters inside JSON string values (unescaped newlines/tabs)
+            s = s.replace(/[\x00-\x1F\x7F]/g, (ch) => {
+                if (ch === '\n') return '\\n';
+                if (ch === '\r') return '';
+                if (ch === '\t') return '\\t';
+                return '';
+            });
+            // Fix trailing commas before } or ] (common LLM mistake)
+            s = s.replace(/,\s*([\]}])/g, '$1');
+            return s;
+        };
+
+        // Attempt 1: Direct parse after sanitization
+        try {
+            content = JSON.parse(sanitizeJsonString(result.text));
+        } catch (parseErr1) {
+            console.warn(`⚠️ [GrowthEngine] Direct JSON parse failed: ${parseErr1.message}. Trying extraction...`);
+            // Attempt 2: Extract the outermost { ... } and try again
+            try {
+                const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    content = JSON.parse(sanitizeJsonString(jsonMatch[0]));
+                } else {
+                    throw new Error('No JSON object found in response');
+                }
+            } catch (parseErr2) {
+                console.error(`❌ [GrowthEngine] All JSON parse attempts failed.`);
+                console.error(`❌ [GrowthEngine] Parse error: ${parseErr2.message}`);
+                console.error(`❌ [GrowthEngine] Raw response (first 2000 chars): ${result.text.substring(0, 2000)}`);
+                throw new Error(`Failed to parse AI response after sanitization: ${parseErr2.message}`);
             }
         }
 
