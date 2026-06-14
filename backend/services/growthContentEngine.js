@@ -540,7 +540,7 @@ THEME: ${itineraryDay.theme}
 CORE TOPIC DESCRIPTION:
 ${itineraryDay.focusTopic}
 
-MANDATORY TALKING POINTS TO WEAVE IN (expand creatively but focus strictly on these):
+MANTATORY TALKING POINTS TO WEAVE IN (expand creatively but focus strictly on these):
 ${itineraryDay.talkingPoints.map(p => `- ${p}`).join('\n')}
 
 PLATFORM-SPECIFIC TARGET TOPICS:
@@ -573,37 +573,37 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
 {
   "linkedin": [
     {
-      "type": "founder_story",
-      "content": "Full post text here (500-1500 chars). One sentence per paragraph. Use → for bullets.",
+      "type": "${itineraryDay.theme}",
+      "content": "Full post text here matching TODAY'S ITINERARY FOCUS (500-1500 chars). One sentence per paragraph. Use → for bullets.",
       "hashtags": ["#D2C", "#AIMarketing", "#BuildingInPublic"],
       "bestTime": "8:30 AM IST"
     },
     {
-      "type": "product_insight",
-      "content": "Full post text here. Different angle from the first.",
+      "type": "${itineraryDay.theme}_alternate",
+      "content": "Full post text here. Different angle from the first, but STILL matching TODAY'S ITINERARY FOCUS.",
       "hashtags": ["#SaaS", "#MarketingTools"],
       "bestTime": "12:00 PM IST"
     }
   ],
   "instagram": {
     "post": {
-      "caption": "Full caption text (max 2200 chars). Include CTA.",
+      "caption": "Full caption text matching TODAY'S ITINERARY FOCUS (max 2200 chars). Include CTA.",
       "hashtags": ["#mantram", "#aimarketing", "#d2c"],
       "slides": [
-        {"slideNumber": 1, "text": "Hook text for slide 1", "visualDescription": "Describe what the visual should show"},
+        {"slideNumber": 1, "text": "Hook text for slide 1", "visualDescription": "Describe what the visual should show based on today's focus"},
         {"slideNumber": 2, "text": "Text for slide 2", "visualDescription": "Visual description"}
       ],
       "bestTime": "11:00 AM IST"
     },
     "story": {
       "slides": [
-        {"slideNumber": 1, "type": "text", "text": "Story opening hook", "visualDescription": "Background visual", "ctaText": "", "stickerSuggestion": ""},
+        {"slideNumber": 1, "type": "text", "text": "Story opening hook matching today's focus", "visualDescription": "Background visual", "ctaText": "", "stickerSuggestion": ""},
         {"slideNumber": 2, "type": "image", "text": "Text overlay", "visualDescription": "What to show", "ctaText": "Swipe up", "stickerSuggestion": "poll or question sticker"}
       ]
     },
     "reel": {
       "hook": "First 3 seconds — the line that stops the scroll",
-      "concept": "One sentence describing what this reel is about",
+      "concept": "One sentence describing what this reel is about (Must match TODAY'S ITINERARY FOCUS)",
       "caption": "Reel caption with CTA (max 2200 chars)",
       "hashtags": ["#mantram", "#aimarketing", "#reels"],
       "audioSuggestion": "Trending audio name OR 'original audio — voiceover'",
@@ -618,13 +618,13 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
   "twitter": [
     {
       "type": "standalone",
-      "tweets": ["Single tweet text under 280 chars. Punchy and shareable."],
+      "tweets": ["Single tweet text under 280 chars. Punchy and shareable. Matches TODAY'S ITINERARY FOCUS."],
       "bestTime": "8:30 AM IST"
     },
     {
       "type": "thread",
       "tweets": [
-        "Thread opener — hook that makes people click 🧵👇",
+        "Thread opener — hook that makes people click 🧵👇 (Matches TODAY'S ITINERARY FOCUS)",
         "Tweet 2 — expand on the hook with specifics",
         "Tweet 3 — the insight or data point",
         "Tweet 4 — CTA or question"
@@ -635,14 +635,14 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
   "reddit": [
     {
       "subreddit": "${subreddits[0]?.name || 'r/Entrepreneur'}",
-      "title": "Post title — specific, not clickbait",
+      "title": "Post title — specific, not clickbait. Matches TODAY'S ITINERARY FOCUS.",
       "body": "Full post body. 500-2000 chars. Raw, authentic tone. NO LINKS if subreddit is r/startups. End with a question.",
       "tone": "${subreddits[0]?.tone || 'story-driven'}",
       "bestTime": "9:00 AM EST"
     },
     {
       "subreddit": "${subreddits[1]?.name || 'r/SaaS'}",
-      "title": "Different angle post title",
+      "title": "Different angle post title for TODAY'S ITINERARY FOCUS.",
       "body": "Full post body. Different angle from the first.",
       "tone": "${subreddits[1]?.tone || 'technical'}",
       "bestTime": "10:00 AM EST"
