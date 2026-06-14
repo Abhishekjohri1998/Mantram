@@ -622,17 +622,35 @@ Generate the adapted creative now.`;
                             .png()
                             .toBuffer();
 
-                        // Step 2: Resize with cover fit (crop to fill)
-                        // 'cover' is required to prevent severe stretching (e.g. 21:9 native stretched to 3.125).
-                        // Since we removed the CRITICAL CROP CONSTRAINT, text will be safely centered anyway.
+                        // Get metadata to determine generated aspect ratio
+                        const metadata = await sharp(normalizedBuffer).metadata();
+                        const genW = metadata.width || targetW;
+                        const genH = metadata.height || targetH;
+                        const genRatio = genW / genH;
+                        const targetRatio = targetW / targetH;
+                        
+                        // If generated ratio differs significantly from target ratio (> 5%),
+                        // we use fit: 'contain' to avoid cutting off text or main elements.
+                        const ratioDiff = Math.abs(genRatio - targetRatio);
+                        const fitMethod = ratioDiff > 0.05 ? 'contain' : 'cover';
+                        
+                        console.log(`📐 Image crop strategy: gen=${genW}x${genH} (ratio ${genRatio.toFixed(2)}), target=${targetW}x${targetH} (ratio ${targetRatio.toFixed(2)}), diff=${ratioDiff.toFixed(2)} -> fit: ${fitMethod}`);
+
+                        // Step 2: Resize
                         let resizedBuffer;
                         try {
                             resizedBuffer = await sharp(normalizedBuffer, { limitInputPixels: false })
-                                .resize({ width: targetW, height: targetH, fit: 'cover', position: 'centre' })
+                                .resize({ 
+                                    width: targetW, 
+                                    height: targetH, 
+                                    fit: fitMethod, 
+                                    position: 'centre',
+                                    background: { r: 0, g: 0, b: 0, alpha: 0 } // transparent background for contain
+                                })
                                 .png()
                                 .toBuffer();
                         } catch (coverErr) {
-                            // Fallback: if fill fails, just try one more direct fill using the original libvips method
+                            // Fallback: if primary resize fails, just try one more direct fill using the original libvips method
                             console.warn(`⚠️ Primary resize failed (${coverErr.message}), falling back to direct fill`);
                             resizedBuffer = await sharp(normalizedBuffer, { limitInputPixels: false })
                                 .resize({ width: targetW, height: targetH, fit: 'fill', fastShrinkOnLoad: false })

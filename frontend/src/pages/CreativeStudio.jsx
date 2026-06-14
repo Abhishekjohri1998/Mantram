@@ -4505,6 +4505,39 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                             <div className="mx-4 h-px bg-[var(--sys-border)]" />
 
+                            {/* ── Section: Size / Aspect Ratio ── */}
+                            <div className="px-4 pt-3 pb-3">
+                                <p className="text-[9px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-2">Size / Aspect Ratio</p>
+                                <div className="grid grid-cols-4 gap-1.5">
+                                    {[
+                                        { id: 'square-hd', ratio: '1:1', label: '1:1', desc: 'Square', icon: 'crop_square' },
+                                        { id: 'instagram-story', ratio: '9:16', label: '9:16', desc: 'Story', icon: 'smartphone' },
+                                        { id: 'instagram-post', ratio: '4:5', label: '4:5', desc: 'Post', icon: 'crop_5_4' },
+                                        { id: 'hd-wide', ratio: '16:9', label: '16:9', desc: 'Landscape', icon: 'crop_16_9' },
+                                    ].map(item => {
+                                        const isActive = selectedType === item.id;
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => setSelectedType(item.id)}
+                                                className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
+                                                    isActive
+                                                        ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-primary)] text-primary font-bold shadow-sm'
+                                                        : 'bg-[var(--sys-surface)] border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:border-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
+                                                }`}
+                                            >
+                                                <span className="material-symbols-outlined mb-0.5" style={{ fontSize: '16px' }}>{item.icon}</span>
+                                                <span className="text-[11px] font-bold">{item.label}</span>
+                                                <span className="text-[8px] opacity-60 mt-0.5">{item.desc}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="mx-4 h-px bg-[var(--sys-border)]" />
+
                             {/* ── Section: Prompt ── */}
                             <div className="px-4 pt-3 pb-3 flex flex-col flex-grow">
                                 <div className="flex items-center justify-between mb-2">
