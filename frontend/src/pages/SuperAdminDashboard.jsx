@@ -149,6 +149,7 @@ export default function SuperAdminDashboard() {
     const [growthPlatformTab, setGrowthPlatformTab] = useState('linkedin')
     const [growthCopied, setGrowthCopied] = useState(null)
     const [growthRegenerating, setGrowthRegenerating] = useState(null)
+    const [growthGeneratingImage, setGrowthGeneratingImage] = useState(null)
     const [growthHistoryPage, setGrowthHistoryPage] = useState(1)
     const [showGrowthHistory, setShowGrowthHistory] = useState(false)
 
@@ -272,6 +273,20 @@ export default function SuperAdminDashboard() {
             }
         } catch (e) { showToast('Regeneration failed', 'error') }
         finally { setGrowthRegenerating(null) }
+    }
+
+    const handleGenerateImage = async (platform, index = 0, slideIndex = null) => {
+        if (!growthContent?._id) return
+        const key = slideIndex !== null ? `${platform}-${index}-${slideIndex}` : `${platform}-${index}`
+        setGrowthGeneratingImage(key)
+        try {
+            const res = await API.generateGrowthImage(growthContent._id, { platform, index, slideIndex })
+            if (res.success) {
+                setGrowthContent(res.content)
+                showToast('Image generated successfully!')
+            }
+        } catch (e) { showToast(e.message || 'Image generation failed', 'error') }
+        finally { setGrowthGeneratingImage(null) }
     }
 
     const handleCopyContent = (text, key) => {
@@ -4735,6 +4750,13 @@ export default function SuperAdminDashboard() {
                                                             {growthRegenerating === `linkedin-${i}` ? '⏳' : '🔄'} Regen
                                                         </button>
                                                         <button
+                                                            onClick={() => handleGenerateImage('linkedin', i)}
+                                                            disabled={growthGeneratingImage === `linkedin-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50"
+                                                        >
+                                                            {growthGeneratingImage === `linkedin-${i}` ? '⏳' : '🖼️'} Gen Image
+                                                        </button>
+                                                        <button
                                                             onClick={() => handleCopyContent(post.content + '\n\n' + (post.hashtags || []).join(' '), `li-${i}`)}
                                                             className="px-3 py-1 rounded-lg text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-all"
                                                         >
@@ -4749,6 +4771,11 @@ export default function SuperAdminDashboard() {
                                                             {post.hashtags.map((h, j) => (
                                                                 <span key={j} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-500">{h}</span>
                                                             ))}
+                                                        </div>
+                                                    )}
+                                                    {post.imageUrl && (
+                                                        <div className="mt-3 rounded-lg overflow-hidden border border-[var(--sys-border)]">
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -4790,10 +4817,24 @@ export default function SuperAdminDashboard() {
                                                         <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             {growthContent.instagram.post.slides.map((s, j) => (
-                                                                <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
-                                                                    <p className="text-[10px] font-bold text-pink-500 mb-1">Slide {s.slideNumber}</p>
-                                                                    <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
-                                                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {s.visualDescription}</p>
+                                                                <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
+                                                                    <div>
+                                                                        <p className="text-[10px] font-bold text-pink-500 mb-1">Slide {s.slideNumber}</p>
+                                                                        <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
+                                                                        <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-2">🎨 {s.visualDescription}</p>
+                                                                    </div>
+                                                                    <div className="mt-2">
+                                                                        {s.imageUrl && (
+                                                                            <img src={s.imageUrl} alt={`Slide ${s.slideNumber}`} className="w-full h-auto rounded-lg border border-[var(--sys-border)] mb-2" />
+                                                                        )}
+                                                                        <button
+                                                                            onClick={() => handleGenerateImage('instagram_post', 0, j)}
+                                                                            disabled={growthGeneratingImage === `instagram_post-0-${j}`}
+                                                                            className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-pink-500/10 hover:text-pink-500 hover:border-pink-500/30 transition-all cursor-pointer disabled:opacity-50"
+                                                                        >
+                                                                            {growthGeneratingImage === `instagram_post-0-${j}` ? '⏳ Generating...' : '🖼️ Generate Image'}
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -4829,15 +4870,29 @@ export default function SuperAdminDashboard() {
                                             <div className="p-4">
                                                 <div className="flex gap-3 overflow-x-auto pb-2">
                                                     {(growthContent.instagram?.story?.slides || []).map((s, j) => (
-                                                        <div key={j} className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
-                                                            <div className="flex items-center gap-1.5 mb-2">
-                                                                <span className="text-[10px] font-bold text-purple-500">Slide {s.slideNumber}</span>
-                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/10 text-purple-500">{s.type}</span>
+                                                        <div key={j} className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
+                                                            <div>
+                                                                <div className="flex items-center gap-1.5 mb-2">
+                                                                    <span className="text-[10px] font-bold text-purple-500">Slide {s.slideNumber}</span>
+                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/10 text-purple-500">{s.type}</span>
+                                                                </div>
+                                                                <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
+                                                                {s.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-1">🎨 {s.visualDescription}</p>}
+                                                                {s.ctaText && <p className="text-[10px] text-emerald-500 font-bold">👆 {s.ctaText}</p>}
+                                                                {s.stickerSuggestion && <p className="text-[10px] text-amber-500 mb-2">🏷️ {s.stickerSuggestion}</p>}
                                                             </div>
-                                                            <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
-                                                            {s.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-1">🎨 {s.visualDescription}</p>}
-                                                            {s.ctaText && <p className="text-[10px] text-emerald-500 font-bold">👆 {s.ctaText}</p>}
-                                                            {s.stickerSuggestion && <p className="text-[10px] text-amber-500">🏷️ {s.stickerSuggestion}</p>}
+                                                            <div className="mt-2">
+                                                                {s.imageUrl && (
+                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className="w-full h-auto rounded-lg border border-[var(--sys-border)] mb-2 object-cover aspect-[9/16]" />
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleGenerateImage('instagram_story', 0, j)}
+                                                                    disabled={growthGeneratingImage === `instagram_story-0-${j}`}
+                                                                    className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-purple-500/10 hover:text-purple-500 hover:border-purple-500/30 transition-all cursor-pointer disabled:opacity-50"
+                                                                >
+                                                                    {growthGeneratingImage === `instagram_story-0-${j}` ? '⏳ Generating...' : '🖼️ Generate Image'}
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -4953,6 +5008,13 @@ export default function SuperAdminDashboard() {
                                                             {growthRegenerating === `twitter-${i}` ? '⏳' : '🔄'} Regen
                                                         </button>
                                                         <button
+                                                            onClick={() => handleGenerateImage('twitter', i)}
+                                                            disabled={growthGeneratingImage === `twitter-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50"
+                                                        >
+                                                            {growthGeneratingImage === `twitter-${i}` ? '⏳' : '🖼️'} Gen Image
+                                                        </button>
+                                                        <button
                                                             onClick={() => handleCopyContent(post.tweets?.join('\n\n---\n\n') || '', `tw-${i}`)}
                                                             className="px-3 py-1 rounded-lg text-[10px] font-bold bg-sky-500 text-white hover:bg-sky-600 cursor-pointer transition-all"
                                                         >
@@ -4975,6 +5037,11 @@ export default function SuperAdminDashboard() {
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    {post.imageUrl && (
+                                                        <div className="mt-3 rounded-lg overflow-hidden border border-[var(--sys-border)]">
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -5001,6 +5068,13 @@ export default function SuperAdminDashboard() {
                                                             {growthRegenerating === `reddit-${i}` ? '⏳' : '🔄'} Regen
                                                         </button>
                                                         <button
+                                                            onClick={() => handleGenerateImage('reddit', i)}
+                                                            disabled={growthGeneratingImage === `reddit-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-orange-500 cursor-pointer transition-all disabled:opacity-50"
+                                                        >
+                                                            {growthGeneratingImage === `reddit-${i}` ? '⏳' : '🖼️'} Gen Image
+                                                        </button>
+                                                        <button
                                                             onClick={() => handleCopyContent(post.title + '\n\n' + post.body, `rd-${i}`)}
                                                             className="px-3 py-1 rounded-lg text-[10px] font-bold bg-orange-600 text-white hover:bg-orange-700 cursor-pointer transition-all"
                                                         >
@@ -5016,6 +5090,11 @@ export default function SuperAdminDashboard() {
                                                         <h4 className="text-sm font-bold text-[var(--sys-text)]">{post.title}</h4>
                                                     </div>
                                                     <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed">{post.body}</pre>
+                                                    {post.imageUrl && (
+                                                        <div className="mt-4 rounded-lg overflow-hidden border border-[var(--sys-border)]">
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}

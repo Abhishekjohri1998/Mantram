@@ -7,6 +7,7 @@ import { Router } from 'express';
 import GrowthContent from '../models/GrowthContent.js';
 import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getRouter } from '../ai/router.js';
 
 const router = Router();
 
@@ -146,6 +147,71 @@ router.post('/:id/regenerate', async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
+// ══════════════════════════════════════════════════════════════
+// POST /api/superadmin/growth/:id/generate-image — Generate image for post
+// ══════════════════════════════════════════════════════════════
+router.post('/:id/generate-image', async (req, res) => {
+    try {
+        const { platform, index = 0, slideIndex = null } = req.body;
+        const content = await GrowthContent.findById(req.params.id);
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        let promptText = '';
+        let targetObj = null;
+        let aspectRatio = '1:1';
+
+        if (platform === 'linkedin' && content.linkedin[index]) {
+            targetObj = content.linkedin[index];
+            promptText = `Create a professional LinkedIn graphic for the following post: ${targetObj.content}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'twitter' && content.twitter[index]) {
+            targetObj = content.twitter[index];
+            promptText = `Create an engaging Twitter graphic for this tweet: ${targetObj.tweets[0]}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'reddit' && content.reddit[index]) {
+            targetObj = content.reddit[index];
+            promptText = `Create a Reddit post image for title: ${targetObj.title}. Tone: ${targetObj.tone}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'instagram_post') {
+            if (slideIndex !== null && content.instagram.post.slides[slideIndex]) {
+                targetObj = content.instagram.post.slides[slideIndex];
+                promptText = targetObj.visualDescription || targetObj.text;
+            } else {
+                return res.status(400).json({ success: false, error: 'Slide index required for instagram post' });
+            }
+            aspectRatio = '4:5';
+        } else if (platform === 'instagram_story') {
+            if (slideIndex !== null && content.instagram.story.slides[slideIndex]) {
+                targetObj = content.instagram.story.slides[slideIndex];
+                promptText = targetObj.visualDescription || targetObj.text;
+            } else {
+                return res.status(400).json({ success: false, error: 'Slide index required for instagram story' });
+            }
+            aspectRatio = '9:16';
+        } else {
+            return res.status(400).json({ success: false, error: 'Invalid platform or index' });
+        }
+
+        const aiRouter = getRouter();
+        // The user specifically requested GPT Image 2 model logic here (which uses google/dalle/flux under the hood in aiRouter)
+        const result = await aiRouter.generateImage({ 
+            prompt: promptText, 
+            aspectRatio 
+        });
+
+        if (!result.imageUrl) throw new Error('Image generation failed to return URL');
+
+        targetObj.imageUrl = result.imageUrl;
+        await content.save();
+
+        res.json({ success: true, content });
+    } catch (error) {
+        console.error('[Growth Generate Image]', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/superadmin/growth/stats — Posting stats & streak
