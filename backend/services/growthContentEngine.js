@@ -698,7 +698,7 @@ export async function generateDailyContent(forceDate = null) {
                 systemPrompt: prompt,
                 userPrompt: `Generate today's growth marketing content for Mantram AI. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Return the JSON object.`,
                 temperature: 0.85,
-                maxTokens: 8000,
+                maxTokens: 16000,
                 model: 'claude-sonnet-4-6',
             },
             { provider: 'anthropic' }
@@ -706,43 +706,86 @@ export async function generateDailyContent(forceDate = null) {
 
         // 4. Parse the JSON response (robust multi-step sanitization)
         let content;
-        const sanitizeJsonString = (raw) => {
-            let s = raw
-                // Strip markdown code fences
-                .replace(/```json\n?/g, '')
-                .replace(/\n?```/g, '')
-                .replace(/```\n?/g, '')
-                .trim();
-            // Fix control characters inside JSON string values (unescaped newlines/tabs)
-            s = s.replace(/[\x00-\x1F\x7F]/g, (ch) => {
-                if (ch === '\n') return '\\n';
-                if (ch === '\r') return '';
-                if (ch === '\t') return '\\t';
-                return '';
-            });
-            // Fix trailing commas before } or ] (common LLM mistake)
-            s = s.replace(/,\s*([\]}])/g, '$1');
-            return s;
+
+        /**
+         * Strip markdown fences only — do NOT touch structural whitespace.
+         * Real newlines between JSON keys are perfectly valid and JSON.parse handles them fine.
+         */
+        const stripFences = (raw) => raw
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/\s*```$/i, '')
+            .trim();
+
+        /**
+         * Fix unescaped control characters ONLY inside JSON string values.
+         * Walks character by character to detect string boundaries so structural
+         * newlines (between keys/values) are left untouched.
+         */
+        const fixUnescapedInStrings = (raw) => {
+            let out = '';
+            let inString = false;
+            let i = 0;
+            while (i < raw.length) {
+                const ch = raw[i];
+                if (inString) {
+                    if (ch === '\\') {
+                        // pass through escape sequence unchanged
+                        out += ch + (raw[i + 1] || '');
+                        i += 2;
+                        continue;
+                    } else if (ch === '"') {
+                        inString = false;
+                        out += ch;
+                    } else if (ch === '\n') {
+                        out += '\\n'; // escape raw newline inside string
+                    } else if (ch === '\r') {
+                        // skip bare CR inside string
+                    } else if (ch === '\t') {
+                        out += '\\t'; // escape raw tab inside string
+                    } else {
+                        out += ch;
+                    }
+                } else {
+                    if (ch === '"') inString = true;
+                    out += ch;
+                }
+                i++;
+            }
+            return out;
         };
 
-        // Attempt 1: Direct parse after sanitization
+        /**
+         * Fix trailing commas before } or ] (common LLM mistake)
+         */
+        const fixTrailingCommas = (s) => s.replace(/,\s*([\]}])/g, '$1');
+
+        // Attempt 1: Direct parse — strip fences only (handles well-formed pretty JSON)
         try {
-            content = JSON.parse(sanitizeJsonString(result.text));
+            content = JSON.parse(stripFences(result.text));
         } catch (parseErr1) {
-            console.warn(`⚠️ [GrowthEngine] Direct JSON parse failed: ${parseErr1.message}. Trying extraction...`);
-            // Attempt 2: Extract the outermost { ... } and try again
+            console.warn(`⚠️ [GrowthEngine] Direct parse failed (${parseErr1.message}). Trying deep sanitization...`);
+
+            // Attempt 2: Fix unescaped chars inside string values + trailing commas
             try {
-                const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    content = JSON.parse(sanitizeJsonString(jsonMatch[0]));
-                } else {
-                    throw new Error('No JSON object found in response');
-                }
+                const deepCleaned = fixTrailingCommas(fixUnescapedInStrings(stripFences(result.text)));
+                content = JSON.parse(deepCleaned);
             } catch (parseErr2) {
-                console.error(`❌ [GrowthEngine] All JSON parse attempts failed.`);
-                console.error(`❌ [GrowthEngine] Parse error: ${parseErr2.message}`);
-                console.error(`❌ [GrowthEngine] Raw response (first 2000 chars): ${result.text.substring(0, 2000)}`);
-                throw new Error(`Failed to parse AI response after sanitization: ${parseErr2.message}`);
+                console.warn(`⚠️ [GrowthEngine] Deep sanitization failed (${parseErr2.message}). Trying JSON extraction...`);
+
+                // Attempt 3: Extract outermost {...} then apply deep sanitization
+                try {
+                    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error('No JSON object found in AI response');
+                    const extracted = fixTrailingCommas(fixUnescapedInStrings(stripFences(jsonMatch[0])));
+                    content = JSON.parse(extracted);
+                } catch (parseErr3) {
+                    console.error(`❌ [GrowthEngine] All parse attempts failed.`);
+                    console.error(`❌ [GrowthEngine] Final error: ${parseErr3.message}`);
+                    console.error(`❌ [GrowthEngine] Response length: ${result.text.length} chars`);
+                    console.error(`❌ [GrowthEngine] Response (first 3000 chars):\n${result.text.substring(0, 3000)}`);
+                    throw new Error(`Failed to parse AI response: ${parseErr3.message}`);
+                }
             }
         }
 
