@@ -3609,8 +3609,8 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             }}
                                             className={`absolute top-3 right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
                                                 selectedImages.includes(result.imageUrl)
-                                                    ? 'bg-primary text-white scale-110'
-                                                    : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                                    ? 'bg-primary text-white scale-110 opacity-100'
+                                                    : 'bg-black/50 text-white border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
                                             }`}
                                             title={selectedImages.includes(result.imageUrl) ? 'Deselect image' : 'Select image'}
                                         >
@@ -3828,27 +3828,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 onClick={() => setZoomImage(item.imageUrl)}>
                                                 <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-contain object-left max-h-[240px] bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded-md shadow-sm">Latest</span>}
-                                                {item.imageUrl && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const url = item.imageUrl;
-                                                            setSelectedImages(prev =>
-                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
-                                                            );
-                                                        }}
-                                                        className={`absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
-                                                            selectedImages.includes(item.imageUrl)
-                                                                ? 'bg-primary text-white scale-110'
-                                                                : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
-                                                        }`}
-                                                        title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
-                                                    >
-                                                        <span className="material-symbols-outlined text-xs font-bold">
-                                                            {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
-                                                        </span>
-                                                    </button>
-                                                )}
                                                 {/* Quick Actions Hover Dock */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-2 leading-tight" title={item._prompt}>{item._prompt || 'AI Generated'}</p>
@@ -3882,6 +3861,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                                     </div>
                                                 </div>
+                                                {item.imageUrl && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = item.imageUrl;
+                                                            setSelectedImages(prev =>
+                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                            );
+                                                        }}
+                                                        className={`absolute top-1.5 right-1.5 z-30 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                            selectedImages.includes(item.imageUrl)
+                                                                ? 'bg-primary text-white scale-110 opacity-100'
+                                                                : 'bg-black/50 text-white border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
+                                                        }`}
+                                                        title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-xs font-bold">
+                                                            {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -3955,27 +3955,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         {group.items.map((item, iIdx) => (
                                                             <div key={item._id || iIdx} className="relative rounded-xl overflow-hidden flex-shrink-0" style={{ width: group.items.length === 1 ? '100%' : '180px' }}>
                                                                 <div className="group/img relative rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
-                                                                    {item.imageUrl && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                const url = item.imageUrl;
-                                                                                setSelectedImages(prev =>
-                                                                                    prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
-                                                                                );
-                                                                            }}
-                                                                            className={`absolute top-2 right-2 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
-                                                                                selectedImages.includes(item.imageUrl)
-                                                                                    ? 'bg-primary text-white scale-110'
-                                                                                    : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover/img:opacity-100'
-                                                                            }`}
-                                                                            title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
-                                                                        >
-                                                                            <span className="material-symbols-outlined text-xs font-bold">
-                                                                                {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
-                                                                            </span>
-                                                                        </button>
-                                                                    )}
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
                                                                         className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
                                                                     
@@ -3999,6 +3978,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
 
                                                                         </div>
                                                                     </div>
+                                                                    {item.imageUrl && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const url = item.imageUrl;
+                                                                                setSelectedImages(prev =>
+                                                                                    prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                                                );
+                                                                            }}
+                                                                            className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                                                selectedImages.includes(item.imageUrl)
+                                                                                    ? 'bg-primary text-white scale-110 opacity-100'
+                                                                                    : 'bg-black/50 text-white border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
+                                                                            }`}
+                                                                            title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-xs font-bold">
+                                                                                {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
+                                                                            </span>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -4129,27 +4129,6 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                     loading="lazy" decoding="async"
                                                     className="w-full aspect-square object-cover" />
-                                                {(img.imageUrl || img.thumbnailUrl) && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const url = img.imageUrl || img.thumbnailUrl;
-                                                            setSelectedImages(prev =>
-                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
-                                                            );
-                                                        }}
-                                                        className={`absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
-                                                            selectedImages.includes(img.imageUrl || img.thumbnailUrl)
-                                                                ? 'bg-primary text-white scale-110'
-                                                                : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
-                                                        }`}
-                                                        title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
-                                                    >
-                                                        <span className="material-symbols-outlined text-xs font-bold">
-                                                            {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
-                                                        </span>
-                                                    </button>
-                                                )}
                                                 {/* Hover overlay with actions */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{img.prompt || img.title || 'AI Generated'}</p>
@@ -4168,6 +4147,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         </button>
                                                     </div>
                                                 </div>
+                                                {(img.imageUrl || img.thumbnailUrl) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = img.imageUrl || img.thumbnailUrl;
+                                                            setSelectedImages(prev =>
+                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                            );
+                                                        }}
+                                                        className={`absolute top-1.5 right-1.5 z-30 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                            selectedImages.includes(img.imageUrl || img.thumbnailUrl)
+                                                                ? 'bg-primary text-white scale-110 opacity-100'
+                                                                : 'bg-black/50 text-white border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
+                                                        }`}
+                                                        title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-xs font-bold">
+                                                            {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                )}
                                                 {/* Time ago badge */}
                                                 <span className="absolute bottom-1.5 right-1.5 text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
                                                 {/* MCoT badge */}
@@ -4230,10 +4230,10 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                             prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
                                                         );
                                                     }}
-                                                    className={`absolute top-2.5 right-2.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                    className={`absolute top-2.5 right-2.5 z-30 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
                                                         selectedImages.includes(img.imageUrl || img.thumbnailUrl)
-                                                            ? 'bg-primary text-white scale-110'
-                                                            : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                                            ? 'bg-primary text-white scale-110 opacity-100'
+                                                            : 'bg-black/50 text-white border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
                                                     }`}
                                                     title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
                                                 >
@@ -9679,6 +9679,27 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                     <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">zoom_in</span>
                                                 </div>
+                                                {(img.imageUrl || img.thumbnailUrl) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = img.imageUrl || img.thumbnailUrl;
+                                                            setSelectedImages(prev =>
+                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                            );
+                                                        }}
+                                                        className={`absolute top-1 right-1 z-30 w-5 h-5 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                            selectedImages.includes(img.imageUrl || img.thumbnailUrl)
+                                                                ? 'bg-primary text-white scale-110 opacity-100'
+                                                                : 'bg-black/50 text-white/80 border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
+                                                        }`}
+                                                        title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-[10px] font-bold">
+                                                            {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                )}
                                             </div>
 
                                             {/* Info */}
@@ -9812,10 +9833,32 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                     <span className="material-symbols-outlined" style={{fontSize:'9px'}}>{isPhotoshoot ? 'photo_camera' : isUploaded ? 'upload_file' : 'palette'}</span>
                                                 </span>
                                             </div>
-                                            {/* Time badge */}
-                                            <div className="absolute top-2 right-2">
+                                            {/* Time badge (shifted to the left) */}
+                                            <div className="absolute top-2 right-10 z-20">
                                                 <span className="text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-full ">{timeAgo}</span>
                                             </div>
+                                            {/* Selection Checkbox */}
+                                            {(img.imageUrl || img.thumbnailUrl) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const url = img.imageUrl || img.thumbnailUrl;
+                                                        setSelectedImages(prev =>
+                                                            prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                        );
+                                                    }}
+                                                    className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                        selectedImages.includes(img.imageUrl || img.thumbnailUrl)
+                                                            ? 'bg-primary text-white scale-110 opacity-100'
+                                                            : 'bg-black/50 text-white/80 border border-white/20 hover:scale-110 hover:bg-black/75 opacity-100'
+                                                    }`}
+                                                    title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
+                                                >
+                                                    <span className="material-symbols-outlined text-xs font-bold">
+                                                        {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
+                                                    </span>
+                                                </button>
+                                            )}
                                         </div>
                                     )
                                 })}
