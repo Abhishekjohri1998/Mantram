@@ -107,6 +107,10 @@ router.put('/:id/mark-posted', async (req, res) => {
         } else if (platform === 'instagram_story') {
             content.instagram.story.posted = !content.instagram.story.posted;
             content.instagram.story.postedAt = content.instagram.story.posted ? now : null;
+        } else if (platform === 'instagram_reel') {
+            if (!content.instagram?.reel) return res.status(400).json({ success: false, error: 'Instagram Reel not found in document' });
+            content.instagram.reel.posted = !content.instagram.reel.posted;
+            content.instagram.reel.postedAt = content.instagram.reel.posted ? now : null;
         } else {
             return res.status(400).json({ success: false, error: 'Invalid platform or index' });
         }
@@ -116,6 +120,7 @@ router.put('/:id/mark-posted', async (req, res) => {
             ...(content.linkedin || []).map(p => p.posted),
             content.instagram?.post?.posted,
             content.instagram?.story?.posted,
+            ...(content.instagram?.reel ? [content.instagram.reel.posted] : []),
             ...(content.twitter || []).map(p => p.posted),
             ...(content.reddit || []).map(p => p.posted),
         ];
@@ -174,13 +179,15 @@ router.get('/stats', async (req, res) => {
         let postsThisWeek = 0;
         let postsPosted = 0;
         for (const day of allRecent.filter(d => new Date(d.date) >= sevenDaysAgo)) {
-            const total = (day.linkedin?.length || 0) + (day.twitter?.length || 0) + (day.reddit?.length || 0) + 2; // +2 for IG post + story
+            const hasReel = !!day.instagram?.reel;
+            const total = (day.linkedin?.length || 0) + (day.twitter?.length || 0) + (day.reddit?.length || 0) + 2 + (hasReel ? 1 : 0); // +2 for IG post + story, +1 for reel if exists
             const posted = [
                 ...(day.linkedin || []).filter(p => p.posted),
                 ...(day.twitter || []).filter(p => p.posted),
                 ...(day.reddit || []).filter(p => p.posted),
                 ...(day.instagram?.post?.posted ? [true] : []),
                 ...(day.instagram?.story?.posted ? [true] : []),
+                ...(day.instagram?.reel?.posted ? [true] : []),
             ].length;
             postsThisWeek += total;
             postsPosted += posted;
