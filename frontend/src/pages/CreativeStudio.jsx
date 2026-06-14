@@ -502,6 +502,7 @@ export default function CreativeStudio() {
     const [customWidth, setCustomWidth] = useState('')
     const [customHeight, setCustomHeight] = useState('')
     const [publishData, setPublishData] = useState(null) // { image, text } or null
+    const [selectedImages, setSelectedImages] = useState([])
     const [imageModel, setImageModel] = useState('nanobanana-2')
     const [showModelMenu, setShowModelMenu] = useState(false)
     const [showBusyModal, setShowBusyModal] = useState(false)
@@ -1437,6 +1438,7 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
             psAbortRef.current?.abort()
             campAbortRef.current?.abort()
             activeBrandIdRef.current = activeBrand?._id
+            setSelectedImages([])
             if (activeGenerations.length > 0 || enhancing || templateGenerating) {
                 setActiveGenerations([]); setEnhancing(false); setTemplateGenerating(false)
             }
@@ -3596,6 +3598,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                             <p className="text-sm text-[var(--sys-text-muted)]">{activeBrand?.name}</p>
                                         </div>
                                     )}
+                                    {result.imageUrl && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const url = result.imageUrl;
+                                                setSelectedImages(prev =>
+                                                    prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                );
+                                            }}
+                                            className={`absolute top-3 right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                selectedImages.includes(result.imageUrl)
+                                                    ? 'bg-primary text-white scale-110'
+                                                    : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                            }`}
+                                            title={selectedImages.includes(result.imageUrl) ? 'Deselect image' : 'Select image'}
+                                        >
+                                            <span className="material-symbols-outlined text-sm font-bold">
+                                                {selectedImages.includes(result.imageUrl) ? 'check' : 'add'}
+                                            </span>
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Metadata Row */}
@@ -3805,6 +3828,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 onClick={() => setZoomImage(item.imageUrl)}>
                                                 <img src={item.imageUrl} alt={item._prompt || 'Creative'} loading="lazy" decoding="async" className="w-full aspect-square object-contain object-left max-h-[240px] bg-[var(--sys-surface)]" />
                                                 {idx === 0 && <span className="absolute top-1.5 left-1.5 text-[8px] font-bold text-[var(--sys-bg)] bg-[var(--sys-text)] px-1.5 py-0.5 rounded-md shadow-sm">Latest</span>}
+                                                {item.imageUrl && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = item.imageUrl;
+                                                            setSelectedImages(prev =>
+                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                            );
+                                                        }}
+                                                        className={`absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                            selectedImages.includes(item.imageUrl)
+                                                                ? 'bg-primary text-white scale-110'
+                                                                : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                                        }`}
+                                                        title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-xs font-bold">
+                                                            {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                )}
                                                 {/* Quick Actions Hover Dock */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] truncate mb-2 leading-tight" title={item._prompt}>{item._prompt || 'AI Generated'}</p>
@@ -3911,6 +3955,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                         {group.items.map((item, iIdx) => (
                                                             <div key={item._id || iIdx} className="relative rounded-xl overflow-hidden flex-shrink-0" style={{ width: group.items.length === 1 ? '100%' : '180px' }}>
                                                                 <div className="group/img relative rounded-xl overflow-hidden border border-[var(--sys-border)] transition-all">
+                                                                    {item.imageUrl && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const url = item.imageUrl;
+                                                                                setSelectedImages(prev =>
+                                                                                    prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                                                );
+                                                                            }}
+                                                                            className={`absolute top-2 right-2 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                                                selectedImages.includes(item.imageUrl)
+                                                                                    ? 'bg-primary text-white scale-110'
+                                                                                    : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover/img:opacity-100'
+                                                                            }`}
+                                                                            title={selectedImages.includes(item.imageUrl) ? 'Deselect image' : 'Select image'}
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-xs font-bold">
+                                                                                {selectedImages.includes(item.imageUrl) ? 'check' : 'add'}
+                                                                            </span>
+                                                                        </button>
+                                                                    )}
                                                                     <img src={item.imageUrl} alt={group.prompt} loading="lazy" decoding="async"
                                                                         className="w-full h-[200px] object-contain object-left-top block bg-[var(--sys-surface)]" />
                                                                     
@@ -4064,6 +4129,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                 <img src={img.thumbnailUrl || img.imageUrl} alt={img.title || 'Creative'}
                                                     loading="lazy" decoding="async"
                                                     className="w-full aspect-square object-cover" />
+                                                {(img.imageUrl || img.thumbnailUrl) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = img.imageUrl || img.thumbnailUrl;
+                                                            setSelectedImages(prev =>
+                                                                prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                            );
+                                                        }}
+                                                        className={`absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                            selectedImages.includes(img.imageUrl || img.thumbnailUrl)
+                                                                ? 'bg-primary text-white scale-110'
+                                                                : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                                        }`}
+                                                        title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
+                                                    >
+                                                        <span className="material-symbols-outlined text-xs font-bold">
+                                                            {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
+                                                        </span>
+                                                    </button>
+                                                )}
                                                 {/* Hover overlay with actions */}
                                                 <div className="absolute inset-0 bg-black/60 border border-[var(--sys-border)] opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2">
                                                     <p className="text-[9px] text-[var(--sys-text-muted)] line-clamp-2 mb-1.5 leading-tight">{img.prompt || img.title || 'AI Generated'}</p>
@@ -4083,7 +4169,7 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     </div>
                                                 </div>
                                                 {/* Time ago badge */}
-                                                <span className="absolute top-1.5 right-1.5 text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
+                                                <span className="absolute bottom-1.5 right-1.5 text-[8px] text-[var(--sys-text-muted)] bg-[var(--sys-surface)] px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all">{getTimeAgo(img.createdAt)}</span>
                                                 {/* MCoT badge */}
                                                 {img.aiMeta?.mcotReasoning && (
                                                     <button onClick={(e) => { e.stopPropagation(); setViewMode('list'); setExpandedReasoning(img._id); }}
@@ -4135,6 +4221,27 @@ Return ONLY the prompt formula. Start with "Create a..." or "Design a..."`,
                                                     <span className="material-symbols-outlined text-base">send</span>
                                                 </button>
                                             </div>
+                                            {(img.imageUrl || img.thumbnailUrl) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const url = img.imageUrl || img.thumbnailUrl;
+                                                        setSelectedImages(prev =>
+                                                            prev.includes(url) ? prev.filter(x => x !== url) : [...prev, url]
+                                                        );
+                                                    }}
+                                                    className={`absolute top-2.5 right-2.5 z-20 w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md cursor-pointer ${
+                                                        selectedImages.includes(img.imageUrl || img.thumbnailUrl)
+                                                            ? 'bg-primary text-white scale-110'
+                                                            : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60 border border-white/20 opacity-0 group-hover:opacity-100'
+                                                    }`}
+                                                    title={selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'Deselect image' : 'Select image'}
+                                                >
+                                                    <span className="material-symbols-outlined text-xs font-bold">
+                                                        {selectedImages.includes(img.imageUrl || img.thumbnailUrl) ? 'check' : 'add'}
+                                                    </span>
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Metadata */}
@@ -11342,6 +11449,41 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                 defaultImages={publishData?.images || null}
                 brandId={activeBrand?._id}
             />
+
+            {/* ── FLOATING SELECTION ACTION BAR ── */}
+            {selectedImages.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-4 px-5 py-3 rounded-2xl bg-[var(--sys-surface)]/90 backdrop-blur-md border border-[var(--sys-border)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] animate-in fade-in slide-in-from-bottom-5 duration-300">
+                    <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary text-sm font-bold">photo_library</span>
+                        </span>
+                        <span className="text-sm font-bold text-[var(--sys-text)]">
+                            {selectedImages.length} image{selectedImages.length > 1 ? 's' : ''} selected
+                        </span>
+                    </div>
+                    <div className="h-4 w-px bg-[var(--sys-border)]" />
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                setPublishData({
+                                    images: selectedImages,
+                                    text: ''
+                                });
+                            }}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF4D00] to-[#FF7A00] text-white text-xs font-bold shadow-lg hover:shadow-[#FF4D00]/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <span className="material-symbols-outlined text-sm">view_carousel</span>
+                            Publish as Carousel / Slider
+                        </button>
+                        <button
+                            onClick={() => setSelectedImages([])}
+                            className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] hover:bg-[var(--sys-surface-hover)] border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] text-xs font-medium transition-all cursor-pointer"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Model Busy Warning Modal ── */}
             {showBusyModal && (
