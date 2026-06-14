@@ -153,7 +153,7 @@ router.post('/:id/regenerate', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 router.post('/:id/generate-image', async (req, res) => {
     try {
-        const { platform, index = 0, slideIndex = null } = req.body;
+        const { platform, index = 0, slideIndex = null, imageModel = 'gpt-image-2' } = req.body;
         const content = await GrowthContent.findById(req.params.id);
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
 
@@ -194,10 +194,10 @@ router.post('/:id/generate-image', async (req, res) => {
         }
 
         const aiRouter = getRouter();
-        // The user specifically requested GPT Image 2 model logic here (which uses google/dalle/flux under the hood in aiRouter)
         const result = await aiRouter.generateImage({ 
             prompt: promptText, 
-            aspectRatio 
+            aspectRatio,
+            model: imageModel
         });
 
         if (!result.imageUrl) throw new Error('Image generation failed to return URL');

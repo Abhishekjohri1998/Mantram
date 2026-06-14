@@ -150,6 +150,7 @@ export default function SuperAdminDashboard() {
     const [growthCopied, setGrowthCopied] = useState(null)
     const [growthRegenerating, setGrowthRegenerating] = useState(null)
     const [growthGeneratingImage, setGrowthGeneratingImage] = useState(null)
+    const [growthImageModel, setGrowthImageModel] = useState('gpt-image-2')
     const [growthHistoryPage, setGrowthHistoryPage] = useState(1)
     const [showGrowthHistory, setShowGrowthHistory] = useState(false)
 
@@ -280,7 +281,7 @@ export default function SuperAdminDashboard() {
         const key = slideIndex !== null ? `${platform}-${index}-${slideIndex}` : `${platform}-${index}`
         setGrowthGeneratingImage(key)
         try {
-            const res = await API.generateGrowthImage(growthContent._id, { platform, index, slideIndex })
+            const res = await API.generateGrowthImage(growthContent._id, { platform, index, slideIndex, imageModel: growthImageModel })
             if (res.success) {
                 setGrowthContent(res.content)
                 showToast('Image generated successfully!')
@@ -4702,28 +4703,45 @@ export default function SuperAdminDashboard() {
                                     )}
                                 </div>
 
-                                {/* Platform Tabs */}
-                                <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
-                                    {[
-                                        { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
-                                        { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
-                                        { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
-                                        { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
-                                    ].map(p => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => setGrowthPlatformTab(p.id)}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
-                                                growthPlatformTab === p.id
-                                                    ? 'text-white shadow-lg'
-                                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
-                                            }`}
-                                            style={growthPlatformTab === p.id ? { background: p.color } : {}}
+                                {/* Top Controls */}
+                                <div className="flex items-center justify-between mt-4">
+                                    {/* Platform Tabs */}
+                                    <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                        {[
+                                            { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
+                                            { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
+                                            { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
+                                            { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
+                                        ].map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => setGrowthPlatformTab(p.id)}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
+                                                    growthPlatformTab === p.id
+                                                        ? 'text-white shadow-lg'
+                                                        : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
+                                                }`}
+                                                style={growthPlatformTab === p.id ? { background: p.color } : {}}
+                                            >
+                                                <span>{p.icon}</span> {p.label}
+                                                <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: growthPlatformTab === p.id ? 'rgba(255,255,255,0.2)' : 'var(--sys-border)' }}>{p.count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Image Model Selector */}
+                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                        <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
+                                        <select
+                                            value={growthImageModel}
+                                            onChange={(e) => setGrowthImageModel(e.target.value)}
+                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
                                         >
-                                            <span>{p.icon}</span> {p.label}
-                                            <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: growthPlatformTab === p.id ? 'rgba(255,255,255,0.2)' : 'var(--sys-border)' }}>{p.count}</span>
-                                        </button>
-                                    ))}
+                                            <option value="gpt-image-2">GPT Image 2</option>
+                                            <option value="nanobanana-2">NanoBanana 2</option>
+                                            <option value="nanobanana-pro">NanoBanana Pro</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 {/* LINKEDIN POSTS */}
