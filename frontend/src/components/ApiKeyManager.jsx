@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { apiFetch } from '../services/api';
 
-const API = '/api/api-keys';
+const API = '/api-keys';
 
 const styles = {
     wrap: {
@@ -237,7 +237,7 @@ export default function ApiKeyManager() {
 
     const fetchKeys = useCallback(async () => {
         try {
-            const { data } = await axios.get(API);
+            const data = await apiFetch(API);
             if (data.success) setKeys(data.keys);
         } catch (_) {}
         setLoading(false);
@@ -252,14 +252,14 @@ export default function ApiKeyManager() {
         setError('');
         setRevealed(null);
         try {
-            const { data } = await axios.post(API, { name: newKeyName.trim() });
+            const data = await apiFetch(API, { method: 'POST', body: JSON.stringify({ name: newKeyName.trim() }) });
             if (data.success) {
                 setRevealed({ plaintext: data.plaintext, id: data.key._id });
                 setNewKeyName('');
                 fetchKeys();
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to create key');
+            setError(err.message || 'Failed to create key');
         }
         setCreating(false);
     };
@@ -267,11 +267,11 @@ export default function ApiKeyManager() {
     const handleRevoke = async (id) => {
         if (!window.confirm('Revoke this API key? Any Claude integrations using it will stop working.')) return;
         try {
-            await axios.delete(`${API}/${id}`);
+            await apiFetch(`${API}/${id}`, { method: 'DELETE' });
             setKeys(keys.map(k => k._id === id ? { ...k, isActive: false } : k));
             if (revealed?.id === id) setRevealed(null);
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to revoke key');
+            setError(err.message || 'Failed to revoke key');
         }
     };
 
