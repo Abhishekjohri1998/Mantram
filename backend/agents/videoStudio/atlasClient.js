@@ -791,6 +791,10 @@ export async function submitGeminiFlashVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, resolution = '720p',
     referenceImages = [],
 }) {
+    // Gemini Omni Flash Image-to-Video supports 1–7 reference images (images[] field)
+    // Prompt: up to 20,000 characters
+    // Durations: 4, 6, 8, 10s (enum)
+    // Ref: https://www.atlascloud.ai/models/google/gemini-omni-flash/image-to-video-developer
     console.log(`⚡ [Gemini Flash Video] submitGeminiFlashVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
 
     // Extract ZH prompt if bilingual
@@ -807,14 +811,15 @@ export async function submitGeminiFlashVideoGeneration({
 
     let safePromptText = (finalPromptText || '').replace(/<img>[^<]*<\/img>/g, '');
     
-    // 🛡️ UNIVERSAL @IMAGE TAG SANITIZER FOR GEMINI FLASH
-    // Gemini Flash only supports 1 image. Strip any @image2, @image3 phantom tags to prevent Atlas Internal Errors.
-    const totalImageCount = (imageUrl || (referenceImages && referenceImages.length > 0)) ? 1 : 0;
+    // 🛡️ @IMAGE TAG SANITIZER FOR GEMINI FLASH
+    // Supports 1–7 reference images. Strip phantom tags beyond actual image count.
+    const allInputImages = [imageUrl, ...referenceImages].filter(Boolean);
+    const totalImageCount = Math.min(allInputImages.length, 7); // Max 7 per Atlas docs
     if (totalImageCount > 0) {
         safePromptText = safePromptText.replace(/@image(\d+)/gi, (match, p1) => {
             const idx = parseInt(p1, 10);
             if (idx > totalImageCount) {
-                console.warn(`🛡️ [Gemini Flash] Stripping phantom ${match} from prompt`);
+                console.warn(`🛡️ [Gemini Flash] Stripping phantom ${match} (only ${totalImageCount} images provided)`);
                 return '';
             }
             return match;
@@ -823,54 +828,55 @@ export async function submitGeminiFlashVideoGeneration({
         safePromptText = safePromptText.replace(/@image\d+/gi, '');
     }
 
+    // Gemini Omni Flash: prompt up to 20,000 characters per Atlas Cloud docs
     const finalPrompt = truncatePrompt(
         safePromptText.replace(/\s{2,}/g, ' ').trim(),
-        4000
+        20000
     );
 
-    // Prepare images: pick the primary first frame or first reference image
-    let targetImage = null;
-    if (imageUrl) {
-        targetImage = imageUrl;
-    } else if (referenceImages && referenceImages.length > 0) {
-        targetImage = referenceImages[0];
+    // Prepare images: upload all provided images (up to 7) to Atlas CDN in parallel
+    // imageUrl → always first in the array (@image1 = starting frame / avatar)
+    // referenceImages → additional product/style refs (@image2, @image3, ...)
+    const imagesToUpload = allInputImages.slice(0, 7); // Gemini Omni Flash max = 7
+    let cdnImageUrls = [];
+    if (imagesToUpload.length > 0) {
+        console.log(`📸 [Gemini Flash] Uploading ${imagesToUpload.length} image(s) to Atlas CDN in parallel...`);
+        const uploads = await Promise.all(imagesToUpload.map(async (img, i) => {
+            try {
+                const s3Url = await ensureS3Url(img, 'video-studio/gemini-flash');
+                if (!s3Url) return null;
+                const cdnUrl = await uploadMediaToAtlasCDN(s3Url);
+                if (cdnUrl) console.log(`  ✅ @image${i + 1}: ${cdnUrl.substring(0, 60)}...`);
+                return cdnUrl || null;
+            } catch (e) {
+                console.warn(`  ⚠️ [Gemini Flash] Image ${i + 1} upload failed: ${e.message}`);
+                return null;
+            }
+        }));
+        cdnImageUrls = uploads.filter(Boolean);
     }
 
-    let cdnImageUrl = null;
-    if (targetImage) {
-        const s3Url = await ensureS3Url(targetImage, 'video-studio/gemini-flash');
-        if (s3Url) {
-            cdnImageUrl = await uploadMediaToAtlasCDN(s3Url);
-        }
-    }
-
-    const hasImage = !!cdnImageUrl;
-    const modelName = hasImage 
-        ? 'google/gemini-omni-flash/image-to-video-developer' 
+    const hasImages = cdnImageUrls.length > 0;
+    // Use I2V model when any images are provided, T2V otherwise
+    const modelName = hasImages
+        ? 'google/gemini-omni-flash/image-to-video-developer'
         : 'google/gemini-omni-flash/text-to-video-developer';
 
-    // Round duration to closest allowed value
-    const allowedDurations = [4, 6, 8, 10, 15, 20, 30, 45, 60, 90];
-    const targetDur = parseInt(duration, 10) || 6;
-    const finalDur = allowedDurations.reduce((prev, curr) => 
+    // Durations: enum [4, 6, 8, 10] per Atlas Cloud docs (I2V model)
+    const allowedDurations = [4, 6, 8, 10];
+    const targetDur = parseInt(duration, 10) || 8;
+    const finalDur = allowedDurations.reduce((prev, curr) =>
         Math.abs(curr - targetDur) < Math.abs(prev - targetDur) ? curr : prev
     );
 
     // Normalize aspect ratio to 16:9 or 9:16
-    let finalRatio = '16:9';
-    if (aspectRatio === '9:16') {
-        finalRatio = '9:16';
-    }
+    const finalRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
 
-    // Normalize resolution to 720p, 1080p, 4k
-    let finalRes = '720p';
-    if (resolution === '1080p') {
-        finalRes = '1080p';
-    } else if (resolution === '4k') {
-        finalRes = '4k';
-    }
+    // Normalize resolution
+    const finalRes = resolution === '4k' ? '4k' : resolution === '1080p' ? '1080p' : '720p';
 
-    console.log(`🎯 [Gemini Flash] model=${modelName} | dur=${finalDur}s | ratio=${finalRatio} | res=${finalRes} | hasImage=${hasImage}`);
+    console.log(`🎯 [Gemini Flash] model=${modelName} | dur=${finalDur}s | ratio=${finalRatio} | res=${finalRes} | images=${cdnImageUrls.length}`);
+    console.log(`📝 [Gemini Flash] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
 
     const taskInput = {
         model: modelName,
@@ -878,11 +884,12 @@ export async function submitGeminiFlashVideoGeneration({
         duration: finalDur,
         aspect_ratio: finalRatio,
         resolution: finalRes,
-        seed: -1
+        seed: -1,
     };
 
-    if (hasImage) {
-        taskInput.images = [cdnImageUrl];
+    // Pass all images as `images[]` array — Gemini Omni Flash uses this field for 1–7 refs
+    if (cdnImageUrls.length > 0) {
+        taskInput.images = cdnImageUrls;
     }
 
     const payload = { model: 'gemini-flash', task_type: modelName, input: taskInput };

@@ -170,14 +170,16 @@ export const MODEL_CAPABILITIES = {
         maxPromptLength: 200000,
     },
     'gemini-flash': {
-        id: 'gemini-flash', name: 'Gemini Flash Video', icon: '⚡', provider: 'atlascloud',
-        description: 'Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration',
-        bestFor: 'High-speed cinematic actions, visual storytelling, text/image-to-video',
-        duration: { min: 4, max: 90, native: 6, step: 2 },
+        id: 'gemini-flash', name: 'Gemini Omni Flash', icon: '⚡', provider: 'atlascloud',
+        description: 'Google Gemini Omni Flash — up to 7 reference images, 20K prompt, cinematic subject-consistent video',
+        bestFor: 'UGC, product showcases, character-consistent storytelling, subject-anchored video',
+        // Durations: 4, 6, 8, 10s per generation (enum — not continuous). For long-form, chain segments.
+        duration: { min: 4, max: 10, native: 10, step: 2 },
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 1, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
-        maxPromptLength: 4000,
+        // referenceImages: true — supports 1–7 reference images via `images[]` field
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
+        maxPromptLength: 20000, // Atlas Cloud docs: up to 20,000 characters
     },
 };
 

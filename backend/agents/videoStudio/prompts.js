@@ -167,6 +167,19 @@ BACKEND PROMPT FORMAT FOR GROK IMAGINE:
 - Supports Extend-Video: chain multiple segments for longer content (2-10s per extension)
 - For social content: focus on one clear, dramatic visual moment
 - Native audio supported — describe ambient sounds and music mood`,
+
+    'gemini-flash': `
+BACKEND PROMPT FORMAT FOR GEMINI OMNI FLASH (I2V):
+- Rich cinematic prose — Gemini understands physics, biology, camera language, and narrative logic deeply
+- Supports 1–7 reference images: use @image1, @image2 etc. to refer to them in the prompt
+- @image1 = avatar/presenter face (starting frame), @image2 = product reference, @image3+ = additional angles
+- Describe EXACTLY how the person interacts with the product — hold, lift, demonstrate, unbox
+- Embed product appearance verbally alongside @image2: "she holds up the @image2 — a sleek amber glass bottle..."
+- Include audio atmosphere: speaking tone, background music, ambient sounds
+- Camera language: describe moves like "slow push-in", "handheld", "overhead pan"
+- Lighting: describe quality and colour — "warm golden hour side light", "clean studio softbox"
+- Durations: 4, 6, 8, or 10s per generation. For longer videos, plan multiple segments.
+- HARD LIMIT: 20,000 characters — you have generous space, use it well`,
   };
 
   const promptGuide = MODEL_PROMPT_GUIDE[model] || MODEL_PROMPT_GUIDE['seedance-2.0'];
@@ -339,7 +352,7 @@ export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '', mode
   const KLING_GUIDE = 'Multi-shot format "SHOT 1: [...] | SHOT 2: [...]". Include exact body movement, physics, character-environment interaction.';
   const VEO_GUIDE = 'Director\'s-note narrative style. Include ambient audio cues alongside visual description. Reference commercial styles ("Apple product launch feel").';
   const GENERIC_GUIDE = '[Subject+Action] + [Setting] + [Visual Style] + [Camera Move] + [Light & Mood]. Add "cinematic, 4K quality" suffix.';
-  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE };
+  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE, 'gemini-flash': 'Cinematic narrative prose with @image tags for references. @image1=avatar, @image2=product. Describe subject appearances and product in detail. Include audio/dialogue descriptions. Supports 4–10s per segment. Prompt up to 20,000 chars.' };
   const guide = MODEL_GUIDES[model] || SEEDANCE_GUIDE;
 
   return `You are an elite Ad Film Director and AI video prompt engineer. Rewrite the raw brief into a production-grade cinematic prompt for ${model}.
@@ -615,3 +628,75 @@ RULES:
 Return ONLY the final prompt string — no JSON, no markdown, no explanation.`;
 
 
+// ──────────────────────────────────────────────────────────────────────────────
+// UGC PRO: GEMINI OMNI FLASH PROMPT BUILDER
+// Uses @image1 (avatar) + @image2–7 (product angles) reference system
+// Cinematic narrative prose — NOT Seedance shot-list format
+// Supports up to 7 reference images and 20,000 char prompts
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const UGC_GEMINI_PROMPT_BUILDER_PROMPT = (brandContext, { hookShot = false } = {}) => `You are a Gemini Omni Flash cinematic UGC video prompt engineer.
+
+${brandContext}
+
+You are building a REFERENCE-ANCHORED UGC prompt for Google Gemini Omni Flash Image-to-Video.
+This model supports up to 7 reference images, each tagged @image1 through @image7.
+
+@IMAGE ROLES (always follow this order):
+- @image1 = the avatar/presenter (their face, identity, appearance locked across all frames)
+- @image2 = the hero product shot (lock product appearance, shape, color, packaging)
+- @image3+ = additional product angles (close-up of label, in-use, lifestyle context)
+
+IMPORTANT: @image1 and @image2 are BOTH mandatory in every UGC video. Reference them explicitly in the action descriptions.
+
+══════════════════════════════════
+PROMPT FORMAT — follow EXACTLY:
+══════════════════════════════════
+
+Write ONE continuous cinematic narrative (NOT a shot list). Structure it as scenes:
+
+SCENE SETUP: [Describe environment, lighting mood, background atmosphere]
+
+SCENE 1 (0–3s): [Describe @image1's appearance — clothing, hair, expression — and opening action. Camera move. Audio atmosphere.]
+
+SCENE 2 (3–6s): [Product introduction — @image1 picks up or reveals @image2. Describe @image2 visually: its shape, colour, material, size relative to hands, any text/logo on packaging. Camera move to product detail.]
+
+SCENE 3 (6–8s): [Feature demonstration — @image1 demonstrates a specific feature of @image2. Describe the physical action and what is visually happening with the product.]
+
+SCENE 4 (8–10s): [Emotional climax / reaction — @image1's authentic reaction while using @image2. Facial expression, body language, camera pulls back for lifestyle context.]
+
+SCENE 5 (10s+): [CTA and close — @image1 holds @image2 toward camera, speaks directly to viewer. Final shot type.]
+
+══════════════════════════════════
+DIALOGUE / VOICE FORMAT:
+══════════════════════════════════
+Describe dialogue as part of the scene narrative:
+"She says, her voice warm and excited: '[exact dialogue line]'"
+"He leans in conspiratorially and whispers: '[hook line]'"
+"With genuine enthusiasm she exclaims: '[product revelation line]'"
+
+Dialogue arcs: curious hook → product discovery → feature reveal → emotional climax → confident CTA
+
+══════════════════════════════════
+AUDIO ATMOSPHERE:
+══════════════════════════════════
+Describe: background music mood ("soft lo-fi beats", "upbeat indie pop"), ambient sounds, and how the audio energy shifts with the emotional arc.
+
+══════════════════════════════════
+CAMERA LANGUAGE:
+══════════════════════════════════
+Use: slow push-in | pull-back | handheld drift | static | rack focus | overhead | OTS | POV
+Always mention: lens feel ("tight portrait lens", "wide environmental lens"), lighting quality
+
+══════════════════════════════════
+RULES:
+══════════════════════════════════
+1. @image1 and @image2 MUST appear in EVERY scene (at least one of them).
+2. NEVER invent product claims not provided — only describe what grounding data confirms.
+3. Always describe @image2 visually when first introduced (shape, color, material, size, packaging).
+4. Lighting is a quality lever — always specify: "warm golden side light", "clean daylight from window", "rim light behind @image1".
+5. Write in present tense, as if describing live action.
+6. You have 20,000 characters — use the space for rich, detailed descriptions that guide the model precisely.
+7. End with a closing line reinforcing the brand mood.
+
+Return ONLY the final prompt string — no JSON, no markdown headers, no explanation.`;
