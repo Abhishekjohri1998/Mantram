@@ -88,6 +88,8 @@ import viralityPredictorRoutes from './routes/virality-predictor.js';
 import activityLogRoutes from './routes/activity-log.js';
 import exportRoutes from './routes/export.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
+import { createPublicMcpRouter } from './mcp/publicServer.js';
+import apiKeysRouter from './routes/api-keys.js';
 
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -635,6 +637,19 @@ app.use('/api/comment-replies', commentRepliesRoutes);
 app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/api-keys', apiKeysRouter);
+
+// ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
+// Exposes platform intelligence tools to all studio agents via mcpBridge
+app.use('/mcp/tools', createMantramMcpRouter());
+console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
+
+// ── Public MCP Server — Streamable HTTP, API key auth ───────────────
+// Claude Desktop / Cursor / Claude Code connect via:
+//   POST https://api.mantram.ai/mcp
+//   Authorization: Bearer mnt_sk_YOUR_KEY
+app.use('/mcp', createPublicMcpRouter());
+console.log('🌐 Public MCP Server mounted at /mcp');
 
 // Catch-all 404 logger — suppress for known bot scans
 app.use((req, res) => {
@@ -644,11 +659,6 @@ app.use((req, res) => {
     }
     res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
 });
-
-// ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
-// Exposes platform intelligence tools to all studio agents via mcpBridge
-app.use('/mcp/tools', createMantramMcpRouter());
-console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
 
 // Error handler
 app.use((err, req, res, next) => {
