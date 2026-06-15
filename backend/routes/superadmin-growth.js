@@ -194,11 +194,19 @@ router.post('/:id/generate-image', async (req, res) => {
         }
 
         const aiRouter = getRouter();
+
+        // Determine the correct provider based on the model name.
+        // The default image provider is Gemini, so OpenAI models (gpt-image-*)
+        // must explicitly request the 'openai' provider to avoid being routed
+        // to Gemini which doesn't recognise gpt-image-* model IDs.
+        const isOpenAIModel = imageModel.startsWith('gpt-') || imageModel.startsWith('dall-e');
+        const providerPreference = isOpenAIModel ? 'openai' : 'gemini';
+
         const result = await aiRouter.generateImage({ 
             prompt: promptText, 
             aspectRatio,
             model: imageModel
-        });
+        }, { provider: providerPreference });
 
         if (!result.imageUrl) throw new Error('Image generation failed to return URL');
 
