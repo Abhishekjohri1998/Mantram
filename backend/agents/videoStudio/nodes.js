@@ -26,6 +26,7 @@ import {
     UGC_PRODUCT_GROUNDING_PROMPT,
     UGC_AVATAR_PROMPT,
     UGC_PROMPT_BUILDER_PROMPT,
+    UGC_GEMINI_PROMPT_BUILDER_PROMPT,
 } from './prompts.js';
 import { estimateCost, submitVideoGeneration, getGenerationStatus, getGrokGenerationStatus, MODEL_CAPABILITIES } from './falClient.js';
 import { getKieGenerationStatus } from './kieClient.js';
@@ -1144,11 +1145,114 @@ export async function ugcAvatarNode(state) {
 }
 
 /**
- * UGC Pro Node 3: Seedance Prompt Builder (callAgent with Brand DNA)
- * Constructs the final MuAPI-ready prompt from product data + settings.
- * Enforces @image1 (avatar) and @image2 (product) tags for Seedance I2V.
+ * UGC Pro Node 3: Prompt Builder — model-aware routing
+ * Routes to Gemini Omni Flash builder (rich @image narrative prose)
+ * or Seedance 2.0 builder (shot-list with @image1/@image2 tags) based on selectedModel.
  */
 export async function ugcPromptBuilderNode(state) {
+    const selectedModel = state.selectedModel || state.settings?.model || 'seedance-2.0';
+
+    // Gemini Omni Flash: cinematic narrative prose, up to 7 @image refs, 20K chars
+    if (selectedModel === 'gemini-flash') {
+        return await _buildGeminiFlashUGCPrompt(state);
+    }
+
+    // All other models (Seedance 2.0, Kling, Veo, etc.) — use Seedance shot-list builder
+    return await _buildSeedanceUGCPrompt(state);
+}
+
+/**
+ * Internal: Gemini Omni Flash UGC prompt builder
+ * Uses cinematic narrative prose with @image1 (avatar) + @image2-7 (product refs)
+ */
+async function _buildGeminiFlashUGCPrompt(state) {
+    console.log('[UGC Node] Building Gemini Omni Flash UGC prompt (narrative prose + @image refs)...');
+
+    const { brand, brandContext } = await loadContext(state.brandId, state.userId);
+    const product = state.productData || {};
+    const settings = state.settings || {};
+    const imageCount = (state.imageUrls || []).length;
+
+    const brandName = brand?.name || '';
+    const brandDNA = brand?.dna || {};
+    const durationSecs = parseInt(settings.duration || 8);
+    const hookShot = !!(settings.hookShot);
+
+    const userPrompt = [
+        `Build a Gemini Omni Flash UGC video prompt for ${brandName || 'this brand'}.`,
+        `Video duration: ${durationSecs} seconds (allowed: 4, 6, 8, or 10s — round to nearest).`,
+        '',
+        `BRAND: ${brandName}`,
+        brandDNA.tagline ? `BRAND TAGLINE: ${brandDNA.tagline}` : '',
+        brandDNA.personality ? `BRAND VOICE: ${brandDNA.personality}` : '',
+        brandDNA.targetAudience ? `TARGET AUDIENCE: ${brandDNA.targetAudience}` : '',
+        '',
+        `PRODUCT (use ONLY these details — do NOT invent product facts):`,
+        `- Name: ${product.productName || 'Product'}`,
+        `- USP: ${product.mainUSP || 'Quality product'}`,
+        `- Key Features: ${(product.keyFeatures || []).join(', ')}`,
+        `- Category: ${product.productCategory || 'other'}`,
+        `- Visual Appearance: ${product.productAppearance || product.texture || 'as shown in reference image'}`,
+        `- How It Is Held/Used On Camera: ${product.productHandling || 'held in hands'}`,
+        `- Problem It Solves: ${product.problemSolved || ''}`,
+        `- Ideal Environment: ${product.idealEnvironment || settings.environment || 'home'}`,
+        product.tagline ? `- Product Tagline: ${product.tagline}` : '',
+        '',
+        `GENERATION SETTINGS:`,
+        `- UGC Style: ${settings.style || 'review'}`,
+        `- Mood: ${settings.mood || 'authentic'}`,
+        `- Environment: ${settings.environment || product.idealEnvironment || 'home'}`,
+        `- Hook Shot: ${hookShot ? 'YES — open with a quirky/funny moment involving the product' : 'NO'}`,
+        `- Aspect Ratio: ${settings.aspectRatio || '9:16'}`,
+        `- CTA: ${settings.cta || 'Shop now'}`,
+        `- Spoken Language: ${settings.language || 'English'}`,
+        '',
+        `CRITICAL LANGUAGE RULE: ALL spoken dialogue MUST be in ${settings.language || 'English'}.`,
+        '',
+        `IMAGES AVAILABLE: ${imageCount}`,
+        imageCount >= 1 ? '- @image1 = avatar/presenter face (reference their appearance in every scene)' : '',
+        imageCount >= 2 ? '- @image2 = hero product shot (show in scenes, describe its appearance when first introduced)' : '',
+        imageCount > 2 ? `- @image3 to @image${Math.min(imageCount, 7)} = additional product angles (use in detail/demo scenes)` : '',
+        '',
+        product.suggestedDialogue ? `SUGGESTED DIALOGUE (adapt naturally): "${product.suggestedDialogue}"` : '',
+        product.suggestedHooks?.length ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
+    ].filter(Boolean).join('\n');
+
+    const result = await agentUtils.callAgentText(
+        UGC_GEMINI_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
+        userPrompt,
+        0.45, 4096,
+    );
+
+    let prompt = typeof result === 'string' ? result : (result?.raw || result?.text || JSON.stringify(result));
+
+    // POST-PROCESSING: Guarantee @image1 and @image2 are referenced
+    if (imageCount >= 1 && !prompt.includes('@image1')) {
+        console.log('[UGC Gemini] Injecting missing @image1 reference');
+        prompt = `SCENE SETUP: @image1 faces camera in a warm, natural setting with soft window light.\n\n` + prompt;
+    }
+    if (imageCount >= 2 && !prompt.includes('@image2')) {
+        console.log('[UGC Gemini] Injecting missing @image2 reference');
+        prompt = prompt.replace(
+            /SCENE (\d+)[^:]*:/,
+            (match) => `${match}\n@image1 reaches for @image2 and holds it up toward the camera.`
+        );
+    }
+
+    console.log(`[UGC Gemini] Prompt built (${prompt.length} chars, @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')})`);
+
+    return {
+        ...state,
+        backendPrompt: prompt,
+        status: 'prompt-ready',
+    };
+}
+
+/**
+ * Internal: Seedance 2.0 UGC prompt builder (original logic)
+ * Shot-list format with @image1/@image2 tags, 2200 char limit
+ */
+async function _buildSeedanceUGCPrompt(state) {
     console.log('[UGC Node] Building Seedance 2.0 prompt...');
 
     const { brand, brandContext } = await loadContext(state.brandId, state.userId);
@@ -1212,7 +1316,7 @@ export async function ugcPromptBuilderNode(state) {
         product.suggestedHooks?.length ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await agentUtils.callAgent(
+    const result = await agentUtils.callAgentText(
         UGC_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
         userPrompt,
         0.4, 2048,

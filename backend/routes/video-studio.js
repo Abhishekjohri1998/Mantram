@@ -3245,7 +3245,8 @@ router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
             if (url && typeof url === 'string' && url.startsWith('http')) imageUrls.push(url);
         }
 
-        console.log(`[UGC Build Prompt] Building with ${imageUrls.length} images...`);
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
+        console.log(`[UGC Build Prompt] Building with ${imageUrls.length} images, model=${selectedModel}...`);
 
         const promptState = await ugcPromptBuilderNode({
             brandId,
@@ -3253,6 +3254,7 @@ router.post('/ugc-pro/build-prompt', protect, async (req, res) => {
             productData: parsedProduct,
             settings: parsedSettings,
             imageUrls,
+            selectedModel, // ← model-aware routing
         });
 
         res.json({
@@ -3367,10 +3369,17 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
 
         console.log(`[UGC Generate] Final imageUrls (${imageUrls.length}): ${imageUrls.map(u => u.substring(0, 50)).join(' | ')}`);
 
+        // Extract parameters early to avoid temporal dead zone / reference errors
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
+        const duration = parseInt(parsedSettings.duration || 8);
+        const aspectRatio = parsedSettings.aspectRatio || '9:16';
+        const quality = parsedSettings.quality || 'high';
+        const resolution = parsedSettings.resolution || '720p';
+
         let prompt = prebuiltPrompt;
         
         if (!prompt || !prompt.trim()) {
-            // Build Seedance prompt via MCoT node if no prompt was provided
+            // Build model-aware UGC prompt via MCoT node
             console.log(`[UGC Generate] No prebuilt prompt provided, building one...`);
             const promptState = await ugcPromptBuilderNode({
                 brandId,
@@ -3378,16 +3387,12 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 productData: parsedProduct,
                 settings: parsedSettings,
                 imageUrls,
+                selectedModel, // ← model-aware routing inside the node
             });
             prompt = promptState.backendPrompt;
         } else {
             console.log(`[UGC Generate] Using explicitly provided prebuilt prompt (${prompt.length} chars)`);
         }
-        const duration = parseInt(parsedSettings.duration || 8);
-        const aspectRatio = parsedSettings.aspectRatio || '9:16';
-        const quality = parsedSettings.quality || 'high';
-        const selectedModel = parsedSettings.model || 'seedance-2.0';
-        const resolution = parsedSettings.resolution || '720p';
 
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
@@ -3396,11 +3401,9 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         let usedProvider;
 
         if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') {
-            // Atlas Cloud path — R2V mode (Reference-to-Video)
-            // ALL images go as references (avatar + product), no starting frame.
-            // This matches Q-Ads V2 behavior: model locks onto product appearance throughout.
+            // Atlas Cloud R2V path — ALL images as references (avatar + product)
             const allRefImages = imageUrls.slice(0, 9);
-            console.log(`[UGC Generate] R2V mode: ${allRefImages.length} reference images (no starting frame)`);
+            console.log(`[UGC Generate] Seedance R2V: ${allRefImages.length} reference images`);
             genResult = await submitAtlasCloudVideoGeneration({
                 prompt,
                 imageUrl: null,
@@ -3411,9 +3414,28 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 referenceImages: allRefImages,
             });
             usedProvider = 'atlascloud';
+
+        } else if (selectedModel === 'gemini-flash') {
+            // Gemini Omni Flash: pass ALL images as referenceImages (up to 7)
+            // @image1 = avatar (first), @image2-7 = product angles
+            // submitGeminiFlashVideoGeneration handles: imageUrl[0] → first, rest → refs
+            const allRefImages = imageUrls.slice(0, 7);
+            console.log(`[UGC Generate] Gemini Flash I2V: ${allRefImages.length} images (@image1=avatar, @image2+=product)`);
+            const result = await submitVideoGeneration({
+                model: 'gemini-flash',
+                prompt,
+                imageUrl: allRefImages[0] || null,      // avatar as primary firstFrame
+                duration: Math.min(duration, 10),        // Gemini Flash max = 10s per segment
+                resolution,
+                aspectRatio,
+                generateAudio: false,                    // Gemini Flash: no native audio in developer tier
+                referenceImages: allRefImages.slice(1),  // product images as additional refs
+            });
+            genResult = { taskId: result.requestId, _payload: result._atlasCloudPayload };
+            usedProvider = result.provider || 'atlascloud';
+
         } else {
             // Kling / Veo / other models via falClient submitVideoGeneration
-            // Same R2V approach — all images as references
             const allRefImages = imageUrls.slice(0, 9);
             console.log(`[UGC Generate] R2V mode (${selectedModel}): ${allRefImages.length} reference images`);
             const result = await submitVideoGeneration({
