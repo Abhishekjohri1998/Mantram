@@ -88,6 +88,8 @@ import viralityPredictorRoutes from './routes/virality-predictor.js';
 import activityLogRoutes from './routes/activity-log.js';
 import exportRoutes from './routes/export.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
+import { createPublicMcpRouter } from './mcp/publicServer.js';
+import apiKeysRouter from './routes/api-keys.js';
 
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -241,7 +243,7 @@ const BOT_DOUBLE_SLASH_REGEX = /\/\/(index|test|db)\.\w+/;
 
 // ── ALLOWLIST: Only these path prefixes are valid ──────────────────────────
 // Everything else gets silently dropped (444) — massively reduces noise from scanners.
-const VALID_PATH_PREFIXES = ['/api/', '/mcp/', '/health'];
+const VALID_PATH_PREFIXES = ['/api/', '/mcp', '/health'];
 const VALID_EXACT_PATHS = new Set(['/', '/health', '/favicon.ico', '/robots.txt']);
 
 app.use((req, res, next) => {
@@ -526,7 +528,8 @@ app.use((req, res, next) => {
 
 // Global input sanitization — strip HTML tags from all string fields
 // PERF-013: Skip sanitization for webhook/upload paths that handle raw/binary data
-const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/'];
+// Also skip /mcp — JSON-RPC bodies must not be modified (protocol integrity)
+const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/', '/mcp'];
 app.use((req, res, next) => {
     if (req.body && typeof req.body === 'object' && !SKIP_SANITIZE_PREFIXES.some(p => req.path.startsWith(p))) {
         const sanitize = (obj) => {
@@ -635,6 +638,19 @@ app.use('/api/comment-replies', commentRepliesRoutes);
 app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/api-keys', apiKeysRouter);
+
+// ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
+// Exposes platform intelligence tools to all studio agents via mcpBridge
+app.use('/mcp/tools', createMantramMcpRouter());
+console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
+
+// ── Public MCP Server — Streamable HTTP, API key auth ───────────────
+// Claude Desktop / Cursor / Claude Code connect via:
+//   POST https://api.mantram.ai/mcp
+//   Authorization: Bearer mnt_sk_YOUR_KEY
+app.use('/mcp', createPublicMcpRouter());
+console.log('🌐 Public MCP Server mounted at /mcp');
 
 // Catch-all 404 logger — suppress for known bot scans
 app.use((req, res) => {
@@ -644,11 +660,6 @@ app.use((req, res) => {
     }
     res.status(404).json({ success: false, error: `Route ${req.originalUrl} not found` });
 });
-
-// ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
-// Exposes platform intelligence tools to all studio agents via mcpBridge
-app.use('/mcp/tools', createMantramMcpRouter());
-console.log('🔌 MCP Tool Server mounted at /mcp/tools/sse');
 
 // Error handler
 app.use((err, req, res, next) => {

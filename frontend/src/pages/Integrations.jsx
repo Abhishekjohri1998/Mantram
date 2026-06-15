@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useShopify } from '../context/ShopifyContext'
 import { social, shopify as shopifyAPI, googleAnalytics as gaAPI, apiFetch, API_BASE, etsy as etsyAPI, woocommerce as wooAPI, products as productsAPI, uploadFileToS3 } from '../services/api'
+import ApiKeyManager from '../components/ApiKeyManager'
 
 // ── SVG Platform Logos ──────────────────────────────────────────────────────
 function PlatformLogo({ id, size = 28 }) {
@@ -680,6 +681,15 @@ export default function Integrations() {
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${activeTab === 'products' ? 'bg-primary text-black' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'}`}>
                         <span className="material-symbols-outlined text-sm mr-1">inventory_2</span> Products
                     </button>
+                    <button onClick={() => setActiveTab('mcp')}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                            activeTab === 'mcp'
+                                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white'
+                                : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)]'
+                        }`}>
+                        <span className="material-symbols-outlined text-sm">hub</span> MCP
+                        <span style={{ fontSize: '10px', background: 'rgba(124,58,237,0.25)', color: '#a78bfa', borderRadius: '4px', padding: '1px 5px', fontWeight: 700 }}>NEW</span>
+                    </button>
                 </div>
             </div>
 
@@ -1232,6 +1242,11 @@ export default function Integrations() {
                                 ))}
                             </div>
                         </section>
+                    </div>
+                ) : activeTab === 'mcp' ? (
+                    /* MCP Tab */
+                    <div className="max-w-2xl">
+                        <ApiKeyManager />
                     </div>
                 ) : (
                     /* Products Tab */
