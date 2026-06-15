@@ -3369,6 +3369,13 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
 
         console.log(`[UGC Generate] Final imageUrls (${imageUrls.length}): ${imageUrls.map(u => u.substring(0, 50)).join(' | ')}`);
 
+        // Extract parameters early to avoid temporal dead zone / reference errors
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
+        const duration = parseInt(parsedSettings.duration || 8);
+        const aspectRatio = parsedSettings.aspectRatio || '9:16';
+        const quality = parsedSettings.quality || 'high';
+        const resolution = parsedSettings.resolution || '720p';
+
         let prompt = prebuiltPrompt;
         
         if (!prompt || !prompt.trim()) {
@@ -3386,11 +3393,6 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         } else {
             console.log(`[UGC Generate] Using explicitly provided prebuilt prompt (${prompt.length} chars)`);
         }
-        const duration = parseInt(parsedSettings.duration || 8);
-        const aspectRatio = parsedSettings.aspectRatio || '9:16';
-        const quality = parsedSettings.quality || 'high';
-        const selectedModel = parsedSettings.model || 'seedance-2.0';
-        const resolution = parsedSettings.resolution || '720p';
 
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);

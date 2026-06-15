@@ -1218,7 +1218,7 @@ async function _buildGeminiFlashUGCPrompt(state) {
         product.suggestedHooks?.length ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await agentUtils.callAgent(
+    const result = await agentUtils.callAgentText(
         UGC_GEMINI_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
         userPrompt,
         0.45, 4096,
@@ -1316,7 +1316,7 @@ async function _buildSeedanceUGCPrompt(state) {
         product.suggestedHooks?.length ? `HOOK OPTIONS: ${product.suggestedHooks.join(' | ')}` : '',
     ].filter(Boolean).join('\n');
 
-    const result = await agentUtils.callAgent(
+    const result = await agentUtils.callAgentText(
         UGC_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
         userPrompt,
         0.4, 2048,
