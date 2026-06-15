@@ -26,12 +26,29 @@ import {
     fetchPostAnalytics
 } from '../services/socialService.js';
 import config from '../config/env.js';
-import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, getSignedUrlForPath } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { publishVideoToTikTok, publishPhotosToTikTok, getAuthorizationUrl as getTikTokAuthUrl, getAccessToken as getTikTokAccessToken } from '../services/tiktokService.js';
 
 const router = express.Router();
 const FB_API_URL = 'https://graph.facebook.com/v22.0';
+
+/**
+ * Helper: If a URL is from our own S3 bucket, strip any expired presigned
+ * query params and generate a fresh presigned URL (1 hour TTL).
+ * Facebook/Instagram Graph APIs fetch URLs server-side, so they need a
+ * valid, non-expired URL at the moment of the API call.
+ */
+const freshSignedUrl = async (url) => {
+    if (!url || typeof url !== 'string') return url;
+    const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
+    if (url.includes('.amazonaws.com') && bucket && url.includes(bucket)) {
+        // Strip existing query params (expired signature) and re-sign
+        const cleanUrl = url.split('?')[0];
+        return await getSignedUrlForPath(cleanUrl, 3600);
+    }
+    return url;
+};
 
 // BUG-3 FIX: Sign OAuth state with HMAC to prevent tampering
 // Uses '|' as delimiter — safe because base64 and hex never contain pipes.
@@ -554,6 +571,8 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
 
             if (normalizedImageUrl && normalizedImageUrl.startsWith('http')) {
                 try {
+                    // Freshen expired presigned S3 URLs before fetching
+                    normalizedImageUrl = await freshSignedUrl(normalizedImageUrl);
                     console.log(`[CAPTION] Fetching image for vision analysis: ${normalizedImageUrl.substring(0, 80)}...`);
                     const imgResp = await fetch(normalizedImageUrl, {
                         headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*' },
@@ -700,8 +719,12 @@ router.post('/publish', protect, async (req, res) => {
         }
     } else if (!isCarousel && imageUrl) {
         console.log(`[SOCIAL] Using provided absolute URL: ${imageUrl}`);
-        // Mirror external URLs to S3 for persistence
-        if (!imageUrl.includes('s3.amazonaws.com') || !imageUrl.includes(process.env.AWS_S3_BUCKET)) {
+        // If it's our own S3 URL, just freshen the signature
+        const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
+        if (imageUrl.includes('.amazonaws.com') && bucket && imageUrl.includes(bucket)) {
+            absoluteImageUrl = await freshSignedUrl(imageUrl);
+        } else {
+            // Mirror external URLs to S3 for persistence
             const s3Url = await mirrorUrlToS3(imageUrl, `social-posts/${req.user._id}/${Date.now()}.png`);
             if (s3Url) absoluteImageUrl = s3Url;
         }
@@ -713,12 +736,15 @@ router.post('/publish', protect, async (req, res) => {
         for (const url of imageUrls) {
             if (!url) continue;
             if (url.startsWith('http')) {
-                // Mirror external URLs to S3
-                if (!url.includes('s3.amazonaws.com') || !url.includes(process.env.AWS_S3_BUCKET)) {
+                const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
+                if (url.includes('.amazonaws.com') && bucket && url.includes(bucket)) {
+                    // Our own S3 URL — just freshen the presigned signature
+                    const freshUrl = await freshSignedUrl(url);
+                    carouselUrls.push(freshUrl);
+                } else {
+                    // External URL — mirror to S3
                     const s3Url = await mirrorUrlToS3(url, `social-carousel/${req.user._id}/${Date.now()}-${carouselUrls.length}.png`);
                     carouselUrls.push(s3Url || url);
-                } else {
-                    carouselUrls.push(url);
                 }
             } else if (url.startsWith('data:')) {
                 try {
