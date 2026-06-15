@@ -30,7 +30,6 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import {
     ListToolsRequestSchema,
     CallToolRequestSchema,
-    InitializeRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -41,7 +40,7 @@ import Brand from '../models/Brand.js';
 import VideoProject from '../models/VideoProject.js';
 import { internalGenerateCreative } from '../routes/creatives.js';
 import { advancedGenerateNode } from '../agents/videoStudio/nodes.js';
-import { getSignedUrlIfNeeded } from '../utils/s3.js';
+import { uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL DEFINITIONS (exposed to Claude)
@@ -137,6 +136,46 @@ async function resolveBrand(user, brandId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HELPER: Ensure imageUrl is a publicly accessible HTTP URL.
+// internalGenerateCreative can return base64 data URLs (when S3 upload is async).
+// We upload those to S3 immediately so Claude can actually display the image.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function resolvePublicImageUrl(imageUrl, creativeId) {
+    if (!imageUrl) return null;
+
+    // Already a public HTTP(S) URL — sign if S3 unsigned
+    if (imageUrl.startsWith('http')) {
+        if (imageUrl.includes('s3.') || imageUrl.includes('amazonaws.com')) {
+            try {
+                return await getSignedUrlIfNeeded(imageUrl);
+            } catch (_) {
+                return imageUrl;
+            }
+        }
+        return imageUrl; // CDN, cloudfront, etc.
+    }
+
+    // Base64 data URL — upload to S3 and return a signed URL
+    if (imageUrl.startsWith('data:image/')) {
+        try {
+            const mimeMatch = imageUrl.match(/^data:(image\/\w+);base64,/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+            const ext = mimeType.split('/')[1] || 'png';
+            const key = `mcp-generated/${creativeId || Date.now()}.${ext}`;
+            console.log(`⬆️  [PublicMCP] Uploading base64 image to S3: ${key}`);
+            const s3Url = await uploadToS3(imageUrl, key, mimeType);
+            return await getSignedUrlIfNeeded(s3Url);
+        } catch (err) {
+            console.warn('⚠️  [PublicMCP] S3 upload for base64 failed:', err.message);
+            return null;
+        }
+    }
+
+    return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TOOL EXECUTOR
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -159,6 +198,7 @@ async function executeTool(toolName, args, user) {
 
             const brand = await resolveBrand(user, brandId);
 
+            // Call the Creative Studio pipeline
             const data = await internalGenerateCreative({
                 body: {
                     prompt,
@@ -172,38 +212,65 @@ async function executeTool(toolName, args, user) {
                 jobId: `mcp-${user._id}-${Date.now()}`,
             });
 
-            if (!data?.success && !data?.imageUrl && !data?.creative?.imageUrl) {
-                throw new Error(data?.error || 'Image generation failed');
+            // internalGenerateCreative returns: { success, creative, warnings }
+            if (!data?.success || !data?.creative) {
+                throw new Error('Image generation failed — no creative returned');
             }
 
-            // Resolve final image URL
-            let imageUrl = data.imageUrl || data.creative?.imageUrl;
-            const creativeId = data.creative?._id;
+            const creative = data.creative;
+            const creativeId = creative._id?.toString();
 
-            // Sign S3 URLs if needed
-            if (imageUrl?.includes('s3.') && !imageUrl.includes('X-Amz-Signature')) {
-                try { imageUrl = await getSignedUrlIfNeeded(imageUrl); } catch (_) {}
-            }
+            // creative.imageUrl may be: S3 URL, CDN URL, base64, or null (if async upload pending)
+            const rawImageUrl = creative.imageUrl || creative.thumbnailUrl || null;
 
-            // If still base64, serve via proxy endpoint
-            if (imageUrl?.startsWith('data:image/') && creativeId) {
-                imageUrl = `https://api.mantram.ai/api/creatives/${creativeId}/image`;
+            // Ensure it's a publicly accessible URL Claude can embed/display
+            const imageUrl = await resolvePublicImageUrl(rawImageUrl, creativeId);
+
+            if (!imageUrl) {
+                const elapsed = Date.now() - t0;
+                console.log(`   ⚠️  [PublicMCP] generate_image: image not yet available (${elapsed}ms)`);
+                return {
+                    content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: true,
+                            status: 'processing',
+                            creativeId,
+                            brand: brand?.name || null,
+                            message: [
+                                `✅ Image generated! The final URL is being processed (S3 upload in progress).`,
+                                `🔗 View it in Mantram Creative Studio once ready.`,
+                                `Creative ID: ${creativeId}`,
+                            ].join('\n'),
+                        }, null, 2),
+                    }],
+                };
             }
 
             const elapsed = Date.now() - t0;
-            console.log(`   ✅ [PublicMCP] generate_image done in ${elapsed}ms → ${imageUrl?.substring(0, 60)}`);
+            console.log(`   ✅ [PublicMCP] generate_image done in ${elapsed}ms → ${imageUrl.substring(0, 80)}`);
 
             return {
-                content: [{
-                    type: 'text',
-                    text: JSON.stringify({
-                        success: true,
-                        imageUrl,
-                        creativeId: creativeId?.toString(),
-                        brand: brand?.name || null,
-                        message: `Image generated successfully! View or download it here: ${imageUrl}`,
-                    }, null, 2),
-                }],
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: true,
+                            imageUrl,
+                            creativeId,
+                            brand: brand?.name || null,
+                            aspectRatio,
+                            type,
+                            message: `✅ Image generated! Download or share: ${imageUrl}`,
+                        }, null, 2),
+                    },
+                    // Return as image content so Claude renders it inline in the chat
+                    {
+                        type: 'image',
+                        data: imageUrl,
+                        mimeType: 'image/png',
+                    },
+                ],
             };
         }
 
@@ -313,7 +380,6 @@ async function executeTool(toolName, args, user) {
 
 async function mcpApiKeyAuth(req, res, next) {
     try {
-        // Skip auth for OPTIONS preflight
         if (req.method === 'OPTIONS') return next();
 
         const authHeader = req.headers.authorization || '';
@@ -328,11 +394,10 @@ async function mcpApiKeyAuth(req, res, next) {
 
         if (!apiKey) {
             return res.status(401).json({
-                error: 'Invalid or revoked API key. Generate a new key at https://mantram.ai/settings/integrations',
+                error: 'Invalid or revoked API key. Generate a new key at https://mantram.ai/integrations',
             });
         }
 
-        // Load the full user
         const user = await User.findById(apiKey.user).lean();
         if (!user) {
             return res.status(401).json({ error: 'User account not found' });
@@ -364,30 +429,23 @@ const mcpRateLimiter = rateLimit({
 // ─────────────────────────────────────────────────────────────────────────────
 // MCP SERVER FACTORY
 // Creates a fresh Server + StreamableHTTPServerTransport per request.
-// Stateless mode: no session IDs — cleaner for public REST-like usage.
+// Stateless mode: no session IDs — clean for public REST-like usage.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function createMcpServerForRequest(user) {
     const server = new Server(
-        {
-            name: 'mantram-ai',
-            version: '1.0.0',
-        },
-        {
-            capabilities: { tools: {} },
-        }
+        { name: 'mantram-ai', version: '1.0.0' },
+        { capabilities: { tools: {} } }
     );
 
-    // List tools
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: PUBLIC_TOOLS,
     }));
 
-    // Execute tools
     server.setRequestHandler(CallToolRequestSchema, async (req) => {
-        const { name, arguments: args } = req.params;
+        const { name, arguments: toolArgs } = req.params;
         try {
-            return await executeTool(name, args || {}, user);
+            return await executeTool(name, toolArgs || {}, user);
         } catch (err) {
             console.error(`❌ [PublicMCP] Tool ${name} error:`, err.message);
             return {
@@ -410,7 +468,7 @@ function createMcpServerForRequest(user) {
 export function createPublicMcpRouter() {
     const router = Router();
 
-    // ── CORS: Open to all MCP clients (Claude Desktop, Cursor, etc.) ──────────
+    // ── CORS ─────────────────────────────────────────────────────────────────
     router.use((req, res, next) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -419,11 +477,11 @@ export function createPublicMcpRouter() {
         next();
     });
 
-    // ── API KEY AUTH + RATE LIMITER ──────────────────────────────────────────
+    // ── AUTH + RATE LIMIT ──────────────────────────────────────────────────────
     router.use(mcpApiKeyAuth);
     router.use(mcpRateLimiter);
 
-    // ── GET /mcp — Info endpoint (also handles SSE stream if client requests it)
+    // ── GET /mcp — discovery / health ─────────────────────────────────────────
     router.get('/', (req, res) => {
         // For plain HTTP GET (e.g. health checks / discovery), return info
         const acceptsSSE = req.headers.accept?.includes('text/event-stream');

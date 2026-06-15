@@ -243,7 +243,7 @@ const BOT_DOUBLE_SLASH_REGEX = /\/\/(index|test|db)\.\w+/;
 
 // ── ALLOWLIST: Only these path prefixes are valid ──────────────────────────
 // Everything else gets silently dropped (444) — massively reduces noise from scanners.
-const VALID_PATH_PREFIXES = ['/api/', '/mcp/', '/health'];
+const VALID_PATH_PREFIXES = ['/api/', '/mcp', '/health'];
 const VALID_EXACT_PATHS = new Set(['/', '/health', '/favicon.ico', '/robots.txt']);
 
 app.use((req, res, next) => {
@@ -528,7 +528,8 @@ app.use((req, res, next) => {
 
 // Global input sanitization — strip HTML tags from all string fields
 // PERF-013: Skip sanitization for webhook/upload paths that handle raw/binary data
-const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/'];
+// Also skip /mcp — JSON-RPC bodies must not be modified (protocol integrity)
+const SKIP_SANITIZE_PREFIXES = ['/api/shopify/webhooks', '/api/webhooks/', '/api/media/', '/api/canvas-assets/', '/mcp'];
 app.use((req, res, next) => {
     if (req.body && typeof req.body === 'object' && !SKIP_SANITIZE_PREFIXES.some(p => req.path.startsWith(p))) {
         const sanitize = (obj) => {
