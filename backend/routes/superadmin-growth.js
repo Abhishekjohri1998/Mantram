@@ -174,11 +174,19 @@ router.post('/:id/generate-image', async (req, res) => {
             promptText = `Create a Reddit post image for title: ${targetObj.title}. Tone: ${targetObj.tone}`;
             aspectRatio = '16:9';
         } else if (platform === 'instagram_post') {
-            if (slideIndex !== null && content.instagram.post.slides[slideIndex]) {
-                targetObj = content.instagram.post.slides[slideIndex];
-                promptText = targetObj.visualDescription || targetObj.text;
+            if (slideIndex !== null) {
+                if (content.instagram.post.slides[slideIndex]) {
+                    targetObj = content.instagram.post.slides[slideIndex];
+                    promptText = targetObj.visualDescription || targetObj.text;
+                } else {
+                    return res.status(400).json({ success: false, error: 'Invalid slide index for instagram post' });
+                }
             } else {
-                return res.status(400).json({ success: false, error: 'Slide index required for instagram post' });
+                // Generate COVER IMAGE!
+                const post = content.instagram.post;
+                const firstSlideText = post.slides?.[0]?.text || '';
+                const theme = content.theme || '';
+                promptText = `A highly aesthetic and scroll-stopping Instagram carousel cover graphic. Main Title/Hook text: "${firstSlideText}". Visual theme context: "${theme}". The cover should be visually striking, clean, premium, and designed to maximize engagement and CTR. Use harmonious color palettes, sophisticated modern layout, and clean typography. Avoid cluttered elements. Make it look like a professional, high-end design agency creation.`;
             }
             aspectRatio = '4:5';
         } else if (platform === 'instagram_story') {
@@ -210,7 +218,11 @@ router.post('/:id/generate-image', async (req, res) => {
 
         if (!result.imageUrl) throw new Error('Image generation failed to return URL');
 
-        targetObj.imageUrl = result.imageUrl;
+        if (platform === 'instagram_post' && slideIndex === null) {
+            content.instagram.post.coverImageUrl = result.imageUrl;
+        } else {
+            targetObj.imageUrl = result.imageUrl;
+        }
         await content.save();
 
         res.json({ success: true, content });

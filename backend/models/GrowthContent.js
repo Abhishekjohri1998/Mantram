@@ -71,6 +71,7 @@ const growthContentSchema = new mongoose.Schema({
             caption: String,
             hashtags: [String],
             slides: [instagramSlideSchema],
+            coverImageUrl: String,
             bestTime: String,
             posted: { type: Boolean, default: false },
             postedAt: Date,
