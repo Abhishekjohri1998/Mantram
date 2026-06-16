@@ -1,6 +1,6 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════
-# Mantram AI — EC2 Server Setup Script (Ubuntu 22/24 LTS)
+# Mantram AI — EC2 Server Setup Script (Ubuntu / Amazon Linux 2023)
 # Run once on a fresh EC2 instance:
 #   chmod +x setup-ec2.sh && ./setup-ec2.sh
 # ══════════════════════════════════════════════════════════════
@@ -12,35 +12,75 @@ echo "🚀 Mantram AI — EC2 Server Setup"
 echo "═══════════════════════════════════════════"
 echo ""
 
-# ── 1. System Update ──
-echo "📦 Updating system packages..."
-sudo apt update && sudo apt upgrade -y
+# ── OS Detection ──
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+else
+    OS="unknown"
+fi
 
-# ── 2. Install Node.js 22 LTS ──
-echo "📦 Installing Node.js 22..."
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
+if [ "$OS" = "ubuntu" ]; then
+    PKG_MANAGER="apt"
+    DEFAULT_USER="ubuntu"
+elif [ "$OS" = "al2023" ] || [ "$OS" = "amzn" ]; then
+    PKG_MANAGER="dnf"
+    DEFAULT_USER="ec2-user"
+else
+    echo "❌ Unsupported OS: $OS. This script supports Ubuntu or Amazon Linux 2023."
+    exit 1
+fi
+
+echo "📋 Detected OS: $OS (using user: $DEFAULT_USER)"
+
+# ── 1. System Update & Dependencies ──
+if [ "$PKG_MANAGER" = "apt" ]; then
+    echo "📦 Updating system packages..."
+    sudo apt update && sudo apt upgrade -y
+    
+    echo "📦 Installing Node.js 22..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt install -y nodejs
+    
+    echo "📦 Installing Nginx..."
+    sudo apt install -y nginx
+    sudo systemctl enable nginx
+    
+    echo "📦 Installing Certbot for SSL..."
+    sudo apt install -y certbot python3-certbot-nginx
+else
+    echo "📦 Updating system packages..."
+    sudo dnf update -y
+    
+    echo "📦 Installing Node.js 22..."
+    curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+    sudo dnf install -y nodejs
+    
+    echo "📦 Installing Nginx..."
+    sudo dnf install -y nginx
+    sudo systemctl enable nginx --now
+    
+    echo "📦 Installing Certbot for SSL (AL2023)..."
+    sudo dnf install -y python3-pip
+    sudo python3 -m venv /opt/certbot/
+    sudo /opt/certbot/bin/pip install --upgrade pip
+    sudo /opt/certbot/bin/pip install certbot certbot-nginx
+    sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
+fi
+
 echo "   Node: $(node -v)"
 echo "   npm:  $(npm -v)"
 
-# ── 3. Install PM2 ──
+# ── 2. Install PM2 ──
 echo "📦 Installing PM2..."
 sudo npm install -g pm2
 echo "   PM2:  $(pm2 -v)"
 
-# ── 4. Install Nginx ──
-echo "📦 Installing Nginx..."
-sudo apt install -y nginx
-sudo systemctl enable nginx
-
-# ── 5. Install Certbot (SSL) ──
-echo "📦 Installing Certbot for SSL..."
-sudo apt install -y certbot python3-certbot-nginx
-
-# ── 6. Create directory structure ──
+# ── 3. Create directory structure ──
 echo "📁 Creating app directory structure..."
 sudo mkdir -p /var/www/mantram/{releases,shared/logs}
-sudo chown -R ubuntu:ubuntu /var/www/mantram
+sudo chown -R $DEFAULT_USER:$DEFAULT_USER /var/www/mantram
+
 
 # ── 7. Generate SSH deploy key for GitHub ──
 echo "🔑 Generating deploy key for GitHub..."
@@ -71,12 +111,12 @@ fi
 
 # ── 8. Configure Nginx ──
 echo "🌐 Configuring Nginx..."
-sudo tee /etc/nginx/sites-available/mantram > /dev/null << 'NGINX_CONF'
+NGINX_CONTENT=$(cat << 'NGINX_CONF'
 limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
 
 server {
     listen 80;
-    server_name mantram.ai www.mantram.ai _;
+    server_name api.mantram.ai mantram.ai www.mantram.ai _;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -116,9 +156,16 @@ server {
     location ~ \.env$ { deny all; }
 }
 NGINX_CONF
+)
 
-sudo ln -sf /etc/nginx/sites-available/mantram /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
+if [ "$PKG_MANAGER" = "apt" ]; then
+    echo "$NGINX_CONTENT" | sudo tee /etc/nginx/sites-available/mantram > /dev/null
+    sudo ln -sf /etc/nginx/sites-available/mantram /etc/nginx/sites-enabled/
+    sudo rm -f /etc/nginx/sites-enabled/default
+else
+    echo "$NGINX_CONTENT" | sudo tee /etc/nginx/conf.d/mantram.conf > /dev/null
+fi
+
 sudo nginx -t && sudo systemctl restart nginx
 echo "   Nginx configured ✅"
 
@@ -149,12 +196,12 @@ echo "   PM2 config created ✅"
 
 # ── 10. Setup PM2 startup ──
 echo "🔄 Configuring PM2 startup on boot..."
-sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $DEFAULT_USER --hp /home/$DEFAULT_USER
 echo "   PM2 startup configured ✅"
 
-# ── 11. Allow ubuntu to reload nginx without password ──
+# ── 11. Allow user to reload nginx without password ──
 echo "🔐 Configuring passwordless nginx reload..."
-echo "ubuntu ALL=(ALL) NOPASSWD: /usr/sbin/nginx, /bin/systemctl reload nginx, /bin/systemctl restart nginx" | sudo tee /etc/sudoers.d/mantram-deploy > /dev/null
+echo "$DEFAULT_USER ALL=(ALL) NOPASSWD: /usr/sbin/nginx, /bin/systemctl reload nginx, /bin/systemctl restart nginx" | sudo tee /etc/sudoers.d/mantram-deploy > /dev/null
 echo "   Sudoers configured ✅"
 
 echo ""
@@ -168,7 +215,7 @@ echo "  2. Create /var/www/mantram/shared/.env with production values"
 echo "     nano /var/www/mantram/shared/.env"
 echo "  3. Add these GitHub Secrets (repo → Settings → Secrets → Actions):"
 echo "     • EC2_HOST  = $(curl -sf http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '<your-ec2-ip>')"
-echo "     • EC2_USER  = ubuntu"
+echo "     • EC2_USER  = $DEFAULT_USER"
 echo "     • EC2_SSH_KEY = <contents of your .pem file>"
 echo "  4. Push to main branch to trigger first deployment!"
 echo ""
