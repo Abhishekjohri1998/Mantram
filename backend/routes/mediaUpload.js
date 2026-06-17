@@ -21,11 +21,14 @@ import config from '../config/env.js';
 const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /api/media/file/* — Query-parameter-less public proxy route for social media publishers
+// GET /api/media/file/*s3Key — Query-parameter-less public proxy route for social media publishers
 // Retrieves S3 objects using AWS credentials and streams them directly.
-router.get('/file/*', async (req, res) => {
+router.get('/file/*s3Key', async (req, res) => {
     try {
-        const s3Key = req.params[0];
+        let s3Key = req.params.s3Key;
+        if (Array.isArray(s3Key)) {
+            s3Key = s3Key.join('/');
+        }
         if (!s3Key) {
             return res.status(400).send('S3 Key is required');
         }
