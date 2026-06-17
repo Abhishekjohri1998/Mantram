@@ -4,6 +4,8 @@ import { Upload } from "@aws-sdk/lib-storage";
 import config from "../config/env.js";
 import crypto from "crypto";
 import axios from "axios";
+import fs from "fs";
+import path from "path";
 
 const s3Client = new S3Client({
     region: config.aws.region,
@@ -60,6 +62,24 @@ const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
 };
 
 /**
+ * Helper to save a file copy to the local SSD backup directory if configured
+ * @param {Buffer} buffer - The file contents
+ * @param {string} key - S3 Key/Path of the file
+ */
+const saveToLocalSsd = (buffer, key) => {
+    if (!config.localSsdPath) return;
+    try {
+        const localFilePath = path.join(config.localSsdPath, key);
+        // Ensure parent directories exist
+        fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
+        fs.writeFileSync(localFilePath, buffer);
+        console.log(`💾 Local SSD backup successful: ${localFilePath}`);
+    } catch (err) {
+        console.error(`❌ Local SSD backup failed for key "${key}":`, err.message);
+    }
+};
+
+/**
  * Uploads a buffer or base64 string to S3
  * @param {Buffer|string} fileContent - The file content to upload
  * @param {string} fileName - Optional filename, will generate if missing
@@ -79,10 +99,14 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
         console.error("Error decoding base64 content:", parseErr);
     }
 
+    // BUG-22 FIX: Sanitize filename to prevent path traversal
+    const sanitizedName = fileName ? fileName.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/^\//, '') : null;
+    const key = sanitizedName || `uploads/${crypto.randomUUID()}.png`;
+
+    // Save copy to local SSD if configured
+    saveToLocalSsd(buffer, key);
+
     try {
-        // BUG-22 FIX: Sanitize filename to prevent path traversal
-        const sanitizedName = fileName ? fileName.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/^\//, '') : null;
-        const key = sanitizedName || `uploads/${crypto.randomUUID()}.png`;
 
         const upload = new Upload({
             client: s3Client,
