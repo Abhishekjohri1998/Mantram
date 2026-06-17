@@ -8,6 +8,7 @@ import GrowthContent from '../models/GrowthContent.js';
 import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
+import { ensureS3Url } from '../utils/s3.js';
 
 const router = Router();
 
@@ -218,10 +219,14 @@ router.post('/:id/generate-image', async (req, res) => {
 
         if (!result.imageUrl) throw new Error('Image generation failed to return URL');
 
+        // Decode base64 and upload to S3 (this also stores a copy on local SSD)
+        console.log(`📤 Growth Image: Uploading generated image to S3...`);
+        const s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+
         if (platform === 'instagram_post' && slideIndex === null) {
-            content.instagram.post.coverImageUrl = result.imageUrl;
+            content.instagram.post.coverImageUrl = s3Url;
         } else {
-            targetObj.imageUrl = result.imageUrl;
+            targetObj.imageUrl = s3Url;
         }
         await content.save();
 

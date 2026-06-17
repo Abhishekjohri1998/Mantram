@@ -761,6 +761,21 @@ router.post('/publish', protect, async (req, res) => {
         console.log(`[SOCIAL] Carousel URLs resolved: ${carouselUrls.length} valid of ${imageUrls.length} total`);
     }
 
+    // For single-video: ensure URL is absolute and signed
+    let absoluteVideoUrl = videoUrl;
+    if (videoUrl && !videoUrl.startsWith('http')) {
+        const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
+        const path = videoUrl.startsWith('/') ? videoUrl : `/${videoUrl}`;
+        absoluteVideoUrl = `${baseUrl}${path}`;
+        console.log(`[SOCIAL] Transformed relative video URL to absolute: ${absoluteVideoUrl}`);
+    } else if (videoUrl) {
+        console.log(`[SOCIAL] Using provided absolute video URL: ${videoUrl}`);
+        const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
+        if (videoUrl.includes('.amazonaws.com') && bucket && videoUrl.includes(bucket)) {
+            absoluteVideoUrl = await freshSignedUrl(videoUrl);
+        }
+    }
+
     try {
         const accounts = await SocialAccount.find({
             _id: { $in: accountIds },
@@ -803,11 +818,11 @@ router.post('/publish', protect, async (req, res) => {
                 } else {
                     // Single image/video publish
                     if (account.platform === 'facebook') {
-                        postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
+                        postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
                     } else if (account.platform === 'instagram') {
-                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
+                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
                     } else if (account.platform === 'linkedin') {
-                        postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl, videoUrl);
+                        postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
                     } else if (account.platform === 'twitter') {
                         const twCreds = {
                             apiKey: config.twitter.apiKey,
@@ -815,10 +830,10 @@ router.post('/publish', protect, async (req, res) => {
                             accessToken: account.accessToken,
                             accessTokenSecret: account.metadata?.accessTokenSecret || config.twitter.accessTokenSecret,
                         };
-                        postId = await publishToTwitter(postText, absoluteImageUrl, videoUrl, twCreds);
+                        postId = await publishToTwitter(postText, absoluteImageUrl, absoluteVideoUrl, twCreds);
                     } else if (account.platform === 'tiktok') {
-                        if (videoUrl) {
-                            postId = await publishVideoToTikTok(account.accessToken, videoUrl, postText);
+                        if (absoluteVideoUrl) {
+                            postId = await publishVideoToTikTok(account.accessToken, absoluteVideoUrl, postText);
                         } else if (absoluteImageUrl) {
                             postId = await publishPhotosToTikTok(account.accessToken, [absoluteImageUrl], postText);
                         } else {
@@ -857,7 +872,7 @@ router.post('/publish', protect, async (req, res) => {
                     accountName: r.accountName,
                     caption: captions?.[r.platform] || text || '',
                     imageUrl: isCarousel ? carouselUrls[0] : (absoluteImageUrl || ''),
-                    videoUrl: videoUrl || '',
+                    videoUrl: absoluteVideoUrl || '',
                     postId: r.postId || '',
                     status: r.status === 'success' ? 'published' : 'failed',
                     error: r.error || '',

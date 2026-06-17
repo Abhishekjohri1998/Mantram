@@ -26,7 +26,7 @@ import {
     publishCarouselToLinkedIn,
 } from './socialService.js';
 import { publishVideoToTikTok, publishPhotosToTikTok } from './tiktokService.js';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { sendRetentionEmail } from '../agents/retention/mailer.js';
 import config from '../config/env.js';
 
@@ -117,13 +117,15 @@ async function resolveMediaUrl(url, userId, ext = 'png') {
     if (!url) return '';
 
     // Already an absolute URL
-    if (url.startsWith('http')) return url;
+    if (url.startsWith('http')) {
+        return await getSignedUrlIfNeeded(url);
+    }
 
     // Data URI — upload to S3
     if (url.startsWith('data:')) {
         try {
             const s3Url = await uploadToS3(url, `social-scheduled/${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`);
-            return s3Url;
+            return await getSignedUrlIfNeeded(s3Url);
         } catch (s3Err) {
             console.error('[SCHEDULER] S3 upload failed:', s3Err.message);
             return url; // Return original as fallback
@@ -133,7 +135,8 @@ async function resolveMediaUrl(url, userId, ext = 'png') {
     // Relative path — prepend backend URL
     const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
     const path = url.startsWith('/') ? url : `/${url}`;
-    return `${baseUrl}${path}`;
+    const fullUrl = `${baseUrl}${path}`;
+    return await getSignedUrlIfNeeded(fullUrl);
 }
 
 // ── Publish a single post ─────────────────────────────────────────────────────

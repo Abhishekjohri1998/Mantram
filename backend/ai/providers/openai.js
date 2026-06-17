@@ -135,26 +135,32 @@ export class OpenAIProvider extends BaseProvider {
             console.log(`   ℹ️ ${modelId}: Injecting S3 URL natively into API payload -> ${image_url.substring(0,60)}...`);
         }
 
+        const lzKeyAvailable = !!this.lzApiKey;
+        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (isGptImageModel && lzKeyAvailable);
+        const apiKey = useLaoZhang ? this.lzApiKey : this.apiKey;
+        const baseUrl = useLaoZhang ? this.lzBaseUrl : this.baseUrl;
+
+        if (quality === 'high' || quality === 'hd') {
+            body.quality = 'hd';
+        }
+
         if (isGptImageModel) {
-            body.quality = quality || 'high';
             // Reference images for gpt-image models — must go through LaoZhang /images/edits
             if (imageParts?.length) {
-                if (!this.lzApiKey) {
-                    console.warn(`   ⚠️  ${modelId} ref images require LAOZHANG_API_KEY (no fallback). Ignoring refs.`);
+                if (!apiKey) {
+                    console.warn(`   ⚠️  ${modelId} ref images require API key (no fallback). Ignoring refs.`);
                 } else {
-                    console.log(`   ℹ️  ${modelId}: ${imageParts.length} reference image(s) — routing to LaoZhang /images/edits`);
+                    console.log(`   ℹ️  ${modelId}: ${imageParts.length} reference image(s) — routing to /images/edits`);
                     return this.generateImageEdit({ prompt, imageParts, size: finalSize, model: modelId });
                 }
             }
-        } else {
-            body.quality = quality || 'high';
         }
 
-        const response = await fetch(`${this.baseUrl}/images/generations`, fetchOptions({
+        const response = await fetch(`${baseUrl}/images/generations`, fetchOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiKey}`,
+                'Authorization': `Bearer ${apiKey}`,
             },
             body: JSON.stringify(body),
         }));

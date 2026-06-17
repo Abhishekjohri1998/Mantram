@@ -7,6 +7,7 @@
 
 import express from 'express';
 import { protect } from '../middleware/auth.js';
+import { ensureS3Url } from '../utils/s3.js';
 import RetentionCampaign from '../models/RetentionCampaign.js';
 import Brand from '../models/Brand.js';
 import { runNode, runPipeline, getPipelineInfo } from '../agents/retention/engine.js';
@@ -466,7 +467,11 @@ Style:
         });
 
         if (result?.imageUrl || result?.url) {
-            const imageUrl = result.imageUrl || result.url;
+            const rawUrl = result.imageUrl || result.url;
+
+            // Decode base64 and upload to S3 (this also stores a copy on local SSD)
+            console.log(`📤 Retention Image: Uploading generated image to S3...`);
+            const imageUrl = await ensureS3Url(rawUrl, `retention/gen-${Date.now()}`);
 
             // Store in campaign creative
             campaign.creative.previewImageUrl = imageUrl;
